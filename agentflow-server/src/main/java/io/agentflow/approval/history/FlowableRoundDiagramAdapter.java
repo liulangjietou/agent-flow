@@ -3,6 +3,14 @@ package io.agentflow.approval.history;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.common.DomainException;
+import io.agentflow.common.JsonUtil;
+import io.agentflow.approval.process.FlowableOrganizationMembers;
+import io.agentflow.approval.process.FlowableApprovalResponsibilities;
+import io.agentflow.organization.OrganizationAssigneeResolver;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Comparator;
 import org.flowable.bpmn.model.*;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RepositoryService;
@@ -29,11 +37,12 @@ public class FlowableRoundDiagramAdapter implements RoundDiagramPort {
     private final RepositoryService repository;
     private final RuntimeService runtime;
     private final TaskService tasks;
+    private final JsonUtil json;
 
     /** 只依赖引擎公开查询接口，不直接读取或修改其内部表。 */
     public FlowableRoundDiagramAdapter(HistoryService history, RepositoryService repository,
-                                       RuntimeService runtime, TaskService tasks) {
-        this.history = history; this.repository = repository; this.runtime = runtime; this.tasks = tasks;
+                                       RuntimeService runtime, TaskService tasks, JsonUtil json) {
+        this.history = history; this.repository = repository; this.runtime = runtime; this.tasks = tasks; this.json = json;
     }
 
     @Override
@@ -69,13 +78,15 @@ public class FlowableRoundDiagramAdapter implements RoundDiagramPort {
                 .collect(Collectors.groupingBy(org.flowable.task.api.Task::getTaskDefinitionKey, Collectors.counting()));
         var live = runtime.createProcessInstanceQuery().processInstanceId(instance.getId()).singleResult();
         Set<String> active = live == null ? Set.of() : new HashSet<>(runtime.getActiveActivityIds(instance.getId()));
+        var candidates = candidateSnapshots(instance.getId());
         List<Node> nodes = flowNodes.stream().map(node -> {
             var evidence = activities.getOrDefault(node.getId(), List.of());
             long count = activeTasks.getOrDefault(node.getId(), 0L);
             State state = active.contains(node.getId()) || count > 0 ? State.ACTIVE : evidence.isEmpty() ? State.NOT_REACHED : State.LEFT;
             Instant entered = evidence.stream().map(HistoricActivityInstance::getStartTime).filter(Objects::nonNull).min(Date::compareTo).map(Date::toInstant).orElse(null);
             Instant left = evidence.stream().map(HistoricActivityInstance::getEndTime).filter(Objects::nonNull).max(Date::compareTo).map(Date::toInstant).orElse(null);
-            return new Node(node.getId(), node.getName() == null ? node.getId() : node.getName(), type(node), state, count, entered, left);
+            return new Node(node.getId(), node.getName() == null ? node.getId() : node.getName(), type(node), state, count, entered, left,
+                    node instanceof UserTask ? candidates.getOrDefault(node.getId(), List.of()) : List.of());
         }).toList();
         Set<String> ids = nodes.stream().map(Node::id).collect(Collectors.toSet());
         List<Edge> edges = process.getFlowElements().stream().filter(SequenceFlow.class::isInstance).map(SequenceFlow.class::cast)
@@ -85,6 +96,38 @@ public class FlowableRoundDiagramAdapter implements RoundDiagramPort {
                                 && definition.getId().equals(activity.getProcessDefinitionId())).toList()))
                 .toList();
         return new Diagram(application.id(), round.roundNo(), round.definitionVersion(), round.status(), Instant.now(), nodes, edges);
+    }
+
+    /** 已核对申请及轮次后读取历史快照，绝不查询当前组织来补写责任。 */
+    private Map<String, List<CandidateSnapshot>> candidateSnapshots(String instanceId) {
+        var result = new HashMap<String, List<CandidateSnapshot>>();
+        // 目录命中与职责过滤是两份原始事实，展示时按同一执行和节点取实际生效名单。
+        var effective = new HashMap<String, Map<String, List<String>>>();
+        String responsibilityPrefix = FlowableApprovalResponsibilities.SNAPSHOT_PREFIX;
+        for (var value : history.createHistoricVariableInstanceQuery().processInstanceId(instanceId)
+                .variableNameLike(responsibilityPrefix + "%").list()) {
+            if (!value.getVariableName().startsWith(responsibilityPrefix) || value.getTaskId() != null) continue;
+            if (!(value.getValue() instanceof String text)) throw unavailable();
+            var snapshot = json.read(text, FlowableApprovalResponsibilities.Snapshot.class);
+            effective.computeIfAbsent(value.getExecutionId(), ignored -> new HashMap<>())
+                    .put(value.getVariableName().substring(responsibilityPrefix.length()), snapshot.candidateSubjects());
+        }
+        String prefix = FlowableOrganizationMembers.SNAPSHOT_PREFIX;
+        var values = history.createHistoricVariableInstanceQuery().processInstanceId(instanceId)
+                .variableNameLike(prefix + "%").list();
+        for (var value : values) {
+            // LIKE 中的下划线是通配符，仍需精确前缀和执行作用域检查。
+            if (!value.getVariableName().startsWith(prefix) || value.getTaskId() != null) continue;
+            if (!(value.getValue() instanceof String text)) throw unavailable();
+            var snapshot = json.read(text, OrganizationAssigneeResolver.Selection.class);
+            if (snapshot.directoryRevision() < 1 || snapshot.subjects().isEmpty()) throw unavailable();
+            String nodeId = value.getVariableName().substring(prefix.length());
+            var subjects = effective.getOrDefault(value.getExecutionId(), Map.of()).getOrDefault(nodeId, snapshot.subjects());
+            result.computeIfAbsent(nodeId, ignored -> new ArrayList<>())
+                    .add(new CandidateSnapshot(value.getId(), snapshot.directoryRevision(), subjects));
+        }
+        result.replaceAll((node, records) -> records.stream().sorted(Comparator.comparing(CandidateSnapshot::id)).toList());
+        return result;
     }
 
     /** 仅使用引擎的连线历史，两个端点都已到达也不能证明这条连线被执行。 */
@@ -102,6 +145,12 @@ public class FlowableRoundDiagramAdapter implements RoundDiagramPort {
         if (node instanceof StartEvent) return "START";
         if (node instanceof EndEvent) return "END";
         if (node instanceof UserTask) return "USER_TASK";
+        if (node instanceof IntermediateCatchEvent event && event.getEventDefinitions().size() == 1
+                && event.getEventDefinitions().get(0) instanceof TimerEventDefinition) return "TIMER_WAIT";
+        if (node instanceof IntermediateCatchEvent event && event.getEventDefinitions().size() == 1
+                && event.getEventDefinitions().get(0) instanceof org.flowable.bpmn.model.MessageEventDefinition) return "EVENT_WAIT";
+        if (node instanceof org.flowable.bpmn.model.ServiceTask service && service.getImplementation() != null
+                && service.getImplementation().startsWith("${flowableCopyRecipients.deliver(")) return "COPY";
         if (node instanceof ExclusiveGateway) return "EXCLUSIVE_GATEWAY";
         if (node instanceof ParallelGateway) return "PARALLEL_GATEWAY";
         return "OTHER";

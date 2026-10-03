@@ -1,0 +1,81 @@
+{
+  "date": "2026-09-28",
+  "scope": "原付款安全结束与原账户重新授权",
+  "localOnly": true,
+  "syntheticFinance": true,
+  "migration": "51",
+  "tests": {
+    "domain": 23,
+    "h2BackendScope": 93,
+    "h2FinalMigrationAndContract": 6,
+    "postgresql": 82,
+    "frontend": 16,
+    "authorCheck": {
+      "javaFiles": 661,
+      "namedTypes": 1179,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "openapi": {
+      "operations": 162,
+      "schemas": 276,
+      "requestExamples": 52
+    }
+  },
+  "redEvidence": {
+    "missingAction": "payment-retirement-red.log",
+    "postgresNotNullCatalog": "red-payment-retirement-postgres.log"
+  },
+  "logs": [
+    "payment-retirement-first.log",
+    "payment-retirement-scope.log",
+    "payment-retirement-regression.log",
+    "payment-retirement-postgres.log",
+    "payment-retirement-package.log",
+    "payment-retirement-ui.log",
+    "payment-retirement-ui-build.log",
+    "payment-retirement-openapi.log",
+    "payment-retirement-authors.log"
+  ],
+  "evidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "http": {
+    "checks": 20,
+    "record": "payment-retirement-http-evidence.json",
+    "originalAuthorization": "709cac60-77bc-489a-8a03-3e66399190c5",
+    "replacementAuthorization": "28aa3300-b7c3-4ba8-b0a9-096f3814fad5",
+    "oldUnchangedAfterReplacement": true,
+    "newCommandsBeforeCashier": 0,
+    "newPaymentStatus": "SUCCEEDED",
+    "paymentVoucher": "POSTED",
+    "databaseScopedCounts": {
+      "authorizations": 2,
+      "retired": 1,
+      "balances": 1,
+      "paymentVouchers": 1,
+      "retirementAudits": 1
+    }
+  },
+  "browser": {
+    "retirementAndReauthorization": "PASS",
+    "screenshots": [
+      "payment-retirement-ui-desktop.png",
+      "payment-retirement-ui-reissued.png",
+      "payment-retirement-ui-mobile.png",
+      "payment-retirement-ui-paid.png"
+    ],
+    "responsive": {
+      "requestedWidth": 360,
+      "actualCssWidth": 480,
+      "documentWidth": 460,
+      "cardsStackVertically": true,
+      "viewportRestored": true
+    },
+    "newPaymentAndVoucher": "PASS"
+  },
+  "remaining": [
+    "账户变更后的重新复核和新授权绑定",
+    "已到账及退回争议裁决",
+    "真实外部资金系统永久失败语义验收",
+    "远端 CI 和 PR"
+  ]
+}

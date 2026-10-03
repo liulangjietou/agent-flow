@@ -1,0 +1,44 @@
+{
+  "date": "2026-09-29",
+  "stage": "expense-resource-adjustment-persistence",
+  "result": "PASS_INTERNAL_PERSISTENCE_ONLY",
+  "migration": 65,
+  "liveAcceptanceSchema": 64,
+  "tests": {
+    "preparationAdjustmentAndVoucherDomainScope": 27,
+    "resourcePlanDomainScope": 17,
+    "newActualExpenseRepositoryTransactions": 4,
+    "h2MigrationAndExistingResourceScope": 14,
+    "scopeOverlapWithEarlierStages": true
+  },
+  "registeredReversalFix": {
+    "redTests": 1,
+    "cause": "Permanent reversal records incorrectly required the local voucher observation to be as fresh as the independently registered check",
+    "guard": "Persisted local revision must not predate registration; command, original posting and resolved reversed status must still match",
+    "redLog": "expense-resource-adjustment-registration-local-red.log",
+    "greenLog": "expense-resource-adjustment-registration-local-green.log"
+  },
+  "verified": [
+    "Actual paid and consumed expense plus full bank return and accrual reversal provide valid persisted adjustment sources",
+    "Prepared period remains read-only until explicit authorization",
+    "Authorization, adjustment and budget outbox roll back together",
+    "Only one active adjustment can claim the original expense",
+    "Unpersisted budget success or missing resource reversals cannot mark the adjustment complete",
+    "Safe retirement preserves original authorization and stopped command; rollback restores both",
+    "Unknown budget results cannot release the active expense claim"
+  ],
+  "authors": {"javaFiles": 815, "namedTypes": 1502, "missing": 0, "parseErrors": 0},
+  "publicApiOrUiAdded": false,
+  "remaining": [
+    "Authorized application services and workers",
+    "Atomic guarded resource reversal journal",
+    "Public API and UI",
+    "PostgreSQL upgrade and live workflow acceptance"
+  ],
+  "logs": [
+    "expense-resource-adjustment-repository.log",
+    "expense-resource-adjustment-schema-smoke.log",
+    "expense-resource-adjustment-persistence-authors.log"
+  ],
+  "localEvidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928"
+}

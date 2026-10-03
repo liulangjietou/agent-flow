@@ -1,0 +1,63 @@
+{
+  "date": "2026-09-28",
+  "feature": "round-scoped-copy",
+  "migration": "31",
+  "scope": "isolated-local-worktree",
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "http": {
+    "result": "PASS",
+    "httpRequests": 30,
+    "applicationId": "5dace855-84e1-4bfa-aaa4-6033b4e4c536",
+    "definitionId": "5a914288-c215-4492-a691-e64ad87d7b76",
+    "draftDefinitionId": "ac6c972e-7624-46f3-9150-927c16acb2b7",
+    "processKey": "copy-9605f2d05a",
+    "roundNo": 1,
+    "attachmentId": "52b480de-df05-4143-a317-b67f9fd9dbc9",
+    "sha256": "490f526fb703a37b82ff17d13e6a0c621f1fffeff1a15cf14718e36d497bf63a"
+  },
+  "browser": {
+    "snapshotApplicationId": "ae42355f-0fd3-4d91-a381-80671a1024d8",
+    "publishedDefinitionId": "4099b981-99cb-4aec-9038-6e46d5952dda",
+    "recipientRule": "user:alice",
+    "publishedVersion": 1,
+    "snapshots": [
+      "copy-snapshot.png",
+      "copy-designer-published.png"
+    ],
+    "checks": [
+      "copied frozen round",
+      "masked and hidden fields",
+      "attachment metadata",
+      "designer recipient save",
+      "publish recovery after process restart"
+    ]
+  },
+  "testLogs": {
+    "boundaries": {
+      "file": "copy-boundaries.log",
+      "passed": 48
+    },
+    "contractFinal": {
+      "file": "copy-contract-green.log",
+      "passed": 11
+    },
+    "domainAndMigration": {
+      "file": "copy-package.log",
+      "passed": 3
+    },
+    "postgresInitial": {
+      "file": "copy-postgres.log",
+      "passed": 6
+    },
+    "postgresFinal": {
+      "file": "copy-postgres-contract.log",
+      "passed": 6
+    },
+    "frontend": {
+      "file": "copy-frontend-final.log",
+      "passed": 66
+    }
+  },
+  "remoteCi": false,
+  "productionAcceptance": false
+}

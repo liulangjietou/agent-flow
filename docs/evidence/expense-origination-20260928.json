@@ -1,0 +1,156 @@
+{
+  "date": "2026-09-28",
+  "scope": "expense origination and precheck submission UI",
+  "backendH2Tests": 21,
+  "backendPostgresTests": 16,
+  "backendScopesOverlap": true,
+  "frontendTests": 69,
+  "originationTestsIncluded": 18,
+  "build": "PASS",
+  "openapi": {
+    "operations": 125,
+    "schemas": 213,
+    "requestExamples": 44
+  },
+  "javaAuthorCheck": {
+    "files": 510,
+    "types": 868,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "http": {
+    "result": "PASS",
+    "reportId": "cf373090-0105-439d-b17c-2435df8fe734",
+    "applicationId": "1b825772-bfde-44f7-b6fc-43f0ffddd1f4",
+    "businessNo": "UI-CREATE-003",
+    "status": "IN_APPROVAL",
+    "roundNo": 2,
+    "financialVersion": 5,
+    "applicationVersion": 8,
+    "originalRoundPreserved": true,
+    "latestPrecheckAttempt": 3,
+    "latestPrecheckByAttempt": true,
+    "actualManagerTasks": 1,
+    "budgetConfirmedCurrent": true,
+    "httpReadChecks": 12,
+    "checks": [
+      {
+        "actor": "alice",
+        "path": "/expense-reports",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/expense-reports/cf373090-0105-439d-b17c-2435df8fe734",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/applications/1b825772-bfde-44f7-b6fc-43f0ffddd1f4",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/applications/1b825772-bfde-44f7-b6fc-43f0ffddd1f4/rounds",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/expense-reports/cf373090-0105-439d-b17c-2435df8fe734?roundNo=1",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/expense-reports/cf373090-0105-439d-b17c-2435df8fe734/precheck-options",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/expense-reports/cf373090-0105-439d-b17c-2435df8fe734/prechecks?limit=25",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/expense-reports/cf373090-0105-439d-b17c-2435df8fe734/prechecks/fe99fd47-cda3-4a82-9dc1-54fed7f2f523",
+        "status": 200
+      },
+      {
+        "actor": "manager",
+        "path": "/workspace/tasks?q=UI-CREATE-003&limit=25",
+        "status": 200
+      },
+      {
+        "actor": "alice",
+        "path": "/expense-reports/cf373090-0105-439d-b17c-2435df8fe734/workflow",
+        "status": 200
+      },
+      {
+        "actor": "admin",
+        "path": "/expense-reports/cf373090-0105-439d-b17c-2435df8fe734",
+        "status": 403
+      },
+      {
+        "actor": "bob",
+        "path": "/expense-reports/cf373090-0105-439d-b17c-2435df8fe734",
+        "status": 404
+      }
+    ],
+    "syntheticFinance": true,
+    "database": "expense_ui_b8e8e035f6"
+  },
+  "browser": {
+    "result": "PASS",
+    "actions": [
+      "create structured draft",
+      "reject unbalanced cents",
+      "restore after navigation",
+      "save revision",
+      "precheck",
+      "cancel submit confirmation",
+      "reject superseded precheck after revision",
+      "submit first round",
+      "withdraw first round",
+      "edit and precheck again",
+      "read latest attempt after reopen",
+      "submit second round"
+    ],
+    "responsive": {
+      "cssWidth": 500,
+      "documentWidth": 500,
+      "dialogWidth": 476,
+      "editorScrollWidth": 411
+    },
+    "consoleErrors": []
+  },
+  "redGreen": [
+    "expired READY checked at action time",
+    "occupied invoice requires matching report identity",
+    "draft first-round fixture corrected to actual one",
+    "latest precheck follows attempt sequence instead of UUID history order",
+    "omitted null project shown as no project",
+    "business-number-only draft triggers unload protection"
+  ],
+  "localArtifacts": [
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-origination-final-tests.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-origination-final-build.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-origination-openapi.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-origination-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-origination-round-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-latest-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-latest-regression.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/precheck-latest-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/precheck-latest-postgres-databases.json",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-number-only-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-origination-confirm.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-origination-mobile.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-origination-submitted.png",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-origination-http.json"
+  ],
+  "limitations": [
+    "synthetic finance is not enterprise integration",
+    "funded source rows and verified invoices are component fixtures, not this browser database",
+    "invoice upload and verification UI still in progress",
+    "settlement, payment and archive still in progress",
+    "remote CI not run"
+  ]
+}

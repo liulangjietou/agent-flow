@@ -95,7 +95,7 @@ test('API 编码申请与游标，断网重试保留原正文和幂等键', asyn
   globalThis.fetch = async (url, init) => {
     requests.push({ url, ...init })
     if (requests.length === 2) throw new TypeError('lost')
-    return Response.json({ id: 'comment', applicationId: 'app' }, { status: 201 })
+    return Response.json({ id: 'comment', applicationId: 'app', author: 'alice', content: '原评论\n第二行', applicationVersion: 2, roundNo: 1, applicationStatus: 'IN_APPROVAL', createdAt: '2026-10-01T12:00:00Z' }, { status: 201 })
   }
   const body = { content: '原评论\n第二行', expectedVersion: 2 }
   await assert.rejects(api.addApplicationComment('app', body))

@@ -1,0 +1,92 @@
+{
+  "date": "2026-09-30",
+  "status": "PASS_PUBLIC_WORKSPACE_READ_AND_PERSONAL_PREPARATION_PROJECTION",
+  "baseCommit": "878deee023ac40ddb3ea2c5669e3788a6ac651dd",
+  "scope": "Read-only partial expense adjustment workspace using original-round field access, actual completed net amounts, persisted return claims and current independent finance preparation visibility",
+  "routes": ["GET /api/v1/expense-reports/{id}/partial-adjustments"],
+  "schema": {
+    "newMigration": false,
+    "testSchema": 85,
+    "longLivedRuntimeSchema": 82,
+    "runtimeHealth": "UP",
+    "runtimeSchemaReadFromDatabase": true,
+    "runtimeUpgradeVerifiedThisStage": false
+  },
+  "validation": {
+    "newIntegrationTests": 8,
+    "domainTests": 27,
+    "h2ServerTests": 110,
+    "h2WorkflowTests": 103,
+    "h2ContractTests": 6,
+    "h2StartupTests": 1,
+    "postgresWorkflowTests": 103,
+    "failures": 0,
+    "errors": 0,
+    "scopesOverlap": true
+  },
+  "openapi": {
+    "operations": 253,
+    "schemas": 518,
+    "requestExamples": 96,
+    "newOperations": 1,
+    "newSchemas": 14,
+    "allPreviousParsedContractsUnchanged": true,
+    "previousContractTextPreserved": true
+  },
+  "authorCheck": {"javaFiles": 1122, "namedTypes": 2160, "missing": 0, "parseErrors": 0},
+  "logs": {
+    "h2": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-workspace-final-h2.log",
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-workspace-postgres.log",
+    "postgresDatabase": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-workspace-postgres-database.json",
+    "openapi": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-workspace-openapi.log",
+    "authors": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-workspace-authors.log"
+  },
+  "checks": [
+    "Original finance versions and exact decimal-string amounts are read in one repeatable-read database snapshot",
+    "An active target of 80 leaves actual remaining amount at 100 until independent local completion",
+    "Completed net 80, original accepted references and completion proof remain visible when historical state requires review",
+    "Whole registered returns exclude both active claims and actual prior consumption; safe retirement releases only its own persisted claim",
+    "Applicants read saved history without another actor's preparation; hidden-field manager and admin cannot bypass original-field restrictions",
+    "Another eligible finance user cannot read the owner's preparation; another tenant cannot discover the report",
+    "Preparation capability uses current source, latest personal record, side identity, personnel and exclusive earliest expiry; GET does not consume or renew evidence",
+    "Unresolved current accrual disables preparation authorization without hiding saved adjustment history",
+    "Zero payable has no fabricated bank or payment voucher; unsettled and zero-approved reports have no partial-adjustment scope",
+    "Unknown filters and invalid round values are rejected; successful reads send Cache-Control no-store",
+    "Response projections exclude raw commands, bank accounts and destination or command digests",
+    "Relevant existing public writes, preparation, worker recovery, completion and full-adjustment guards remain green"
+  ],
+  "initialFeatureCheck": {
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-workspace-missing.log",
+    "tests": 3,
+    "expectedFailures": 3,
+    "result": "GET returned 405 before the read handler existed"
+  },
+  "zeroApprovedBoundaryRegression": {
+    "test": "partialWorkspaceZeroApprovedAmountHasNoPartialAdjustmentScope",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-workspace-boundaries.log",
+    "redTests": 8,
+    "redFailures": 1,
+    "redErrors": 0,
+    "testGap": "Initial workspace scenarios used a positive approved amount; zero payable is different from zero approved amount",
+    "rootCause": "The read service constructed a positive-only adjustment projection before excluding a zero-approved settlement, returning a domain-validation error instead of unavailable scope",
+    "fix": "Exclude zero-approved settlements at the workspace scope boundary before constructing any adjustment projection"
+  },
+  "acceptanceBoundary": {
+    "publicSpringHandlersViaMockMvc": true,
+    "syntheticFinanceHttp": true,
+    "realEnterpriseFinance": false,
+    "publicWorkspaceGet": true,
+    "publicRecoveryAndDisputeActions": false,
+    "publicWorkflowComplete": false,
+    "actualBrowserAcceptance": false,
+    "longLivedRuntimeUnchanged": true,
+    "originalMainUnchanged": true,
+    "remoteConfigured": false
+  },
+  "remaining": [
+    "Public original-id recovery, explicit resend, safe retirement, current-fact confirmation and independent financial dispute decisions with atomic audit and exact proofs",
+    "Current action projection and frontend workflow",
+    "Nonempty runtime upgrade, real HTTP, browser, narrow viewport, restart and old-data/file preservation acceptance",
+    "Real enterprise budget and ERP integration, plus the other three remaining work packages"
+  ]
+}

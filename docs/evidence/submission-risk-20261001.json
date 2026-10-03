@@ -1,0 +1,202 @@
+{
+  "recordedAt": "2026-10-01T21:36:55.671367+00:00",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "fullProductComplete": false,
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "095b0cc17e15f499315796686aca19149bf7c231",
+  "scope": [
+    "Explicit versioned rules using the restricted condition language",
+    "Per-submission immutable classification and independent fixed child rules",
+    "Risk query authorization, counts and cursor binding",
+    "Designer, template serialization and round history"
+  ],
+  "tests": {
+    "javaUnique": 50,
+    "domain": 14,
+    "h2Server": 36,
+    "classes": {
+      "io.agentflow.definition.ConditionLanguageTest": 7,
+      "io.agentflow.definition.ApprovalRiskPolicyTest": 7,
+      "io.agentflow.approval.PendingTaskQueueIntegrationTest": 15,
+      "io.agentflow.definition.DefinitionComparisonIntegrationTest": 4,
+      "io.agentflow.api.OpenApiContractTest": 7,
+      "io.agentflow.approval.SubmissionRiskIntegrationTest": 5,
+      "io.agentflow.approval.BundledDefinitionBindingIntegrationTest": 4,
+      "io.agentflow.approval.SubmissionRiskMigrationTest": 1
+    },
+    "postgres": {
+      "tests": 21,
+      "overlapsH2": true,
+      "status": "PASS"
+    },
+    "frontend": 37,
+    "build": "PASS",
+    "openapi": {
+      "operations": 290,
+      "schemas": 571,
+      "requestExamples": 110
+    },
+    "authorGate": {
+      "javaFiles": 1271,
+      "namedTypes": 2443,
+      "missingTags": 0,
+      "parseErrors": 0
+    }
+  },
+  "actualResponses": {
+    "status": "PASS",
+    "responses": 56,
+    "schemas": 15
+  },
+  "browser": {
+    "status": "PASS_WITH_DOWNLOAD_OBSERVATION_LIMIT",
+    "designerDraftKey": "risk-browser-20261001",
+    "designer": [
+      "add explicit high rule",
+      "save and reload",
+      "quick and advanced views",
+      "undo restores high classification",
+      "sensitive field reference blocks validation and original rule is retained"
+    ],
+    "queues": {
+      "highList": 2,
+      "highBoard": 2,
+      "lowBoard": 2,
+      "unmatchedBoard": 1,
+      "legacyUnassessed": 10
+    },
+    "rounds": [
+      "HIGH",
+      "LOW"
+    ],
+    "narrow": {
+      "innerWidth": 500,
+      "clientWidth": 480,
+      "scrollWidth": 480,
+      "operable": true
+    },
+    "consoleErrors": 0,
+    "viewportRestored": true,
+    "temporaryTabClosed": true,
+    "templateExportLinkGenerated": true,
+    "templateDownloadCompletedObserved": false,
+    "templateDownloadLimitation": "Browser download event timed out; no completed file or browser import claim. Typed JSON round trip is covered by actual serializer/parser tests."
+  },
+  "upgrade": {
+    "status": "PASS",
+    "from": 93,
+    "to": 94,
+    "preservedSourceRows": 2150,
+    "preservedTables": 225,
+    "preservedFiles": 3,
+    "historicalRiskInvented": false,
+    "sourceUnchanged": true
+  },
+  "restart": {
+    "status": "PASS",
+    "boot": 3,
+    "jarSha256": "92be135758f81c66f5ceacdae0b5918ccc8a3b2453e763c7a0adf1ff8a077548",
+    "preservedTables": 225,
+    "preservedRows": 2472,
+    "preservedFiles": 3,
+    "sourceUnchanged": true,
+    "readOnlyAfterRestart": true,
+    "responseCount": 10,
+    "browserSavedPolicyPreserved": true,
+    "historicalLevels": [
+      "HIGH",
+      "LOW"
+    ]
+  },
+  "runtime": {
+    "database": "submission_risk_runtime_dedd014b96",
+    "sourceDatabase": "operations_runtime_89b1d2fcb5",
+    "backendPort": 18251,
+    "frontendPort": 15338,
+    "schemaVersion": 94,
+    "jarSha256": "92be135758f81c66f5ceacdae0b5918ccc8a3b2453e763c7a0adf1ff8a077548",
+    "boot": 3,
+    "externalWorkersEnabled": false,
+    "existingServicesReplaced": false,
+    "readiness": {
+      "18249": "UP",
+      "18251": "UP"
+    }
+  },
+  "contractCorrection": {
+    "reproduced": "Actual unassessed HTTP response omitted null definitionId but OpenAPI required it",
+    "fixed": "Made absent definitionId optional and added real serialization regression before final package"
+  },
+  "boundaries": [
+    "No real enterprise risk policy or model classification claimed",
+    "No historical risks invented",
+    "Browser template download completion was not observed",
+    "Main and remote delivery unchanged"
+  ],
+  "artifacts": {
+    "submission-risk-first-tests.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-first-tests.log",
+      "sha256": "4751f422dadb42201c43963d1b971b125cbeda1245a22dfade519cc273403fc3"
+    },
+    "submission-risk-workflow-tests.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-workflow-tests.log",
+      "sha256": "24049be3ec3c83db7ee163631c51f43afe8961d959ffc163a82fc72042c4531e"
+    },
+    "submission-risk-final-package-tests.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-final-package-tests.log",
+      "sha256": "17bcbd29a32b85b2f2620745551cd5fc8c481ff3c2560a0f94853eb17421a58a"
+    },
+    "submission-risk-postgres.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-postgres.log",
+      "sha256": "8d60372fb0c816ba84ca1fab1b7f478028eddc9281b5bea552bfd9be03aeca7a"
+    },
+    "submission-risk-postgres.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-postgres.json",
+      "sha256": "571bfef2504d4453f477f8cd0bca93a1215f3199cfe4b43849564deb7376e294"
+    },
+    "submission-risk-web-tests-final.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-web-tests-final.log",
+      "sha256": "8ed7facb2bca5e3887ea3218f9ba2c4680ab526262d5d68e9c34b15364366972"
+    },
+    "submission-risk-web-build.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-web-build.log",
+      "sha256": "152458d4f607ebd41bde49c912f7f79c2f534756a3c28cb69febf4262f199149"
+    },
+    "submission-risk-authors.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-authors.log",
+      "sha256": "42d4be966ae48c4ddac00c028d5985dd80f5b1335eb3418fcb397c0b7c54c0c3"
+    },
+    "submission-risk-http-workflow.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-http-workflow.json",
+      "sha256": "8f4aefad7fca9756134bdec28234034f7d5c955af35d48f9e270b76d00a031a2"
+    },
+    "submission-risk-http-restart.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-http-restart.json",
+      "sha256": "dcf21609ecc3534f596d442412386c37d24498b9203b5891c7418e95af9656df"
+    },
+    "submission-risk-http-contracts.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-http-contracts.json",
+      "sha256": "0fae796cdc143f54e741ac3aa4b535fefe9454c65029ab71e77c82c8ddaa8326"
+    },
+    "submission-risk-restart.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-restart.json",
+      "sha256": "fd3b0cd7fafffcb1add9447abffbb550ab5da0b55581ca502b0c47ff2ec040e2"
+    },
+    "submission-risk-browser-observations.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-browser-observations.json",
+      "sha256": "47dbedd69df2c0de6ff21b95b2e1615ef49565f33c6583244f081dd695aeb6b8"
+    },
+    "submission-risk-history.png": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-history.png",
+      "sha256": "acd0c099dd6adc6aab90beeeb2f68c08f838ee18d858b2737d3a9753a19b2635"
+    },
+    "submission-risk-queue.png": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-queue.png",
+      "sha256": "7a407b86ab40f14b44ee80890c5998266e4d34bbad37772407f97ba4e32c82e2"
+    },
+    "submission-risk-500-css.png": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/submission-risk-500-css.png",
+      "sha256": "3edd2872d2c2d10972a8a3cbbe537974eddc715277cdc2d0845e7f43ebb9d23b"
+    }
+  }
+}

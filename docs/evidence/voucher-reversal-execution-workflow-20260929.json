@@ -1,0 +1,114 @@
+{
+  "date": "2026-09-29",
+  "stage": "voucher-reversal-public-workflow",
+  "result": "PASS",
+  "scope": "Local PostgreSQL, real application HTTP and browser; finance integration is synthetic loopback only",
+  "schemaVersion": 62,
+  "tests": {
+    "h2Api": 9,
+    "postgresApiAndExecution": 15,
+    "frontendVoucherScope": 37,
+    "overlappingScopes": true,
+    "buildPassed": true
+  },
+  "openApi": {
+    "operations": 181,
+    "schemas": 340,
+    "requestExamples": 66,
+    "addedOperations": 4,
+    "addedSchemas": 10,
+    "oldDefinitionsUnchanged": true
+  },
+  "authors": {
+    "javaFiles": 772,
+    "namedTypes": 1415,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "httpRequestsIncludingLogins": 44,
+  "businessResponsesValidated": 38,
+  "upgrade": {
+    "from": 61,
+    "to": 62,
+    "preservedExistingTables": 22,
+    "backupBytes": 591437,
+    "restorePerformed": false
+  },
+  "browser": {
+    "explicitPreparation": true,
+    "explicitAuthorization": true,
+    "postedReversal": true,
+    "originalHeld": true,
+    "independentRegistration": true,
+    "noAutomaticAuthorization": true,
+    "responsive": {
+      "cssWidth": 500,
+      "documentScrollWidth": 500,
+      "panelWidth": 411,
+      "panelScrollWidth": 411,
+      "lineWidth": 379,
+      "lineScrollWidth": 379,
+      "viewportReset": true,
+      "resetCssWidth": 1423,
+      "resetDocumentScrollWidth": 1423
+    },
+    "screenshots": [
+      "voucher-reversal-execution-browser-posted.png",
+      "voucher-reversal-execution-browser-recorded.png",
+      "voucher-reversal-execution-browser-narrow.png"
+    ]
+  },
+  "financialPreservation": {
+    "originalPaid": "300.00",
+    "netRepaid": "130.00",
+    "originalDisbursementReturned": "70.00",
+    "outstanding": "100.00",
+    "available": "0.00",
+    "unchangedTables": [
+      "advance_repayment",
+      "advance_repayment_return",
+      "advance_repayment_resolution",
+      "repayment_review_check",
+      "repayment_review_check_revision",
+      "advance_repayment_check",
+      "advance_repayment_check_revision",
+      "payment_operation",
+      "payment_operation_revision",
+      "payment_authorization",
+      "advance_disbursement_resolution",
+      "disbursement_return_check",
+      "disbursement_return_check_revision",
+      "advance_receipt_credit",
+      "voucher_dispute_resolution"
+    ],
+    "oldRevisionsPreserved": true,
+    "originalCommandInputsPreserved": true,
+    "originalCommandFilesPreserved": true,
+    "originalAttachmentFilesPreserved": 4,
+    "independentReversalCommands": 1,
+    "actualGatewayWriteCalls": 1
+  },
+  "redGreen": {
+    "case": "Switching identity while a child reversal operation is busy",
+    "uncoveredReason": "Original parent component tests did not cover a child operation running during identity change",
+    "red": "voucher-reversal-execution-ui-red.log",
+    "green": "voucher-reversal-execution-ui-green.log",
+    "rootCause": "Synchronous parent watch ran before the old child unmounted, allowing stale busy state to block a new identity read"
+  },
+  "logs": {
+    "h2": "/fyoung/tmp/agentflow-remaining-20260928/voucher-reversal-execution-api-green.log",
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/voucher-reversal-execution-api-postgres.log",
+    "frontend": "/fyoung/tmp/agentflow-remaining-20260928/voucher-reversal-execution-ui-green.log",
+    "actualHttp": "/fyoung/tmp/agentflow-remaining-20260928/voucher-reversal-execution-http.json",
+    "finalHttp": "/fyoung/tmp/agentflow-remaining-20260928/voucher-reversal-execution-final.json",
+    "responseContracts": "/fyoung/tmp/agentflow-remaining-20260928/voucher-reversal-execution-http-schema.json"
+  },
+  "remoteCiRun": false,
+  "realErpAcceptance": false,
+  "next": [
+    "Safe retirement of never-sent and definitely failed reversal operations",
+    "Expense bank returns and separate resource adjustments",
+    "Procurement and budget adjustments",
+    "Remaining advanced workflow and notification plan"
+  ]
+}

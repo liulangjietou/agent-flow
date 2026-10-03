@@ -1,0 +1,175 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { createRenderer, reactive } from 'vue'
+const { validateReversalExecution, reversalPrepareInput, reversalAuthorizeInput, reversalOperationInput, reversalRetirementInput, validateReversalExecutionReceipt } = await import(process.env.AGENTFLOW_TEST_VOUCHER_REVERSAL_EXECUTION)
+const { default: Component } = await import(process.env.AGENTFLOW_TEST_VOUCHERREVERSALEXECUTION)
+const { api, bindAuthenticationActor, writeRequests } = await import(process.env.AGENTFLOW_TEST_API)
+const originals = { ...api }, originalFetch = global.fetch, copy = value => JSON.parse(JSON.stringify(value)), settle = () => new Promise(resolve => setImmediate(resolve))
+global.localStorage = { getItem: () => 'test-token', setItem() {}, removeItem() {} }
+const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })
+const binding = () => ({ applicationId: 'app', operationId: 'voucher', roundNo: 1, applicationVersion: 8, businessVersion: 4, operationVersion: 6, kind: 'EXPENSE_ACCRUAL' })
+const money = value => ({ value, currency: 'CNY' })
+function view() {
+  const at = Date.now() - 1000, time = offset => new Date(at + offset).toISOString()
+  return { ...binding(), originalStatus: 'POSTED', originalHeld: false, original: { postingReference: 'original-posting', voucherReference: 'original-voucher', periodReference: '2026-09', accountingDate: '2026-09-29', total: money('100.00'), postedAt: time(-5000) }, canPrepare: true, operation: null, retirements: [],
+    latestPreparation: { id: 'prepared', version: 3, status: 'READY', requestedAt: time(-500), updatedAt: time(50), issue: null, accountingDate: '2026-09-30', evidenceReference: 'ERP-PROOF', reason: '更正原件', canAuthorize: true, authorizationIssue: null,
+      candidate: { createdAt: time(50), expiresAt: time(120000), originalRevision: 1, originalObservedAt: time(0), periodReference: '2026-09', periodSourceVersion: 'p1', lines: [
+        { originalLineNo: 1, accountCode: 'expense', side: 'CREDIT', amount: money('100.00'), sourceLineNo: 1, costCenter: 'IT', projectCode: null, advanceId: null },
+        { originalLineNo: 2, accountCode: 'payable', side: 'DEBIT', amount: money('100.00'), sourceLineNo: 0 }
+      ] } } }
+}
+function held(status = 'UNKNOWN') {
+  const value = view(), prepared = value.latestPreparation, candidate = prepared.candidate, at = Date.parse(candidate.createdAt), time = offset => new Date(at + offset).toISOString()
+  value.operationVersion++; value.originalHeld = true; value.canPrepare = false; prepared.status = 'AUTHORIZED'; prepared.version++; prepared.canAuthorize = false; prepared.authorizationIssue = 'VOUCHER_REVERSAL_NOT_READY'; prepared.updatedAt = time(10)
+  value.operation = { id: prepared.id, version: 3, status, attempts: 1, highestRevision: 0, failure: status === 'UNKNOWN' ? 'CONNECTION' : null, createdAt: time(10), sendExpiresAt: candidate.expiresAt, updatedAt: time(20), nextAttemptAt: status === 'UNKNOWN' ? time(5000) : null,
+    authorizedBy: 'finance', accountingDate: prepared.accountingDate, evidenceReference: prepared.evidenceReference, reason: prepared.reason, lines: copy(candidate.lines), observation: status === 'NOT_FOUND' ? { status: 'NOT_FOUND', revision: 0, observedAt: time(20), acceptanceReference: null, posting: null, rejection: null } : null, conflictingObservation: null, canQuery: true, canResendOriginal: status === 'NOT_FOUND', canRetire: false, retirementIssue: 'VOUCHER_REVERSAL_RETIREMENT_UNSAFE', retirementCheck: null }
+  return value
+}
+function receipt(input) { return { applicationId: 'app', operationId: 'voucher', roundNo: 1, operationVersion: input.operationVersion + ('preparationId' in input ? 1 : 0), preparationId: input.preparationId ?? input.reversalId ?? 'new', preparationVersion: 'preparationId' in input ? input.preparationVersion + 1 : 'reversalId' in input ? 4 : 1, reversalId: input.preparationId ?? input.reversalId ?? null, reversalVersion: 'preparationId' in input ? 1 : 'reversalId' in input ? input.reversalVersion + 1 : null, auditEventId: 'audit' } }
+let scope = 0
+function panel(extra = {}) {
+  const props = reactive({ ...binding(), scopeKey: `finance-${++scope}`, locked: false, ...extra }), events = []
+  const app = renderer.createApp({ ...Component, setup: (_, context) => Component.setup(props, context), render: () => null }, { ...props, onBusy: value => events.push(['busy', value]), onChanged: () => events.push(['changed']) })
+  const mounted = app.mount({})
+  return { props, events, state: mounted.$.setupState, close() { app.unmount(); Object.assign(api, originals); bindAuthenticationActor(null); global.fetch = originalFetch } }
+}
+test('准备只传人工日期与材料，授权精确消费候选并递增原凭证版本', () => {
+  const value = view(); assert.equal(validateReversalExecution(value, binding()), value)
+  const input = reversalPrepareInput(value, '2026-09-30', ' ERP-PROOF ', ' 核对原件 ')
+  assert.deepEqual(input, { roundNo: 1, applicationVersion: 8, businessVersion: 4, operationVersion: 6, accountingDate: '2026-09-30', evidenceReference: 'ERP-PROOF', comment: '核对原件' })
+  const authorized = reversalAuthorizeInput(value, ' 审阅全部分录 ')
+  assert.deepEqual(authorized, { roundNo: 1, applicationVersion: 8, businessVersion: 4, operationVersion: 6, preparationId: 'prepared', preparationVersion: 3, comment: '审阅全部分录' })
+  for (const command of [input, authorized]) assert.doesNotThrow(() => validateReversalExecutionReceipt(receipt(command), value, command))
+  for (const changes of [{ operationVersion: 6 }, { preparationVersion: 3 }, { preparationId: 'other' }, { reversalId: null }, { reversalVersion: 2 }, { applicationId: 'other' }]) assert.throws(() => validateReversalExecutionReceipt({ ...receipt(authorized), ...changes }, value, authorized))
+})
+test('错轮、不完整或不平衡分录、非法日期与错误能力不能进入确认', () => {
+  const changes = [v => v.operationId = 'other', v => v.applicationVersion++, v => v.originalHeld = true,
+    v => v.latestPreparation.candidate.lines.pop(), v => v.latestPreparation.candidate.lines[1].amount = money('99.99'), v => v.latestPreparation.candidate.lines[1].amount.currency = 'USD',
+    v => v.latestPreparation.candidate.lines[1].originalLineNo = 1, v => v.latestPreparation.accountingDate = '2026-02-30', v => v.latestPreparation.accountingDate = '2026-09-28',
+    v => v.latestPreparation.candidate.expiresAt = v.latestPreparation.candidate.createdAt, v => v.latestPreparation.status = 'RUNNING', v => v.latestPreparation.authorizationIssue = 'SOURCE_CHANGED']
+  for (const change of changes) { const value = copy(view()); change(value); assert.throws(() => validateReversalExecution(value, binding())) }
+  for (const date of ['', '2026-02-30', '2026-09-28']) assert.throws(() => reversalPrepareInput(view(), date, 'ERP', '核对'))
+  for (const ref of ['', 'bad\nvalue', 'a'.repeat(129)]) assert.throws(() => reversalPrepareInput(view(), '2026-09-30', ref, '核对'))
+})
+test('授权过期不能发送，查询跨过期限仍可继续，查无重发不能延长原期限', () => {
+  const value = view(); assert.throws(() => reversalAuthorizeInput(value, '核对', Date.parse(value.latestPreparation.candidate.expiresAt)))
+  const pending = held(), missing = held('NOT_FOUND'); assert.doesNotThrow(() => validateReversalExecution(pending, { ...binding(), operationVersion: 7 }))
+  const later = Date.parse(pending.operation.sendExpiresAt) + 1
+  assert.equal(reversalOperationInput(pending, 'QUERY', '读取实际结果', later).reversalId, pending.operation.id)
+  assert.throws(() => reversalOperationInput(pending, 'RESEND_ORIGINAL', '不能自动重发'))
+  const resend = reversalOperationInput(missing, 'RESEND_ORIGINAL', '明确重发原编号'); assert.doesNotThrow(() => validateReversalExecutionReceipt(receipt(resend), missing, resend))
+  assert.throws(() => reversalOperationInput(missing, 'RESEND_ORIGINAL', '依据过期', Date.parse(missing.operation.sendExpiresAt)))
+  missing.operation.highestRevision = 1; assert.throws(() => validateReversalExecution(missing, missing))
+})
+test('ERP 已过账必须返回与授权一致的独立凭证和全部分录', () => {
+  const value = held(); const op = value.operation
+  op.status = 'POSTED'; op.highestRevision = 1; op.failure = null; op.nextAttemptAt = null
+  op.observation = { status: 'POSTED', revision: 1, observedAt: op.updatedAt, acceptanceReference: 'ERP-ACCEPTED', rejection: null,
+    posting: { postingReference: 'reverse-posting', voucherReference: 'reverse-voucher', periodReference: '2026-09', accountingDate: op.accountingDate, postedAt: op.updatedAt, lines: op.lines.map((line, index) => ({ ...line, entryReference: 'line-' + index })) } }
+  assert.doesNotThrow(() => validateReversalExecution(value, value))
+  for (const change of [v => v.operation.observation.posting.accountingDate = '2026-09-29', v => v.operation.observation.posting.lines[0].accountCode = 'different', v => v.operation.observation.posting.lines[0].costCenter = 'other', v => v.operation.observation.posting.voucherReference = v.original.voucherReference]) {
+    const invalid = copy(value); change(invalid); assert.throws(() => validateReversalExecution(invalid, invalid))
+  }
+})
+test('加载、展开准备和展开授权都不写入，确认后通知父凭证刷新新版本', async () => {
+  let writes = 0, reads = 0; api.voucherReversalExecution = async () => { reads++; return view() }
+  api.authorizeVoucherReversal = async (app, original, input) => { writes++; assert.equal(original, 'voucher'); return receipt(input) }
+  const p = panel()
+  try {
+    await settle(); p.state.prepare('PREPARE'); assert.equal(writes, 0); p.state.prepare('AUTHORIZE'); p.state.comment = '审阅并授权'; await p.state.execute(); assert.equal(writes, 0)
+    p.state.acknowledged = true; await p.state.execute(); assert.equal(writes, 1); assert.equal(reads, 1)
+    assert.equal(p.state.view, null); assert.equal(p.state.requiresRefresh, true); assert.ok(p.events.some(event => event[0] === 'changed')); assert.deepEqual(p.events.at(-1), ['busy', false])
+  } finally { p.close() }
+})
+test('准备明确提交后只重读准备，不自动授权；重复点击共用进行中的动作', async () => {
+  let finish, writes = 0, authorizations = 0, input; api.voucherReversalExecution = async () => view()
+  api.prepareVoucherReversal = async (_app, _original, value) => { writes++; input = value; return new Promise(resolve => finish = resolve) }; api.authorizeVoucherReversal = async () => authorizations++
+  const p = panel()
+  try {
+    await settle(); p.state.prepare('PREPARE'); p.state.accountingDate = '2026-09-30'; p.state.reference = 'ERP'; p.state.comment = '准备核对'
+    const first = p.state.execute(); await settle(); await p.state.execute(); assert.equal(writes, 1); finish(receipt(input)); await first
+    assert.equal(authorizations, 0); assert.equal(p.state.pending, null); assert.match(p.state.notice, /再明确授权/)
+  } finally { p.close() }
+})
+test('身份切换清除原材料，迟到读取和写入都不能恢复原候选或触发父级刷新', async () => {
+  let deliver, reads = 0; api.voucherReversalExecution = () => ++reads === 1 ? new Promise(resolve => deliver = resolve) : Promise.resolve({ ...view(), canPrepare: false, latestPreparation: null })
+  const p = panel()
+  try {
+    await settle(); p.props.scopeKey = 'other'; await settle(); deliver(view()); await settle(); assert.equal(p.state.view.latestPreparation, null)
+    api.voucherReversalExecution = async () => view(); p.props.scopeKey = 'finance-again'; await settle()
+    let finish, input; api.authorizeVoucherReversal = async (_app, _original, value) => { input = value; return new Promise(resolve => finish = resolve) }
+    p.state.prepare('AUTHORIZE'); p.state.comment = '确认'; p.state.acknowledged = true; const pending = p.state.execute(); await settle()
+    api.voucherReversalExecution = async () => ({ ...view(), canPrepare: false, latestPreparation: null }); p.props.scopeKey = 'other-again'; await settle(); finish(receipt(input)); await pending
+    assert.equal(p.state.view.latestPreparation, null); assert.equal(p.state.comment, ''); assert.equal(p.state.acknowledged, false); assert.equal(p.events.some(event => event[0] === 'changed'), false)
+  } finally { p.close() }
+})
+test('确认时权限撤销立即清空分录和输入，禁止继续办理', async () => {
+  let writes = 0; api.voucherReversalExecution = async () => view(); api.authorizeVoucherReversal = async () => { writes++; throw { status: 403, code: 'FORBIDDEN' } }
+  const p = panel()
+  try {
+    await settle(); p.state.prepare('AUTHORIZE'); p.state.comment = '确认'; p.state.acknowledged = true; await p.state.execute()
+    assert.equal(writes, 1); assert.equal(p.state.view, null); assert.equal(p.state.comment, ''); assert.equal(p.state.requiresRefresh, true); await p.state.execute(); assert.equal(writes, 1)
+  } finally { p.close() }
+})
+test('授权请求结果未知时保留原路径和字节，恢复后必须刷新父凭证才能继续', async () => {
+  bindAuthenticationActor({ tenantId: 'demo', userId: 'reversal-authorizer-' + ++scope, roles: ['FINANCE'] }); api.voucherReversalExecution = async () => view()
+  const requests = []; let failed = true
+  global.fetch = async (url, init) => { requests.push({ url, init }); if (failed) throw new Error('connection lost'); return new Response(JSON.stringify(receipt(JSON.parse(init.body))), { status: 202, headers: { 'Content-Type': 'application/json' } }) }
+  const p = panel()
+  try {
+    await settle(); p.state.prepare('AUTHORIZE'); p.state.comment = '确认原分录'; p.state.acknowledged = true; await p.state.execute()
+    assert.equal(p.state.unconfirmed, true); const entry = writeRequests.pending()[0]; assert.equal(entry.path, '/applications/app/vouchers/voucher/reversal-execution/authorizations')
+    failed = false; await writeRequests.recover(entry.id); assert.equal(requests[0].init.body, requests[1].init.body); assert.equal(requests[0].init.headers.get('Idempotency-Key'), requests[1].init.headers.get('Idempotency-Key'))
+    assert.equal(p.state.unconfirmed, false); assert.equal(p.state.requiresRefresh, true); await p.state.execute(); assert.equal(requests.length, 2)
+  } finally { p.close() }
+})
+
+function retirable() {
+  const value = held(); const op = value.operation
+  Object.assign(op, { status: 'QUEUED', attempts: 0, failure: null, canQuery: false, canRetire: true, retirementIssue: null,
+    retirementCheck: { basis: 'NEVER_DISPATCHED', originalRevision: 1, originalObservedAt: new Date(Date.parse(op.updatedAt) + 10).toISOString() } })
+  return value
+}
+function retiredReceipt(value, input) { return { applicationId: value.applicationId, operationId: value.operationId, roundNo: input.roundNo, retirementId: 'end-record', reversalId: input.reversalId, reversalVersion: input.reversalVersion + (value.operation.status === 'QUEUED' ? 1 : 0), operationVersion: input.operationVersion + 1, basis: value.operation.retirementCheck.basis, auditEventId: 'end-audit' } }
+test('安全结束绑定真实资格及新鲜原件，拒绝查无、未知、原件已变和伪造释放回执', () => {
+  const value = retirable(), input = reversalRetirementInput(value, ' END-PROOF ', ' 核对原过账 ')
+  assert.deepEqual(input, { roundNo: 1, applicationVersion: 8, businessVersion: 4, operationVersion: 7, reversalId: 'prepared', reversalVersion: 3, evidenceReference: 'END-PROOF', comment: '核对原过账' })
+  const result = retiredReceipt(value, input); assert.doesNotThrow(() => validateReversalExecutionReceipt(result, value, input))
+  for (const patch of [{ operationVersion: 7 }, { reversalVersion: 3 }, { basis: 'CONFIRMED_FAILED' }, { reversalId: 'other' }]) assert.throws(() => validateReversalExecutionReceipt({ ...result, ...patch }, value, input))
+  for (const change of [v => v.operation.status = 'UNKNOWN', v => v.operation.attempts = 1, v => v.originalStatus = 'REVERSED', v => v.operation.retirementCheck.originalObservedAt = v.operation.createdAt, v => v.operation.retirementIssue = 'CHANGED']) {
+    const invalid = copy(value); change(invalid); assert.throws(() => reversalRetirementInput(invalid, 'END', '结束'))
+  }
+  for (const status of ['UNKNOWN', 'NOT_FOUND']) assert.throws(() => reversalRetirementInput(held(status), 'END', '不得结束'))
+  assert.throws(() => reversalRetirementInput(value, 'END', '依据过期', Date.parse(value.operation.retirementCheck.originalObservedAt) + 300000))
+})
+test('结束历史保留原编号和精确恢复版本，不能混入当前操作或重复依据', () => {
+  const value = view(); value.latestPreparation = null
+  const at = new Date().toISOString(); value.retirements = [{ id: 'end', reversalId: 'old', reversalVersion: 2, originalVersion: 4, releasedVersion: 5, basis: 'NEVER_DISPATCHED', retiredBy: 'finance', evidenceReference: 'END', comment: '结束原操作', retiredAt: at, originalRevision: 1, originalObservedAt: at }]
+  assert.doesNotThrow(() => validateReversalExecution(value, value))
+  for (const patch of [{ releasedVersion: 7 }, { originalVersion: 5 }, { reversalId: 'voucher' }, { basis: 'NOT_FOUND' }, { originalObservedAt: new Date(Date.now() - 600000).toISOString() }]) {
+    const invalid = copy(value); Object.assign(invalid.retirements[0], patch); assert.throws(() => validateReversalExecution(invalid, invalid))
+  }
+  value.retirements.push(copy(value.retirements[0])); assert.throws(() => validateReversalExecution(value, value))
+})
+test('安全结束需材料说明和再次确认，成功后刷新父凭证，不自动重新准备或发送', async () => {
+  const value = retirable(); let writes = 0, prepares = 0; api.voucherReversalExecution = async () => value
+  api.retireVoucherReversal = async (_app, _original, input) => { writes++; return retiredReceipt(value, input) }; api.prepareVoucherReversal = async () => prepares++
+  const p = panel({ operationVersion: value.operationVersion })
+  try {
+    await settle(); p.state.prepare('RETIRE'); p.state.reference = 'END'; p.state.comment = '确认原件'; await p.state.execute(); assert.equal(writes, 0)
+    p.state.acknowledged = true; await p.state.execute(); assert.equal(writes, 1); assert.equal(prepares, 0)
+    assert.equal(p.state.view, null); assert.equal(p.state.requiresRefresh, true); assert.ok(p.events.some(e => e[0] === 'changed'))
+  } finally { p.close() }
+})
+test('安全结束响应丢失沿原路径原请求恢复，恢复后先刷新而非新建命令', async () => {
+  const value = retirable(); bindAuthenticationActor({ tenantId: 'demo', userId: 'retirement-' + ++scope, roles: ['FINANCE'] }); api.voucherReversalExecution = async () => value
+  let failed = true; const requests = []
+  global.fetch = async (url, init) => { requests.push({ url, init }); if (failed) throw new Error('lost decision'); return new Response(JSON.stringify(retiredReceipt(value, JSON.parse(init.body))), { status: 202, headers: { 'Content-Type': 'application/json' } }) }
+  const p = panel({ operationVersion: value.operationVersion })
+  try {
+    await settle(); p.state.prepare('RETIRE'); p.state.reference = 'END'; p.state.comment = '核对原件'; p.state.acknowledged = true; await p.state.execute()
+    assert.equal(p.state.unconfirmed, true); const entry = writeRequests.pending()[0]; assert.equal(entry.path, '/applications/app/vouchers/voucher/reversal-execution/retirements')
+    failed = false; await writeRequests.recover(entry.id); assert.equal(requests[0].init.body, requests[1].init.body); assert.equal(requests[0].init.headers.get('Idempotency-Key'), requests[1].init.headers.get('Idempotency-Key'))
+    assert.equal(p.state.requiresRefresh, true); assert.equal(p.state.unconfirmed, false); await p.state.execute(); assert.equal(requests.length, 2)
+  } finally { p.close() }
+})

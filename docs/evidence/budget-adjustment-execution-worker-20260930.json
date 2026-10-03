@@ -1,0 +1,32 @@
+{
+  "date": "2026-09-30",
+  "sourceCommit": "ae14983df9298cc800b99d01b3d1a970b007ced2",
+  "scope": "原批准与财务任职守卫、持久台账读取、具名授权、事务外原子执行、恢复及独立调度",
+  "localOnly": true,
+  "verification": {
+    "domain": { "tests": 12, "failures": 0, "errors": 0 },
+    "h2": { "tests": 39, "failures": 0, "errors": 0, "executionPersistenceAndWorker": 17, "workflow": 16, "openApi": 6 },
+    "postgresql": { "tests": 17, "failures": 0, "errors": 0 },
+    "newWorkerTests": 7,
+    "overlapsEarlierScopes": true,
+    "logs": [
+      "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-execution-worker-h2-final.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-execution-worker-h2-green.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-execution-worker-postgres.log"
+    ],
+    "authorCheck": { "javaFiles": 1010, "namedTypes": 1894, "missing": 0, "parseErrors": 0 },
+    "redThenGreen": "领域与仓储测试未覆盖跨服务事务拦截。实际代理下任职失效使只读校验标记回滚，停止状态无法保存；移除守卫的独立事务边界，交由调用方保存停止或回滚，H2/PostgreSQL 均通过。",
+    "cases": [
+      "领取和结果在事务中，台账读取和原子执行端口在事务外",
+      "台账读取成功不自动授权，明确授权后原编号只执行一次",
+      "财务任职失效和目的地变化阻止新发送；旧目标失效仍可安全结束未发送指令",
+      "复核期间人员失效停止读取，到期租约和迟到响应不能生成可授权证据",
+      "原批准变化、人员停用或授权过期不阻断已发送操作的原号恢复状态机",
+      "权威查无仅由原授权人明确重发，仍保持原命令和有效期",
+      "工作器异常持久保存未知，明确恢复只调用原号查询，不再次执行"
+    ],
+    "externalPorts": "本阶段事务测试使用合成端口，HTTP 字节及协议由先前回环适配器测试验证"
+  },
+  "runtime": { "schema": "V76", "replaced": false, "existingBudgetRequestsExecuted": false },
+  "remaining": ["独立财务及敏感字段权限的公开接口", "财务执行页面", "实际库升级与 HTTP 验收", "浏览器及窄屏", "真实企业预算联调"]
+}

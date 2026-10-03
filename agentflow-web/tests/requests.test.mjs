@@ -7,6 +7,43 @@ globalThis.localStorage = { getItem: () => currentToken }
 const { api, writeRequests } = await import(pathToFileURL(process.env.AGENTFLOW_TEST_API))
 const body = { key: 'expense', name: '费用审批', graph: { nodes: [], edges: [] } }
 
+test('历史通知或任务已不可读时用中文说明不可访问，保留404而不透露记录是否存在', async () => {
+  writeRequests.setActor({ tenantId: 'demo', userId: 'missing-record-notice' })
+  const paths = []
+  globalThis.fetch = async url => {
+    paths.push(url)
+    return Response.json({ code: 'NOT_FOUND', message: 'Application not found' }, { status: 404 })
+  }
+  for (const read of [() => api.application('past-app'), () => api.applicationRounds('past-app'), () => api.task('past-task', new AbortController().signal)]) {
+    await assert.rejects(read(), failure => {
+      assert.equal(failure.status, 404)
+      assert.equal(failure.code, 'NOT_FOUND')
+      assert.equal(failure.message, '记录不存在或当前账号无权查看，请刷新列表或返回原入口。')
+      return true
+    })
+  }
+  assert.deepEqual(paths, ['/api/v1/applications/past-app', '/api/v1/applications/past-app/rounds', '/api/v1/tasks/past-task'])
+  assert.equal(writeRequests.pending().length, 0)
+})
+
+test('版本停用响应丢失后保留原修订、原因与幂等键，禁止改成恢复请求', async () => {
+  writeRequests.setActor({ tenantId: 'demo', userId: 'availability-recovery' })
+  const sent = [], body = { expectedRevision: 3, startEnabled: false, reason: '制度调整' }
+  globalThis.fetch = async (url, init) => {
+    sent.push({ url, ...init })
+    if (sent.length === 1) throw new TypeError('lost')
+    return Response.json({ id: 'definition', revision: 4, startEnabled: false })
+  }
+  await assert.rejects(api.changeDefinitionAvailability('definition', body))
+  await assert.rejects(api.changeDefinitionAvailability('definition', { ...body, startEnabled: true }), error => error.code === 'PENDING_REQUEST_CHANGED')
+  const recovered = await writeRequests.recover(writeRequests.pending()[0].id)
+  assert.equal(recovered.result.startEnabled, false)
+  assert.equal(sent[0].url, '/api/v1/process-definitions/definition/availability')
+  assert.equal(sent[0].body, sent[1].body)
+  assert.equal(sent[0].headers.get('Idempotency-Key'), sent[1].headers.get('Idempotency-Key'))
+  assert.equal(writeRequests.pending().length, 0)
+})
+
 test('作废响应丢失后只恢复原版本和说明，不新建动作或修改请求', async () => {
   writeRequests.setActor({ tenantId: 'demo', userId: 'cancel-recovery' })
   const sent = [], body = { expectedVersion: 7, comment: '计划已取消' }
@@ -344,4 +381,32 @@ test('响应丢失后遇到 CSRF 失效仍保留原请求键，重新认证后�
   assert.equal(new Set(sent.map(request => request.headers.get('Idempotency-Key'))).size, 1)
   assert.equal(new Set(sent.map(request => request.body)).size, 1)
   assert.equal(writeRequests.pending().length, 0)
+})
+
+test('摘要生成及复核响应丢失后保留已选择来源、目标指纹和人工稿原字节', async () => {
+  const cases = [
+    { name: 'generate', invoke: body => api.generateAssist('app/one', body), path: '/api/v1/applications/app%2Fone/assist-runs',
+      body: { taskId: 'task', expectedVersion: 2, targetDigest: 'a'.repeat(64), sourceIds: ['form:reason'] },
+      mutate: body => { body.sourceIds.push('application:title') } },
+    { name: 'review', invoke: body => api.reviewAssist('app/one', 'run/one', body), path: '/api/v1/applications/app%2Fone/assist-runs/run%2Fone/review',
+      body: { taskId: 'task', expectedVersion: 2, expectedRunVersion: 3, action: 'ADOPT', acceptedText: '已核对的人工稿', comment: '保留原文' },
+      mutate: body => { body.acceptedText = '后续编辑内容' } }
+  ]
+  for (const scenario of cases) {
+    writeRequests.setActor({ tenantId: 'demo', userId: 'assist-' + scenario.name })
+    const sent = [], original = JSON.stringify(scenario.body)
+    globalThis.fetch = async (url, init) => {
+      sent.push({ url, ...init })
+      if (sent.length === 1) throw new TypeError('lost')
+      return Response.json({ id: 'run', status: scenario.name === 'generate' ? 'QUEUED' : 'ADOPTED', version: 1 })
+    }
+    await assert.rejects(scenario.invoke(scenario.body))
+    scenario.mutate(scenario.body)
+    await assert.rejects(scenario.invoke(scenario.body), error => error.code === 'PENDING_REQUEST_CHANGED')
+    await writeRequests.recover(writeRequests.pending()[0].id)
+    assert.equal(sent.length, 2); assert.equal(sent[0].url, scenario.path)
+    assert.equal(sent[0].body, original); assert.equal(sent[1].body, original)
+    assert.equal(sent[0].headers.get('Idempotency-Key'), sent[1].headers.get('Idempotency-Key'))
+    assert.equal(writeRequests.pending().length, 0)
+  }
 })

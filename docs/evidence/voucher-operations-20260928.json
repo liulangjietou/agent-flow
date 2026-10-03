@@ -1,0 +1,48 @@
+{
+  "recordedAt": "2026-09-28T21:47:45.337352+00:00",
+  "status": "LOCAL_PERSISTENCE_ACCEPTANCE_PASSED",
+  "syntheticErp": true,
+  "enterpriseAcceptance": false,
+  "databaseMigration": "V43__voucher_operations.sql",
+  "tests": {
+    "h2Scope": 85,
+    "domain": 25,
+    "server": 60,
+    "postgresql": 10,
+    "postgresqlVersion": "17.11",
+    "scopesOverlap": true,
+    "initialStateRestorationRegression": {
+      "tests": 9,
+      "failures": 1
+    },
+    "javaAuthors": {
+      "files": 580,
+      "namedTypes": 1019,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "logs": [
+    "voucher-operation-first-tests.log",
+    "voucher-source-tests.log",
+    "voucher-operation-scope.log",
+    "voucher-operation-postgres.log"
+  ],
+  "implemented": [
+    "Derive voucher amounts, tax and allocations from actual approved aggregates",
+    "Short transactions with immutable target and same-round original-command uniqueness",
+    "Lease expiry and ambiguous HTTP outcomes recover by original query",
+    "Revision audit is atomic with current state and downstream events",
+    "Cross-worker send fencing and no locks during network waits",
+    "Persist accepted posting facts and maximum external revision through contradictions",
+    "V42 to V43 migration preserves applications and advance revisions"
+  ],
+  "notImplementedInThisSlice": [
+    "Automatic preparation after final approval",
+    "Financial API and UI",
+    "Persisted payment authorization and execution",
+    "Manual conflict resolution or replacement commands",
+    "Enterprise ERP acceptance"
+  ]
+}

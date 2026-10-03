@@ -1,5 +1,6 @@
 package io.agentflow.approval.workspace;
 
+import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -21,22 +22,45 @@ import java.util.Set;
  * @author owlzhangfq@gmail.com
  */
 public record TaskQueryParameters(PendingTaskReadPort.Query query, String context) {
-    private static final Set<String> KEYS = Set.of("q", "processKey", "applicant", "assignment", "minAmount", "maxAmount", "limit", "cursor");
+    private static final Set<String> KEYS = Set.of("q", "processKey", "applicant", "organization", "assignment", "deadline", "risk", "minAmount", "maxAmount", "limit", "cursor");
     private static final Set<String> ASSIGNMENTS = Set.of("all", "assigned", "unclaimed", "delegated");
     private static final int DEFAULT_LIMIT = 30;
     private static final int MAX_LIMIT = 100;
 
     /** 一次解析筛选，不接受客户端覆盖租户、处理人和排序字段。 */
-    public static TaskQueryParameters parse(Actor actor, Map<String, String> raw, JsonUtil json) {
+    public static TaskQueryParameters parse(Actor actor, Map<String, String> raw, JsonUtil json, Instant now) {
         if (!KEYS.containsAll(raw.keySet())) throw invalid();
         try {
             String text = text(raw, "q", 100), process = text(raw, "processKey", 128), applicant = text(raw, "applicant", 128);
+            String organization = text(raw, "organization", 128);
             String assignment = raw.getOrDefault("assignment", "all");
+            var deadline = switch (raw.getOrDefault("deadline", "all")) {
+                case "all" -> PendingTaskReadPort.DeadlineFilter.ALL;
+                case "overdue" -> PendingTaskReadPort.DeadlineFilter.OVERDUE;
+                case "pending" -> PendingTaskReadPort.DeadlineFilter.PENDING;
+                case "unrecorded" -> PendingTaskReadPort.DeadlineFilter.UNRECORDED;
+                default -> throw invalid();
+            };
+            var risk = switch (raw.getOrDefault("risk", "all")) {
+                case "all" -> null;
+                case "high" -> SubmissionRisk.Level.HIGH;
+                case "medium" -> SubmissionRisk.Level.MEDIUM;
+                case "low" -> SubmissionRisk.Level.LOW;
+                case "unmatched" -> SubmissionRisk.Level.UNMATCHED;
+                case "unassessed" -> SubmissionRisk.Level.UNASSESSED;
+                default -> throw invalid();
+            };
             int limit = raw.containsKey("limit") ? Integer.parseInt(raw.get("limit")) : DEFAULT_LIMIT;
             BigDecimal min = number(raw, "minAmount"), max = number(raw, "maxAmount");
             if (!ASSIGNMENTS.contains(assignment) || limit < 1 || limit > MAX_LIMIT || min != null && max != null && min.compareTo(max) > 0) throw invalid();
             String context = digest(json.write(List.of("v1", actor.tenantId(), actor.userId(), actor.roles().stream().sorted().toList(),
                     text, process, applicant, assignment, min == null ? "" : min.toPlainString(), max == null ? "" : max.toPlainString())));
+            // 不限制期限时保留原游标上下文；新增筛选不能复用其他期限条件的游标。
+            if (deadline != PendingTaskReadPort.DeadlineFilter.ALL) context = digest(json.write(List.of("deadline-v1", context, deadline.name())));
+            // 未设置组织条件时兼容已有游标；历史名称匹配不读取当前组织目录。
+            if (!organization.isEmpty()) context = digest(json.write(List.of("organization-v1", context, organization)));
+            // 风险筛选也绑定游标；未设置时继续兼容原游标。
+            if (risk != null) context = digest(json.write(List.of("risk-v1", context, risk.name())));
             Instant time = null; String id = null;
             if (raw.containsKey("cursor")) {
                 String cursor = raw.get("cursor");
@@ -46,7 +70,7 @@ public record TaskQueryParameters(PendingTaskReadPort.Query query, String contex
                 time = Instant.parse(parts[1]); id = parts[2];
                 if (time.isBefore(Instant.parse("0001-01-01T00:00:00Z")) || time.isAfter(Instant.parse("9999-12-31T23:59:59Z"))) throw invalid();
             }
-            return new TaskQueryParameters(new PendingTaskReadPort.Query(text, process, applicant, assignment, min, max, limit, time, id), context);
+            return new TaskQueryParameters(new PendingTaskReadPort.Query(text, process, applicant, organization, assignment, deadline, now, min, max, limit, time, id, risk), context);
         } catch (IllegalArgumentException | DateTimeParseException exception) { throw invalid(); }
     }
 

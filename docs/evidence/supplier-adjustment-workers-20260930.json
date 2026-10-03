@@ -1,0 +1,55 @@
+{
+  "status": "PASS_BACKGROUND_EXECUTION",
+  "date": "2026-09-30",
+  "h2Tests": 42,
+  "h2Breakdown": {
+    "fullAdjustmentPersistence": 41,
+    "applicationStartup": 1
+  },
+  "newSourceAndWorkerTests": 14,
+  "postgresqlTests": 14,
+  "postgresqlIsolated": true,
+  "temporaryContainerRemoved": true,
+  "liveAcceptanceSchema": 80,
+  "codeSchema": 81,
+  "verified": [
+    "Sources are derived from exact displayed bank and return versions with first original ERP success and actual prior completion",
+    "Fresh send evidence must preserve latest local bank, original ERP and previous adjustment observations",
+    "Current original-entity appointment and applicant/cashier separation are rechecked before new effects",
+    "Read failures and closed periods never register fake success or silently change the intended date",
+    "Possible dispatch is stored before ERP transport and lost responses recover by original command query",
+    "Recovery after original finance leaves or period closes does not resubmit or redate the command",
+    "Authoritative not-found requires explicit retry using the original immutable command",
+    "ERP success commits before post-success bank read and atomic local completion",
+    "Completion bank failure or local transaction failure never redispatches the ERP command",
+    "Late preparation and send results cannot bypass expired leases or safe retirement",
+    "Preparation and dispatch use separate schedulers and are inactive while the finance gateway is disabled"
+  ],
+  "authorAudit": {
+    "javaFiles": 1068,
+    "namedTypes": 2025,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "configuration": {
+    "adjustment-preparation-lease-seconds": 90,
+    "adjustment-lease-seconds": 90,
+    "adjustment-preparation-worker-enabled": true,
+    "adjustment-worker-enabled": true,
+    "adjustment-preparation-poll-delay-ms": 1000,
+    "adjustment-poll-delay-ms": 1000
+  },
+  "remaining": [
+    "Public finance role and sensitive-field authorization, idempotency and audit",
+    "Public API and OpenAPI contract",
+    "Finance UI with explicit authorization and recovery controls",
+    "Actual V81 acceptance upgrade, HTTP, restart and browser acceptance",
+    "Real external ERP acceptance"
+  ],
+  "logs": [
+    "supplier-adjustment-current-sources-h2.log",
+    "supplier-adjustment-workers-final-h2.log",
+    "supplier-adjustment-workers-postgres.log",
+    "supplier-adjustment-workers-authors.log"
+  ]
+}

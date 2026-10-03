@@ -1,0 +1,55 @@
+{
+  "status": "PASS_BUDGET_REDUCTION_PROTOCOL_AND_STATE_MODEL",
+  "date": "2026-09-30",
+  "runtimeSchemaUnchanged": 82,
+  "newPersistence": false,
+  "publicPartialExpenseWorkflowComplete": false,
+  "tests": {
+    "newCommandAndObservation": 8,
+    "newExecutionState": 7,
+    "relatedDomain": 43,
+    "newHttpGateway": 6,
+    "relatedGatewayAndTransport": 32,
+    "failures": 0,
+    "errors": 0,
+    "scopesOverlapPriorRuns": true
+  },
+  "red": [
+    "budget-consumption-reduction-red.log",
+    "budget-consumption-reduction-gateway-red.log",
+    "budget-consumption-reduction-operation-red.log"
+  ],
+  "green": [
+    "budget-consumption-reduction-protocol-green.log",
+    "budget-consumption-reduction-operation-green.log"
+  ],
+  "checks": [
+    "Original consumed budget and its receipt remain immutable",
+    "First reduction starts at original positions; next reduction requires exact prior applied remaining positions and original consumption identity",
+    "No position increase, reclassification, truncated allocation or missing zero position",
+    "Independent finance, explicitly selected open period, bounded authorization and exact source factory",
+    "Stable digest binds source, previous result, all positions and explicit decision",
+    "Applied result requires next ledger version, distinct reference and exact complete before/after positions",
+    "Strict actual loopback HTTP preserves fixed bytes, identity and idempotency header",
+    "Changed destination, missing configuration and active transaction cause no sends",
+    "Timed out write is sent once and recovered only through original operation query",
+    "Unknown or expired lease never causes automatic resend; NOT_FOUND requires explicit same-command retry",
+    "Pending disappearance and changed terminal evidence preserve reconciliation state",
+    "Only never-sent or unambiguous rejected operations qualify as safely unexecuted"
+  ],
+  "authorCheck": {
+    "files": 1092,
+    "namedTypes": 2086,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remaining": [
+    "Independent accrual reduction command and accounting result",
+    "Restore previous sources only from actual completed adjustments",
+    "Durable preparation and operations, background workers and atomic resource completion",
+    "Public API, permissions, audit, UI and runtime acceptance",
+    "Real enterprise budget integration"
+  ],
+  "followUpEvidence": "partial-expense-accrual-reduction-20260930.json",
+  "historicalProtocolNote": "This earlier evidence describes before/after arrays in receipts. Follow-up large HTTP reproduction changed them to complete position digests plus actual reduction amount; immutable commands still keep every position."
+}

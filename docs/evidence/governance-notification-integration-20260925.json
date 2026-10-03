@@ -1,0 +1,190 @@
+{
+  "recordedAt": "2026-09-25T23:58:21.600685-04:00",
+  "status": "INTEGRATED_VALIDATED_NOT_DELIVERED",
+  "baseCommit": "b111d32478233e060773af42d835a8fcc28cc1c0",
+  "branch": "codex/governance-notification-integration",
+  "worktree": "/Volumes/fyoung/tmp/agentflow-governance-notification-integration",
+  "committed": false,
+  "merged": false,
+  "deployed": false,
+  "remoteConfigured": false,
+  "pullRequest": null,
+  "scope": "停用恢复和期限配置接入通知文案、并行设计器当前主线；不包含旧申请重提策略或实际 SLA 计时",
+  "regressions": {
+    "migrationCollision": {
+      "redLog": "/fyoung/tmp/agentflow-governance-notification-migration-red.log",
+      "cause": "两条 V24 迁移冲突",
+      "fix": "仅把未发布治理迁移调整为 V25"
+    },
+    "portableTemplate": {
+      "redLog": "/fyoung/tmp/agentflow-governance-portable-red.log",
+      "failedTests": 2,
+      "cause": "模板节点属性白名单遗漏期限配置",
+      "fix": "保留期限引用；缺失租户日历可创建待配置草稿，非法规则与发布校验继续阻断"
+    }
+  },
+  "gates": {
+    "java": {
+      "total": 785,
+      "modules": {
+        "agentflow-domain": {
+          "tests": 205,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "agentflow-server": {
+          "tests": 580,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    "frontend": {
+      "tests": 279,
+      "failures": 0,
+      "skipped": 0,
+      "typecheck": "PASS",
+      "build": "PASS",
+      "javascriptKB": 514.48
+    },
+    "tools": {
+      "tests": 38,
+      "failures": 0
+    },
+    "authors": {
+      "javaFiles": 315,
+      "namedTypes": 490,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "openapi": {
+      "operations": 70,
+      "schemas": 116,
+      "requestExamples": 22,
+      "static": "PASS",
+      "postgresqlExercise": "PASS"
+    },
+    "diffCheck": "PASS"
+  },
+  "sourcePreservation": {
+    "originalWorktree": "/fyoung/tmp/agentflow-governance-deadlines-integration",
+    "patchSha256": "ef309a3cc17068d305a811f89591c64ed275b98ca881679ddf6e1635ec954452",
+    "untrackedFiles": 23,
+    "unchanged": true,
+    "publishedMigrationsUnchanged": 21
+  },
+  "migration": {
+    "result": "PASS",
+    "migration": "24 -> 25",
+    "originalTablesPreserved": 66,
+    "originalHistoryPreserved": true
+  },
+  "runtime": {
+    "result": "PASS",
+    "oldParallelApplicationCompleted": true,
+    "oldDraftGuardAndRecovery": true,
+    "frozenNotificationPreserved": true,
+    "versionCopyIndependent": true,
+    "fixedCalendarRevision": "1",
+    "currentCalendarRevision": 2,
+    "originalWorkingMinutes": "480",
+    "copyWorkingMinutes": "960",
+    "originalDefinition": "024e330f-1eb2-405d-bd03-86545add5808",
+    "originalRevision": 3,
+    "copyDefinition": "67e007e9-557d-4d11-829d-95aebea4a48a",
+    "browserDefinitionId": "3bd366bc-498f-4f8d-bdc3-f94b9f9f2656",
+    "browserDefinitionName": "治理通知浏览器验收"
+  },
+  "artifact": {
+    "containerId": "f0a767d2b41da30af9c3b6d2c4d6ada0f6c9193f4e5eb37e44cc38260bafd13f",
+    "image": "sha256:97432f980da100ebd3e419711efee84e1e97a966d62c035286a07f239ddb4d9c",
+    "database": "agentflow_gov_notice",
+    "backendPort": 18185,
+    "frontendPort": 5205,
+    "databasePort": 18645,
+    "oldJarSha256": "ca23d9c6d71a9f422a0b671c9c0869a9555a368475c6cefa11d0ed731e9b699b",
+    "candidateJarSha256": "e12caea8d0fbbb461aeb990639ecbc51654e57011cb0ddf2860dc474a3816e9c"
+  },
+  "browser": {
+    "result": "PASS",
+    "definitionId": "3bd366bc-498f-4f8d-bdc3-f94b9f9f2656",
+    "revision": 5,
+    "version": 1,
+    "workingMinutes": "720",
+    "calendarRevision": "1",
+    "notificationText": "浏览器联合验收已批准。",
+    "history": [
+      [
+        5,
+        true
+      ],
+      [
+        4,
+        false
+      ]
+    ],
+    "engine": "Chrome / CUA",
+    "quickToAdvanced": "PASS",
+    "undoRedo": "PASS",
+    "saveAndPublish": "PASS",
+    "disableAndRestore": "PASS",
+    "templateGeneration": "PASS",
+    "templateUpload": "NOT_COMPLETED_EXTENSION_FILE_ACCESS_DENIED",
+    "tabClosed": true
+  },
+  "cleanup": {
+    "fixturePortsClosed": [
+      18185,
+      5205,
+      18645
+    ],
+    "databaseContainerStopped": true,
+    "databaseRetained": true,
+    "worktreeRetained": true,
+    "dependencySymlinkRemoved": true,
+    "mainHead": "b111d32478233e060773af42d835a8fcc28cc1c0",
+    "mainClean": true,
+    "mainServices": {
+      "agentflow-demo-server-1": {
+        "id": "4d286c2365ede97e68c5df25850cdfdbaac73c7c2d823ce5c4f27529a6fca29a",
+        "running": true,
+        "health": "healthy"
+      },
+      "agentflow-demo-web-1": {
+        "id": "33a827b0bdac9a1a4b02b98d15739fcbce3beaea07a9f20b398f3fa76bf18f10",
+        "running": true,
+        "health": "healthy"
+      },
+      "agentflow-demo-database-1": {
+        "id": "307a9af8b6d8c834be1e5949c415f708a3514e4694e228ec73b492208103a641",
+        "running": true,
+        "health": "healthy"
+      }
+    }
+  },
+  "limits": [
+    "旧申请退回或撤回后的重提策略待确认与实现",
+    "任务实际到期计时、提醒和升级尚未实现",
+    "浏览器上传被扩展文件访问权限拒绝，未执行完整 UI 导入验收",
+    "使用演示身份和隔离 PostgreSQL，不是企业生产验收",
+    "未执行本候选版的应用回退演练，未部署主环境",
+    "无远端、PR 或远程 CI"
+  ],
+  "followupDefect": {
+    "description": "节点与连线同名标识通过领域校验后，Flowable 发布抛出重复 XML ID；本轮组合测试初稿已暴露，尚未修复",
+    "evidence": "/fyoung/tmp/agentflow-governance-notification-focused.log",
+    "nextAction": "独立最小回归复现并修复流程图标识冲突校验"
+  },
+  "logs": {
+    "java": "/fyoung/tmp/agentflow-governance-notification-verify.log",
+    "tools": "/fyoung/tmp/agentflow-governance-notification-tools.log",
+    "contract": "/fyoung/tmp/agentflow-governance-notification-contract.log"
+  },
+  "executionNotes": [
+    "迁移快照读取期间 Docker socket 短暂不可用；确认原容器继续运行、候选进程尚未启动后，重新采集旧版本快照",
+    "新增组合测试初稿的连线与节点重名导致引擎部署失败，改用有效夹具后全量通过；标识校验缺口另记待修复",
+    "验收辅助脚本被导入时读取不存在的命令参数，已修正辅助脚本，不属于产品修改"
+  ]
+}

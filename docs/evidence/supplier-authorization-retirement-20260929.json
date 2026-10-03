@@ -1,0 +1,41 @@
+{
+  "date": "2026-09-29",
+  "status": "INTERNAL_RETIREMENT_AND_REPLACEMENT_VERIFIED_LOCALLY",
+  "migration": "V69__supplier_authorization_retirement.sql",
+  "verification": {
+    "h2_domain_tests": 23,
+    "h2_persistence_tests": 15,
+    "postgres_run_domain_tests": 23,
+    "postgres_actual_database_tests": 43,
+    "postgres_run_openapi_h2_tests": 5,
+    "test_scopes_overlap": true,
+    "java_files_checked": 881,
+    "named_types_checked": 1626,
+    "missing_authors": 0,
+    "parse_errors": 0,
+    "git_diff_check": "PASS"
+  },
+  "verified_behaviors": [
+    "Retirement requires never-dispatched stopped state or definitive original ERP rejection",
+    "Unknown, pending, not-found, held and disputed outcomes cannot release authorization ownership",
+    "Queue stop, named retirement and active ownership release commit atomically",
+    "Retirement and background claim race cannot both succeed",
+    "Replacement retains old authorization, command revisions, original local payable and invoice ownership",
+    "Retired authorizations cannot be claimed or explicitly queried again",
+    "V68 upgrade preserves original authorization and command bytes and backfills active identity"
+  ],
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-retirement-h2.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-retirement-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-retirement-authors.log"
+  ],
+  "live_acceptance_schema": "V67",
+  "live_service_replaced": false,
+  "public_finance_entry": false,
+  "remaining": [
+    "Fresh payable review and single-use binding to authorization",
+    "Public finance and cashier workspaces",
+    "Supplier bank payment, ERP settlement and explicit safe release of established external holds",
+    "Real external integration"
+  ]
+}

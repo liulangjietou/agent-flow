@@ -1,0 +1,983 @@
+{
+  "recordedAt": "2026-10-02T11:57:52.751701+00:00",
+  "status": "BOUNDED_OFD_COMPOSITES_SCOPE_AND_PACKAGE_PASSED_FULL_OFD_INCOMPLETE",
+  "baseCommit": "b11da2401dd0db033bbf68982d90887ee66096c1",
+  "remainingTopLevelCategories": 6,
+  "preciseSmallTaskCountKnown": false,
+  "callerChain": "InvoiceOfdWorker -> InvoiceOfdRenderer page/template/annotation -> InvoiceOfdResources composite -> shared primitive/style/clip pipeline -> complete ordered PNG output",
+  "responsibility": "Rendering infrastructure owns resources, transforms, bounds and raster allocation; no invoice domain, public API or application state changes",
+  "missingCoverage": "The old renderer rejected CompositeObject at layer or annotation shape validation, so no positive resource expansion, alpha or pixel coverage existed.",
+  "red": {
+    "tests": 4,
+    "failures": 0,
+    "errors": 4,
+    "reason": "unsupported CompositeObject in layer and annotation appearance"
+  },
+  "implemented": [
+    "Resolve CompositeGraphicUnit in the calling page/template scope, retaining font/image resource base paths",
+    "Clip Width/Height in resource coordinates without automatic fitting; retain instance Boundary/CTM/DrawParam/Clips",
+    "Render required vector Content; validate optional preview resource type/path without rendering or decoding unused previews",
+    "Support nested PageBlock and CompositeObject; repeated instances retain independent transforms, styles and alpha",
+    "Apply composite alpha once to the already composed group; retain nested group and child alpha",
+    "Still validate hidden, zero-sized and off-page content; reject direct and indirect active-reference cycles",
+    "Bound actual combined recursion and shared object/geometry budgets; bound visible offscreen surface allocation before constructing images",
+    "Retain whole-document failure and existing isolated process cleanup"
+  ],
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/GBT_33190-2016_电子文件存储与交换格式版式文档.pdf",
+      "sections": "8.5 graphical units and 13 composite objects, tables 49-50",
+      "printedPagesViewed": [
+        49,
+        50,
+        51,
+        71,
+        72
+      ]
+    },
+    {
+      "url": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/compositeObj/CT_Composite.java",
+      "use": "ResourceID and graphical unit inheritance"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/compositeObj/CT_VectorG.java",
+      "use": "required dimensions and Content; preview references"
+    }
+  ],
+  "alphaInterpretation": "One Alpha per composite graphical object is implemented through an isolated transparency surface. This is an implementation interpretation of graphical-unit inheritance, not an explicitly specified offscreen algorithm. Synthetic pixel tests cover it; no public composite invoice conformance claim.",
+  "limits": {
+    "activeCompositeDepth": 16,
+    "combinedBlockAndResourceDepth": 64,
+    "sharedObjectsAndBlocks": 20000,
+    "sharedOutlineSegments": 1000000,
+    "maxSurfacePixels": 8000000,
+    "maxLiveSurfacePixels": 16000000,
+    "maxCumulativeSurfacePixels": 40000000,
+    "existingWorkerAndArchiveLimitsUnchanged": true
+  },
+  "tests": {
+    "scoped": 195,
+    "new": 17,
+    "previousScopeOverlap": 178,
+    "focused": 54,
+    "suites": [
+      {
+        "name": "io.agentflow.agent.InvoiceDocumentProcessTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceDocumentProcessTest.xml",
+          "bytes": 43364,
+          "sha256": "42e98f6372615f32cf38d74ec6cb9c53ac16423ab22eda909fed4b3038999775"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceExtractionModelTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceExtractionModelTest.xml",
+          "bytes": 44618,
+          "sha256": "537becf5999527b59e0bb5e216ba484f7c53b09a5ffde5aaeeb0bf145cca3e10"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceExtractionXmlTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceExtractionXmlTest.xml",
+          "bytes": 43980,
+          "sha256": "4861d596fab8ebd8034ffe1c8723e76f769423dc2814ee017e8d71e4868c569c"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdAnnotationsTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdAnnotationsTest.xml",
+          "bytes": 44700,
+          "sha256": "f5ed11b1c22ef17ccccbde828701ae08d48b1576824d634d77d0c3a39393b8bb"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdArchiveTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdArchiveTest.xml",
+          "bytes": 43735,
+          "sha256": "ccc146cdccf92b2c42320c76019f675e1d51560c63bb1d9c118a651410b330ac"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdCffDataTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdCffDataTest.xml",
+          "bytes": 43541,
+          "sha256": "89c8eb0c12d1d27e4e073e6fa9f97498e788891d4bc58f09048c2d9e9ea974e4"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdCidFontTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdCidFontTest.xml",
+          "bytes": 43933,
+          "sha256": "73a2ebed6f3c44c411cfc11beaffd00c3bc54d757c40f6d5770ad285aba644e3"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdCompositeTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdCompositeTest.xml",
+          "bytes": 45116,
+          "sha256": "31da7d452f083415e189db6c15eabd79b46959c0c604365932f241e8937e70c6"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdDeployedFontsTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdDeployedFontsTest.xml",
+          "bytes": 44877,
+          "sha256": "0265820a4f4f6cd2992961eb7f1a73afefb519609c1331b78ac3f0d9600781b7"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdDocumentTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdDocumentTest.xml",
+          "bytes": 44386,
+          "sha256": "74c51d0efbac9a349307b92a45b9614ef30c34362f2a958db981da98ee091ac5"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdDrawingTest",
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdDrawingTest.xml",
+          "bytes": 45118,
+          "sha256": "4bdc4ccf7676e6a855fdda66b69b878f96ae2cda92ee89cb9d38c4431c0fa543"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdFontTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdFontTest.xml",
+          "bytes": 43589,
+          "sha256": "fa4d554ab7490261cf4beb54850a5d014b1220e7d3fd3961f9dfec5e8352b856"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdInspectorTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdInspectorTest.xml",
+          "bytes": 43329,
+          "sha256": "6b68f93bb6d68bcb9a408196864155820fa333287c8b4da5b0796a20ef2d21a6"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdPathTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdPathTest.xml",
+          "bytes": 43548,
+          "sha256": "3b60482585c05cdd533106fb95904aa74c96eb235d27860544acb2b05b85a52a"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdRendererTest",
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdRendererTest.xml",
+          "bytes": 45481,
+          "sha256": "9c40b63e6086d25baa6d1781a7b2490a01e59ac67024c16ca70fb6b68e3a4e93"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdResultTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdResultTest.xml",
+          "bytes": 43278,
+          "sha256": "7d4d5e1b5579a0234a811e045b71b15ae09552ee40f6787cbad7634bbb45bbb3"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdTemplateTest",
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdTemplateTest.xml",
+          "bytes": 44921,
+          "sha256": "62502956371b5d349d1112fa4e39766a7aa7d891e672479eef920967c7f27529"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoicePdfInspectorTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoicePdfInspectorTest.xml",
+          "bytes": 43029,
+          "sha256": "3850f65e2c3465a8d805636baf81fbc610896af3aa5a9e407c9ad2358855528b"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoicePdfSourceTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoicePdfSourceTest.xml",
+          "bytes": 43318,
+          "sha256": "ccc383b7b7d39379d63c17028cba2175a7ab8c0f9c38a33764f9eee8b492f348"
+        }
+      }
+    ]
+  },
+  "authors": {
+    "files": 1386,
+    "namedTypes": 2655,
+    "missingTags": 0,
+    "parseErrors": 0
+  },
+  "packagedVerification": {
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-server.jar",
+    "jarSha256": "55f5d58c447b0618c3b022aae0a2fbb1ed0ef6438d72dfccf396ddfff389f060",
+    "jarBytes": 78619551,
+    "cases": [
+      {
+        "name": "synthetic",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/composites-two-pages.ofd",
+        "sourceSha256": "9583ba013e632ceb96ea5dbc9ad0d1f0d387e3ed9939236c010079feb2a83eeb",
+        "sourceUnchanged": true,
+        "exitCode": 0,
+        "pages": 2,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "response": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/synthetic/output/result.json",
+        "byteIdenticalToReference": true
+      },
+      {
+        "name": "max-composite-depth",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/max-depth.ofd",
+        "sourceSha256": "3ff8a0b9d7f55e066243ad59b6deab1c72c66c3c6d4f2f025e874441a5741bd5",
+        "sourceUnchanged": true,
+        "exitCode": 0,
+        "pages": 1,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "response": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/max-composite-depth/output/result.json"
+      },
+      {
+        "name": "max-combined-depth",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/max-combined-depth.ofd",
+        "sourceSha256": "e14a0d7fbff83a81717e016ed54758f7ca5310a00037d0f60083b2bd21ccad4e",
+        "sourceUnchanged": true,
+        "exitCode": 0,
+        "pages": 1,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "response": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/max-combined-depth/output/result.json"
+      },
+      {
+        "name": "cycle-last",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/cycle-last.ofd",
+        "sourceSha256": "748470e24acf0d0b291437db865101af604b8fdd1faf7976c4a06b9f0d454e12",
+        "sourceUnchanged": true,
+        "exitCode": 1,
+        "pages": 0,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "partialOutputAbsent": true
+      },
+      {
+        "name": "unsupported-last",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/unsupported-last.ofd",
+        "sourceSha256": "654e7c636ebc24c390f4f197a9c10b409b596345bb3535fc42c6541df2992b68",
+        "sourceUnchanged": true,
+        "exitCode": 1,
+        "pages": 0,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "partialOutputAbsent": true
+      },
+      {
+        "name": "too-deep",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/too-deep.ofd",
+        "sourceSha256": "187563b7e9fe0beda5a3cebef209039c958e3c0647ea264a52f8dbc6998f44dc",
+        "sourceUnchanged": true,
+        "exitCode": 1,
+        "pages": 0,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "partialOutputAbsent": true
+      },
+      {
+        "name": "live-surfaces-limit",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/live-surfaces-limit.ofd",
+        "sourceSha256": "1591d8df147bab730bdf7c7b9c4796bddaabb9864380931a69aa30b8058afdda",
+        "sourceUnchanged": true,
+        "exitCode": 1,
+        "pages": 0,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "partialOutputAbsent": true
+      },
+      {
+        "name": "public-watermark",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/AddWatermarkAnnot.ofd",
+        "sourceSha256": "dfed483fa08c30d0ee1326cff1b7bd158a5cc29a8dffa9c8425d5a830f21a125",
+        "sourceUnchanged": true,
+        "exitCode": 0,
+        "pages": 6,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "response": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/public-watermark/output/result.json",
+        "byteIdenticalToReference": true
+      },
+      {
+        "name": "old-annotations",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-fixtures/annotated-two-pages.ofd",
+        "sourceSha256": "87b87f5b4456721f0da98b3d1f5b9936d0d3554c7bb2cbfe0db78fc022c73e91",
+        "sourceUnchanged": true,
+        "exitCode": 0,
+        "pages": 2,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "response": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/old-annotations/output/result.json",
+        "byteIdenticalToReference": true
+      },
+      {
+        "name": "signed-still-rejected",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/DigitalSign.ofd",
+        "sourceSha256": "5b5bec16c539aa041ef3784d47a5665c03cf7f2e228551df87f13ee28d122989",
+        "sourceUnchanged": true,
+        "exitCode": 1,
+        "pages": 0,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "partialOutputAbsent": true
+      },
+      {
+        "name": "hello-regression",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/helloworld.ofd",
+        "sourceSha256": "a7b6f9eceb7ca4eafc73a318ac06f5476af6010d0dbcc99337912049748e141e",
+        "sourceUnchanged": true,
+        "exitCode": 0,
+        "pages": 1,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "response": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/hello-regression/output/result.json",
+        "byteIdenticalToReference": true
+      }
+    ],
+    "successfulCases": 6,
+    "outputPages": 13,
+    "rejectedCases": 5,
+    "publicOriginalPreserved": true,
+    "publicCompositeSampleUsed": false,
+    "modelCalled": false,
+    "runtimeReplaced": false
+  },
+  "visualInspection": {
+    "viewed": [
+      "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/synthetic/output/page-1.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/synthetic/output/page-2.png"
+    ],
+    "dimensions": [
+      114,
+      114
+    ],
+    "observed": "Two synthetic pages show grouped red/blue overlap, rotated content and the green annotation placement. Other 9 regression pages are byte-identical to existing references; 2 depth fixtures are empty boundary cases.",
+    "publicCompositeOriginalAvailable": false
+  },
+  "securityReview": {
+    "performedBy": "primary agent",
+    "findingsRequiringFix": [],
+    "checked": [
+      "resource paths use bounded package resolver",
+      "unknown attributes/content fail closed",
+      "identity-based active cycle tracking without rejecting sibling reuse",
+      "combined stack and pre-allocation pixel budgets",
+      "no child alpha can reveal hidden groups",
+      "no new external I/O, actions or public content acceptance"
+    ]
+  },
+  "publicOfdEnabled": false,
+  "modelCalled": false,
+  "runtimeReplaced": false,
+  "schemaChanged": false,
+  "dependenciesAdded": false,
+  "remaining": [
+    "nonconformal minimum stroke width",
+    "remaining gradients/patterns and clip visibility/alpha",
+    "nondefault text weight/italic",
+    "digital signatures and nested seals",
+    "application font configuration and public OFD source/model integration",
+    "real invoice and lifecycle acceptance"
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdRenderer.java",
+      "bytes": 18559,
+      "sha256": "0c728f6504f68b425029cc3e18cbff756bac992ff04382213f86f83fec7bed38"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdResources.java",
+      "bytes": 9862,
+      "sha256": "444cbf8b13a83712af5d7191854e55a29cebf2d9e4234c1fb58cc70eabeccc41"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdCompositeTest.java",
+      "bytes": 19008,
+      "sha256": "dcf2900c15f9efe14917c38637b30db129784d9d055dee6d03ba95a9bb9c09d3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/docs/invoice-extraction.md",
+      "bytes": 52366,
+      "sha256": "7b3332ab0e0db747a67c46ed96c450af0f63cdb2e070578f066f214bced12b57"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/docs/product-goal-gap-audit.md",
+      "bytes": 7947,
+      "sha256": "fd36cfa0e306b802f89a1b711a828ca099d5ec75668adf57cf1878ce92c33f9c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/docs/remaining-implementation-plan.md",
+      "bytes": 45615,
+      "sha256": "706f39d892a74ad44ca0ac1454e1d1d9d5b9ca17b0cf307ff1782c36fe9997da"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/InvoiceOfdCompositeFixtures.java",
+      "bytes": 3583,
+      "sha256": "5e331a78682f077913ca8ef68df1a215f4e51cccf4456a3a8e09b5785000283b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/AddWatermarkAnnot.ofd",
+      "bytes": 49181,
+      "sha256": "dfed483fa08c30d0ee1326cff1b7bd158a5cc29a8dffa9c8425d5a830f21a125"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/composites/CT_Composite.java",
+      "bytes": 2343,
+      "sha256": "dcc56e86e1e7c8bbd807baa2f28ecccd72d01c1622f95b9b284b810b366ac39e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/composites/CT_VectorG.java",
+      "bytes": 5431,
+      "sha256": "e7c390baf9cbf94a73304fd6be96579165a7327f95b58d5f04fdb160f08b4807"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/composites/CompositeObject.java",
+      "bytes": 2092,
+      "sha256": "5c3abd276180d90075e4da2a230b0b571844aeeef98d2df3c7c175d79a9804c5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/composites/Content.java",
+      "bytes": 422,
+      "sha256": "6d9e879eb8c592e74857679a41996d0650762b39546531a5ccd31f09f3aeca9b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/composites/gbt-printed-49.png",
+      "bytes": 144044,
+      "sha256": "96be071065127a45113c7aa18110d8be5387b8ae792d8b310ad43dc9e001cb5e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/composites/gbt-printed-50.png",
+      "bytes": 154460,
+      "sha256": "1b646196ca9919ca7fc4cca452a235715eb307b45fc37e7b85df650be1f2ace3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/composites/gbt-printed-51.png",
+      "bytes": 226753,
+      "sha256": "4498ff47fd2e24e0db5b606272b9b427adade565f60bce075036558bdccc478d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/composites/gbt-printed-71.png",
+      "bytes": 184468,
+      "sha256": "584661fd4a383bd685a3498b35a20185a7df406b945820552cb63ebeafd7a3bc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/composites/gbt-printed-72.png",
+      "bytes": 133291,
+      "sha256": "d49f6df05cb02c3fdc3a67eba482c1e096e33c6bab724f6a89baf397ff38de37"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/gbt33190-2016.pdf",
+      "bytes": 4331919,
+      "sha256": "dae45301d0a3c906f8f172a2def2dee14df3bd2b62783bca402ca0a9ec4f9e13"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/DigitalSign.ofd",
+      "bytes": 3041,
+      "sha256": "5b5bec16c539aa041ef3784d47a5665c03cf7f2e228551df87f13ee28d122989"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/helloworld.ofd",
+      "bytes": 1651,
+      "sha256": "a7b6f9eceb7ca4eafc73a318ac06f5476af6010d0dbcc99337912049748e141e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-fixtures/annotated-two-pages.ofd",
+      "bytes": 3173,
+      "sha256": "87b87f5b4456721f0da98b3d1f5b9936d0d3554c7bb2cbfe0db78fc022c73e91"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-authors.log",
+      "bytes": 131,
+      "sha256": "193e226f3ef770b421d35d20f6d35a5745f9227e80c5a4b616cdcf40024c3a87"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/composites-two-pages.ofd",
+      "bytes": 2842,
+      "sha256": "9583ba013e632ceb96ea5dbc9ad0d1f0d387e3ed9939236c010079feb2a83eeb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/cycle-last.ofd",
+      "bytes": 2841,
+      "sha256": "748470e24acf0d0b291437db865101af604b8fdd1faf7976c4a06b9f0d454e12"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/expected-1.png",
+      "bytes": 363,
+      "sha256": "6c17fb0bb4982e14e3a6154d3504adf7ed1ae2e764eb24ac822e51e2a0e518cf"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/expected-2.png",
+      "bytes": 357,
+      "sha256": "793fda1833c3bf828f7e2c56334840e85239d3ca33d804073fd1a85d3177f88d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/live-surfaces-limit.ofd",
+      "bytes": 1823,
+      "sha256": "1591d8df147bab730bdf7c7b9c4796bddaabb9864380931a69aa30b8058afdda"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/max-combined-depth.ofd",
+      "bytes": 1815,
+      "sha256": "e14a0d7fbff83a81717e016ed54758f7ca5310a00037d0f60083b2bd21ccad4e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/max-depth.ofd",
+      "bytes": 1914,
+      "sha256": "3ff8a0b9d7f55e066243ad59b6deab1c72c66c3c6d4f2f025e874441a5741bd5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/too-deep.ofd",
+      "bytes": 1815,
+      "sha256": "187563b7e9fe0beda5a3cebef209039c958e3c0647ea264a52f8dbc6998f44dc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures/unsupported-last.ofd",
+      "bytes": 2820,
+      "sha256": "654e7c636ebc24c390f4f197a9c10b409b596345bb3535fc42c6541df2992b68"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-fixtures.log",
+      "bytes": 146,
+      "sha256": "a19ab3abfd3e83052018b1cbeba947d28e5c0e0b1d10ff3fba8d222f80f33833"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-focused.log",
+      "bytes": 13643,
+      "sha256": "0d523d3cf82cf56a5107af2741f928322c3c222db87bdb1284b65155db160621"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-package.log",
+      "bytes": 13929,
+      "sha256": "764588a7a0b83bf4b803416c7b7b756b02aea2036792828691310afae54f8b9c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaged-probe.log",
+      "bytes": 4655,
+      "sha256": "4c25e4ffb9b24f13115687e8df9e30745f8e95a9050d09ae51b5be6d194606cb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/cycle-last/parent-classes.log",
+      "bytes": 166139,
+      "sha256": "342cc007c50a0beb16c110b2877633f0f15e14f35ba7023e571cb603080a47b3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/cycle-last/process.log",
+      "bytes": 1198,
+      "sha256": "c15c822cd83f9813a076f9c57ad916511702b483cbf048c9b8581eee60ea56f1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/hello-regression/output/page-1.png",
+      "bytes": 13418,
+      "sha256": "564233710156ad06df5deba0b595a8f50ec22c319e7e26c75fd5c7279e901f34"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/hello-regression/output/result.json",
+      "bytes": 380,
+      "sha256": "eff85e81c0e2c4dc7d8a478c6b92a3df07ab94bb319cb1fbac70055290f97929"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/hello-regression/parent-classes.log",
+      "bytes": 288944,
+      "sha256": "807935f10faca99f9e7a8376f53196006f06838f3fa20261e029000ac2651fb9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/hello-regression/process.log",
+      "bytes": 88,
+      "sha256": "15a99cab42dd9c60f1c21dbf065417c79fef0a5d3a4139b5b1cb5e2de3f905ae"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/live-surfaces-limit/parent-classes.log",
+      "bytes": 166139,
+      "sha256": "f0d1dd00f91e06301adf5a7129ffadf9ed61c078664a7b2cb67d1e67a2d160c4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/live-surfaces-limit/process.log",
+      "bytes": 1198,
+      "sha256": "c15c822cd83f9813a076f9c57ad916511702b483cbf048c9b8581eee60ea56f1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/max-combined-depth/output/page-1.png",
+      "bytes": 325,
+      "sha256": "6bdc65ef0f682db593a2c2499a60d367183d3f197611cb4dbc60f0b93a50a1af"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/max-combined-depth/output/result.json",
+      "bytes": 380,
+      "sha256": "40efde47cb9ece99146077bba21d0366c8cd848677c93e6851958d28b2ca9856"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/max-combined-depth/parent-classes.log",
+      "bytes": 288871,
+      "sha256": "c6d3a4f2063846424ca5a1b286429df18a06374e9e022d323f8c1e6cc05b7c18"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/max-combined-depth/process.log",
+      "bytes": 88,
+      "sha256": "15a99cab42dd9c60f1c21dbf065417c79fef0a5d3a4139b5b1cb5e2de3f905ae"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/max-composite-depth/output/page-1.png",
+      "bytes": 325,
+      "sha256": "6bdc65ef0f682db593a2c2499a60d367183d3f197611cb4dbc60f0b93a50a1af"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/max-composite-depth/output/result.json",
+      "bytes": 381,
+      "sha256": "16f4724d9fe7b7e836baa513b86ff846c942cb23ca12d6d8fffb2853e8e0a0f4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/max-composite-depth/parent-classes.log",
+      "bytes": 288871,
+      "sha256": "abf4651c908f0383647af7fc54a1bcb951902ef0a5befbeff191ef513d354007"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/max-composite-depth/process.log",
+      "bytes": 88,
+      "sha256": "15a99cab42dd9c60f1c21dbf065417c79fef0a5d3a4139b5b1cb5e2de3f905ae"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/old-annotations/output/page-1.png",
+      "bytes": 434,
+      "sha256": "67a4f96ac0fdaca741576d31f92b7e8824e497617d7a416ec49952798bcf21a4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/old-annotations/output/page-2.png",
+      "bytes": 442,
+      "sha256": "c05b76455549854ccb90c989a8a277c8b20ebf11c02185a66c66d3e2639ef08d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/old-annotations/output/result.json",
+      "bytes": 576,
+      "sha256": "86e0b8005deb1dc7a5881b0887ae7015e542a864c004785458d4aff2d44f0229"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/old-annotations/parent-classes.log",
+      "bytes": 288871,
+      "sha256": "c44e9f0080b5cb6a9e30dd5f57682ac9c81268682a4591accf55a846f7df31eb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/old-annotations/process.log",
+      "bytes": 88,
+      "sha256": "8969852d4f344e288c29725c35ba8f235e7de5b2badf49d39f148fd06b1f79ed"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/public-watermark/output/page-1.png",
+      "bytes": 443416,
+      "sha256": "0cb6017c7d9bb81032d6b2bf834d4779a1a4aa8361b226ca6643a2fd87c62753"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/public-watermark/output/page-2.png",
+      "bytes": 385888,
+      "sha256": "8eae7654b4396c6842c7243b85e1fd76d30052459393daf22bfb269d9dc32c69"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/public-watermark/output/page-3.png",
+      "bytes": 495189,
+      "sha256": "01d41550f74cc8db1ee10d3fdaa666b5457e3c0844ee92530e9a5e27e5cf4cf8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/public-watermark/output/page-4.png",
+      "bytes": 376770,
+      "sha256": "da8656d66f00f8c0b6abefff78f9ec9de4e7a63ff37e124dd9ee27fe37c3b536"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/public-watermark/output/page-5.png",
+      "bytes": 491692,
+      "sha256": "1d7d30c5c57334dccac0a41508d1ba2e2fced0e168215c8b28764ce4732d6fcf"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/public-watermark/output/page-6.png",
+      "bytes": 263983,
+      "sha256": "6d1f838d78095c4febdcceed596ea175a7621150c64105512fd990c08f33a856"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/public-watermark/output/result.json",
+      "bytes": 1397,
+      "sha256": "37cda3fdc97923d341c35ecf80f569b5a7b4a84870bde23562082001dd470017"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/public-watermark/parent-classes.log",
+      "bytes": 288871,
+      "sha256": "f5543f6db70f9f3d5e7e86e0b806e95c5b4b6822198c72e8e19096a66bf6c555"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/public-watermark/process.log",
+      "bytes": 88,
+      "sha256": "ca20d340f56bc96c7e0d91c3e99b3d02abab4884ac2e51f1f2d9a7693becefb4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/results.json",
+      "bytes": 5764,
+      "sha256": "d68f72f5324c63a5fc80adb25970017d2d4bc570ad6ea0f880c884fdefc363f6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/signed-still-rejected/parent-classes.log",
+      "bytes": 166212,
+      "sha256": "c418015cfddbf76403391d8eb4c86fe0719855d76bcc8936303a0072dd659e6b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/signed-still-rejected/process.log",
+      "bytes": 1198,
+      "sha256": "c15c822cd83f9813a076f9c57ad916511702b483cbf048c9b8581eee60ea56f1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/synthetic/output/page-1.png",
+      "bytes": 363,
+      "sha256": "6c17fb0bb4982e14e3a6154d3504adf7ed1ae2e764eb24ac822e51e2a0e518cf"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/synthetic/output/page-2.png",
+      "bytes": 357,
+      "sha256": "793fda1833c3bf828f7e2c56334840e85239d3ca33d804073fd1a85d3177f88d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/synthetic/output/result.json",
+      "bytes": 564,
+      "sha256": "c80f60db4ad869286ea6dfff1429dc8ef7c07b8f4be73b6d99f7acf3c9251ec8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/synthetic/parent-classes.log",
+      "bytes": 288944,
+      "sha256": "c88c00cf3ac322a79e3db5900b4fa8ed17689c5d56eb5f62ec67c8e3f6993c21"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/synthetic/process.log",
+      "bytes": 88,
+      "sha256": "8969852d4f344e288c29725c35ba8f235e7de5b2badf49d39f148fd06b1f79ed"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/too-deep/parent-classes.log",
+      "bytes": 166139,
+      "sha256": "4a6b848f7201db123964ecdac3bcf079cafd7aa4e6e600e32aade746bb3ea72e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/too-deep/process.log",
+      "bytes": 1198,
+      "sha256": "c15c822cd83f9813a076f9c57ad916511702b483cbf048c9b8581eee60ea56f1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/unsupported-last/parent-classes.log",
+      "bytes": 166139,
+      "sha256": "e192f63b912fab05ff5ff4ad5299707330e764b4bec9bb71c772f04e23315e3f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-packaging/unsupported-last/process.log",
+      "bytes": 1198,
+      "sha256": "c15c822cd83f9813a076f9c57ad916511702b483cbf048c9b8581eee60ea56f1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-probe-compile.log",
+      "bytes": 58,
+      "sha256": "0423c3ea3a2f0a9f3f5c27ea31160b4749ed54bddc3202043896fd78aed36456"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-red.log",
+      "bytes": 18839,
+      "sha256": "b1efab44d464995831516f22983755006dfd93371bd904f86b097fbda48c5b1d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceDocumentProcessTest.xml",
+      "bytes": 43364,
+      "sha256": "42e98f6372615f32cf38d74ec6cb9c53ac16423ab22eda909fed4b3038999775"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceExtractionModelTest.xml",
+      "bytes": 44618,
+      "sha256": "537becf5999527b59e0bb5e216ba484f7c53b09a5ffde5aaeeb0bf145cca3e10"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceExtractionXmlTest.xml",
+      "bytes": 43980,
+      "sha256": "4861d596fab8ebd8034ffe1c8723e76f769423dc2814ee017e8d71e4868c569c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdAnnotationsTest.xml",
+      "bytes": 44700,
+      "sha256": "f5ed11b1c22ef17ccccbde828701ae08d48b1576824d634d77d0c3a39393b8bb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdArchiveTest.xml",
+      "bytes": 43735,
+      "sha256": "ccc146cdccf92b2c42320c76019f675e1d51560c63bb1d9c118a651410b330ac"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdCffDataTest.xml",
+      "bytes": 43541,
+      "sha256": "89c8eb0c12d1d27e4e073e6fa9f97498e788891d4bc58f09048c2d9e9ea974e4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdCidFontTest.xml",
+      "bytes": 43933,
+      "sha256": "73a2ebed6f3c44c411cfc11beaffd00c3bc54d757c40f6d5770ad285aba644e3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdCompositeTest.xml",
+      "bytes": 45116,
+      "sha256": "31da7d452f083415e189db6c15eabd79b46959c0c604365932f241e8937e70c6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdDeployedFontsTest.xml",
+      "bytes": 44877,
+      "sha256": "0265820a4f4f6cd2992961eb7f1a73afefb519609c1331b78ac3f0d9600781b7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdDocumentTest.xml",
+      "bytes": 44386,
+      "sha256": "74c51d0efbac9a349307b92a45b9614ef30c34362f2a958db981da98ee091ac5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdDrawingTest.xml",
+      "bytes": 45118,
+      "sha256": "4bdc4ccf7676e6a855fdda66b69b878f96ae2cda92ee89cb9d38c4431c0fa543"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdFontTest.xml",
+      "bytes": 43589,
+      "sha256": "fa4d554ab7490261cf4beb54850a5d014b1220e7d3fd3961f9dfec5e8352b856"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdInspectorTest.xml",
+      "bytes": 43329,
+      "sha256": "6b68f93bb6d68bcb9a408196864155820fa333287c8b4da5b0796a20ef2d21a6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdPathTest.xml",
+      "bytes": 43548,
+      "sha256": "3b60482585c05cdd533106fb95904aa74c96eb235d27860544acb2b05b85a52a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdRendererTest.xml",
+      "bytes": 45481,
+      "sha256": "9c40b63e6086d25baa6d1781a7b2490a01e59ac67024c16ca70fb6b68e3a4e93"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdResultTest.xml",
+      "bytes": 43278,
+      "sha256": "7d4d5e1b5579a0234a811e045b71b15ae09552ee40f6787cbad7634bbb45bbb3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoiceOfdTemplateTest.xml",
+      "bytes": 44921,
+      "sha256": "62502956371b5d349d1112fa4e39766a7aa7d891e672479eef920967c7f27529"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoicePdfInspectorTest.xml",
+      "bytes": 43029,
+      "sha256": "3850f65e2c3465a8d805636baf81fbc610896af3aa5a9e407c9ad2358855528b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-reports/TEST-io.agentflow.agent.InvoicePdfSourceTest.xml",
+      "bytes": 43318,
+      "sha256": "ccc383b7b7d39379d63c17028cba2175a7ab8c0f9c38a33764f9eee8b492f348"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-scope.log",
+      "bytes": 16785,
+      "sha256": "f8a43bb5107c0cfdca162becf45401fd65a101f96b0a722ddde87a0bd44a13ba"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-composites-server.jar",
+      "bytes": 78619551,
+      "sha256": "55f5d58c447b0618c3b022aae0a2fbb1ed0ef6438d72dfccf396ddfff389f060"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/verify-ofd-composites-package.py",
+      "bytes": 5624,
+      "sha256": "085ea34c889b00f86c09afe1877ca4ab5ead3711156ebde4de86abef0bbd8df5"
+    }
+  ]
+}

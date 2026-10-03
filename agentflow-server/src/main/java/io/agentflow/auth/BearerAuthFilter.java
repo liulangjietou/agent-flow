@@ -11,6 +11,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.finance.callback.PaymentCallbackVerifier;
+import io.agentflow.event.EventIngressVerifier;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -100,7 +102,11 @@ public class BearerAuthFilter extends OncePerRequestFilter {
         try {
             currentActor.set(actor);
             // 仅认证后缓存完整原始字节，业务写接口用它核对重试；不以固定前缀代替真实 body。
-            chain.doFilter(new ContentCachingRequestWrapper(request, Integer.MAX_VALUE), response);
+            boolean fileUpload = HttpMethod.PUT.matches(request.getMethod()) && (request.getRequestURI()
+                    .matches("/api/v1/applications/[0-9a-f-]{36}/attachments/[0-9a-f-]{36}/content")
+                    || request.getRequestURI().matches("/api/v1/invoices/[0-9a-f-]{36}/content"));
+            // 二进制内容由附件服务流式限长并核对登记摘要，不复制整份文件到 JSON 幂等缓存。
+            chain.doFilter(fileUpload ? request : new ContentCachingRequestWrapper(request, Integer.MAX_VALUE), response);
         } finally {
             currentActor.clear();
         }
@@ -137,7 +143,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
 
     private boolean isPublic(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return (HttpMethod.POST.matches(request.getMethod()) && path.equals("/api/v1/auth/login"))
+        return PaymentCallbackVerifier.matches(request) || EventIngressVerifier.matches(request) || (HttpMethod.POST.matches(request.getMethod()) && path.equals("/api/v1/auth/login"))
                 || (HttpMethod.GET.matches(request.getMethod()) && path.equals("/api/v1/auth/options"))
                 || ((HttpMethod.GET.matches(request.getMethod()) || HttpMethod.HEAD.matches(request.getMethod()))
                 && PUBLIC_HEALTH_PATHS.contains(path)) || path.equals("/error");

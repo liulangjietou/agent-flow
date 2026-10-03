@@ -52,6 +52,7 @@ class RoundDiagramIntegrationTest {
         JsonNode first = diagram(id, 1, "alice");
         assertThat(node(first, "manager").path("state").asText()).isEqualTo("ACTIVE");
         assertTaken(first, "a");
+        assertThat(first.path("nodes")).allSatisfy(node -> assertThat(node.path("candidateSnapshots")).isEmpty());
         assertThat(node(first, "manager").path("activeTasks").asLong()).isEqualTo(1);
         assertThat(node(first, "finance").path("state").asText()).isEqualTo("NOT_REACHED");
         assertThat(first.toString()).doesNotContain("formData", "assigneeRule", "role:MANAGER", "tenantId", "sensitive-value");

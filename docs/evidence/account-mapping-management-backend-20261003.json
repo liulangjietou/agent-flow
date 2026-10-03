@@ -1,0 +1,268 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T04:11:38.161511+00:00",
+  "taskId": "F02",
+  "status": "MANAGEMENT_BACKEND_PHASE_VERIFIED_TASK_OPEN",
+  "implementationCommit": "ef0869a4c43bc0b3bcef3baf26f75e3ed38f58da",
+  "branch": "codex/governance-identifier-integration",
+  "migration": {
+    "version": 104,
+    "newTables": [
+      "account_mapping_scope",
+      "account_mapping_draft",
+      "account_mapping_draft_revision",
+      "account_mapping_version",
+      "account_mapping_activation"
+    ],
+    "baseline": 103,
+    "legacyPreservationScope": "Non-empty finance_resource and expense_category_revision sample rows retained; full installation package recovery remains pending."
+  },
+  "management": {
+    "operations": 9,
+    "role": "FINANCE_CONFIG_ADMIN",
+    "writeEndpoints": [
+      "PUT /api/v1/admin/account-mappings/{key}/draft",
+      "POST /api/v1/admin/account-mappings/{key}/publish"
+    ],
+    "scope": [
+      "authenticated tenant",
+      "legal entity",
+      "currency"
+    ],
+    "publishChecks": [
+      "draft revision",
+      "category revision",
+      "scope active revision",
+      "server-configured finance target"
+    ],
+    "externalCallsDuringPublication": false,
+    "preparationSelectionIntegrated": false
+  },
+  "validation": {
+    "h2Scoped": {
+      "tests": 86,
+      "suites": [
+        {
+          "suite": "io.agentflow.finance.AccountMappingConfigurationTest",
+          "module": "agentflow-domain",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "io.agentflow.expense.ExpenseConfigurationIntegrationTest",
+          "module": "agentflow-server",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "io.agentflow.finance.GatewayAccountingTest",
+          "module": "agentflow-server",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "io.agentflow.finance.AccountMappingConfigurationMigrationTest",
+          "module": "agentflow-server",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "io.agentflow.finance.AccountMappingConfigurationApiTest",
+          "module": "agentflow-server",
+          "tests": 28,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "io.agentflow.api.OpenApiContractTest",
+          "module": "agentflow-server",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "io.agentflow.expense.ExpenseConfigurationMigrationTest",
+          "module": "agentflow-server",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "io.agentflow.expense.ExpenseConfigurationApiTest",
+          "module": "agentflow-server",
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "postgresSubset": {
+      "tests": 29,
+      "suites": [
+        {
+          "suite": "AccountMappingConfigurationApiTest",
+          "tests": 28,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "suite": "AccountMappingConfigurationMigrationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "finalProjectionSubset": {
+      "tests": 2,
+      "database": "PostgreSQL 17.11",
+      "scope": "Final summary-only SQL projections; subset of the prior 28 API cases",
+      "cases": [
+        "directoryPaginationAndScopeFiltersDoNotExposeAccountCodes",
+        "publicationAndDraftHistorySurviveRevisionsAndKeepAuditFacts"
+      ]
+    },
+    "postgresVersion": "17.11 (Debian 17.11-1.pgdg13+2)",
+    "counting": "29 PostgreSQL cases are a subset of the 86 unique scoped cases; the final 2 projection checks repeat cases in that subset. Do not add these counts.",
+    "openapi": {
+      "paths": 294,
+      "operations": 332,
+      "schemas": 661,
+      "requestExamples": 123,
+      "existingPathsSemanticallyUnchanged": true,
+      "existingSchemasSemanticallyUnchanged": true,
+      "compiledResourceMatchesSource": true
+    },
+    "authors": {
+      "javaFiles": 1440,
+      "namedTypes": 2773,
+      "missingAuthorTags": 0,
+      "parseErrors": 0
+    },
+    "gitDiffCheck": "PASS"
+  },
+  "verifiedBehaviors": [
+    "Reads do not create configuration or fabricate active versions",
+    "Offline drafts remain unpublished until a server finance target is available",
+    "Role checks precede reads, writes and idempotent replay",
+    "Cross-tenant drafts and histories are not discoverable",
+    "Each legal entity and currency keeps an independent active revision",
+    "Two keys racing to replace one confirmed revision yield one success and one conflict",
+    "Activation failure rolls back publication, draft cursor, active pointer and success receipt",
+    "Old idempotent publication returns the original receipt after a later draft edit",
+    "Database foreign keys reject cross-scope activation and deletion of referenced category history",
+    "Malformed revisions, nested coercion, unknown fields, repeated keys and trailing JSON fail before writes",
+    "Directory and history queries load summary columns only",
+    "Published projection corruption fails closed rather than falling back"
+  ],
+  "diagnostics": [
+    "OpenAPI generation initially referenced the old draft-history placeholder as revision; the existing route uses version. The script was corrected and maps the new endpoint placeholder explicitly. No incomplete OpenAPI file was written."
+  ],
+  "remaining": [
+    "Bind active mapping selection to preparation work and recheck under the publication lock before voucher registration",
+    "Cover managed and legacy preparation races, immutable registered commands and restart recovery",
+    "Implement the management page and historical mapping evidence display",
+    "Run fixed-package browser, synthetic ERP voucher workflow and full database/file restore acceptance"
+  ],
+  "limitations": [
+    "F02 remains OPEN; the current automatic worker still uses the legacy ERP mapping request.",
+    "No new application package or browser acceptance was performed in this management-backend phase.",
+    "Synthetic configuration and local PostgreSQL tests do not prove real enterprise ERP account validity.",
+    "Origin became configured during this turn and is reachable with push permission. No remote branch or current-branch PR exists at final review; E15 remains open and depends on V02. No push, PR creation or remote CI was performed."
+  ],
+  "taskCount": {
+    "knownOpenTaskCount": 38,
+    "localDevelopment": 20,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "sourceHashes": {
+    "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java": "dc081d4cab987469c3f82b261dd0c974f120bc4ce99e89f6b490043cf0e0d786",
+    "agentflow-server/src/main/java/io/agentflow/finance/AccountMappingConfigurationController.java": "b9db40687a059fd6b1ff0937aed5841e452b90c1e5ddb5771c1644f3d046fe19",
+    "agentflow-server/src/main/java/io/agentflow/finance/AccountMappingConfigurationInput.java": "237bbb6a2c01876dfaa607693e23eb004ff3e612506ff23bd6e6756d77e491af",
+    "agentflow-server/src/main/java/io/agentflow/finance/AccountMappingConfigurationJson.java": "4854cee3b0362d0c8e5114074fa21edd66187f48bae39a9899ba1a2f550f3ee3",
+    "agentflow-server/src/main/java/io/agentflow/finance/AccountMappingConfigurationQuery.java": "9d6abfda226cb9dc3540addef62cad0e6f4fb93bb5147fadc78efc99779ce2f7",
+    "agentflow-server/src/main/java/io/agentflow/finance/AccountMappingConfigurationService.java": "4e7072f45d85c38662f57f36b7b20c4d06ab69ad85a19f151cc69a605c1c90a9",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcAccountMappingRepository.java": "ba013c660fc221a5900b9495210e3df78921cce865742f0ed7cac2cf1ea6d450",
+    "agentflow-server/src/main/resources/api/openapi.json": "38dffb2cdac88e95b96cb8a8cf5c545f7650d0c1d8976fb289b609e08c9bede3",
+    "agentflow-server/src/main/resources/db/migration/V104__account_mapping_configuration.sql": "04bb06fc64693041628d499f18d2382228ed3f9d0d14d31d4b5492a49f5c4413",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "fc14063f727b8f051805714c3bcc1b8a28898d7c8f67e33665680094da961b2a",
+    "agentflow-server/src/test/java/io/agentflow/finance/AccountMappingConfigurationApiTest.java": "0526df8d70325badcfbedefd6ed49154e7a38c26e3044939212ac454eda8a792",
+    "agentflow-server/src/test/java/io/agentflow/finance/AccountMappingConfigurationMigrationTest.java": "0869e0be6d5359cff1be48a074140e1121dc5d8ced6aea5ad59d69026ad6c169"
+  },
+  "artifacts": {
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-first.log": "9faeec290c2c69f896f279e8dd8bfec72770cffffdf5b5b726b38221967267f8",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-green.log": "da7bea02489939186da2938e285a1605b25add826d7f311e6c983e95fc04c29c",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-postgres.log": "1b5303b66b9b4e924a46b9faaddda72bac972c9d2bf1ddae5e684d16ca58574e",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-projections.log": "2f7d1e507e64f3def8b479f5526c9b0740d2ec160fcfe3bab16b57a3b1a1156c",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-authors.log": "d18e104d0f7cf5494871164039c002b2d2b705add27e92d76972b0f672f0c712",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-openapi.log": "a1fa2a0fbdd82e44a5fc9acff21a48ce71d9406da25077858918c2c15e431246",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-postgres-databases.json": "81f39e145a2c93e33c41fa9ba121e187551859a65f7136ed633ebd61aab0fb69",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/update-account-mapping-openapi.py": "d1d06c3e6de38ab008c5a3438fc22a3439cacbe77d94d3a1f59cd4604dcc22d5",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/run-account-mapping-management-postgres.py": "2eca87bc015a71b688fedc02c969e818511d2d9a643d42a437d2b514e16bcfde",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/run-account-mapping-management-projections.py": "ad65d40f13d9c4555c30833251a9de793639c0ee40e3c59eb9a9ea0000bf6c83",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/record-account-mapping-management.py": "c11509fa83768a08f9569109b741590fb17402d83172e58e82aa15ba59af716d",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-h2-reports/agentflow-domain-TEST-io.agentflow.finance.AccountMappingConfigurationTest.xml": "7dc3a777c26ede43a3ee0e9269bf5acafd332bfef58346df9cb8a9c3d72804fb",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-h2-reports/agentflow-server-TEST-io.agentflow.api.OpenApiContractTest.xml": "d12faaed24efc52cd8dbff78fb9e2b3908bd05c2b2d9ad20da30d4cbcdb1346c",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-h2-reports/agentflow-server-TEST-io.agentflow.expense.ExpenseConfigurationApiTest.xml": "d9241d3f02a9bb3340e4538a0f3dbfb6b05996f983981ebc6ceff129828b2af8",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-h2-reports/agentflow-server-TEST-io.agentflow.expense.ExpenseConfigurationIntegrationTest.xml": "0de01557f3aa5b68a3b226a6301dc0f8423edb7521ea6338de33791bb514cc60",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-h2-reports/agentflow-server-TEST-io.agentflow.expense.ExpenseConfigurationMigrationTest.xml": "4f1c09b08e708d57cd91bcb31adbee05d3d2d7a77a92f86fbf94d9e812847b2c",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-h2-reports/agentflow-server-TEST-io.agentflow.finance.AccountMappingConfigurationApiTest.xml": "3f0ecc66a406d21e710263dd9f08952a7859762f57558455fe47b54521946b0e",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-h2-reports/agentflow-server-TEST-io.agentflow.finance.AccountMappingConfigurationMigrationTest.xml": "10a3358fccbff74eeb3b7384e6bc2237102e1fc723634d46a57b606806afdfe4",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-h2-reports/agentflow-server-TEST-io.agentflow.finance.GatewayAccountingTest.xml": "6f8c6d81f10c167469d2ebab9e1000628206245e9e8820aaee030b13d6339cef",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-h2-reports/summary.json": "25b2af0664f33f2bb4759f10e337c2ed59813f1dbd40521eb3d479f1fa990444",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-postgres-reports/TEST-io.agentflow.finance.AccountMappingConfigurationApiTest.xml": "46265b0fcd463e67baa3bfdd3720ab5e649be2b845ad390304591114d411d568",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-postgres-reports/TEST-io.agentflow.finance.AccountMappingConfigurationMigrationTest.xml": "65964d14f2d6fdadfa492417e4ec61d27ce452838a13c9e3ba5a9fba905b42ef",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-postgres-reports/summary.json": "f0fc79912247fd5c92165efaeb5cd591c3779a23c3a3c1f9f8cd338cf377ef87",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-projection-reports/TEST-io.agentflow.finance.AccountMappingConfigurationApiTest.xml": "a16090285b9abe7a37fbc347656a1192dcc1286f349bea84515cd14d19b8b897",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-management-projection-reports/summary.json": "530e228a7b1218d864c0afdf5b9a6775c75d5c92a82b41811800810af63e69ba",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-remote-discovery-20261003.json": "ad1c72a078ba9fd97855549abeb2f795a757daf6ebfe3516d36f8cb4a31356f1",
+    "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/record-account-mapping-remote-discovery.py": "5463071dea86f6bd7442f9a53edc6ebad9930c5c9bdf9c162159c959532abfd1"
+  },
+  "deliveryAtFinalReview": {
+    "recordedAt": "2026-10-03T04:14:38.448896+00:00",
+    "origin": "https://github.com/liulangjietou/agent-flow.git",
+    "repository": {
+      "default_branch": "main",
+      "full_name": "liulangjietou/agent-flow",
+      "html_url": "https://github.com/liulangjietou/agent-flow",
+      "permissions": {
+        "admin": true,
+        "maintain": true,
+        "pull": true,
+        "push": true,
+        "triage": true
+      },
+      "private": false
+    },
+    "remoteRefs": [],
+    "branches": [],
+    "branchPullRequests": [],
+    "readOnly": true,
+    "pushed": false,
+    "createdPullRequest": false,
+    "deliveryDependency": "E15 depends on V02; local full-version acceptance remains open."
+  },
+  "postGenerationUpdates": [
+    {
+      "recordedAt": "2026-10-03T04:14:38.448896+00:00",
+      "scope": "Refresh remote delivery facts discovered after the original evidence generator ran",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-management-evidence-snapshot/account-mapping-remote-discovery-20261003.json"
+    }
+  ]
+}

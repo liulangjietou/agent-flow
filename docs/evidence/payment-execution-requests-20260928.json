@@ -1,0 +1,32 @@
+{
+  "date": "2026-09-28",
+  "scope": "Persistent cashier selection, V46 and transaction-free account checks before original payment registration",
+  "worktree": "/fyoung/tmp/agentflow-governance-identifier-integration",
+  "requestDomainTests": 6,
+  "newIntegrationTests": 7,
+  "requestMigrationTests": 1,
+  "h2ScopeTests": 87,
+  "h2DomainTests": 34,
+  "h2ServerTests": 53,
+  "postgresqlScopeTests": 25,
+  "overlappingScopes": true,
+  "logs": {
+    "readyTimeRed": "/fyoung/tmp/agentflow-remaining-20260928/payment-execution-request-first.log",
+    "h2Scope": "/fyoung/tmp/agentflow-remaining-20260928/payment-request-worker-scope.log",
+    "postgresqlScope": "/fyoung/tmp/agentflow-remaining-20260928/payment-request-worker-postgres.log",
+    "postgresqlDatabases": "/fyoung/tmp/agentflow-remaining-20260928/payment-request-worker-postgres-databases.json",
+    "authors": "/fyoung/tmp/agentflow-remaining-20260928/payment-request-worker-authors.log"
+  },
+  "confirmed": [
+    "Cashier choice is committed before account HTTP calls and is unique per authorization",
+    "Selected account version, cashier and authorization cannot be replaced on retry",
+    "READY means the original payment is queued, never paid",
+    "Authorization execution, payment queue and request completion commit or roll back together",
+    "Expired request lease recovers the same choice and ignores late workers",
+    "Finance voiding authorization during reads prevents payment registration",
+    "Authorization expiring during reads closes both unexecuted records",
+    "V45 to V46 retains original authorizations and enforces same-authorization operation references",
+    "Ready timestamp cannot precede the actual execution registration"
+  ],
+  "notClaimed": ["Authenticated payment API", "Cashier page", "Real funds transfer", "Loan balance creation", "Expense settlement", "Enterprise acceptance", "Remote PR or CI"]
+}

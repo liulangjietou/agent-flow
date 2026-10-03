@@ -1,0 +1,393 @@
+{
+  "recordedAt": "2026-10-01T11:29:26.002168+00:00",
+  "status": "SUBPROCESS_NEGATIVE_CONCLUSIONS_VERIFIED_PUBLIC_LIFECYCLE_INCOMPLETE",
+  "baseCommit": "72e3686e3ba70d8c4a41089851403380c34a1971",
+  "scope": "Child return/rejection, root withdrawal, ancestor conclusions and unfinished-branch cancellation with real native termination and transactional audit/inbox/outbox",
+  "tests": {
+    "domainScopePassed": 18,
+    "h2ServerScopePassed": 324,
+    "subprocessCasesIncludedInH2": 28,
+    "h2UpgradeCasesIncluded": 1,
+    "h2InitialRegression": {
+      "serverTests": 324,
+      "failures": 1,
+      "cause": "Obsolete contract assertion excluded CANCELLED from all submission rounds"
+    },
+    "h2FinalContractAndOriginalCancellationRegression": {
+      "tests": 16,
+      "result": "PASS",
+      "note": "Only the obsolete test assertion changed after broad regression; original editable-application cancellation still preserves previous round conclusions"
+    },
+    "h2MergedLatestSuiteResults": {
+      "io.agentflow.approval.ApplicationCancellationTest": {
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.expense.ExpensePlanIntegrationTest": {
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.expense.ExpenseSubmissionIntegrationTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.notification.NotificationTextsIntegrationTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.integration.WebhookIntegrationTest": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.procurement.ProcurementPaymentWorkflowTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.api.OpenApiContractTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.event.EventInboxIntegrationTest": {
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.ParallelApprovalIntegrationTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.ApplicationResubmissionIntegrationTest": {
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.InstanceControlIntegrationTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.CountersignPolicyIntegrationTest": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.TaskDelegationIntegrationTest": {
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.SubprocessCancellationMigrationTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.ApplicationWithdrawalIntegrationTest": {
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.EventWaitIntegrationTest": {
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.SubprocessStartIntegrationTest": {
+        "tests": 28,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.IdempotencyIntegrationTest": {
+        "tests": 30,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.TimerWaitIntegrationTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.operations.AuditSearchIntegrationTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.operations.AuditExportIntegrationTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.RoundDiagramIntegrationTest": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.ApplicationCancellationIntegrationTest": {
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.copy.ApplicationCopyIntegrationTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.ApprovalSecurityTest": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.ApplicationHistoryIntegrationTest": {
+        "tests": 31,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.process.CountersignMembershipApiTest": {
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.process.TaskDeadlineIntegrationTest": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "io.agentflow.approval.process.TaskDeadlineReminderSchedulerTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "postgresSubprocessCasesPassed": 28,
+    "postgresUpgradeCasesPassed": 1,
+    "frontendScopePassed": 25,
+    "frontendBuild": "PASS",
+    "openapi": {
+      "result": "PASS",
+      "operations": 279,
+      "schemas": 550,
+      "requestExamples": 108
+    },
+    "scopesOverlap": true
+  },
+  "redTests": {
+    "negativeConclusions": {
+      "cases": 3,
+      "failures": 3,
+      "errors": 0
+    },
+    "approvalWinningBeforeWithdrawal": {
+      "cases": 2,
+      "failures": 1,
+      "errors": 0,
+      "actual": "SUBPROCESS_STOP_MISMATCH",
+      "expected": "CONCURRENCY_CONFLICT"
+    }
+  },
+  "postgres": {
+    "database": "subprocess_stopping_bec132751a",
+    "migrationDatabase": "subprocess_stopping_upgrade_b7974a805d",
+    "sourceDatabase": "subprocess_completion_16cba3a989",
+    "status": "PASS",
+    "existingDatabasesModified": false,
+    "pid": 78905,
+    "exitCode": 0,
+    "upgradePreservation": {
+      "tables": 221,
+      "rows": 1702,
+      "allOriginalRowsPreserved": true,
+      "originalSourceUnchanged": true,
+      "schemaVersion": "90"
+    },
+    "databaseEvidence": {
+      "schemaVersion": "90",
+      "applications": 65,
+      "rounds": 65,
+      "calls": 37,
+      "parentRoundBindings": 37,
+      "childRoundBindings": 37,
+      "activeNativeCallBindings": 11,
+      "nativeHistoryBindings": 37,
+      "normallyCompletedChildren": 14,
+      "approvedChildBindings": 14,
+      "normallyCompletedParents": 9,
+      "approvedParentBindings": 9,
+      "terminatedChildrenAwaitingBusinessCoordination": 0,
+      "terminatedChildInstances": 12,
+      "stoppedChildBindings": 12,
+      "stopAudits": 12,
+      "stopOutbox": 12,
+      "stopConclusionOutbox": 12,
+      "cancelledRounds": 7,
+      "cancellationInbox": 11,
+      "progressAudits": 14,
+      "progressOutbox": 14,
+      "childAuditRecords": 74,
+      "logicalChildAttachments": 1,
+      "physicalAttachments": 1,
+      "attachmentProvenance": 1,
+      "nativeProcessHistory": 65,
+      "secondParentRoundCalls": 2
+    },
+    "tlsAccepted": false,
+    "scope": "Positive and negative subprocess application/round coordination; audited termination, native pause cascade and complete public acceptance remain pending"
+  },
+  "rules": [
+    "A child return or rejection propagates the same conclusion to its active ancestors",
+    "Other active branches are cancelled; already completed conclusions and human opinions are retained",
+    "Only the root can be corrected and resubmitted; original child input and round snapshots remain unchanged",
+    "Free-text child reasons are not copied to other applications",
+    "A failed cancellation notification rolls back all native and business conclusions, audit, inbox and outbox",
+    "Original timer/event deliveries after cancellation are stale and cannot advance the tree",
+    "Ancestor rejection uses existing expense/procurement release services; returned/withdrawn roots retain reservations"
+  ],
+  "financialValidation": "Existing expense and procurement release/return/withdrawal regression passed; full structured financial parent subprocess runtime acceptance remains pending",
+  "runtimePreservation": {
+    "phase": "after",
+    "tableCount": 219,
+    "totalRows": 5580,
+    "files": 10,
+    "schema": "88",
+    "allTablesAndFilesPreserved": true
+  },
+  "runtimeHealth": {
+    "http://127.0.0.1:18224/actuator/health/readiness": {
+      "status": 200,
+      "body": {
+        "status": "UP"
+      }
+    },
+    "http://127.0.0.1:15324/": {
+      "status": 200
+    },
+    "http://127.0.0.1:15324/src/App.vue": {
+      "status": 200
+    }
+  },
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/approval/model/Application.java": "150d02db962d94bd9ab3cff884c3e54725e8f312658d7a94b1710fe6767c4fa0",
+    "agentflow-domain/src/main/java/io/agentflow/approval/model/SubmissionRound.java": "55f106010168809ecb014e4e1bd56782adaf76de8a47aca29744a3e35d093408",
+    "agentflow-domain/src/main/java/io/agentflow/approval/service/ApplicationAuditPort.java": "e07e1c7bf2ed8e5c70f22e0234cbd8141ca38fa1bbc4e68bd720337f281fab56",
+    "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java": "b9614cbda9b1b41604b4d3ebfab289c7e6fcbf3525fe943b43a57b63dfa5b48f",
+    "agentflow-domain/src/test/java/io/agentflow/approval/ApplicationCancellationTest.java": "9de440b94ed335e1352787d1232b7ec4c16275b21102d40dd45cfbc4acc522a9",
+    "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java": "7668331fa0eb80d1dc6cc70b49ec74ab070528b81e55cbec7a204d61c823216d",
+    "agentflow-server/src/main/java/io/agentflow/approval/history/HistoryQueryParameters.java": "a8cd602b0a66cca341572d1fbd02e789b77e6bd141d35a853b390c2ddf3a7df0",
+    "agentflow-server/src/main/java/io/agentflow/approval/operations/AuditSearchParameters.java": "00aa81173eccc134ff3b79b3d3e64b63fbea8bb8b58705a97da4fb43b7eb41ce",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskFacade.java": "0c13c71416d9125a0e9b0e30a1190f7f8fe696ac1f9d34537d7f8131d38ed614",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/SubprocessStopService.java": "f4ba6dab5be3b729657346ba8106951be6f2c05e3f33c812cb9585c3049e8de1",
+    "agentflow-server/src/main/java/io/agentflow/integration/ApprovalWebhookEvents.java": "aaf561d87f22f4849ccb19b2f1dc5ad22520e7541c0802007b4ce13292b5d18b",
+    "agentflow-server/src/main/java/io/agentflow/notification/ApprovalNotificationService.java": "541c7bb83d0fed4743181bf9058423b9138f53056e13916bb44473a7828b88e5",
+    "agentflow-server/src/main/resources/api/openapi.json": "cc73ed152a6e013044760839bc1f42db780484a26e3a28f09d0606f0917b2be1",
+    "agentflow-server/src/main/resources/db/migration/V90__subprocess_cancelled_rounds.sql": "77f6fb16b8d3150371ee5c6e4b66641ae0c2a23d691889af69145f35859f5e16",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "8162d9aa9132a564b7c96360b0b0d398ae5a2ac7de013f9f342dc40616940aa7",
+    "agentflow-server/src/test/java/io/agentflow/approval/SubprocessCancellationMigrationTest.java": "5719ae6063df74f5bf89cbff8f7657ba22b7de97ea96da2cb6adf6e9d3f1c508",
+    "agentflow-server/src/test/java/io/agentflow/approval/SubprocessStartIntegrationTest.java": "8319107453b1c059c0687dd2303f9f4c2bdf8a63b4f2f3e8b8e7497dfa6cac64",
+    "agentflow-web/src/api.ts": "c4ed31fc0ec7403131023a792176a083c40aa79728a2a4c991a6cbd2774d90a0",
+    "agentflow-web/src/components/ApplicationHistory.vue": "bf820688b076a161fbcd46184d8d534b042ee42bc270e9be1342654da216159b",
+    "agentflow-web/src/components/AuditSearch.vue": "33a3a883aec5888b41d535fe3c035c7e95c86677daaac245143e48c07a3618f9",
+    "agentflow-web/src/notificationInbox.ts": "942d7bbd3661f34027baa5dacacded6c924d4d9d90bff50b27aa94399a71b580",
+    "agentflow-web/src/webhooks.ts": "30325d0fd5c63c2fe12f6aff75ca1f85d59b4f734be94b81cf7f9a97d574c7d2",
+    "agentflow-web/tests/notifications.test.mjs": "7c8fcd50ea3a4eadd539e758edc7f5958e6e305cae705e5a2df7d4a4e44014bd"
+  },
+  "logs": {
+    "subprocess-stopping-red.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-stopping-red.log",
+      "sha256": "5635d301a382ac52e315e3c435282d30872c03ac23ea0293f605a2e252f3156a"
+    },
+    "subprocess-stopping-first.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-stopping-first.log",
+      "sha256": "30906782e8d074ddc8fde7dfdc07d4f964a45d360ceb97a83be5851f2127e196"
+    },
+    "subprocess-stopping-race-red.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-stopping-race-red.log",
+      "sha256": "3e936d48acb77ccd9e36f89d97ce7b7c8507dd7a4c4ac270394f44fcbd999238"
+    },
+    "subprocess-stopping-race-green.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-stopping-race-green.log",
+      "sha256": "7fdfcb3363a6a271ed237550e63209d475a0beb402b0f276e7c2699a77dbc000"
+    },
+    "subprocess-stopping-focused.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-stopping-focused.log",
+      "sha256": "4ae345d135157fffd90da9fc899bc3fc54c6c5c3c03275b9b3390af5b2667bdf"
+    },
+    "subprocess-stopping-h2-regression.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-stopping-h2-regression.log",
+      "sha256": "34e4c4b110363803b3f016aff652609e5e99554bf4fdcd7ce8315f0ce87f6834"
+    },
+    "subprocess-stopping-contract-final.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-stopping-contract-final.log",
+      "sha256": "b6d63996a13db4b9a0c7bbb3e82c81a21dfff7fb0f344f6b36ec5bf318422829"
+    },
+    "subprocess-stopping-postgres.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-stopping-postgres.log",
+      "sha256": "438bff80056528e7f2f074d4b34c54bb82d79f4da7b690d44cd0e51452264bc3"
+    },
+    "subprocess-stopping-frontend-tests.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-stopping-frontend-tests.log",
+      "sha256": "011159638047bc4461338b871453409787a742c2c3da689176e68c6417518a64"
+    },
+    "subprocess-stopping-frontend-build.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-stopping-frontend-build.log",
+      "sha256": "7185d674925f6df3724906e239c1fa5e538be0d8e165cdbc51b849de470161e3"
+    },
+    "subprocess-stopping-openapi.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-stopping-openapi.log",
+      "sha256": "e57522c0f90ea67e32185840b6a0fb2e5267952b7fc89f99ded0019d3646be49"
+    }
+  },
+  "newMigration": "V90__subprocess_cancelled_rounds.sql",
+  "currentAcceptanceSchema": 88,
+  "testSchema": 90,
+  "existingRuntimeUpgraded": false,
+  "actualSubprocessHttpAcceptance": false,
+  "actualBrowserAcceptance": false,
+  "restartAcceptance": false,
+  "tlsAccepted": false,
+  "remoteDelivery": false,
+  "remainingPackages": 4,
+  "remaining": [
+    "Native parent-child pause/resume and per-task remaining SLA",
+    "Audited termination and other explicit failure recovery",
+    "Dependency validation/publication, designer/templates, authorized parent-child views, structured financial parent and complete HTTP/browser/upgrade/restart acceptance",
+    "Safe batch handling and template browser download receipt",
+    "External notifications, mentions, preferences, escalation and pause suppression",
+    "Real enterprise finance policy and budget/ERP/bank/invoice/event-source integration and reconciliation",
+    "Real model/IdP and enterprise deployment/upgrade/restore/capacity/alerts/TLS; Git remote/PR/CI"
+  ]
+}

@@ -25,6 +25,7 @@ public final class DefinitionDiffService {
         List<Change> changes = new ArrayList<>();
         modified(changes, Area.DEFINITION, "", after.name(), "name", before.name(), after.name());
         modified(changes, Area.ROUTING, "", "条件语言", "conditionLanguageVersion", before.graph().conditionLanguageVersion(), after.graph().conditionLanguageVersion());
+        modified(changes, Area.DEFINITION, "", "提交时风险规则", "riskPolicy", before.graph().riskPolicy(), after.graph().riskPolicy());
         compareNodes(changes, before.graph(), after.graph());
         compareEdges(changes, before.graph(), after.graph());
         compareForm(changes, before.formSchema(), after.formSchema());
@@ -103,6 +104,8 @@ public final class DefinitionDiffService {
             modified(changes, Area.FIELD, key, label, "options", oldField.options(), newField.options());
             modified(changes, Area.FIELD, key, label, "columns", oldField.columns(), newField.columns());
             modified(changes, Area.FIELD, key, label, "maxRows", oldField.maxRows(), newField.maxRows());
+            modified(changes, Area.FIELD, key, label, "sensitive", oldField.sensitive(), newField.sensitive());
+            modified(changes, Area.FIELD, key, label, "nodeAccess", oldField.nodeAccess(), newField.nodeAccess());
         }
     }
 

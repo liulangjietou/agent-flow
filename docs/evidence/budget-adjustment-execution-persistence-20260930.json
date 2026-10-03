@@ -1,0 +1,31 @@
+{
+  "date": "2026-09-30",
+  "sourceCommit": "13159abd96d25f3be59e0de021d48aae7c6247fc",
+  "scope": "V77 预算财务台账复核、单次消费、唯一原子指令、持久执行及安全结束",
+  "localOnly": true,
+  "verification": {
+    "domain": { "tests": 20, "failures": 0, "errors": 0, "newTests": 5 },
+    "h2": { "tests": 40, "failures": 0, "errors": 0, "newExecutionTests": 10, "includesWorkflow": 16, "includesOpenApi": 6 },
+    "postgresql": { "tests": 18, "failures": 0, "errors": 0, "newExecutionTests": 10 },
+    "overlapsEarlierScopes": true,
+    "logs": [
+      "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-execution-persistence-red.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-execution-persistence-h2-final.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-execution-postgres.log"
+    ],
+    "authorCheck": { "javaFiles": 1005, "namedTypes": 1887, "missing": 0, "parseErrors": 0 },
+    "redThenGreen": "正常消费和事务回滚测试未覆盖消费记录不一致；原 READY 仍存在但当前消费标记丢失的测试先失败，再补恢复时的原消费核对。",
+    "cases": [
+      "真实最终批准、冻结载荷、人员及版本共同绑定；旧 READY 不可越过新读取授权",
+      "两名财务并发授权只有一个活动原指令，另一份复核保持未消费",
+      "竞争领取只保存一个租约；从排队直接伪造成功不能落库",
+      "消费修订追加失败回滚指令、队列及当前复核",
+      "失联租约和迟到回执只允许原号查询，授权到期后仍可恢复实际生效事实",
+      "安全结束与领取竞争互斥，结束回滚保持原指令活动",
+      "结束后可用新台账重新授权，原授权与历史保持且不能复活",
+      "V76 至 V77 保留既有审批与预算修订，重复迁移无变更且校验通过"
+    ]
+  },
+  "runtime": { "schema": "V76", "replaced": false, "existingBudgetRequestsExecuted": false },
+  "remaining": ["事务外读取与执行工作器", "财务岗位及敏感字段权限的公开办理", "财务状态与操作页面", "实际验收库升级和业务 HTTP", "浏览器及窄屏", "真实外部预算联调"]
+}

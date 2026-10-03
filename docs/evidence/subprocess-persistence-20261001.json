@@ -1,0 +1,73 @@
+{
+  "date": "2026-10-01",
+  "stage": "SUBPROCESS_RELATION_AND_ATTACHMENT_PERSISTENCE_VERIFIED",
+  "featureComplete": false,
+  "schemaVersion": 89,
+  "scope": [
+    "Immutable parent-child invocation identity and exact definition version",
+    "Unique native activation and one parent per child application",
+    "Child round persisted while initial parent round is still pending",
+    "Attachment rebinding, original fingerprint verification, provenance and logical quota",
+    "Child field permissions including sensitive-field constraints for administrators",
+    "Physical-original backup inventory and paired database/file recovery"
+  ],
+  "regression": {
+    "cause": "Detail attachment transfer paths included row indexes, unlike the existing persisted field-path contract; repeated rows also created duplicate transfers",
+    "previousTestGap": "The prior test asserted its own indexed-path assumption instead of comparing with AttachmentReferences",
+    "redTests": 1,
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-attachment-path-red.log",
+    "greenDomainTests": 23,
+    "greenLog": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-attachment-path-green.log"
+  },
+  "h2": {
+    "serverScopePassed": 31,
+    "additionalChildFieldPermissionPassed": 1,
+    "newPersistenceCasesInScope": 7,
+    "migrationCases": 1,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-persistence-h2-final.log",
+    "additionalLog": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-child-field-permissions.log",
+    "initialTestFixtureCompileErrorsCorrected": 5
+  },
+  "postgres": {
+    "database": "subprocess_persistence_34c68666b9",
+    "migrationDatabase": "subprocess_migration_3f87377971",
+    "serverScopePassed": 12,
+    "databasePersistenceCases": 7,
+    "databaseMigrationCases": 1,
+    "localFileStoreCases": 4,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-persistence-postgres.log",
+    "existingAcceptanceDatabasesModified": false
+  },
+  "pairedRecovery": {
+    "status": "PASS",
+    "restoredDatabase": "agentflow_restore_0be4d76280814c7ba3b260021ff22aac",
+    "tablesCompared": 221,
+    "physicalOriginalFiles": 16,
+    "logicalChildReferences": 8,
+    "calls": 4,
+    "attachmentProvenanceRows": 8,
+    "corruptFixtureBackupRejected": true,
+    "reconstructedKnownFixtureFilesInNewDirectory": 1,
+    "originalCorruptionScenePreserved": true,
+    "sourceDatabaseUnchanged": true,
+    "restoredAliasFingerprintsVerified": true,
+    "transport": "Local container Unix socket; existing production backup/restore implementation reused without changing TLS behavior",
+    "tlsStatus": "NOT_VERIFIED: test certificate expired at 2026-09-30T09:02:22Z; the verify-full attempt failed",
+    "applicationStarted": false,
+    "evidence": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-paired-recovery-unix/evidence.json",
+    "scriptRegressionPassed": 6
+  },
+  "review": {
+    "method": "Manual scoped review using java-code-reviewer",
+    "blockingFindings": 0,
+    "diffCheck": "PASS"
+  },
+  "limits": [
+    "Test scopes overlap and are not a platform completion percentage",
+    "Persistence fixtures do not invoke a native parent-child process",
+    "Native startup orchestration, actual approval conclusions, descendant cancellation, pause/SLA and UI remain incomplete",
+    "The public subprocess node and publishing entry remain unavailable",
+    "No existing acceptance runtime was restarted or upgraded",
+    "No Git remote, PR or remote CI"
+  ]
+}

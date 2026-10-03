@@ -16,13 +16,13 @@ public interface DefinitionCatalogPort {
      * 已通过入口校验的筛选与稳定创建时间游标。
      * @author owlzhangfq@gmail.com
      */
-    record Query(String text, String status, String processKey, Long version, int limit,
+    record Query(String text, String status, String processKey, Long version, Boolean startEnabled, int limit,
                  Instant beforeTime, UUID beforeId) { }
 
     /**
      * 定义版本摘要；草稿版本为 0，完整定义需通过原详情接口重新授权读取。
      * @author owlzhangfq@gmail.com
      */
-    record Item(UUID id, String key, String name, String status, long version, long revision,
+    record Item(UUID id, String key, String name, String status, long version, long revision, boolean startEnabled,
                 Instant createdAt, Instant updatedAt) { }
 }

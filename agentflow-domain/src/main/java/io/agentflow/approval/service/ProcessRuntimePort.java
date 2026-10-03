@@ -1,7 +1,9 @@
 package io.agentflow.approval.service;
 
+import io.agentflow.approval.model.SubmissionRisk;
 import java.util.UUID;
 import io.agentflow.form.FormSchema;
+import io.agentflow.organization.InitiatorContext;
 import java.util.Map;
 
 /**
@@ -12,8 +14,28 @@ public interface ProcessRuntimePort {
     /** 按明确来源解析实际定义标识；内置与租户定义之间禁止自动替换。 */
     String resolveDefinition(String tenantId, String processKey, long definitionVersion, boolean bundled);
 
+    /** 只读地检查原绑定版本及其固定后代是否需要任职，不选择人员或启动流程。 */
+    boolean requiresInitiatorAppointment(DefinitionBinding binding);
+
+    /**
+     * 原申请和历史实例共同确定定义来源，供启动和发起提示复用。
+     * @author owlzhangfq@gmail.com
+     */
+    record DefinitionBinding(String tenantId, UUID applicationId, String processKey, long definitionVersion,
+                             String runtimeDefinitionId, String previousProcessInstanceId) { }
+
     /** 启动与申请版本绑定的流程实例。 */
     StartedProcess start(StartProcessCommand command);
+
+    /** 核定业务金额变化仅更新当前唯一实例的派生路由，不启动或结束任务。 */
+    void updateBusinessPayload(UpdateBusinessPayload command);
+
+    /**
+     * 精确绑定实际审批轮次，不能把核减写到另一个或已结束的实例。
+     * @author owlzhangfq@gmail.com
+     */
+    record UpdateBusinessPayload(String tenantId, UUID applicationId, int roundNo, String processInstanceId,
+                                 Map<String, Object> payload) { }
 
     /** 完成当前人工任务。 */
     CompletedTask complete(CompleteTaskCommand command);
@@ -30,7 +52,18 @@ public interface ProcessRuntimePort {
     record StartProcessCommand(String tenantId, UUID applicationId, String processKey,
                                long definitionVersion, int roundNo, String businessNo,
                                Map<String, Object> payload, FormSchema formSchema,
-                               String runtimeDefinitionId, String previousProcessInstanceId) {
+                               String runtimeDefinitionId, String previousProcessInstanceId, InitiatorContext initiatorContext) {
+        /** 提取实际定义来源；查询不需要访问表单内容或发起人的任职资料。 */
+        public DefinitionBinding definitionBinding() {
+            return new DefinitionBinding(tenantId, applicationId, processKey, definitionVersion, runtimeDefinitionId, previousProcessInstanceId);
+        }
+        /** 未选择任职的旧调用不补造上下文。 */
+        public StartProcessCommand(String tenantId, UUID applicationId, String processKey, long definitionVersion,
+                                   int roundNo, String businessNo, Map<String, Object> payload, FormSchema formSchema,
+                                   String runtimeDefinitionId, String previousProcessInstanceId) {
+            this(tenantId, applicationId, processKey, definitionVersion, roundNo, businessNo, payload, formSchema,
+                    runtimeDefinitionId, previousProcessInstanceId, null);
+        }
         /** 兼容尚未保存实际定义标识的旧调用。 */
         public StartProcessCommand(String tenantId, UUID applicationId, String processKey, long definitionVersion,
                                    int roundNo, String businessNo, Map<String, Object> payload, FormSchema formSchema) {
@@ -52,7 +85,12 @@ public interface ProcessRuntimePort {
     /**
      * @author owlzhangfq@gmail.com
      */
-    record StartedProcess(String processInstanceId, String firstTaskId) { }
+    record StartedProcess(String processInstanceId, String firstTaskId, SubmissionRisk risk) {
+        /** 未提供策略的旧运行适配器保持未评估。 */
+        public StartedProcess(String processInstanceId, String firstTaskId) {
+            this(processInstanceId, firstTaskId, SubmissionRisk.unassessed());
+        }
+    }
 
     /**
      * @author owlzhangfq@gmail.com

@@ -1,6 +1,7 @@
 package io.agentflow.approval;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.JdbcDefinitionDraftRepository;
 import org.flywaydb.core.Flyway;
@@ -53,15 +54,29 @@ class FormSchemaMigrationTest {
         definitionAfter.remove("FORM_SCHEMA_JSON"); applicationAfter.remove("FORM_SCHEMA_JSON"); applicationAfter.remove("RUNTIME_DEFINITION_ID"); roundAfter.remove("FORM_SCHEMA_JSON");
         assertThat(definitionAfter.remove("NOTIFICATION_TEXTS_JSON")).isNull();
         assertThat(applicationAfter.remove("NOTIFICATION_TEXTS_JSON")).isNull();
+        assertThat(definitionAfter.remove("START_ENABLED")).isEqualTo(true);
         assertThat(definitionAfter).isEqualTo(definitionBefore);
         assertThat(applicationAfter.remove("SEARCH_AMOUNT")).isNull();
+        // 新增业务关联不能把历史普通表单变成费用单。
+        assertThat(applicationAfter.remove("BUSINESS_TYPE")).isNull();
+        assertThat(applicationAfter.remove("BUSINESS_ID")).isNull();
         assertThat(applicationAfter).isEqualTo(applicationBefore);
+        assertThat(roundAfter.remove("INITIATOR_CONTEXT_JSON")).isNull();
+        assertThat(roundAfter.remove("INITIATOR_DEPARTMENT_NAME")).isNull();
+        assertThat(roundAfter.remove("INITIATOR_POSITION_NAME")).isNull();
+        assertThat(roundAfter.remove("INITIATOR_LEGAL_ENTITY_NAME")).isNull();
+        assertThat(roundAfter.remove("RISK_LEVEL")).isNull();
+        assertThat(roundAfter.remove("RISK_JSON")).isNull();
         assertThat(roundAfter).isEqualTo(roundBefore);
         JsonUtil json = new JsonUtil(new ObjectMapper());
         assertThat(new JdbcDefinitionDraftRepository(jdbc, json).findPublished("demo", "legacy", 1).orElseThrow().formSchema()).isNull();
         var restoredApplication = new JdbcApplicationRepository(jdbc, json).findById("demo", UUID.fromString(applicationId)).orElseThrow();
         assertThat(restoredApplication.formSchema()).isNull();
         assertThat(restoredApplication.runtimeDefinitionId()).isNull();
-        assertThat(new JdbcSubmissionRoundRepository(jdbc, json).findAll("demo", UUID.fromString(applicationId)).get(0).formSchema()).isNull();
+        assertThat(restoredApplication.businessReference()).isNull();
+        var restoredRound = new JdbcSubmissionRoundRepository(jdbc, json).findAll("demo", UUID.fromString(applicationId)).get(0);
+        assertThat(restoredRound.formSchema()).isNull();
+        assertThat(restoredRound.initiatorContext()).isNull();
+        assertThat(restoredRound.risk()).isEqualTo(SubmissionRisk.unassessed());
     }
 }

@@ -1,0 +1,554 @@
+{
+  "date": "2026-10-01T19:07:29.580033+00:00",
+  "status": "LOCALLY_VERIFIED",
+  "feature": "Explicit task escalation with frozen audience and independent pause/resume deadline",
+  "baseCommit": "998413ea03ce36bce9bc00a90cdc432a78b044b9",
+  "branch": "codex/governance-identifier-integration",
+  "mainModified": false,
+  "remoteDelivery": {
+    "remoteConfigured": false,
+    "pullRequest": null,
+    "ci": null
+  },
+  "tests": {
+    "domain": 26,
+    "h2ServerUnique": 47,
+    "h2Classes": {
+      "io.agentflow.calendar.BusinessDeadlineResumeTest": 6,
+      "io.agentflow.definition.TaskDeadlinePolicyTest": 9,
+      "io.agentflow.definition.TaskEscalationPolicyTest": 11,
+      "io.agentflow.definition.DefinitionInitiatorRequirementsTest": 5,
+      "io.agentflow.approval.InstanceControlIntegrationTest": 14,
+      "io.agentflow.approval.copy.ApplicationCopyIntegrationTest": 6,
+      "io.agentflow.approval.process.TaskDeadlineIntegrationTest": 7,
+      "io.agentflow.approval.process.TaskDeadlineReminderSchedulerTest": 1,
+      "io.agentflow.approval.process.TaskEscalationIntegrationTest": 7,
+      "io.agentflow.api.OpenApiContractTest": 6,
+      "io.agentflow.approval.process.TaskEscalationSchedulerTest": 1
+    },
+    "postgresCommandTotal": 22,
+    "postgresIntegration": 21,
+    "postgresSchedulerUnit": 1,
+    "frontendUnique": 50,
+    "frontendTestNames": [
+      "两种视图保留升级原文，关闭升级与关闭整个期限分别清理对应属性",
+      "会签方式可保存、重新加载和切回单人审批，旧节点保持缺省属性",
+      "分页失败保留消息与游标，重试去重且末页省略游标可停止加载",
+      "切换账号与未读筛选清空消息和计数，迟到成功或失败不能回填",
+      "区间遗漏可导入待修正草稿，结构错误仍阻止导入",
+      "升级模板完整保留明确规则，缺少目标收件人可先导入，非法规则仍阻断",
+      "升级消息不会被当作当前收件人的待办",
+      "历史流程测试 JSON 限制结构并防止把不精确数字默认为可靠输入",
+      "取消预检会中止请求，旧成功和失败不能更新新文件；失败后可以重新检查",
+      "只持久化实际移动的坐标，未改变的原坐标文本保持不变",
+      "固定子版本与映射在两种视图往返，清除引用时不残留旧输入且不污染来源",
+      "子流程模板只保留固定引用和显式输入，拒绝路径、原型及引擎扩展",
+      "字段敏感标记和节点权限完整往返，错误权限或字符串布尔值拒绝导入",
+      "实际待办消息仍实时复核，抄送保持专用轮次读取入口",
+      "审批人不可用允许待修改草稿，结构错误阻断，检查中禁止重复检查",
+      "导入响应丢失后复用原请求，改目标不可替代原请求",
+      "导入导出保留条件语言版本，未知或强制转换版本拒绝",
+      "导入按目标流程标识校验，修改标识后保留文件但取消旧检查",
+      "导出投影只保留配置，完整往返节点顺序、表单和精确数值，不改变原对象",
+      "带通知文案导出为 v2，纯文本完整往返，旧 v1 不能偷偷携带新增配置",
+      "并行模板往返保留分支、固定期限与通知文案，不携带版本停用状态",
+      "快速模式读取的期限副本与画布一致，编辑或清除不污染原属性及审批人",
+      "抄送名单在加载、修改及清空时原样保存，不附加审批方式",
+      "换文件后忽略旧读取成功与失败，离开后不留下模板",
+      "文件大小按 UTF-8 字节检查，节点和连线有界，未知格式不兜底",
+      "无表单与显式空表单往返不混淆",
+      "旧失败不能覆盖新模拟，表单和图错误只属于当前请求",
+      "旧节点未修改时不写入虚构坐标，保留编辑器未知属性",
+      "期限保存明确日历修订，重新加载和撤销快照不改变引用",
+      "期限日历缺失允许待配置草稿，但不能放行同时存在的目标标识冲突",
+      "未编辑的缺项、非法期限和错误节点类型原样往返，不能静默当成无期限",
+      "条件升级只读请求携带原图与取消信号，不创建幂等写入",
+      "条件错误定位保留含冒号的连线标识和字符位置",
+      "标识冲突提示说明冲突类型，保留定位标识",
+      "格式版本、租户数据、脚本扩展、原型属性、非白名单节点整份拒绝",
+      "检查超时释放界面并阻断迟到成功",
+      "消息查询只读且可取消，标记已读丢失响应后重放原请求",
+      "清空审批人规则移除旧值，但保留其他配置；新节点正常保存坐标",
+      "版本二明细模板完整往返，嵌套与未知列属性整份拒绝",
+      "畸形表单不依赖类型断言通过：null、字符串、重复字段与不精确数字都拒绝",
+      "目标租户缺失日历允许导入待配置草稿，非法期限仍阻止导入",
+      "真实组件显式启用后查询目录，输入和选择沿原撤销边界同步",
+      "结束或移除会签的消息直接打开申请，不请求已取消任务，也不显示待办异常提示",
+      "设计试算用只读 POST，携带完整未保存内容与取消信号，不进入写请求恢复",
+      "身份切换和迟到目录不会覆盖已有升级规则，当前读取失败保持不可选择",
+      "输入发送不可变快照，编辑清除旧结果与高亮，迟到响应无效",
+      "通知文案拒绝未知事件、超长和控制字符，空配置不会继承其他文件内容",
+      "重复加载更多只查询一次，筛选变化不沿用旧分页结果",
+      "非法布局坐标采用可展示位置，未移动时仍保留原始属性",
+      "预检携带取消信号且不使用写请求键，创建使用既有幂等链路不自动发布"
+    ],
+    "scopesOverlap": true,
+    "typecheckAndBuild": "PASS",
+    "openapi": {
+      "result": "PASS",
+      "operations": 290,
+      "schemas": 564,
+      "requestExamples": 110
+    },
+    "actualResponses": {
+      "status": "PASS",
+      "files": {
+        "task-escalation-http-prepare-fixture-attempt1.json": {
+          "responses": 4,
+          "successfulRequests": 3
+        },
+        "task-escalation-http-prepare-fixture-attempt2.json": {
+          "responses": 3,
+          "successfulRequests": 1
+        },
+        "task-escalation-http-prepare.json": {
+          "responses": 23,
+          "successfulRequests": 20
+        },
+        "task-escalation-http-observe.json": {
+          "responses": 5,
+          "successfulRequests": 0
+        },
+        "task-escalation-http-restart1.json": {
+          "responses": 7,
+          "successfulRequests": 1
+        },
+        "task-escalation-http-restart2-before-due-observation.json": {
+          "responses": 1,
+          "successfulRequests": 0
+        },
+        "task-escalation-http-restart2.json": {
+          "responses": 2,
+          "successfulRequests": 0
+        },
+        "task-escalation-browser-http-final.json": {
+          "responses": 58,
+          "successfulRequests": 7
+        }
+      },
+      "totalResponses": 103
+    }
+  },
+  "runtime": {
+    "database": "task_escalation_3ab59b97e5",
+    "sourceDatabase": "notification_delivery_e79866d143",
+    "schemaVersion": 93,
+    "newMigration": false,
+    "bootCount": 3,
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-server.jar",
+    "jarSha256": "50fa4708247ffe26f95d0bf04eee8b982aac950462e57128d2debd001697563d",
+    "backendPort": 18241,
+    "frontendPort": 15334,
+    "sourceRows": 1365,
+    "sourceTables": 225,
+    "finalTables": 225,
+    "finalRows": 1780,
+    "files": 3,
+    "sourceUnchanged": true,
+    "sourceRowsPreservedExceptEngineIdReservation": true,
+    "pendingTimeAndAudiencePreservedAfterRestart": true,
+    "databaseClockEdited": false,
+    "escalationCounts": {
+      "old": 0,
+      "live": 1,
+      "paused": 1,
+      "stopped": 0,
+      "counter": 2
+    },
+    "deliveryAfterResumedDueMilliseconds": 332.095947265625,
+    "externalDispatchIntentCount": 4,
+    "externalWorkerEnabled": false
+  },
+  "browser": {
+    "status": "PASS",
+    "source": "CUA UI actions and recorded HTTP responses",
+    "quickAndCanvasPreserved": true,
+    "undoMinutesAndToggleAndRecipient": true,
+    "actualSaveAndPublish": true,
+    "publishedInputsReadOnly": true,
+    "downloadedFileImportedAsIndependentDraft": true,
+    "importedDefinitionId": "09d38b16-b980-416b-b338-d9cebe85abd6",
+    "importedGraphMatchesActualDownload": true,
+    "receivedTwoActualEscalations": true,
+    "noApplicationAccessFromReminder": true,
+    "widthCss": 500,
+    "horizontalOverflow": false,
+    "browserSessionRenewedAfterServerRestart": true,
+    "browserConsole": []
+  },
+  "limitations": [
+    "Real SMTP/TLS/final delivery and enterprise IM remain separate acceptance tasks.",
+    "SLA sender reuses existing dispatch intents; outbound workers stayed disabled in this runtime.",
+    "Three overall work packages remain; platform goal is not complete."
+  ],
+  "testFixtureCorrections": [
+    "The first scheduler mock setup consumed a stubbed page; doReturn/doThrow setup fixes the fixture and the final H2/PostgreSQL commands pass.",
+    "The runtime fixture initially expected 201 for definition creation (actual contract is 200) and used demo rules in an initialized organization directory; preserved responses show the rejection, then actual directory rules were used.",
+    "A second-restart observation before the stored due time had zero escalation; the later check passed after the actual due time.",
+    "Demo browser tokens expired after server restart; two 401 responses were preserved and the user session was renewed for template import."
+  ],
+  "sourceFiles": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java",
+      "sha256": "26c60eac6a5b6f6d85f8fd9dc63427bf95556025ef30d6761de358cc544938be"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/definition/TaskEscalationPolicy.java",
+      "sha256": "7c02756156b9f1313968c4ec76ec9b12ef5204bdd9e030d6179727d49517178a"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java",
+      "sha256": "ee7a9e90863c115333cf5c9d153ac2107bbebd86146fc33c2180fc754e941b76"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/definition/TaskEscalationPolicyTest.java",
+      "sha256": "46c24abff2e8b25b299dd6051416b5dbdc17a98aa3a439a8bdd2d73eba346891"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/SubprocessStartService.java",
+      "sha256": "4f72ee3484ce687b1be3fd3e224136cb9e5114083f419abcdd53f316563ea4b8"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskDeadlineListener.java",
+      "sha256": "bc55836af2bf1a995a0d0db1185878d9b97ea019dc2db91b9a89f7e76df994b9"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskEscalations.java",
+      "sha256": "b05c468d6563fd389f1a67085393fc36320b6b9aca58657d69292bc2024268aa"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/process/InstanceControlService.java",
+      "sha256": "b9f18cd5f8501d2d930498ceab1ef0a43dc8636aafa7e78a73efb272dbda54fc"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/process/TaskEscalationBindings.java",
+      "sha256": "d5aacf9559ecf079d50c5b60b2fba0564fd8897bbafaec0d9eb4b2b48be6c899"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/process/TaskEscalationScheduler.java",
+      "sha256": "efb0c7dfce31fc83109aa6499741aa3fd0afb4e195ada60b3b37cefd90fc9457"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/definition/DefinitionInitiatorRequirements.java",
+      "sha256": "964dc7627a086909dc1f2ad7b1ed2ad26a465860ce4fe6b1e6821453daaccce5"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/definition/DefinitionReferenceInspector.java",
+      "sha256": "6c3aeed0f296c421c1752f0c05ac3d354655c9b9eea40afa33efa7a8b46c90ea"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ApprovalNotificationService.java",
+      "sha256": "a786a73a0547fef40e51f13dd01d0ef0e565dfa85c84b1721a9716bf71d4a76a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationAssigneeResolver.java",
+      "sha256": "dc8d6aa5ad4ed72f0de628cab0222e723ca8f4e8c376ff547e5a624bc5369221"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "09fc0e037e9f9bce164595444a3f44e941fe81cf44107b0be62c9f7fad64d7e8"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/approval/process/TaskEscalationIntegrationTest.java",
+      "sha256": "403bd4f1965a787bb01d4bb2aef27f5c8d80874a34c7a379926c04c3a1488c51"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/approval/process/TaskEscalationSchedulerTest.java",
+      "sha256": "11d3fac7f424e267720b33c7e1876af5080caaf742193f1911fd9b6beead7900"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/definition/DefinitionInitiatorRequirementsTest.java",
+      "sha256": "77fcb7b42fc3ec99e33051eb9bbb3fb1ee7c5e6d08993e2c3baca2e9e84f3748"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "52fb015217a3f2c06d571d5ee1f146dc2fe26919d90284067f31ebe410d5aa59"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "dddc0a81327bfcc89ae52b2831a83dfacfa1c986324315b186689450c610258b"
+    },
+    {
+      "path": "agentflow-web/src/components/DefinitionDeadline.vue",
+      "sha256": "be9243d47e7d91eb5008b07ead9914de5e23dfe69afebb7cbb59d4991f262e4f"
+    },
+    {
+      "path": "agentflow-web/src/components/DefinitionEscalation.vue",
+      "sha256": "6e03aa60f5339f35364172a280a71531fc70219317070e67349eda84946aad4c"
+    },
+    {
+      "path": "agentflow-web/src/definitionSimulation.ts",
+      "sha256": "982247ed02741a6ded40a13bb48d39f8a67a728d6477f361948a08a95ee91623"
+    },
+    {
+      "path": "agentflow-web/src/designerGraph.ts",
+      "sha256": "4afa32e10a13634b39dc3994ecb5d13e1c2b4ffb5665d0127c8bc4c41c6c2a1c"
+    },
+    {
+      "path": "agentflow-web/src/notificationInbox.ts",
+      "sha256": "6ca2d0cf9c1378e0799a2d44e7a15e41a1b5c1e62cec51ac9a3c85dfc8b1b60d"
+    },
+    {
+      "path": "agentflow-web/src/portableTemplate.ts",
+      "sha256": "f1c013e8938b168a4f38438ccef7ee5aaf8f40925b5f74ba022de3ef96e75c74"
+    },
+    {
+      "path": "agentflow-web/tests/escalation-config.test.mjs",
+      "sha256": "dc4ffe7c53b6fff1d4cb6d649bbaee5e0b1865d9961a7aa4720fab6d831444b3"
+    },
+    {
+      "path": "agentflow-web/tests/portable-template.test.mjs",
+      "sha256": "862e2f68db10bd632e2d4d31e7aa46c95418731416a034501832ac22677226ff"
+    },
+    {
+      "path": "docs/instance-control.md",
+      "sha256": "84b4b8fa9d869fbb10e981b70f777e9a676acb193c965f564a7324a9469899b2"
+    },
+    {
+      "path": "docs/notification-inbox.md",
+      "sha256": "7e590bee760f553df23e176f74a9a736a53b8503349665908d1a8151d7dc3485"
+    },
+    {
+      "path": "docs/notification-preferences.md",
+      "sha256": "9bb2fa54f9d2aff82fec0e87615f28a0fd810ee12c85b02125a6fd0d80930efb"
+    },
+    {
+      "path": "docs/remaining-implementation-plan.md",
+      "sha256": "393a7bc7608afa2e18bc8a4409fd2471099146659b84f568e5e0e19358507c1d"
+    },
+    {
+      "path": "docs/remaining-local-work.md",
+      "sha256": "61e2f90149b065a8a28a1a92e2c124a9f09f2b11700eae95162beb75ea42c7a5"
+    },
+    {
+      "path": "docs/task-deadlines.md",
+      "sha256": "03c9ec3b26ada5a41a9de813f722441bffde2783c0aded5308ff2a81856cdcf6"
+    },
+    {
+      "path": "docs/task-escalation.md",
+      "sha256": "bc38927a8824a105b72e471dcee3c0c107ee553ec179f9cc638f68e76119422b"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-policy-red.log",
+      "sha256": "a634908a9a3e4bca8d0ad1c5404b4adbcbdab7616588bd7b17d692c542ff5850",
+      "bytes": 37077
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-before-pause.log",
+      "sha256": "9decd46570714b33c2b37fc338bea8ee5c303b0d3f887cf87851975707a7d526",
+      "bytes": 46579
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-h2-initial.log",
+      "sha256": "35a7b931f880d37ad3fb9237185794c471cee589889787709a8f798ffd8ed78d",
+      "bytes": 120412
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-h2-boundaries.log",
+      "sha256": "4be1b5f754dc522795e441d18cdc1208eaf1eb77488994e5155dd856fc24aed2",
+      "bytes": 68026
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-h2-boundaries-final.log",
+      "sha256": "bf997bf157378fbe1195cd3778ac5ab62020ca769f1d446787fc0feaf8b27d79",
+      "bytes": 83864
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-postgres.log",
+      "sha256": "fdd500d57b8f762e6b593d3816e2e89a760522e8f42a9b7f5554c5a8a843b57b",
+      "bytes": 87926
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-postgres.json",
+      "sha256": "30a677fb7592ea595317587f0b465d1d25c5b2332f50f3ec9f8752c146059aad",
+      "bytes": 239
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-ui-tests-initial.log",
+      "sha256": "e2b5842f9e699094a7c698dcff5bd6c5217ffc957a8608197eee413b5f5f529f",
+      "bytes": 4976
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-ui-boundaries.log",
+      "sha256": "1f021876b34c2f587f4a7afc501ac5ed10f9be0e8e56382b0167e3744db2cce9",
+      "bytes": 2811
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-ui-build-initial.log",
+      "sha256": "317543c534f5e47dec6415f8df2a17722edbc4d7ae028d47ea25f63d6f05495a",
+      "bytes": 781
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-openapi.log",
+      "sha256": "1f8bc92b12f74b2b3554ff0fa1d6c81160cd2208ef6b35594ecb68c823e7a3fe",
+      "bytes": 71
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-package.log",
+      "sha256": "688d1df7422f7e928b3923bb4a138936a3ec1745d42575be477ebe617716b9bf",
+      "bytes": 11498
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-server.jar",
+      "sha256": "50fa4708247ffe26f95d0bf04eee8b982aac950462e57128d2debd001697563d",
+      "bytes": 74311920
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-runtime-final.json",
+      "sha256": "09302b4ef4aa03634c7d13144ba06865eb7af06afc8b7727b33abf09eacb6b98",
+      "bytes": 29789
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-boot3-verified.log",
+      "sha256": "ba07ea258e8f5ff0ff825f430c48622726a2407579dc57caa8edf45cb3dd69de",
+      "bytes": 7348
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-first-boot.json",
+      "sha256": "122e1db5c3f51f64061742818f149ebc7b74bbb8efdddf582dc74a01b6500af4",
+      "bytes": 26217
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-before-restart1.json",
+      "sha256": "6429a92e7fa8963bc39a2bbe9b5e3418f7758c98566afe577c25b562acbf1531",
+      "bytes": 24305
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-restart1-preservation.json",
+      "sha256": "22acbc73d33d12ce76fa7632f4d461194787912b7124d73be5d6bfde7e567bab",
+      "bytes": 26195
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-before-restart2.json",
+      "sha256": "256c3c9bac058f28ec125e4db858e71faaf19a69163b58ffac2691ae4f2ac6fb",
+      "bytes": 35183
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-runtime-verification.json",
+      "sha256": "1ac1c16f7fc97b202eb544d0556186b9764c7c8d16c1287339d69dfc19a0dfa9",
+      "bytes": 32580
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-http-state.json",
+      "sha256": "aaecac08cf55f14540c100d7da4d45bc9b05d284e833c5a181aae65e91a45a97",
+      "bytes": 13390
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-contracts.json",
+      "sha256": "d9f15edd0187f09662c710fa5fa80d7ab51d4808f1c155ae0c006ff973b39bdc",
+      "bytes": 950
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-browser-http-final.json",
+      "sha256": "ffcf17ce40ac1c020f1314d5cb480d434f0fd632040f58b5c426e8e6c053264b",
+      "bytes": 93182
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-browser-assertions.json",
+      "sha256": "fee3003050fd00fcca699ec2a86ee2bfeb3fa525d677bb32b9907617cbba8a1a",
+      "bytes": 599
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-browser-layout.json",
+      "sha256": "7712701e0a751ce05a1974ce9f0c248355a86ac35aaab4055efcc5cca716834d",
+      "bytes": 196
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-browser-500.png",
+      "sha256": "00a70eb79ede17c374676d98dc6e7030298f1cb0edbc5f67b7b6e483dd5e1e9a",
+      "bytes": 33203
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-browser-inbox.png",
+      "sha256": "eacfddce4cabf5d28eb501b27bc7993a30cbceb789d1fe1cd341768b6ac79cbe",
+      "bytes": 79886
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-browser-denied.png",
+      "sha256": "4f24a9bf3ca5c1e8f6a2ccf9ea87227cca96362de23b3009ce87bc8f730edf51",
+      "bytes": 65329
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-browser-console.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-downloaded-template.json",
+      "sha256": "a17f25f71b403ba21ca6c216a2a958d3017f0399fae5cc36420e3a9b0c594fee",
+      "bytes": 1549
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-download.json",
+      "sha256": "527f8ce79736e8c4558f1ababde6b6cfb7ce39be81be0275fbdb7158c4be20b8",
+      "bytes": 1677
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/exercise-task-escalation.mjs",
+      "sha256": "d686b9345142f7a68726097184a7b21862c465766f225dfb619703cb11140ad6",
+      "bytes": 8538
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/verify-task-escalation-runtime.py",
+      "sha256": "0e1e79990a0e029b4f017f6f8df7870ba945b20c1c6582f5f53557fd281ac8cc",
+      "bytes": 3634
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/verify-task-escalation-contracts.mjs",
+      "sha256": "f374d2611a83cd064daaf717e0a4c9d199e6eff469fe0f8192c3403c020f5ec2",
+      "bytes": 2490
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/run-task-escalation-postgres.py",
+      "sha256": "04ebdec3d56e3fd452ded6a4d5900b21ba026ab037583f1590be245aae1fe7a8",
+      "bytes": 2660
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/prepare-task-escalation-runtime.py",
+      "sha256": "6533913a1bebb454d61437e6299578a422a09bfff4f6667a151f2cc2bdb9b05e",
+      "bytes": 2323
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/run-task-escalation-runtime.py",
+      "sha256": "dc9ea24a8b52e76bdddaed1279bd7664caa401b295022c93f24efad4228f05b2",
+      "bytes": 3709
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-http-prepare-fixture-attempt1.json",
+      "sha256": "4dde3f361f0c865d9d6d27eece2de67e510c7bce5f2804980a636c3f8c137882",
+      "bytes": 6447
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-http-prepare-fixture-attempt2.json",
+      "sha256": "5e55b3a39417e7d919f4abbb8f8e94f14ff25f48dfb85ddf5c7b619f5379052c",
+      "bytes": 1669
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-http-prepare.json",
+      "sha256": "1e81679fc6fb896f4c558c3fe494f3cf7806d4447675bfde200aabc73d218add",
+      "bytes": 39780
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-http-observe.json",
+      "sha256": "c28de50972cbeca1304e61241995124671a8f6e254713a9824b15c0d4270e996",
+      "bytes": 40929
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-http-restart1.json",
+      "sha256": "5d01014e8f6a718fc4459ef8b49d4593e72ea3dcd27e97ca9764adee1797bcde",
+      "bytes": 42278
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-http-restart2-before-due-observation.json",
+      "sha256": "9c4ec7f22b529e26c20397b7fa195cd61f9093ffc0b0a107dd3587830ff480df",
+      "bytes": 5689
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/task-escalation-http-restart2.json",
+      "sha256": "d0f066fa8b1ca1c0ad41b1c8757bad421dfe8283535fcfac9042d0a60403c210",
+      "bytes": 7085
+    }
+  ]
+}

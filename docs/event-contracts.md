@@ -1,0 +1,44 @@
+# 已发布事件契约
+
+更新：2026-10-01。事件白名单的后台目录、明确发布、精确版本启停、追加历史及设计器只读选择接口已实现。精确版本节点、原生等待和事务消费见[原生等待后台](event-waits.md)；来源验签、持久收件及管理员原号恢复见[签名收件](event-inbox.md)。管理、设计器和等待页面已完成本地验收，见[事件页面与运行验收](event-workspace.md)；实际企业来源尚未联调。
+
+## 调用链与职责
+
+管理员通过事件契约 API 明确发布白名单，流程设计器通过独立只读 API 选择发布版本。领域对象固定契约正文并判定启停修订；应用服务编排租户内查询与事务；JDBC 仓储原子保存发布指针、正文、可用性与历史。后续流程发布和事件消费必须读取被引用的精确版本，不能用最新版本或相似事件名称替代。
+
+目录接口本身不触发 Flowable，不修改申请、人工意见或财务结果，也不调用外部来源。来源凭据由部署集成配置管理，契约 API 不接受密钥、任意目标 URL、脚本或客户端指定的租户、作者、发布时间。
+
+## 发布与停用规则
+
+- `key` 是租户内固定标识，只允许小写字母开头的 ASCII 字母、数字、点、下划线和连字符，最长 64 位。`sourceKey` 使用同一边界，是来源的逻辑标识。
+- 每版固定 `name`、`sourceKey`、`eventType` 和服务端规定的 `envelopeVersion=1`。事件类型只接受最长 128 位的字面量，不接受表达式。发布只登记白名单，不代替来源认证或实际接入验收。
+- 首次发布携带 `expectedVersion=0`；之后必须携带已核对的最新发布版本。成功只分配下一个相邻版本；并发请求只有一个成功，冲突请求不会留下空版本或历史。
+- 旧版正文没有更新或删除入口。发布新版可以调整来源和事件类型，但旧版正文及可用性保持原值。
+- 启停针对一个明确发布版本，携带独立的 `expectedRevision`、显式 `enabled` 及原因。发布时形成可用性修订 1，每次实际启停递增一次。相同状态或旧修订返回冲突，不追加虚假操作。
+- 发布、停用和恢复均记录认证操作者、微秒精度时间及非空原因，原因最长 2,000 字符。初始发布和所有启停决定共同保留在该版本的历史中。
+- 最新版停用后，目录仍显示该版本及停用状态，不擅自降级成旧版。精确版本查询、发布版本历史和启停历史均限定当前租户。
+- 写请求使用已有幂等协议。原键回放返回当次保存的回执；即使后来又启用或停用，也不重做原动作。客户端应在回放后重新读取当前版本，不能将旧回执当作最新状态。
+
+## 已实现的接口
+
+| 入口 | 权限与行为 |
+| --- | --- |
+| `GET /api/v1/event-contracts` | ADMIN；按稳定业务键分页，显示各契约最新版本 |
+| `POST /api/v1/event-contracts/{key}/versions` | ADMIN；明确发布，要求原幂等键、期望发布版本及原因 |
+| `GET /api/v1/event-contracts/{key}/versions` | ADMIN；按发布版本倒序分页 |
+| `GET /api/v1/event-contracts/{key}/versions/{version}` | ADMIN；精确正文、发布依据及当前可用性 |
+| `POST /api/v1/event-contracts/{key}/versions/{version}/availability` | ADMIN；按原可用性修订启停，要求原因及幂等键 |
+| `GET /api/v1/event-contracts/{key}/versions/{version}/history` | ADMIN；该版本的发布及启停历史 |
+| `GET /api/v1/process-definitions/event-contract-options` | ADMIN 或 PROCESS_ADMIN；设计器只读目录 |
+| `GET /api/v1/process-definitions/event-contract-options/{key}/versions` | 同上；明确选择历史发布版本 |
+| `GET /api/v1/process-definitions/event-contract-options/{key}/versions/{version}` | 同上；精确版本摘要，不包含管理员填写的审计原因 |
+
+读取结果和成功写入回执均禁止缓存。管理员权限在幂等回放之前重新检查。业务版本与可用性修订不得混用。目录 `afterKey`、版本 `beforeVersion`、历史 `beforeRevision` 各自独立；默认每页 30 条，最多 100 条，最后一页显式返回空游标。空游标不施加版本上界，不使用一个合法版本号代表“无限大”。
+
+V87 只新增 `event_contract`、`event_contract_version` 和 `event_contract_availability_history`，不补造企业白名单，不改写旧流程定义、原申请或财务数据。旧二进制不能直接连接已经升到 V87 的库。
+
+## 验证与接续
+
+领域 5 项、H2 服务端 17 项通过；PostgreSQL 服务端 11 项使用相同业务断言重复验证，范围不相加为不同用例数。覆盖权限在回放前复核、租户隔离、原回执恢复、发布与启停并发、事务回滚、有限分页、旧版保留以及 V86→V87 迁移。OpenAPI 对照真实路由及请求/响应字段通过；当前共 273 个操作、542 个 schema、106 个请求示例，原有操作和 schema 内容保持。
+
+契约目录的完整本地运行证据见 [事件契约后台验收](evidence/event-contract-catalog-20261001.json)。该阶段的接口数量是当时的快照。精确版本发布校验、原生等待和可信持久收件已随后接通；管理、设计器和等待页面及本地完整交互验收见[事件页面](event-workspace.md)。

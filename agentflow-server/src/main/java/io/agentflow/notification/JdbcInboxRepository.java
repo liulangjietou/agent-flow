@@ -4,6 +4,7 @@ import io.agentflow.common.Actor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +18,7 @@ import java.util.UUID;
 @Repository
 public class JdbcInboxRepository implements InboxRepository {
     private final JdbcTemplate jdbc;
+    private final NotificationDispatchPlanner dispatches;
     private static final RowMapper<InboxMessage> MAPPER = (row, index) -> new InboxMessage(
             UUID.fromString(row.getString("id")), row.getString("tenant_id"), row.getString("recipient_id"),
             UUID.fromString(row.getString("application_id")), row.getString("title"), row.getString("business_no"),
@@ -25,11 +27,12 @@ public class JdbcInboxRepository implements InboxRepository {
             row.getTimestamp("read_at") == null ? null : row.getTimestamp("read_at").toInstant(), row.getString("content"));
 
     /** 复用审批事务所用数据源。 */
-    public JdbcInboxRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public JdbcInboxRepository(JdbcTemplate jdbc, NotificationDispatchPlanner dispatches) { this.jdbc = jdbc; this.dispatches = dispatches; }
 
     @Override
+    @Transactional
     public void append(String eventKey, InboxMessage message) {
-        jdbc.update("""
+        int inserted = jdbc.update("""
                 INSERT INTO notification_inbox
                 (id,tenant_id,recipient_id,event_key,application_id,title,business_no,kind,actor_id,task_id,node_name,round_no,created_at,content)
                 SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS
@@ -38,6 +41,7 @@ public class JdbcInboxRepository implements InboxRepository {
                 message.applicationId().toString(), message.title(), message.businessNo(), message.kind().name(),
                 message.actor(), message.taskId(), message.nodeName(), message.roundNo(), Timestamp.from(message.createdAt()), message.content(),
                 message.tenantId(), message.recipient(), eventKey);
+        if (inserted == 1) dispatches.append(message);
     }
 
     @Override

@@ -1,0 +1,1000 @@
+{
+  "recordedAt": "2026-10-02T11:38:57.396507+00:00",
+  "status": "STATIC_OFD_ANNOTATIONS_SCOPE_AND_PACKAGE_PASSED_FULL_OFD_INCOMPLETE",
+  "baseCommit": "d90f066714d6cbf4204965726cb3ca6a96eed01e",
+  "remainingTopLevelCategories": 6,
+  "preciseSmallTaskCountKnown": false,
+  "callerChain": "InvoiceOfdWorker -> InvoiceOfdRenderer -> InvoiceOfdDocument retained page ID + InvoiceOfdAnnotations -> original page resources -> ordered static overlay -> all PNG pages",
+  "responsibility": "Rendering infrastructure; no invoice/extraction business-state or public API changes",
+  "missingCoverage": "Previous tests only asserted that annotations were unsupported. No positive annotation page binding, coordinate, visibility, resource-isolation or pixel evidence existed.",
+  "red": {
+    "tests": 5,
+    "failures": 0,
+    "errors": 5,
+    "reason": "Renderer rejected Document/Annotations before any static appearance was rendered"
+  },
+  "implemented": [
+    "Bind annotation index PageID to actual pages within its own document; retain normal output page order",
+    "Resolve PageAnnot paths relative to the owning annotation index; reject missing, duplicate or unknown mappings",
+    "Validate static annotation metadata, XML dates and booleans; preserve per-page annotation order",
+    "Draw Link/Path/Highlight/Stamp/Watermark Appearance using existing supported path/text/image/PageBlock primitives after page and templates",
+    "Clip explicit Boundary in page coordinates then translate to local coordinates; absent optional Boundary retains page coordinates",
+    "Visible=false uses empty clipping but still checks content and consumes shared resources; Remark controls do not change static appearance",
+    "Keep page-private/document resources, fonts, ICC and object/segment budgets in the existing pipeline",
+    "Never execute actions, follow link parameters, or create a second rendering path with weaker checks"
+  ],
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/GBT_33190-2016_电子文件存储与交换格式版式文档.pdf",
+      "sections": "15.1-15.2; Appendix A.3-A.4",
+      "printedPagesViewed": [
+        78,
+        79,
+        80,
+        98,
+        99,
+        100
+      ]
+    },
+    {
+      "url": "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-converter/src/main/java/org/ofdrw/converter/AWTMaker.java",
+      "lines": [
+        206,
+        260
+      ],
+      "use": "Cross-check page-after annotation order and local boundary translation; no implementation copied"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/annotation/pageannot/Annot.java",
+      "use": "Cross-check static appearance and Remark-related flags"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/annotation/pageannot/Appearance.java",
+      "use": "Cross-check page block content and Boundary"
+    }
+  ],
+  "limits": {
+    "annotationsPerCompleteRender": 1024,
+    "annotationDateCharacters": 64,
+    "sharedDrawingObjectsAndBlocks": 20000,
+    "sharedPerOutputPageIccLoads": 32,
+    "sharedPerOutputPageIccBytes": 8388608,
+    "otherExistingWorkerArchiveXmlFontOutlinePixelAndOutputLimitsUnchanged": true
+  },
+  "tests": {
+    "scoped": 178,
+    "new": 14,
+    "previousScopeOverlap": 164,
+    "suites": [
+      {
+        "name": "io.agentflow.agent.InvoiceDocumentProcessTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceDocumentProcessTest.xml",
+          "bytes": 43366,
+          "sha256": "9f4452266f2c9a6939017150a69b7b2e321a54e3ae403062f7dae48d12be3085"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceExtractionModelTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceExtractionModelTest.xml",
+          "bytes": 44619,
+          "sha256": "e16d5d18151fb7f2eaaf5f732bca25ed66fff3a094399b790383964782ea9c64"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceExtractionXmlTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceExtractionXmlTest.xml",
+          "bytes": 43980,
+          "sha256": "9492adf1be387264cd24d15d01c0e7c3d1bfbd7b7b911e69cd886d488c79bcf3"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdAnnotationsTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdAnnotationsTest.xml",
+          "bytes": 44702,
+          "sha256": "220f69b361358509ecc6958afd8d4ee7c3f72d8e03849f8695546e00bb0bdb41"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdArchiveTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdArchiveTest.xml",
+          "bytes": 43734,
+          "sha256": "1b62ad3e2fdf5f52063b175ada8b31917ab31859b3d0dd068eebd3c431cb5359"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdCffDataTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdCffDataTest.xml",
+          "bytes": 43541,
+          "sha256": "47dcd630c8c499e7fc66838de89a501f8335cca93bdf65a93797671e134d6f9e"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdCidFontTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdCidFontTest.xml",
+          "bytes": 43931,
+          "sha256": "2b67b66ebe570552113096b74d0a273c4b2b6509d8e32f9e54d3a991dfff7a9a"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdDeployedFontsTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdDeployedFontsTest.xml",
+          "bytes": 44880,
+          "sha256": "507a1d55154b94c6f6e0dd004462923bd386c44cf8514df482d0075763e7e9bf"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdDocumentTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdDocumentTest.xml",
+          "bytes": 44386,
+          "sha256": "60729b5e268a57bff38d6eef1697dff9021c49586dcb5310667360405f0be03a"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdDrawingTest",
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdDrawingTest.xml",
+          "bytes": 45114,
+          "sha256": "8611f25372c17f9274f283ff221043f81ca6f095f9002749a399924c59f31df4"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdFontTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdFontTest.xml",
+          "bytes": 43591,
+          "sha256": "1737abf7204c7a39a35726a3df22073041cd8977ce3cb61582920f8a532e44bb"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdInspectorTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdInspectorTest.xml",
+          "bytes": 43329,
+          "sha256": "bf840504e5859390e6d754d7471135ad37285d48c39f0b367e0e9c6ec4de1634"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdPathTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdPathTest.xml",
+          "bytes": 43545,
+          "sha256": "559e81fa7e89a3cb1c903a3d2a7a75874771037b94219cedb3f24f345d2541ad"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdRendererTest",
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdRendererTest.xml",
+          "bytes": 45477,
+          "sha256": "885d58885a9b091b8be1ffe1a823f5adad567e0c64a7593a7c0b9a118eb4db86"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdResultTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdResultTest.xml",
+          "bytes": 43279,
+          "sha256": "27a99201e917a7d8521306d145ace6db9a90b39070ba46d78a36aa2f9ce7d151"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdTemplateTest",
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdTemplateTest.xml",
+          "bytes": 44920,
+          "sha256": "0cddaa7eca7b86e84e8ce8ced2a17aa55aaab6eb3c695750ef9f0fd96df4e2ef"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoicePdfInspectorTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoicePdfInspectorTest.xml",
+          "bytes": 43030,
+          "sha256": "454f28ba8a8e2835f293324472a2262f34d71c6638f35e81becbc96d8a1da9e9"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoicePdfSourceTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoicePdfSourceTest.xml",
+          "bytes": 43319,
+          "sha256": "216f4a743dc1151b52450ef3e75805259479314ff61af180224e8b916cde5d23"
+        }
+      }
+    ],
+    "initialFocused": 37,
+    "parentSyntheticSecretMarkerPresent": true
+  },
+  "authorGate": {
+    "javaFiles": 1385,
+    "namedTypes": 2653,
+    "missingAuthorTags": 0,
+    "parseErrors": 0
+  },
+  "packaging": {
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-server.jar",
+    "jarSha256": "986a8b9322de8109a9d3eeafaa2ffe8ccc3fe1d1f01965574f91b7fbd4d83c3c",
+    "jarBytes": 78616497,
+    "cases": [
+      {
+        "name": "synthetic",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-fixtures/annotated-two-pages.ofd",
+        "sourceSha256": "87b87f5b4456721f0da98b3d1f5b9936d0d3554c7bb2cbfe0db78fc022c73e91",
+        "sourceUnchanged": true,
+        "exitCode": 0,
+        "pages": 2,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "response": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/synthetic/output/result.json",
+        "byteIdenticalToReference": true
+      },
+      {
+        "name": "public-watermark",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/AddWatermarkAnnot.ofd",
+        "sourceSha256": "dfed483fa08c30d0ee1326cff1b7bd158a5cc29a8dffa9c8425d5a830f21a125",
+        "sourceUnchanged": true,
+        "exitCode": 0,
+        "pages": 6,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "response": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/public-watermark/output/result.json"
+      },
+      {
+        "name": "diagnostic-without-annotations",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-fixtures/watermark-without-annotations-diagnostic.ofd",
+        "sourceSha256": "f54284995d7be179554ba012ba4f275f1ed66977d18121c8b5e900f49fd0f7fb",
+        "sourceUnchanged": true,
+        "exitCode": 0,
+        "pages": 6,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "response": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/diagnostic-without-annotations/output/result.json"
+      },
+      {
+        "name": "unsupported-annotation-last",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-fixtures/unsupported-annotation-last.ofd",
+        "sourceSha256": "515df2d7c7e5407a0ce652699e684aeede035a363793bfb5851609b8f473f817",
+        "sourceUnchanged": true,
+        "exitCode": 1,
+        "pages": 0,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "partialOutputAbsent": true
+      },
+      {
+        "name": "signed-still-rejected",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/DigitalSign.ofd",
+        "sourceSha256": "5b5bec16c539aa041ef3784d47a5665c03cf7f2e228551df87f13ee28d122989",
+        "sourceUnchanged": true,
+        "exitCode": 1,
+        "pages": 0,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "partialOutputAbsent": true
+      },
+      {
+        "name": "hello-regression",
+        "source": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/helloworld.ofd",
+        "sourceSha256": "a7b6f9eceb7ca4eafc73a318ac06f5476af6010d0dbcc99337912049748e141e",
+        "sourceUnchanged": true,
+        "exitCode": 0,
+        "pages": 1,
+        "temporaryRootEmpty": true,
+        "parentLoadedDocumentParsers": false,
+        "response": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/hello-regression/output/result.json",
+        "byteIdenticalToReference": true
+      }
+    ],
+    "successfulCases": 4,
+    "outputPagesIncludingDiagnostic": 15,
+    "rejectedCases": 2,
+    "publicOriginal": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/AddWatermarkAnnot.ofd",
+    "publicOriginalPreserved": true,
+    "watermarkComparison": [
+      {
+        "page": 1,
+        "dimensions": [
+          1191,
+          1684
+        ],
+        "annotationDifferenceBox": [
+          283,
+          283,
+          510,
+          454
+        ]
+      },
+      {
+        "page": 2,
+        "dimensions": [
+          1191,
+          1684
+        ],
+        "annotationDifferenceBox": null
+      },
+      {
+        "page": 3,
+        "dimensions": [
+          1191,
+          1684
+        ],
+        "annotationDifferenceBox": [
+          283,
+          283,
+          510,
+          454
+        ]
+      },
+      {
+        "page": 4,
+        "dimensions": [
+          1191,
+          1684
+        ],
+        "annotationDifferenceBox": null
+      },
+      {
+        "page": 5,
+        "dimensions": [
+          1191,
+          1684
+        ],
+        "annotationDifferenceBox": [
+          283,
+          283,
+          510,
+          454
+        ]
+      },
+      {
+        "page": 6,
+        "dimensions": [
+          1191,
+          1684
+        ],
+        "annotationDifferenceBox": null
+      }
+    ],
+    "diagnosticOnly": "Separate copy omits Document/Annotations solely to compare pixels; never presented as the original",
+    "modelCalled": false,
+    "runtimeReplaced": false
+  },
+  "visualCheck": {
+    "publicPagesViewed": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "publicDimensions": [
+      1191,
+      1684
+    ],
+    "syntheticPagesViewed": [
+      1,
+      2
+    ],
+    "syntheticDimensions": [
+      114,
+      114
+    ],
+    "observed": "Chinese text present across all six public pages; translucent tulip watermark appears only on pages 1,3,5. Synthetic overlay order and clipping visible.",
+    "notClaimed": [
+      "Exact visual equivalence to original author font",
+      "Real invoice extraction accuracy",
+      "Digital signature validity"
+    ]
+  },
+  "diagnosticCopy": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-fixtures/watermark-without-annotations-diagnostic.ofd",
+    "change": "Only Document/Annotations reference omitted in a separate copy for pixel difference measurement",
+    "originalModified": false,
+    "treatedAsOriginalSuccess": false,
+    "pagesCompared": 6,
+    "changedPages": [
+      1,
+      3,
+      5
+    ],
+    "unchangedPages": [
+      2,
+      4,
+      6
+    ],
+    "changedBoundsExclusive": [
+      283,
+      283,
+      510,
+      454
+    ]
+  },
+  "fontProvenance": {
+    "previousEvidence": "docs/evidence/invoice-ofd-deployed-fonts-20261002.json",
+    "metadata": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/font-provenance.json",
+    "explicitDeployedFace": "STSongti-SC-Regular",
+    "originalDeclaredName": "宋体",
+    "fontEquivalenceClaimed": false,
+    "systemOrDerivedFontCommittedOrDistributed": false
+  },
+  "scopeBoundaries": {
+    "staticAnnotationsForExistingSupportedPrimitives": true,
+    "stampAnnotationEqualsDigitalSignature": false,
+    "digitalSignaturesSupported": false,
+    "unsupportedVisibleContentSkipped": false,
+    "publicOfdSourceEnabled": false,
+    "applicationFontConfigurationWired": false,
+    "newDependencies": false,
+    "schemaChanged": false,
+    "modelCalled": false,
+    "runtimeReplaced": false,
+    "wholeOFDComplete": false,
+    "allOriginalRequirementsAccepted": false
+  },
+  "pending": [
+    "Complex colors/patterns/composite objects and nonconformal minimum stroke width",
+    "Non-default text Weight/Italic and clip Visible/Alpha",
+    "Digital signatures and bounded nested seal resources",
+    "Application font configuration, public OFD source and all-page model input",
+    "Complete model/lifecycle acceptance, other local features, evidence audit and enterprise integrations"
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdAnnotations.java",
+      "bytes": 5944,
+      "sha256": "8b0bcde33f800c02e7b1dcc26465c2629f256d8b7ed22a2672149a9511baa6a9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdDocument.java",
+      "bytes": 18606,
+      "sha256": "1ecd618abdddd6ddb608d1b169803e5cf35d8e140ecb63024290038f741f5e08"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdRenderer.java",
+      "bytes": 14747,
+      "sha256": "d01c10d2729440d2fd21b90899852c6c145bf597308a39a8a9e8746bc1de2224"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdAnnotationsTest.java",
+      "bytes": 17303,
+      "sha256": "ae3b581b3d11b237acebb8cca13632b04f3bb5f95f382b8e8661cf9e72983f7f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdDocumentTest.java",
+      "bytes": 12317,
+      "sha256": "17b55a0ec0e343c5fabdbbd01064cdb165f5a1244f15c2e873c332ced690a2bb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdRendererTest.java",
+      "bytes": 18786,
+      "sha256": "e553c87bd34982b50a676f0930190c7b8c50d20dbe8b82c2b121be16ad54e46d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/docs/evidence/invoice-ofd-process-20261002.json",
+      "bytes": 39086,
+      "sha256": "3b7bfa5911f4bf927740a8dbe064e9aec1a8269c6e59d6e8ba9d85a367124160"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/InvoiceOfdAnnotationsFixtures.java",
+      "bytes": 1700,
+      "sha256": "6db74e7a15aa4b5d259fc1b0ccfc243988e03137b9b09d38833354043e52fcbb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/AddWatermarkAnnot.ofd",
+      "bytes": 49181,
+      "sha256": "dfed483fa08c30d0ee1326cff1b7bd158a5cc29a8dffa9c8425d5a830f21a125"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/AnnPage.java",
+      "bytes": 2058,
+      "sha256": "cbad4d3bde36f8fe0abf841ccf107c4b50d33a85d3b5023e725aeeaae27ea042"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/Annot.java",
+      "bytes": 11888,
+      "sha256": "c8f887cc05dd618124ea63196f020d6550de2600787e0f682a5178bcfff5dbef"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/AnnotType.java",
+      "bytes": 1580,
+      "sha256": "8e01b663ba70fb700e505b089b58c922efd07763c9dcd1061bed82a0281a7438"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/AnnotationRender.java",
+      "bytes": 6649,
+      "sha256": "a3fb1004c56a66c45f5582f47c122e78d27ee6de28f81a37a72da40a88a28ffb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/Annotations.java",
+      "bytes": 1730,
+      "sha256": "af3214581e24d9a5e8341f2452cc8d74f31dff209f5e827fb2ac784dea26dbd7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/Appearance.java",
+      "bytes": 1561,
+      "sha256": "ff4643a8768a7f7a57f5f5742a08f10acb6a9a4edd6b0ee2401f85e72f30de5d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/PageAnnot.java",
+      "bytes": 913,
+      "sha256": "74459de58c9b37f8b40deab5b2422529f47f278054ade2ecddd052a04e522a77"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/gbt-printed-100.png",
+      "bytes": 166698,
+      "sha256": "31c18937332049e12044534934542afd21be8bc74f5c7289442dd9bd9858218a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/gbt-printed-78.png",
+      "bytes": 143337,
+      "sha256": "5716ca6a2d9662dadd427f1c24eb456fb154b16e2d3135dc8ea53cd35b381c32"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/gbt-printed-79.png",
+      "bytes": 159339,
+      "sha256": "142380e4bf7d6ceff882004aac1da561d711d69c17b2aa0448972e83f03dfcf9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/gbt-printed-80.png",
+      "bytes": 206091,
+      "sha256": "74155912b481163d1d302e969904d2c4d55b0e399caecaf6e5ce6ed1c7a9a5ae"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/gbt-printed-98.png",
+      "bytes": 166321,
+      "sha256": "47ef58e898587ea027b0da6b50277f92829c869a89b4f2050c94c1d175dd406b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/gbt-printed-99.png",
+      "bytes": 138822,
+      "sha256": "7151172e58dc6dc5b0529fbc2dd71f4d30cdea8333b65bef93daab66cf507fdb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/gbt-toc-3.png",
+      "bytes": 116472,
+      "sha256": "fdfb7e7e75013635a62f0d50cdc805ff32a684c326e57215fbe29c05ba0dc633"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/gbt-toc-4.png",
+      "bytes": 97059,
+      "sha256": "4d1bf0ca50db4f13a60ae511ae3300e958e431f162981019988828de9435906a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/annotations/source.json",
+      "bytes": 333,
+      "sha256": "d2c452ef0e39888f68e0044b3764ceab548c12d6f680c91ee0dc0a1a950dcf11"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/gbt33190-2016.pdf",
+      "bytes": 4331919,
+      "sha256": "dae45301d0a3c906f8f172a2def2dee14df3bd2b62783bca402ca0a9ec4f9e13"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/DigitalSign.ofd",
+      "bytes": 3041,
+      "sha256": "5b5bec16c539aa041ef3784d47a5665c03cf7f2e228551df87f13ee28d122989"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/helloworld.ofd",
+      "bytes": 1651,
+      "sha256": "a7b6f9eceb7ca4eafc73a318ac06f5476af6010d0dbcc99337912049748e141e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-authors.log",
+      "bytes": 131,
+      "sha256": "c291d6c2f4c1ddfa49409d00ae8f3edd230420f84c3e7231eaf7cda9c4a3ad6e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-fixtures/annotated-two-pages.ofd",
+      "bytes": 3173,
+      "sha256": "87b87f5b4456721f0da98b3d1f5b9936d0d3554c7bb2cbfe0db78fc022c73e91"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-fixtures/expected-1.png",
+      "bytes": 434,
+      "sha256": "67a4f96ac0fdaca741576d31f92b7e8824e497617d7a416ec49952798bcf21a4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-fixtures/expected-2.png",
+      "bytes": 442,
+      "sha256": "c05b76455549854ccb90c989a8a277c8b20ebf11c02185a66c66d3e2639ef08d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-fixtures/unsupported-annotation-last.ofd",
+      "bytes": 3105,
+      "sha256": "515df2d7c7e5407a0ce652699e684aeede035a363793bfb5851609b8f473f817"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-fixtures/watermark-without-annotations-diagnostic.ofd",
+      "bytes": 49156,
+      "sha256": "f54284995d7be179554ba012ba4f275f1ed66977d18121c8b5e900f49fd0f7fb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-fixtures.log",
+      "bytes": 147,
+      "sha256": "8dea1742a2b66518f57d5b762a4d9a32f9d715c37af6f6b133ab09bf4713b89b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-focused.log",
+      "bytes": 13403,
+      "sha256": "a6db0d565683f0001f6deef7243ec2b6b22286bc11ba7a9c4c839c0332770aaa"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-package.log",
+      "bytes": 13929,
+      "sha256": "3a951fe6ee1079ecbf55b3b8e36fa149b04c8518f0ee997f523014e7bc9e817e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaged-probe.log",
+      "bytes": 2712,
+      "sha256": "af43863ed46de6ed00e4be6b91dedfa22ebbcd225f4cd3ae27870d712b628bae"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/diagnostic-without-annotations/output/page-1.png",
+      "bytes": 341966,
+      "sha256": "549cb8c51f9512abb88d24e0512ae4a00a56829d9b1b145ddc10e56a3e99f3a7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/diagnostic-without-annotations/output/page-2.png",
+      "bytes": 385888,
+      "sha256": "8eae7654b4396c6842c7243b85e1fd76d30052459393daf22bfb269d9dc32c69"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/diagnostic-without-annotations/output/page-3.png",
+      "bytes": 395515,
+      "sha256": "05b4b28ecc0c134c305def9219e88599f49ab851ea8dcfb8a425fb6d7e8d43b1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/diagnostic-without-annotations/output/page-4.png",
+      "bytes": 376770,
+      "sha256": "da8656d66f00f8c0b6abefff78f9ec9de4e7a63ff37e124dd9ee27fe37c3b536"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/diagnostic-without-annotations/output/page-5.png",
+      "bytes": 390945,
+      "sha256": "683d67043e17c559728490bd0c943ffc7ff12a552bcc856b7618bb85f8f863b1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/diagnostic-without-annotations/output/page-6.png",
+      "bytes": 263983,
+      "sha256": "6d1f838d78095c4febdcceed596ea175a7621150c64105512fd990c08f33a856"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/diagnostic-without-annotations/output/result.json",
+      "bytes": 1487,
+      "sha256": "d33e55147a914a5e304d4f639a583250350564767e04045224d8e6b23f489cd4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/diagnostic-without-annotations/parent-classes.log",
+      "bytes": 289521,
+      "sha256": "8c268c6a711a5bf4fb4204e3464943226413288dc5a0a638bb0a928c72a7258e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/diagnostic-without-annotations/process.log",
+      "bytes": 88,
+      "sha256": "ca20d340f56bc96c7e0d91c3e99b3d02abab4884ac2e51f1f2d9a7693becefb4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/hello-regression/output/page-1.png",
+      "bytes": 13418,
+      "sha256": "564233710156ad06df5deba0b595a8f50ec22c319e7e26c75fd5c7279e901f34"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/hello-regression/output/result.json",
+      "bytes": 381,
+      "sha256": "905fccf23c54f46dd9fd7760d0bdcbe503ff1c7bb0944fc210ce4422934958c3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/hello-regression/parent-classes.log",
+      "bytes": 289594,
+      "sha256": "b1b8aaaf76e7180c41891cf307a5d26c68277411834c83d6aeb22e5781eaa070"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/hello-regression/process.log",
+      "bytes": 88,
+      "sha256": "15a99cab42dd9c60f1c21dbf065417c79fef0a5d3a4139b5b1cb5e2de3f905ae"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/public-watermark/output/page-1.png",
+      "bytes": 443416,
+      "sha256": "0cb6017c7d9bb81032d6b2bf834d4779a1a4aa8361b226ca6643a2fd87c62753"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/public-watermark/output/page-2.png",
+      "bytes": 385888,
+      "sha256": "8eae7654b4396c6842c7243b85e1fd76d30052459393daf22bfb269d9dc32c69"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/public-watermark/output/page-3.png",
+      "bytes": 495189,
+      "sha256": "01d41550f74cc8db1ee10d3fdaa666b5457e3c0844ee92530e9a5e27e5cf4cf8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/public-watermark/output/page-4.png",
+      "bytes": 376770,
+      "sha256": "da8656d66f00f8c0b6abefff78f9ec9de4e7a63ff37e124dd9ee27fe37c3b536"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/public-watermark/output/page-5.png",
+      "bytes": 491692,
+      "sha256": "1d7d30c5c57334dccac0a41508d1ba2e2fced0e168215c8b28764ce4732d6fcf"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/public-watermark/output/page-6.png",
+      "bytes": 263983,
+      "sha256": "6d1f838d78095c4febdcceed596ea175a7621150c64105512fd990c08f33a856"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/public-watermark/output/result.json",
+      "bytes": 1403,
+      "sha256": "d56191132d22eb82b3b0c9a60f9abddc9076ab46e367f421b7c1d3ccd847bd8e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/public-watermark/parent-classes.log",
+      "bytes": 289594,
+      "sha256": "d4a5768c152d3de4bfea17571cf5d5551aaa1ec2d30b88043245cfa64102e9fc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/public-watermark/process.log",
+      "bytes": 88,
+      "sha256": "ca20d340f56bc96c7e0d91c3e99b3d02abab4884ac2e51f1f2d9a7693becefb4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/results.json",
+      "bytes": 4666,
+      "sha256": "4b59dcd0803e40e5053352b556cf29e3ca3d16241d8c82105ebb187eabb20257"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/signed-still-rejected/parent-classes.log",
+      "bytes": 166390,
+      "sha256": "3c25ac2ca4ae5444059f57768874b74fe983e3b07552b058da203b0108b15721"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/signed-still-rejected/process.log",
+      "bytes": 1198,
+      "sha256": "c15c822cd83f9813a076f9c57ad916511702b483cbf048c9b8581eee60ea56f1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/synthetic/output/page-1.png",
+      "bytes": 434,
+      "sha256": "67a4f96ac0fdaca741576d31f92b7e8824e497617d7a416ec49952798bcf21a4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/synthetic/output/page-2.png",
+      "bytes": 442,
+      "sha256": "c05b76455549854ccb90c989a8a277c8b20ebf11c02185a66c66d3e2639ef08d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/synthetic/output/result.json",
+      "bytes": 566,
+      "sha256": "c19cd138272fd71f28434b7985f001771422c131ed51dc3f928229cda5b610b7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/synthetic/parent-classes.log",
+      "bytes": 289521,
+      "sha256": "c9152fade28a9809573c7cc845c03d27e4328c682bd87c08ef83f2c37ddfcbdb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/synthetic/process.log",
+      "bytes": 88,
+      "sha256": "8969852d4f344e288c29725c35ba8f235e7de5b2badf49d39f148fd06b1f79ed"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/unsupported-annotation-last/parent-classes.log",
+      "bytes": 166317,
+      "sha256": "c1c92cab422350c6bc61cfffbe53d8c758c2a4b6f35171e4e6aacd8be03c3691"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-packaging/unsupported-annotation-last/process.log",
+      "bytes": 1198,
+      "sha256": "c15c822cd83f9813a076f9c57ad916511702b483cbf048c9b8581eee60ea56f1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-probe-compile.log",
+      "bytes": 58,
+      "sha256": "0423c3ea3a2f0a9f3f5c27ea31160b4749ed54bddc3202043896fd78aed36456"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-red.log",
+      "bytes": 19769,
+      "sha256": "d6dc4cc8b92b0a621fbef9bcc03bcddca4b0f1d3a5807d6519089361c26f0b32"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceDocumentProcessTest.xml",
+      "bytes": 43366,
+      "sha256": "9f4452266f2c9a6939017150a69b7b2e321a54e3ae403062f7dae48d12be3085"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceExtractionModelTest.xml",
+      "bytes": 44619,
+      "sha256": "e16d5d18151fb7f2eaaf5f732bca25ed66fff3a094399b790383964782ea9c64"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceExtractionXmlTest.xml",
+      "bytes": 43980,
+      "sha256": "9492adf1be387264cd24d15d01c0e7c3d1bfbd7b7b911e69cd886d488c79bcf3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdAnnotationsTest.xml",
+      "bytes": 44702,
+      "sha256": "220f69b361358509ecc6958afd8d4ee7c3f72d8e03849f8695546e00bb0bdb41"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdArchiveTest.xml",
+      "bytes": 43734,
+      "sha256": "1b62ad3e2fdf5f52063b175ada8b31917ab31859b3d0dd068eebd3c431cb5359"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdCffDataTest.xml",
+      "bytes": 43541,
+      "sha256": "47dcd630c8c499e7fc66838de89a501f8335cca93bdf65a93797671e134d6f9e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdCidFontTest.xml",
+      "bytes": 43931,
+      "sha256": "2b67b66ebe570552113096b74d0a273c4b2b6509d8e32f9e54d3a991dfff7a9a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdDeployedFontsTest.xml",
+      "bytes": 44880,
+      "sha256": "507a1d55154b94c6f6e0dd004462923bd386c44cf8514df482d0075763e7e9bf"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdDocumentTest.xml",
+      "bytes": 44386,
+      "sha256": "60729b5e268a57bff38d6eef1697dff9021c49586dcb5310667360405f0be03a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdDrawingTest.xml",
+      "bytes": 45114,
+      "sha256": "8611f25372c17f9274f283ff221043f81ca6f095f9002749a399924c59f31df4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdFontTest.xml",
+      "bytes": 43591,
+      "sha256": "1737abf7204c7a39a35726a3df22073041cd8977ce3cb61582920f8a532e44bb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdInspectorTest.xml",
+      "bytes": 43329,
+      "sha256": "bf840504e5859390e6d754d7471135ad37285d48c39f0b367e0e9c6ec4de1634"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdPathTest.xml",
+      "bytes": 43545,
+      "sha256": "559e81fa7e89a3cb1c903a3d2a7a75874771037b94219cedb3f24f345d2541ad"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdRendererTest.xml",
+      "bytes": 45477,
+      "sha256": "885d58885a9b091b8be1ffe1a823f5adad567e0c64a7593a7c0b9a118eb4db86"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdResultTest.xml",
+      "bytes": 43279,
+      "sha256": "27a99201e917a7d8521306d145ace6db9a90b39070ba46d78a36aa2f9ce7d151"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoiceOfdTemplateTest.xml",
+      "bytes": 44920,
+      "sha256": "0cddaa7eca7b86e84e8ce8ced2a17aa55aaab6eb3c695750ef9f0fd96df4e2ef"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoicePdfInspectorTest.xml",
+      "bytes": 43030,
+      "sha256": "454f28ba8a8e2835f293324472a2262f34d71c6638f35e81becbc96d8a1da9e9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-reports/TEST-io.agentflow.agent.InvoicePdfSourceTest.xml",
+      "bytes": 43319,
+      "sha256": "216f4a743dc1151b52450ef3e75805259479314ff61af180224e8b916cde5d23"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-scope.log",
+      "bytes": 16545,
+      "sha256": "7ae73acf97362f565753c7f9dba986e14bf89f51abaf3b6991804db1036d77fe"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-annotations-server.jar",
+      "bytes": 78616497,
+      "sha256": "986a8b9322de8109a9d3eeafaa2ffe8ccc3fe1d1f01965574f91b7fbd4d83c3c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/font-provenance.json",
+      "bytes": 574,
+      "sha256": "8df3eb2e53766c43d4df26899362ff1e484c3f34c4503f830057cf372d86146b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/fonts.json",
+      "bytes": 512,
+      "sha256": "d115acfcb18348bcc3e61f698c5a9ed812047e32b0a02dcd3bb0044d568d509a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/verify-ofd-annotations-package.py",
+      "bytes": 6112,
+      "sha256": "f7b983da22d31c7ad73e1501efa4feef64def234a79ffc9bd9379e952f44e6fb"
+    }
+  ]
+}

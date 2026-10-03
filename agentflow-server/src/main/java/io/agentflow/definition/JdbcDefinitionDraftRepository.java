@@ -43,10 +43,10 @@ public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository 
         int updated;
         try {
             updated = jdbcTemplate.update("""
-                    UPDATE approval_definition SET name=?, version=?, revision=?, status=?, graph_json=?, form_schema_json=?, notification_texts_json=?,
+                    UPDATE approval_definition SET name=?, version=?, revision=?, status=?, graph_json=?, form_schema_json=?, notification_texts_json=?, start_enabled=?,
                         published_at=CASE WHEN ?='PUBLISHED' THEN COALESCE(published_at, CURRENT_TIMESTAMP) ELSE published_at END,
                         updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND id=? AND revision=?
-                    """, draft.name(), persistedVersion, draft.revision(), draft.status().name(), graphJson, schemaJson, textsJson,
+                    """, draft.name(), persistedVersion, draft.revision(), draft.status().name(), graphJson, schemaJson, textsJson, draft.startEnabled(),
                     draft.status().name(), draft.tenantId(), draft.id().toString(), expectedRevision);
         } catch (DuplicateKeyException exception) {
             throw new DomainException("CONCURRENCY_CONFLICT", "Definition version already exists");
@@ -61,10 +61,10 @@ public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository 
             }
             try {
                 jdbcTemplate.update("""
-                    INSERT INTO approval_definition (id, tenant_id, process_key, name, version, revision, status, graph_json, form_schema_json, notification_texts_json)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO approval_definition (id, tenant_id, process_key, name, version, revision, status, graph_json, form_schema_json, notification_texts_json, start_enabled)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """, draft.id().toString(), draft.tenantId(), draft.key(), draft.name(), persistedVersion,
-                        draft.revision(), draft.status().name(), graphJson, schemaJson, textsJson);
+                        draft.revision(), draft.status().name(), graphJson, schemaJson, textsJson, draft.startEnabled());
             } catch (DuplicateKeyException exception) {
                 throw new DomainException("CONCURRENCY_CONFLICT", "Definition version or id already exists");
             }
@@ -94,6 +94,12 @@ public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository 
     }
 
     @Override
+    public Optional<DefinitionDraft> lockPublished(String tenantId, String key, long version) {
+        return jdbcTemplate.query("SELECT * FROM approval_definition WHERE tenant_id=? AND process_key=? AND version=? AND status='PUBLISHED' FOR UPDATE",
+                this::map, tenantId, key, version).stream().findFirst();
+    }
+
+    @Override
     public List<DefinitionDraft> findAll(String tenantId, String status) {
         if (status == null || status.isBlank()) {
             return jdbcTemplate.query("SELECT * FROM approval_definition WHERE tenant_id=? ORDER BY updated_at DESC",
@@ -111,6 +117,6 @@ public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository 
                 jsonUtil.read(resultSet.getString("graph_json"), Graph.class),
                 resultSet.getString("form_schema_json") == null ? null : jsonUtil.read(resultSet.getString("form_schema_json"), FormSchema.class),
                 resultSet.getString("notification_texts_json") == null ? null
-                        : jsonUtil.read(resultSet.getString("notification_texts_json"), NotificationTexts.class));
+                        : jsonUtil.read(resultSet.getString("notification_texts_json"), NotificationTexts.class), resultSet.getBoolean("start_enabled"));
     }
 }

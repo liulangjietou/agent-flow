@@ -17,7 +17,11 @@ public final class ConditionLanguageUpgrade {
             // 等价转换超出新版限制时整次失败，不能截断或部分升级。
             parser.parse(condition, 2);
             return new Edge(edge.id(), edge.source(), edge.target(), condition, edge.defaultBranch());
-        }).toList(), 2);
+        }).toList(), 2, graph.riskPolicy() == null ? null : new ApprovalRiskPolicy(graph.riskPolicy().rules().stream().map(rule -> {
+            String condition = render(parser.parse(rule.condition(), 1));
+            parser.parse(condition, 2);
+            return new ApprovalRiskPolicy.Rule(rule.id(), rule.label(), rule.level(), condition);
+        }).toList()));
     }
 
     private String render(ConditionAst ast) {

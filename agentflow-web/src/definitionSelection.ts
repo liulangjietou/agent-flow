@@ -4,7 +4,7 @@ import type { DefinitionCatalogFilters, DefinitionCatalogPage } from './definiti
 const DEFINITION_READ_TIMEOUT_MS = 12_000
 
 /** 完整配置读取约束；恢复设计器时才允许失效偏好回退。@author owlzhangfq@gmail.com */
-export interface DefinitionSelectionOptions { publishedOnly?: boolean; processKey?: string; restoreMissing?: boolean }
+export interface DefinitionSelectionOptions { publishedOnly?: boolean; startEnabledOnly?: boolean; processKey?: string; version?: number; restoreMissing?: boolean }
 
 /**
  * 列表只读摘要，选中后读取一份完整配置；旧账号或旧选择的结果不能回填。
@@ -34,8 +34,9 @@ export class DefinitionSelection {
     this.controller = controller; this.loading = true
     let timer: ReturnType<typeof setTimeout> | undefined
     const latest = async () => {
-      const page = await this.search({ limit: 1, ...(options.publishedOnly ? { status: 'PUBLISHED' } : {}),
-        ...(options.processKey ? { processKey: options.processKey } : {}) }, controller.signal)
+      const page = await this.search({ limit: 1, ...(options.publishedOnly || options.startEnabledOnly ? { status: 'PUBLISHED' } : {}),
+        ...(options.startEnabledOnly ? { startEnabled: true } : {}),
+        ...(options.processKey ? { processKey: options.processKey } : {}), ...(options.version !== undefined ? { version: options.version } : {}) }, controller.signal)
       if (generation !== this.generation || controller.signal.aborted || !page.items.length) return null
       return this.get(page.items[0]!.id, controller.signal)
     }
@@ -52,8 +53,10 @@ export class DefinitionSelection {
         timer = setTimeout(() => { controller.abort(); reject(new Error('读取流程配置超时，请重试。')) }, DEFINITION_READ_TIMEOUT_MS)
       })])
       if (generation !== this.generation) return null
-      if (definition && (options.publishedOnly && definition.status !== 'PUBLISHED'
-        || options.processKey && definition.key !== options.processKey)) throw new Error('所选流程版本不符合当前用途，请重新选择。')
+      if (definition && (options.startEnabledOnly && !definition.startEnabled
+        || (options.publishedOnly || options.startEnabledOnly) && definition.status !== 'PUBLISHED'
+        || options.processKey && definition.key !== options.processKey
+        || options.version !== undefined && definition.version !== options.version)) throw new Error('所选流程版本不符合当前用途，请重新选择。')
       this.definition = definition
       return definition
     } catch (cause) {

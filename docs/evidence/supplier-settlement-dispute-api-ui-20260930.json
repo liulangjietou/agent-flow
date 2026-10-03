@@ -1,0 +1,62 @@
+{
+  "date": "2026-09-30",
+  "status": "PASS_AUTHORIZED_API_AND_UI_TESTS",
+  "localRuntimeSchema": 78,
+  "migration": 79,
+  "newWorkflowTests": 6,
+  "newFrontendTests": 12,
+  "h2": {
+    "tests": 41,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-dispute-api-h2.log"
+  },
+  "postgres": {
+    "workflowTests": 35,
+    "separateH2ContractTests": 6,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-dispute-api-postgres.log"
+  },
+  "frontend": {
+    "tests": 51,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-dispute-web-tests.log",
+    "build": "PASS",
+    "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-dispute-web-build.log"
+  },
+  "openapi": {
+    "result": "PASS",
+    "operations": 240,
+    "schemas": 470,
+    "requestExamples": 87,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-dispute-openapi.log"
+  },
+  "authors": {
+    "files": 1024,
+    "namedTypes": 1937,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "verified": [
+    "Original posting and existing completion preserved",
+    "Current finance appointment and original sensitive field permissions required for replay",
+    "Applicant, original cashier and unauthorized administrator excluded",
+    "Forged facts, wrong terminal and stale version rejected",
+    "Audit failure rolls back decision, revision, local completion and idempotent receipt",
+    "ERP decision cannot clear independent bank dispute",
+    "Rejection requires separate safe retirement and keeps decision",
+    "Five minute UI deadline, identity changes, late response and timeout handling",
+    "Unknown request recovers exact original idempotent key and body",
+    "Parent prevents refresh and record switch during decision save"
+  ],
+  "regression": {
+    "test": "erpDecisionRejectsForgedFactsWrongTerminalStaleRevisionAndForeignScope",
+    "firstResult": "Expected query error 400, observed default 422",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-dispute-api-query-mapping-red.log",
+    "fix": "Map the new invalid-query error to BAD_REQUEST at the existing HTTP exception boundary."
+  },
+  "boundaries": [
+    "PostgreSQL and H2 test scopes overlap.",
+    "Live database upgrade, real HTTP, restart and browser acceptance remain pending.",
+    "No real ERP, bank, remote PR or CI acceptance."
+  ]
+}

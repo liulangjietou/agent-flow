@@ -1,0 +1,62 @@
+{
+  "stage": "Employee advance origination backend and actual reviewed approval facts",
+  "date": "2026-09-28",
+  "result": "LOCAL_BACKEND_ACCEPTANCE_PASSED",
+  "branch": "codex/governance-identifier-integration",
+  "migration": "V42",
+  "tests": {
+    "advanceDomainAndContract": 13,
+    "h2ScopedRegression": 115,
+    "postgresAdvanceAndMigration": 18,
+    "scopesOverlap": true,
+    "openapi": {
+      "operations": 147,
+      "schemas": 248,
+      "requestExamples": 48
+    },
+    "authors": {
+      "files": 560,
+      "namedTypes": 974,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-request-regression.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-request-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-request-authors.log"
+  ],
+  "postgresDatabases": {
+    "AGENTFLOW_ADVANCE_TEST": {
+      "database": "expense_advance_test_894f1381",
+      "url": "jdbc:postgresql://127.0.0.1:55460/expense_advance_test_894f1381",
+      "user": "agentflow"
+    },
+    "AGENTFLOW_ADVANCE_MIGRATION": {
+      "database": "expense_advance_migration_610487fb",
+      "url": "jdbc:postgresql://127.0.0.1:55460/expense_advance_migration_610487fb",
+      "user": "agentflow"
+    }
+  },
+  "verified": [
+    "ADVANCE_REQUEST binding rejects ordinary form writes",
+    "Applicant-only draft and precheck, sensitive round permissions including administrators",
+    "Original request idempotency returns minimal receipts",
+    "Actual catalog and employee account HTTP outside database transactions",
+    "Account applicant/legal entity/validity, positive base-currency amount and legal timezone repayment date",
+    "Immutable returned/withdrawn rounds and per-round approval visibility",
+    "No EmployeeAdvance or payment authorization from draft, precheck, submit or final approval",
+    "Final actual Flowable approval seals terms once; failed revision insert rolls back application, engine and completed round",
+    "One worker claimant, lease timeout without resend, stale or late facts cannot become usable",
+    "Public preview/detail exclude account reference and digest",
+    "V41 to V42 preserves existing applications/reports and enforces exact owner/version bindings"
+  ],
+  "acceptanceBoundaries": {
+    "financeGateway": "synthetic loopback HTTP",
+    "approvalEngine": "actual Flowable",
+    "ui": "pending dedicated page and browser validation",
+    "actualDisbursement": "pending voucher, payment authorization, execution and settlement",
+    "enterpriseFinance": "not configured or accepted",
+    "remote": "no Git remote; no PR or remote CI"
+  }
+}

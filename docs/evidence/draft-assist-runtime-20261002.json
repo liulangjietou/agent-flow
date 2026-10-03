@@ -1,0 +1,189 @@
+{
+  "recordedAt": "2026-10-02T04:43:53.031368+00:00",
+  "scope": "普通根申请的草稿建议页面、显式来源与人工逐字段采纳、本地运行验收",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "backendCommit": "e9d770f3bf3ed1067ab044f1c6fda5c62b459b62",
+  "frontendTests": {
+    "uniqueCases": 114,
+    "newDraftCases": 18,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-ui-regression-final.log",
+    "build": "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-ui-build-final.log",
+    "buildWarning": "现有前端产物超过 500 kB 分包建议，构建成功"
+  },
+  "priorBackendTests": {
+    "uniqueJavaCases": 59,
+    "postgresRepeatedCases": 27,
+    "repeatedCountsAreNotAdditive": true,
+    "evidence": "draft-assist-backend-20261002.json"
+  },
+  "openapi": {
+    "operations": 302,
+    "schemas": 602,
+    "requestExamples": 115,
+    "contractChecks": {
+      "status": "PASS",
+      "files": {
+        "draft-assist-browser-responses.json": {
+          "responses": 26,
+          "successfulRequests": 2
+        },
+        "draft-assist-http-browser-stale.json": {
+          "responses": 3,
+          "successfulRequests": 1
+        },
+        "draft-assist-http-final-checks.json": {
+          "responses": 11,
+          "successfulRequests": 3
+        },
+        "draft-assist-http-journey.json": {
+          "responses": 59,
+          "successfulRequests": 12
+        },
+        "draft-assist-http-pagination.json": {
+          "responses": 140,
+          "successfulRequests": 38
+        },
+        "draft-assist-http-restart-one.json": {
+          "responses": 3,
+          "successfulRequests": 1
+        },
+        "draft-assist-http-restart-two.json": {
+          "responses": 5,
+          "successfulRequests": 1
+        },
+        "draft-assist-http-setup-final.json": {
+          "responses": 7,
+          "successfulRequests": 6
+        }
+      },
+      "totalResponses": 254,
+      "successfulRequests": 64,
+      "browserCaptureGaps": 0
+    },
+    "formColumnPermissionsDeclared": true
+  },
+  "browser": {
+    "partialAdoption": true,
+    "originalSuggestionRetained": true,
+    "applicationRemainedDraftAfterAdoption": true,
+    "mainSubmitLockedWhileAssistantDirty": true,
+    "staleSuggestionBlocked": true,
+    "dismissReceiptLostAtHttp200": true,
+    "originalRequestRecovered": true,
+    "paginationTotal": 21,
+    "pageTwoCount": 1,
+    "cssViewport": 500,
+    "panelWidth": 391,
+    "panelScrollWidth": 391,
+    "historyVisibleAfterExplicitSubmit": true,
+    "generationInputCountDuringApproval": 0,
+    "captureGaps": 0,
+    "networkInterceptionCleared": true,
+    "viewportReset": true,
+    "recovery": {
+      "attempts": 2,
+      "sameBody": true,
+      "sameKey": true
+    },
+    "screenshots": [
+      "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-adopted.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-500css.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-history-final.png"
+    ]
+  },
+  "runtime": {
+    "database": "draft_assist_runtime_2067ac411f",
+    "sourceDatabase": "form_assignees_runtime_1c7eac56b7",
+    "backendPort": 18258,
+    "frontendPort": 15344,
+    "boot": 3,
+    "jarSha256": "3f1d29b9eb9b2c4e2e0d02177d40738b7800ec7f94b5c422378a5bac8c218cea",
+    "finalRows": 4019,
+    "finalTables": 230,
+    "finalFiles": 3,
+    "sourceUnchanged": true
+  },
+  "upgrade": {
+    "oldTables": 228,
+    "oldRows": 3778,
+    "newTables": 230,
+    "files": 3,
+    "oldRowsAndFilesPreserved": true
+  },
+  "firstRestart": {
+    "tables": 230,
+    "rowsPreserved": 3976,
+    "files": 3
+  },
+  "secondRestart": {
+    "oldTablesPreserved": 228,
+    "changedTables": [
+      "agent_draft_assist_run",
+      "agent_draft_assist_transition"
+    ],
+    "modelCallsAdded": 1,
+    "oldTasksPreserved": 15,
+    "filesPreserved": 3,
+    "rows": 3981,
+    "servedContractMatchesFinalSource": true
+  },
+  "oldInFlightContinuation": {
+    "taskId": "5b54b72d-bdd8-11f1-abf3-96d22b99d590",
+    "applicationId": "7102e0e0-580c-4fee-a5fd-4c412dbed61c",
+    "processInstanceId": "5b54900e-bdd8-11f1-abf3-96d22b99d590",
+    "result": "APPROVED"
+  },
+  "summaryMetricScope": {
+    "metrics": {
+      "runs": 3,
+      "queued": 0,
+      "running": 0,
+      "awaitingReview": 0,
+      "failed": 0,
+      "adopted": 2,
+      "dismissed": 1,
+      "reviewedRuns": 3,
+      "adoptionRatePercent": 66.7
+    },
+    "draftRuns": 26,
+    "draftRunsExcluded": true
+  },
+  "syntheticModelOnly": true,
+  "modelRequestsDoNotContainSensitiveFieldOrRestrictedColumn": true,
+  "frontendRedBeforeFix": [
+    "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-ui-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-ui-lifecycle-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-column-contract-red.log"
+  ],
+  "redRoots": [
+    "模型值基线未响应式更新导致初次读取误报已修改",
+    "只取消网络读取未结束等待链，可能永久锁住原表单",
+    "助手与撤回、原表单保存提交缺少互斥",
+    "详情刷新未同步目录中同一运行的状态",
+    "OpenAPI 明细列未声明真实返回的 sensitive 和 nodeAccess"
+  ],
+  "fixtureSetupCorrections": [
+    "初次发布请求缺少 expectedRevision；改按真实 API 提交版本",
+    "旧演示 user:manager 不在当前发布目录；改用已有组织人员关系规则"
+  ],
+  "knownSeparateAuditGap": {
+    "path": "POST /process-definitions/{id}/publish",
+    "trigger": "缺少必填 expectedRevision 查询参数",
+    "observed": "框架默认 400 结构缺少统一 code/message，与声明错误契约不一致",
+    "evidence": "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-http-setup.json",
+    "status": "CLOSED_WITH_ASSESSMENT_CORRECTION",
+    "followUp": {
+      "correction": "原 RequestError.anyOf 已兼容框架默认正文；初次契约不一致判断不准确。后续完成参数错误格式统一，保留其他框架错误兼容。",
+      "evidence": "request-binding-errors-20261002.json"
+    }
+  },
+  "remainingTopLevelItems": 6,
+  "remainingAgentScope": [
+    "票据抽取",
+    "预检建议",
+    "结构化财务业务 Agent 入口",
+    "真实企业模型质量与接入验收"
+  ],
+  "remoteConfigured": false,
+  "mainModified": false
+}

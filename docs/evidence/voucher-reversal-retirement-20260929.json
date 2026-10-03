@@ -1,0 +1,117 @@
+{
+  "date": "2026-09-29",
+  "stage": "voucher-reversal-safe-retirement",
+  "result": "PASS",
+  "scope": "Local PostgreSQL and real application HTTP/browser; finance services are synthetic loopback only",
+  "schemaVersion": 63,
+  "tests": {
+    "domain": 49,
+    "h2FocusedServer": 25,
+    "postgresServer": 150,
+    "postgresExpenseSubmission": 95,
+    "postgresAdvanceRepayment": 38,
+    "frontendVoucherAndAdvance": 78,
+    "frontendExpense": 25,
+    "overlappingEarlierScopes": true,
+    "buildPassed": true
+  },
+  "openApi": {
+    "operations": 182,
+    "schemas": 344,
+    "requestExamples": 67,
+    "addedOperations": 1,
+    "addedSchemas": 4,
+    "updatedSchemas": [
+      "VoucherReversalExecutionWorkspace",
+      "VoucherReversalExecutionOperation"
+    ]
+  },
+  "authors": {
+    "javaFiles": 777,
+    "namedTypes": 1425,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "httpRequestsIncludingLogins": 34,
+  "businessResponsesValidated": 28,
+  "upgrade": {
+    "from": 62,
+    "to": 63,
+    "preservedExistingTables": 26,
+    "backupBytes": 618794,
+    "restorePerformed": false
+  },
+  "browser": {
+    "explicitOriginalRecheck": true,
+    "explicitRetirement": true,
+    "twoIndependentCommands": true,
+    "historyRetained": true,
+    "explicitNewPreparationAndAuthorization": true,
+    "automaticBalanceRefreshAfterSecondRetirement": true,
+    "screenshots": [
+      "voucher-reversal-retirement-browser-ended.png",
+      "voucher-reversal-retirement-browser-new-command.png",
+      "voucher-reversal-retirement-browser-final.png"
+    ]
+  },
+  "acceptance": {
+    "retirementCount": 2,
+    "basis": "CONFIRMED_FAILED",
+    "originalStillPosted": true,
+    "originalHoldReleased": true,
+    "originalAvailableAmount": "300.00",
+    "finalAvailableAmount": "300.00",
+    "outstandingAmount": "300.00",
+    "newRejectedCommands": 2,
+    "newPostedReversals": 0,
+    "unaffectedTables": [
+      "advance_repayment",
+      "advance_repayment_return",
+      "advance_repayment_resolution",
+      "repayment_review_check",
+      "repayment_review_check_revision",
+      "advance_repayment_check",
+      "advance_repayment_check_revision",
+      "payment_operation",
+      "payment_operation_revision",
+      "payment_authorization",
+      "advance_disbursement_resolution",
+      "disbursement_return_check",
+      "disbursement_return_check_revision",
+      "advance_receipt_credit",
+      "voucher_dispute_resolution",
+      "voucher_reversal_check",
+      "voucher_reversal_check_revision",
+      "voucher_reversal_record"
+    ],
+    "oldRevisionRowsPreserved": true,
+    "originalCommandFilesPreserved": true,
+    "attachmentsPreserved": 4,
+    "legacyBalanceSerialization": "Existing missing list fields acquire empty-list defaults and missing repaymentReviewRequired acquires false; original revision bytes and all monetary facts remain unchanged."
+  },
+  "bugRegression": {
+    "cause": "VoucherStatus refreshed itself after a changed operation revision but did not notify enclosing advance/expense details to refresh related funds and settlement.",
+    "red": "voucher-reversal-retirement-refresh-red.log: expected one notification, actual zero",
+    "green": "voucher-reversal-retirement-refresh-green.log: 78 passed",
+    "browserConfirmed": true
+  },
+  "logs": [
+    "voucher-reversal-retirement-domain.log",
+    "voucher-reversal-retirement-api.log",
+    "voucher-reversal-retirement-postgres.log",
+    "voucher-reversal-retirement-refresh-green.log",
+    "voucher-reversal-retirement-expense-ui.log",
+    "voucher-reversal-retirement-build.log",
+    "voucher-reversal-retirement-openapi.log",
+    "voucher-reversal-retirement-authors.log",
+    "voucher-reversal-retirement-http-schema.json"
+  ],
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "pending": [
+    "Expense bank returns and separate resource adjustments",
+    "Procurement payments and budget adjustments",
+    "Advanced workflow and external notifications",
+    "Real ERP/bank/model/enterprise/production acceptance",
+    "Remote PR and CI after remote is available"
+  ]
+}

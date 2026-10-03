@@ -1,0 +1,35 @@
+{
+  "status": "PASS_ORIGINAL_FINANCIAL_SOURCE_BINDING",
+  "date": "2026-09-30",
+  "runtimeSchemaUnchanged": 82,
+  "publicPartialExpenseWorkflowComplete": false,
+  "tests": {
+    "newFinancialSource": 7,
+    "relatedDomain": 43,
+    "failures": 0,
+    "errors": 0
+  },
+  "red": "expense-adjustment-financial-source-red.log",
+  "green": "expense-adjustment-financial-source-green.log",
+  "checks": [
+    "Original consumed budget and posted accrual bind the frozen expense and approval versions",
+    "Compare complete original budget categories and cost positions",
+    "Compare every original accrual tax, expense, advance and payable position",
+    "Derive only incremental opposite entries with original accounts and line numbers",
+    "Keep before/after budget positions including zeros",
+    "Reject unconsumed resources, pending budget and queried or unposted accrual",
+    "Equal totals and balanced postings cannot replace original cost objects"
+  ],
+  "authorCheck": {
+    "files": 1082,
+    "namedTypes": 2067,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remaining": [
+    "Bind original bank returns and prior actual completed adjustments",
+    "Independent budget and accounting commands, observation and execution lifecycle",
+    "Durable preparation, atomic completion and public API/UI",
+    "Real HTTP, upgrade and browser acceptance"
+  ]
+}

@@ -57,6 +57,15 @@ class TaskDelegationIntegrationTest {
     @MockitoSpyBean TaskAuditPort taskAudit;
 
     @Test
+    void removedApprovalRoleCannotReadAssignedTasksFromTheLegacyList() throws Exception {
+        Task task = submitted("user:finance");
+        currentActor.set(new Actor("demo", "finance", Set.of("EMPLOYEE")));
+        try {
+            assertThat(facade.list("PENDING")).noneMatch(value -> value.taskId().equals(task.getId()));
+        } finally { currentActor.clear(); }
+    }
+
+    @Test
     void candidateDelegationRecordsTheActualOwnerInsteadOfLeavingItUnassigned() throws Exception {
         Task task = submitted("role:FINANCE");
         act(task.getId(), "finance", "DELEGATE", "bob", 2).andExpect(status().isOk());

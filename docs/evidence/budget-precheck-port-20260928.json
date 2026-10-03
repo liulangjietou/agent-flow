@@ -1,0 +1,45 @@
+{
+  "recordedAt": "2026-09-28T14:01:47.808431+00:00",
+  "result": "PASS",
+  "scope": "Read-only budget precheck contract and actual HTTP adapter; no freezing or submission implemented in this slice",
+  "basis": "Approved gross base-currency cost allocations before deductible tax and advance offsets",
+  "binding": [
+    "reportId",
+    "roundNo",
+    "financialVersion",
+    "employeeId",
+    "legalEntityId",
+    "baseCurrency",
+    "accountingDate",
+    "exact allocations including category, cost center, project and amount"
+  ],
+  "syntheticExample": {
+    "originalGross": "USD 0.03",
+    "exchangeRate": "1.5",
+    "approvedGross": "CNY 0.05",
+    "deductibleTax": "CNY 0.02",
+    "advanceOffset": "CNY 0.03",
+    "payable": "CNY 0.02",
+    "budgetTotal": "CNY 0.05",
+    "allocations": [
+      "CNY 0.02",
+      "CNY 0.03"
+    ]
+  },
+  "tests": {
+    "domainBudget": 3,
+    "domainFinanceContracts": 4,
+    "domainExpenseAccounting": 16,
+    "realHttpGateway": 14,
+    "invoiceVerificationRegression": 11,
+    "catalogControllerRegression": 3,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-precheck-first.log"
+  },
+  "limits": {
+    "budgetFreeze": "not yet implemented",
+    "completeExpensePrecheck": "in progress",
+    "enterpriseBudgetAcceptance": "not run",
+    "databaseMigrations": "none",
+    "UIChanges": "none"
+  }
+}

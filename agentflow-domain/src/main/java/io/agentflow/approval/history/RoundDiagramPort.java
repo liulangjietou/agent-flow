@@ -38,7 +38,15 @@ public interface RoundDiagramPort {
      * @author owlzhangfq@gmail.com
      */
     record Node(String id, String name, String type, State state, long activeTasks,
-                Instant firstEnteredAt, Instant lastLeftAt) { }
+                Instant firstEnteredAt, Instant lastLeftAt, List<CandidateSnapshot> candidateSnapshots) { }
+
+    /**
+     * 节点激活时已记录的本地候选账号；不代表当前资格、实际办理人或审批结论。
+     * @author owlzhangfq@gmail.com
+     */
+    record CandidateSnapshot(String id, long directoryRevision, List<String> candidateUserIds) {
+        public CandidateSnapshot { candidateUserIds = List.copyOf(candidateUserIds); }
+    }
 
     /**
      * 只返回安全的拓扑信息，不向申请读者暴露内部表达式和人员规则。

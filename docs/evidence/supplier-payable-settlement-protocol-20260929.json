@@ -1,0 +1,78 @@
+{
+  "date": "2026-09-29",
+  "scope": "Supplier ERP payable settlement domain and fixed-destination HTTP protocol",
+  "totalTests": 85,
+  "domainTests": 40,
+  "serverTests": 45,
+  "newDomainTests": 13,
+  "newGatewayTests": 6,
+  "suites": [
+    {
+      "module": "agentflow-domain",
+      "class": "SupplierPayableSettlementTest",
+      "passed": 13
+    },
+    {
+      "module": "agentflow-domain",
+      "class": "SupplierPaymentOperationTest",
+      "passed": 14
+    },
+    {
+      "module": "agentflow-domain",
+      "class": "SupplierPayableHoldTest",
+      "passed": 13
+    },
+    {
+      "module": "agentflow-server",
+      "class": "GatewaySupplierPayableSettlementTest",
+      "passed": 6
+    },
+    {
+      "module": "agentflow-server",
+      "class": "GatewaySupplierPaymentTest",
+      "passed": 6
+    },
+    {
+      "module": "agentflow-server",
+      "class": "GatewaySupplierPayableHoldTest",
+      "passed": 5
+    },
+    {
+      "module": "agentflow-server",
+      "class": "FinanceGatewayClientTest",
+      "passed": 14
+    },
+    {
+      "module": "agentflow-server",
+      "class": "FinanceGatewayConfigurationTest",
+      "passed": 14
+    }
+  ],
+  "verified": [
+    "Independent immutable settlement operation id linked to original paid bank operation and revision",
+    "Fresh original bank receipt, held payable, and open accounting date",
+    "Finance separate from applicant and cashier",
+    "Authorization expiry does not erase already-paid settlement duties",
+    "Original precise decimal quantity survives NON_NULL JSON round trips",
+    "Fixed request bytes and idempotency key through evidence and credential refresh",
+    "One timed-out write recovers by original query only",
+    "Authoritative NOT_FOUND requires explicit original-command retry",
+    "Complete ERP voucher and exact settled balance increment required",
+    "Monotonic external revision and sticky contradictions",
+    "Disabled or changed destination, active database transaction and generic read all fail closed"
+  ],
+  "authors": {
+    "javaFiles": 924,
+    "namedTypes": 1715,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "migrationsAdded": false,
+  "runtimeVersionStill": 72,
+  "limitations": [
+    "No persistent settlement queue or public settlement action in this change",
+    "Safe retirement and next accounting-date attempt require subsequent persistence and application orchestration",
+    "ERP must enforce one successful settlement per original bank payment across different settlement attempts",
+    "No live enterprise ERP or bank transaction acceptance"
+  ]
+}

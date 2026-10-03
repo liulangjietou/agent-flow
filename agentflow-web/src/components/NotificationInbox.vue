@@ -2,6 +2,8 @@
 import { onUnmounted, reactive, ref, watch } from 'vue'
 import { api, type InboxMessage } from '../api'
 import { isTaskNotification, notificationLabels, NotificationInboxQuery } from '../notificationInbox'
+import NotificationPreferencesPanel from './NotificationPreferencesPanel.vue'
+import NotificationDeliveriesPanel from './NotificationDeliveriesPanel.vue'
 
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean }>()
 const emit = defineEmits<{ read: [message: InboxMessage]; open: [message: InboxMessage] }>()
@@ -16,6 +18,8 @@ const time = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12
 <template>
   <section class="content inbox-page" aria-labelledby="inbox-title">
     <div class="inbox-heading"><div><p class="eyebrow">NOTIFICATIONS</p><h2 id="inbox-title">消息中心</h2><p class="inbox-intro">跟进审批与任务流转，回到申请继续处理。</p></div><span v-if="query.loaded" class="unread-total" role="status">{{ query.unreadCount }} 条未读</span></div>
+    <NotificationPreferencesPanel :scope-key="scopeKey" :refresh-version="refreshVersion" :locked="locked" />
+    <NotificationDeliveriesPanel :scope-key="scopeKey" :refresh-version="refreshVersion" :locked="locked" />
     <div class="inbox-toolbar"><div role="group" aria-label="消息筛选"><button :class="{ selected: readFilter === 'all' }" :aria-pressed="readFilter === 'all'" :disabled="locked" @click="readFilter = 'all'">全部消息</button><button :class="{ selected: readFilter === 'unread' }" :aria-pressed="readFilter === 'unread'" :disabled="locked" @click="readFilter = 'unread'">只看未读</button></div><button class="secondary" :disabled="query.loading || locked" @click="refresh">刷新消息</button></div>
     <p class="inbox-hint">消息保留发生时的进展，最新状态请查看申请。已读不会改变审批状态。</p>
     <div v-if="query.error" class="inbox-error" role="alert"><p>{{ query.error }}</p><button class="secondary" :disabled="locked || query.loading" @click="query.loaded ? query.more() : refresh()">重新读取</button></div>
@@ -25,7 +29,7 @@ const time = (value: string) => new Date(value).toLocaleString('zh-CN', { hour12
       <li v-for="item in query.items" :key="item.id" :class="{ unread: !item.readAt }">
         <div class="message-state"><i aria-hidden="true" /><span>{{ item.readAt ? '已读' : '未读' }}</span></div>
         <div class="message-body"><div class="message-meta"><strong>{{ notificationLabels[item.kind] }}</strong><time :datetime="item.createdAt">{{ time(item.createdAt) }}</time></div><h3>{{ item.title }}</h3><p v-if="item.content" class="message-content">{{ item.content }}</p><p>{{ item.businessNo }} · 第 {{ item.roundNo }} 轮<span v-if="item.nodeName"> · {{ item.nodeName }}</span></p><p class="message-actor">操作人 {{ item.actor }}<span v-if="item.readAt"> · {{ time(item.readAt) }} 已读</span></p></div>
-        <div class="message-actions"><button class="secondary" :disabled="locked" @click="emit('open', item)">{{ isTaskNotification(item) ? '查看待办' : '查看申请' }} ↗</button><button v-if="!item.readAt" class="quiet" :disabled="locked" @click="emit('read', item)">标为已读</button></div>
+        <div class="message-actions"><button class="secondary" :disabled="locked" @click="emit('open', item)">{{ item.kind === 'APPLICATION_COPIED' ? '查看抄送' : isTaskNotification(item) ? '查看待办' : '查看申请' }} ↗</button><button v-if="!item.readAt" class="quiet" :disabled="locked" @click="emit('read', item)">标为已读</button></div>
       </li>
     </ol>
     <div v-if="query.loaded && query.items.length" class="inbox-footer"><span>已加载 {{ query.items.length }} 条消息</span><button v-if="query.nextCursor" class="secondary" :disabled="query.loading || locked" @click="query.more">{{ query.loading ? '正在加载…' : '加载更多' }}</button><span v-else>已加载全部匹配消息</span></div>

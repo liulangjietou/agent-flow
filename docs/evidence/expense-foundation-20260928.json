@@ -1,0 +1,48 @@
+{
+  "date": "2026-09-28",
+  "baseCommit": "f0015bfac73c7cd86d56839c3dedd721f16ba954",
+  "scope": "Structured expense domain, immutable application binding, authorized draft APIs and round reads",
+  "migration": "V33",
+  "domainTests": 15,
+  "serverScopedTests": 39,
+  "migrationAndContractTests": 6,
+  "postgresTests": 11,
+  "scopesOverlap": true,
+  "openapi": {
+    "operations": 101,
+    "schemas": 166,
+    "requestExamples": 36
+  },
+  "result": "PASS",
+  "logs": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-api-green.log",
+      "sha256": "1e9a951d342fd2c7e7f0df18c0883fe38c4419c6e93889d3bd807c1ebaac5c15"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-contract-migration.log",
+      "sha256": "b54212f098d33844dac3134bc82fa89e0b5abae2dd3f89899a5b75c2bc8290ac"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-postgres.log",
+      "sha256": "d888315a2c3d7792f694c47aa97ec45d6b70ba56cf95737405337f2c9e64d004"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-openapi.log",
+      "sha256": "352a094a0f62786029b251059166ac38c6e14fd788ab230140e3a804c61dbb16"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-authors.log",
+      "sha256": "b2926bfa7a6ebc632f2ee7e1139b2fe6b879016a020d8577c3051064df258f7b"
+    }
+  ],
+  "notYetImplemented": [
+    "Production expense submission prechecks and resource reservations",
+    "Financial task guards, budgets, vouchers, payments and archive",
+    "Business master-data picker and expense UI"
+  ],
+  "notVerified": [
+    "Real enterprise finance interfaces",
+    "Packaged HTTP and browser acceptance for this financial slice"
+  ]
+}

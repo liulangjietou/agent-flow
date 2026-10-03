@@ -1,0 +1,89 @@
+{
+  "date": "2026-09-29",
+  "scope": "本人账户变更复核与新授权",
+  "syntheticExternalServices": true,
+  "migration": "V51 to V52",
+  "redEvidence": [
+    "payment-payee-review-red.log",
+    "payment-payee-downstream-red.log"
+  ],
+  "verified": {
+    "domain": 29,
+    "h2Expense": 55,
+    "h2PaymentMigrationContract": 41,
+    "postgresql": 91,
+    "frontend": 20,
+    "http": 19,
+    "testScopesOverlap": true,
+    "productionFrontendBuild": "PASS",
+    "openApi": {
+      "operations": 163,
+      "schemas": 279,
+      "requestExamples": 53
+    },
+    "authors": {
+      "javaFiles": 669,
+      "namedTypes": 1195,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "database": {
+    "migration": 52,
+    "reviewId": "ed9227c7-9b9c-4763-b7cc-5f98cc794077",
+    "status": "CONSUMED",
+    "version": 4,
+    "originalAuthorizationId": "084b4d6b-6c10-40b5-ae59-4d4006fc79ac",
+    "consumedAuthorizationId": "7c17545e-dc2e-4235-93f0-0821df9cf6bb",
+    "requestedBy": "finance",
+    "checkedAt": "2026-09-29T04:24:45.210100Z",
+    "validUntil": "2026-09-29T04:29:45.210100Z",
+    "consumedAt": "2026-09-29T04:25:26.161625Z",
+    "originalTermsUnchanged": true,
+    "newAuthorizationMatchesEvidence": true,
+    "reviewAuditEvents": 1,
+    "originalMask": "****1234",
+    "newMask": "****9876"
+  },
+  "applicationId": "4063d04c-eb5e-4c70-9440-2ea9dee5feaf",
+  "businessId": "16361344-85c2-4c30-b3e5-16af04216141",
+  "businessNo": "UI-PAYEE-50202f67",
+  "bankStatus": "SUCCEEDED",
+  "paymentVoucher": "UI-VOUCHER-67ab2422",
+  "bankPaymentCommandsForBusiness": 1,
+  "browser": [
+    "Explicit request queued account read",
+    "Ready evidence did not create authorization",
+    "Finance separately confirmed new masked account",
+    "New authorization waited for cashier",
+    "Independent cashier execution produced successful bank result and posted payment voucher"
+  ],
+  "screenshots": [
+    "payment-payee-review-confirm.png",
+    "payment-payee-review-authorized.png",
+    "payment-payee-review-paid.png",
+    "payment-payee-review-mobile.png"
+  ],
+  "viewport": {
+    "override": {
+      "width": 375,
+      "height": 812
+    },
+    "observedCssViewport": 500,
+    "documentScrollWidth": 500,
+    "dialogClientWidth": 456,
+    "dialogScrollWidth": 456,
+    "paymentClientWidth": 412,
+    "paymentScrollWidth": 412,
+    "resetAfterCheck": true
+  },
+  "backup": {
+    "file": "expense-ui-before-v52.dump",
+    "bytes": 467014
+  },
+  "evidenceRoot": "/fyoung/tmp/agentflow-remaining-20260928",
+  "limits": [
+    "企业员工账户和资金系统尚未联调",
+    "本地 Git 没有配置 remote；未推送或创建 PR"
+  ]
+}

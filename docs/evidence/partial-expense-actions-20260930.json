@@ -1,0 +1,119 @@
+{
+  "date": "2026-09-30",
+  "status": "PASS_PUBLIC_PARTIAL_ADJUSTMENT_RECOVERY_AND_RETIREMENT",
+  "baseCommit": "562bff80b51d506ae56c28f87b207d96b574f0b5",
+  "scope": "Explicit original-id queries, original-authorizer same-command resends, safe retirement, original-fact confirmation and pure current-action projection",
+  "routes": [
+    "POST /api/v1/expense-reports/{id}/partial-adjustments/actions",
+    "POST /api/v1/expense-reports/{id}/partial-adjustments/source-queries",
+    "POST /api/v1/expense-reports/{id}/partial-adjustments/retirements"
+  ],
+  "schema": {
+    "newMigration": false,
+    "testSchema": 85,
+    "longLivedRuntimeSchema": 82,
+    "runtimeHealth": "UP",
+    "runtimeSchemaReadFromDatabase": true,
+    "runtimeUpgradeVerifiedThisStage": false
+  },
+  "validation": {
+    "newIntegrationTests": 14,
+    "domainTests": 27,
+    "h2ServerTests": 124,
+    "h2WorkflowTests": 117,
+    "h2ContractTests": 6,
+    "h2StartupTests": 1,
+    "postgresWorkflowTests": 117,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "scopesOverlap": true
+  },
+  "openapi": {
+    "operations": 256,
+    "schemas": 521,
+    "requestExamples": 99,
+    "newOperations": 3,
+    "newSchemas": 3,
+    "existingPathsUnchanged": true,
+    "existingResponsePropertiesUnchanged": true,
+    "addedResponseCapabilities": [
+      "availableActions",
+      "canRetire",
+      "canQueryOriginals"
+    ]
+  },
+  "authorCheck": {
+    "javaFiles": 1124,
+    "namedTypes": 2167,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "logs": {
+    "h2": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-actions-final-h2.log",
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-actions-postgres.log",
+    "postgresDatabase": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-actions-postgres-database.json",
+    "openapi": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-actions-openapi.log",
+    "contractDiff": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-actions-contract-diff.json",
+    "authors": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-actions-authors.log",
+    "runtimePreservation": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-actions-runtime-preserved.json"
+  },
+  "checks": [
+    "Current original-round field and independent-finance access is rechecked before writes and successful idempotent replay; applicants, original cashier, hidden-field admin and other tenants cannot act",
+    "All routes bind actual report, application, round, original settlement and partial adjustment versions; original queries additionally require explicit actual accrual/payment/payment-voucher versions",
+    "A preparation read failure can recover unknown original finance through original-id queries without creating a new payment, posting or partial operation",
+    "Budget and accrual queries are independent; completed queries preserve immutable local completion and need explicit source confirmation",
+    "Only the original authorizer can explicitly resend a confirmed NOT_FOUND operation under its existing unexpired command; success on either side never resends",
+    "Two never-dispatched queues retire atomically, become unusable and release only this adjustment return claim; unknown, NOT_FOUND and disputed or applied effects do not qualify",
+    "Retirement competing with worker claim is serialized by the same original report lock; no surviving runnable retired command or incorrectly released claim",
+    "Unknown original sources retain query capability while retirement, new sends and confirmation remain unavailable",
+    "Current-source confirmation retains exact original completion and actual source versions; an unresolved financial dispute cannot be cleared by this action",
+    "An incomplete successor cannot confirm while prior completed adjustments require review; historical completed adjustment can confirm without being the latest",
+    "Audit failures separately roll back retirement/return release, all three original queries, and source confirmation together with idempotency occupation",
+    "Pure GET capabilities do not mutate state or send finance requests; successful replies use no-store and do not expose raw accounts or command/target digests",
+    "Relevant previous preparation, completion, original-full-reversal and resource tests pass in H2 and isolated PostgreSQL"
+  ],
+  "redEvidence": [
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-actions-missing.log",
+      "tests": 3,
+      "failures": 3,
+      "cause": "Public actions, source queries and retirement routes did not exist"
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-actions-boundaries.log",
+      "test": "partialActionsConfirmationCannotBypassAReviewingCompletedPredecessor",
+      "cause": "Current-source confirmation only checked original finance, allowing a successor to clear review while its completed predecessor still required review",
+      "fix": "Shared repository confirmationSource preserves predecessor checks for incomplete successors"
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-actions-edge-red.log",
+      "tests": 2,
+      "failures": 1,
+      "errors": 1,
+      "testGap": "Previous positive-approved and completed-operation queries did not cover no original accrual or currently executing operations",
+      "cause": "Zero-approved settlement dereferenced a null voucher id; both finance state conflicts defaulted to HTTP 422",
+      "fix": "Exclude absent-accrual scope before original lookup; map exposed state and expiry conflicts to HTTP 409"
+    }
+  ],
+  "acceptanceBoundary": {
+    "publicSpringHandlersViaMockMvc": true,
+    "syntheticFinanceHttp": true,
+    "realEnterpriseFinance": false,
+    "publicRecoveryActions": true,
+    "publicSafeRetirement": true,
+    "publicSourceConfirmation": true,
+    "publicFinancialDisputeDecisions": false,
+    "publicWorkflowComplete": false,
+    "actualBrowserAcceptance": false,
+    "longLivedRuntimeUnchanged": true,
+    "originalMainUnchanged": true,
+    "remoteConfigured": false
+  },
+  "remaining": [
+    "Independent budget and ERP dispute decisions with recent terminal evidence, historical posting protection and immutable adjacent-revision proof",
+    "Complete frontend handling workflow",
+    "Nonempty runtime upgrade, real HTTP, browser, narrow viewport, restart and legacy-data/file preservation",
+    "Real enterprise finance integration and the other three remaining work packages"
+  ]
+}

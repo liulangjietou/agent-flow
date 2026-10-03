@@ -20,7 +20,7 @@ import java.util.UUID;
  * @author owlzhangfq@gmail.com
  */
 public record DefinitionCatalogParameters(DefinitionCatalogPort.Query query, String context) {
-    private static final Set<String> KEYS = Set.of("q", "status", "processKey", "version", "limit", "cursor");
+    private static final Set<String> KEYS = Set.of("q", "status", "processKey", "version", "startEnabled", "limit", "cursor");
     private static final Set<String> STATUSES = Set.of("", "DRAFT", "PUBLISHED");
     private static final int DEFAULT_LIMIT = 30;
     private static final int MAX_LIMIT = 100;
@@ -37,12 +37,16 @@ public record DefinitionCatalogParameters(DefinitionCatalogPort.Query query, Str
             boolean manager = actor.hasRole("ADMIN") || actor.hasRole("PROCESS_ADMIN");
             if (!manager && "DRAFT".equals(status)) throw new DomainException("FORBIDDEN", "Draft definitions are not visible to this role");
             if (!manager) status = "PUBLISHED";
+            String availability = raw.getOrDefault("startEnabled", "");
+            if (!Set.of("", "true", "false").contains(availability)) throw invalid();
+            Boolean startEnabled = availability.isEmpty() ? null : Boolean.valueOf(availability);
+            if (startEnabled != null && !"PUBLISHED".equals(status)) throw invalid();
             Long version = raw.containsKey("version") ? Long.valueOf(raw.get("version")) : null;
             int limit = raw.containsKey("limit") ? Integer.parseInt(raw.get("limit")) : DEFAULT_LIMIT;
             if (limit < 1 || limit > MAX_LIMIT || version != null && (version < 1 || version > Integer.MAX_VALUE
                     || key.isEmpty() || "DRAFT".equals(status))) throw invalid();
-            String context = digest(json.write(List.of("definition-catalog-v1", actor.tenantId(), actor.userId(),
-                    actor.roles().stream().sorted().toList(), text, status, key, version == null ? "" : version.toString())));
+            String context = digest(json.write(List.of("definition-catalog-v2", actor.tenantId(), actor.userId(),
+                    actor.roles().stream().sorted().toList(), text, status, key, version == null ? "" : version.toString(), availability)));
             Instant beforeTime = null; UUID beforeId = null;
             if (raw.containsKey("cursor")) {
                 String cursor = raw.get("cursor");
@@ -53,7 +57,7 @@ public record DefinitionCatalogParameters(DefinitionCatalogPort.Query query, Str
                 beforeTime = Instant.parse(parts[1]); beforeId = UUID.fromString(parts[2]);
                 if (beforeTime.isBefore(EARLIEST) || beforeTime.isAfter(LATEST)) throw invalid();
             }
-            return new DefinitionCatalogParameters(new DefinitionCatalogPort.Query(text, status, key, version,
+            return new DefinitionCatalogParameters(new DefinitionCatalogPort.Query(text, status, key, version, startEnabled,
                     limit, beforeTime, beforeId), context);
         } catch (IllegalArgumentException | DateTimeException exception) { throw invalid(); }
     }

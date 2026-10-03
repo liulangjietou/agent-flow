@@ -1,0 +1,66 @@
+{
+  "date": "2026-09-30",
+  "status": "PASS_DOMAIN_AND_PERSISTENCE",
+  "localRuntimeSchema": 77,
+  "migration": 78,
+  "newDomainTests": 7,
+  "domainScope": {
+    "tests": 29,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-dispute-domain.log"
+  },
+  "newPersistenceTests": 6,
+  "h2Scope": {
+    "tests": 45,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-dispute-persistence-h2.log"
+  },
+  "postgresScope": {
+    "tests": 45,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-dispute-postgres.log",
+    "databases": {
+      "AGENTFLOW_SUPPLIER_PAYMENT": {
+        "database": "supplierdispute_2484de442f",
+        "url": "jdbc:postgresql://127.0.0.1:55460/supplierdispute_2484de442f",
+        "user": "agentflow"
+      },
+      "AGENTFLOW_SUPPLIER_SETTLEMENT": {
+        "database": "supplierdispute_99e72a22ea",
+        "url": "jdbc:postgresql://127.0.0.1:55460/supplierdispute_99e72a22ea",
+        "user": "agentflow"
+      }
+    }
+  },
+  "regression": {
+    "whyMissing": "Prior persistence tests exercised normal query transitions but did not require a separate decision when clearing conflict.",
+    "redTest": "SupplierPaymentPersistenceTest.directOperationUpdateCannotDropDisputeWithoutADecision",
+    "redResult": "1 test, 1 assertion failure: ordinary update cleared conflict without a recorded decision",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-dispute-persistence-red.log",
+    "fix": "Ordinary update preserves conflict; dedicated resolution validates continuous history and atomically appends decision and result revision."
+  },
+  "verified": [
+    "Exact original bank reference and settled receipt",
+    "Five minute exclusive evidence deadline and highest observed revision",
+    "Previously observed funding cannot become never paid",
+    "Confirmed return cannot become paid or a different return",
+    "Independent finance excludes applicant and original cashier",
+    "One winner for concurrent decisions",
+    "Decision insert failure rolls back bank state and revision",
+    "Missing history and corrupted decision rejected",
+    "V77 to V78 retains 13 prior financial/application tables",
+    "Original bank command, ERP hold and downstream settlement regression"
+  ],
+  "authors": {
+    "files": 1018,
+    "namedTypes": 1916,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "boundaries": [
+    "No new public API or UI accepted in this phase.",
+    "Live local acceptance database remains V77.",
+    "PostgreSQL and H2 scope overlaps; counts are not added.",
+    "No enterprise financial integration or remote delivery."
+  ]
+}

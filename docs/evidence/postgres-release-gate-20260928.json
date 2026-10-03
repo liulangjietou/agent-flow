@@ -1,0 +1,148 @@
+{
+  "date": "2026-09-28",
+  "scope": "当前 V29 发布包的 PostgreSQL 生命周期及持续业务门禁",
+  "status": "PASS",
+  "sourceCommit": "0d506bb9316f3c50cc7c26d35d8685f6b63ced6f",
+  "productionCodeChanged": false,
+  "schemaMigrationAdded": false,
+  "rootCause": "V22 legacy fixture compared whole rows without allowing the notification_texts_json column introduced by V24; old values were intact",
+  "fix": "Keep exact old fields and row count; explicitly require the added notification snapshot column to be null",
+  "tests": {
+    "redPostgresLifecycle": {
+      "run": 5,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    "greenPostgresLifecycle": {
+      "run": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "postgresBusiness": {
+      "run": 36,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "h2Fallback": {
+      "run": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "scopesOverlap": true
+  },
+  "postgres": {
+    "version": "PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+    "businessSchema": "V29",
+    "legacyUpgrade": "V22 to V29",
+    "legacyFlowableTaskCompleted": true,
+    "checksumMismatchSchema": "One isolated fixture deliberately retains a corrupted checksum; rejection without repair is expected and tested",
+    "businessDatabaseCount": 7,
+    "observedBusinessDatabaseVersions": {
+      "organization": 29,
+      "organization_migration": 26,
+      "context_migration": 28,
+      "field_permissions": 29,
+      "pending_queue": 29,
+      "operations": 29,
+      "round_organization": 29
+    }
+  },
+  "packagedCommands": [
+    {
+      "action": "validate",
+      "exitCode": 0,
+      "tableSnapshotUnchanged": true
+    },
+    {
+      "action": "migrate",
+      "exitCode": 0,
+      "tableSnapshotUnchanged": true
+    },
+    {
+      "action": "validate",
+      "exitCode": 0,
+      "tableSnapshotUnchanged": true
+    }
+  ],
+  "jarSha256": "308ab303c585c04d6e474861fa7cc3ff7de5db75411b82fe0dd84fa73b82dca9",
+  "unchangedTableCount": 73,
+  "tableSnapshotSha256": "5b5c74722ab89f359e3132a780721c84ea0a8033875409cf3fa0776bab9501ae",
+  "ci": {
+    "workflowStepAdded": true,
+    "localVerificationScope": "CI database setup and Maven command executed locally; final generalized database-presence guard separately executed against all seven populated databases",
+    "finalWholeWorkflowExecutedLocally": false,
+    "remoteRun": false,
+    "yamlParsed": true,
+    "bashSyntaxChecked": true
+  },
+  "javaAuthorCheck": {
+    "files": 349,
+    "namedTypes": 541,
+    "missingTags": 0,
+    "parseErrors": 0
+  },
+  "gitDiffCheck": "PASS",
+  "cleanup": {
+    "testContainerStopped": true,
+    "dockerDesktopRestoredStopped": true,
+    "dataPreserved": true,
+    "failedReproductionDatabasePreserved": true,
+    "temporaryWebServerStarted": false
+  },
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-schema-v29-20260928/red-postgres.log",
+      "sha256": "1cc2cd7e84f08f3ec32b9ef21cfc08596fe81029b63e2a9f0096a384cf87ca6c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-schema-v29-20260928/postgres.log",
+      "sha256": "9735bc2eb1572ff04322b621a32fdca408a960e117b36e1406dad0b7d857e5d2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-schema-v29-20260928/ci-business.log",
+      "sha256": "6a4cea1fbba7db9b61b0a49221238f7697ada038fefd938f44d03d61a39b0eb0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-schema-v29-20260928/h2-fallback.log",
+      "sha256": "c931c7fe8804cf252a20636865803365c254a74df6a973333cd6a4e23086e2af"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-schema-v29-20260928/runtime-evidence.json",
+      "sha256": "507e5cbdd3ab1ba192a604ce655f0e523dacb7fc2bbc392b8ada4f28ee2aabd7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-schema-v29-20260928/ci-business-environment.json",
+      "sha256": "67f2206f6ac5df98f711d7e067c2c6b2d85701dd4dbb3183adab4153c9c32b81"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-schema-v29-20260928/ci-business-final.sh",
+      "sha256": "ab72c9ad9f1c432e6157822dad5fce5c7c656fe2f1a150e23d894e82e8f408b1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-schema-v29-20260928/ci-business-final-probe.sh",
+      "sha256": "2cf9c434413ea41e2e76d3cb378d57eec7938717c746681973ff119d095c722b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-schema-v29-20260928/ci-business-final-probe.log",
+      "sha256": "6acc52b3c8d2267dc26e4e30d15f63925f16f2f9436b5b4cb08e428028517785"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-schema-v29-20260928/authors.log",
+      "sha256": "89302a3a46222b23f8134d600165475563564b7aa12e9eaff55c7fbf121067ae"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-schema-v29-20260928/cleanup.json",
+      "sha256": "c1c87426b225b7e16b8a45f831d67f751413319ffe66aa0ea684cc51371ec83c"
+    }
+  ],
+  "boundaries": [
+    "No new full regression run; checks matched the changed test/configuration scope",
+    "No main or primary demo deployment",
+    "No actual enterprise identity or production environment acceptance",
+    "No Git remote, pull request or remote CI"
+  ]
+}

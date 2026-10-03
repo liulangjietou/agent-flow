@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.event.EventContractBindings;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.Actor;
 import io.agentflow.form.FormSchema;
@@ -25,6 +26,9 @@ public class DefinitionApplicationService {
     private final DefinitionDeploymentPort deploymentPort;
     private final DefinitionPublicationRepository publications;
     private final DefinitionAssigneeDirectory assignees;
+    private final DefinitionReferenceInspector references;
+    private final EventContractBindings eventContracts;
+    private final SubprocessDeploymentBindings subprocesses;
     private final DefinitionValidator validator = new DefinitionValidator();
     private final BranchCoverageAnalyzer coverage = new BranchCoverageAnalyzer();
     private final DefinitionSimulator simulator = new DefinitionSimulator();
@@ -32,28 +36,33 @@ public class DefinitionApplicationService {
 
     /** 创建定义服务。 */
     public DefinitionApplicationService(DefinitionDraftRepository repository, DefinitionDeploymentPort deploymentPort,
-                                        DefinitionPublicationRepository publications, DefinitionAssigneeDirectory assignees) {
+                                        DefinitionPublicationRepository publications, DefinitionAssigneeDirectory assignees,
+                                        DefinitionReferenceInspector references, EventContractBindings eventContracts,
+                                        SubprocessDeploymentBindings subprocesses) {
         this.repository = repository;
         this.deploymentPort = deploymentPort;
         this.publications = publications;
         this.assignees = assignees;
+        this.references = references;
+        this.eventContracts = eventContracts;
+        this.subprocesses = subprocesses;
     }
 
     /** 校验流程图，不改变持久化状态。 */
     public List<String> validate(Graph graph) {
-        return validator.validate(graph);
+        return validate(graph, null);
     }
 
     /** 联合校验流程图与表单，不改变持久化状态。 */
     public List<String> validate(Graph graph, FormSchema formSchema) {
-        return validator.validate(graph, formSchema);
+        return List.copyOf(validator.validate(graph, formSchema));
     }
 
-    /** 结构通过后查询真实身份源；目录解析属于跨上下文编排，不进入纯领域校验器。 */
+    /** 结构通过后核对身份源、明确日历修订与事件契约；跨上下文读取由应用层编排。 */
     public List<String> validate(String tenantId, Graph graph, FormSchema formSchema) {
-        List<String> errors = validator.validate(graph, formSchema);
+        List<String> errors = validate(graph, formSchema);
         if (!errors.isEmpty()) return errors;
-        return unavailableAssignees(tenantId, graph);
+        return references.inspect(tenantId, graph, formSchema);
     }
 
     /** 发布就绪检查；草稿存储和样例模拟仍只要求结构与类型合法。 */
@@ -63,6 +72,10 @@ public class DefinitionApplicationService {
 
     /** 预检携带当前流程标识时，同图元素一起验证，不查询或修改流程定义。 */
     public Validation inspect(Graph graph, FormSchema formSchema, String processKey) {
+        return inspectStructure(graph, formSchema, processKey);
+    }
+
+    private Validation inspectStructure(Graph graph, FormSchema formSchema, String processKey) {
         List<String> errors = validator.validate(graph, formSchema, processKey);
         if (!errors.isEmpty()) return new Validation(errors, List.of());
         var diagnostics = coverage.analyze(graph, formSchema);
@@ -71,16 +84,17 @@ public class DefinitionApplicationService {
         return new Validation(routingErrors, diagnostics);
     }
 
-    /** 管理员检查在纯领域结果之外核对当前租户的审批人目录。 */
+    /** 发布检查在纯领域结果之外核对当前租户审批人、固定日历修订及事件契约。 */
     public Validation inspect(String tenantId, Graph graph, FormSchema formSchema) {
         return inspect(tenantId, graph, formSchema, null);
     }
 
-    /** 先检查标识和图结构，再核对当前租户审批人，发布与设计预检共用。 */
+    /** 先检查标识和图结构，再核对当前租户审批人、固定日历修订及事件契约，发布与设计预检共用。 */
     public Validation inspect(String tenantId, Graph graph, FormSchema formSchema, String processKey) {
-        Validation result = inspect(graph, formSchema, processKey);
+        Validation result = inspectStructure(graph, formSchema, processKey);
         if (!result.errors().isEmpty()) return result;
-        var errors = unavailableAssignees(tenantId, graph);
+        var errors = new java.util.ArrayList<>(references.inspect(tenantId, graph, formSchema));
+        errors.addAll(subprocesses.inspect(tenantId, graph, formSchema));
         return new Validation(errors, result.branchDiagnostics());
     }
 
@@ -96,6 +110,12 @@ public class DefinitionApplicationService {
     public List<DefinitionAssigneeDirectory.Option> assigneeOptions(String tenantId) {
         return assignees.options(tenantId);
     }
+
+    /** 设计者将本租户组织对象加入版本化表单选项，不能借此更改目录。 */
+    public List<DefinitionAssigneeDirectory.FormOption> formAssigneeOptions(String tenantId) { return assignees.formOptions(tenantId); }
+
+    /** 抄送名单不要求审批资格；发布时仍使用同一目录再次校验。 */
+    public List<DefinitionAssigneeDirectory.Option> copyOptions(String tenantId) { return assignees.copyOptions(tenantId); }
 
     /** 新建流程草稿。 */
     @Transactional
@@ -146,6 +166,7 @@ public class DefinitionApplicationService {
         DefinitionDraft draft = get(publisher.tenantId(), id);
         Validation validation = inspect(publisher.tenantId(), draft.graph(), draft.formSchema(), draft.key());
         if (!validation.errors().isEmpty()) throw new DefinitionValidationException(validation.errors());
+        eventContracts.requireAvailable(publisher.tenantId(), draft.graph());
         long version = repository.nextVersion(publisher.tenantId(), draft.key());
         DefinitionPublication publication = DefinitionPublication.prepare(draft, version, publisher, changeNote, Instant.now(), validation.branchDiagnostics());
         draft.publish(expectedRevision, version);
@@ -209,18 +230,11 @@ public class DefinitionApplicationService {
         return repository.findAll(tenantId, status);
     }
 
-    private List<String> unavailableAssignees(String tenantId, Graph graph) {
-        var available = assignees.options(tenantId).stream().filter(option -> option.memberCount() > 0)
-                .map(DefinitionAssigneeDirectory.Option::rule).collect(java.util.stream.Collectors.toSet());
-        return graph.nodes().stream().filter(node -> node.type() == DefinitionModels.NodeType.USER_TASK)
-                .filter(node -> !available.contains(node.properties().get("assigneeRule")))
-                .map(node -> "ASSIGNEE_NOT_AVAILABLE:" + node.id()).toList();
-    }
-
     private void requireValid(Graph graph, FormSchema formSchema, String processKey) {
-        List<String> errors = validator.validate(graph, formSchema, processKey);
+        var errors = validator.validate(graph, formSchema, processKey);
         if (!errors.isEmpty()) {
             throw new DefinitionValidationException(errors);
         }
     }
+
 }

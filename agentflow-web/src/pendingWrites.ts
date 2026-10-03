@@ -3,6 +3,13 @@ export interface PendingWrite { id: string; method: string; path: string; label:
 export interface RequestFailure { status: number; code: string; message: string }
 interface Entry { id: string; scope: string; request: WriteRequest; key: string; inflight?: Promise<unknown> }
 
+/** 认证和会话失败无法确认前次结果；单笔恢复与批次停发共用同一边界。 */
+export function isDefinitiveWriteFailure(error: unknown): boolean {
+  const failure = error as Partial<RequestFailure> | null
+  return !!failure && failure.code !== 'SESSION_CHANGED' && failure.code !== 'CSRF_INVALID'
+    && typeof failure.status === 'number' && failure.status >= 400 && failure.status < 500 && failure.status !== 401
+}
+
 /**
  * 页面内保留尚未确认的原请求；不自动重试，不把正文或令牌写入持久存储。
  * @author owlzhangfq@gmail.com
@@ -68,10 +75,8 @@ export class PendingWrites {
       if (epoch !== this.epoch) throw sessionChanged()
       return result
     }).catch((error: unknown) => {
-      const failure = error as Partial<RequestFailure>
       // 认证或 CSRF 失败不能证明前次请求未成功；恢复会话后仍须使用原键。
-      if (failure.code !== 'SESSION_CHANGED' && failure.code !== 'CSRF_INVALID' && typeof failure.status === 'number'
-          && failure.status >= 400 && failure.status < 500 && failure.status !== 401) remove()
+      if (isDefinitiveWriteFailure(error)) remove()
       if (epoch !== this.epoch) throw sessionChanged()
       throw error
     }).finally(() => {

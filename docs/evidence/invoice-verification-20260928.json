@@ -1,0 +1,71 @@
+{
+  "recordedAt": "2026-09-28T13:47:57.133335+00:00",
+  "result": "LOCAL_ACCEPTANCE_PASS",
+  "scope": "Persistent personal invoice verification; synthetic local facts only",
+  "businessState": "Expense precheck, submission, budget, settlement and UI remain in progress",
+  "unitAndIntegration": {
+    "domain": 4,
+    "gatewayConfiguration": 14,
+    "schedulingIsolation": 1,
+    "h2VerificationAndMigration": 12,
+    "postgresVerificationAndMigration": 12,
+    "walletFinancialResourceGatewayAndOpenApiRegression": 34,
+    "databaseScopesOverlap": true
+  },
+  "openapi": {
+    "operations": 112,
+    "schemas": 186,
+    "requestExamples": 38
+  },
+  "authors": {
+    "javaFiles": 456,
+    "namedTypes": 741,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "regression": {
+    "failure": "Extra status request field was silently ignored and returned 202",
+    "rootCause": "Existing HTTP decoder ignores unknown properties; external strict-response tests did not cover this new request DTO",
+    "fix": "Reject unknown properties on the invoice verification request only",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/invoice-verification-integration-first.log",
+    "greenLog": "/fyoung/tmp/agentflow-remaining-20260928/invoice-verification-integration-green.log"
+  },
+  "packagedRestart": {
+    "result": "PASS",
+    "scope": "Synthetic loopback HTTP and isolated PostgreSQL; not enterprise tax acceptance",
+    "httpRequests": 128,
+    "database": "invoice_verification_http_2f8a537c09",
+    "directory": "/fyoung/tmp/agentflow-remaining-20260928/verification-restart-originals",
+    "jarSha256": "d04bd5ae47d44515d8cebe814e6c8a1e3a3765d7d2908b753a9cd2c3a8243b5b",
+    "queuedRestartJob": "b47e1eba-c07c-4bde-9112-4ac14b1fc3e7",
+    "crashedJob": "4f868a06-73a5-4f82-afef-9338f40a5882",
+    "explicitRetryJob": "724c3526-7e9f-49af-9d44-ba917db03797",
+    "gatewayCalls": {
+      "5a92d1a9-b552-4d3f-a36f-90ea9a90e9d6": 1,
+      "390a42a6-55c5-4757-84ee-b8c103effd1f": 2
+    },
+    "terminalJobs": [
+      "SUCCEEDED:2",
+      "UNAVAILABLE:1"
+    ],
+    "jobRevisionRows": 9,
+    "fixturesPreserved": true,
+    "ownedBackendStopped": true,
+    "fixtureStopped": true
+  },
+  "logs": {
+    "domainAndScheduling": "/fyoung/tmp/agentflow-remaining-20260928/invoice-verification-domain-first.log",
+    "h2": "/fyoung/tmp/agentflow-remaining-20260928/invoice-verification-integration-green.log",
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/verification-postgres.log",
+    "regressionAndPackage": "/fyoung/tmp/agentflow-remaining-20260928/invoice-verification-regression-package.log",
+    "restart": "/fyoung/tmp/agentflow-remaining-20260928/invoice-verification-restart.log",
+    "detailedRestart": "/fyoung/tmp/agentflow-remaining-20260928/invoice-verification-restart-evidence.json"
+  },
+  "externalAcceptance": {
+    "enterpriseInvoiceProvider": "not run",
+    "financeUI": "not implemented in this slice",
+    "remoteCI": "not run"
+  },
+  "mainUnchanged": true,
+  "remoteConfigured": false
+}

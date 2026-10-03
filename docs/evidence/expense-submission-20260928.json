@@ -1,0 +1,108 @@
+{
+  "date": "2026-09-28",
+  "scope": "Formal expense submit/resubmit, paper receipt, finance guard, withdrawal/cancellation and budget outcomes",
+  "parentCommit": "1ae87926c437400d0bdc0af603d9ec6a1672591c",
+  "localOnly": true,
+  "checks": {
+    "domain": {
+      "tests": 20,
+      "result": "PASS"
+    },
+    "h2ServiceRegression": {
+      "tests": 85,
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-submission-regression.log"
+    },
+    "postgresql": {
+      "tests": 10,
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/submission-postgres.log",
+      "databases": {
+        "AGENTFLOW_SUBMISSION_TEST": "expense_submission_test_e69a4a70",
+        "AGENTFLOW_EXPENSE_CONTROL_MIGRATION": "expense_expense_control_migration_1f07a184"
+      }
+    },
+    "adjacentH2": {
+      "tests": 31,
+      "result": "PASS",
+      "classes": [
+        "CountersignIntegrationTest",
+        "FieldPermissionsIntegrationTest",
+        "NotificationTextsIntegrationTest",
+        "WebhookIntegrationTest"
+      ]
+    },
+    "openapi": {
+      "operations": 120,
+      "schemas": 199,
+      "requestExamples": 43,
+      "result": "PASS"
+    },
+    "webBuild": {
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-stage-web-build.log"
+    }
+  },
+  "bugRegression": {
+    "test": "BudgetOperationTest.rejectedResubmissionDoesNotPreventAThirdRoundUsingTheLastConfirmedLedger",
+    "coverageGap": "Previous tests retried an adjustment within one round, not third-round resubmission after rejected second round",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/budget-third-round-red.log",
+    "failure": "BUDGET_LEDGER_CONFLICT at BudgetOccupation.enqueue",
+    "fix": "Financial version must increase and round must not regress; rejected rounds do not advance confirmed ledger"
+  },
+  "consumerScenarios": [
+    "same idempotency request replays once",
+    "different concurrent request keys create one round and one budget command",
+    "latest READY and exact versions only",
+    "finance node path validation",
+    "late pending-budget exception rolls back engine and financial submission",
+    "explicit paper receipt and per-round reset",
+    "pending delegation cannot confirm receipt",
+    "matching actual budget freeze guards finance approval",
+    "insufficient budget returns actual round with system audit",
+    "other budget rejections preserve exact status",
+    "unknown budget is queried before rejected report release",
+    "cancel correction draft releases only frozen references"
+  ],
+  "ui": {
+    "id": "c21cdb10-5f53-47a1-b12a-ba1462a22390",
+    "key": "expense-stage-ui-d122f78d",
+    "name": "合成费用职责界面验收",
+    "base": "http://127.0.0.1:18210",
+    "frontend": "http://127.0.0.1:15310",
+    "backendScope": "Existing local QA backend; designer configuration only, new submission semantics are verified independently.",
+    "scenario": "Quick FINANCE_REVIEW -> advanced FINANCE_RECHECK -> save -> reload -> quick preserved",
+    "screenshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-stage-ui.png",
+    "tabClosed": true
+  },
+  "limitations": [
+    "Synthetic external finance facts; not enterprise gateway acceptance",
+    "Business expense/receipt/reduction screens and reduction application service remain",
+    "Settlement, vouchers, payments and archive remain",
+    "No remote is configured; no GitHub PR or remote CI"
+  ],
+  "withdrawalBoundaryRegression": {
+    "test": "ExpenseSubmissionIntegrationTest.applicantCannotWithdrawOnceTheRoundHasEnteredFinancialReview",
+    "coverageGap": "Prior withdrawal tests only stopped at business or receipt tasks; finance entry and completed finance history were not covered",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/expense-finance-withdrawal-red.log",
+    "failure": "Withdraw returned 200 after entering financial review",
+    "fix": "Use actual task history from the exact current approval round; financial completion never reopens withdrawal",
+    "h2": {
+      "tests": 10,
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-finance-withdrawal-green.log"
+    },
+    "postgresql": {
+      "tests": 10,
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/withdrawal-postgres.log",
+      "databases": {
+        "AGENTFLOW_SUBMISSION_TEST": {
+          "database": "expense_submission_test_2a7e02d4",
+          "url": "jdbc:postgresql://127.0.0.1:55460/expense_submission_test_2a7e02d4",
+          "user": "agentflow"
+        }
+      }
+    }
+  }
+}

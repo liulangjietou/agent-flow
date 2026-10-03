@@ -36,4 +36,21 @@ if [ -n "${AGENTFLOW_OIDC_CLIENT_SECRET_FILE:-}" ]; then
     fi
 fi
 
+if [ -n "${AGENTFLOW_ASSIST_API_KEY_FILE:-}" ]; then
+    if [ -n "${AGENTFLOW_ASSIST_API_KEY:-}" ]; then
+        echo "Ambiguous assist secret configuration" >&2
+        exit 2
+    fi
+    if [ ! -r "$AGENTFLOW_ASSIST_API_KEY_FILE" ]; then
+        echo "Assist secret file is not readable" >&2
+        exit 2
+    fi
+    AGENTFLOW_ASSIST_API_KEY=$(cat "$AGENTFLOW_ASSIST_API_KEY_FILE")
+    export AGENTFLOW_ASSIST_API_KEY
+    if [ -z "$AGENTFLOW_ASSIST_API_KEY" ]; then
+        echo "Assist secret file is empty" >&2
+        exit 2
+    fi
+fi
+
 exec java -jar /app/app.jar "$@"

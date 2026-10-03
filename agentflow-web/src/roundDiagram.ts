@@ -13,7 +13,10 @@ export interface DiagramEdge {
 export interface DiagramNode {
   id: string; name: string; type: string; state: 'NOT_REACHED' | 'ACTIVE' | 'LEFT'; activeTasks: number
   firstEnteredAt?: string | null; lastLeftAt?: string | null
+  candidateSnapshots?: CandidateSnapshot[]
 }
+/** 已冻结的原候选账号，不能据此判断当前办理资格。@author owlzhangfq@gmail.com */
+export interface CandidateSnapshot { id: string; directoryRevision: number; candidateUserIds: string[] }
 /** 文本记录与画布使用同一份证据，便于键盘和屏幕阅读器查看。 */
 export function traversalRecords(diagram: RoundDiagram) {
   const names = new Map(diagram.nodes.map(node => [node.id, node.name]))

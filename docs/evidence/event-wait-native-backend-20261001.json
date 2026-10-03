@@ -1,0 +1,95 @@
+{
+  "recordedAt": "2026-10-01T08:04:03.868677+00:00",
+  "status": "BACKEND_STAGE_VERIFIED_EVENT_FEATURE_INCOMPLETE",
+  "branch": "codex/governance-identifier-integration",
+  "parentCommit": "9cb022ccb324188413d9ee67d3a53b47b37b9fcf",
+  "implemented": [
+    "Explicit published event contract version and tenant-bound availability checks for publication and each new round",
+    "Flowable intermediate message catch events with generated collision-free names",
+    "Exact current application/round/native activation binding and transaction-bound single consumption",
+    "Pause and contract disable retain the same native subscription",
+    "Native progression, business completion, audit and notifications commit or roll back together",
+    "Participant read-only wait API and EVENT_RECEIVED audit event"
+  ],
+  "verification": {
+    "h2Domain": 34,
+    "h2Server": 48,
+    "postgresDomain": 9,
+    "postgresServer": 25,
+    "nativeEventIntegrationCases": 15,
+    "scopesOverlap": true,
+    "logs": {
+      "event-wait-native-h2-final.log": {
+        "classes": {
+          "io.agentflow.definition.TimerDefinitionTest": 6,
+          "io.agentflow.definition.DefinitionIdentifierTest": 4,
+          "io.agentflow.definition.DefinitionDomainTest": 9,
+          "io.agentflow.definition.EventDefinitionTest": 4,
+          "io.agentflow.definition.ParallelGatewayTest": 11,
+          "io.agentflow.definition.DefinitionDeploymentIntegrationTest": 5,
+          "io.agentflow.definition.DefinitionApplicationServiceTest": 4,
+          "io.agentflow.api.OpenApiContractTest": 6,
+          "io.agentflow.approval.InstanceControlIntegrationTest": 9,
+          "io.agentflow.approval.EventWaitIntegrationTest": 15,
+          "io.agentflow.approval.TimerWaitIntegrationTest": 9
+        },
+        "sha256": "655416a090a58325534e108711962c47f45fd0adf9c5bdea85fb05a911cfb322"
+      },
+      "event-wait-native-postgres.log": {
+        "classes": {
+          "io.agentflow.definition.EventDefinitionTest": 4,
+          "io.agentflow.event.EventContractTest": 5,
+          "io.agentflow.event.EventContractIntegrationTest": 10,
+          "io.agentflow.approval.EventWaitIntegrationTest": 15
+        },
+        "sha256": "133fec19b2ac06bdadae397bcea009499301f680219956878f86e33b933464b9"
+      }
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 274,
+      "schemas": 544,
+      "requestExamples": 106
+    },
+    "openapiBaselineChanges": {
+      "changedExistingPaths": [
+        "/api/v1/applications/{id}/audit",
+        "/api/v1/operations/audit",
+        "/api/v1/operations/audit/export"
+      ],
+      "addedPaths": [
+        "/api/v1/applications/{id}/rounds/{roundNo}/event-waits"
+      ],
+      "changedExistingSchemas": [
+        "GraphNode",
+        "RoundDiagramNode"
+      ],
+      "addedSchemas": [
+        "EventWaitEntry",
+        "EventWaitView"
+      ]
+    },
+    "existingOperationsOnlyAddAuditActionFilter": true,
+    "javaAuthors": "PASS",
+    "gitDiffCheck": "PASS"
+  },
+  "postgres": {
+    "waitDatabase": "event_wait_it_b949e9e7f0",
+    "contractDatabase": "event_wait_contract_b949e9e7f0",
+    "status": "PASS",
+    "pid": 48812,
+    "exitCode": 0
+  },
+  "schemaVersion": 87,
+  "newMigration": false,
+  "notYetAccepted": [
+    "Source authentication/signature verification",
+    "Durable inbound event inbox and message idempotency",
+    "Background delivery and audited original-failure recovery",
+    "Catalog/designer/participant UI",
+    "Actual HTTP/browser and runtime upgrade/restart acceptance"
+  ],
+  "longRunningRuntimesChanged": false,
+  "remainingWorkPackages": 4,
+  "remoteCi": "NOT_RUN_NO_REMOTE"
+}

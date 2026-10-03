@@ -1,0 +1,60 @@
+{
+  "date": "2026-09-30",
+  "status": "PASS_DOMAIN_AND_PERSISTENCE",
+  "localRuntimeSchema": 78,
+  "migration": 79,
+  "newDomainTests": 8,
+  "newPersistenceTests": 8,
+  "domainScope": {
+    "tests": 34,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-dispute-domain.log"
+  },
+  "h2Scope": {
+    "tests": 53,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-dispute-persistence-h2.log"
+  },
+  "postgresScope": {
+    "tests": 53,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-dispute-postgres.log"
+  },
+  "regression": {
+    "whyMissing": "Existing tests covered normal transitions without requiring an independent decision at the persistence boundary.",
+    "redTest": "SupplierSettlementPersistenceTest.ordinaryUpdateCannotClearAnErpDisputeWithoutAnIndependentDecision",
+    "redResult": "1 test, 1 assertion failure: ordinary update cleared conflict without a recorded decision",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-dispute-unguarded-update-red.log",
+    "fix": "Ordinary update preserves conflict; dedicated resolution validates continuous history and atomically appends decision and result revision."
+  },
+  "verified": [
+    "Original ERP posting identity and complete balances preserved",
+    "Highest revision and exclusive five minute evidence deadline",
+    "Historical settled or ALREADY_SETTLED evidence prevents safe rejection",
+    "Applicant and original cashier excluded",
+    "Concurrent decisions have one winner",
+    "Decision insert failure rolls back state and revision",
+    "Continuous revision history and both foreign keys checked",
+    "External nanoseconds preserved across repository recreation",
+    "Later dispute and resolution preserve original local completion",
+    "V78 to V79 preserves 16 prior tables; repeated migration is a no-op"
+  ],
+  "authors": {
+    "files": 1022,
+    "namedTypes": 1929,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "boundaries": [
+    "Public API and UI are not implemented in this phase.",
+    "Live local acceptance database remains V78.",
+    "PostgreSQL and H2 scope overlaps; counts are not added.",
+    "No real bank or ERP integration, remote PR or remote CI."
+  ]
+}

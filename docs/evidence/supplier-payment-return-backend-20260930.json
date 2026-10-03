@@ -1,0 +1,89 @@
+{
+  "status": "PASS_LOCAL_BACKEND",
+  "date": "2026-09-30",
+  "schemaCode": 80,
+  "liveSchema": 79,
+  "syntheticFinanceOnly": true,
+  "newBackendTests": 15,
+  "postgresql": {
+    "domainTotal": 13,
+    "broadServerTotal": 151,
+    "additionalDuplicateConflictTest": 1,
+    "distinctServerTotal": 152,
+    "SupplierPaymentReturnTest": 13,
+    "SupplierPaymentPersistenceTestBeforeFinalConflictTest": 37,
+    "SupplierSettlementPersistenceTest": 38,
+    "SupplierPayableHoldPersistenceTest": 15,
+    "SupplierPayableReviewPersistenceTest": 11,
+    "ProcurementPersistenceTest": 8,
+    "CrossBusinessInvoiceClaimTest": 7,
+    "SupplierFinanceWorkflowTest": 35,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "broadLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-backend-postgres.log",
+    "additionalLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-duplicate-error-postgres.log"
+  },
+  "h2": {
+    "broadServerTotal": 113,
+    "additionalBankAndCompletedPayableBranches": 2,
+    "additionalCompletionQueueTest": 1,
+    "additionalDuplicateConflictTest": 1,
+    "distinctServerTotal": 117,
+    "broadLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-backend-h2.log",
+    "additionalBranchLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-final-branches-h2.log",
+    "completionQueueLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-completion-queue-green.log",
+    "duplicateConflictLog": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-duplicate-error-green.log"
+  },
+  "redThenGreen": [
+    {
+      "scope": "Return review before settlement preparation, before first send and during ERP response",
+      "redFailures": 3,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-guards-red.log"
+    },
+    {
+      "scope": "Completion queue must exclude uncertainty on earlier payments for the same payable",
+      "redFailures": 1,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-completion-queue-red.log"
+    },
+    {
+      "scope": "Duplicate bank funds must produce a stable finance conflict and fully roll back",
+      "redFailures": 1,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-duplicate-error-red.log"
+    }
+  ],
+  "verified": [
+    "Original success and fixed target remain queryable before or after settlement",
+    "External reads execute outside database transactions and require explicit registration",
+    "Current access, actor eligibility, displayed versions and fresh original bank facts are rechecked",
+    "Query expiry, lost responses and late workers cannot overwrite newer state",
+    "Audit or duplicate-funds failure rolls back the complete decision",
+    "Partial and full cumulative refunds preserve first registration ownership",
+    "Shared payable locks serialize concurrent return freezes and new requests",
+    "Unknown original bank evidence after completed settlement blocks another payment request",
+    "Actual ERP posting is retained when a return prevents local completion"
+  ],
+  "runtimeRecovery": {
+    "schema": 79,
+    "preservedOldRows": 2401,
+    "unchangedAttachments": 7,
+    "preservedOriginalFinancialFiles": 16,
+    "originalBankCommands": 2,
+    "originalErpCommands": 2,
+    "oldCompletionPreserved": true,
+    "browserRerun": false,
+    "record": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-runtime-recovery.json"
+  },
+  "javaAuthors": {
+    "files": 1038,
+    "namedTypes": 1965,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remaining": [
+    "Public return API and sensitive-field permission acceptance",
+    "Browser workflow and existing nonempty V79 database upgrade",
+    "Independent ERP adjustment",
+    "Real enterprise integration and production acceptance"
+  ]
+}

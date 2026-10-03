@@ -17,10 +17,15 @@ import java.util.UUID;
 public class AssistRunQueryService {
     private final AssistRunReadPort readPort;
     private final AssistRunRepository repository;
+    private final io.agentflow.approval.ApplicationFieldViews fields;
+    private final JdbcAssistJobRepository jobs;
+    private final AssistInputService inputs;
 
     /** 列表使用轻量读模型，详情通过仓储恢复完整领域记录。 */
-    public AssistRunQueryService(AssistRunReadPort readPort, AssistRunRepository repository) {
+    public AssistRunQueryService(AssistRunReadPort readPort, AssistRunRepository repository, io.agentflow.approval.ApplicationFieldViews fields,
+                                  JdbcAssistJobRepository jobs, AssistInputService inputs) {
         this.readPort = readPort; this.repository = repository;
+        this.fields = fields; this.jobs = jobs; this.inputs = inputs;
     }
 
     /** 不返回全库数量或正文；末页显式标记为空游标。 */
@@ -38,6 +43,9 @@ public class AssistRunQueryService {
         var run = repository.find(application.tenantId(), runId)
                 .filter(value -> value.input().applicationId().equals(application.id()))
                 .orElseThrow(() -> new DomainException("NOT_FOUND", "Assist run not found"));
+        var job = jobs.find(application.tenantId(), run.id());
+        if (job.isPresent()) inputs.requireReadable(application, run, job.get().sources());
+        else fields.requireFullAssistInput(application, run.input().roundNo());
         return new Detail(run.id(), application.id(), run.input().applicationVersion(), run.input().roundNo(),
                 run.status(), run.version(), run.requestedBy(), run.createdAt(), run.startedAt(), run.completedAt(),
                 run.promptVersion(), run.input().references(), run.suggestion(), run.failure(), run.review(),

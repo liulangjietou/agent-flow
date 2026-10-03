@@ -1,5 +1,6 @@
 package io.agentflow.approval.workspace;
 
+import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.common.Actor;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -20,17 +21,25 @@ public interface PendingTaskReadPort {
     record Result(List<Item> items, long total) { }
 
     /**
-     * 任务与申请摘要；金额使用十进制文本，避免前端浮点精度损失。
+     * 任务与申请摘要；金额使用十进制文本，组织名称仅取本轮快照，不补造缺失历史。
      * @author owlzhangfq@gmail.com
      */
     record Item(String taskId, String taskName, String applicationId, String businessNo, String title,
                 String processKey, long definitionVersion, String applicant, String amount, int roundNo,
-                String assignee, String owner, String delegationState, Instant createdAt) { }
+                String assignee, String owner, String delegationState, Instant createdAt, Instant dueAt,
+                String legalEntityName, String departmentName, String positionName, SubmissionRisk risk) { }
+
+    /**
+     * 仅筛选引擎记录的期限事实；到达截止时刻即超时，缺失期限不推定为未到期。
+     * @author owlzhangfq@gmail.com
+     */
+    enum DeadlineFilter { ALL, OVERDUE, PENDING, UNRECORDED }
 
     /**
      * 已通过入口校验的查询条件；按创建时间和任务标识升序，先处理较早任务。
      * @author owlzhangfq@gmail.com
      */
-    record Query(String text, String processKey, String applicant, String assignment, BigDecimal minAmount,
-                 BigDecimal maxAmount, int limit, Instant afterTime, String afterId) { }
+    record Query(String text, String processKey, String applicant, String organization, String assignment, DeadlineFilter deadline,
+                 Instant deadlineAt, BigDecimal minAmount, BigDecimal maxAmount, int limit, Instant afterTime, String afterId,
+                 SubmissionRisk.Level risk) { }
 }

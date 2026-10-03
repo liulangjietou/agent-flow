@@ -1,0 +1,189 @@
+{
+  "recordedAt": "2026-10-01T12:00:37.914340+00:00",
+  "scope": "Audited administrator termination of current running or paused root approval rounds, descendant cancellation, financial resource reconciliation and explicit UI",
+  "status": "LOCAL_IMPLEMENTATION_AND_SCOPED_VERIFICATION_COMPLETE_RUNTIME_ACCEPTANCE_PENDING",
+  "baseCommit": "62e4489263c6341e7d637cced2a5c65e99d2e3ac",
+  "branch": "codex/governance-identifier-integration",
+  "migrationAdded": false,
+  "testedSchemaVersion": 90,
+  "acceptedRuntimeSchemaVersion": 88,
+  "redEvidence": [
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/instance-termination-red.log",
+      "tests": 2,
+      "failures": 2,
+      "errors": 0,
+      "cause": "Terminate endpoint was absent; real running and paused instances returned HTTP 404"
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/instance-termination-frontend-red.log",
+      "failures": 2,
+      "cause": "Termination confirmation and terminal receipt validation were absent"
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/instance-termination-first.log",
+      "tests": 2,
+      "failures": 1,
+      "errors": 0,
+      "cause": "Paused termination notified applicant but missed the suspended task recipient"
+    }
+  ],
+  "checks": {
+    "domainTests": 18,
+    "h2ServerUniqueTests": 143,
+    "h2Classes": {
+      "io.agentflow.api.OpenApiContractTest": 6,
+      "io.agentflow.approval.InstanceControlIntegrationTest": 14,
+      "io.agentflow.approval.SubprocessStartIntegrationTest": 41,
+      "io.agentflow.expense.ExpenseSubmissionIntegrationTest": 3,
+      "io.agentflow.notification.NotificationTextsIntegrationTest": 5,
+      "io.agentflow.integration.WebhookIntegrationTest": 12,
+      "io.agentflow.procurement.ProcurementPaymentWorkflowTest": 23,
+      "io.agentflow.approval.operations.AuditSearchIntegrationTest": 5,
+      "io.agentflow.approval.operations.OperationsQueryParametersTest": 3,
+      "io.agentflow.approval.ApplicationHistoryIntegrationTest": 31
+    },
+    "postgresTests": 58,
+    "frontendRelatedTests": 33,
+    "typescript": "PASS",
+    "build": "PASS",
+    "openApi": {
+      "result": "PASS",
+      "operations": 280,
+      "schemas": 550,
+      "requestExamples": 109
+    },
+    "diffCheck": "PASS"
+  },
+  "behaviors": [
+    "Current tenant administrator, root round and expected version; role checked again for original idempotent replay",
+    "Running or suspended native instance deleted, actual history checked; root and current unfinished descendants cancelled atomically",
+    "Completed nested branches, authentic approval opinions, original round payload and identity preserved",
+    "Root reason kept only in root round and audit; descendant native delete reason contains only source root identifier",
+    "Unfinished task audience includes suspended tasks without widening active pending task queries",
+    "Concurrent prior-authorized child approval cannot survive a root termination that wins the root lock",
+    "Expense reservations released locally; unknown external budget result queried using original command before separate release",
+    "Original procurement hold released; release failure restores original paused instance, task, version, audit and hold",
+    "Notification failure rolls back root and descendant native state, conclusions, audit, inbox and outbox",
+    "UI requires capability, current version, reason and explicit confirmation; cancel sends nothing; unknown or invalid receipt retains original recovery key"
+  ],
+  "postgres": {
+    "databases": {
+      "family": "instance_termination_family_6edaba95",
+      "single": "instance_termination_single_63cd7782",
+      "expense": "instance_termination_expense_7796161e",
+      "procurement": "instance_termination_procurement_badbed13"
+    },
+    "status": "PASS",
+    "existingDatabasesModified": false,
+    "pid": 85579,
+    "exitCode": 0,
+    "tlsAccepted": false,
+    "databaseEvidence": {
+      "family": {
+        "schemaVersion": 90,
+        "terminationAudits": 5,
+        "boundTerminations": 5,
+        "terminationOutbox": 5,
+        "cancelledButRunning": 0,
+        "calls": 65,
+        "boundCalls": 65,
+        "terminatedChildrenStillInApproval": 0,
+        "stoppedChildren": 21,
+        "childStopAudits": 21,
+        "activeSuspensionMismatch": 0,
+        "remainingDeadlinePauseMarkers": 0,
+        "invalidDeadlinePauseMarkers": 0
+      },
+      "single": {
+        "schemaVersion": 90,
+        "terminationAudits": 5,
+        "boundTerminations": 5,
+        "terminationOutbox": 5,
+        "cancelledButRunning": 0,
+        "calls": 0,
+        "boundCalls": 0,
+        "terminatedChildrenStillInApproval": 0,
+        "stoppedChildren": 0,
+        "childStopAudits": 0,
+        "activeSuspensionMismatch": 0,
+        "remainingDeadlinePauseMarkers": 2,
+        "invalidDeadlinePauseMarkers": 0
+      },
+      "expense": {
+        "schemaVersion": 90,
+        "terminationAudits": 1,
+        "boundTerminations": 1,
+        "terminationOutbox": 0,
+        "cancelledButRunning": 0,
+        "calls": 0,
+        "boundCalls": 0,
+        "terminatedChildrenStillInApproval": 0,
+        "stoppedChildren": 0,
+        "childStopAudits": 0,
+        "activeSuspensionMismatch": 0,
+        "remainingDeadlinePauseMarkers": 0,
+        "invalidDeadlinePauseMarkers": 0
+      },
+      "procurement": {
+        "schemaVersion": 90,
+        "terminationAudits": 2,
+        "boundTerminations": 2,
+        "terminationOutbox": 0,
+        "cancelledButRunning": 0,
+        "calls": 0,
+        "boundCalls": 0,
+        "terminatedChildrenStillInApproval": 0,
+        "stoppedChildren": 0,
+        "childStopAudits": 0,
+        "activeSuspensionMismatch": 0,
+        "remainingDeadlinePauseMarkers": 0,
+        "invalidDeadlinePauseMarkers": 0
+      }
+    },
+    "scope": "MockMvc, real Flowable and PostgreSQL verification; independent HTTP, browser, upgrade and restart acceptance remain pending"
+  },
+  "preservation": {
+    "phase": "after",
+    "tableCount": 219,
+    "totalRows": 5580,
+    "files": 10,
+    "schema": "88",
+    "allTablesAndFilesPreserved": true
+  },
+  "runtimeHealth": {
+    "backend": {
+      "status": 200,
+      "readiness": "UP"
+    },
+    "frontend": {
+      "status": 200
+    },
+    "frontendSource": {
+      "status": 200
+    }
+  },
+  "seedFilesUnchanged": 5,
+  "verificationNotes": [
+    "Test inspection initially required zero pause markers in every database; two retained markers belonged to intentionally still-paused standalone fixtures. Actual task and native process suspension state verified. Inspection now rejects only orphan or active-task pause markers; no application data changed."
+  ],
+  "pending": [
+    "Independent HTTP, real browser and narrow layout acceptance for termination",
+    "Termination on existing in-approval data through upgrade and restart",
+    "Complete structured-financial parent subprocess runtime acceptance",
+    "Subprocess publication dependencies, designer, authorized family views and public feature acceptance",
+    "Other defined failure recovery and safe batch handling",
+    "Remaining notification/collaboration and actual enterprise integrations/deployment",
+    "Template browser download receipt and expired test TLS acceptance",
+    "Git remote, PR and remote CI"
+  ],
+  "overallGoalComplete": false,
+  "remainingWorkPackages": 4,
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/instance-termination-expanded.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/instance-termination-h2-regression.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/instance-termination-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/instance-termination-frontend.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/instance-termination-frontend-build.log"
+  ]
+}

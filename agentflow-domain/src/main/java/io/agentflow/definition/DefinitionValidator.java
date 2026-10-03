@@ -2,6 +2,8 @@ package io.agentflow.definition;
 
 import java.util.*;
 import io.agentflow.form.FormSchema;
+import io.agentflow.expense.ExpenseFormContract;
+import io.agentflow.expense.ExpenseProcessPolicy;
 import java.util.regex.Pattern;
 
 import static io.agentflow.definition.DefinitionModels.*;
@@ -11,6 +13,7 @@ import static io.agentflow.definition.DefinitionModels.*;
  * @author owlzhangfq@gmail.com
  */
 public final class DefinitionValidator {
+    private static final int MAX_SUBPROCESS_NODE_NAME_LENGTH = 200;
     private static final Pattern LITERAL_ASSIGNEE_RULE =
             Pattern.compile("(?:role|user):[\\p{L}\\p{N}_][\\p{L}\\p{N}_.@-]{0,127}");
 
@@ -27,33 +30,85 @@ public final class DefinitionValidator {
     /** 图元素共享标识空间；已知流程标识时一并检查，避免部署时才发生冲突。 */
     public List<String> validate(Graph graph, FormSchema formSchema, String processKey) {
         List<String> errors = new ArrayList<>();
+        if (graph.riskPolicy() != null) errors.addAll(graph.riskPolicy().validate(formSchema, graph.conditionLanguageVersion()));
         Map<String, Node> nodes = new HashMap<>();
         for (Node n : graph.nodes()) {
+            if (n.type() == NodeType.SUB_PROCESS) {
+                if (n.id().length() > FormSchema.MAX_NODE_ID_LENGTH || n.name().length() > MAX_SUBPROCESS_NODE_NAME_LENGTH) errors.add("SUBPROCESS_NODE_LIMIT_EXCEEDED:" + n.id());
+                try { SubprocessPolicy.fromProperties(n.properties()); }
+                catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+            }
+            else if (SubprocessPolicy.hasProperties(n.properties())) errors.add("SUBPROCESS_REQUIRES_CALL_NODE:" + n.id());
+            if (n.type() == NodeType.EVENT_WAIT) {
+                if (n.id().length() > 128 || n.name().length() > 200) errors.add("EVENT_NODE_LIMIT_EXCEEDED:" + n.id());
+                try { EventWaitPolicy.fromProperties(n.properties()); }
+                catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+            } else if (EventWaitPolicy.PROPERTY_KEYS.stream().anyMatch(n.properties()::containsKey)) errors.add("EVENT_REQUIRES_WAIT_NODE:" + n.id());
+            if (n.type() == NodeType.TIMER_WAIT) {
+                try { TimerWaitPolicy.fromProperties(n.properties()); }
+                catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+            } else if (n.properties().containsKey(TimerWaitPolicy.PROPERTY)) errors.add("TIMER_REQUIRES_WAIT_NODE:" + n.id());
+            if (n.properties().containsKey(ExpenseProcessPolicy.PROPERTY)) {
+                try { ExpenseProcessPolicy.stage(n); }
+                catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+                if (!ExpenseFormContract.structured(formSchema)) errors.add("EXPENSE_STAGE_REQUIRES_EXPENSE_FORM:" + n.id());
+            }
             if (n.id().equals(processKey)) errors.add("PROCESS_KEY_CONFLICT:" + n.id());
-            String approvalMode = n.properties().get("approvalMode");
-            if (approvalMode != null) {
+            if (TaskDeadlinePolicy.PROPERTY_KEYS.stream().anyMatch(n.properties()::containsKey)) {
+                if (n.type() != NodeType.USER_TASK) errors.add("DEADLINE_REQUIRES_USER_TASK:" + n.id());
+                else {
+                    try { TaskDeadlinePolicy.fromProperties(n.properties()); }
+                    catch (io.agentflow.common.DomainException exception) { errors.add("DEADLINE_RULE_INVALID:" + n.id()); }
+                }
+            }
+            if (TaskEscalationPolicy.PROPERTY_KEYS.stream().anyMatch(n.properties()::containsKey)) {
+                if (n.type() != NodeType.USER_TASK) errors.add("ESCALATION_REQUIRES_USER_TASK:" + n.id());
+                else {
+                    if (TaskDeadlinePolicy.PROPERTY_KEYS.stream().noneMatch(n.properties()::containsKey)) errors.add("ESCALATION_REQUIRES_DEADLINE:" + n.id());
+                    try { TaskEscalationPolicy.fromProperties(n.properties()); }
+                    catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+                }
+            }
+            if (n.properties().containsKey(ApprovalPolicy.MODE_PROPERTY) || n.properties().containsKey(ApprovalPolicy.PERCENTAGE_PROPERTY)) {
                 if (n.type() != NodeType.USER_TASK) errors.add("APPROVAL_MODE_REQUIRES_USER_TASK:" + n.id());
-                else if (java.util.Arrays.stream(ApprovalMode.values()).noneMatch(mode -> mode.name().equals(approvalMode))) {
-                    errors.add("APPROVAL_MODE_INVALID:" + n.id());
+                else {
+                    try { n.approvalPolicy(); }
+                    catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+                }
+            }
+            if (ApprovalResponsibilityPolicy.PROPERTY_KEYS.stream().anyMatch(n.properties()::containsKey)) {
+                if (n.type() != NodeType.USER_TASK) errors.add("APPROVAL_RESPONSIBILITY_REQUIRES_USER_TASK:" + n.id());
+                else {
+                    try { ApprovalResponsibilityPolicy.fromProperties(n.properties()); }
+                    catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
                 }
             }
             if (nodes.put(n.id(), n) != null) errors.add("DUPLICATE_NODE:" + n.id());
+            if (n.type() == NodeType.COPY && (n.id().length() > 128 || n.name().length() > 200)) {
+                errors.add("COPY_NODE_LIMIT_EXCEEDED:" + n.id());
+            }
             if (n.type() == NodeType.SERVICE_TASK) {
                 errors.add("UNSUPPORTED_NODE_TYPE:" + n.id());
             }
-            if (n.type() == NodeType.USER_TASK) {
+            if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT || n.type() == NodeType.SUB_PROCESS) {
                 // Flowable 会对任务名称求值，业务标签必须保持字面量，不能成为访问 Spring Bean 的入口。
                 if (n.name().contains("${") || n.name().contains("#{")) {
                     errors.add("TASK_NAME_EXPRESSION_FORBIDDEN:" + n.id());
                 }
-                String assigneeRule = n.properties().get("assigneeRule");
+            }
+            if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY) {
+                String assigneeRule = n.properties().get(n.type() == NodeType.COPY ? "recipientRule" : "assigneeRule");
                 if (assigneeRule == null || assigneeRule.isBlank()) {
                     errors.add("ASSIGNEE_RULE_REQUIRED:" + n.id());
-                } else if (!LITERAL_ASSIGNEE_RULE.matcher(assigneeRule).matches()) {
+                } else if (n.type() == NodeType.USER_TASK && FormAssigneePolicy.isFieldRule(assigneeRule)) {
+                    try { FormAssigneePolicy.parse(assigneeRule).field(formSchema); }
+                    catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+                } else if (!isLiteralAssigneeRule(assigneeRule)) {
                     errors.add("ASSIGNEE_RULE_INVALID:" + n.id());
                 }
             }
         }
+        if (formSchema != null) validateFieldNodes(formSchema.fields(), nodes, errors);
         long starts = graph.nodes().stream().filter(n -> n.type() == NodeType.START).count();
         long ends = graph.nodes().stream().filter(n -> n.type() == NodeType.END).count();
         if (starts != 1) errors.add("START_COUNT_MUST_BE_ONE");
@@ -110,7 +165,8 @@ public final class DefinitionValidator {
             if (n.type() == NodeType.START && incoming.contains(n.id())) errors.add("START_MUST_HAVE_NO_INCOMING:" + n.id());
             if (n.type() == NodeType.END && outgoingCount != 0) errors.add("END_MUST_HAVE_NO_OUTGOING:" + n.id());
             // 并行必须显式建模，普通节点的多出线会在引擎中产生隐式并行。
-            if ((n.type() == NodeType.START || n.type() == NodeType.USER_TASK) && outgoingCount > 1) {
+            if ((n.type() == NodeType.START || n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY
+                    || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT || n.type() == NodeType.SUB_PROCESS) && outgoingCount > 1) {
                 errors.add("SINGLE_OUTGOING_REQUIRED:" + n.id());
             }
             if (n.type() != NodeType.END && !outgoing.contains(n.id())) errors.add("NODE_DEAD_END:" + n.id());
@@ -121,6 +177,17 @@ public final class DefinitionValidator {
             }
         }
         Node start = graph.nodes().stream().filter(n -> n.type() == NodeType.START).findFirst().orElse(null);
+        if (start != null && graph.nodes().stream().anyMatch(node -> node.type() == NodeType.COPY)) {
+            // 抄送不是审批：含抄送的申请不能沿没有任何人工审批的路径直接结束。
+            Set<String> visited = new HashSet<>();
+            Deque<String> pending = new ArrayDeque<>(); pending.add(start.id());
+            while (!pending.isEmpty()) {
+                var node = nodes.get(pending.removeFirst());
+                if (node == null || !visited.add(node.id()) || node.type() == NodeType.USER_TASK || node.type() == NodeType.SUB_PROCESS) continue;
+                if (node.type() == NodeType.END) { errors.add("COPY_REQUIRES_APPROVAL_PATH:" + node.id()); break; }
+                outgoingEdges.getOrDefault(node.id(), List.of()).stream().map(Edge::target).forEach(pending::addLast);
+            }
+        }
         if (start != null) {
             Set<String> reachable = new HashSet<>();
             Deque<String> queue = new ArrayDeque<>();
@@ -138,7 +205,33 @@ public final class DefinitionValidator {
         }
         if (containsCycle(nodes.keySet(), outgoingEdges)) errors.add("GRAPH_LOOP");
         if (errors.isEmpty()) errors.addAll(new ParallelStructureValidator().validate(graph));
+        if (errors.isEmpty()) {
+            for (Node node : graph.nodes()) {
+                if (node.type() == NodeType.USER_TASK && !ApprovalResponsibilityPolicy.fromProperties(node.properties()).referencesValid(graph, node.id())) {
+                    errors.add("APPROVAL_RESPONSIBILITY_REFERENCE_INVALID:" + node.id());
+                }
+            }
+        }
+        if (errors.isEmpty() && graph.nodes().stream().anyMatch(n -> n.type() == NodeType.SUB_PROCESS)) {
+            validateWaitApprovalPaths(graph, errors, "SUBPROCESS_REQUIRES_APPROVAL_PATH");
+        }
+        if (errors.isEmpty() && graph.nodes().stream().anyMatch(n -> n.type() == NodeType.TIMER_WAIT)) {
+            validateWaitApprovalPaths(graph, errors, "TIMER_REQUIRES_APPROVAL_PATH");
+        }
+        if (errors.isEmpty() && graph.nodes().stream().anyMatch(n -> n.type() == NodeType.EVENT_WAIT)) {
+            validateWaitApprovalPaths(graph, errors, "EVENT_REQUIRES_APPROVAL_PATH");
+        }
         return List.copyOf(errors);
+    }
+
+    /** 审批、抄送和升级共用字面量语法；实际成员可用性由发布编排检查。 */
+    static boolean isLiteralAssigneeRule(String value) {
+        return value != null && LITERAL_ASSIGNEE_RULE.matcher(value).matches();
+    }
+
+    /** 并行汇合要求全部入口到达，因此另一分支的人工审批不能被误判为可绕过。 */
+    private void validateWaitApprovalPaths(Graph graph, List<String> errors, String errorCode) {
+        DefinitionApprovalPaths.endsWithoutApproval(graph).forEach(id -> errors.add(errorCode + ":" + id));
     }
 
     private boolean containsMembership(ConditionAst condition) {
@@ -166,4 +259,14 @@ public final class DefinitionValidator {
         }
         return visited != nodeIds.size();
     }
+    private static void validateFieldNodes(List<FormSchema.Field> fields, Map<String, Node> nodes, List<String> errors) {
+        for (var field : fields) {
+            if (field.nodeAccess() != null) for (String nodeId : field.nodeAccess().keySet()) {
+                var node = nodes.get(nodeId);
+                if (node == null || node.type() != NodeType.USER_TASK && node.type() != NodeType.COPY && node.type() != NodeType.SUB_PROCESS) errors.add("FIELD_PERMISSION_NODE_INVALID:" + field.key() + ":" + nodeId);
+            }
+            if (field.columns() != null) validateFieldNodes(field.columns(), nodes, errors);
+        }
+    }
+
 }

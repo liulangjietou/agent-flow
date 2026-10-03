@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
@@ -41,7 +42,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "agentflow.auth.oidc.tenant-claim=tenant", "agentflow.auth.oidc.roles-claim=roles",
         "agentflow.auth.oidc.tenant-mappings.external=tenant-a", "agentflow.auth.oidc.tenant-mappings.external-b=tenant-b",
         "agentflow.auth.oidc.role-mappings.staff[0]=EMPLOYEE", "agentflow.auth.oidc.allow-insecure-loopback=true",
-        "agentflow.web.allowed-origin=http://localhost"})
+        "agentflow.web.allowed-origin=http://localhost", "agentflow.finance-gateway.enabled=true",
+        "agentflow.finance-gateway.tenants.demo.endpoint=http://127.0.0.1:12345/finance",
+        "agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback=true",
+        "agentflow.payment-callbacks.enabled=true", "agentflow.payment-callbacks.worker-enabled=false",
+        "agentflow.events.enabled=true", "agentflow.events.worker-enabled=false"})
 @AutoConfigureMockMvc
 class OidcAuthenticationIntegrationTest {
     static final OidcTestProvider provider = new OidcTestProvider();
@@ -53,6 +58,12 @@ class OidcAuthenticationIntegrationTest {
     @DynamicPropertySource
     static void issuer(DynamicPropertyRegistry registry) {
         registry.add("agentflow.auth.oidc.issuer", provider::issuer);
+        registry.add("agentflow.payment-callbacks.tenants.demo.signing-secrets[0]", () -> io.agentflow.finance.callback.PaymentCallbackTestRequests.SECRET);
+        registry.add("agentflow.events.sources.erp.tenant-id", () -> "demo");
+        registry.add("agentflow.events.sources.erp.source-key", () -> "erp");
+        registry.add("agentflow.events.sources.erp.trust-revision", () -> 1);
+        registry.add("agentflow.events.sources.erp.enabled", () -> true);
+        registry.add("agentflow.events.sources.erp.signing-secrets[0]", () -> io.agentflow.event.EventTestRequests.SECRET);
         registry.add("spring.datasource.url", () -> System.getProperty("agentflow.oidc-test.jdbc-url", "jdbc:h2:mem:oidc-auth;DB_CLOSE_DELAY=-1"));
         registry.add("spring.datasource.driver-class-name", () -> System.getProperty("agentflow.oidc-test.jdbc-driver", "org.h2.Driver"));
         registry.add("spring.datasource.username", () -> System.getProperty("agentflow.oidc-test.jdbc-user", "sa"));
@@ -60,6 +71,32 @@ class OidcAuthenticationIntegrationTest {
     }
     @AfterAll static void closeProvider() { provider.close(); }
     @BeforeEach void reset() { provider.mode = "valid"; provider.subject = "employee-42"; provider.tenant = "external"; }
+
+    @Test void callbackPostUsesSignatureWhileManagementStillRequiresSessionAndCsrf() throws Exception {
+        String path = io.agentflow.finance.callback.PaymentCallbackVerifier.PATH;
+        mvc.perform(post(path).contentType("application/json").content("{}"))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("code").value("PAYMENT_CALLBACK_UNAUTHENTICATED"));
+        String body = json.write(new io.agentflow.finance.callback.PaymentCallbackVerifier.Signal(1, "payment.changed", "demo",
+                io.agentflow.finance.callback.PaymentCallbackVerifier.Kind.EMPLOYEE, java.util.UUID.randomUUID(), "a".repeat(64), 1));
+        mvc.perform(io.agentflow.finance.callback.PaymentCallbackTestRequests.request("evt_oidc", body))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("code").value("NOT_FOUND"));
+        mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        mvc.perform(post(path + "/" + java.util.UUID.randomUUID() + "/retry").contentType("application/json").content("{}"))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("code").value("CSRF_INVALID"));
+    }
+
+    @Test
+    void eventReceptionRequiresSignatureAndRecoveryKeepsSessionCsrfProtection() throws Exception {
+        String path = io.agentflow.event.EventIngressVerifier.PATH;
+        mvc.perform(post(path).contentType("application/json").content("{}"))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("code").value("EVENT_UNAUTHENTICATED"));
+        String body = json.write(new io.agentflow.event.EventSignal(1, "demo", "erp", "GoodsAccepted", java.util.UUID.randomUUID(), 1, "wait", "accepted", 1));
+        mvc.perform(io.agentflow.event.EventTestRequests.request(body, "evt_oidc_event", Instant.now()))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("code").value("NOT_FOUND"));
+        mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        mvc.perform(post(path + "/" + java.util.UUID.randomUUID() + "/retry").contentType("application/json").content("{}"))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("code").value("CSRF_INVALID"));
+    }
 
     @Test
     void realCodeExchangeMapsOnlyExplicitIdentityAndRotatesSession() throws Exception {
@@ -113,6 +150,26 @@ class OidcAuthenticationIntegrationTest {
                 .andExpect(status().isNoContent()).andExpect(cookie().maxAge("AGENTFLOW_SESSION", 0));
         assertThat(session.isInvalid()).isTrue();
         mvc.perform(get("/api/v1/auth/me")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void binaryAttachmentUploadStillRequiresCsrfAndTheOriginalSessionActor() throws Exception {
+        MockHttpSession session = complete(authorize());
+        String path = "/api/v1/applications/" + java.util.UUID.randomUUID() + "/attachments/" + java.util.UUID.randomUUID() + "/content";
+        mvc.perform(put(path).session(session).header("X-Application-Version", "1")
+                        .contentType("application/octet-stream").content(new byte[]{1, 2}))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("code").value("CSRF_INVALID"));
+        JsonNode options = options(session);
+        String identity = java.net.URLEncoder.encode("[\"tenant-a\",\"other-user\"]", java.nio.charset.StandardCharsets.UTF_8);
+        mvc.perform(put(path).session(session).header("X-Application-Version", "1")
+                        .header("X-CSRF-TOKEN", options.path("csrfToken").asText()).header("X-AgentFlow-Actor", identity)
+                        .contentType("application/octet-stream").content(new byte[]{1, 2}))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("code").value("UNAUTHENTICATED"));
+        identity = java.net.URLEncoder.encode("[\"tenant-a\",\"employee-42\"]", java.nio.charset.StandardCharsets.UTF_8);
+        mvc.perform(put(path).session(session).header("X-Application-Version", "1")
+                        .header("X-CSRF-TOKEN", options.path("csrfToken").asText()).header("X-AgentFlow-Actor", identity)
+                        .contentType("application/octet-stream").content(new byte[]{1, 2}))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("code").value("NOT_FOUND"));
     }
 
     @Test

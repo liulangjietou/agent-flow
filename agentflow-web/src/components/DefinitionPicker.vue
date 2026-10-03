@@ -4,7 +4,7 @@ import { api } from '../api'
 import { DefinitionCatalogQuery, type DefinitionCatalogItem } from '../definitionCatalog'
 
 const props = defineProps<{ scopeKey: string; label: string; selectedId?: string; selectedLabel?: string;
-  publishedOnly?: boolean; processKey?: string; locked?: boolean; refreshVersion?: number }>()
+  publishedOnly?: boolean; startEnabledOnly?: boolean; processKey?: string; locked?: boolean; refreshVersion?: number }>()
 const MAX_DEFINITION_VERSION = 2_147_483_647
 const emit = defineEmits<{ select: [item: DefinitionCatalogItem] }>()
 const open = ref(false), text = ref(''), key = ref(''), version = ref(''), status = ref('')
@@ -19,11 +19,12 @@ function search() {
   }
   submitted.value = signature.value
   void query.load(props.scopeKey, { q: text.value.trim(), processKey: exactKey,
-    status: props.publishedOnly ? 'PUBLISHED' : status.value, ...(number ? { version: Number(number) } : {}) })
+    status: props.publishedOnly || props.startEnabledOnly ? 'PUBLISHED' : status.value,
+    ...(props.startEnabledOnly ? { startEnabled: true } : {}), ...(number ? { version: Number(number) } : {}) })
 }
 function toggle() { open.value = !open.value; if (open.value) search(); else query.clear() }
 function choose(item: DefinitionCatalogItem) { if (!props.locked) { open.value = false; query.clear(); emit('select', item) } }
-watch(() => [props.scopeKey, props.processKey, props.publishedOnly], () => {
+watch(() => [props.scopeKey, props.processKey, props.publishedOnly, props.startEnabledOnly], () => {
   open.value = false; text.value = ''; key.value = ''; version.value = ''; status.value = ''; validation.value = ''; query.clear()
 }, { flush: 'sync' })
 watch([key, status], () => { if (!(props.processKey ?? key.value).trim() || status.value === 'DRAFT') version.value = '' })
@@ -42,12 +43,13 @@ onUnmounted(() => query.clear())
         <label>发布版本<input v-model="version" inputmode="numeric" maxlength="10" :aria-label="label + '版本'" :disabled="!(processKey || key.trim()) || status === 'DRAFT'" placeholder="全部版本" /></label>
         <button type="button" class="primary" :disabled="query.loading" @click="search">查询{{ label }}</button>
       </div>
+      <p v-if="startEnabledOnly" class="picker-help">仅显示允许新发起的已发布版本。</p>
       <p v-if="processKey" class="picker-help">仅显示流程 {{ processKey }} 的已发布版本。</p>
       <p v-if="validation || query.error" class="picker-error" role="alert">{{ validation || query.error }}<button v-if="query.error" type="button" class="quiet" @click="query.loaded ? query.more() : search()">重试读取</button></p>
       <p v-if="query.loaded && submitted !== signature" class="picker-help" role="status">筛选已修改，查询后生效；当前仍为上次结果。</p>
       <p v-if="query.loading && !query.loaded" role="status" class="picker-help">正在读取流程…</p>
       <p v-else-if="query.loaded && !query.items.length" class="picker-help">没有匹配的流程版本，请调整筛选条件。</p>
-      <ul v-if="query.items.length" class="picker-results"><li v-for="item in query.items" :key="item.id"><div><strong>{{ item.name }}</strong><small>{{ item.key }} · {{ item.status === 'PUBLISHED' ? '已发布 v' + item.version : '草稿' }}{{ selectedId === item.id ? ' · 当前选择' : '' }}</small></div><button type="button" class="secondary" :disabled="locked" :aria-label="`选择 ${item.name} ${item.key} ${item.status === 'PUBLISHED' ? 'v' + item.version : '草稿'}`" @click="choose(item)">选择</button></li></ul>
+      <ul v-if="query.items.length" class="picker-results"><li v-for="item in query.items" :key="item.id"><div><strong>{{ item.name }}</strong><small>{{ item.key }} · {{ item.status === 'PUBLISHED' ? '已发布 v' + item.version + (item.startEnabled ? '' : ' · 已停用') : '草稿' }}{{ selectedId === item.id ? ' · 当前选择' : '' }}</small></div><button type="button" class="secondary" :disabled="locked" :aria-label="`选择 ${item.name} ${item.key} ${item.status === 'PUBLISHED' ? 'v' + item.version : '草稿'}`" @click="choose(item)">选择</button></li></ul>
       <div class="picker-footer"><span v-if="query.loaded">已加载 {{ query.items.length }} 项 · 按创建时间倒序</span><button v-if="query.nextCursor" type="button" class="secondary" :disabled="query.loading" @click="query.more()">{{ query.loading ? '正在加载…' : '加载更多版本' }}</button></div>
     </div>
   </section>

@@ -1,0 +1,45 @@
+{
+  "date": "2026-09-29",
+  "scope": "Supplier finance public workspace, review, authorization and original hold actions",
+  "h2": {
+    "tests": 37,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-finance-api-h2.log"
+  },
+  "postgres": {
+    "domain": 5,
+    "actualPostgres": 54,
+    "h2OpenApiAndAccess": 9,
+    "failures": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-finance-api-postgres.log"
+  },
+  "openapi": {
+    "operations": 205,
+    "schemas": 396,
+    "requestExamples": 74,
+    "existingSchemasUnchanged": true
+  },
+  "authors": {
+    "javaFiles": 893,
+    "namedTypes": 1654,
+    "missing": 0
+  },
+  "boundaries": [
+    "current original-round sensitive field permission",
+    "FINANCE and independent actor with current original entity appointment",
+    "current permissions before every idempotency replay",
+    "exact approved versions and own single-use review",
+    "cross-request review rejection",
+    "audit failure rolls back authorization, queue, consumption and idempotency",
+    "unknown hold queries original only",
+    "retired authorization keeps original facts and requires new review"
+  ],
+  "testData": "local synthetic ERP only",
+  "liveAcceptanceSchema": 67,
+  "pending": [
+    "browser finance UI",
+    "supplier bank payment",
+    "ERP settlement",
+    "real enterprise integration"
+  ]
+}

@@ -26,7 +26,7 @@ class DefinitionDomainTest {
         for (String mode : List.of("SINGLE", "ALL", "ANY", "${evil}")) {
             var review = new Node("review", "审批", NodeType.USER_TASK, Map.of("assigneeRule", "role:FINANCE", "approvalMode", mode));
             var errors = validator.validate(new Graph(List.of(start, review, end), edges));
-            if (mode.equals("SINGLE") || mode.equals("ALL")) assertThat(errors).isEmpty();
+            if (mode.equals("SINGLE") || mode.equals("ALL") || mode.equals("ANY")) assertThat(errors).isEmpty();
             else assertThat(errors).contains("APPROVAL_MODE_INVALID:review");
         }
         var legacy = new Node("review", "审批", NodeType.USER_TASK, Map.of("assigneeRule", "role:FINANCE"));
@@ -34,6 +34,28 @@ class DefinitionDomainTest {
         assertThat(validator.validate(new Graph(List.of(new Node("start", "开始", NodeType.START,
                 Map.of("approvalMode", "ALL")), legacy, end), edges)))
                 .contains("APPROVAL_MODE_REQUIRES_USER_TASK:start");
+    }
+
+    @Test
+    void percentageRequiresAnExplicitIntegerAndDoesNotSilentlyApplyToAnotherMode() {
+        var start = new Node("start", "开始", NodeType.START, Map.of());
+        var end = new Node("end", "结束", NodeType.END, Map.of());
+        var edges = List.of(new Edge("a", "start", "review", ""), new Edge("b", "review", "end", ""));
+        for (String percentage : List.of("1", "50", "67", "100", "0", "101", "50.5", " 50", "${evil}", "")) {
+            var review = new Node("review", "审批", NodeType.USER_TASK,
+                    Map.of("assigneeRule", "role:FINANCE", "approvalMode", "PERCENT", "approvalPercentage", percentage));
+            var errors = validator.validate(new Graph(List.of(start, review, end), edges));
+            if (List.of("1", "50", "67", "100").contains(percentage)) assertThat(errors).isEmpty();
+            else assertThat(errors).contains("APPROVAL_PERCENTAGE_INVALID:review");
+        }
+        for (String mode : List.of("SINGLE", "ALL", "ANY")) {
+            var review = new Node("review", "审批", NodeType.USER_TASK,
+                    Map.of("assigneeRule", "role:FINANCE", "approvalMode", mode, "approvalPercentage", "50"));
+            assertThat(validator.validate(new Graph(List.of(start, review, end), edges)))
+                    .contains("APPROVAL_PERCENTAGE_UNEXPECTED:review");
+        }
+        var missing = new Node("review", "审批", NodeType.USER_TASK, Map.of("assigneeRule", "role:FINANCE", "approvalMode", "PERCENT"));
+        assertThat(validator.validate(new Graph(List.of(start, missing, end), edges))).contains("APPROVAL_PERCENTAGE_REQUIRED:review");
     }
 
     @Test

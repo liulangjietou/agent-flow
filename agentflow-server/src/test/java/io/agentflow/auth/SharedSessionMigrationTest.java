@@ -26,6 +26,7 @@ class SharedSessionMigrationTest {
         Flyway.configure().dataSource(source).load().migrate();
         var after = jdbc.queryForList("SELECT * FROM approval_definition");
         after.forEach(row -> assertThat(row.remove("NOTIFICATION_TEXTS_JSON")).isNull());
+        after.forEach(row -> assertThat(row.remove("START_ENABLED")).isEqualTo(true));
         assertThat(after).isEqualTo(before);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM AF_HTTP_SESSION", Integer.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM AF_HTTP_SESSION_ATTRIBUTES", Integer.class)).isZero();

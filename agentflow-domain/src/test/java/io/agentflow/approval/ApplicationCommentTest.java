@@ -38,6 +38,16 @@ class ApplicationCommentTest {
                 .isInstanceOf(DomainException.class).extracting("code").isEqualTo("CONCURRENCY_CONFLICT");
     }
 
+    @Test
+    void mentionRecipientsAreImmutableAndLegacyCommentsHaveNoInventedRecipients() {
+        var recipients = new java.util.ArrayList<>(java.util.List.of("finance"));
+        var comment = ApplicationComment.record(application(ApplicationStatus.IN_APPROVAL), 7, "alice", "核对", Instant.now(), recipients);
+        recipients.add("manager");
+        assertThat(comment.mentions()).containsExactly("finance");
+        assertThatThrownBy(() -> comment.mentions().add("bob")).isInstanceOf(UnsupportedOperationException.class);
+        assertThat(ApplicationComment.record(application(ApplicationStatus.IN_APPROVAL), 7, "alice", "旧格式", Instant.now()).mentions()).isEmpty();
+    }
+
     @ParameterizedTest
     @EnumSource(value = ApplicationStatus.class, names = "IN_APPROVAL", mode = EnumSource.Mode.EXCLUDE)
     void onlyTheConfirmedInApprovalScopeIsWritable(ApplicationStatus status) {

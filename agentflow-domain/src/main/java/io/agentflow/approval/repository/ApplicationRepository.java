@@ -15,6 +15,8 @@ public interface ApplicationRepository {
     Application save(Application application);
     /** 按租户和标识读取聚合。 */
     Optional<Application> findById(String tenantId, UUID id);
+    /** 在当前业务事务中锁定申请，跨引擎变更沿用财务操作的申请优先锁顺序。 */
+    Optional<Application> lockById(String tenantId, UUID id);
     /** 按租户和业务单号读取聚合。 */
     Optional<Application> findByBusinessNo(String tenantId, String businessNo);
     /** 保存带乐观锁的聚合。 */

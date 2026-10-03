@@ -1,0 +1,397 @@
+{
+  "date": "2026-09-29",
+  "scope": "Immutable employee payment batches, mixed advance and expense execution, UI implementation",
+  "status": "HTTP_ACCEPTANCE_PASSED_BROWSER_PENDING",
+  "previousCommit": "c962c1442905eef4cdacab73ec83e2017338c304",
+  "upgrade": {
+    "fromVersion": 74,
+    "toVersion": 75,
+    "unchangedBusinessTables": 133,
+    "unchangedBusinessRows": 1538,
+    "unchangedAttachments": 5,
+    "unchangedCommandFiles": 15,
+    "newTablesEmpty": [
+      "payment_batch",
+      "payment_batch_item"
+    ],
+    "backupBytes": 910799,
+    "backupSha256": "66a20ee0546ca6abc784353dea6791482b3a5d1ba3d72ea668b2605a26c66030"
+  },
+  "validation": {
+    "domainRelated": 11,
+    "h2ServerPaymentAndContract": 55,
+    "postgresServerWorkflowAndMigration": 50,
+    "scopesOverlap": true,
+    "frontendRelated": 36,
+    "frontendBuild": "PASS",
+    "backendPackage": "PASS",
+    "javaFiles": 961,
+    "namedTypes": 1799,
+    "missingAuthorTags": 0,
+    "javaParseErrors": 0,
+    "openapiOperations": 219,
+    "openapiSchemas": 429,
+    "requestExamples": 80,
+    "recordedBusinessHttp": 98,
+    "recordedLogins": 36,
+    "actualBusinessResponseSchemas": 98,
+    "frontendValidatedActualBatchResponses": 10
+  },
+  "liveAcceptance": {
+    "result": "PASS",
+    "unchangedOriginalBusinessRows": 1537,
+    "invoiceWalletUsageMatchesOneNewOriginal": true,
+    "oldBusinessTables": 133,
+    "newRowsInTables": [
+      {
+        "table": "advance_request",
+        "before": 4,
+        "after": 5
+      },
+      {
+        "table": "advance_request_check_job",
+        "before": 5,
+        "after": 6
+      },
+      {
+        "table": "advance_request_check_revision",
+        "before": 15,
+        "after": 18
+      },
+      {
+        "table": "advance_request_revision",
+        "before": 14,
+        "after": 17
+      },
+      {
+        "table": "approval_application",
+        "before": 16,
+        "after": 18
+      },
+      {
+        "table": "approval_definition",
+        "before": 8,
+        "after": 9
+      },
+      {
+        "table": "approval_submission_round",
+        "before": 19,
+        "after": 21
+      },
+      {
+        "table": "audit_event",
+        "before": 199,
+        "after": 214
+      },
+      {
+        "table": "budget_occupation",
+        "before": 7,
+        "after": 8
+      },
+      {
+        "table": "budget_occupation_revision",
+        "before": 26,
+        "after": 30
+      },
+      {
+        "table": "budget_operation",
+        "before": 13,
+        "after": 15
+      },
+      {
+        "table": "budget_operation_revision",
+        "before": 39,
+        "after": 45
+      },
+      {
+        "table": "definition_publication",
+        "before": 8,
+        "after": 9
+      },
+      {
+        "table": "expense_archive",
+        "before": 2,
+        "after": 3
+      },
+      {
+        "table": "expense_archive_original",
+        "before": 2,
+        "after": 3
+      },
+      {
+        "table": "expense_precheck_job",
+        "before": 9,
+        "after": 10
+      },
+      {
+        "table": "expense_precheck_revision",
+        "before": 27,
+        "after": 30
+      },
+      {
+        "table": "expense_report",
+        "before": 7,
+        "after": 8
+      },
+      {
+        "table": "expense_report_revision",
+        "before": 19,
+        "after": 21
+      },
+      {
+        "table": "expense_settlement",
+        "before": 2,
+        "after": 3
+      },
+      {
+        "table": "expense_settlement_revision",
+        "before": 12,
+        "after": 15
+      },
+      {
+        "table": "expense_submission_control",
+        "before": 8,
+        "after": 9
+      },
+      {
+        "table": "expense_submission_control_revision",
+        "before": 11,
+        "after": 13
+      },
+      {
+        "table": "finance_resource",
+        "before": 11,
+        "after": 13
+      },
+      {
+        "table": "finance_resource_revision",
+        "before": 56,
+        "after": 61
+      },
+      {
+        "table": "invoice_active_claim",
+        "before": 4,
+        "after": 5
+      },
+      {
+        "table": "invoice_original",
+        "before": 7,
+        "after": 8
+      },
+      {
+        "table": "invoice_verification_job",
+        "before": 8,
+        "after": 9
+      },
+      {
+        "table": "invoice_verification_revision",
+        "before": 24,
+        "after": 27
+      },
+      {
+        "table": "invoice_wallet",
+        "before": 1,
+        "after": 1
+      },
+      {
+        "table": "notification_inbox",
+        "before": 67,
+        "after": 75
+      },
+      {
+        "table": "payment_authorization",
+        "before": 6,
+        "after": 8
+      },
+      {
+        "table": "payment_authorization_revision",
+        "before": 13,
+        "after": 17
+      },
+      {
+        "table": "payment_execution_request",
+        "before": 5,
+        "after": 7
+      },
+      {
+        "table": "payment_execution_request_revision",
+        "before": 15,
+        "after": 21
+      },
+      {
+        "table": "payment_operation",
+        "before": 5,
+        "after": 7
+      },
+      {
+        "table": "payment_operation_revision",
+        "before": 40,
+        "after": 48
+      },
+      {
+        "table": "request_idempotency",
+        "before": 250,
+        "after": 268
+      },
+      {
+        "table": "voucher_operation",
+        "before": 9,
+        "after": 13
+      },
+      {
+        "table": "voucher_operation_revision",
+        "before": 89,
+        "after": 101
+      },
+      {
+        "table": "voucher_preparation",
+        "before": 10,
+        "after": 14
+      },
+      {
+        "table": "voucher_preparation_revision",
+        "before": 30,
+        "after": 42
+      }
+    ],
+    "originalAttachmentsUnchanged": 5,
+    "newInvoiceOriginals": 1,
+    "originalCommandFiles": 15,
+    "filesWithOnlyNewCommands": [
+      "voucher-ui-synthetic-commands.json",
+      "payment-ui-synthetic-commands.json"
+    ],
+    "mixedBatch": {
+      "id": "a8f88d11-8684-4fc2-81df-689810d5a72f",
+      "total": "300.02",
+      "memberCount": 2,
+      "bankCommands": 2
+    },
+    "syntheticFinanceOnly": true,
+    "browserAcceptance": "PENDING_BROWSER_POLICY_UNAVAILABLE"
+  },
+  "browser": {
+    "status": "PENDING",
+    "reason": "Browser security check unavailable: admin-enforced policy could not be verified",
+    "narrowLayout": "NOT_VERIFIED",
+    "manualBatchSubmit": "NOT_VERIFIED",
+    "workaroundUsed": false
+  },
+  "redGreen": {
+    "test": "登记成功后的目录刷新不能覆盖用户随后切换的新建批次视图",
+    "red": "payment-batch-view-race-red.log",
+    "green": "payment-batch-ui-tests.log"
+  },
+  "runtime": {
+    "backendPort": 18214,
+    "backendPid": 69158,
+    "frontendPort": 15314,
+    "syntheticFinancePort": 18222,
+    "database": "expense_ui_b8e8e035f6",
+    "schemaVersion": 75
+  },
+  "dockerRecovery": {
+    "result": "RUNNING_SET_RESTORED",
+    "containers": [
+      {
+        "name": "agentflow-invoice-wallet-proxy-20260928",
+        "originalId": "7bed52535290",
+        "sameContainer": true,
+        "running": true,
+        "restartPolicy": "no",
+        "manuallyStarted": true,
+        "health": null,
+        "ports": {
+          "8080/tcp": [
+            {
+              "HostIp": "127.0.0.1",
+              "HostPort": "63635"
+            }
+          ]
+        }
+      },
+      {
+        "name": "agentflow-attachments-postgres-20260928",
+        "originalId": "b96235bd72ae",
+        "sameContainer": true,
+        "running": true,
+        "restartPolicy": "no",
+        "manuallyStarted": true,
+        "health": null,
+        "ports": {
+          "5432/tcp": [
+            {
+              "HostIp": "127.0.0.1",
+              "HostPort": "55460"
+            }
+          ]
+        }
+      },
+      {
+        "name": "xxl-job-admin",
+        "originalId": "d11d58535c13",
+        "sameContainer": true,
+        "running": true,
+        "restartPolicy": "always",
+        "manuallyStarted": false,
+        "health": null,
+        "ports": {
+          "8080/tcp": [
+            {
+              "HostIp": "127.0.0.1",
+              "HostPort": "8088"
+            },
+            {
+              "HostIp": "::",
+              "HostPort": "8088"
+            }
+          ]
+        }
+      },
+      {
+        "name": "nacos-mysql",
+        "originalId": "a285e913450d",
+        "sameContainer": true,
+        "running": true,
+        "restartPolicy": "always",
+        "manuallyStarted": false,
+        "health": "healthy",
+        "ports": {
+          "3306/tcp": []
+        }
+      },
+      {
+        "name": "redis",
+        "originalId": "8ece95f5163e",
+        "sameContainer": true,
+        "running": true,
+        "restartPolicy": "always",
+        "manuallyStarted": false,
+        "health": null,
+        "ports": {
+          "6379/tcp": [
+            {
+              "HostIp": "127.0.0.1",
+              "HostPort": "6379"
+            },
+            {
+              "HostIp": "::",
+              "HostPort": "6379"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "invoiceProxyPortPreservation": {
+    "formerPort": 53212,
+    "currentContainerPort": 63635,
+    "loopbackForwarderScript": "/fyoung/tmp/agentflow-remaining-20260928/restore-invoice-proxy-port.py",
+    "oldUrlHttpStatus": 200
+  },
+  "evidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "externalEnterpriseIntegration": false,
+  "mainUpdated": false,
+  "remoteConfigured": false,
+  "remainingWorkPackages": 4
+}

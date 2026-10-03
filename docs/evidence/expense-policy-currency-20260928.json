@@ -1,0 +1,33 @@
+{
+  "recordedAt": "2026-09-28T13:53:30.949382+00:00",
+  "result": "PASS",
+  "issue": "ExpenseReport.freeze treated base-currency policy results and deductible tax as original-currency facts",
+  "coverageGap": "Domain fixtures created original-currency policy facts; prior gateway tests used CNY only, so the real foreign-currency consumer path was absent",
+  "red": {
+    "domain": {
+      "tests": 1,
+      "failures": 1,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-foreign-policy-red.log"
+    },
+    "actualHttpConsumer": {
+      "tests": 1,
+      "errors": 1,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-foreign-policy-consumer-red.log"
+    }
+  },
+  "fix": "Freeze validates policy gross against line conversion and deductible tax against converted claimed tax; already assessed base-currency deductible tax is not converted a second time",
+  "example": {
+    "originalGross": "USD 100.00",
+    "originalTax": "USD 6.00",
+    "rate": "7.1",
+    "baseGross": "CNY 710.00",
+    "deductibleTax": "CNY 42.60"
+  },
+  "green": {
+    "domainAndContracts": 20,
+    "gatewayAndDraft": 22,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-foreign-policy-green.log"
+  },
+  "history": "No migrations or rewriting existing frozen rounds",
+  "externalFinanceAcceptance": "not run"
+}

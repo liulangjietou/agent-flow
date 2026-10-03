@@ -1,0 +1,112 @@
+{
+  "status": "PASS_ATOMIC_LOCAL_COMPLETION",
+  "date": "2026-09-30",
+  "migration": 81,
+  "liveAcceptanceSchema": 80,
+  "relatedDomainTests": 35,
+  "h2DistinctServerTests": 140,
+  "serverBreakdown": {
+    "adjustmentPersistence": 23,
+    "paymentAndReturnPersistence": 38,
+    "settlementPersistence": 38,
+    "holdPersistence": 15,
+    "payableReviewPersistence": 11,
+    "procurementPersistence": 8,
+    "crossBusinessInvoiceClaims": 7
+  },
+  "newPersistenceTests": 13,
+  "h2Runs": [
+    {
+      "tests": 96,
+      "scope": "Payment, settlement and adjustment before final concurrent completion case"
+    },
+    {
+      "tests": 62,
+      "scope": "Final adjustment concurrency plus original reservation, hold, payable review and invoice claim regressions"
+    },
+    {
+      "tests": 61,
+      "scope": "Final original settlement before local completion and subsequent original ERP uncertainty, with full adjustment and settlement regressions"
+    }
+  ],
+  "postgresql": {
+    "status": "PASS",
+    "isolatedContainer": true,
+    "sharedMemoryMiB": 512,
+    "defaultParallelSettings": true,
+    "serverTests": 97,
+    "domainTests": 22,
+    "temporaryContainerRemoved": true,
+    "distinctServerTests": 99,
+    "priorRunServerTests": 97,
+    "finalFollowUpTests": 9,
+    "temporaryContainersRemoved": true
+  },
+  "verified": [
+    "Actual persisted revisions reconstruct and replay exact completion proof",
+    "ERP success is saved separately from atomic local accounting",
+    "Receipt ledger, shared accounting entries, held reservation and active operation marker commit together",
+    "Shared entry conflicts roll back local changes and retain ERP success",
+    "Concurrent completion is idempotent",
+    "Original settlement completion and reservation bytes are preserved",
+    "Late registered returns stay pending and next adjustment posts only new receipts",
+    "Partial and full return accounting before and after original settlement",
+    "Historical higher bank evidence cannot be downgraded",
+    "Completed old operation query does not reclaim a newer active operation",
+    "Bank and ERP uncertainty after accounting freezes the original payable",
+    "Original ERP success with a still-held local reservation can finish through the adjustment without inventing an original local completion",
+    "Further receipts after that intermediate state continue to post only new funds",
+    "Referenced original ERP settlement uncertainty also freezes the payable"
+  ],
+  "redThenGreen": [
+    {
+      "bug": "Completion ignored send-preflight bank revision",
+      "redFailures": 1,
+      "reasonExistingTestsMissed": "Existing cases checked received funds and timestamps without a higher bank revision in send-preflight evidence"
+    },
+    {
+      "bug": "Payable guard ignored independently adjusted reservations and later adjustment uncertainty",
+      "redFailures": 2,
+      "reasonExistingTestsMissed": "Earlier guard tests only exercised original settlement completion; independent adjustment completion was newly connected"
+    },
+    {
+      "bug": "Original ERP success was conflated with local reservation completion; referenced original settlement uncertainty was missing from the guard",
+      "redAssertionFailures": 1,
+      "redDomainErrors": 1,
+      "reasonExistingTestsMissed": "Earlier fixtures always completed the local reservation with the original ERP success and did not query the original settlement after an independent adjustment"
+    }
+  ],
+  "upgradeFixture": {
+    "from": 80,
+    "to": 81,
+    "nonemptyBusinessTablesCompared": 11,
+    "originalSettledAndUnsettledSources": true,
+    "oldColumnsAndJsonPreserved": true
+  },
+  "authorAudit": {
+    "javaFiles": 1061,
+    "namedTypes": 2015,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remaining": [
+    "Background preparation, evidence reads and command/query execution",
+    "Current independent finance and field permission checks, idempotency and audit",
+    "Public API and UI",
+    "Actual acceptance database V81 upgrade, HTTP, restart and browser acceptance",
+    "Real external financial system acceptance"
+  ],
+  "logs": [
+    "supplier-adjustment-completion-revision-red.log",
+    "supplier-adjustment-completion-revision-green.log",
+    "supplier-adjustment-atomic-completion-h2.log",
+    "supplier-adjustment-guard-confirmed-red.log",
+    "supplier-adjustment-atomic-completion-guard-green.log",
+    "supplier-adjustment-completion-reservation-h2.log",
+    "supplier-adjustment-completion-postgres.log",
+    "supplier-adjustment-completion-authors.log",
+    "supplier-adjustment-original-completion-red.log",
+    "supplier-adjustment-original-completion-green.log",
+    "supplier-adjustment-completion-final-postgres.log"
+  ]
+}

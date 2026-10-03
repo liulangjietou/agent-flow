@@ -1,0 +1,54 @@
+{
+  "date": "2026-09-29",
+  "scope": "Signed payment callback backend, protocol, inbox, recovery and administration API",
+  "migration": "V74",
+  "runtimeAcceptanceDatabaseVersion": "V73",
+  "runtimeUpgraded": false,
+  "validation": {
+    "coreDomainAndSignature": 46,
+    "h2OidcHttpRelated": 101,
+    "postgresRelated": 66,
+    "contractAndWorkerAfterRepair": 6,
+    "scopesOverlap": true,
+    "openapi": {
+      "result": "PASS",
+      "operations": 216,
+      "schemas": 422,
+      "requestExamples": 79
+    },
+    "javaFiles": 955,
+    "missingAuthorTags": 0,
+    "javaParseErrors": 0
+  },
+  "verified": [
+    "Raw byte HMAC, bounded UTF-8, strict JSON, delivery time window and tenant key rotation",
+    "Tenant event uniqueness and concurrent duplicate receipt",
+    "Callback and original query version atomic rollback",
+    "No first dispatch or new transaction from callbacks",
+    "In-flight wait, queued retry cancellation, original command identity",
+    "Retired failed authorization late success retained as dispute without funding",
+    "Supplier settled ERP and local completion retained across bank callback query",
+    "Exact incoming POST bypass; OIDC administration retains session and CSRF",
+    "No secret, amount, account or raw body in administration views"
+  ],
+  "redGreen": [
+    {
+      "test": "callbackFromRetiredFailedAuthorizationStillQueriesAndRecordsContradictionWithoutNewFunding",
+      "red": "payment-callback-flow-tests.log",
+      "rootCause": "Retirement reads incorrectly required historical proof version to remain the latest payment version",
+      "fix": "Keep current-version check for the retirement write; restore historical evidence for reads"
+    },
+    {
+      "test": "unavailableRecordDoesNotStarveOtherCandidates",
+      "red": "payment-callback-worker-red.log",
+      "rootCause": "Record read was outside per-item worker failure isolation",
+      "green": "payment-callback-contract-worker-tests.log"
+    }
+  ],
+  "pending": [
+    "Administrator browser UI",
+    "Existing acceptance database V73 to V74 preservation and actual signed HTTP/browser checks",
+    "Real enterprise gateway integration"
+  ],
+  "evidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928"
+}

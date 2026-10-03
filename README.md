@@ -2,7 +2,9 @@
 
 AgentFlow 是面向 OA、财务和表单审批的 DDD 工作流平台骨架。领域层表达审批、流程定义与工作日历规则，Flowable 作为基础设施防腐层运行 BPMN，Web 层提供租户隔离后的 REST API，Vue 设计器负责流程图编辑。
 
-当前已贯通官方模板复制、流程草稿编辑、版本化基础表单配置、校验、版本发布、申请提交和人工审批。初始化向导、完整组织、节点字段权限与附件、财务领域、Agent 协作和生产认证仍在开发范围内；当前版本用于本地开发验收。详细进度与验收证据见相邻文档目录中的 [开发进度与验收记录](../doc/06-开发进度与验收记录.md)。
+当前已贯通官方模板复制、流程草稿编辑、版本化基础表单配置、校验、版本发布、申请提交和人工审批。本开发分支还包含[本地组织与选人](docs/local-organization.md)、[流程版本停用与恢复](docs/definition-availability.md)、[实际任务期限及站内超时提醒](docs/confirmed-rules-runtime.md)，以及[发起任职、动态主管和节点字段权限](docs/organization-context-and-field-permissions.md)、[表单附件及历史原文件保留](docs/field-attachments.md)。[Agent 审批摘要](docs/agent-execution.md)、财务执行链路和多项高级流程已有本地范围验收；原方案中的部分 Agent、费用管理/规则/模板/报表、组织同步、电子签和服务任务仍有本地开发。2026-10-02 已确认至少 **41 项**未完成（23 项本地开发、3 项本地验收与核对、15 项企业联调及交付），详见[当前任务台账](docs/remaining-task-ledger.md)。
+
+截至 2026-10-02，上述本地成果位于 `codex/governance-identifier-integration`，尚未合入 `main`，也未部署主演示；`main` 为 `60bafa0`，Git 远端未配置，尚无 PR 或远程 CI。历史部署记录只证明记录中的版本。当前版本用于本地开发验收；[系统自检](docs/system-adapter-checks.md)区分存储查询、适配器配置与实际企业验收，不能用健康状态推定完整平台已上线。
 
 “流程管理”提供[流程目录](docs/definition-catalog.md)，支持名称、状态、准确流程标识及版本筛选，分批加载草稿和发布版本；打开时读取最新配置并保护未保存修改。
 
@@ -10,8 +12,7 @@ AgentFlow 是面向 OA、财务和表单审批的 DDD 工作流平台骨架。�
 
 待办办理支持[批准意见填写与确认](docs/approval-comments.md)：意见选填，确认后提交；支持取消、原请求恢复和会签分别留痕，可在已办记录与操作审计追溯。
 
-[Agent 审批摘要核心](docs/agent-summary-core.md)正在开发：已建立领域状态、证据绑定与事务存储；真实模型、应用 API、执行器和 UI 尚未接入，不计为可用 Agent 功能。
-- [Agent 摘要运行记录](docs/agent-summary-records.md)：有申请授权的分页目录与详情展示；模型生成和人工复核写入尚未启用。
+[Agent 审批摘要](docs/agent-execution.md)支持当前审批人显式选择允许发送的字段，通过持久队列调用受控模型服务，再由有效审批人采纳修订或拒绝。结果不能代替批准；[运行记录](docs/agent-summary-records.md)保留原文、证据与人工复核历史。适配器默认关闭，真实模型连接和输出质量仍需目标环境验收。
 
 管理员“操作审计”支持按操作人、动作、来源、申请及 UTC 时间跨申请检索追加事件，保留缺失元数据的旧记录，并可下钻原申请详情。详见[管理员操作审计](docs/audit-search.md)。
 
@@ -33,7 +34,7 @@ docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
 
 演示 PostgreSQL 支持[完整备份与隔离恢复](docs/demo-backup-recovery.md)：校验归档后使用原镜像恢复到新项目、新卷及新端口，保留旧实例；恢复后可继续办理未完成会签任务。工具不会覆盖已有数据，当前不包含生产灾备、跨版本升级或 H2 备份。
 
-本地 Docker 演示已完成[阶段 70 → 75 升级与回退验收](docs/demo-stage75-upgrade.md)：隔离恢复和原待办继续办理通过，主入口切换前后 67 张表及原待办／定义响应一致，数据库保持 V23。该记录仅覆盖这次同结构版本升级。
+历史上，本地 Docker 演示完成了[阶段 70 → 75 升级与回退验收](docs/demo-stage75-upgrade.md)：隔离恢复和原待办继续办理通过，主入口切换前后 67 张表及原待办／定义响应一致，数据库保持 V23。该记录仅覆盖这次同结构版本升级。
 
 生产部署使用[独立数据库迁移命令](docs/production-database-lifecycle.md)：同一发布 jar 提供 `--schema=migrate` 和 `--schema=validate`，前者初始化或升级业务及引擎结构，后者使用 PostgreSQL 只读连接校验。`prod` 服务启动只检查已迁移结构，未迁移时拒绝启动；生产安装、升级和备份流程见该文档。
 
@@ -44,6 +45,8 @@ docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
 [多实例部署与故障接续](docs/multi-instance-deployment.md)说明同版本副本配置、统一 HTTPS 入口、请求重放边界和升级停写要求；已有流程的幂等及租约竞争通过双实例测试，不代表组织接入或完整生产高可用已完成。
 
 [生产数据库备份与隔离恢复](docs/production-backup-recovery.md)提供外部 PostgreSQL 17 的完整逻辑备份、离线校验和随机新库恢复，强制 TLS 主机名校验并保留失败现场。原待办已通过隔离恢复后的办理验证；对象存储、生产切流、异地副本和 RTO/RPO 仍需独立验收。
+
+已启用附件的部署使用[数据库与文件配套备份恢复](docs/field-attachments.md#数据库与文件配套恢复)：停写后备份数据库和全部已发布原文件，逐文件核对摘要，恢复到全新数据库及目录；不自动删除历史原文或切换生产入口。
 
 ## 本地启动
 
@@ -72,15 +75,15 @@ npm run dev -- --host 127.0.0.1
 ## 模块边界
 
 - `agentflow-common`：认证主体、统一 JSON 和稳定错误码。
-- `agentflow-domain`：流程定义、受限条件 AST、流程模拟、审批申请与日历聚合及仓储/运行时端口。
+- `agentflow-domain`：流程定义、受限条件 AST、流程模拟、审批申请、组织实体与日历聚合及仓储/运行时端口。
 - `agentflow-server`：Spring Boot、Flowable/Flyway/JDBC 适配器、认证过滤器和 REST API。
 - `agentflow-web`：Vue 3 + TypeScript 的任务中心、申请表单和流程设计器。
 
-流程设计器接受 `START`、`END`、`USER_TASK`、`EXCLUSIVE_GATEWAY` 和 `PARALLEL_GATEWAY` 节点；条件使用白名单语法（例如 `amount >= 1000 AND department == 'finance'`），不会执行用户输入的 JUEL、脚本或 Java 代码。
+流程设计器接受 `START`、`END`、`USER_TASK`、`COPY`、`TIMER_WAIT`、`EVENT_WAIT`、`SUB_PROCESS`、`EXCLUSIVE_GATEWAY` 和 `PARALLEL_GATEWAY` 节点；条件使用白名单语法（例如 `amount >= 1000 AND department == 'finance'`），不会执行用户输入的 JUEL、脚本或 Java 代码。
 
 高级画布支持[并行拆分与汇合](docs/parallel-gateways.md)：同时启动多个审批分支，全部完成后进入后续步骤；支持嵌套、分支内会签与条件选择，发布前阻止缺分支或交叉汇合造成的永久等待。
 
-Web 端的流程管理、申请记录和待办动作均调用服务端接口。流程设计器支持从当前身份源选择指定账号或审批角色，显示有效成员人数，发布前重新检查无人审批节点；组织关系解析、Agent 预检、发票核验、预算控制和付款台显示为未接入状态，不使用演示数据冒充真实结果。详见[审批人配置与发布检查](docs/designer-assignees.md)。
+Web 端的流程管理、申请记录和待办动作均调用服务端接口。流程设计器从当前租户选人目录读取有效成员，发布前重新检查静态规则的无人审批节点。显式启用本地目录后，可配置指定人员、部门、岗位成员，以及基于本轮发起任职的主管和部门负责人；单人候选和会签名单均在节点激活时冻结。动态规则在节点激活时校验实际关系，无有效人员则回滚推进。Agent 与财务的本地能力及真实企业接入边界见[当前剩余清单](docs/remaining-local-work.md)。详见[审批人配置与发布检查](docs/designer-assignees.md)。
 
 申请记录支持申请人撤回当前审批、查看退回或撤回说明、保存补正和重新提交；每次提交保存独立轮次快照及实际流程实例，后续修改不覆盖旧轮次。详见[申请撤回、补正与重新提交](docs/approval-resubmission.md)。
 
@@ -92,7 +95,7 @@ Web 端的流程管理、申请记录和待办动作均调用服务端接口。�
 
 待办支持委派、回交、转交、领取和释放。受托人填写意见并回交后，由原审批人最终决定；接收人从当前身份源读取，操作审计和已办保留双方办理事实。详见[任务委派与回交](docs/task-delegation.md)。
 
-消息中心提供真实站内提醒、全部/未读筛选、未读总数、分页和已读操作，可从消息定位当前待办或申请。审批与消息共同提交，消息不扩大原申请权限；邮件、IM 和 SLA 尚未接入。详见[站内消息中心](docs/notification-inbox.md)。
+消息中心提供真实站内提醒、全部/未读筛选、未读总数、分页和已读操作，可从消息定位当前待办或申请。审批与消息共同提交，消息不扩大原申请权限。[个人偏好](docs/notification-preferences.md)、[邮件投递与恢复](docs/notification-delivery.md)、[企业微信参考发送器](docs/wecom-notifications.md)及[超时升级](docs/task-escalation.md)已完成本地验收；外发只使用通用提醒，真实企业渠道和最终递送另行验收。详见[站内消息中心](docs/notification-inbox.md)。
 
 待办与申请详情支持真实审批轨迹、操作审计、轮次与动作/时间筛选及游标分页。新操作在业务事务内保存当时的操作人、转交接收人和申请状态变化；旧记录没有的信息不补造。详见[审批轨迹与操作审计](docs/approval-history.md)。
 
@@ -100,11 +103,11 @@ Web 端的流程管理、申请记录和待办动作均调用服务端接口。�
 
 待办与申请详情提供[提交轮次内容对比](docs/submission-round-comparison.md)，并排核对任意两轮的标题、版本、字段和表单配置，保留精确金额、空值及字段增删。对比仅使用提交快照，不包含尚未提交的修改。
 
-审批中申请支持协作评论，按申请权限读取并保留当时的轮次和状态，支持分页、草稿保留及幂等恢复；已结束申请的追加策略待确认，当前只读。详见[申请协作评论](docs/application-comments.md)。
+审批中申请支持协作评论，按申请权限读取并保留当时的轮次和状态，支持分页、草稿保留、幂等恢复及对本轮已有读取权限人员的 @ 提醒；已结束申请保持只读。详见[申请协作评论](docs/application-comments.md)。
 
-管理员可维护工作日历、节假日与调休，保留不可变修订并按固定版本试算到期时间。当前未关联实际审批任务期限；详见[工作日历与期限试算](docs/business-calendars.md)。
+管理员可维护工作日历、节假日与调休，保留不可变修订并按固定版本试算到期时间。流程节点绑定明确日历修订后，新任务从创建时起计算期限；转交、委派和回交不重置，旧任务不补造期限。详见[工作日历与期限试算](docs/business-calendars.md)与[任务期限](docs/task-deadlines.md)。
 
-所有申请、评论、日历管理、任务动作、流程定义和模板复制写接口要求 `Idempotency-Key`。服务端在业务事务内保存成功响应，前端在网络结果未确认时保留原请求供恢复；详见[业务写请求幂等协议](docs/request-idempotency.md)。
+所有申请、评论、日历管理、组织维护、任务动作、流程定义和模板复制写接口要求 `Idempotency-Key`。服务端在业务事务内保存成功响应，前端在网络结果未确认时保留原请求供恢复；详见[业务写请求幂等协议](docs/request-idempotency.md)。
 
 流程管理支持文本、长文本、数字、日期、单选、布尔字段配置和填写预览。申请可先保存不完整草稿，提交时由服务端检查必填与类型；申请及每轮历史各自保留绑定表单，不随新版本改变。数字字段使用十进制字符串保留精度，分支只能引用已声明字段；详见[版本化申请表单](docs/versioned-forms.md)。
 
@@ -157,7 +160,7 @@ npm run build
 
 需要额外验证内置与租户同名定义的来源绑定时，执行 `python3 scripts/check-versioned-forms.py http://127.0.0.1:8080 --check-bundled-binding`。此选项会保留一个固定 key 为 `expense-reimbursement` 的租户定义，仅用于尚无同名已发布模板的验收环境；登录后会先检查前置条件，再创建业务记录。详见[来源绑定验收说明](docs/versioned-forms.md#ui-与验收)。
 
-执行 `python3 scripts/check-process-templates.py` 验证三个模板的权限、复制幂等、样例模拟、真实审批路径、独立副本和来源记录；可用第一个参数指定后端地址。脚本会创建带随机前缀的定义与申请并完成审批，保留所有验收数据。
+执行 `python3 scripts/check-process-templates.py` 验证三个通用表单模板的权限、复制幂等、样例模拟、真实审批路径、独立副本和来源记录；可用第一个参数指定后端地址。脚本会创建带随机前缀的定义与申请并完成审批，保留所有验收数据。
 
 执行 `python3 scripts/check-designer-simulation.py` 验证当前设计模拟、全部模板样例、精确边界、权限和错误定位；可用第一个参数指定后端地址。该脚本只读业务数据，并检查定义、申请、任务和模板列表前后相等。
 
@@ -175,7 +178,7 @@ GitHub Actions 将执行作者检查、后端 `verify`、备份恢复保护测�
 
 开放 API 与集成：[接口契约、调用顺序与验收](docs/openapi-reference.md)。登录后从“接口文档”进入，下载当前部署的 OpenAPI JSON。
 
-人工审批节点现支持[全员会签](docs/all-countersign.md)：全部同意才流转，任一驳回结束整轮。设计器可配置，待办展示实际完成进度；名单在节点激活时固定，支持委派协助后回交。
+人工审批节点支持[任一人通过和比例会签](docs/countersign-policies.md)，按固定名单计算门槛，达标后结束其他待办并保留真实意见；[全员会签](docs/all-countersign.md)继续要求全部同意才流转，任一驳回结束整轮。设计器可配置，待办展示实际完成进度；名单在节点激活时固定，支持委派协助后回交。
 
 审批运营的指标、权限、日期边界和验证方式见 [审批运营统计](docs/approval-operations.md)。
 

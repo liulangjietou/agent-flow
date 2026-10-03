@@ -1,0 +1,69 @@
+{
+  "stage": "Expense plan backend and actual approval credit origination",
+  "date": "2026-09-28",
+  "result": "LOCAL_BACKEND_ACCEPTANCE_PASSED",
+  "branch": "codex/governance-identifier-integration",
+  "migration": "V41",
+  "tests": {
+    "domain": 17,
+    "h2ScopedInitial": 94,
+    "h2FinalPlanMigrationAndContract": 21,
+    "postgresPlanAndMigration": 16,
+    "scopesOverlap": true,
+    "openapi": {
+      "operations": 136,
+      "schemas": 231,
+      "requestExamples": 46
+    },
+    "authors": {
+      "files": 531,
+      "namedTypes": 914,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-backend-regression.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-final-h2.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-openapi.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-authors.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-cancelled-correction-red.log"
+  ],
+  "postgresDatabases": {
+    "AGENTFLOW_PLAN_TEST": {
+      "database": "expense_plan_test_11b03cb5",
+      "url": "jdbc:postgresql://127.0.0.1:55460/expense_plan_test_11b03cb5",
+      "user": "agentflow"
+    },
+    "AGENTFLOW_PLAN_MIGRATION": {
+      "database": "expense_plan_migration_3371b6c4",
+      "url": "jdbc:postgresql://127.0.0.1:55460/expense_plan_migration_3371b6c4",
+      "user": "agentflow"
+    }
+  },
+  "verified": [
+    "Independent EXPENSE_PLAN binding and generic write isolation",
+    "Two actual Flowable review steps grant exact frozen line credit once",
+    "No credit on draft, preparation, submission, first approval, rejection or cancellation",
+    "Strict zero tolerance, exact decimal original and base money",
+    "Return and withdrawal produce immutable separate rounds",
+    "Applicant only drafts and preparation; explicit sensitive round permissions",
+    "Credit write failure rolls back application, engine task and round result",
+    "One worker claimant, external HTTP outside database transactions, stale context rejection",
+    "Original lease timeout without resend; late result cannot overwrite terminal",
+    "V40 to V41 preserves old ordinary applications and expense reports"
+  ],
+  "regressionsObservedBeforeFix": [
+    "Normal published form rejected by string versus enum type map comparison",
+    "Cancelled draft lookup assumed a submission round",
+    "Corrected then cancelled plan returned old 100.00 rather than current 40.00"
+  ],
+  "acceptanceBoundaries": {
+    "financeGateway": "synthetic loopback HTTP",
+    "approvalEngine": "actual Flowable",
+    "ui": "pending dedicated page and browser validation",
+    "enterpriseFinance": "not configured or accepted",
+    "remote": "no Git remote; no PR or remote CI"
+  }
+}

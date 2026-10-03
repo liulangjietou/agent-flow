@@ -1,0 +1,240 @@
+{
+  "date": "2026-10-01",
+  "scope": "SMTP notification delivery backend; public APIs, UI and runtime acceptance remain incomplete",
+  "baseCommit": "351ff12d989183233be258aa7b98103c68379fa8",
+  "branch": "codex/governance-identifier-integration",
+  "status": "BACKEND_SCOPE_VERIFIED",
+  "overallGoalComplete": false,
+  "remainingPackages": 3,
+  "validation": {
+    "domainTests": 8,
+    "h2ServerTests": 61,
+    "postgresTests": 16,
+    "postgresOverlapsH2": true,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "smtpProtocol": "Real loopback SMTP: accepted, recipient/DATA temporary and permanent rejection, disconnect and timeout after DATA, authentication rejection, no STARTTLS fallback",
+    "database": "Concurrent single claim, preference generation revocation, ownership and active membership, original binding, expired lease, late receipt, explicit retry, atomic rollback",
+    "migration": "Nonempty V92 to V93 on H2 and PostgreSQL; inbox/preferences unchanged; original unbound intents suppressed; repeat migration does not add history",
+    "fixtureRepair": "H2 schema casing failure corrected using quoted schema creation and JDBC setSchema; final entire H2 scope passed",
+    "buildEnvironment": "Used isolated public repository settings and available local dependency cache; global Maven settings unchanged",
+    "frontendChanged": false,
+    "apiContractChanged": false,
+    "enterpriseMessagesSent": false,
+    "realEnterpriseSmtpVerified": false,
+    "tlsCertificateAcceptanceVerified": false,
+    "existingRuntimeUpgraded": false
+  },
+  "postgresDatabases": {
+    "AGENTFLOW_NOTIFICATION_DELIVERY": "notification_delivery_test_7af0e213fc",
+    "AGENTFLOW_NOTIFICATION_PREF": "notification_delivery_pref_test_7af0e213fc"
+  },
+  "remaining": [
+    "Personal delivery query and retry API with idempotent original-request recovery",
+    "Delivery status and retry UI, actual HTTP/browser and old runtime upgrade/restart acceptance",
+    "Enterprise IM adapter and actual channel/account binding",
+    "SLA escalation and escalation suppression during suspension",
+    "Real enterprise finance systems and production/deployment/model/IdP/remote delivery"
+  ],
+  "sources": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/NotificationDelivery.java",
+      "sha256": "b6d112032a8a2f56750062a16025dc3b4cb14b29b81555397bb3385d8657a953"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/NotificationDeliveryProgress.java",
+      "sha256": "67540e041be3925279703d2e3b1daf4ff82f55d6a9687d6e4192ff981f3f75e4"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/NotificationPreferencesRepository.java",
+      "sha256": "5fa6ae2878b05ebd8456fd0fc3101c715e34264f7fba56c9557bdd026918bd5b"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/notification/NotificationDeliveryProgressTest.java",
+      "sha256": "b974359ae0d8d9455d3651860dcebb55769de6ed421688943b0f502b95950f38"
+    },
+    {
+      "path": "agentflow-server/pom.xml",
+      "sha256": "760383aa8aeb5f091253b6cef6514fb63dc2c5444cb33921a06839e7baf4191b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/auth/AuthService.java",
+      "sha256": "809c7d9eaad48596dc92a6b630a748ef4ed3d5dc3c5c13ceb561cc9c48971259"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/JdbcNotificationDeliveryStore.java",
+      "sha256": "ef44c555da702061bf1f06d7d251ec988f8361b4350872df841ebd6dc75324da"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/JdbcNotificationPreferencesRepository.java",
+      "sha256": "41f036aebdc0fec1789f531b4454bcbf4276ad9c04e1e64d342077e727708514"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryConfiguration.java",
+      "sha256": "7f9686de6b95ab1d34a20b2c79315f4f8653bed600344f55d4dd2ef210beec3b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryScheduler.java",
+      "sha256": "d5251b2d28b8e8f81cfd02e33245aab6948a44a41e17e96a544d7693c21b2b7a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java",
+      "sha256": "140b570a61a3a581964cf3cc3888245dfa9beb490a31910b2ea742aaf6eb5293"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryWorker.java",
+      "sha256": "afb2c1dd87e22a7014cf67e8faee432651de04d04b07b07580ce327018b41bad"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDestinations.java",
+      "sha256": "e3eedaed44b90cf534df20b371164f54bf6117b5f696f1d5a9ffd1e28a555305"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDispatchPlanner.java",
+      "sha256": "4882c859c488e99108ab59b17bc5b1114aaf66b55d7e06b8b2f666fd174bd85b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SmtpNotificationTransport.java",
+      "sha256": "78353fa496d509cb4e97ae45c306e136ed533b178be21c8f1a316b857afe1715"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/application.yml",
+      "sha256": "a3d2c77f07a1cc24ac1c2837f91dbe0fb6dd769e921f91cf2d0ae9f51c850762"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/db/migration/V93__notification_delivery.sql",
+      "sha256": "48ff4949cc0b6064bc3d08b14cf6520fb82e363dac5a3fd223c5dc03cb7ee3d9"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/LocalSmtpServer.java",
+      "sha256": "04db120432ca36a867df176ae4b24d85b72b84ebdaabab4a7c16378e12f3b4de"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDeliveryIntegrationTest.java",
+      "sha256": "ae3b5499a724657f7e832c207956048574a4e443af24db858261e977ce51822d"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDeliveryMigrationTest.java",
+      "sha256": "48ed11ab8dbcb45e48b0d4e6f0ffa746ac97510ee8ce4dfbeeab42a79b9354ab"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDestinationsTest.java",
+      "sha256": "872c0c3a67368049d0cbd5b5cd0435ed5aa66a2710a277d2d7497da15a3cea47"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/notification/SmtpNotificationTransportTest.java",
+      "sha256": "e82479997fa91946f4fea45afca9e4a5ea1d52bfc7ef0440c81e9829f9b989d2"
+    },
+    {
+      "path": "docs/notification-delivery.md",
+      "sha256": "74d58dee7f3f9fac96969cc3cc46ba809eee73e8de1f6497f01d7be074e5a598"
+    },
+    {
+      "path": "docs/notification-preferences.md",
+      "sha256": "e5052c2c6c205f3ed553e364924a7b051c0db7619870d451452d20292ba0b0b0"
+    },
+    {
+      "path": "docs/remaining-implementation-plan.md",
+      "sha256": "a22a11df9eb0c57c51498a2fb90ed8b423002c4df3193c0be10c0d2b890becc8"
+    },
+    {
+      "path": "docs/remaining-local-work.md",
+      "sha256": "0dea6ef64dae8669cc4c8eae9bc712ebecee52e973aeb143b34034ab4b181791"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.api.OpenApiContractTest.xml",
+      "sha256": "e26f98f5dba4377a8f1dffc6e752f0b40a6d76ee5c7de6eb9964cb4dbde9b0ab"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.approval.comment.CommentMentionIntegrationTest.xml",
+      "sha256": "a428ba844827015be5ba7657f4e87d5af49a6ea7df931c305bd76e1c49da71fa"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.approval.copy.ApplicationCopyIntegrationTest.xml",
+      "sha256": "34ea2c2d6991fdc887d536cb1980dd752304e1fc3c6ce8974cbbd52c84ac6adb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.approval.process.TaskDeadlineIntegrationTest.xml",
+      "sha256": "5b9217e7d35f516bba6b7f61667d0adcc1d41cd6ccd1e2bf0719952f6d0b5096"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+      "sha256": "a22381a7aac9e6267358a41365d72338b67715e702542035362574623756de7a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+      "sha256": "1623e8f711abc429679cc6a3acf7658e222ea585bee8d504f85451ad8e203f13"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.notification.NotificationDeliveryMigrationTest.xml",
+      "sha256": "8e831e944fc86cd2e08cf70a5055484834b562695f839b1b52dd2ecc510e1ef4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.notification.NotificationDeliveryProgressTest.xml",
+      "sha256": "242ce37aee4a734baa591feb4e514e43d1b6bb67eaf5405de73088f1cf3f97c5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.notification.NotificationDestinationsTest.xml",
+      "sha256": "db4d26efb4b88cf1054bb67bdcfe4d98c06ffc55fd9aec25ea33d9491c01628d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.notification.NotificationPreferencesIntegrationTest.xml",
+      "sha256": "7f96843e0b121459f187bb8c56c85c4db6daf546edb93b70288fd8416b2c2027"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.notification.NotificationPreferencesMigrationTest.xml",
+      "sha256": "bb4e0e528160d1baeefb7594ca235c41c924a0fc4201ca2dc7ec458d2e35b6e2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.notification.NotificationPreferencesTest.xml",
+      "sha256": "e8d7b0ac15d76b28625dd0f147555e9ecf530673827767bb1d858797d7dd97b2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-reports/TEST-io.agentflow.notification.SmtpNotificationTransportTest.xml",
+      "sha256": "d7f67fcbf83addfb28300bb97ecf8a25d72e9e02f081f83e9540abc522b8991f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-results.json",
+      "sha256": "d13ce157c7a554e5d8b0fd07c8070d1445bcd62fdff83a0aca1f829bba8645f2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-h2-verified.log",
+      "sha256": "d5f4149140a5165ee9ca0a4febccd1a15c413a7e916c58eeb90cb7ffb420b958"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-maven-settings.xml",
+      "sha256": "ad3911ebbdf559594b507460acfad85f66a8eb6793ed8213e76cca9609c0a5ee"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-postgres-reports/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+      "sha256": "6105a07fa4c939252949579c1979445499b81c74d828b88217f916bd7cdd1015"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-postgres-reports/TEST-io.agentflow.notification.NotificationDeliveryMigrationTest.xml",
+      "sha256": "07aad11eb81fde356de2f40b1c411f75ed09e60ad41bc9029a08484220b2972a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-postgres-reports/TEST-io.agentflow.notification.NotificationPreferencesIntegrationTest.xml",
+      "sha256": "4e04584c00ca2cb9ede1404bc04da02269b5560d1cc76e10983a78be33dd7f5c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-postgres-results.json",
+      "sha256": "31d5fc4d390fcce76cc70dae3ecf8f51f4196f0845ddbc1c092c36f7c87f024d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-postgres.json",
+      "sha256": "5178574d4a9a3cb3ad3ad939617a4c1c60cdf9f21f2514aaa06ff5c7a81a09be"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/notification-delivery-postgres.log",
+      "sha256": "d28de985cb40b2a7b4e3ebf78d6b359ceadd9c365ab85770ec86486aa0766bb5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/run-notification-delivery-postgres.py",
+      "sha256": "35b207545ed9cff6074876ca891a7e4043e584fe0443c2df1f2b2d99221331f2"
+    }
+  ]
+}

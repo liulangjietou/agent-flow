@@ -23,13 +23,13 @@ public final class DefinitionModels {
      * 节点类型。
      * @author owlzhangfq@gmail.com
      */
-    public enum NodeType { START, END, USER_TASK, SERVICE_TASK, EXCLUSIVE_GATEWAY, PARALLEL_GATEWAY }
+    public enum NodeType { START, END, USER_TASK, COPY, TIMER_WAIT, EVENT_WAIT, SUB_PROCESS, SERVICE_TASK, EXCLUSIVE_GATEWAY, PARALLEL_GATEWAY }
 
     /**
-     * 单人办理或全员会签；未配置的历史节点保持单人办理。
+     * 单人、全员、任一人和比例审批；历史缺省节点保持单人办理。
      * @author owlzhangfq@gmail.com
      */
-    public enum ApprovalMode { SINGLE, ALL }
+    public enum ApprovalMode { SINGLE, ALL, ANY, PERCENT }
 
     /**
      * 流程节点。
@@ -47,6 +47,9 @@ public final class DefinitionModels {
         public ApprovalMode approvalMode() {
             return ApprovalMode.valueOf(properties.getOrDefault("approvalMode", ApprovalMode.SINGLE.name()));
         }
+
+        /** 发布方式与比例共同构成不可分割的节点规则。 */
+        public ApprovalPolicy approvalPolicy() { return ApprovalPolicy.fromProperties(properties); }
     }
 
     /**
@@ -70,7 +73,9 @@ public final class DefinitionModels {
      * 不可变的流程图。
      * @author owlzhangfq@gmail.com
      */
-    public record Graph(List<Node> nodes, List<Edge> edges, Integer conditionLanguageVersion) {
+    public record Graph(List<Node> nodes, List<Edge> edges, Integer conditionLanguageVersion, ApprovalRiskPolicy riskPolicy) {
+        /** 旧图没有显式风险策略，不能给它补造默认风险等级。 */
+        public Graph(List<Node> nodes, List<Edge> edges, Integer conditionLanguageVersion) { this(nodes, edges, conditionLanguageVersion, null); }
         /** 历史调用方使用 v1，不能因服务升级而改变文本含义。 */
         public Graph(List<Node> nodes, List<Edge> edges) { this(nodes, edges, 1); }
         public Graph {
@@ -100,6 +105,7 @@ public final class DefinitionModels {
         private Graph graph;
         private FormSchema formSchema;
         private NotificationTexts notificationTexts;
+        private boolean startEnabled = true;
 
         /** 创建新草稿。 */
         public static DefinitionDraft create(UUID id, String tenantId, String key, String name, Graph graph) {
@@ -137,6 +143,23 @@ public final class DefinitionModels {
                                               long revision, DraftStatus status, Graph graph, FormSchema formSchema,
                                               NotificationTexts notificationTexts) {
             return new DefinitionDraft(id, tenantId, key, name, version, revision, status, graph, formSchema, notificationTexts);
+        }
+
+        /** 恢复版本自己的发起开关，开关不改变已发布图和表单。 */
+        public static DefinitionDraft restore(UUID id, String tenantId, String key, String name, long version,
+                                              long revision, DraftStatus status, Graph graph, FormSchema formSchema,
+                                              boolean startEnabled) {
+            return restore(id, tenantId, key, name, version, revision, status, graph, formSchema,
+                    NotificationTexts.EMPTY, startEnabled);
+        }
+
+        /** 恢复同一记录的通知配置与发起开关，不使用当前模板或默认文案替换。 */
+        public static DefinitionDraft restore(UUID id, String tenantId, String key, String name, long version,
+                                              long revision, DraftStatus status, Graph graph, FormSchema formSchema,
+                                              NotificationTexts notificationTexts, boolean startEnabled) {
+            DefinitionDraft draft = restore(id, tenantId, key, name, version, revision, status, graph, formSchema, notificationTexts);
+            draft.startEnabled = startEnabled;
+            return draft;
         }
 
         private DefinitionDraft(UUID id, String tenantId, String key, String name, long version, long revision,
@@ -177,6 +200,24 @@ public final class DefinitionModels {
             this.status = DraftStatus.PUBLISHED; this.version = nextVersion; this.revision++;
         }
 
+        /** 停用和恢复只修改发起开关；已发布内容、版本号和现有实例保持原样。 */
+        public void changeAvailability(long expectedRevision, boolean enabled) {
+            if (status != DraftStatus.PUBLISHED) {
+                throw new DomainException("DEFINITION_NOT_PUBLISHED", "Only published definitions can change availability");
+            }
+            ensureRevision(expectedRevision);
+            if (startEnabled == enabled) {
+                throw new DomainException("DEFINITION_AVAILABILITY_UNCHANGED", "Definition already has the requested availability");
+            }
+            startEnabled = enabled;
+            revision++;
+        }
+
+        /** 新发起入口复核当前状态，历史读取不受此开关限制。 */
+        public void requireStartEnabled() {
+            if (!startEnabled) throw new DomainException("DEFINITION_DISABLED", "This process version is disabled for new starts");
+        }
+
         private void ensureDraft() { if (status != DraftStatus.DRAFT) throw new DomainException("DEFINITION_IMMUTABLE", "Published definition cannot be changed"); }
         private void ensureRevision(long expected) { if (revision != expected) throw new DomainException("CONCURRENCY_CONFLICT", "Definition revision has changed"); }
 
@@ -184,6 +225,7 @@ public final class DefinitionModels {
         public String name() { return name; } public long version() { return version; } public long revision() { return revision; }
         public FormSchema formSchema() { return formSchema; }
         public NotificationTexts notificationTexts() { return notificationTexts; }
+        public boolean startEnabled() { return startEnabled; }
         public DraftStatus status() { return status; } public Graph graph() { return graph; }
     }
 
@@ -231,7 +273,7 @@ public final class DefinitionModels {
                     case NUMBER -> FormSchema.decimal(raw.toString()).compareTo(FormSchema.decimal(literal));
                     case BOOLEAN -> Boolean.compare((Boolean) raw, Boolean.parseBoolean(literal));
                     case DATE, TEXT, TEXTAREA, SELECT -> raw.toString().compareTo(literal);
-                    case TABLE -> throw new DomainException("INVALID_CONDITION", "Detail tables only support presence conditions");
+                    case TABLE, ATTACHMENT -> throw new DomainException("INVALID_CONDITION", "Structured fields only support presence conditions");
                 };
             } else {
                 try { cmp = new BigDecimal(raw.toString()).compareTo(new BigDecimal(literal)); }

@@ -1,0 +1,105 @@
+{
+  "stage": "XML invoice originals",
+  "date": "2026-09-29",
+  "localOnly": true,
+  "migration": "V57",
+  "h2ScopeTests": 104,
+  "postgresScopeTests": 94,
+  "frontendScopeTests": 15,
+  "scopesOverlap": true,
+  "javaAuthorCheck": {
+    "files": 717,
+    "namedTypes": 1297,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "openapi": {
+    "operations": 171,
+    "schemas": 309,
+    "requestExamples": 59,
+    "businessResponsesValidated": 35
+  },
+  "build": "PASS with existing frontend chunk-size warning",
+  "xmlStructure": {
+    "depth": 64,
+    "elements": 100000,
+    "attributesIncludingNamespaceDeclarations": 64,
+    "doctype": "rejected",
+    "externalResolution": "disabled and verified zero loopback requests",
+    "bytePreservation": [
+      "UTF-8",
+      "UTF-8 BOM",
+      "UTF-16",
+      "namespaces",
+      "CDATA",
+      "signature nodes"
+    ],
+    "noLocalInvoiceFacts": true
+  },
+  "actualHttp": {
+    "initialRequestsIncludingLogins": 39,
+    "browserFinalReadRequestsIncludingLogin": 4,
+    "initialBinaryDownloads": 3,
+    "finalBrowserOriginalDownload": "HTTP byte comparison",
+    "checks": [
+      "v56_originals_wallets_resources_and_recovery_inventory_unchanged_after_v57",
+      "utf16_bytes_sha_and_download_headers_preserved_without_inferred_verification",
+      "owner_only_even_administrator",
+      "doctype_and_malformed_content_rejected_cleanly_and_cannot_enter_verification",
+      "gateway_received_application_xml_and_exact_original_and_only_gateway_amount_applied",
+      "existing_funding_repayments_returns_vouchers_and_balance_unchanged"
+    ]
+  },
+  "browser": {
+    "result": "PASS",
+    "invoiceId": "da409837-862b-4622-8803-bb8158eea4d0",
+    "originalId": "49100209-605b-4c4a-8480-fb51c09c2065",
+    "sha256": "b344fef819cc5487e80975028d6219a3bde0cf7d98c41d6c36862d30891938b0",
+    "size": 243,
+    "verification": "VERIFIED",
+    "gross": "100.00",
+    "historyCount": 1,
+    "originalBytesPreserved": true,
+    "businessJsonResponses": 2,
+    "httpReadRequestsIncludingLogin": 4,
+    "existingFinanceAndOriginalsUnchanged": true
+  },
+  "screenshots": {
+    "pending": "/fyoung/tmp/agentflow-remaining-20260928/invoice-xml-browser-pending.png",
+    "verified": "/fyoung/tmp/agentflow-remaining-20260928/invoice-xml-browser-verified.png"
+  },
+  "archive": "ExpenseSubmissionIntegrationTest verified XML consumed and original bytes preserved in sealed ZIP on H2 and PostgreSQL",
+  "backup": {
+    "database": "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-before-v57.dump",
+    "bytes": 541412,
+    "originalDirectory": "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-before-v57-files",
+    "originalFiles": 2
+  },
+  "migrationPreserved": [
+    "originals",
+    "wallets",
+    "inventory",
+    "resources",
+    "resourceRevisions",
+    "repayments",
+    "repaymentReturns",
+    "paymentOperations",
+    "voucherOperations"
+  ],
+  "postAcceptancePreserved": [
+    "prior original files",
+    "non-invoice financial resources and revisions",
+    "repayments",
+    "repayment returns",
+    "payment operations",
+    "voucher operations",
+    "funding and accounting fixture commands"
+  ],
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "postgresDatabaseManifest": "/fyoung/tmp/agentflow-remaining-20260928/invoice-xml-postgres-databases.json",
+  "limitations": [
+    "Invoice verification service is a synthetic loopback fixture, not enterprise acceptance.",
+    "No Git remote, PR or remote CI.",
+    "Business XML schemas and signature authenticity require configured enterprise verification."
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "key": "procurement-payment",
+  "templateVersion": 1,
+  "name": "已验收采购付款",
+  "category": "财务",
+  "description": "读取已有合同、订单、验收和发票匹配的原应付，由本次任职的直属主管与财务复核。",
+  "scope": "供应商已挂账应付的本币部分或全额付款申请。原采购和预算确认已由财务系统记录。",
+  "businessType": "PROCUREMENT_PAYMENT",
+  "dependencies": [
+    "维护申请人本次任职及直属主管，主管须具有审批资格",
+    "复制后在设计器把财务复核占位角色 FINANCE 绑定为本租户具有审批资格的实际人员或岗位，再发布",
+    "配置可按申请人读取目录与已匹配供应商应付的财务连接"
+  ],
+  "defaultRoles": ["FINANCE"],
+  "fieldDescriptions": {
+    "procurementPaymentDetails": "独立采购页面显示原三单匹配及供应商账户掩码，人工节点需完整读取该敏感组。",
+    "amount": "由正式提交的本次付款金额派生，不由普通表单填写。",
+    "currency": "由原应付和申请法人共同确认的本位币。"
+  },
+  "risks": [
+    "仅适用于已验收、已开票且已挂账的原应付，预付款和外币付款不能套用。",
+    "复制并发布后从采购付款入口填写；普通申请入口不能绕过采购预检及占用。",
+    "审批通过只形成付款申请依据，银行执行和原应付核销仍需独立财务授权与结算。",
+    "下面的场景只验证审批路径和派生字段，不代表供应商应付已经预留或付款。"
+  ],
+  "upgradePolicy": "复制后是租户独立草稿；目录升级不会覆盖既有流程、任职快照或申请轮次。",
+  "notificationTexts": {
+    "SUBMITTED": "采购付款申请已提交，请等待主管与财务复核。",
+    "RETURNED": "采购付款申请已退回，请核对意见，补正后重新预检。",
+    "APPROVED": "采购付款申请已批准，实际付款请以后续财务授权与结算记录为准。"
+  },
+  "notificationsAvailable": true,
+  "graph": {
+    "nodes": [
+      {"id": "start", "name": "开始", "type": "START", "properties": {"x": "40", "y": "180"}},
+      {"id": "supervisor", "name": "本次任职直属主管", "type": "USER_TASK", "properties": {"x": "260", "y": "180", "assigneeRule": "role:ORG_SUPERVISOR_1"}},
+      {"id": "finance", "name": "原应付财务复核", "type": "USER_TASK", "properties": {"x": "520", "y": "180", "assigneeRule": "role:FINANCE"}},
+      {"id": "end", "name": "结束", "type": "END", "properties": {"x": "780", "y": "180"}}
+    ],
+    "edges": [
+      {"id": "start_supervisor", "source": "start", "target": "supervisor", "condition": "", "defaultBranch": false},
+      {"id": "supervisor_finance", "source": "supervisor", "target": "finance", "condition": "", "defaultBranch": false},
+      {"id": "finance_end", "source": "finance", "target": "end", "condition": "", "defaultBranch": false}
+    ]
+  },
+  "formSchema": {
+    "schemaVersion": 2,
+    "fields": [
+      {"key": "procurementPaymentDetails", "label": "原供应商应付与三单明细", "type": "TEXT", "required": true, "sensitive": true, "nodeAccess": {"supervisor": "READ_ONLY", "finance": "READ_ONLY"}},
+      {"key": "amount", "label": "本次付款额", "type": "NUMBER", "required": true, "minimum": "0.01"},
+      {"key": "currency", "label": "本位币", "type": "TEXT", "required": true}
+    ]
+  },
+  "scenarios": [
+    {"id": "partial-payable", "name": "原应付部分金额", "description": "正额派生字段经过主管和财务两个人工节点。", "payload": {"procurementPaymentDetails": "原应付依据见独立采购明细", "amount": "70.00", "currency": "CNY"}, "expectedPath": ["start", "supervisor", "finance", "end"], "expectedFieldErrors": {}},
+    {"id": "minimum-payable", "name": "最小正金额", "description": "0.01 元仍经过完整人工复核路径。", "payload": {"procurementPaymentDetails": "原应付依据见独立采购明细", "amount": "0.01", "currency": "CNY"}, "expectedPath": ["start", "supervisor", "finance", "end"], "expectedFieldErrors": {}},
+    {"id": "zero-payable", "name": "拒绝零付款", "description": "零金额不能通过派生表单边界，实际业务金额也须大于零。", "payload": {"procurementPaymentDetails": "原应付依据见独立采购明细", "amount": "0.00", "currency": "CNY"}, "expectedPath": [], "expectedFieldErrors": {"amount": "BELOW_MINIMUM"}}
+  ]
+}

@@ -1,0 +1,338 @@
+{
+  "recordedAt": "2026-10-02T09:50:47.550245+00:00",
+  "status": "BASIC_STYLES_AND_CLIPS_SCOPE_PASSED_FULL_OFD_INCOMPLETE",
+  "baseCommit": "97a9b72811075c2a97a4122b3e1b8fea6e2d218f",
+  "remainingTopLevelCategories": 6,
+  "preciseSmallTaskCountKnown": false,
+  "callerChain": "InvoiceOfdRenderer -> page-scoped InvoiceOfdResources -> style/color/vector/clip interpretation; InvoiceExtractionSources OFD integration remains pending",
+  "responsibility": "Content rendering infrastructure; no approval, financial domain, API, database or runtime changes",
+  "implemented": [
+    "Per-property layer DrawParam, Relative chain and explicit object precedence; typed references and cycle rejection",
+    "Physical miter cutoff converted to Java width ratio; cap/join, multi-part dashes and normalized signed phase",
+    "Uniform device hairline and minimum positive width; nonuniform strokes already above the minimum",
+    "Path and text-specific fill/stroke defaults; fill then stroke and existing alpha",
+    "Default color space, RGB/GRAY/CMYK, bit depth, decimal/hex channels, palette Value precedence and confined ICC profiles",
+    "Area union, Clip intersection, shared path/text geometry, boundary/CTM/nested clips and explicit TransFlag",
+    "Pre-expansion dash work, clip geometry/Boolean work and native profile budgets"
+  ],
+  "standard": {
+    "document": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/gbt33190-2016.pdf",
+      "bytes": 4331919,
+      "sha256": "dae45301d0a3c906f8f172a2def2dee14df3bd2b62783bca402ca0a9ec4f9e13"
+    },
+    "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/GBT_33190-2016_电子文件存储与交换格式版式文档.pdf",
+    "newPrintedPagesInspected": [
+      29,
+      30,
+      31,
+      32,
+      33
+    ],
+    "relatedPreviouslyInspectedPages": [
+      26,
+      28,
+      49,
+      51
+    ],
+    "findings": [
+      "MiterLimit is physical inner-to-outer corner length, not a width ratio",
+      "Individual drawing properties inherit from nearer declarations",
+      "Color Value overrides Index, and absent Value/Index means zero-valued components",
+      "Areas within a Clip are unioned; different Clips are intersected"
+    ],
+    "javaStrokeReference": "https://docs.oracle.com/en/java/javase/17/docs/api/java.desktop/java/awt/BasicStroke.html",
+    "transFlagExtensionReference": "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/pageDescription/clips/Clips.java",
+    "transFlagNotProofOfOFD12Support": true,
+    "upstreamCodeCopied": false,
+    "newDependencies": false
+  },
+  "limits": {
+    "drawParamReferenceDepth": 32,
+    "dashItems": 256,
+    "dashTransitions": 25000,
+    "clipAreasPerCall": 256,
+    "clipDepth": 8,
+    "clipSegmentsPerGeometry": 20000,
+    "clipBooleanWorkPerCall": 4000000,
+    "iccBytesPerProfile": 1048576,
+    "iccTagCount": 256,
+    "iccActualLoadsPerPage": 32,
+    "iccTotalLoadedBytesPerPage": 8388608,
+    "paletteEntries": 65536,
+    "priorPageAndArchiveLimitsUnchanged": true
+  },
+  "red": {
+    "initialFeature": {
+      "tests": 12,
+      "failures": 0,
+      "errors": 11
+    },
+    "initialCombinedScope": {
+      "tests": 65,
+      "failures": 2,
+      "errors": 0,
+      "reason": "Exact black pixel assertions selected antialiased edges; independently exported PNGs confirmed geometry and identified interior sample coordinates"
+    },
+    "iccLoadCount": {
+      "tests": 1,
+      "failures": 1,
+      "errors": 0,
+      "reason": "33 actual ICC loads accepted before a count budget existed"
+    },
+    "expandedLimits": {
+      "tests": 18,
+      "failures": 3,
+      "errors": 0,
+      "reason": "Missing ICC count and byte budgets, and float-unrepresentable stroke width reached Java expansion"
+    },
+    "existingTestGap": "New renderer tests initially covered a single normal ICC profile and ordinary CTM values; aggregate native allocation and minimum-width amplification were missing",
+    "boundary": "The renderer remains internal and disabled in public OFD requests; these are development-stage cases, not reported production incidents"
+  },
+  "tests": {
+    "scopedTotal": 71,
+    "newDrawingTests": 18,
+    "priorScopeOverlap": 53,
+    "suites": [
+      {
+        "name": "InvoiceOfdDrawingTest",
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-reports/TEST-io.agentflow.agent.InvoiceOfdDrawingTest.xml",
+          "bytes": 45129,
+          "sha256": "4813f3f9d8f56da05dfad2fdb019605869282c7178d4107a2ca2ae5ad8b87d7d"
+        }
+      },
+      {
+        "name": "InvoiceOfdRendererTest",
+        "tests": 19,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-reports/TEST-io.agentflow.agent.InvoiceOfdRendererTest.xml",
+          "bytes": 45365,
+          "sha256": "ebc2654c984d58a836c0bec45d704f91153057ee635a052c6d7160cfa2baef81"
+        }
+      },
+      {
+        "name": "InvoiceOfdFontTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-reports/TEST-io.agentflow.agent.InvoiceOfdFontTest.xml",
+          "bytes": 43602,
+          "sha256": "3c0568b5ebc033a6d394c9e5ad04862185a9f97ac064a99b37babc3153f3acab"
+        }
+      },
+      {
+        "name": "InvoiceOfdPathTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-reports/TEST-io.agentflow.agent.InvoiceOfdPathTest.xml",
+          "bytes": 43557,
+          "sha256": "a009855179c14bc4e4de76ef1012ebb3f4ca8c9e668351a06fe1e1d8f84921ae"
+        }
+      },
+      {
+        "name": "InvoiceOfdArchiveTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-reports/TEST-io.agentflow.agent.InvoiceOfdArchiveTest.xml",
+          "bytes": 43743,
+          "sha256": "31a51cb47cd401030e646cca148565452d59c3330d30024831a1d39da687be4b"
+        }
+      },
+      {
+        "name": "InvoiceOfdDocumentTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-reports/TEST-io.agentflow.agent.InvoiceOfdDocumentTest.xml",
+          "bytes": 44395,
+          "sha256": "97b9e3de9255a5378453e1884cf2bc5ea211df338b4c4a77e0b67aabac27ef3b"
+        }
+      }
+    ]
+  },
+  "probe": {
+    "source": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/InvoiceOfdDrawingProbe.java",
+      "bytes": 5350,
+      "sha256": "553cef2eb88f27619e10c0ab59f4b7d910501c15b27b01da499555acf223d8f8"
+    },
+    "images": [
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-synthetic/strokes.png",
+        "bytes": 1897,
+        "sha256": "e25b7a2167d9000849c7cebbe34ba6b032fd1e6b9d65286e2dfdd559b2fae6d2",
+        "width": 227,
+        "height": 227,
+        "visuallyInspected": true,
+        "originalOFD": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-synthetic/strokes.ofd",
+          "bytes": 1800,
+          "sha256": "a0f06d60050df6a0c4f8097a0ab4eda2c523a520c72298ca6f28abdd4f7d663a"
+        }
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-synthetic/caps.png",
+        "bytes": 1002,
+        "sha256": "ea607cc55c7c80b7c7a7745ea4c047907d111b0d24bb2ae4ba46a34d5195a04e",
+        "width": 227,
+        "height": 227,
+        "visuallyInspected": true,
+        "originalOFD": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-synthetic/caps.ofd",
+          "bytes": 1754,
+          "sha256": "7c2d1f0d3408d06d89694946713b21bc7f580df561a65f3ec94262445cd760cf"
+        }
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-synthetic/styles-clips.png",
+        "bytes": 1984,
+        "sha256": "4201a2232d6e094391f892a3610abddc4df0f9d38087b9773581e6a4b80a64eb",
+        "width": 227,
+        "height": 227,
+        "visuallyInspected": true,
+        "originalOFD": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-synthetic/styles-clips.ofd",
+          "bytes": 2077,
+          "sha256": "f6b42f419db2c2e29430fa87a9f689750e0a513fe0d94089feaf67b15f62b381"
+        }
+      }
+    ],
+    "styleAndClipPixelChecks": 9,
+    "syntheticOnly": true,
+    "publicSamplesFullRenderAcceptedThisStage": false
+  },
+  "logs": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-red.log",
+      "bytes": 28492,
+      "sha256": "638bdfddb10a60ffae522bfbfd22eeefe4f81a75825d05c9f7f14d8654cdde54"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-initial-scope.log",
+      "bytes": 16750,
+      "sha256": "45569f94e79dedbb971d877cbbe3ec8fa74b41c222511135d9dc6c27ccbd13e4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-sampling-probe.log",
+      "bytes": 359,
+      "sha256": "67615ad81f253e167dd01837fd9202f103547d308aa659ef7c6d3a7eb5a594ed"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-profile-budget-red.log",
+      "bytes": 14339,
+      "sha256": "15c1b60858c96f994a367cc2423614697ce88084cc061ecc29b4a524ccbf9bf8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-stroke-limits-probe.log",
+      "bytes": 274,
+      "sha256": "6fee1ce3f2e3fcc4aaa7ddfdfecf52f13b80095e2e09f4121ef47719ddaab6d7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-limits-red.log",
+      "bytes": 15633,
+      "sha256": "38660c5e0aace7a5d61a2cc9a5037fe61ab534387d8be202b6229293a5f4dc64"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-final-scope.log",
+      "bytes": 14088,
+      "sha256": "dfa891e39465cac8128414076702b79731d1c3215a05ece9752b4f142654e43a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-final-probe.log",
+      "bytes": 415,
+      "sha256": "0d4ae37a60184bd097b945822a288fb2930165ac1c1ece559b9c30c159838b1e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-drawing-authors.log",
+      "bytes": 131,
+      "sha256": "956c8621f18cd14635f3ad8ab3a04e1621035dd0990941ef1edf6bf1593516e0"
+    }
+  ],
+  "diagnosticSource": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/InvoiceOfdStrokeLimitsProbe.java",
+    "bytes": 797,
+    "sha256": "d22fd31377d5677616e488df703cefb25d7dc5dbbe42752ac4d58fcff4637685"
+  },
+  "sourceFiles": [
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdRenderer.java",
+      "bytes": 11575,
+      "sha256": "7477de0e417385a72d8c9285c536efeb393eaee5a419848e38752a8967194b82"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdResources.java",
+      "bytes": 7223,
+      "sha256": "6fe762f8d775acc7b4d2b9be2109d0a5fc0ed3f77d661294665d84b7204ccfe1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdStyle.java",
+      "bytes": 7595,
+      "sha256": "26508b7286dc218629d33187a0f48679a283456ff429104ba85124b956babad6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdColors.java",
+      "bytes": 6779,
+      "sha256": "f756fe6dc9c27fc3e02447d7e9786e862ccd7b4cf92164a82623128b3ff0f14e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdClips.java",
+      "bytes": 5445,
+      "sha256": "135cf7f3b1e2537f73c9a12c90f8bd2e41cdee411ba3fb786889053258e308d0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdVector.java",
+      "bytes": 2405,
+      "sha256": "66081399e5b3589e547dcf3d66084dbd231ed498c1065eaf4ca7da76f6bcac10"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdRendererTest.java",
+      "bytes": 18421,
+      "sha256": "1387879c391c29c833914c6b82e528f7e9829a28b5d3ea918a16f19f3cb484f3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdDrawingTest.java",
+      "bytes": 19554,
+      "sha256": "c459e93bfb1342b636cdb566acd2dfb6a62e15cf42051b33a5f8a4f9d5774e7a"
+    }
+  ],
+  "checks": {
+    "javaFiles": 1368,
+    "namedJavaTypes": 2624,
+    "missingAuthorTags": 0,
+    "parseErrors": 0,
+    "gitDiffCheck": "PASS"
+  },
+  "ofdAdvertisedAsSupported": false,
+  "boundedWorkerImplemented": false,
+  "modelCalled": false,
+  "runtimeReplaced": false,
+  "migrationAdded": false,
+  "remaining": [
+    "Nonconformal device-minimum stroke widths",
+    "Nondefault clip visibility and opacity semantics",
+    "Patterns, gradients and remaining complex graphical features",
+    "Templates, annotations, signatures and nested seals/resources",
+    "Controlled deployed fonts, nondefault weight/italic and CFF CID per-FD matrix verification",
+    "Bounded worker, all-page source adapter and model integration",
+    "Public complete-page compatibility and model/lifecycle acceptance",
+    "Other Agent work, organization sync/e-sign, real enterprise integration and full requirement audit"
+  ]
+}

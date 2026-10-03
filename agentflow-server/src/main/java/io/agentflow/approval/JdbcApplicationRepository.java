@@ -1,6 +1,7 @@
 package io.agentflow.approval;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.workspace.ApplicationAmountProjection;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.repository.ApplicationRepository;
@@ -37,12 +38,14 @@ public class JdbcApplicationRepository implements ApplicationRepository {
         jdbcTemplate.update("""
                 INSERT INTO approval_application
                 (id, tenant_id, business_no, process_key, definition_version, created_by, title,
-                 payload_json, status, round_no, version, form_schema_json, runtime_definition_id, notification_texts_json, search_amount, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                 payload_json, status, round_no, version, form_schema_json, runtime_definition_id, notification_texts_json, search_amount, business_type, business_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                 """, application.id().toString(), application.tenantId(), application.businessNo(),
                 application.processKey(), application.definitionVersion(), application.createdBy(), application.title(),
                 jsonUtil.write(application.payload()), application.status().name(), application.roundNo(), application.version(),
-                application.formSchema() == null ? null : jsonUtil.write(application.formSchema()), application.runtimeDefinitionId(), jsonUtil.write(application.notificationTexts()), ApplicationAmountProjection.extract(application.payload(), application.formSchema()));
+                application.formSchema() == null ? null : jsonUtil.write(application.formSchema()), application.runtimeDefinitionId(), jsonUtil.write(application.notificationTexts()), ApplicationAmountProjection.extract(application.payload(), application.formSchema()),
+                application.businessReference() == null ? null : application.businessReference().type().name(),
+                application.businessReference() == null ? null : application.businessReference().id().toString());
         return application;
     }
 
@@ -51,6 +54,13 @@ public class JdbcApplicationRepository implements ApplicationRepository {
         List<Application> rows = jdbcTemplate.query("SELECT * FROM approval_application WHERE tenant_id=? AND id=?",
                 this::map, tenantId, id.toString());
         return rows.stream().findFirst();
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public Optional<Application> lockById(String tenantId, UUID id) {
+        return jdbcTemplate.query("SELECT * FROM approval_application WHERE tenant_id=? AND id=? FOR UPDATE",
+                this::map, tenantId, id.toString()).stream().findFirst();
     }
 
     @Override
@@ -87,6 +97,8 @@ public class JdbcApplicationRepository implements ApplicationRepository {
                 resultSet.getLong("version"), resultSet.getString("form_schema_json") == null ? null
                         : jsonUtil.read(resultSet.getString("form_schema_json"), FormSchema.class), resultSet.getString("runtime_definition_id"),
                 resultSet.getString("notification_texts_json") == null ? null
-                        : jsonUtil.read(resultSet.getString("notification_texts_json"), NotificationTexts.class));
+                        : jsonUtil.read(resultSet.getString("notification_texts_json"), NotificationTexts.class),
+                resultSet.getString("business_type") == null ? null : new BusinessReference(
+                        BusinessReference.Type.valueOf(resultSet.getString("business_type")), UUID.fromString(resultSet.getString("business_id"))));
     }
 }

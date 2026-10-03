@@ -1,0 +1,276 @@
+{
+  "recordedAt": "2026-10-01T15:13:53.346487+00:00",
+  "feature": "报销父流程与顺序子调用、签收、预算、核减和资源收尾",
+  "status": "EXPENSE_SCOPE_AND_LEGACY_ACTIVATION_RECOVERY_VERIFIED_PUBLIC_SUBPROCESS_RELEASE_PENDING",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "502c47ad303f273d56d757f6fc94ed1af64810d2",
+  "migrationsAdded": false,
+  "rootCause": {
+    "missingCoverage": "原测试覆盖单次、嵌套及并行调用，未覆盖同一执行令牌先后进入两个子调用节点。",
+    "defect": "Flowable 执行标识会跨顺序节点复用，被误作调用激活标识；第二次调用遭 SUBPROCESS_CALL_EXISTS 拒绝。",
+    "repair": "仅在原生启动适配器中获取当前未完成活动实例 ID；保持应用服务的重复检查及数据库唯一约束，旧记录不改写。",
+    "redH2": {
+      "tests": 11,
+      "failures": 3,
+      "errors": 0,
+      "log": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-subprocess-h2.log",
+        "sha256": "3e1bcc01ed30a22aaf22c9585963b7cd5e3296f9f0ac051f3b470f155f704677"
+      }
+    },
+    "redPostgres": {
+      "tests": 3,
+      "failures": 3,
+      "errors": 0,
+      "skipped": 0,
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-subprocess-postgres-red-report.xml",
+      "sha256": "a6ade11a53af0b03e96e649dabe50235ce003ac7f6815b14fe983118b4bbcb09"
+    }
+  },
+  "scope": [
+    "实际报销专用预检与提交、原生父子审批；根签收和精确版本预算确认不可被普通子审批替代",
+    "同轮核减只进入之后激活的子输入，原提交、财务原金额和已完成子轮次保持",
+    "退回和撤回保留可修正资源，重提创建新子申请并重新签收；驳回和具名终止释放原占用",
+    "冻结未知只查询原预算命令，确认后释放；预算不足退回父申请并取消未完成子申请",
+    "凭证准备失败或预算释放登记失败整体回滚父子任务、业务、资源及幂等，原请求可重试",
+    "原执行标识格式保留；不同活动使用真实活动标识，独立父子权限保持"
+  ],
+  "fixtureBoundary": "父定义使用内部持久化夹具经正式部署适配器发布，普通子定义正常公开发布；外部财务、原发票和历史额度为合成数据。未开放公开 SUB_PROCESS 保存和发布。",
+  "tests": {
+    "h2": {
+      "tests": 105,
+      "reports": [
+        {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-subprocess-h2-fixed-report.xml",
+          "sha256": "d3cdf0375f26b750f4b0293ff355382e23dcd53f986d823c387de5e7cc5685a6"
+        },
+        {
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-activation-h2-SubprocessDeploymentIntegrationTest.xml",
+          "sha256": "01fb5b02e6d99d2e265ec2c7fe73ae96d8d4c56c48bd80f5a6e85f28a502fd5c"
+        },
+        {
+          "tests": 22,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-activation-h2-SubprocessFinanceIntegrationTest.xml",
+          "sha256": "d94831555d22f9a08f97559d2561f856851087ae5277d8383483cbc6e50f8139"
+        },
+        {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-activation-h2-SubprocessPersistenceIntegrationTest.xml",
+          "sha256": "00274b735ebdc949b90f9b39e55b96c0198ac331c0be0f93e2c15b2862008567"
+        },
+        {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-activation-h2-SubprocessRelationsIntegrationTest.xml",
+          "sha256": "bae223ebe6f708cd70d86a45e2c273652a0259320569ab87fd659e543c7660f7"
+        },
+        {
+          "tests": 41,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-activation-h2-SubprocessStartIntegrationTest.xml",
+          "sha256": "4bb13888e7bbd87bd500d4c891d6f1cfa96c689958334b50339c12a2d4ce3f0a"
+        }
+      ]
+    },
+    "postgres": {
+      "tests": 105,
+      "reports": [
+        {
+          "class": "io.agentflow.approval.ExpenseSubprocessIntegrationTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-activation-postgres-ExpenseSubprocessIntegrationTest.xml",
+          "sha256": "a9432f698eb7acc6d1c4821150ba48443cd8ea2ecd30d2cbe44a9f6bbdcd0d40"
+        },
+        {
+          "class": "io.agentflow.approval.SubprocessStartIntegrationTest",
+          "tests": 41,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-activation-postgres-SubprocessStartIntegrationTest.xml",
+          "sha256": "ce953c453cf9ac66e10267968471f5ffdee8ddc3aea76621b9b301c1589f868b"
+        },
+        {
+          "class": "io.agentflow.approval.SubprocessPersistenceIntegrationTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-activation-postgres-SubprocessPersistenceIntegrationTest.xml",
+          "sha256": "134a5959d849200f4f172735a1fb4f67c3e3b1a45b311895a325a8e7af5190d3"
+        },
+        {
+          "class": "io.agentflow.definition.SubprocessDeploymentIntegrationTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-activation-postgres-SubprocessDeploymentIntegrationTest.xml",
+          "sha256": "0a47b474c4acbd79bfa34016900d78ffde0e1d1674a722668fc902d212066fcb"
+        },
+        {
+          "class": "io.agentflow.approval.SubprocessFinanceIntegrationTest",
+          "tests": 22,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-activation-postgres-SubprocessFinanceIntegrationTest.xml",
+          "sha256": "73f01d311dd0f91fc99f95ed3591c0fdd41804b8cc538ba5ebd5a342ea5316fb"
+        },
+        {
+          "class": "io.agentflow.approval.SubprocessRelationsIntegrationTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-activation-postgres-SubprocessRelationsIntegrationTest.xml",
+          "sha256": "9b372aeb10ee691f00b8a38be6f67cf91e3371990c35c7c73eb5489aa28d68fe"
+        }
+      ]
+    },
+    "countsOverlap": true,
+    "package": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-subprocess-package.log",
+      "sha256": "39247b8fbe9c79d40b99479d94de81d6087a6e76f624e78344d89226926cdea7"
+    }
+  },
+  "postgres": {
+    "database": "expense_subprocess_ddeef86054",
+    "queries": {
+      "schemaVersion": 90,
+      "calls": 17,
+      "childApplications": 17,
+      "invalidRuntimeBindings": 0,
+      "activityIdentities": 16,
+      "legacyIdentityFixture": 1,
+      "faultConstraintsRemaining": 0,
+      "voucherPreparations": 4,
+      "voucherOperations": 0,
+      "paymentAuthorizations": 0
+    }
+  },
+  "legacyUpgrade": {
+    "sourceDatabase": "expense_subprocess_red_0a72cfb3c5",
+    "database": "expense_call_upgrade_c816866ba0",
+    "sourceCommit": "502c47ad303f273d56d757f6fc94ed1af64810d2",
+    "source": "修复前真实旧代码在 PostgreSQL 复现故障后保留的三份在审报销，复制数据库及配套原件；不是将新记录改成旧格式的测试。",
+    "initialCopy": {
+      "tables": 221,
+      "rows": 580,
+      "files": 3
+    },
+    "firstBoot": {
+      "allOriginalRowsPreserved": true,
+      "originalTables": 221,
+      "originalRows": 580,
+      "files": 3,
+      "startupAdditions": {
+        "act_re_procdef": {
+          "before": 7,
+          "after": 8
+        },
+        "act_re_deployment": {
+          "before": 7,
+          "after": 8
+        },
+        "act_ge_bytearray": {
+          "before": 25,
+          "after": 26
+        }
+      }
+    },
+    "firstActions": {
+      "phase": "advance",
+      "parents": 3,
+      "legacyCallsPreserved": 3,
+      "newCallsUsingNativeActivityIdentity": 3,
+      "httpResponses": 15,
+      "unchangedFinancialTables": 114,
+      "unchangedOriginalFiles": 3,
+      "voucherPreparations": 0,
+      "voucherOperations": 0,
+      "paymentAuthorizations": 0
+    },
+    "restartWithActiveChildren": {
+      "allTablesAndFilesPreserved": true,
+      "tables": 221,
+      "rows": 730,
+      "files": 3
+    },
+    "completion": {
+      "phase": "complete",
+      "parents": 3,
+      "legacyCallsPreserved": 3,
+      "newCallsUsingNativeActivityIdentity": 3,
+      "httpResponses": 15,
+      "unchangedFinancialTables": 114,
+      "unchangedOriginalFiles": 3,
+      "voucherPreparations": 3,
+      "voucherOperations": 0,
+      "paymentAuthorizations": 0
+    },
+    "restartAfterCompletion": {
+      "allTablesAndFilesPreserved": true,
+      "tables": 221,
+      "rows": 649,
+      "files": 3
+    },
+    "verification": {
+      "phase": "verify",
+      "parents": 3,
+      "legacyCallsPreserved": 3,
+      "newCallsUsingNativeActivityIdentity": 3,
+      "httpResponses": 3,
+      "unchangedFinancialTables": 114,
+      "unchangedOriginalFiles": 3,
+      "voucherPreparations": 3,
+      "voucherOperations": 0,
+      "paymentAuthorizations": 0
+    },
+    "originalSourcePreserved": {
+      "allOriginalTablesAndFilesPreserved": true,
+      "tables": 221,
+      "rows": 580,
+      "files": 3
+    },
+    "httpResponsesExcludingLogin": 33,
+    "browserPerformed": false,
+    "openApiResponseValidationPerformed": false,
+    "financialGatewayEnabledDuringResume": false,
+    "outboundWorkersEnabledDuringResume": false,
+    "runtimeStoppedAfterVerification": true,
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/expense-subprocess-upgrade-server.jar",
+    "jarSha256": "8dfca6e3a493c35690388c3d566929f4dc114968c010f71237acc53b9fb4cc6f",
+    "runtimeRecord": "/fyoung/tmp/agentflow-remaining-20260928/expense-subprocess-upgrade.json"
+  },
+  "productionSource": {
+    "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/approval/process/FlowableSubprocessStartInterceptor.java",
+    "sha256": "c014995c906d7c31de8410fb8c0dc26fae304050ef2b86bfc7f6e909dcdc0025"
+  },
+  "remaining": [
+    "子流程公开保存/发布与完整 HTTP、浏览器、在审升级和重启验收",
+    "其他明确失败恢复、安全批量办理",
+    "通知协作、真实企业财务系统及制度、企业环境和远端交付"
+  ]
+}

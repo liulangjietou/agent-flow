@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
@@ -65,7 +65,7 @@ class ApplicationWithdrawalIntegrationTest {
     @Autowired RuntimeService runtime;
     @Autowired TaskService tasks;
     @Autowired JdbcTemplate jdbc;
-    @Autowired ApplicationRepository applications;
+    @MockitoSpyBean ApplicationRepository applications;
     @Autowired ApprovalApplicationFacade facade;
     @Autowired CurrentActor currentActor;
     @Autowired DefinitionApplicationService definitions;
@@ -287,26 +287,36 @@ class ApplicationWithdrawalIntegrationTest {
         assertPending(id);
     }
 
-    @Test
-    void simultaneousWithdrawalAndFinalApprovalHaveExactlyOneConclusion() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void simultaneousWithdrawalAndFinalApprovalHaveExactlyOneConclusion(boolean withdrawalWins) throws Exception {
         String id = submitted().path("id").asText();
         Task original = task(id);
-        CyclicBarrier barrier = new CyclicBarrier(2);
+        var loserReady = new CountDownLatch(1);
+        var winnerCommitted = new CountDownLatch(1);
+        String loser = withdrawalWins ? "finance" : "alice";
+        ApplicationRepository target = org.springframework.test.util.AopTestUtils.getUltimateTargetObject(applications);
+        // 两笔请求都先通过授权，再让胜者提交；同步点不能放在已持有排他锁的引擎调用中。
         doAnswer(invocation -> {
-            barrier.await(5, TimeUnit.SECONDS);
+            if (currentActor.actor().userId().equals(loser)) {
+                loserReady.countDown();
+                if (!winnerCommitted.await(15, TimeUnit.SECONDS)) throw new IllegalStateException("Concurrent winner did not commit");
+            }
             return invocation.callRealMethod();
-        }).when(processRuntime).withdraw(any());
-        doAnswer(invocation -> {
-            barrier.await(5, TimeUnit.SECONDS);
-            return invocation.callRealMethod();
-        }).when(processRuntime).complete(any());
-        var executor = Executors.newFixedThreadPool(2);
+        }).when(target).lockById("demo", UUID.fromString(id));
+        var executor = Executors.newSingleThreadExecutor();
         int withdrawalStatus;
         try {
-            var withdrawal = executor.submit(() -> withdraw(id, "alice", 2, "并发撤回").andReturn().getResponse());
-            var approval = executor.submit(() -> decide(original, "APPROVE", 2).andReturn().getResponse());
-            var responses = List.of(withdrawal.get(15, TimeUnit.SECONDS), approval.get(15, TimeUnit.SECONDS));
-            withdrawalStatus = responses.get(0).getStatus();
+            var losingRequest = executor.submit(() -> withdrawalWins
+                    ? decide(original, "APPROVE", 2).andReturn().getResponse()
+                    : withdraw(id, "alice", 2, "并发撤回").andReturn().getResponse());
+            assertThat(loserReady.await(15, TimeUnit.SECONDS)).isTrue();
+            var winningResponse = withdrawalWins ? withdraw(id, "alice", 2, "并发撤回").andReturn().getResponse()
+                    : decide(original, "APPROVE", 2).andReturn().getResponse();
+            winnerCommitted.countDown();
+            var losingResponse = losingRequest.get(15, TimeUnit.SECONDS);
+            var responses = List.of(winningResponse, losingResponse);
+            withdrawalStatus = withdrawalWins ? winningResponse.getStatus() : losingResponse.getStatus();
             assertThat(responses).extracting(response -> response.getStatus())
                     .containsExactlyInAnyOrder(200, 409);
             for (var response : responses) {
@@ -316,6 +326,7 @@ class ApplicationWithdrawalIntegrationTest {
                 }
             }
         } finally {
+            winnerCommitted.countDown();
             executor.shutdownNow();
             assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
         }

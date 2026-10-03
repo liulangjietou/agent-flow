@@ -1,6 +1,7 @@
 package io.agentflow.approval.service;
 
 import io.agentflow.approval.model.ApplicationStatus;
+import io.agentflow.organization.ApprovalProxyUse;
 
 import java.util.UUID;
 
@@ -19,5 +20,29 @@ public interface TaskAuditPort {
     record TaskOperation(String tenantId, String taskId, UUID applicationId, long aggregateVersion,
                          int roundNo, String processInstanceId, String actor, String action,
                          String comment, String targetUser, String nodeId, String nodeName,
-                         ApplicationStatus previousStatus, ApplicationStatus currentStatus) { }
+                         ApplicationStatus previousStatus, ApplicationStatus currentStatus, MembershipChange membershipChange,
+                         ApprovalProxyUse proxyUse) {
+        /** 会签增减仍只记录成员变更，不补造代理依据。 */
+        public TaskOperation(String tenantId, String taskId, UUID applicationId, long aggregateVersion,
+                             int roundNo, String processInstanceId, String actor, String action,
+                             String comment, String targetUser, String nodeId, String nodeName,
+                             ApplicationStatus previousStatus, ApplicationStatus currentStatus, MembershipChange membershipChange) {
+            this(tenantId, taskId, applicationId, aggregateVersion, roundNo, processInstanceId, actor, action,
+                    comment, targetUser, nodeId, nodeName, previousStatus, currentStatus, membershipChange, null);
+        }
+        /** 既有任务动作没有会签增减事实，保留原调用及历史语义。 */
+        public TaskOperation(String tenantId, String taskId, UUID applicationId, long aggregateVersion,
+                             int roundNo, String processInstanceId, String actor, String action,
+                             String comment, String targetUser, String nodeId, String nodeName,
+                             ApplicationStatus previousStatus, ApplicationStatus currentStatus) {
+            this(tenantId, taskId, applicationId, aggregateVersion, roundNo, processInstanceId, actor, action,
+                    comment, targetUser, nodeId, nodeName, previousStatus, currentStatus, null, null);
+        }
+    }
+
+    /**
+     * 实际多实例和被增减任务的身份；减签保持 completed，不产生新的同意票。
+     * @author owlzhangfq@gmail.com
+     */
+    record MembershipChange(String executionId, String targetTaskId, int totalBefore, int totalAfter, int completed) { }
 }

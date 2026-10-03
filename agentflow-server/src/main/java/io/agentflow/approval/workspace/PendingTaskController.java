@@ -29,7 +29,7 @@ public class PendingTaskController {
     @GetMapping
     public Page list(@RequestParam Map<String, String> raw) {
         var actor = currentActor.actor();
-        var parameters = TaskQueryParameters.parse(actor, raw, json);
+        var parameters = TaskQueryParameters.parse(actor, raw, json, java.time.Instant.now());
         var result = reader.read(actor, parameters.query());
         var rows = result.items();
         int count = Math.min(rows.size(), parameters.query().limit());

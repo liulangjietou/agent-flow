@@ -1,0 +1,216 @@
+{
+  "status": "PASS_LOCAL_SYNTHETIC_RUNTIME",
+  "recordedAt": "2026-10-01T02:15:55.497415+00:00",
+  "baseCommit": "024fdf007a3a3ddbd81b5cb6bfcd95f147e4eb5f",
+  "branch": "codex/governance-identifier-integration",
+  "database": "expense_ui_b8e8e035f6",
+  "runtimeSchema": 86,
+  "realEnterpriseIntegration": false,
+  "remoteConfigured": false,
+  "upgrade": {
+    "fromVersion": 82,
+    "toVersion": 86,
+    "unchangedBusinessTables": 158,
+    "unchangedBusinessRows": 2858,
+    "unchangedAttachments": 7,
+    "unchangedFinancialFiles": 17,
+    "newPartialTablesEmpty": true,
+    "preservedReceiptCredits": 12,
+    "backupBytes": 1265905,
+    "backupSha256": "01a55c1f62c80ab6b23166bec0d77e33da2547ba05701474d8c58c22615edc42"
+  },
+  "preservationAfterNewBusinessAndRestart": {
+    "status": "PASS",
+    "historicalTablesChecked": 158,
+    "unchangedHistoricalRows": 2857,
+    "walletCounterExpectedNewUploads": 2,
+    "walletCounterExpectedNewBytes": 251,
+    "preservedOldAttachments": 7,
+    "preservedOldFinanceFiles": 17,
+    "originalCommandsPreserved": true,
+    "schema": 86
+  },
+  "cashExpense": {
+    "reportId": "41ec7f47-799f-47f5-8bd8-13811ebaed39",
+    "applicationId": "0c9ff102-2b63-4122-b7ec-064377ff7d8f",
+    "originalGross": {
+      "value": "100.00",
+      "currency": "CNY"
+    },
+    "completedGrossPath": [
+      "100.00",
+      "80.00",
+      "50.00",
+      "0.00"
+    ],
+    "adjustmentStatuses": [
+      "APPLIED",
+      "APPLIED",
+      "RETIRED",
+      "APPLIED"
+    ],
+    "wholeReturnedAmounts": [
+      "20.00",
+      "30.00",
+      "50.00"
+    ],
+    "sourceAndEachSideDisputesIndependent": true,
+    "historicalCompletionProofsPreserved": true,
+    "retiredUnsentIntentReleasedWholeReturn": true,
+    "originalArchiveBytesPreserved": true,
+    "initialPageHadNoPartialWrites": true,
+    "createAndDisputeCancelHadNoWrite": true
+  },
+  "fullAdvanceOffsetExpense": {
+    "reportId": "af40f22d-c2a0-41c0-83da-c87cbf881ace",
+    "advanceId": "33a3bc2e-6385-410d-a3de-073967044fef",
+    "completedGrossPath": [
+      "100.00",
+      "40.00"
+    ],
+    "remainingTax": "2.40",
+    "remainingAdvanceOffset": "40.00",
+    "restoredAvailableAdvance": "60.00",
+    "noExpenseBankPaymentOrReturn": true
+  },
+  "actualFiveMinuteExpiry": {
+    "status": "PASS",
+    "expiresAt": "2026-10-01T01:43:03.528521Z",
+    "checkedAt": "2026-10-01T01:43:50.008921+00:00",
+    "browserPostCount": 0,
+    "directHttpStatus": 409,
+    "directErrorCode": "PARTIAL_ADJUSTMENT_PREPARATION_CONFLICT",
+    "successfulOtherSidePreserved": true
+  },
+  "recovery": {
+    "lostResponseAutomaticOriginalQuery": {
+      "status": "PASS",
+      "operationId": "dfd4d9d6-4592-42df-a9a0-de100871bc0d",
+      "events": [
+        {
+          "operation": "expense-accrual-reduction-command",
+          "operationId": "dfd4d9d6-4592-42df-a9a0-de100871bc0d",
+          "adjustmentId": "27bdb5e9-92a8-40eb-bb7e-0a68119a8afe",
+          "mode": "LOST_RESPONSE",
+          "at": "2026-10-01T01:44:45.246863+00:00"
+        },
+        {
+          "operation": "expense-accrual-reduction-query",
+          "operationId": "dfd4d9d6-4592-42df-a9a0-de100871bc0d",
+          "adjustmentId": "27bdb5e9-92a8-40eb-bb7e-0a68119a8afe",
+          "mode": "LOST_RESPONSE",
+          "at": "2026-10-01T01:44:50.452358+00:00"
+        }
+      ]
+    },
+    "unknownAcrossActualRestartPreserved": true,
+    "explicitOriginalQueryRecoveredSecondErp": true,
+    "notFoundDidNotPermitReplacement": true,
+    "expiredSendDidNotPermitResend": true,
+    "confirmedRejectedBudgetReauthorization": {
+      "oldOperationId": "58a63523-e5a0-479b-aa10-4c2689c11fd9",
+      "newOperationId": "2faae8a8-5577-4b6c-8f74-20ac2924b3f9"
+    },
+    "explicitSameIdBudgetResend": "40044da6-8744-4824-890a-892a1c191dc5"
+  },
+  "permissions": {
+    "status": "PASS",
+    "unauthorizedWrites": 21,
+    "unchangedPartialTables": 5,
+    "applicantPrivatePreparationsHidden": true
+  },
+  "finalRestart": {
+    "status": "PASS",
+    "views": {
+      "partial_expense_http": {
+        "exactlyPreserved": true,
+        "reportId": "41ec7f47-799f-47f5-8bd8-13811ebaed39",
+        "remainingGross": {
+          "value": "0.00",
+          "currency": "CNY"
+        },
+        "statuses": [
+          "APPLIED",
+          "APPLIED",
+          "RETIRED",
+          "APPLIED"
+        ]
+      },
+      "partial_expense_offset_http": {
+        "exactlyPreserved": true,
+        "reportId": "af40f22d-c2a0-41c0-83da-c87cbf881ace",
+        "remainingGross": {
+          "value": "40.00",
+          "currency": "CNY"
+        },
+        "statuses": [
+          "APPLIED"
+        ]
+      }
+    },
+    "commandFiles": {
+      "partial-expense-budget-commands.json": "ba2b54440a60f93faa1f4f7b583f80b627c14fbb7fa000f4dafbd5906684372f",
+      "partial-expense-accrual-commands.json": "3ffc9efd6784d63a4c78877754984c9f2e0d6685c0af72fad284e0c5cf21faa4",
+      "partial-expense-original-budget-facts.json": "bfd89b0fe8b23da23be5a788d8ce8453695ce0c0fe61b961253aba0817a5432d",
+      "payment-ui-synthetic-commands.json": "04fa6847432936c42e21b50d950fe071647636c2377182725fe0186e652570b8",
+      "voucher-ui-synthetic-commands.json": "84f9a48928765a38f591968fd12006836c27bd2ba45d393c4269c6c1d8be7169"
+    },
+    "advanceBalanceExactlyPreserved": true
+  },
+  "actualResponses": {
+    "status": "PASS",
+    "actualResponseSchemas": 439,
+    "actualFrontendViews": 211,
+    "actualFrontendReceipts": 41,
+    "earlierReceiptsOnlySchemaChecked": 0,
+    "browserResponseSchemas": 3,
+    "browserFrontendReceipts": 3,
+    "browserCaptureTruncated": true
+  },
+  "browser": {
+    "actualApplicationUsed": true,
+    "narrowLayout": {
+      "clientWidth": 480,
+      "innerWidth": 500,
+      "panel": [
+        {
+          "clientWidth": 391,
+          "scrollWidth": 391
+        }
+      ],
+      "scrollWidth": 480
+    },
+    "capturedPostResponses": 3,
+    "networkBufferTruncated": true,
+    "networkCaptureIsExhaustive": false,
+    "screenshots": [
+      "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-expired.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-complete.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-complete-500.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-full-offset.png"
+    ]
+  },
+  "uiHintFix": {
+    "cause": "实际模板未区分已消费准备与可授权准备，将不可再次授权误提示为应重新准备；原测试只覆盖 setup 和动作，未渲染这段模板。",
+    "failedReproduction": "partial-expense-authorized-hint-red.log",
+    "fix": "已消费准备保留授权历史，恢复动作仍按原操作能力；未消费的失效准备继续显示原因。",
+    "newRegressionTests": 1,
+    "relatedFrontendTests": 73,
+    "typeCheck": "PASS",
+    "productionBuild": "PASS",
+    "javaChangesThisStage": false
+  },
+  "openapi": {
+    "operations": 257,
+    "schemas": 523,
+    "requestExamples": 100,
+    "status": "PASS"
+  },
+  "rawEvidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "remaining": [
+    "真实企业预算、ERP 和银行接口及财务制度接入验收",
+    "加减签、其他会签策略、事件、定时器、子流程、实例运维和批量办理",
+    "外部通知、@提醒、偏好、升级和暂停恢复规则",
+    "真实模型和 IdP、生产恢复与容量故障验收、远端 PR 和 CI"
+  ]
+}

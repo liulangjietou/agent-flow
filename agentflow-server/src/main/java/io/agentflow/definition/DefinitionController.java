@@ -5,12 +5,14 @@ import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.form.FormSchema;
+import io.agentflow.form.FormFieldProjection;
 import io.agentflow.notification.NotificationTexts;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -33,12 +35,15 @@ public class DefinitionController {
     private final DefinitionApplicationService service;
     private final CurrentActor currentActor;
     private final IdempotencyExecutor idempotency;
+    private final DefinitionInitiatorRequirements initiatorRequirements;
 
     /** 创建控制器。 */
-    public DefinitionController(DefinitionApplicationService service, CurrentActor currentActor, IdempotencyExecutor idempotency) {
+    public DefinitionController(DefinitionApplicationService service, CurrentActor currentActor, IdempotencyExecutor idempotency,
+                                DefinitionInitiatorRequirements initiatorRequirements) {
         this.service = service;
         this.currentActor = currentActor;
         this.idempotency = idempotency;
+        this.initiatorRequirements = initiatorRequirements;
     }
 
     /** 校验设计器图，不落库。 */
@@ -68,6 +73,39 @@ public class DefinitionController {
                 .body(service.assigneeOptions(currentActor.actor().tenantId()));
     }
 
+    /** 表单选项目录只向本租户流程管理员开放，不返回认证主体或组织审计。 */
+    @GetMapping("/form-assignee-options")
+    public ResponseEntity<List<DefinitionAssigneeDirectory.FormOption>> formAssigneeOptions() {
+        requireProcessAdmin();
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(service.formAssigneeOptions(currentActor.actor().tenantId()));
+    }
+
+    /** 设计器的抄送名单只向流程管理员开放，不要求收件人具备审批资格。 */
+    @GetMapping("/copy-options")
+    public ResponseEntity<List<DefinitionAssigneeDirectory.Option>> copyOptions() {
+        requireProcessAdmin();
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(service.copyOptions(currentActor.actor().tenantId()));
+    }
+
+    /** 仅对设计者提供的测试内容计算权限展示，不读取申请或授予所选节点的实际权限。 */
+    @PostMapping("/field-preview")
+    public ResponseEntity<FormFieldProjection> fieldPreview(@Valid @RequestBody FieldPreviewRequest request) {
+        requireProcessAdmin();
+        request.formSchema().validateDraft(request.values());
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(FormFieldProjection.forNodes(request.formSchema(), request.values(), request.nodeIds()));
+    }
+
+    /**
+     * 预览只接受显式测试数据；空节点集合表示没有节点参与事实的管理视角。
+     * @author owlzhangfq@gmail.com
+     */
+    public record FieldPreviewRequest(@NotNull FormSchema formSchema, @NotNull java.util.Map<String, Object> values,
+                                      @NotNull @Size(max = FormSchema.MAX_PERMISSION_NODES)
+                                      java.util.Set<@NotBlank @Size(max = FormSchema.MAX_NODE_ID_LENGTH) String> nodeIds) { }
+
     /** 创建流程草稿。 */
     @PostMapping
     public ResponseEntity<String> create(@Valid @RequestBody DefinitionRequest request, HttpServletRequest httpRequest) {
@@ -92,6 +130,18 @@ public class DefinitionController {
     @GetMapping("/{id}")
     public DefinitionResponse get(@PathVariable UUID id) {
         return DefinitionResponse.from(requireVisibleDefinition(id));
+    }
+
+    /** 仅检查用户选中的原发布版本，不为目录每一行展开依赖，也不授予启动权限。 */
+    @GetMapping("/{id}/initiator-requirements")
+    public ResponseEntity<DefinitionInitiatorRequirements.View> initiatorRequirements(@PathVariable UUID id) {
+        var definition = requireVisibleDefinition(id);
+        if (definition.status() != DefinitionModels.DraftStatus.PUBLISHED) {
+            throw new DomainException("NOT_FOUND", "Published process definition not found");
+        }
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
+                .body(new DefinitionInitiatorRequirements.View(definition.key(), definition.version(),
+                        initiatorRequirements.required(definition.tenantId(), definition.graph())));
     }
 
     /** 更新草稿。 */
@@ -205,11 +255,11 @@ public class DefinitionController {
      * @author owlzhangfq@gmail.com
      */
     public record DefinitionResponse(UUID id, String tenantId, String key, String name, long version, long revision,
-                                     String status, Graph graph, @JsonInclude(JsonInclude.Include.ALWAYS) FormSchema formSchema, NotificationTexts notificationTexts) {
+                                     String status, Graph graph, @JsonInclude(JsonInclude.Include.ALWAYS) FormSchema formSchema, NotificationTexts notificationTexts, boolean startEnabled) {
         /** 将定义聚合转换为统一响应，供模板复制等创建入口复用。 */
         public static DefinitionResponse from(DefinitionDraft draft) {
             return new DefinitionResponse(draft.id(), draft.tenantId(), draft.key(), draft.name(), draft.version(),
-                    draft.revision(), draft.status().name(), draft.graph(), draft.formSchema(), draft.notificationTexts());
+                    draft.revision(), draft.status().name(), draft.graph(), draft.formSchema(), draft.notificationTexts(), draft.startEnabled());
         }
     }
 

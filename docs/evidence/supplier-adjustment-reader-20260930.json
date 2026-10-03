@@ -1,0 +1,32 @@
+{
+  "status": "PASS_EVIDENCE_READER",
+  "date": "2026-09-30",
+  "newIntegrationTests": 4,
+  "applicationStartupTests": 1,
+  "liveAcceptanceSchema": 80,
+  "verified": [
+    "Bank returns, original hold or settlement and previous adjustment are read outside database transactions",
+    "The exact previous command is restored from actual persisted completion evidence",
+    "Fixed original target and accounting date are retained",
+    "External failure stops subsequent reads and preserves failure or closed-period classification",
+    "Preparation evidence does not send any adjustment or create accounting records",
+    "All application beans, Flyway and Flowable start together"
+  ],
+  "authorAudit": {
+    "javaFiles": 1062,
+    "namedTypes": 2017,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remaining": [
+    "Background preparation and command/query execution",
+    "Current finance and persisted evidence checks before dispatch",
+    "Public API and UI",
+    "Runtime V81 upgrade, actual HTTP, restart and browser acceptance"
+  ],
+  "logs": [
+    "supplier-adjustment-evidence-reader-h2.log",
+    "supplier-adjustment-reader-startup.log",
+    "supplier-adjustment-reader-authors.log"
+  ]
+}

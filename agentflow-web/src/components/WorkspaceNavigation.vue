@@ -2,13 +2,13 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { workspaceMenu, type WorkspacePage } from '../workspaceNavigation'
 
-const props = defineProps<{ page: WorkspacePage; tenantId: string; username: string; canInspect: boolean; canManage: boolean; taskCount: number | null; serverAvailable: boolean; logoutDisabled: boolean }>()
+const props = defineProps<{ page: WorkspacePage; tenantId: string; username: string; canInspect: boolean; canManage: boolean; canCashier?: boolean; canConfigureFinance?: boolean; taskCount: number | null; serverAvailable: boolean; logoutDisabled: boolean }>()
 const emit = defineEmits<{ 'update:page': [page: WorkspacePage]; logout: [] }>()
 const compact = ref(false)
 const opened = ref(false)
 const panel = ref<HTMLElement | null>(null)
 const closeButton = ref<HTMLButtonElement | null>(null)
-const groups = computed(() => workspaceMenu.map(group => ({ ...group, items: group.items.filter(item => !item.access || (item.access === 'inspect' ? props.canInspect : props.canManage)) })))
+const groups = computed(() => workspaceMenu.map(group => ({ ...group, items: group.items.filter(item => !item.access || (item.access === 'inspect' ? props.canInspect : item.access === 'cashier' ? props.canCashier : item.access === 'finance-config' ? props.canConfigureFinance : props.canManage)) })))
 let media: MediaQueryList | undefined
 let previousOverflow: string | null = null
 

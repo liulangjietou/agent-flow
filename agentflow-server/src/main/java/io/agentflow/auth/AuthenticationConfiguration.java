@@ -1,6 +1,8 @@
 package io.agentflow.auth;
 
 import io.agentflow.common.JsonUtil;
+import io.agentflow.finance.callback.PaymentCallbackVerifier;
+import io.agentflow.event.EventIngressVerifier;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -57,7 +59,7 @@ public class AuthenticationConfiguration {
         var providerLogout = new OidcProviderLogoutFilter(repository, json, home);
         http.addFilterBefore(providerLogout, LogoutFilter.class);
         http.sessionManagement(session -> session.sessionFixation(fixation -> fixation.changeSessionId()))
-                .csrf(csrf -> csrf.csrfTokenRepository(new HttpSessionCsrfTokenRepository()))
+                .csrf(csrf -> csrf.csrfTokenRepository(new HttpSessionCsrfTokenRepository()).ignoringRequestMatchers(PaymentCallbackVerifier::matches, EventIngressVerifier::matches))
                 .exceptionHandling(errors -> errors.accessDeniedHandler((request, response, exception) -> {
                     response.setStatus(403);
                     response.setContentType("application/json;charset=UTF-8");

@@ -1,0 +1,70 @@
+{
+  "status": "PASS_ACCRUAL_REDUCTION_PROTOCOL_STATE_AND_LARGE_HTTP",
+  "date": "2026-09-30",
+  "runtimeSchemaUnchanged": 82,
+  "newPersistence": false,
+  "publicPartialExpenseWorkflowComplete": false,
+  "tests": {
+    "newAccrualCommandAndObservation": 8,
+    "newAccrualExecutionState": 8,
+    "newAccrualHttpGateway": 8,
+    "finalRelatedDomain": 31,
+    "finalGatewayAndTransport": 29,
+    "earlierRelatedDomain": 59,
+    "failures": 0,
+    "errors": 0,
+    "scopesOverlapPriorRuns": true
+  },
+  "red": [
+    "expense-accrual-reduction-red.log",
+    "expense-accrual-reduction-gateway-red.log",
+    "expense-accrual-reduction-state-red.log",
+    "partial-expense-large-proof-red.log",
+    "expense-accrual-large-proof-red.log"
+  ],
+  "green": [
+    "expense-accrual-reduction-green.log",
+    "expense-accrual-reduction-protocol-green.log",
+    "expense-accrual-reduction-state-green.log",
+    "partial-expense-large-proof-final-green.log"
+  ],
+  "largePayloadFix": {
+    "rootCause": "Full before/after positions duplicated in reduction receipts exceeded the shared 2 MiB transport limit; actual accrual entries alone can also exceed this limit",
+    "whyTestsMissed": "Previous fixtures covered only a small number of positions",
+    "budgetPositions": 5000,
+    "budgetReceiptBytesUpperBound": 4096,
+    "accrualActualEntries": 4001,
+    "accrualResponseExceedsTwoMiB": true,
+    "actualPostAndQueryPass": true,
+    "receiptBeforeAfterProof": "SHA-256 length-prefixed complete position digests",
+    "completeCommandPositionsRetained": true,
+    "completeActualAccrualEntriesRetained": true,
+    "accrualOperationResponseLimitMiB": 128,
+    "otherOperationResponseLimitMiB": 2,
+    "existingDefaultOverflowAndTimeoutRegressionPass": true
+  },
+  "checks": [
+    "Original expense accrual remains posted and immutable; a distinct voucher contains only exact reversed differences",
+    "Original accounts, line numbers, cost objects, currencies and zero positions remain fixed",
+    "Fresh original and explicitly selected current accounting period with bounded independent authorization",
+    "Previous successful remaining positions and cumulative sequence are independent from original voucher revision",
+    "Strict HTTP validates identity, digest, original posting, exact actual entries, period and next cumulative revision",
+    "Unknown writes and expired leases query only the original operation; authoritative absence needs explicit same-command retry",
+    "Highest revision, acceptance and terminal facts cannot silently disappear or change",
+    "Never-dispatched or narrowly confirmed pre-posting failures may retire; original and version conflicts may not"
+  ],
+  "authorCheck": {
+    "files": 1100,
+    "namedTypes": 2103,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remaining": [
+    "Recover preceding amounts and used bank entries from actual completed adjustments",
+    "Durable preparation, independent authorization, operation queues and background recovery",
+    "Atomic local completion with immutable bank, budget and accounting evidence",
+    "Guard old full cancellation and full original accrual reversal when partial work exists",
+    "Permissions, API, audit, UI and nonempty PostgreSQL runtime acceptance",
+    "Actual enterprise accounting and budget integration"
+  ]
+}

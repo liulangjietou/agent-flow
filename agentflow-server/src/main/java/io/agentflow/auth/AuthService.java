@@ -20,8 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDirectory {
     private static final Map<String, Set<String>> DEMO_ROLES = Map.of(
-            "admin", Set.of("EMPLOYEE", "APPROVER", "FINANCE", "PROCESS_ADMIN", "ADMIN"),
+            "admin", Set.of("EMPLOYEE", "APPROVER", "FINANCE", "FINANCE_CONFIG_ADMIN", "PROCESS_ADMIN", "ADMIN"),
             "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE"),
+            "cashier", Set.of("EMPLOYEE", "CASHIER"),
             "manager", Set.of("EMPLOYEE", "APPROVER", "MANAGER"),
             "employee", Set.of("EMPLOYEE", "APPROVER"),
             "alice", Set.of("EMPLOYEE", "APPROVER"),
@@ -62,6 +63,11 @@ public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDi
         if (!demoEnabled || !demoTenant.equals(tenantId)) return List.of();
         return DEMO_ROLES.entrySet().stream().filter(entry -> entry.getValue().contains("APPROVER"))
                 .map(Map.Entry::getKey).sorted().toList();
+    }
+
+    /** 普通员工和出纳也可以接收本人提醒，通知资格不要求审批角色。 */
+    public boolean activeAccount(String tenantId, String username) {
+        return demoEnabled && demoTenant.equals(tenantId) && DEMO_ROLES.containsKey(username);
     }
 
     /** 任务候选人与候选组取并集；与登录共享同一租户、账号和角色来源。 */

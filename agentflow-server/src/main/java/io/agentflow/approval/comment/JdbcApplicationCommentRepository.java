@@ -2,6 +2,8 @@ package io.agentflow.approval.comment;
 
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.common.DomainException;
+import io.agentflow.common.JsonUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import java.util.ArrayList;
@@ -15,19 +17,20 @@ import java.util.UUID;
 @Repository
 public class JdbcApplicationCommentRepository implements ApplicationCommentRepository {
     private final JdbcTemplate jdbc;
+    private final JsonUtil json;
 
     /** 使用平台数据源读取评论。 */
-    public JdbcApplicationCommentRepository(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public JdbcApplicationCommentRepository(JdbcTemplate jdbc, JsonUtil json) { this.jdbc = jdbc; this.json = json; }
 
     @Override
     public void append(String tenantId, ApplicationComment comment) {
         int inserted = jdbc.update("""
                 INSERT INTO application_comment
-                  (id,tenant_id,application_id,author_id,content,round_no,application_version,application_status,created_at)
-                SELECT ?,tenant_id,id,?,?,round_no,version,status,? FROM approval_application
+                  (id,tenant_id,application_id,author_id,content,round_no,application_version,application_status,created_at,mentions_json)
+                SELECT ?,tenant_id,id,?,?,round_no,version,status,?,? FROM approval_application
                 WHERE tenant_id=? AND id=? AND version=? AND status=? AND round_no=?
                 """, comment.id().toString(), comment.author(), comment.content(), java.sql.Timestamp.from(comment.createdAt()),
-                tenantId, comment.applicationId().toString(), comment.applicationVersion(), comment.applicationStatus().name(), comment.roundNo());
+                json.write(comment.mentions()), tenantId, comment.applicationId().toString(), comment.applicationVersion(), comment.applicationStatus().name(), comment.roundNo());
         if (inserted != 1) throw new DomainException("CONCURRENCY_CONFLICT", "Application context changed before comment was recorded");
     }
 
@@ -46,6 +49,7 @@ public class JdbcApplicationCommentRepository implements ApplicationCommentRepos
         return jdbc.query(sql.toString(), (row, index) -> new ApplicationComment(UUID.fromString(row.getString("id")),
                 UUID.fromString(row.getString("application_id")), row.getString("author_id"), row.getString("content"),
                 row.getInt("round_no"), row.getLong("application_version"),
-                ApplicationStatus.valueOf(row.getString("application_status")), row.getTimestamp("created_at").toInstant()), arguments.toArray());
+                ApplicationStatus.valueOf(row.getString("application_status")), row.getTimestamp("created_at").toInstant(),
+                json.read(row.getString("mentions_json"), new TypeReference<List<String>>() { })), arguments.toArray());
     }
 }

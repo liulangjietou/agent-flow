@@ -1,8 +1,68 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-const { loadDesignerNodes, serializeDesignerNodes } = await import(process.env.AGENTFLOW_TEST_DESIGNER_GRAPH)
+const { loadDesignerNodes, serializeDesignerNodes, readDesignerDeadline } = await import(process.env.AGENTFLOW_TEST_DESIGNER_GRAPH)
 const loaded = () => ({ id: 'approve', name: '审批', type: 'USER_TASK', x: 220, y: 180, assigneeRule: 'role:MANAGER',
   originalProperties: { assigneeRule: 'role:MANAGER', businessTag: '保留原属性' }, loadedPosition: { x: 220, y: 180 } })
+
+test('固定子版本与映射在两种视图往返，清除引用时不残留旧输入且不污染来源', () => {
+  const original = [{ id: 'child', name: '子审批', type: 'SUB_PROCESS', properties: {
+    subprocessKey: 'child-review', subprocessVersion: '3', 'subprocessInput.total': 'amount', businessTag: '保留' } }]
+  const nodes = loadDesignerNodes(original)
+  assert.deepEqual(nodes[0].subprocess, { key: 'child-review', version: '3', inputs: { total: 'amount' } })
+  assert.deepEqual(serializeDesignerNodes(nodes), original)
+  nodes[0].subprocess.inputs.total = 'net'
+  assert.equal(serializeDesignerNodes(nodes)[0].properties['subprocessInput.total'], 'net')
+  assert.equal(original[0].properties['subprocessInput.total'], 'amount')
+  nodes[0].subprocess = { inputs: {} }
+  assert.deepEqual(serializeDesignerNodes(nodes)[0].properties, { businessTag: '保留' })
+})
+
+test('抄送名单在加载、修改及清空时原样保存，不附加审批方式', () => {
+  const graph = [{ id: 'copy', name: '抄送', type: 'COPY', properties: { recipientRule: 'user:bob' } }]
+  const nodes = loadDesignerNodes(graph)
+  assert.deepEqual(serializeDesignerNodes(nodes), graph)
+  nodes[0].recipientRule = 'role:ORG_DEPARTMENT_HEAD'
+  assert.deepEqual(serializeDesignerNodes(nodes)[0].properties, { recipientRule: 'role:ORG_DEPARTMENT_HEAD' })
+  nodes[0].recipientRule = ''
+  assert.deepEqual(serializeDesignerNodes(nodes)[0].properties, {})
+})
+
+test('快速模式读取的期限副本与画布一致，编辑或清除不污染原属性及审批人', () => {
+  const properties = { ...loaded().originalProperties, deadlineCalendarId: 'e7251050-b46b-40c3-9c4c-cc5d90f85688',
+    deadlineCalendarRevision: '1', deadlineWorkingMinutes: '480' }
+  const node = loadDesignerNodes([{ id: 'approve', name: '审批', type: 'USER_TASK', properties }])[0]
+  const quickDeadline = readDesignerDeadline(properties)
+  assert.deepEqual(quickDeadline, node.deadline)
+  quickDeadline.workingMinutes = '960'
+  assert.equal(properties.deadlineWorkingMinutes, '480')
+  assert.equal(node.deadline.workingMinutes, '480')
+  node.deadline = quickDeadline
+  assert.equal(serializeDesignerNodes([node])[0].properties.deadlineWorkingMinutes, '960')
+  node.deadline = undefined
+  assert.deepEqual(serializeDesignerNodes([node])[0].properties, loaded().originalProperties)
+})
+
+test('期限保存明确日历修订，重新加载和撤销快照不改变引用', () => {
+  const nodes = loadDesignerNodes([{ id: 'approve', name: '审批', type: 'USER_TASK', properties: loaded().originalProperties }])
+  assert.equal(nodes[0].deadline, undefined)
+  nodes[0].deadline = { calendarId: 'e7251050-b46b-40c3-9c4c-cc5d90f85688', calendarRevision: '1', workingMinutes: '480' }
+  const snapshot = serializeDesignerNodes(nodes)
+  assert.deepEqual(loadDesignerNodes(snapshot)[0].deadline, nodes[0].deadline)
+  nodes[0].deadline.calendarRevision = '2'
+  assert.equal(loadDesignerNodes(snapshot)[0].deadline.calendarRevision, '1')
+  nodes[0].deadline = undefined
+  assert.deepEqual(serializeDesignerNodes(nodes)[0].properties, loaded().originalProperties)
+})
+
+test('未编辑的缺项、非法期限和错误节点类型原样往返，不能静默当成无期限', () => {
+  for (const type of ['USER_TASK', 'START']) for (const deadline of [
+    { deadlineCalendarId: '' },
+    { deadlineCalendarId: 'missing', deadlineCalendarRevision: 'latest', deadlineWorkingMinutes: '0' }
+  ]) {
+    const graph = [{ id: 'legacy', name: '旧配置', type, properties: { ...deadline, businessTag: '保留' } }]
+    assert.deepEqual(serializeDesignerNodes(loadDesignerNodes(graph)), graph)
+  }
+})
 
 test('会签方式可保存、重新加载和切回单人审批，旧节点保持缺省属性', () => {
   const graph = [{ id: 'approve', name: '审批', type: 'USER_TASK', properties: loaded().originalProperties }]

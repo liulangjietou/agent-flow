@@ -18,7 +18,7 @@ import java.util.UUID;
  */
 @Repository
 public class JdbcWorkspaceReadAdapter implements WorkspaceReadPort, ApplicationParticipantPort {
-    private static final String HANDLED_ACTIONS = "('APPROVE','RETURN','REJECT','TRANSFER','DELEGATE','RESOLVE')";
+    private static final String HANDLED_ACTIONS = "('APPROVE','RETURN','REJECT','TRANSFER','DELEGATE','RESOLVE','ADD_SIGNER','REMOVE_SIGNER')";
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
 
@@ -74,6 +74,18 @@ public class JdbcWorkspaceReadAdapter implements WorkspaceReadPort, ApplicationP
                 SELECT EXISTS(SELECT 1 FROM audit_event WHERE tenant_id=? AND application_id=?
                 AND actor_id=? AND aggregate_type='Task' AND action IN
                 """ + HANDLED_ACTIONS + ")", Boolean.class, tenantId, applicationId.toString(), actor.userId()));
+    }
+
+    /** 评论选人只包含本轮真实办理者，复用建立申请读取关系的动作范围。 */
+    public java.util.Set<String> participantsInRound(String tenantId, UUID applicationId, int roundNo) {
+        var result = new java.util.HashSet<String>();
+        jdbc.query("SELECT actor_id,payload_json FROM audit_event WHERE tenant_id=? AND application_id=? "
+                        + "AND aggregate_type='Task' AND action IN " + HANDLED_ACTIONS,
+                (org.springframework.jdbc.core.RowCallbackHandler) row -> {
+                    var payload = json.map(row.getString("payload_json"));
+                    if (payload.get("roundNo") instanceof Number value && value.intValue() == roundNo) result.add(row.getString("actor_id"));
+                }, tenantId, applicationId.toString());
+        return java.util.Set.copyOf(result);
     }
 
     private static void appendText(StringBuilder sql, List<Object> parameters, String text) {

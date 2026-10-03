@@ -1,0 +1,238 @@
+{
+  "recordedAt": "2026-10-02T08:52:34.515881+00:00",
+  "status": "FONT_AND_PATH_SCOPE_PASSED_RENDERING_INCOMPLETE",
+  "baseCommit": "99ca50691879a395ea0001523d6f186e2669848d",
+  "remainingTopLevelCategories": 6,
+  "preciseSmallTaskCountKnown": false,
+  "callerChain": "InvoiceExtractionSources -> archive/document preflight -> bounded full-page rendering -> ordered model images (OFD wiring remains pending)",
+  "responsibility": "Content adapter infrastructure; no approval or expense domain changes",
+  "dependenciesChanged": false,
+  "font": {
+    "library": "FontBox 3.0.8 (already present)",
+    "maximumBytes": 33554432,
+    "maximumFaces": 32,
+    "maximumTablesPerFace": 128,
+    "systemFontsScanned": false,
+    "thirdPartyFontDataDistributed": false,
+    "syntheticBinaryFixtures": 6,
+    "fixturesReproducedByteIdentically": true,
+    "coverage": [
+      "TrueType outline units",
+      "exact unique TTC PostScript face",
+      "BMP and supplementary Unicode",
+      "explicit glyph ids",
+      "CFF outlines",
+      "missing glyph rejection",
+      "legacy cmap rejection",
+      "closed owner and independent returned outlines"
+    ],
+    "notProven": [
+      "All CFF CID font dictionary matrix variants",
+      "Font resources and deployment configuration",
+      "OFD text positioning and glyph transformations"
+    ]
+  },
+  "path": {
+    "commands": [
+      "S",
+      "M",
+      "L",
+      "Q",
+      "B",
+      "A",
+      "C"
+    ],
+    "maximumCharacters": 1048576,
+    "maximumCommands": 25000,
+    "maximumTokenCharacters": 64,
+    "maximumNumericMagnitude": 1000000,
+    "maximumArcSegmentDegrees": 45,
+    "unknownOrMalformedDataRejected": true,
+    "coverage": [
+      "all four large/sweep combinations",
+      "rotated ellipse coordinates from independent center geometry",
+      "negative/zero/undersized radii",
+      "subpath origin after close",
+      "exact final endpoint",
+      "nonzero and even-odd pixel results"
+    ]
+  },
+  "tests": {
+    "scopedTotal": 34,
+    "newTests": 14,
+    "existingPreflightTests": 20,
+    "suites": [
+      {
+        "name": "InvoiceOfdFontTest",
+        "tests": 7,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-primitives-reports/TEST-io.agentflow.agent.InvoiceOfdFontTest.xml",
+          "bytes": 43565,
+          "sha256": "c89e3f2fb9d345858a0e5815268ca18e23ee5ea3015b3f0b90915c635cdf4a50"
+        }
+      },
+      {
+        "name": "InvoiceOfdPathTest",
+        "tests": 7,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-primitives-reports/TEST-io.agentflow.agent.InvoiceOfdPathTest.xml",
+          "bytes": 43462,
+          "sha256": "2e27369db879d74498e9f5de4d08dd541e52233b4a06282fd69153c7a0cebca9"
+        }
+      },
+      {
+        "name": "InvoiceOfdArchiveTest",
+        "tests": 8,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-primitives-reports/TEST-io.agentflow.agent.InvoiceOfdArchiveTest.xml",
+          "bytes": 43707,
+          "sha256": "95067c64f0d1b2b8391de57eeb5c6e85d27c76e9af5080ad1b26de39be59e281"
+        }
+      },
+      {
+        "name": "InvoiceOfdDocumentTest",
+        "tests": 12,
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-primitives-reports/TEST-io.agentflow.agent.InvoiceOfdDocumentTest.xml",
+          "bytes": 44359,
+          "sha256": "5fd714c6ac55c50ab65572efca7de8e150c99924f0d8fe3fa15c15bbe25db061"
+        }
+      }
+    ],
+    "previousScopesOverlap": true,
+    "fullApplicationSuiteRun": false,
+    "reason": "Package-private drawing primitives are not connected to application services yet."
+  },
+  "red": {
+    "font": {
+      "tests": 7,
+      "errors": 6,
+      "failures": 0
+    },
+    "path": {
+      "tests": 7,
+      "errors": 6,
+      "failures": 0
+    },
+    "meaning": "New feature tests failed against explicit unimplemented scaffolds; these are not claims of six existing application bugs."
+  },
+  "publicSamples": {
+    "fullPagesRendered": false,
+    "modelCalled": false,
+    "passed": true,
+    "fixtures": [
+      {
+        "file": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/helloworld.ofd",
+        "pagesInspected": 1,
+        "pathsParsed": 0,
+        "pathsContainingArc": 0,
+        "passed": true
+      },
+      {
+        "file": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/chineseDir.ofd",
+        "pagesInspected": 1,
+        "pathsParsed": 0,
+        "pathsContainingArc": 0,
+        "passed": true
+      },
+      {
+        "file": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/draw_param_ref.ofd",
+        "pagesInspected": 5,
+        "pathsParsed": 40,
+        "pathsContainingArc": 0,
+        "passed": true
+      },
+      {
+        "file": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/DigitalSign.ofd",
+        "pagesInspected": 1,
+        "pathsParsed": 0,
+        "pathsContainingArc": 0,
+        "passed": true
+      }
+    ]
+  },
+  "publicSampleBoundary": "Four original samples passed preflight; 40 abbreviated paths occur only in draw_param_ref.ofd. None contains an arc. No full-page layout, image or text rendering was performed by this probe.",
+  "application": {
+    "ofdAdvertisedAsSupported": false,
+    "sourceAdapterConnected": false,
+    "boundedWorkerConnected": false,
+    "fullPagesRendered": false,
+    "modelCalled": false,
+    "databaseMigrationAdded": false,
+    "runtimeReplaced": false,
+    "remoteConfigured": false
+  },
+  "remaining": [
+    "Complete all-page renderer using strict fonts and paths",
+    "Font resources, text spacing and glyph transforms",
+    "Styles, clipping, alpha, images, templates and nested seals",
+    "Bounded worker and complete output validation",
+    "Connect source adapter and accept model/lifecycle paths",
+    "Other five top-level categories remain open"
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-font-red.log",
+      "bytes": 18485,
+      "sha256": "44e8b76b2fd87cce2d37666ed8f7a0d88eac8818e5b3f94b138fffdc3f7e92c8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-path-red.log",
+      "bytes": 19146,
+      "sha256": "317c3660e1e31404b64fb6d722a576683d03e04e49c122d2c8a21d9d9440bdee"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-font-scope.log",
+      "bytes": 13385,
+      "sha256": "005b8308f8a8c6239ae1dc5e6da2718dc73e2bb96b236742eb6bcd1ab9475442"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-primitives-scope.log",
+      "bytes": 13614,
+      "sha256": "3eb2aa44438190a06d937b693591e51144ad3bdea3c4ab278f1125bac89431a5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-font-fixtures-reproducibility.json",
+      "bytes": 707,
+      "sha256": "58b4c7b899f00a246f6c9173b68d986bf646f1dcbe593cdfa56a099e30168d8a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/InvoiceOfdPrimitivesProbe.java",
+      "bytes": 3479,
+      "sha256": "ac5b6f5d51272f205e71cb1e6950beceff8f493b11232247f2c62ab7449fd8da"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-primitives-probe.log",
+      "bytes": 44,
+      "sha256": "4e25ee598a2d64d89bd1ef0c6774a67a77a4c2f57dd8b348ffd6e54bcb0d0ee0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-primitives-public-paths.json",
+      "bytes": 793,
+      "sha256": "157523a5c3fc64f81ea0eed9aeb65ddae0b7b21071f98fd048dda2dda469cba2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-primitives-authors.log",
+      "bytes": 73,
+      "sha256": "c1abfa8b695045eec8cec34185721989286330703a44b6732954409627edc8cc"
+    }
+  ],
+  "sources": [
+    "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/graph/pathObj/AbbreviatedData.java",
+    "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/graph/tight/method/Arc.java",
+    "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-layout/src/main/java/org/ofdrw/layout/element/canvas/DrawContext.java",
+    "https://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes"
+  ]
+}

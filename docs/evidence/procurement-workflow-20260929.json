@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-29",
+  "stage": "procurement-precheck-submission-and-approval-api",
+  "result": "PASS_LOCAL_API_INTEGRATION",
+  "tests": {"h2Scope": 38, "h2Breakdown": {"procurementWorkflow": 18, "procurementGateway": 6, "financeTransport": 14}, "postgresScope": 42, "postgresBreakdown": {"procurementWorkflow": 18, "advanceWorkflow": 19, "openApi": 5}},
+  "openApi": {"operations": 201, "schemas": 387, "requestExamples": 74},
+  "verified": [
+    "Only authenticated owners write drafts or request prechecks; generic form writes cannot bypass business binding",
+    "Network reads run outside request locks and edits invalidate late results",
+    "Claimed expired jobs never resend and late results cannot overwrite timeouts",
+    "Submission atomically freezes the source, reserves the payable and starts approval",
+    "Concurrent submissions for one payable start only one approval",
+    "Failed resubmission preserves the previous held source and corrected draft",
+    "Final approval validates the original held source; intermediate approval does not seal business terms",
+    "Injected submission, final approval and release failures roll back engine tasks and business changes together",
+    "Historical reviewers see their original round; administrators cannot bypass sensitive field permissions",
+    "Account references, hashes and verification credentials are absent from public projections",
+    "Six-decimal quantities survive HTTP and persistence beyond browser Number precision",
+    "Approval does not invoke bank, payable write, accounting or budget write operations"
+  ],
+  "precisionRegression": {"red": "procurement-quantity-red.log", "green": "procurement-quantity-green.log", "rootCause": "Intermediate finance envelope JSON tree used floating point before domain mapping", "fixScope": "Dedicated FinanceGatewayClient mapper only"},
+  "migration": 66,
+  "liveAcceptanceSchema": 65,
+  "publicApiImplemented": true,
+  "publicUiImplemented": false,
+  "externalSystem": "Local synthetic finance HTTP only",
+  "remaining": ["Templates and UI", "Independent supplier authorization and payment settlement", "Cross-business invoice duplicate safeguards", "Live database and browser acceptance"],
+  "logs": ["procurement-workflow-h2.log", "procurement-quantity-red.log", "procurement-quantity-green.log", "procurement-workflow-postgres.log", "procurement-workflow-openapi.log", "procurement-workflow-authors.log"],
+  "localEvidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928"
+}

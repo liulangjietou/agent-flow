@@ -29,7 +29,7 @@ public class WebConfig {
         var configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(allowedOrigin));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key", "X-CSRF-TOKEN", "X-AgentFlow-Actor"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key", "X-CSRF-TOKEN", "X-AgentFlow-Actor", "X-Application-Version"));
         configuration.setAllowCredentials(false);
         configuration.setMaxAge(3600L);
         var source = new UrlBasedCorsConfigurationSource();

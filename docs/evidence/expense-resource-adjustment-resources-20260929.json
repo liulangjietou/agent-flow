@@ -1,0 +1,22 @@
+{
+  "date": "2026-09-29",
+  "stage": "expense-resource-adjustment-resource-execution",
+  "result": "PASS_INTERNAL_RESOURCE_TRANSACTIONS_ONLY",
+  "tests": {"domainScope": 43, "h2ServerScope": 178, "adjustmentFocusedSubset": 7, "scopeOverlap": true},
+  "verified": [
+    "All resource effects and adjustment completion roll back together",
+    "Late advance guard failure rolls back prior invoice and approved-credit changes",
+    "Original gross consumptions and amount-use records remain while net consumption decreases",
+    "Invoice claim releases only after a persisted reversal and returns to pending verification",
+    "Original payment, settlement input and archive ZIP remain unchanged",
+    "Repeated execution has no additional resource effect",
+    "Unrelated aggregate mutations and erased reversal history are rejected",
+    "Explicit recovery accepts newer confirmations of the same original posting without repeating budget execution"
+  ],
+  "liveAcceptanceSchema": 64,
+  "testSchema": 65,
+  "publicApiOrUiAdded": false,
+  "remaining": ["Permissioned preparation and action services", "Budget and resource workers", "Public API and UI", "PostgreSQL and live acceptance"],
+  "logs": ["expense-resource-adjustment-resource-execution.log", "expense-resource-adjustment-resource-regression.log", "expense-resource-adjustment-resource-authors.log"],
+  "localEvidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928"
+}

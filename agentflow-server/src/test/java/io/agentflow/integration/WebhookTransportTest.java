@@ -40,8 +40,9 @@ class WebhookTransportTest {
     @Test
     void receivesHttpDateAndFallsBackOnRepeatedRetryAfterHeaders() throws Exception {
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-        Instant deadline = Instant.now().plusSeconds(120).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
-        String date = java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.format(deadline.atZone(java.time.ZoneOffset.UTC));
+        // 固定月初日期，真实 HTTP 夹具也遵守 IMF-fixdate 的两位日期格式。
+        Instant deadline = Instant.parse("2026-10-03T03:00:00Z");
+        String date = "Sat, 03 Oct 2026 03:00:00 GMT";
         server.createContext("/date", exchange -> {
             exchange.getResponseHeaders().set("Retry-After", date);
             exchange.sendResponseHeaders(503, -1); exchange.close();

@@ -1,7 +1,13 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.approval.model.SubmissionRisk;
+import io.agentflow.event.EventContractBindings;
 import io.agentflow.approval.service.ProcessRuntimePort;
 import io.agentflow.common.DomainException;
+import io.agentflow.common.JsonUtil;
+import io.agentflow.definition.DefinitionDraftRepository;
+import io.agentflow.definition.DefinitionInitiatorRequirements;
+import io.agentflow.organization.FormAssigneeBindings;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
@@ -29,14 +35,28 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     private final RuntimeService runtimeService;
     private final TaskService taskService;
     private final HistoryService historyService;
+    private final DefinitionDraftRepository platformDefinitions;
+    private final JsonUtil json;
+    private final EventContractBindings eventContracts;
+    private final DefinitionInitiatorRequirements initiatorRequirements;
+    private final FormAssigneeBindings formAssignees;
+    public static final String INITIATOR_CONTEXT = "agentflowInitiatorContext";
+    public static final String FORM_ASSIGNEES = "agentflowFormAssignees";
 
     /** 注入 Flowable 运行服务。 */
     public FlowableProcessRuntimeAdapter(RepositoryService repositoryService, RuntimeService runtimeService,
-                                         TaskService taskService, HistoryService historyService) {
+                                         TaskService taskService, HistoryService historyService, DefinitionDraftRepository platformDefinitions,
+                                         JsonUtil json, EventContractBindings eventContracts, DefinitionInitiatorRequirements initiatorRequirements,
+                                         FormAssigneeBindings formAssignees) {
         this.repositoryService = repositoryService;
         this.runtimeService = runtimeService;
         this.taskService = taskService;
         this.historyService = historyService;
+        this.platformDefinitions = platformDefinitions;
+        this.json = json;
+        this.eventContracts = eventContracts;
+        this.initiatorRequirements = initiatorRequirements;
+        this.formAssignees = formAssignees;
     }
 
     /** 创建申请时严格解析指定来源，返回不透明定义标识。 */
@@ -50,12 +70,33 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     @Override
     @Transactional
     public StartedProcess start(StartProcessCommand command) {
-        ProcessDefinition definition = boundDefinition(command);
+        ProcessDefinition definition = boundDefinition(command.definitionBinding());
+        var risk = SubmissionRisk.unassessed();
+        var selected = FormAssigneeBindings.Snapshot.EMPTY;
+        // 首提和重提均检查已绑定版本；先确认引擎来源，避免误停同名内置流程。
+        if (command.tenantId().equals(definition.getTenantId())) {
+            var published = platformDefinitions.lockPublished(command.tenantId(), command.processKey(), command.definitionVersion()).orElse(null);
+            if (published != null) {
+                published.requireStartEnabled();
+                eventContracts.requireAvailable(command.tenantId(), published.graph());
+                // 任职要求只取实际绑定的租户定义，同名新定义不能改变内置申请或旧轮次来源。
+                if (command.initiatorContext() == null && initiatorRequirements.required(command.tenantId(), published.graph())) {
+                    throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");
+                }
+                if (published.graph().riskPolicy() != null) {
+                    risk = published.graph().riskPolicy().assess(published.id(), published.version(), published.formSchema(),
+                            published.graph().conditionLanguageVersion(), command.payload());
+                }
+                selected = formAssignees.freeze(command.tenantId(), published.graph(), command.payload());
+            }
+        }
         Map<String, Object> variables = new HashMap<>();
         variables.put("tenantId", command.tenantId());
         variables.put("applicationId", command.applicationId().toString());
         variables.put("businessNo", command.businessNo());
         variables.put("roundNo", command.roundNo());
+        if (command.initiatorContext() != null) variables.put(INITIATOR_CONTEXT, json.write(command.initiatorContext()));
+        if (!selected.nodes().isEmpty()) variables.put(FORM_ASSIGNEES, json.write(selected));
         // 表单的显式 null 需要原样交给引擎，不能因不可变拷贝丢失清空语义。
         variables.put("formData", command.payload() == null ? Map.of()
                 : Collections.unmodifiableMap(new HashMap<>(command.payload())));
@@ -66,19 +107,45 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         // 会签会同时产生多张待办；兼容端口只提供首个标识，不把它作为全部运行任务。
         List<Task> firstTasks = taskService.createTaskQuery().processInstanceId(instance.getId())
                 .orderByTaskCreateTime().asc().orderByTaskId().asc().listPage(0, 1);
-        return new StartedProcess(instance.getId(), firstTasks.isEmpty() ? null : firstTasks.get(0).getId());
+        return new StartedProcess(instance.getId(), firstTasks.isEmpty() ? null : firstTasks.get(0).getId(), risk);
     }
 
-    private ProcessDefinition boundDefinition(StartProcessCommand command) {
-        String definitionId = command.runtimeDefinitionId();
-        if (definitionId == null && command.previousProcessInstanceId() != null) {
+    /** 路由更新复查唯一活跃实例和实际轮次，保留原任务与历史提交快照。 */
+    @Override
+    @Transactional
+    public void updateBusinessPayload(UpdateBusinessPayload command) {
+        var instances = runtimeService.createProcessInstanceQuery().active()
+                .variableValueEquals("tenantId", command.tenantId())
+                .variableValueEquals("applicationId", command.applicationId().toString())
+                .variableValueEquals("roundNo", command.roundNo()).listPage(0, 2);
+        if (instances.size() != 1 || !instances.get(0).getId().equals(command.processInstanceId())) {
+            throw new DomainException("CONCURRENCY_CONFLICT", "Business adjustment requires the exact active submission instance");
+        }
+        requireTenantBinding(instances.get(0), command.tenantId());
+        runtimeService.setVariable(command.processInstanceId(), "formData", Collections.unmodifiableMap(new HashMap<>(command.payload())));
+    }
+
+    /** 查询沿用启动时的精确来源规则；无租户的已知内置版本没有动态组织规则。 */
+    @Override
+    @Transactional(readOnly = true)
+    public boolean requiresInitiatorAppointment(DefinitionBinding binding) {
+        var definition = boundDefinition(binding);
+        if (!binding.tenantId().equals(definition.getTenantId())) return false;
+        var published = platformDefinitions.findPublished(binding.tenantId(), binding.processKey(), binding.definitionVersion())
+                .orElseThrow(this::definitionUnavailable);
+        return initiatorRequirements.required(binding.tenantId(), published.graph());
+    }
+
+    private ProcessDefinition boundDefinition(DefinitionBinding binding) {
+        String definitionId = binding.runtimeDefinitionId();
+        if (definitionId == null && binding.previousProcessInstanceId() != null) {
             // 旧申请只相信实际历史实例的租户、申请绑定与定义标识，不能改用当前同号版本。
             var previous = historyService.createHistoricProcessInstanceQuery()
-                    .processInstanceId(command.previousProcessInstanceId())
-                    .variableValueEquals("tenantId", command.tenantId())
-                    .variableValueEquals("applicationId", command.applicationId().toString()).singleResult();
+                    .processInstanceId(binding.previousProcessInstanceId())
+                    .variableValueEquals("tenantId", binding.tenantId())
+                    .variableValueEquals("applicationId", binding.applicationId().toString()).singleResult();
             if (previous == null || previous.getTenantId() != null && !previous.getTenantId().isEmpty()
-                    && !command.tenantId().equals(previous.getTenantId())) {
+                    && !binding.tenantId().equals(previous.getTenantId())) {
                 throw definitionUnavailable();
             }
             definitionId = previous.getProcessDefinitionId();
@@ -87,15 +154,15 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         if (definitionId != null) {
             definition = repositoryService.createProcessDefinitionQuery().processDefinitionId(definitionId).singleResult();
         } else {
-            ProcessDefinition tenantDefinition = findDefinition(command.tenantId(), command.processKey(), command.definitionVersion(), false);
-            ProcessDefinition bundledDefinition = isBundled(command.processKey(), command.definitionVersion())
-                    ? findDefinition(command.tenantId(), command.processKey(), command.definitionVersion(), true) : null;
+            ProcessDefinition tenantDefinition = findDefinition(binding.tenantId(), binding.processKey(), binding.definitionVersion(), false);
+            ProcessDefinition bundledDefinition = isBundled(binding.processKey(), binding.definitionVersion())
+                    ? findDefinition(binding.tenantId(), binding.processKey(), binding.definitionVersion(), true) : null;
             if (tenantDefinition != null && bundledDefinition != null) {
                 throw new DomainException("DEFINITION_BINDING_AMBIGUOUS", "Legacy application has no saved definition source and multiple sources match");
             }
             definition = tenantDefinition == null ? bundledDefinition : tenantDefinition;
         }
-        requireDefinitionMatches(definition, command.tenantId(), command.processKey(), command.definitionVersion());
+        requireDefinitionMatches(definition, binding.tenantId(), binding.processKey(), binding.definitionVersion());
         return definition;
     }
 

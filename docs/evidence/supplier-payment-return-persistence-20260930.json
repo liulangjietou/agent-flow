@@ -1,0 +1,49 @@
+{
+  "status": "PASS_LOCAL_PERSISTENCE",
+  "date": "2026-09-30",
+  "schemaCode": 80,
+  "liveSchema": 79,
+  "newPersistenceTests": 8,
+  "h2": {
+    "SupplierPaymentReturnTest": 13,
+    "SupplierPaymentPersistenceTest": 30,
+    "SupplierSettlementPersistenceTest": 31,
+    "domainTotal": 13,
+    "serverTotal": 61,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-persistence-h2.log"
+  },
+  "postgresql": {
+    "ExpenseSubmissionIntegrationTest": 125,
+    "AdvanceRepaymentIntegrationTest": 38,
+    "SupplierPaymentPersistenceTest": 30,
+    "SupplierSettlementPersistenceTest": 31,
+    "serverTotal": 224,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-return-postgres.log"
+  },
+  "migrationFixture": {
+    "from": 79,
+    "to": 80,
+    "preservedTables": 17,
+    "sharedFundsTableInitiallyEmpty": true,
+    "secondMigrationNoChanges": true,
+    "existingRuntimeUpgradeVerified": false
+  },
+  "verified": [
+    "Immutable original successful bank revision and nanosecond evidence restore",
+    "Cumulative receipts preserve their first registration owner",
+    "Second bank-fund insertion failure rolls back the entire registration",
+    "Cross-payment bank receipt uniqueness and competing single-use decisions",
+    "Unregistered observations and current bank uncertainty prevent stale registration",
+    "Existing employee, advance and expense funds still require accounting entries"
+  ],
+  "remaining": [
+    "Independent finance service, return guards and background read worker",
+    "Public API and browser workflow",
+    "Independent ERP adjustment",
+    "Existing nonempty runtime upgrade and actual local workflow acceptance",
+    "Enterprise integration acceptance"
+  ]
+}

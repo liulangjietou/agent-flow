@@ -1,0 +1,317 @@
+{
+  "recordedAt": "2026-10-01T11:06:08.656197+00:00",
+  "status": "POSITIVE_COMPLETION_VERIFIED_FULL_SUBPROCESS_LIFECYCLE_INCOMPLETE",
+  "baseCommit": "bc0772b639ee3d5ac525a215361e8d34cf9d8734",
+  "scope": "Normal child approval, nested parent completion, root-to-leaf locks and transactional notifications; public subprocess publication remains gated",
+  "tests": {
+    "h2RegressionPassed": 296,
+    "subprocessCasesIncludedInH2": 20,
+    "postgresSubprocessCasesPassed": 20,
+    "frontendScopePassed": 20,
+    "frontendBuild": "PASS",
+    "openapi": {
+      "result": "PASS",
+      "operations": 279,
+      "schemas": 550,
+      "requestExamples": 108
+    },
+    "scopesOverlap": true,
+    "h2Suites": [
+      {
+        "suite": "io.agentflow.expense.ExpensePlanIntegrationTest",
+        "tests": 15
+      },
+      {
+        "suite": "io.agentflow.integration.WebhookIntegrationTest",
+        "tests": 12
+      },
+      {
+        "suite": "io.agentflow.api.OpenApiContractTest",
+        "tests": 6
+      },
+      {
+        "suite": "io.agentflow.event.EventInboxIntegrationTest",
+        "tests": 13
+      },
+      {
+        "suite": "io.agentflow.approval.ParallelApprovalIntegrationTest",
+        "tests": 9
+      },
+      {
+        "suite": "io.agentflow.approval.ApplicationResubmissionIntegrationTest",
+        "tests": 14
+      },
+      {
+        "suite": "io.agentflow.approval.InstanceControlIntegrationTest",
+        "tests": 9
+      },
+      {
+        "suite": "io.agentflow.approval.CountersignPolicyIntegrationTest",
+        "tests": 12
+      },
+      {
+        "suite": "io.agentflow.approval.TaskDelegationIntegrationTest",
+        "tests": 17
+      },
+      {
+        "suite": "io.agentflow.approval.ApplicationWithdrawalIntegrationTest",
+        "tests": 21
+      },
+      {
+        "suite": "io.agentflow.approval.EventWaitIntegrationTest",
+        "tests": 15
+      },
+      {
+        "suite": "io.agentflow.approval.SubprocessStartIntegrationTest",
+        "tests": 20
+      },
+      {
+        "suite": "io.agentflow.approval.IdempotencyIntegrationTest",
+        "tests": 30
+      },
+      {
+        "suite": "io.agentflow.approval.TimerWaitIntegrationTest",
+        "tests": 9
+      },
+      {
+        "suite": "io.agentflow.approval.operations.AuditSearchIntegrationTest",
+        "tests": 5
+      },
+      {
+        "suite": "io.agentflow.approval.operations.AuditExportIntegrationTest",
+        "tests": 5
+      },
+      {
+        "suite": "io.agentflow.approval.ApplicationCancellationIntegrationTest",
+        "tests": 10
+      },
+      {
+        "suite": "io.agentflow.approval.copy.ApplicationCopyIntegrationTest",
+        "tests": 6
+      },
+      {
+        "suite": "io.agentflow.approval.ApprovalSecurityTest",
+        "tests": 12
+      },
+      {
+        "suite": "io.agentflow.approval.ApplicationHistoryIntegrationTest",
+        "tests": 31
+      },
+      {
+        "suite": "io.agentflow.approval.process.CountersignMembershipApiTest",
+        "tests": 17
+      },
+      {
+        "suite": "io.agentflow.approval.process.TaskDeadlineIntegrationTest",
+        "tests": 7
+      },
+      {
+        "suite": "io.agentflow.approval.process.TaskDeadlineReminderSchedulerTest",
+        "tests": 1
+      }
+    ],
+    "postgresSuites": [
+      {
+        "suite": "io.agentflow.approval.SubprocessStartIntegrationTest",
+        "tests": 20
+      }
+    ]
+  },
+  "postgres": {
+    "database": "subprocess_completion_16cba3a989",
+    "status": "PASS",
+    "existingDatabasesModified": false,
+    "pid": 74455,
+    "exitCode": 0,
+    "databaseEvidence": {
+      "schemaVersion": "89",
+      "applications": 41,
+      "rounds": 40,
+      "calls": 21,
+      "parentRoundBindings": 21,
+      "childRoundBindings": 21,
+      "activeNativeCallBindings": 9,
+      "nativeHistoryBindings": 21,
+      "normallyCompletedChildren": 12,
+      "approvedChildBindings": 12,
+      "normallyCompletedParents": 8,
+      "approvedParentBindings": 8,
+      "terminatedChildrenAwaitingBusinessCoordination": 0,
+      "progressAudits": 12,
+      "progressOutbox": 12,
+      "childAuditRecords": 42,
+      "logicalChildAttachments": 1,
+      "physicalAttachments": 1,
+      "attachmentProvenance": 1,
+      "nativeProcessHistory": 40,
+      "secondParentRoundCalls": 1
+    },
+    "tlsAccepted": false,
+    "scope": "Positive subprocess completion only; terminal lifecycle and native pause cascade remain pending"
+  },
+  "verified": [
+    "Child approval advances the parent business version and notifies its newly created human task",
+    "Normal nested completion settles all ended ancestor applications and rounds without fabricated parent human decisions",
+    "Inbox failure rolls back child decision, native instances, ancestor states, audit, notifications and outbox; explicit retry commits once",
+    "Parallel child decisions serialize at the common root and require each real child conclusion",
+    "Child timer and exact-contract event can complete their parent; repeat event returns STALE without marking the transaction rollback-only",
+    "Root timer after a child uses actual child approval evidence; root timer before a call starts the child without a request actor",
+    "Root pause prevents child manual, timer and event progress; child lifecycle cannot be independently withdrawn or paused",
+    "Application version is checked on the locked entity before the post-lock task authorization check",
+    "Withdrawal/final-approval and submission/cancellation preserve one business conclusion and rollback created runtime on failed submission",
+    "Application history, audit filters, OpenAPI action enums and webhook event label include SubprocessCompleted",
+    "Public definition validation still rejects incomplete SUB_PROCESS runtime"
+  ],
+  "redEvidence": [
+    {
+      "log": "subprocess-completion-red.log",
+      "failure": "Parent version did not advance; normally ended ancestors remained IN_APPROVAL"
+    },
+    {
+      "log": "subprocess-completion-h2-expanded.log",
+      "failure": "Repeat child event threw parent-changed instead of returning STALE"
+    },
+    {
+      "log": "subprocess-lock-http-race-red-3.log",
+      "failure": "Withdrawal winning after task authorization returned 404 instead of CONCURRENCY_CONFLICT to the waiting approval request"
+    }
+  ],
+  "testFixtureCorrections": [
+    "Move concurrency barriers before application row locks; waiting for another engine command while holding the shared row lock creates an artificial test deadlock",
+    "Test both withdrawal/approval orders and both success/rollback outcomes of an already started submission",
+    "Configure repository spies through their underlying target to preserve the mandatory transaction proxy",
+    "An interrupted red test was confirmed stopped with a missing exec handle and no Maven or Surefire process before rerunning"
+  ],
+  "review": {
+    "method": "Manual Java review of changed call chains, transaction/lock order, authorization, notifications and regression tests",
+    "delegated": false,
+    "unresolvedWithinVerifiedPositiveScope": [],
+    "fullLifecycleStillGated": true
+  },
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/approval/model/Application.java": "de46e1834cde8ce78b8b8bd85ca4f52a87c81af5468ce8891b892c2d53716739",
+    "agentflow-domain/src/main/java/io/agentflow/approval/service/ApplicationAuditPort.java": "547fba0851d0ef9240f210624326a3b3816423eb5d3dba68f347565649adad7f",
+    "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java": "00491bd656ce59a6c3a3e5833288aa5e784b7f391e19568bb930edb345d06397",
+    "agentflow-server/src/main/java/io/agentflow/approval/SubprocessExecutionLocks.java": "ac7543e6b19caa97c1d199c524e761a16ae594a7a41162f063d862386eecfd17",
+    "agentflow-server/src/main/java/io/agentflow/approval/history/HistoryQueryParameters.java": "93d7925438851b31e099994d0dae29c73ade3d197fb6cad0d275ee41ee7aed85",
+    "agentflow-server/src/main/java/io/agentflow/approval/operations/AuditSearchParameters.java": "4ceb85d8cbc47692b2bd43f0e78b20577e1413fcbd3079988b5c4827a010f4b0",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/ApprovalCompletionService.java": "234a940513554a3d5894f6c5042e095e53105b3045f826e1c0e16662d5b95ee3",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/CountersignMembershipService.java": "edd683276acc88a16d4fb90c2141f4890072a5c70435074e4f1bbd55d0e7c5fc",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/EventWaitService.java": "39b3f803e126f3e27d2df50edb308fff3bedc4a9b9638777dc77ba29e819ce42",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskDeadlineReminders.java": "6949fa8d8fb1cab22c3772f53a7f2fd261154aec7fd7f2d37c6f15908081ef50",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskFacade.java": "ecb432c04c37b5e07a7b71386a1222b5a2c35f6cae48c29d79eef470826f53a3",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/InstanceControlService.java": "1389d56c6f1f95e2347e59dba0bf7586922d815f188e50baed9b5c7a5b792ced",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/SubprocessProgressService.java": "2fca09ba763eeed4a9279713eea0f846de6a98a1a4a20f0113d448a7a9d6147a",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/TimerWaitService.java": "4ca1a2b73f20c82d6fe24115098f9d11e23d4a1ff92888a1371a77e2fc924c8b",
+    "agentflow-server/src/main/java/io/agentflow/integration/ApprovalWebhookEvents.java": "dbf116ea88ba897a08bae413654ddfee33244a2977f2f11d3d1a06c0bb985c66",
+    "agentflow-server/src/main/resources/api/openapi.json": "32b260a4486f3b98bde19b52036825d4725ee85bd6dcfd771f6ddb266a25a703",
+    "agentflow-server/src/test/java/io/agentflow/approval/ApplicationCancellationIntegrationTest.java": "a41e1b72fddeba0032656addf54a7180464b79eee045082c3c66cc2b8fa4d9e0",
+    "agentflow-server/src/test/java/io/agentflow/approval/ApplicationWithdrawalIntegrationTest.java": "0f2efc594a5d2b2e1b4d1943f9571bde2db28502f9d5103f84a8b5567c5473d9",
+    "agentflow-server/src/test/java/io/agentflow/approval/ParallelApprovalIntegrationTest.java": "251b320a6a19e3b63cb1efebe6fe47fefd9c8dbf4b5b64f43a4dd2f86737d997",
+    "agentflow-server/src/test/java/io/agentflow/approval/SubprocessStartIntegrationTest.java": "71b8f83b3156acef29c305cbd133e0a135beaae72165f0fde8430d15155644b9",
+    "agentflow-web/src/components/ApplicationHistory.vue": "f82779d7e16df0c5a4498a5a77b344226e910073e6a8d1c8088387a60dc77f4d",
+    "agentflow-web/src/components/AuditSearch.vue": "a29c407f4e899448a5b8ae1520d4016b4c5c3540cb74113d89736a6f08325f16",
+    "agentflow-web/src/webhooks.ts": "7a2ce5fdbad9992f106f0bddc23e3c6c43e5d015d5144db70e00ccb11c0a8000"
+  },
+  "logs": {
+    "subprocess-completion-red.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-completion-red.log",
+      "sha256": "174c590c9b2f6252b5e6545b0db5661dd0729e7e136b981d37c3c6ab88ee0670"
+    },
+    "subprocess-completion-h2-expanded.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-completion-h2-expanded.log",
+      "sha256": "53efcf731c895886263dd7828e8ddb8e90824f61bd2e62c46a2981d46e002420"
+    },
+    "subprocess-completion-h2-regression.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-completion-h2-regression.log",
+      "sha256": "59e22360e83a45abbaf0fd0df53faa772dd3c2cc4fc3f71f734d1d105e4a98d7"
+    },
+    "subprocess-lock-http-race-red-3.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-lock-http-race-red-3.log",
+      "sha256": "e3481eb982777d35c547dd49c6d6e28f18f60fbbb85d0a239b35e17a5c313425"
+    },
+    "subprocess-completion-h2-regression-final.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-completion-h2-regression-final.log",
+      "sha256": "fc90abfdd1d8524e700d3952f3dbdc955022cc19875481759106182710c2064c"
+    },
+    "subprocess-completion-h2-regression-verified.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-completion-h2-regression-verified.log",
+      "sha256": "37dc42ff154d48fa9a3b43b9f6ce8c4db2b4a5ed47379b8e07b93eeb87a000b2"
+    },
+    "subprocess-completion-postgres.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-completion-postgres.log",
+      "sha256": "d065bd148df3b84888967721b5b5bc225846ea4e9812b4be6cbf1d9f453b472c"
+    },
+    "subprocess-completion-frontend-tests.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-completion-frontend-tests.log",
+      "sha256": "8e025b7d0ed65858cd6057c4e8c151dce1c95fe8dc72358e79d01542bbe8d7ce"
+    },
+    "subprocess-completion-frontend-build.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-completion-frontend-build.log",
+      "sha256": "2c023199bf38de2c99d3abbe6841edeffc152740449038ed3bda53c620c83fab"
+    },
+    "subprocess-completion-openapi.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-completion-openapi.log",
+      "sha256": "e57522c0f90ea67e32185840b6a0fb2e5267952b7fc89f99ded0019d3646be49"
+    }
+  },
+  "existingRuntimeUpgraded": false,
+  "existingRuntimeRecovered": true,
+  "runtimeRecovery": {
+    "checkedAt": "2026-10-01T11:05:43.653310+00:00",
+    "priorBackendPidAbsent": 57410,
+    "priorPortsNotListening": [
+      18224,
+      15324
+    ],
+    "backendPort": 18224,
+    "backendPid": 75450,
+    "backendSession": 20567,
+    "backendHealth": "UP",
+    "backendProcess": "75450 02:24 /Users/zhangfuqiang/Library/Java/JavaVirtualMachines/corretto-17.0.16/Contents/Home/bin/java",
+    "jarSha256": "b59c0d39306b7bbab9028a35b98ecfb6d3e0cd6561e83973fd608d088ef8d557",
+    "backendCodeCommit": "542b3cd58881f37c0960604c32a1c4a944dc99c0",
+    "schema": 88,
+    "frontendPort": 15324,
+    "frontendSession": 34057,
+    "frontendHttpResponses": {
+      "/": 200,
+      "/src/main.ts": 200,
+      "/src/App.vue": 200
+    },
+    "frontendCodeCommit": "7f7ddca59fd340e5bc35f0618cf4b6f368f5b627",
+    "frontendRoot": "/fyoung/tmp/agentflow-remaining-20260928/event-ui-frozen-7f7ddca/agentflow-web",
+    "frontendConfig": "/fyoung/tmp/agentflow-remaining-20260928/event-ui-restored-vite.config.mjs",
+    "restarted": true,
+    "upgraded": false,
+    "dataPreservation": {
+      "phase": "after",
+      "tableCount": 219,
+      "totalRows": 5580,
+      "files": 10,
+      "schema": "88",
+      "allTablesAndFilesPreserved": true
+    }
+  },
+  "currentAcceptanceSchema": 88,
+  "testSchema": 89,
+  "newMigration": false,
+  "actualSubprocessHttpAcceptance": false,
+  "actualBrowserAcceptance": false,
+  "restartAcceptance": false,
+  "tlsAccepted": false,
+  "remoteDelivery": false,
+  "remainingPackages": 4,
+  "remaining": [
+    "Negative child results, parent withdrawal, audited termination and consistent descendant application/round states",
+    "Native parent-child pause/resume and each task remaining SLA; guards alone do not complete this requirement",
+    "Dependency/publication validation, designer and templates, authorized parent-child views and API",
+    "Actual subprocess HTTP/browser/upgrade/restart acceptance",
+    "Other explicit failure recovery and safe batch handling",
+    "Browser template download receipt",
+    "Expired local test TLS certificate verification",
+    "External notifications, mentions, preferences and escalation with pause suppression",
+    "Real enterprise finance policy, budget/ERP/bank/invoice/event-source integration and reconciliation",
+    "Real model/IdP, enterprise deployment/upgrade/restore/capacity/alerts, Git remote/PR/CI"
+  ]
+}

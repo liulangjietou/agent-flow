@@ -1,0 +1,362 @@
+{
+  "recordedAt": "2026-10-02T10:09:34.574948+00:00",
+  "status": "TEMPLATE_COMPOSITION_SCOPE_PASSED_FULL_OFD_INCOMPLETE",
+  "baseCommit": "3fe280fede6a6c7a665802e49acd4a0820035b6c",
+  "remainingTopLevelCategories": 6,
+  "preciseSmallTaskCountKnown": false,
+  "callerChain": "InvoiceOfdRenderer -> InvoiceOfdDocument template references and physical area -> per-output-page resource scopes -> existing layer/vector drawing; public OFD adapter remains disabled",
+  "responsibility": "Page/document rendering infrastructure; no expense or approval domain changes",
+  "implemented": [
+    "Per-document template directory, confined file references, strict identifiers/types and immutable per-page overrides",
+    "Background templates/layers, Body templates/layers, Foreground templates/layers; stable order and repeated reference painting",
+    "Template-internal Template references do not recurse",
+    "Page physical area then compatible template areas then CommonData fallback",
+    "Main and template private resources remain separate while document resources are available to both",
+    "Per-output-page cached resource scopes and shared original ICC allocation budget; close all loaded fonts at page end",
+    "Optional layer identifier accepted; provided identifiers still validated",
+    "Bounded declarations, per-page references and total layer painting including empty layers"
+  ],
+  "standard": {
+    "document": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/gbt33190-2016.pdf",
+      "bytes": 4331919,
+      "sha256": "dae45301d0a3c906f8f172a2def2dee14df3bd2b62783bca402ca0a9ec4f9e13"
+    },
+    "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/GBT_33190-2016_电子文件存储与交换格式版式文档.pdf",
+    "printedPagesInspected": [
+      10,
+      11,
+      17,
+      18,
+      19,
+      20,
+      21
+    ],
+    "relevantSections": [
+      "7.5 tables 6-7",
+      "7.7 tables 12-15 and figures 13-16"
+    ],
+    "findings": [
+      "Template references in template page descriptions are inactive",
+      "Template declaration supplies a default ZOrder; page references can override it",
+      "Figure 16 interleaves each template type with the corresponding native page layer type",
+      "Layer ID is optional",
+      "A missing page area uses template area before CommonData"
+    ],
+    "referenceUrls": [
+      "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/basicStructure/pageObj/Template.java",
+      "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/basicStructure/pageObj/CT_TemplatePage.java"
+    ],
+    "upstreamCodeCopied": false,
+    "newDependencies": false
+  },
+  "deliberateInputBoundary": "If multiple referenced templates supply different PhysicalBox values and the main page has no explicit Area, reject instead of selecting an undocumented winner; conflicting template areas are allowed when the main page explicitly defines its area.",
+  "limits": {
+    "templatesPerDocument": 64,
+    "templateReferencesPerPage": 64,
+    "paintedLayersPerCall": 20000,
+    "emptyLayersCounted": true,
+    "existingObjectGeometryPixelArchiveLimitsUnchanged": true,
+    "iccLimitsSharedAcrossAllScopesOfOneOutputPage": true
+  },
+  "red": {
+    "selectedTotal": 16,
+    "failures": 2,
+    "errors": 11,
+    "passed": 3,
+    "templateSuite": {
+      "tests": 15,
+      "failures": 2,
+      "errors": 10
+    },
+    "optionalLayerIdentifier": {
+      "tests": 1,
+      "errors": 1
+    },
+    "existingTestGap": "All existing layer fixtures provided ID. Earlier preflight used page/CommonData boxes only and renderer rejected templates, so composition and template scope rules were absent.",
+    "boundary": "Development of an internal renderer; no production OFD extraction was enabled."
+  },
+  "tests": {
+    "scopedTotal": 88,
+    "newTemplateTests": 16,
+    "newOptionalLayerIdentifierTest": 1,
+    "priorScopeOverlap": 71,
+    "suites": [
+      {
+        "name": "InvoiceOfdTemplateTest",
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-reports/TEST-io.agentflow.agent.InvoiceOfdTemplateTest.xml",
+          "bytes": 44961,
+          "sha256": "32f20536f0672d45713533fb1409e6e5e22a08b788e90c4c9d985dfd8563e367"
+        }
+      },
+      {
+        "name": "InvoiceOfdRendererTest",
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-reports/TEST-io.agentflow.agent.InvoiceOfdRendererTest.xml",
+          "bytes": 45522,
+          "sha256": "14703ca3986fb41bcd2671c7dae33a02b3e139afd233ef79c437a7bc4bd6113e"
+        }
+      },
+      {
+        "name": "InvoiceOfdDrawingTest",
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-reports/TEST-io.agentflow.agent.InvoiceOfdDrawingTest.xml",
+          "bytes": 45155,
+          "sha256": "72bded1b9add73fc2669a46a3376643bb2e76aa26e2782891b250a27c3588c7b"
+        }
+      },
+      {
+        "name": "InvoiceOfdFontTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-reports/TEST-io.agentflow.agent.InvoiceOfdFontTest.xml",
+          "bytes": 43633,
+          "sha256": "6ce0e0eadab788d3f397bb4dd69003a3b993834dd9a56abeb0fc2be410dce43f"
+        }
+      },
+      {
+        "name": "InvoiceOfdPathTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-reports/TEST-io.agentflow.agent.InvoiceOfdPathTest.xml",
+          "bytes": 43590,
+          "sha256": "84e3a85ba707ef1177135f1d37d7d5611072340c2e1ad448fdbc267f9e5a837a"
+        }
+      },
+      {
+        "name": "InvoiceOfdArchiveTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-reports/TEST-io.agentflow.agent.InvoiceOfdArchiveTest.xml",
+          "bytes": 43775,
+          "sha256": "b5fd3ce4631f150ea25923bd74b505587652390a44be7024ce96f7d6401f689d"
+        }
+      },
+      {
+        "name": "InvoiceOfdDocumentTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-reports/TEST-io.agentflow.agent.InvoiceOfdDocumentTest.xml",
+          "bytes": 44427,
+          "sha256": "cac49d229aedefa1e3b62e3207a121c4fb2765edd0622142f02444f58a48421f"
+        }
+      }
+    ]
+  },
+  "probe": {
+    "source": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/InvoiceOfdTemplateProbe.java",
+      "bytes": 5760,
+      "sha256": "52e15965a047e8bbf6613bf137a51eb9d5fb06b87270e34f30bcee9048c94fcd"
+    },
+    "images": [
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-synthetic/page-1.png",
+        "bytes": 979,
+        "sha256": "8c8a013fdddfacbaf6e65691198b886a162b0052b2a3fc745baca061d63a5834",
+        "width": 227,
+        "height": 114,
+        "visuallyInspected": true
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-synthetic/page-2.png",
+        "bytes": 528,
+        "sha256": "e3d98781bde71134b240bfe73731a0e424c45bd8ad290e2062db07ee83ab87ad",
+        "width": 171,
+        "height": 86,
+        "visuallyInspected": true
+      }
+    ],
+    "original": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-synthetic/templates.ofd",
+      "bytes": 4763,
+      "sha256": "45836ce780da4c0f45f5af8d4fcfd7997c7c15ff42ba99a1c11d142b6fa77b25"
+    },
+    "invalidLaterTemplate": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-synthetic/invalid-last-template.ofd",
+      "bytes": 4764,
+      "sha256": "2a45fee7d512a90a284819848b4cbb6aab00d945c54cf50cdb7d829dd3f4acf6"
+    },
+    "pixelChecks": 9,
+    "laterTemplateFailureRejectsWholeCall": true,
+    "syntheticFontOnly": true
+  },
+  "publicSamples": [
+    {
+      "name": "helloworld.ofd",
+      "original": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/helloworld.ofd",
+        "bytes": 1651,
+        "sha256": "a7b6f9eceb7ca4eafc73a318ac06f5476af6010d0dbcc99337912049748e141e"
+      },
+      "downloadSource": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-converter/src/test/resources/helloworld.ofd",
+      "originalHashUnchanged": true,
+      "preflightPassed": true,
+      "pages": 1,
+      "templateReferences": 0,
+      "fullRenderPassed": false
+    },
+    {
+      "name": "chineseDir.ofd",
+      "original": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/chineseDir.ofd",
+        "bytes": 2097,
+        "sha256": "c6defec84b241c74679a0d424634ff4a8605ccecc480d9736ef89218d806ac09"
+      },
+      "downloadSource": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-reader/src/test/resources/chineseDir.ofd",
+      "originalHashUnchanged": true,
+      "preflightPassed": true,
+      "pages": 1,
+      "templateReferences": 0,
+      "fullRenderPassed": false
+    },
+    {
+      "name": "draw_param_ref.ofd",
+      "original": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/draw_param_ref.ofd",
+        "bytes": 33402,
+        "sha256": "525eba2e09a4d7ac01a05bc176146ee9ecf5b1184fa3b909cc15599803493700"
+      },
+      "downloadSource": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-converter/src/test/resources/draw_param_ref.ofd",
+      "originalHashUnchanged": true,
+      "preflightPassed": true,
+      "pages": 5,
+      "templateReferences": 5,
+      "fullRenderPassed": false
+    },
+    {
+      "name": "DigitalSign.ofd",
+      "original": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/DigitalSign.ofd",
+        "bytes": 3041,
+        "sha256": "5b5bec16c539aa041ef3784d47a5665c03cf7f2e228551df87f13ee28d122989"
+      },
+      "downloadSource": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-sign/src/test/resources/DigitalSign.ofd",
+      "originalHashUnchanged": true,
+      "preflightPassed": true,
+      "pages": 1,
+      "templateReferences": 0,
+      "fullRenderPassed": false
+    }
+  ],
+  "publicSummary": {
+    "originalPreflightPassed": 4,
+    "templateReferencesInFivePageSample": 5,
+    "fullRenderPassed": 0,
+    "previousRejectedSamplesRechecked": false
+  },
+  "logs": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-red.log",
+      "bytes": 28235,
+      "sha256": "49f6fa9507ac2fe7efa832031bc4ed2b7e30b2fe95e94cdcb619d318c1ac1e31"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-initial-scope.log",
+      "bytes": 14326,
+      "sha256": "46a00eaa5b082ac99b0da7dd76c9f50a243e9af8a61e11f72d14267ba618cee8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-probe.log",
+      "bytes": 328,
+      "sha256": "53431ad06c0cca44be863da56a8c6df7021ee44442981c77fc45ea3a055a4992"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-authors.log",
+      "bytes": 131,
+      "sha256": "3faff36f807743b57d5971d83dab2d7f602a55ce522b654ebe9cecbf01f7c64b"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdDocument.java",
+      "bytes": 18518,
+      "sha256": "63ebbc88042e2a274b5f7096627535889f6c3634a746a96b3a7b5492e53ca8c7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdRenderer.java",
+      "bytes": 13241,
+      "sha256": "d07dd199847602bb6b7f2c444813e8dea085538313a70207a088598315e8cdc5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdResources.java",
+      "bytes": 8985,
+      "sha256": "88df86c73e169f98fc33c33c5707d27278c36f1df8afcee3192da295b3fc4424"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdColors.java",
+      "bytes": 7081,
+      "sha256": "2a66dc0062d7c0db71ca6a0557f69ecc2b4552958fddd582aedf4fe60e99f478"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdTemplateTest.java",
+      "bytes": 16785,
+      "sha256": "3b4b910b7c204961b244b00a792c4a20b9689bbc8c5d85a18eb339361b2ea910"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdRendererTest.java",
+      "bytes": 18772,
+      "sha256": "60b8fd30bcd702032b4167e92036178a4a174d910a081fa82257b9d3d13368e3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdDocumentTest.java",
+      "bytes": 12311,
+      "sha256": "6b0918eb03d052bc6efddd853191db07fdbda801e5fbeb7261e6f8ad1b2f99ef"
+    }
+  ],
+  "checks": {
+    "javaFiles": 1369,
+    "namedJavaTypes": 2628,
+    "missingAuthorTags": 0,
+    "parseErrors": 0,
+    "gitDiffCheck": "PASS"
+  },
+  "ofdAdvertisedAsSupported": false,
+  "boundedWorkerImplemented": false,
+  "modelCalled": false,
+  "runtimeReplaced": false,
+  "migrationAdded": false,
+  "remaining": [
+    "Controlled deployed fonts, font style and CFF CID per-FD matrix verification",
+    "Annotations, signatures/seals, nested resources and remaining graphical features",
+    "Nonconformal minimum device stroke width and nondefault clipping visibility/alpha semantics",
+    "Full public invoice rendering, isolated worker and all-page model input",
+    "Model and queued/running lifecycle acceptance, precheck suggestions and structured financial Agent entry",
+    "Organization sync/e-sign, three enterprise integration/delivery categories and full requirement audit"
+  ],
+  "nextStepFontInventory": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-template-font-followup.json",
+    "bytes": 1408,
+    "sha256": "9813c180949ce4a2586ae0f1aefcd83fdfb4e454be1731203f9fc1cb649243fe"
+  },
+  "observedUnembeddedFontNames": [
+    "宋体",
+    "楷体",
+    "Courier New"
+  ]
+}

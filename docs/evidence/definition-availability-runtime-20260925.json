@@ -1,0 +1,133 @@
+{
+  "date": "2026-09-25",
+  "result": "PASS_WITH_DELIVERY_PENDING",
+  "baseline": "44ccf936933f1496e382f51cf37d526ed10fe12c",
+  "branch": "codex/definition-availability-integration",
+  "candidateJarSha256": "6d31337af3e8bba825b15d1703ade6d54873efa05d7ce714c4c07ef3701c7c79",
+  "fixture": {
+    "database": "availability_browser_d7e70fb56d",
+    "containerId": "50a78bbf250cd7fb6c1c3ab55c05a932412d144556ae9ee85539aeed04635a30",
+    "backendPort": 18178,
+    "frontendPort": 5198,
+    "definitionId": "d714e0c6-69cf-4f5a-ad2a-925865209172",
+    "definitionKey": "availability-browser",
+    "draftId": "e9bcf9b8-190c-4949-aca9-662a7af48010",
+    "activeId": "bd20ec72-8cab-4b2e-a7bb-36cad56a1ca2"
+  },
+  "browser": {
+    "provider": "Chrome via cua_repl",
+    "cancelNoWrite": true,
+    "emptyReasonConfirmDisabled": true,
+    "disabledVersionNotSelectable": true,
+    "existingDraftFirstSubmitRejected": true,
+    "managerApprovedExistingTaskWhileDisabled": true,
+    "restoredHistoryAndStateVisible": true,
+    "originalDraftSubmittedAfterRestore": true,
+    "restoredVersionSelectable": true,
+    "newApplicationCreatedAndSubmitted": true,
+    "governanceLayoutInspected": true
+  },
+  "runtime": {
+    "cancelKeepsDefinitionExact": true,
+    "cancelHistoryCount": 0,
+    "disabledRevision": 2,
+    "immutableDefinitionFieldsUnchanged": true,
+    "disabledCreation": "409 DEFINITION_DISABLED",
+    "disabledFirstSubmission": "409 DEFINITION_DISABLED",
+    "blockedDraftUnchanged": true,
+    "activeTaskUnchanged": true,
+    "historyAfterDisable": {
+      "items": [
+        {
+          "tenantId": "demo",
+          "definitionId": "d714e0c6-69cf-4f5a-ad2a-925865209172",
+          "revision": 2,
+          "previousEnabled": true,
+          "startEnabled": false,
+          "changedBy": "admin",
+          "authorizedRole": "ADMIN",
+          "changedAt": "2026-09-25T04:12:58.143371Z",
+          "reason": "隔离验收：暂停新的首轮发起"
+        }
+      ]
+    },
+    "inFlightApprovedWhileDisabled": true,
+    "originalTaskCompletedInBoundRound": true,
+    "browserBlockedDraftStillUnchanged": true,
+    "managerPendingAfterApproval": 0,
+    "restoredRevision": 3,
+    "businessVersion": 1,
+    "definitionFieldsUnchangedAfterRestore": true,
+    "historyAfterRestore": {
+      "items": [
+        {
+          "tenantId": "demo",
+          "definitionId": "d714e0c6-69cf-4f5a-ad2a-925865209172",
+          "revision": 3,
+          "previousEnabled": false,
+          "startEnabled": true,
+          "changedBy": "admin",
+          "authorizedRole": "ADMIN",
+          "changedAt": "2026-09-25T04:15:33.617318Z",
+          "reason": "隔离验收：恢复首轮发起"
+        },
+        {
+          "tenantId": "demo",
+          "definitionId": "d714e0c6-69cf-4f5a-ad2a-925865209172",
+          "revision": 2,
+          "previousEnabled": true,
+          "startEnabled": false,
+          "changedBy": "admin",
+          "authorizedRole": "ADMIN",
+          "changedAt": "2026-09-25T04:12:58.143371Z",
+          "reason": "隔离验收：暂停新的首轮发起"
+        }
+      ]
+    },
+    "originalDraftFirstRoundSubmitted": true,
+    "newBrowserApplication": "7b70ff10-c9bf-4893-bff6-979a0c5711b9",
+    "newBrowserApplicationStatus": "IN_APPROVAL",
+    "managerPendingAfterRestore": 2,
+    "engineDefinitionCount": 1,
+    "engineDefinitionVersion": 1,
+    "engineDefinitionActive": true
+  },
+  "cleanup": {
+    "fixtureStopped": true,
+    "fixturePortsClosed": true,
+    "temporaryDependencyLinkRemoved": true,
+    "browserTabClosed": true,
+    "mainClean": true,
+    "mainHead": "44ccf936933f1496e382f51cf37d526ed10fe12c",
+    "originalWorktreeUnchanged": true,
+    "fixtureDataRetained": true,
+    "mainHealth": {
+      "8080": {
+        "httpStatus": 200,
+        "body": "{\"status\":\"UP\",\"groups\":[\"liveness\",\"readiness\"]}"
+      },
+      "8180": {
+        "httpStatus": 200,
+        "body": "ok"
+      }
+    }
+  },
+  "artifactDigests": {
+    "api.py": "ce4e31fb5219e16491bd4b70dced0f75e2324d1f77a3aa5cdce233a7da13854d",
+    "check-inflight.py": "588db5083c2828ef212409dd741bc4b74f2cabb327ecbdbfa50056fc659f9426",
+    "check-restored.py": "b2a656297cc2b4ea41a93a6e709c36493483fd1b5a945e61615a40bed2bcaeda",
+    "seed.json": "b23c80ef016cfbf76b1a451ddabcd9b9079e34d8a2a2a19c1d8ae80c203f3ec9",
+    "runtime-report.json": "0b733d7b9f694f3f2c8087c1cc728d2df6db7e94bf74f7027a47a3f02be6b685"
+  },
+  "verificationNotes": [
+    "No production source changes in this continuation; previously completed Java 742/frontend 262 checks were not rerun.",
+    "Temporary readback script first assumed a non-exposed response property and a wrong table name; corrected to the actual controller and V3 schema before asserting database linkage.",
+    "Browser approval completed the original seeded task; PostgreSQL history joins it to the approved submission round."
+  ],
+  "limits": [
+    "Synthetic demo users and isolated PostgreSQL only.",
+    "Disabled-version resubmission after return/withdrawal remains undecided and unimplemented.",
+    "No real enterprise identity or production acceptance.",
+    "Uncommitted, unmerged, not deployed; no remote or PR."
+  ]
+}

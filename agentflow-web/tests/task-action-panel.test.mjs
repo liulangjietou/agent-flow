@@ -20,6 +20,38 @@ function panel(task = {}) {
   return { state: mounted.$.setupState, props, events, close: () => app.unmount() }
 }
 
+const proxy = id => ({ proxyId: id, revision: 1, definitionId: 'published', principalId: id, principal: id,
+  startsAt: new Date(Date.now() - 60_000).toISOString(), endsAt: new Date(Date.now() + 60_000).toISOString() })
+
+test('代理批准须在确认表单固定原审批人，多个依据不能默认替人选择', () => {
+  const p = panel({ canActDirectly: false, proxyOptions: [proxy('first'), proxy('second')] })
+  try {
+    p.state.prepare('APPROVE'); p.state.execute('APPROVE')
+    assert.deepEqual(p.events, []); assert.match(p.state.error, /选择.*代理/)
+    p.state.selectedProxy = 'second'; p.state.execute('APPROVE')
+    assert.equal(p.events[0].proxyId, 'second'); assert.equal(p.events[0].expectedVersion, 2)
+    p.state.cancelForm(); assert.equal(p.state.selectedProxy, '')
+    p.props.task.proxyOptions = [proxy('first')]; p.state.prepare('APPROVE')
+    assert.equal(p.state.selectedProxy, 'first'); p.state.execute('APPROVE')
+    assert.equal(p.events[1].proxyId, 'first')
+  } finally { p.close() }
+})
+
+test('同版本的代理撤销或权限变化清除确认，纯代理不显示增减会签入口', () => {
+  const p = panel({ canActDirectly: false, proxyOptions: [proxy('first')], countersign: { mode: 'ALL', completed: 0, total: 2 } })
+  try {
+    assert.equal(p.state.membershipAllowed, false)
+    p.state.prepare('APPROVE'); p.state.comment = '旧意见'
+    p.props.task.proxyOptions = []
+    assert.equal(p.state.pending, null); assert.equal(p.state.comment, ''); assert.equal(p.state.selectedProxy, '')
+    p.props.task.proxyOptions = [proxy('first')]; p.props.task.canActDirectly = true
+    assert.equal(p.state.membershipAllowed, true)
+    p.state.prepare('APPROVE'); assert.equal(p.state.selectedProxy, '')
+    p.props.task.canActDirectly = false
+    assert.equal(p.state.pending, null); assert.deepEqual(p.events, [])
+  } finally { p.close() }
+})
+
 test('批准先打开可取消的意见表单，明确确认后才发送原任务版本和意见', () => {
   const p = panel()
   try {

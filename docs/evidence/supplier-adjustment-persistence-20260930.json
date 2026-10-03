@@ -1,0 +1,84 @@
+{
+  "status": "PASS_PREPARATION_AND_DURABLE_OPERATIONS",
+  "date": "2026-09-30",
+  "migration": 81,
+  "liveAcceptanceSchema": 80,
+  "newPersistenceTests": {
+    "h2": 10,
+    "postgresql": 10,
+    "failures": 0,
+    "errors": 0
+  },
+  "relatedDomainTests": 42,
+  "relatedServerTests": 92,
+  "serverBreakdown": {
+    "newAdjustmentPersistence": 10,
+    "originalSupplierPaymentAndReturns": 38,
+    "originalSupplierSettlement": 38,
+    "httpProtocol": 6
+  },
+  "upgradeFixture": {
+    "from": 80,
+    "to": 81,
+    "nonemptyBusinessTablesCompared": 11,
+    "sources": [
+      "original payment before ERP settlement",
+      "original completed ERP settlement"
+    ],
+    "oldColumnsAndJsonPreserved": true
+  },
+  "verified": [
+    "Immutable return ledger version and first bank receipt owners are bound to actual persisted sources",
+    "Single active preparation and command; late registration and revision failures roll back atomically",
+    "Unknown external writes recover by the original command; safe retirement cannot erase ambiguous results",
+    "Current bank uncertainty and unresolved original ERP settlement prevent new adjustment work",
+    "Completed accounting is represented separately in domain state and V81 reference constraints",
+    "Historical source JSON survives nullable accounting and reservation extensions"
+  ],
+  "redThenGreen": [
+    {
+      "case": "Previous accounting must match the exact immutable prefix",
+      "failures": 1,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-return-accounting-prefix-red.log"
+    },
+    {
+      "case": "Earlier return registration must not override current unknown bank state",
+      "productionFailures": 1,
+      "fixtureFailureAlsoCorrected": true,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-persistence-red.log"
+    }
+  ],
+  "environment": {
+    "firstTwoAttempts": "Shared 64 MiB PostgreSQL shared memory exhausted; second attempt triggered automatic recovery",
+    "finalPostgres": "Dedicated temporary PostgreSQL 17 container, 512 MiB shared memory, default parallel settings",
+    "acceptanceRecovery": {
+      "health": "UP",
+      "oldTablesPreserved": 146,
+      "oldRowsPreserved": 2583,
+      "attachmentsPreserved": 7,
+      "financialFilesPreserved": 16,
+      "httpResponsesValidated": 146,
+      "frontendViewsValidated": 32,
+      "decisionReceiptsValidated": 17
+    },
+    "temporaryDatabasesFromFailedRunsRemoved": true
+  },
+  "authors": {
+    "files": 1058,
+    "namedTypes": 2012,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-persistence-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-isolated-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-persistence-h2-final.log"
+  ],
+  "remaining": [
+    "Atomic successful-adjustment completion across bank proof, receipt credit entries, return ledger and original reservation",
+    "Preserve completion bank receipts in all subsequent return comparisons",
+    "Prepare/execute/query/completion workers, current finance and field permissions",
+    "Public API, explicit UI and V81 nonempty runtime/restart/browser acceptance",
+    "Real enterprise ERP integration"
+  ]
+}

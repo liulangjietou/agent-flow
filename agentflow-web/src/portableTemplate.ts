@@ -1,6 +1,8 @@
 import { readNotificationTexts, type NotificationTexts } from './notificationTexts.js'
 import type { Graph } from './api'
 import { validateFormSchema, type FormSchema } from './formSchema.js'
+import { subprocessFieldKey } from './subprocessDesigner.js'
+import { MAX_RESPONSIBILITY_REFERENCE_TEXT } from './approvalResponsibilities.js'
 
 export const TEMPLATE_FILE_LIMIT = 1024 * 1024
 export const TEMPLATE_FORMAT = 'agentflow-process-template'
@@ -23,7 +25,7 @@ function list(value: unknown, path: string, max: number): asserts value is unkno
 }
 
 function readField(raw: unknown, column = false) {
-      const f = object(raw, ['key', 'label', 'type', 'required', 'helpText', 'maxLength', 'minimum', 'maximum', 'options', 'columns', 'maxRows'], ['key', 'label', 'type', 'required'], '字段')
+      const f = object(raw, ['key', 'label', 'type', 'required', 'helpText', 'maxLength', 'minimum', 'maximum', 'options', 'columns', 'maxRows', 'sensitive', 'nodeAccess'], ['key', 'label', 'type', 'required'], '字段')
       text(f.key, '字段标识', 64); text(f.label, '字段名称', 128)
       if (typeof f.required !== 'boolean') throw new Error('字段必填配置必须是布尔值。')
       if (f.helpText != null) text(f.helpText, '填写提示', 1000, true)
@@ -48,16 +50,35 @@ function process(value: unknown, version: 1 | 2): PortableProcess {
   const p = object(value, fields, fields, '流程')
   if (version === 2) p.notificationTexts = readNotificationTexts(p.notificationTexts)
   text(p.key, '来源流程标识', 128); text(p.name, '流程名称', 128)
-  const g = object(p.graph, ['nodes', 'edges', 'conditionLanguageVersion'], ['nodes', 'edges'], '流程图')
+  const g = object(p.graph, ['nodes', 'edges', 'conditionLanguageVersion', 'riskPolicy'], ['nodes', 'edges'], '流程图')
   if (g.conditionLanguageVersion !== undefined && g.conditionLanguageVersion !== 1 && g.conditionLanguageVersion !== 2) throw new Error('条件语言版本不受支持。')
+  if (g.riskPolicy != null) {
+    const policy = object(g.riskPolicy, ['rules'], ['rules'], '风险策略')
+    list(policy.rules, '风险规则', 10)
+    if (!policy.rules.length) throw new Error('风险策略必须包含规则，未配置时请移除策略。')
+    const ids = new Set<string>()
+    for (const rawRule of policy.rules) {
+      const rule = object(rawRule, ['id', 'label', 'level', 'condition'], ['id', 'label', 'level', 'condition'], '风险规则')
+      text(rule.id, '风险规则标识', 64); text(rule.label, '风险公开说明', 120); text(rule.condition, '风险条件', 4000)
+      if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(rule.id) || ids.has(rule.id)) throw new Error('风险规则标识必须合法且唯一。')
+      if (/[\u0000-\u001f\u007f-\u009f]/.test(rule.label)) throw new Error('风险公开说明不能包含控制字符。')
+      if (!['LOW', 'MEDIUM', 'HIGH'].includes(rule.level as string)) throw new Error('风险命中等级只能为低、中、高。')
+      ids.add(rule.id)
+    }
+  }
   list(g.nodes, '节点', 200); list(g.edges, '连线', 400)
   for (const raw of g.nodes) {
     const n = object(raw, ['id', 'name', 'type', 'properties'], ['id', 'name', 'type', 'properties'], '节点')
     text(n.id, '节点标识', 128); text(n.name, '节点名称', 256)
-    if (!['START', 'END', 'USER_TASK', 'EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(n.type as string)) throw new Error('模板包含当前版本不支持的节点类型。')
-    const properties = object(n.properties, ['x', 'y', 'assigneeRule', 'approvalMode'], [], '节点配置')
+    if (!['START', 'END', 'USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'SUB_PROCESS', 'EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(n.type as string)) throw new Error('模板包含当前版本不支持的节点类型。')
+    const inputs = n.type === 'SUB_PROCESS' && n.properties && typeof n.properties === 'object'
+      ? Object.keys(n.properties).filter(key => key.startsWith('subprocessInput.') && subprocessFieldKey(key.slice('subprocessInput.'.length))) : []
+    if (inputs.length > 50) throw new Error('子流程最多映射 50 个输入字段。')
+    const properties = object(n.properties, ['x', 'y', 'assigneeRule', 'recipientRule', 'approvalMode', 'approvalPercentage', 'excludeApplicant', 'differentApproverFrom', 'timerDelaySeconds', 'eventContractKey', 'eventContractVersion',
+      'deadlineCalendarId', 'deadlineCalendarRevision', 'deadlineWorkingMinutes', 'escalationWorkingMinutes', 'escalationRecipientRule', ...(n.type === 'SUB_PROCESS' ? ['subprocessKey', 'subprocessVersion', ...inputs] : [])], [], '节点配置')
     for (const [key, value] of Object.entries(properties)) {
-      text(value, `节点配置 ${key}`, 256)
+      text(value, `节点配置 ${key}`, key === 'differentApproverFrom' ? MAX_RESPONSIBILITY_REFERENCE_TEXT : 256)
+      if (inputs.includes(key) && !subprocessFieldKey(value)) throw new Error('子流程输入只能引用父表单字段标识，不能使用路径或表达式。')
       if ((key === 'x' || key === 'y') && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > 1_000_000)) throw new Error('节点位置必须在 0 至 1000000 之间。')
     }
   }
@@ -155,6 +176,9 @@ export class PortableTemplateReview {
     } finally { clearTimeout(timeout); if (generation === this.generation) { this.loading = false; this.controller = null } }
   }
 
-  /** 审批人缺失或区间遗漏允许创建待配置草稿，发布仍须重新通过检查。 */
-  get canImport() { return this.reviewed && !!this.value && !this.loading && this.errors.every(error => error.startsWith('ASSIGNEE_NOT_AVAILABLE:') || error.startsWith('BRANCH_COVERAGE_GAP:')) }
+  /** 缺失租户引用或区间遗漏允许创建待配置草稿，发布仍须重新通过检查。 */
+  get canImport() {
+    const repairable = ['COPY_RECIPIENT_UNAVAILABLE:', 'ESCALATION_RECIPIENT_UNAVAILABLE:', 'ASSIGNEE_NOT_AVAILABLE:', 'FORM_ASSIGNEE_OPTION_UNAVAILABLE:', 'DEADLINE_CALENDAR_UNAVAILABLE:', 'BRANCH_COVERAGE_GAP:']
+    return this.reviewed && !!this.value && !this.loading && this.errors.every(error => repairable.some(prefix => error.startsWith(prefix)))
+  }
 }

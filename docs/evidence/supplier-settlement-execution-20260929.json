@@ -1,0 +1,55 @@
+{
+  "date": "2026-09-29",
+  "baseCommit": "39b8ce3b80a444c21d16eee6e66ae91a6aab0e68",
+  "scope": "supplier settlement background preparation, recovery and local completion",
+  "tests": {
+    "h2WorkflowAndLoopbackHttp": {
+      "tests": 65,
+      "failed": 0
+    },
+    "postgresql": {
+      "tests": 23,
+      "failed": 0,
+      "databases": {
+        "AGENTFLOW_SUPPLIER_SETTLEMENT": {
+          "database": "supplier_settle_supplier_settlement_b32f8c42",
+          "url": "jdbc:postgresql://127.0.0.1:55460/supplier_settle_supplier_settlement_b32f8c42",
+          "user": "agentflow"
+        }
+      }
+    },
+    "newExecutionTests": 9,
+    "authorCheck": {
+      "javaFiles": 938,
+      "namedTypes": 1739,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "verified": [
+    "explicit current finance can settle original paid bank after authorization expiry and cashier departure",
+    "unavailable preparation retries same intent; closed period stops without a write",
+    "current source is rechecked after network reads",
+    "concurrent claims admit one worker; expired possible send only queries original command",
+    "retirement stops read claim and blocks all old actions",
+    "all three reads and external settlement calls occur outside database transactions",
+    "lost response results in one settlement send and one original query",
+    "ERP success waits for bank recheck then completes locally with no new external call",
+    "atomic completion failure rolls back and recovers via query without resending",
+    "authoritative not-found requires explicit same-command retry and current eligibility"
+  ],
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-execution-h2.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-execution-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-execution-authors.log"
+  ],
+  "newMigration": false,
+  "runtimeMigration": 72,
+  "countsOverlap": true,
+  "limitations": [
+    "public finance settlement API and UI not yet connected",
+    "existing browser acceptance service remains unchanged on V72",
+    "synthetic financial ports do not establish enterprise integration",
+    "no Git remote configured; local development only"
+  ]
+}

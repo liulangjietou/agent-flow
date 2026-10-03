@@ -2,6 +2,33 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 const { taskActionInput, TaskRecipientsQuery } = await import(process.env.AGENTFLOW_TEST_TASK_ACTIONS)
 
+const proxy = (id, principal = id) => ({ proxyId: id, revision: 1, definitionId: 'published', principalId: principal,
+  principal, startsAt: new Date(Date.now() - 60_000).toISOString(), endsAt: new Date(Date.now() + 60_000).toISOString() })
+
+test('代理决定固定明确依据，多名原审批人必须选择，原生权利不替代失效的显式选择', () => {
+  const first = proxy('first', 'manager'), second = proxy('second', 'finance')
+  const task = { version: 4, allowedActions: ['APPROVE', 'RETURN'], canActDirectly: false, proxyOptions: [first] }
+  assert.equal(taskActionInput(task, 'APPROVE', '', '', []).proxyId, 'first')
+  const multiple = { ...task, proxyOptions: [first, second] }
+  assert.throws(() => taskActionInput(multiple, 'APPROVE', '', '', []), /选择.*代理/)
+  assert.equal(taskActionInput(multiple, 'RETURN', '补材料', '', [], 'second').proxyId, 'second')
+  const native = { ...multiple, canActDirectly: true }
+  assert.equal(Object.hasOwn(taskActionInput(native, 'APPROVE', '', '', []), 'proxyId'), false)
+  assert.equal(taskActionInput(native, 'APPROVE', '', '', [], 'first').proxyId, 'first')
+  assert.throws(() => taskActionInput(native, 'APPROVE', '', '', [], 'missing'), /代理.*失效|代理.*不可用/)
+})
+
+test('过期或尚未开始的代理不能提交，代理不能领取或再委派', () => {
+  const task = { version: 4, canActDirectly: false, allowedActions: ['APPROVE', 'CLAIM', 'DELEGATE'], proxyOptions: [proxy('first')] }
+  assert.throws(() => taskActionInput(task, 'CLAIM', '', '', []), /代理.*不支持/)
+  assert.throws(() => taskActionInput(task, 'DELEGATE', '', 'target', ['target']), /代理.*不支持/)
+  for (const option of [{ ...proxy('first'), endsAt: new Date(Date.now() - 1_000).toISOString() },
+    { ...proxy('first'), startsAt: new Date(Date.now() + 60_000).toISOString() }]) {
+    assert.throws(() => taskActionInput({ ...task, proxyOptions: [option] }, 'APPROVE', '', '', []), /代理.*失效|代理.*不可用/)
+  }
+  assert.throws(() => taskActionInput({ ...task, proxyOptions: [] }, 'APPROVE', '', '', []), /代理.*失效|代理.*不可用/)
+})
+
 test('回交不携带伪造接收人，保留原版本并要求真实处理意见', () => {
   const task = { taskId: 'delegated', version: 3, owner: 'finance', allowedActions: ['RESOLVE'] }
   assert.throws(() => taskActionInput(task, 'APPROVE', '', '', []), /不允许/)
@@ -52,10 +79,12 @@ test('批准与回交响应丢失后复用原意见和幂等键，目录查询�
       if (writes.length === 1) throw new Error('lost response')
       return Response.json({ taskId: 'task', action, applicationStatus: 'IN_APPROVAL', version: 4 })
     }
-    await assert.rejects(api.taskAction('task', { action, expectedVersion: 3, comment: '原意见' }))
+    const input = { action, expectedVersion: 3, comment: '原意见', ...(action === 'APPROVE' ? { proxyId: 'original-proxy' } : {}) }
+    await assert.rejects(api.taskAction('task', input))
     await writeRequests.recover(writeRequests.pending()[0].id)
     assert.equal(writes[0].body, writes[1].body)
     assert.equal(JSON.parse(writes[1].body).comment, '原意见')
+    assert.equal(JSON.parse(writes[1].body).proxyId, input.proxyId)
     assert.equal(writes[0].headers.get('Idempotency-Key'), writes[1].headers.get('Idempotency-Key'))
     assert.equal(writeRequests.pending().length, 0)
   }

@@ -155,12 +155,12 @@ class AssistRunQueryIntegrationTest {
     }
 
     @Test
-    void rejectsRepeatedParametersAndDetailFiltersAndDoesNotExposeCreationOrReviewRoutes() throws Exception {
+    void rejectsRepeatedParametersAndDetailFiltersAndInvalidCreationRequests() throws Exception {
         var app = application("demo"); var run = run(app, AssistRun.Status.COMPLETED);
         mvc.perform(get(path(app)).param("limit", "1", "2").header("Authorization", token("alice"))).andExpect(status().isBadRequest());
         mvc.perform(get(path(app) + "/" + run.id()).param("tenantId", "other").header("Authorization", token("alice"))).andExpect(status().isBadRequest());
         mvc.perform(post(path(app)).header("Authorization", token("alice")).contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isMethodNotAllowed());
+                .andExpect(status().isBadRequest());
     }
 
     private Application application(String tenant) {

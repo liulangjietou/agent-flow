@@ -1,0 +1,112 @@
+{
+  "date": "2026-09-30",
+  "status": "PASS_PUBLIC_PARTIAL_DISPUTE_API_AND_PROJECTION",
+  "baseCommit": "9ce2ecd1e40798e284c7dc340471cc7d89b7d4e7",
+  "scope": "Current-authorized independent budget and ERP dispute API, atomic named audit/idempotency and pure per-side capability/result projection",
+  "route": "POST /api/v1/expense-reports/{id}/partial-adjustments/disputes",
+  "schema": {
+    "newMigration": false,
+    "testSchema": 86,
+    "runtimeHealth": "UP",
+    "runtimeSchema": 82,
+    "runtimeUpgradedThisStage": false
+  },
+  "validation": {
+    "newIntegrationScenarios": 11,
+    "domainTests": 55,
+    "h2ServerTests": 146,
+    "h2WorkflowTests": 138,
+    "h2MigrationTests": 1,
+    "h2ContractTests": 6,
+    "h2StartupTests": 1,
+    "postgresTests": 139,
+    "postgresWorkflowTests": 138,
+    "postgresMigrationTests": 1,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "scopesOverlap": true
+  },
+  "openapi": {
+    "operations": 257,
+    "schemas": 523,
+    "newPaths": [
+      "/api/v1/expense-reports/{id}/partial-adjustments/disputes"
+    ],
+    "newSchemas": [
+      "ExpensePartialResolution",
+      "ExpensePartialDisputeInput"
+    ],
+    "existingPathsUnchanged": true,
+    "existingResponsePropertiesUnchanged": true,
+    "addedCapabilities": [
+      "canResolve",
+      "resolutionIssue",
+      "candidateValidUntil",
+      "latestResolution"
+    ],
+    "requestExamples": 100
+  },
+  "authorCheck": {
+    "javaFiles": 1128,
+    "namedTypes": 2178,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "logs": {
+    "h2": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-api-final-h2.log",
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-api-postgres.log",
+    "postgresDatabase": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-api-postgres-database.json",
+    "openapi": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-api-openapi.log",
+    "contractDiff": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-api-contract-diff.json",
+    "authors": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-api-authors.log",
+    "runtimePreservation": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-api-runtime-preserved.json"
+  },
+  "checks": [
+    "The public request binds actual report, round, application, business, original settlement, adjustment identity and root revision; caller chooses only side and displayed terminal outcome",
+    "Current legal-entity finance eligibility and complete original-field access are rechecked before mutation and successful idempotent replay; original applicant/cashier, hidden-field admin, unauthorized reader and other tenant cannot act",
+    "Unknown fields, forged candidate/actor/tenant/completion, absent required fields, stale versions and changed side/outcome are rejected without a decision",
+    "Only the actual stored candidate is used; no finance command, authorization renewal or automatic source confirmation is created by a decision",
+    "Both side decisions preserve original immutable completion, original commands and the peer; audit contains actual resolutionId, side, outcome and beforeVersion",
+    "Each side audit insertion failure rolls back root revision, proof and idempotency claim, allowing the same request and key to retry",
+    "Different concurrent sides cannot consume the same root revision; exactly one decision and audit wins and the other receives HTTP 409",
+    "A peer decision requires reloading the root; reusing an already successful key with a different outcome is rejected",
+    "Actual effect-free REJECTED/FAILED decisions allow explicit fresh preparation/authorization or separate safe retirement; original resources remain unchanged",
+    "The latest named result keeps its actual operationId after a new command is authorized, so historical decisions are not rebound to new commands",
+    "Pure GET exposes independent canResolve, resolutionIssue, candidateValidUntil and latestResolution, without finance queries or state mutation; authorized applicant history remains read-only",
+    "Unknown original bank does not block recording genuine independent ERP evidence, while subsequent current-source confirmation remains forbidden",
+    "Nonterminal and historically inconsistent candidates remain non-resolvable; exact expiry is tested through the same production preview method used by GET and mutation",
+    "Related V86 persistence, preparation, public actions, workspace, original reversal, resource, contract, startup and segmented nonempty migration regressions pass"
+  ],
+  "redEvidence": {
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-api-missing.log",
+    "tests": 2,
+    "failures": 2,
+    "cause": "Dispute route returned 404 and per-side decision capability was absent"
+  },
+  "testSetupRepair": {
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-partial-dispute-api-first-h2.log",
+    "apiTests": 11,
+    "errors": 1,
+    "cause": "Second fault-injection CHECK also rejected the first already committed audit row",
+    "fix": "Constrain injection to the target next aggregate revision; then both side rollbacks and same-key retries passed"
+  },
+  "acceptanceBoundary": {
+    "publicSpringHandlersViaMockMvc": true,
+    "syntheticFinanceHttp": true,
+    "publicFinancialDisputeDecisions": true,
+    "liveExpiryWaitVerified": false,
+    "completeFrontend": false,
+    "actualRuntimeHttpAcceptance": false,
+    "actualBrowserAcceptance": false,
+    "longLivedRuntimeUpgrade": false,
+    "realEnterpriseFinance": false,
+    "originalMainUnchanged": true,
+    "remoteConfigured": false
+  },
+  "remaining": [
+    "Complete partial-adjustment frontend including creation, full receipt selection, per-side preparation/authorization, recovery and dispute decisions",
+    "Long-lived V82 to V86 nonempty upgrade and actual HTTP/browser/expiry/restart/old data and file preservation acceptance",
+    "Real enterprise finance integration and remaining advanced-workflow/notification/external-delivery packages"
+  ]
+}

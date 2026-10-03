@@ -1,0 +1,98 @@
+{
+  "recordedAt": "2026-09-26T12:20:16.739980+00:00",
+  "baseline": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+  "branch": "codex/governance-identifier-integration",
+  "status": "verified-local-development",
+  "fullGoalComplete": false,
+  "dynamicSupervisorDecisionPending": true,
+  "fullSuiteClaimed": false,
+  "postgresOrganizationTests": 10,
+  "postgresMigrationTests": 1,
+  "webTests": 293,
+  "runtimeOpenApiOperations": 82,
+  "oidcProvider": "local signed test provider; not a real enterprise connection",
+  "productionDeployed": false,
+  "remoteConfigured": false,
+  "evidence": [
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-init-identity-red.log",
+      "sha256": "ce338d3d56b866b6193881713980c4ded90810ddf63259e1f701e067becb55fe",
+      "bytes": 23676
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/approval-role-red.log",
+      "sha256": "fe5c8dd3883adafa7995db4f8afb295aa99e4e44a4958d999869d9ce56a958cd",
+      "bytes": 28138
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-panel-red.log",
+      "sha256": "ba7c13d186db043c20130f5ba394cb755afab1d5d2ab65a8a72f085e24c87d70",
+      "bytes": 29031
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-label-red.log",
+      "sha256": "6f80b45a1bd9bdf7865c5cb8914dea67618a2336c5fc99c3c5d21db41d76ea36",
+      "bytes": 28869
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-identity-regression.log",
+      "sha256": "5f5227f7d5b31d6956819e603555ff4204b327cf83f3b477de8ae36c22a0ab8a",
+      "bytes": 78875
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-security-regression.log",
+      "sha256": "e6e5e5e95d7433f6db181376f4db80d4ae221852383c795713d893955424d0a5",
+      "bytes": 102227
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-postgres.log",
+      "sha256": "ceaa1939838569ff6a86374bb4609434b44617af9b4193f2f06b3162cef447ac",
+      "bytes": 28363
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-postgres-migration.log",
+      "sha256": "30ffa23d23196ceaea7fd29059277a52bc8a09ccdf43674712619f7baaed1abf",
+      "bytes": 15837
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-contract-migrations.log",
+      "sha256": "ecbe08a9a2f6f821c16408cc955a7c064e5c3e30fe11c8c76d5eadcfb5f5143e",
+      "bytes": 52396
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-final-web-tests.log",
+      "sha256": "8b748710437aa8fd27fd9360ea5a39c7b2adeddd220b2d476237f578bcb68735",
+      "bytes": 27940
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-openapi-runtime.log",
+      "sha256": "6dcf5bbdbdbe889870d5e6bd05b2f493f76689ab910b7198e1cc21db5c83e4fb",
+      "bytes": 318
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-final-build.log",
+      "sha256": "2a2c1eaf3ea513dcb131ced3c394114637eea9f4025a70989947109273976ee7",
+      "bytes": 775
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-authors.log",
+      "sha256": "aff043d268a82f2e8edc0474a37f6f2f5f562795c8ebed576d560a8fae6be9f8",
+      "bytes": 71
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-browser-fixture.json",
+      "sha256": "53e06a10480a92bf9357296de3274d040576a4edae1a59174b649d9ebf9aadc6",
+      "bytes": 667
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-browser-appointments.png",
+      "sha256": "aa9beb98c75c721d4f3ec2e4eff87cc9ac69c2cbe4187862000f17dae45ba8f5",
+      "bytes": 68665
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-confirmed-rules-20260926/organization-browser-approved.png",
+      "sha256": "27407a9089b67107a2a57ee562533496a925c504804f2fa78785bd88c52a8d3f",
+      "bytes": 59942
+    }
+  ]
+}

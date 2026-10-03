@@ -12,6 +12,20 @@ ajv.addFormat('binary', true)
 ajv.addSchema({ $id: 'agentflow', components: spec.components })
 // 历史页明确序列化 null，不能与其他列表的省略语义混淆。
 validate({ $ref: '#/components/schemas/HistoryPage' }, { items: [], nextCursor: null })
+// 组织启用后动态规则尚未解析本轮任职；静态目录仍须具有实际可用成员。
+const assigneeSchema = { $ref: '#/components/schemas/AssigneeOption' }
+validate(assigneeSchema, { rule: 'role:ORG_SUPERVISOR_1', label: '本次任职一级主管', memberCount: 0, contextual: true })
+validate(assigneeSchema, { rule: 'user:bob', label: 'Bob', memberCount: 1 })
+validate(assigneeSchema, { rule: 'role:FINANCE', label: '财务', memberCount: 2, contextual: false })
+for (const value of [
+  { rule: 'user:bob', label: 'Bob', memberCount: 0 },
+  { rule: 'user:bob', label: 'Bob', memberCount: 0, contextual: false },
+  { rule: 'role:ORG_SUPERVISOR_1', label: '本次任职一级主管', memberCount: -1, contextual: true }
+]) assert.equal(validator(assigneeSchema)(value), false, 'invalid assignee count must be rejected')
+validate({ $ref: '#/components/schemas/GraphNode' }, {
+  id: 'call', name: '固定版本子审批', type: 'SUB_PROCESS',
+  properties: { subprocessKey: 'child-approval', subprocessVersion: '1', 'subprocessInput.total': 'amount' }
+})
 const ids = new Set()
 let examples = 0
 for (const methods of Object.values(spec.paths)) for (const operation of Object.values(methods)) {
@@ -38,18 +52,18 @@ async function exercise(base) {
   const completed = new Set(), tokens = {}, statuses = new Set()
   async function call(method, template, options = {}) {
     const operation = spec.paths[template][method.toLowerCase()]
-    const { user = 'admin', status = 200, body, path = template, key = randomUUID() } = options
-    const headers = { 'Content-Type': 'application/json' }
+    const { user = 'admin', status = 200, body, raw, extraHeaders = {}, path = template, key = randomUUID() } = options
+    const headers = { 'Content-Type': raw === undefined ? 'application/json' : 'application/octet-stream', ...extraHeaders }
     if (tokens[user]) headers.Authorization = `Bearer ${tokens[user]}`
     if (operation['x-idempotency']) headers['Idempotency-Key'] = key
     if (body !== undefined) validate(operation.requestBody.content['application/json'].schema, body)
-    const response = await fetch(base + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15000) })
-    const binary = response.ok && operation.responses[String(status)]?.content?.['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+    const response = await fetch(base + path, { method, headers, body: raw ?? (body === undefined ? undefined : JSON.stringify(body)), signal: AbortSignal.timeout(15000) })
+    const binary = response.ok && Object.keys(operation.responses[String(status)]?.content ?? {}).find(type => type !== 'application/json')
     const text = binary ? '' : await response.text(), value = binary ? new Uint8Array(await response.arrayBuffer()) : text ? JSON.parse(text) : undefined
     assert.equal(response.status, status, `${method} ${template}: ${value?.code ?? 'unexpected status'}`)
     const declared = operation.responses[String(status)]
     assert.ok(declared, `undocumented status ${status}`)
-    if (binary) { assert.equal(response.headers.get('content-type'), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); assert.deepEqual([...value.slice(0, 2)], [80, 75]); assert.equal(response.headers.get('cache-control'), 'no-store') }
+    if (binary) { assert.equal(response.headers.get('content-type'), binary); if (binary.includes('spreadsheetml')) assert.deepEqual([...value.slice(0, 2)], [80, 75]); assert.equal(response.headers.get('cache-control'), 'no-store') }
     else if (declared.content) validate(declared.content['application/json'].schema, value)
     else assert.equal(value, undefined)
     if (status < 300 && operation['x-idempotency']) assert.ok(['true', 'false'].includes(response.headers.get('Idempotency-Replayed')))
@@ -92,14 +106,24 @@ async function exercise(base) {
   collidingGraph.edges[0].id = conflictingId
   assert.ok((await call('POST', defs + '/validate', { body: { graph: collidingGraph } })).errors.includes('NODE_EDGE_ID_CONFLICT:' + conflictingId))
   await call('POST', defs + '/simulate', { body: { graph: create.graph, values: {} } })
+  const fieldPreview = example(defs + '/field-preview')
+  assert.equal((await call('POST', defs + '/field-preview', { body: fieldPreview })).payload.amount, '已脱敏')
+  await call('POST', defs + '/field-preview', { body: fieldPreview, user: 'alice', status: 403 })
   await call('POST', defs + '/{id}/simulate', { path: defPath + '/simulate', body: { values: {} } })
   definition = await call('PUT', defs + '/{id}', { path: defPath, body: { name: '接口契约验收流程', graph: create.graph, expectedRevision: definition.revision } })
   definition = await call('POST', defs + '/{id}/publish', { path: defPath + `/publish?expectedRevision=${definition.revision}`, body: example(defs + '/{id}/publish') })
   await call('GET', defs + '/{id}', { path: defPath }); await call('GET', defs)
+  await call('GET', defs + '/{id}/initiator-requirements', { path: defPath + '/initiator-requirements', user: 'alice' })
   await call('GET', defs + '/{id}/publication', { path: defPath + '/publication' })
+  definition = await call('POST', defs + '/{id}/availability', { path: defPath + '/availability', body: { startEnabled: false, expectedRevision: definition.revision, reason: '契约验证停用' } })
+  assert.equal(definition.startEnabled, false)
+  await call('GET', defs + '/{id}/availability-history', { path: defPath + '/availability-history?limit=1' })
+  await call('GET', defs + '/{id}/availability-history', { path: defPath + '/availability-history', user: 'alice', status: 403 })
+  definition = await call('POST', defs + '/{id}/availability', { path: defPath + '/availability', body: { startEnabled: true, expectedRevision: definition.revision, reason: '契约验证恢复' } })
   await call('POST', defs + '/{id}/compare', { path: defPath + '/compare', body: { key: definition.key, name: definition.name, graph: definition.graph, formSchema: definition.formSchema } })
   let application = await call('POST', apps, { user: 'alice', status: 201, body: { ...example(apps), businessNo: `API-${suffix}`, processKey: definition.key } })
   const appPath = `${apps}/${application.id}`
+  await call('GET', apps + '/{id}/initiator-requirements', { path: appPath + '/initiator-requirements', user: 'alice' })
   const revise = { expectedVersion: application.version, title: '接口契约申请', payload: { amount: '100.01' } }, retryKey = randomUUID()
   application = await call('PUT', apps + '/{id}', { user: 'alice', path: appPath, body: revise, key: retryKey })
   assert.deepEqual(await call('PUT', apps + '/{id}', { user: 'alice', path: appPath, body: revise, key: retryKey }), application)
@@ -111,6 +135,12 @@ async function exercise(base) {
   assert.ok(diagram.nodes.some(node => node.state === 'ACTIVE' && node.activeTasks > 0))
   await call('GET', diagramTemplate, { user: 'bob', path: diagramPath, status: 404 })
   await call('GET', diagramTemplate, { user: 'alice', path: appPath + '/rounds/0/diagram', status: 400 })
+  const relationsTemplate = apps + '/{id}/rounds/{roundNo}/subprocesses', relationsPath = appPath + '/rounds/1/subprocesses'
+  const relations = await call('GET', relationsTemplate, { user: 'alice', path: relationsPath })
+  assert.equal(relations.applicationId, application.id); assert.equal(relations.roundNo, 1)
+  assert.deepEqual(relations.children, []); assert.equal(relations.childApplication, false)
+  await call('GET', relationsTemplate, { user: 'bob', path: relationsPath, status: 404 })
+  await call('GET', relationsTemplate, { user: 'alice', path: relationsPath + '?limit=0', status: 400 })
   const commentTemplate = apps + '/{id}/comments', commentPath = appPath + '/comments', commentKey = randomUUID()
   const commentBody = { content: '契约验收：补充审批依据', expectedVersion: application.version }
   const comment = await call('POST', commentTemplate, { user: 'alice', path: commentPath, status: 201, body: commentBody, key: commentKey })
@@ -239,6 +269,13 @@ async function exercise(base) {
   assert.deepEqual(await call('GET', calendars + '/{id}/versions/{revision}', { path: calendarPath + '/versions/1' }), calendar)
   const versions = await call('GET', calendars + '/{id}/versions', { path: calendarPath + '/versions?limit=1' })
   assert.equal(versions.items[0].revision, 2); assert.equal(versions.nextBeforeRevision, 2)
+  const calendarOptions = defs + '/calendar-options'
+  await call('GET', calendarOptions)
+  await call('GET', calendarOptions, { user: 'alice', status: 403 })
+  const optionVersions = await call('GET', calendarOptions + '/{id}/versions', { path: calendarOptions + '/' + calendar.id + '/versions?limit=1' })
+  assert.equal(optionVersions.items[0].revision, 2)
+  const fixedOption = await call('GET', calendarOptions + '/{id}/versions/{revision}', { path: calendarOptions + '/' + calendar.id + '/versions/1' })
+  assert.equal(fixedOption.revision, 1); assert.equal(fixedOption.name, calendar.name); assert.equal(fixedOption.rules, undefined)
   for (const [revision, dueAt] of [[1, '2026-09-28T02:30:00Z'], [2, '2026-09-29T02:30:00Z']]) {
     const calculation = await call('POST', calendars + '/{id}/calculate', { path: calendarPath + '/calculate', body: { revision, startLocal: '2026-09-25T17:30:00', workingMinutes: 120 } })
     assert.equal(calculation.revision, revision); assert.equal(calculation.deadline.dueAt, dueAt)
@@ -260,6 +297,59 @@ async function exercise(base) {
     await call('GET', wh + '/deliveries/{id}', { path: wh + '/deliveries/' + item.id })
     assert.ok(!JSON.stringify(item).includes('payload_json'))
   }
+  // 最后启用独立测试租户的本地组织，避免改变前面的演示目录验收前提。
+  const fileOptions = await call('GET', '/api/v1/attachments/options', { user: 'alice' })
+  const fileTemplate = apps + '/{applicationId}/attachments', fileContent = fileTemplate + '/{id}/content'
+  if (fileOptions.enabled) {
+    const fileCreate = example(defs); fileCreate.key = `attachment-contract-${suffix}`
+    fileCreate.formSchema = { schemaVersion: 1, fields: [{ key: 'proof', label: '证明附件', type: 'ATTACHMENT', required: false, sensitive: true }] }
+    let fileDefinition = await call('POST', defs, { body: fileCreate })
+    fileDefinition = await call('POST', defs + '/{id}/publish', { path: defs + '/' + fileDefinition.id + '/publish?expectedRevision=' + fileDefinition.revision, body: example(defs + '/{id}/publish') })
+    let fileApp = await call('POST', apps, { user: 'alice', status: 201, body: { businessNo: `FILE-${suffix}`, processKey: fileDefinition.key, definitionVersion: fileDefinition.version, title: '附件契约验收', payload: {} } })
+    const filePath = apps + '/' + fileApp.id + '/attachments', input = example(fileTemplate), fileKey = randomUUID()
+    input.expectedVersion = fileApp.version
+    const attachment = await call('POST', fileTemplate, { user: 'alice', path: filePath, status: 201, body: input, key: fileKey })
+    assert.deepEqual(await call('POST', fileTemplate, { user: 'alice', path: filePath, status: 201, body: input, key: fileKey }), attachment)
+    const itemPath = filePath + '/' + attachment.id
+    assert.equal((await call('PUT', fileContent, { user: 'alice', path: itemPath + '/content', raw: Buffer.from('abc'), extraHeaders: { 'X-Application-Version': String(fileApp.version) } })).status, 'READY')
+    assert.equal((await call('GET', fileTemplate + '/{id}', { user: 'alice', path: itemPath })).sha256, input.sha256)
+    assert.equal(Buffer.from(await call('GET', fileContent, { user: 'alice', path: itemPath + '/content' })).toString(), 'abc')
+    await call('GET', fileContent, { user: 'admin', path: itemPath + '/content', status: 403 })
+    fileApp = await call('PUT', apps + '/{id}', { user: 'alice', path: apps + '/' + fileApp.id, body: { expectedVersion: fileApp.version, title: fileApp.title, payload: { proof: [attachment.id] } } })
+    await call('POST', apps + '/{id}/submit', { user: 'alice', path: apps + '/' + fileApp.id + '/submit', body: { expectedVersion: fileApp.version } })
+    assert.equal(Buffer.from(await call('GET', fileContent, { user: 'alice', path: itemPath + '/content?roundNo=1' })).toString(), 'abc')
+  } else {
+    const unavailable = apps + '/' + randomUUID() + '/attachments', itemPath = unavailable + '/' + randomUUID()
+    await call('POST', fileTemplate, { user: 'alice', path: unavailable, status: 503, body: example(fileTemplate) })
+    await call('PUT', fileContent, { user: 'alice', path: itemPath + '/content', status: 404, raw: Buffer.from('abc'), extraHeaders: { 'X-Application-Version': '1' } })
+    await call('GET', fileTemplate + '/{id}', { user: 'alice', path: itemPath, status: 404 })
+    await call('GET', fileContent, { user: 'alice', path: itemPath + '/content', status: 404 })
+  }
+  const org = '/api/v1/organization'
+  await call('GET', org + '/my-appointments', { user: 'alice' })
+  await call('GET', org)
+  await call('GET', org, { user: 'alice', status: 403 })
+  const initKey = randomUUID()
+  await call('POST', org + '/initialize', { status: 201, key: initKey })
+  await call('POST', org + '/initialize', { status: 201, key: initKey })
+  let company = await call('POST', org + '/units', { status: 201, body: example(org + '/units') })
+  const department = await call('POST', org + '/units', { status: 201, body: { kind: 'DEPARTMENT', name: '验收部门', legalEntityId: company.id, active: true } })
+  const position = await call('POST', org + '/units', { status: 201, body: { kind: 'POSITION', name: '验收岗位', legalEntityId: company.id, active: true } })
+  company = await call('PUT', org + '/units/{id}', { path: org + '/units/' + company.id, body: { name: '修订法人', active: true, expectedRevision: 1 } })
+  assert.equal(company.revision, 2)
+  let person = await call('POST', org + '/people', { status: 201, body: example(org + '/people') })
+  let appointment = await call('POST', org + '/appointments', { status: 201, body: { personId: person.id, departmentId: department.id, positionId: position.id, active: true } })
+  await call('PUT', org + '/units/{id}/head', { path: org + '/units/' + department.id + '/head', body: { appointmentId: appointment.id, expectedRevision: department.revision } })
+  appointment = await call('PUT', org + '/appointments/{id}/supervisor', { path: org + '/appointments/' + appointment.id + '/supervisor', body: { appointmentId: null, expectedRevision: appointment.revision } })
+  appointment = await call('PUT', org + '/appointments/{id}', { path: org + '/appointments/' + appointment.id, body: { active: false, expectedRevision: appointment.revision } })
+  assert.equal(appointment.active, false)
+  person = await call('PUT', org + '/people/{id}', { path: org + '/people/' + person.id, body: { displayName: '已停用审批人', active: false, approvalEligible: true, expectedRevision: 1 } })
+  assert.equal(person.active, false)
+  await call('GET', org + '/units', { path: org + '/units?kind=LEGAL_ENTITY' })
+  await call('GET', org + '/people')
+  await call('GET', org + '/appointments')
+  await call('GET', org + '/changes')
+  await call('GET', org + '/people', { path: org + '/people?tenantId=foreign', status: 400 })
   assert.deepEqual([...completed].sort(), [...ids].sort())
   console.log(JSON.stringify({ result: 'PASS', base, operations: completed.size, statuses: [...statuses].sort(), processKey: definition.key, approved: application.id, withdrawn: withdrawn.id }))
 }

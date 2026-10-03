@@ -23,7 +23,7 @@ public class JdbcDefinitionCatalogAdapter implements DefinitionCatalogPort {
     public List<Item> search(String tenantId, Query query) {
         var arguments = new ArrayList<Object>(List.of(tenantId));
         StringBuilder sql = new StringBuilder("""
-                SELECT id,process_key,name,status,version,revision,created_at,updated_at
+                SELECT id,process_key,name,status,version,revision,start_enabled,created_at,updated_at
                 FROM approval_definition WHERE tenant_id=?
                 """);
         if (!query.text().isEmpty()) {
@@ -32,6 +32,7 @@ public class JdbcDefinitionCatalogAdapter implements DefinitionCatalogPort {
             arguments.addAll(List.of(pattern, pattern));
         }
         if (!query.status().isEmpty()) { sql.append(" AND status=?"); arguments.add(query.status()); }
+        if (query.startEnabled() != null) { sql.append(" AND start_enabled=?"); arguments.add(query.startEnabled()); }
         if (!query.processKey().isEmpty()) { sql.append(" AND process_key=?"); arguments.add(query.processKey()); }
         if (query.version() != null) { sql.append(" AND version=?"); arguments.add(query.version()); }
         if (query.beforeTime() != null) {
@@ -41,6 +42,6 @@ public class JdbcDefinitionCatalogAdapter implements DefinitionCatalogPort {
         sql.append(" ORDER BY created_at DESC,id DESC LIMIT ?"); arguments.add(query.limit() + 1);
         return jdbc.query(sql.toString(), (row, index) -> new Item(UUID.fromString(row.getString("id")),
                 row.getString("process_key"), row.getString("name"), row.getString("status"), row.getLong("version"),
-                row.getLong("revision"), row.getTimestamp("created_at").toInstant(), row.getTimestamp("updated_at").toInstant()), arguments.toArray());
+                row.getLong("revision"), row.getBoolean("start_enabled"), row.getTimestamp("created_at").toInstant(), row.getTimestamp("updated_at").toInstant()), arguments.toArray());
     }
 }

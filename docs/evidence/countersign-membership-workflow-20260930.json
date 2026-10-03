@@ -1,0 +1,142 @@
+{
+  "status": "PASS_LOCAL_PUBLIC_WORKFLOW",
+  "recordedAt": "2026-10-01T03:32:30.992870+00:00",
+  "baseCommit": "bae118b47819b5b4f48484556dd41bddd50aab05",
+  "migrationAdded": false,
+  "actualDatabase": {
+    "schema": "86",
+    "applications": 2,
+    "historicalTasks": 9,
+    "canceledTasks": 2
+  },
+  "publicWorkflowComplete": true,
+  "actualBrowserAcceptance": true,
+  "tests": {
+    "h2RelatedDomain": 7,
+    "h2RelatedServer": 97,
+    "finalH2ApiWorkspaceSearchAndContract": 42,
+    "finalPostgresDomain": 7,
+    "finalPostgresApi": 17,
+    "frontendRelated": 49,
+    "typecheckAndBuild": "PASS",
+    "scopesOverlap": true
+  },
+  "testLogs": {
+    "h2Related": "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-api-h2.log",
+    "finalH2": "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-handled-green.log",
+    "finalPostgres": "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-final-postgres.log",
+    "frontend": "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-frontend-final.log",
+    "frontendBuild": "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-frontend-final-build.log",
+    "parentRefreshFailureReproduced": "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-parent-red.log",
+    "handledActionsFailureReproduced": "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-handled-red.log"
+  },
+  "contract": {
+    "operations": 259,
+    "schemas": 528,
+    "requestExamples": 101,
+    "actualHttp": {
+      "status": "PASS",
+      "jsonResponses": 68,
+      "binaryDownloads": 2,
+      "totalResponses": 70
+    }
+  },
+  "runtime": {
+    "database": "countersign_ui_acc1039945c5",
+    "backendPort": 18215,
+    "frontendPort": 15315,
+    "container": "agentflow-attachments-postgres-20260928",
+    "backendPid": 13728
+  },
+  "http": {
+    "applicationId": "d32779e6-cbb3-423f-b5ad-fda6997d5b09",
+    "status": "APPROVED",
+    "actualJsonResponses": 68,
+    "binaryDownloads": 2,
+    "maskedAndHiddenAttachmentsDenied": true,
+    "allowedAttachmentDigestsMatch": true,
+    "currentActorAndRoundPermissions": true
+  },
+  "browser": {
+    "applicationId": "7b056607-596c-42b8-af6d-586f11554638",
+    "status": "APPROVED",
+    "version": 9,
+    "cancelNoWrite": true,
+    "addRemoveAndReadd": true,
+    "readdUsesDifferentTask": true,
+    "actualApprovalActors": [
+      "finance",
+      "admin",
+      "bob"
+    ],
+    "afterOriginalApproversStillInApproval": true,
+    "originalMembersPreserved": [
+      "admin",
+      "finance"
+    ],
+    "completedOpinionsPreserved": true,
+    "successfulChangeReloadsTask": true,
+    "handledFilterVerified": true,
+    "handledRowsForThisApplication": 4,
+    "actualViewport": {
+      "innerWidth": 500,
+      "documentScrollWidth": 480,
+      "bodyScrollWidth": 480,
+      "horizontalOverflow": false
+    },
+    "notifications": {
+      "pending": 2,
+      "removed": 1,
+      "removedTargetTaskId": "56b54823-bd45-11f1-b48c-ee92ae4b8ffe"
+    },
+    "screenshots": [
+      "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-500.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-complete.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-audit.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/countersign-membership-handled.png"
+    ]
+  },
+  "restarts": {
+    "inProgress": {
+      "status": "PASS",
+      "identicalAfterRestart": true,
+      "completedRequestReplayIdentical": true,
+      "pendingTaskIds": [
+        "1c768ba7-bd45-11f1-b48c-ee92ae4b8ffe",
+        "dd26656a-bd45-11f1-b48c-ee92ae4b8ffe"
+      ],
+      "filesPreserved": 3
+    },
+    "finalPackage": {
+      "status": "PASS",
+      "businessAndFilesPreserved": true,
+      "handled": {
+        "ADD_SIGNER": 2,
+        "REMOVE_SIGNER": 1
+      },
+      "originalReceiptUnchanged": true,
+      "jarSha256": "102c082ff860f6eb49f1d378f36c34e2229e271f2d5c28563eb442068aa4a74b"
+    }
+  },
+  "authorCheck": {
+    "javaFiles": 1135,
+    "namedTypes": 2194,
+    "missingTags": 0,
+    "parseErrors": 0
+  },
+  "knownBoundary": "Only current ALL nodes on the current acyclic graph. Repeated activation and subprocess support require explicit historical activation binding first. Older binaries do not understand TASK_COUNTERSIGN_REMOVED; restore their corresponding database backup for rollback.",
+  "preservedFinancialRuntime": {
+    "backendPort": 18214,
+    "schema": 86,
+    "changedByThisFeature": false
+  },
+  "remainingPackages": 4,
+  "remoteConfigured": false,
+  "remotePr": null,
+  "pending": [
+    "Other countersign policies, events, timers, subprocess, instance operations and bounded batch handling",
+    "External notification channels, mentions, preferences and escalation/pause rules",
+    "Real enterprise finance policies and budget/ERP/bank/invoice integration acceptance",
+    "Real model and IdP integration, production recovery/capacity/alerts, remote PR and CI"
+  ]
+}

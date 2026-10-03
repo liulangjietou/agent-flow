@@ -1,0 +1,495 @@
+{
+  "date": "2026-10-01",
+  "scope": "固定版本子流程公开保存、更新、发布、模板创建及完整本地生命周期验收",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "baseCommit": "b77c40fcad92fc1967a4442c5ce3f474df153a66",
+  "publicBehavior": {
+    "save": "合法结构可保存为草稿；缺失依赖仍可修正",
+    "publish": "发布复查完整依赖、精确版本、输入及敏感权限；失败不产生发布或引擎副作用",
+    "access": "保留管理员和流程管理员的原管理权限；父子读取独立授权，管理员受敏感字段约束",
+    "runtime": "父子按已保存版本与原轮次启动、返回、暂停、恢复及终止；同键恢复沿用原操作"
+  },
+  "regression": {
+    "h2": {
+      "tests": 141,
+      "classes": [
+        {
+          "class": "approval.SubprocessPublicApiIntegrationTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-h2-SubprocessPublicApiIntegrationTest.xml",
+          "sha256": "9e10b8267bca4339b928055bd28a18ba4ada3279cc42320c8f650bee176ad391"
+        },
+        {
+          "class": "definition.DefinitionPreviewIntegrationTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-h2-DefinitionPreviewIntegrationTest.xml",
+          "sha256": "caee61fa818c5e918011371df21ec6a9f797b451a7fbc05c0eacd597967e92da"
+        },
+        {
+          "class": "definition.SubprocessDeploymentIntegrationTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-h2-SubprocessDeploymentIntegrationTest.xml",
+          "sha256": "3a685886477d2fd09669b29ef378907ed1b8342d2de974975bed722e0646f344"
+        },
+        {
+          "class": "definition.DefinitionApplicationServiceTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-h2-DefinitionApplicationServiceTest.xml",
+          "sha256": "78964dfa9e13f0a5cef4282cd59b581949485fd3bab3859f5a08b481e0b365b3"
+        },
+        {
+          "class": "definition.DefinitionPublicationIntegrationTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-h2-DefinitionPublicationIntegrationTest.xml",
+          "sha256": "c7d7c452886b447bf1510953a3dee3bdcdafa921462616a94467773297902e17"
+        },
+        {
+          "class": "definition.DefinitionSecurityTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-h2-DefinitionSecurityTest.xml",
+          "sha256": "71f16f167f9262ac568c675e6dd6587e7c023af501cad3c2585f983b3223076f"
+        },
+        {
+          "class": "template.ProcessTemplateIntegrationTest",
+          "tests": 29,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-h2-ProcessTemplateIntegrationTest.xml",
+          "sha256": "bab0f7e72d5c57d99de7c05f09cfcbf46869950c35eaa231b61759aea9a7cb2b"
+        },
+        {
+          "class": "approval.SubprocessStartIntegrationTest",
+          "tests": 40,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-h2-SubprocessStartIntegrationTest.xml",
+          "sha256": "b83c7e243315b2b238c3a867d147d8f93f54269a9676419e2f1799e53ce14894"
+        },
+        {
+          "class": "definition.SubprocessDefinitionResolverIntegrationTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-h2-SubprocessDefinitionResolverIntegrationTest.xml",
+          "sha256": "2b71db3f0465cbb56cd81d9632d769a62812e2b343446a6b4fdde37a8993dc18"
+        },
+        {
+          "class": "definition.InitiatorRequirementsQueryIntegrationTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-h2-InitiatorRequirementsQueryIntegrationTest.xml",
+          "sha256": "03e95a6099a6ea7c0476c69f763b1d04604f31740838b725951f8ccabd182662"
+        }
+      ]
+    },
+    "postgres": {
+      "tests": 22,
+      "classes": [
+        {
+          "class": "approval.SubprocessPublicApiIntegrationTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-postgres-SubprocessPublicApiIntegrationTest.xml",
+          "sha256": "08be16db0c29594979cfa038066cd0afad06311d1c23c30b52b31a1fd6dfff98"
+        },
+        {
+          "class": "definition.SubprocessDeploymentIntegrationTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-postgres-SubprocessDeploymentIntegrationTest.xml",
+          "sha256": "c2555676c3005c5a9328ca4b90ba7b321dee3d8bc5e62b51ae28f7ca5bcf0afd"
+        }
+      ]
+    },
+    "counting": "PostgreSQL 重复验证新增公开接口与部署范围，不与 H2 相加为唯一用例数；此前各阶段范围有重叠。",
+    "initialRed": "修正组织夹具后 7 项公开接口测试均因原 SUBPROCESS_RUNTIME_NOT_READY 失败；开放入口后同组通过。"
+  },
+  "contractFixes": [
+    {
+      "issue": "组织初始化后动态选人规则尚未按任职解析，实际 memberCount 为 0，旧契约却要求至少 1。",
+      "cause": "旧测试只使用未初始化演示目录；静态检查没有动态响应样例。",
+      "fix": "contextual=true 时允许非负人数，静态或省略 contextual 时继续要求至少 1；先补失败契约断言。"
+    },
+    {
+      "issue": "公开图节点响应包含 SUB_PROCESS，但 GraphNode.type 未列出该值。",
+      "cause": "此前公开写入关闭，实际返回没有覆盖此类型。",
+      "fix": "先补失败图节点契约样例，再补枚举和固定引用输入说明；真实接口响应复验通过。"
+    }
+  ],
+  "http": {
+    "businessResponses": 111,
+    "phases": [
+      {
+        "status": "PASS",
+        "phase": "prepare",
+        "responses": 57,
+        "contracts": 57
+      },
+      {
+        "status": "PASS",
+        "phase": "resume",
+        "responses": 48,
+        "contracts": 48
+      },
+      {
+        "status": "PASS",
+        "phase": "verify",
+        "responses": 6,
+        "contracts": 6
+      }
+    ],
+    "authenticationResponsesExcluded": true,
+    "cases": [
+      "实际公开创建、修改、发布与同键回放",
+      "发布子 V2 后父 V1 仍调用子 V1",
+      "普通账号管理拒绝、匿名拒绝、父子审批人读取隔离和管理员敏感原文限制",
+      "子申请独立撤回拒绝、根暂停后子任务不可办理及原任务恢复",
+      "子退回令根退回，重提新轮次保留旧调用；子驳回令根驳回",
+      "根暂停后具名终止取消活动后代",
+      "三份修复前在审报销经最终 JAR 继续原财务任务、后置子审批并批准"
+    ]
+  },
+  "browser": {
+    "businessResponses": 77,
+    "allResponsesConformToOpenApi": true,
+    "url": "http://127.0.0.1:15329/",
+    "applicationId": "78c7642c-934d-42a7-ab15-20e013605d04",
+    "businessNo": "BROWSER-SUBPROCESS-MUPP1D25",
+    "status": "APPROVED",
+    "children": [
+      "77bcb955-163f-4d10-b0a4-c6e9afa48ee6",
+      "da338bb2-8ac1-49e9-b65c-297b58b14e63"
+    ],
+    "cases": [
+      "原父草稿页面保存并发布 V1",
+      "实际模板文件下载、重新导入、创建独立草稿并发布 V1",
+      "alice 从页面创建并提交 128 元合成普通申请",
+      "在审重启后 manager、finance、manager 顺序办理；两个子调用均为 V1",
+      "父节点 finance 只见脱敏说明，admin 不见敏感原文",
+      "500 CSS 像素无横向溢出，双向关联可打开原轮次",
+      "第二次最终 JAR 重启后页面仍显示根及两个子轮次批准"
+    ],
+    "download": {
+      "source": "/Users/zhangfuqiang/Downloads/agentflow-process-template (2).json",
+      "preserved": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-downloaded-template.json",
+      "bytes": 2760,
+      "sha256": "e27f14fcf8441d63b47cef7f63c5abafb64adaa9fce838e70d0359274ce46812",
+      "name": "页面固定版本子流程验收",
+      "key": "browser-parent-mupp1d25",
+      "subprocesses": [
+        {
+          "id": "first",
+          "properties": {
+            "subprocessKey": "public-child-mupp1d25",
+            "subprocessVersion": "1",
+            "subprocessInput.total": "amount"
+          }
+        },
+        {
+          "id": "last",
+          "properties": {
+            "subprocessKey": "public-child-mupp1d25",
+            "subprocessVersion": "1",
+            "subprocessInput.total": "amount"
+          }
+        }
+      ],
+      "downloadEvent": "Timed out; actual UI link click saved file and content was verified"
+    },
+    "viewport": {
+      "dialogs": [
+        {
+          "rect": {
+            "height": 828,
+            "width": 476,
+            "x": 12,
+            "y": 36
+          },
+          "scrollWidth": 456,
+          "width": 456
+        }
+      ],
+      "height": 900,
+      "scrollWidth": 500,
+      "width": 500,
+      "parentChildNavigationPassed": true
+    },
+    "notes": [
+      "下载自动事件回执超时，实际链接点击后文件落盘；核对真实文件内容、大小、摘要后用于导入，未合成替代文件。",
+      "演示登录会话在后端重启后失效；重新登录后核对原业务记录。"
+    ]
+  },
+  "runtime": {
+    "database": "subprocess_public_786ca8f4fe",
+    "sourceDatabase": "expense_subprocess_red_0a72cfb3c5",
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-server-final.jar",
+    "jarSha256": "1b4dc1494a2e1f31a4e4b10577d4c1bbaacc22f50a7bdedc7c7ca1b60bf6cf10",
+    "backendPort": 18230,
+    "frontendPort": 15329,
+    "schemaVersion": 90,
+    "newMigrations": 0,
+    "finalJarAcceptanceBoots": [
+      3,
+      4,
+      5
+    ],
+    "restarts": [
+      {
+        "tables": 221,
+        "rows": 929,
+        "files": 3,
+        "allTablesAndFilesUnchanged": true,
+        "bootBefore": 3,
+        "bootAfter": 4
+      },
+      {
+        "tables": 221,
+        "rows": 1059,
+        "files": 3,
+        "allTablesAndFilesUnchanged": true,
+        "bootBefore": 4,
+        "bootAfter": 5
+      }
+    ],
+    "preservation": {
+      "sourceTablesUnchanged": 221,
+      "sourceRowsUnchanged": 580,
+      "sourceFilesUnchanged": 3,
+      "protectedFinancialTablesUnchanged": 114,
+      "originalCallsUnchanged": 3,
+      "newCallsWithActivityIdentity": 10,
+      "totalCalls": 13,
+      "allNewCallsMatchNativeHistory": true,
+      "counts": {
+        "voucher_preparation": 3,
+        "voucher_operation": 0,
+        "payment_authorization": 0,
+        "act_ru_task": 0
+      },
+      "finalTables": 221,
+      "finalRows": 1059,
+      "finalFiles": 3
+    },
+    "outboundWorkersEnabled": false,
+    "previousServicesReplaced": false
+  },
+  "build": {
+    "frontendTypecheckAndBuild": "PASS",
+    "serverPackage": "PASS",
+    "openapi": {
+      "operations": 283,
+      "schemas": 554,
+      "requestExamples": 109,
+      "status": "PASS"
+    }
+  },
+  "limitations": [
+    "全部资金、身份和审批数据均为本地合成验收数据，不代表企业财务、真实 IdP 或生产环境验收。",
+    "高级流程的其余明确失败恢复、安全批量操作和其他工作包继续；不计为整个项目完成。",
+    "未配置 Git remote，未创建或运行远端 PR/CI。"
+  ],
+  "sources": [
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/definition/DefinitionApplicationService.java",
+      "sha256": "ee8d9a884868ca07f721d4531e292b163e1bdb81ce0081c2c11595b2cab7e523"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/approval/SubprocessPublicApiIntegrationTest.java",
+      "sha256": "a3e6e574ca225b006dff28d5ce350b08e702b91003afdafcd4a655783f89cac2"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/approval/SubprocessStartIntegrationTest.java",
+      "sha256": "67e0a5e9690464ae6cdb12dad4c1e805904c241d26800cd3d837fbd808439a6a"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/definition/DefinitionPreviewIntegrationTest.java",
+      "sha256": "a1f7d718fdc11a94891488f95d3fef4130b244020a1010d299a73abfaee92684"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/definition/SubprocessDeploymentIntegrationTest.java",
+      "sha256": "4c706194a6360df4eb1fd0d771f46e6eba4fb29e24ed47023e389b9b86394f92"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "d14193984d0ac90c78b0de5aa01d57a0623d210dba357211e58f624a19580cc6"
+    },
+    {
+      "path": "agentflow-web/scripts/check-openapi.mjs",
+      "sha256": "3854766ca982eb20c297d2eb675f0fe477ae68a79b5f1c74a05e8e358bf4d42e"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-red-valid-fixture-report.xml",
+      "bytes": 86234,
+      "sha256": "3aa2b70d514b5c6547ade83429641e91b9e8354a0bf7a9520b9d121f6b146343"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-assignee-contract-red.log",
+      "bytes": 767,
+      "sha256": "3148700e2cbd5b4b462117ec87cd1a31a9b77beb1d9cbd6b47d53fb637f15ffa"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-assignee-runtime-red.json",
+      "bytes": 2308,
+      "sha256": "e838c8faaf052edbd2bf9afe8a2fb7da74d2ed51b7ea5d4aa82e2ed40975ec63"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-node-contract-red.log",
+      "bytes": 860,
+      "sha256": "4f33208241f5491b77320e821cc060ed0d6c78949a669142ffcbd03bfd8661ed"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-node-runtime-red.json",
+      "bytes": 10826,
+      "sha256": "ab280413f6ec1fb0bf8dd5e461bce7e055080bfb55a5073d8ac7b22179dbf1c5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-h2-tests.json",
+      "bytes": 3372,
+      "sha256": "8dcf8ed3eda26e253cbc9c5c912ba2c6f30f0523954e5cea8122ef596ad00751"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-postgres-tests.json",
+      "bytes": 692,
+      "sha256": "45ff576d83ec9ee0fc34851221bafe869af851929a7b70f1842f627259c1a110"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-http-prepare.json",
+      "bytes": 65266,
+      "sha256": "562d8b7fa6fd05f263dd7c23e1a233a874815b43f3ea6df74876989c5ef3fc65"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-http-resume.json",
+      "bytes": 44049,
+      "sha256": "486041f9af1a4cb1fcefae91eb3083f38503abdb1afe7315563f35863a447feb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-http-verify.json",
+      "bytes": 7170,
+      "sha256": "9b865bc21cbc80ece9ba3f2090e887b4d6a87fc372f2b41cdd24ad9abaec0b49"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-browser-http.json",
+      "bytes": 90511,
+      "sha256": "64104b8eb4f969e11f4f9f3cf6392222d50c158430901877bf40768336360610"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-browser-contract.json",
+      "bytes": 15514,
+      "sha256": "2d63af209e6889c3e1a93690bde48fbf58558ac52bb1114812544d024048d38e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-before-restart1.json",
+      "bytes": 23865,
+      "sha256": "c8b5f527c5b082da1533650595d9fa5d7a2335b8350d85f15993de94ef6446b1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-before-restart2.json",
+      "bytes": 23863,
+      "sha256": "481860590ec893358b15ff4802334f5725bc1eed1fba19d542a141a7d1733f48"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-restart1-preservation.json",
+      "bytes": 124,
+      "sha256": "976ce64ecc67137b3b2a28797c50ee8c3654aca502d806857669ba3ad03aaba9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-restart2-preservation.json",
+      "bytes": 125,
+      "sha256": "80a19c8d6da4aebd8e56b1f3fdba3ef54dd62f9a8d9115488541b076ad707b31"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-final-data.json",
+      "bytes": 460,
+      "sha256": "9ba54d1d66fbb5a189d3726e321838336f94bb94c98a749497160e9843245c6b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-download-receipt.json",
+      "bytes": 859,
+      "sha256": "d1abbad98f42714e1d2ef8c4f8dda735c763e431d7a3bae2c5b661e423632fae"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-downloaded-template.json",
+      "bytes": 2760,
+      "sha256": "e27f14fcf8441d63b47cef7f63c5abafb64adaa9fce838e70d0359274ce46812"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-viewport.json",
+      "bytes": 277,
+      "sha256": "d78757e3a368cf794ee30d5ea12f700ca69ca53c4b384cc3996c5f1782335ea1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-final-approved.jpg",
+      "bytes": 105808,
+      "sha256": "39f4f4e3959dd69a7c81c299b62886c7726cad427f8252227c6a4d745ccc88bd"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-finance-masked.jpg",
+      "bytes": 85319,
+      "sha256": "b154a09a4b44cc20acc954356d9f433374d645be7064f97483411eac437205cb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-template-published.jpg",
+      "bytes": 83579,
+      "sha256": "03c6f5d45b3bcd8fc83c3e779a931dc2e1e296938a0c264a54fc4139c2ea7538"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-500px.jpg",
+      "bytes": 30190,
+      "sha256": "ec3042d3e18af6d5fd358c19c2393a6f73bc578996c759b09aca1869a3799049"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-frontend-build.log",
+      "bytes": 781,
+      "sha256": "a12af763c173f26eda2e1b4e225ea270a1d126fc3dbffe9056615a41bb7273a2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-contract-final.log",
+      "bytes": 141,
+      "sha256": "091af7fe5cd311586246dc630e7476e91415c57984d689e81929ca3126c6d871"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-public-final-package.log",
+      "bytes": 9613,
+      "sha256": "67e8917ea1141d9eab34274dd2e6a847b3600b3887caef5b6b59499c9221f633"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/exercise-subprocess-public.mjs",
+      "bytes": 12292,
+      "sha256": "ee39d779222f61b91e507e061377fd3d3251e7101f2a823875cbef926016e114"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/verify-subprocess-public-browser.mjs",
+      "bytes": 1799,
+      "sha256": "3086198a3fce68d0b0550e3d4c82f18c3b168efed2cd16d0c024c40f5dbcc9c6"
+    }
+  ]
+}

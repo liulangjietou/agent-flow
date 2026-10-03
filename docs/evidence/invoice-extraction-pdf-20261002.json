@@ -1,0 +1,178 @@
+{
+  "date": "2026-10-02",
+  "status": "PDF_ADAPTER_SCOPE_PASS_FEATURE_INCOMPLETE",
+  "baseCommit": "a52714353cd1d1a962213f1dd401c7e81c78f72a",
+  "implemented": [
+    "完整原始 PDF 以固定文件名和内联 file_data 发送",
+    "独立 JVM 严格解析和实际唯一叶子页数检查",
+    "拒绝加密、零页、超过 10 页、伪造页数和畸形页树",
+    "JVM 资源上限、超时／中断终止、独立目录清理及单进程槽",
+    "固定原件与实际页数复核，模型伪造页码拒绝"
+  ],
+  "notImplemented": [
+    "OFD 内容适配",
+    "持久运行、租约、轨迹与数据库迁移",
+    "公开 API、外发同意与票夹页面",
+    "完整新功能 HTTP／浏览器／非空升级／重启验收",
+    "真实企业模型 PDF 能力与识别质量验收"
+  ],
+  "tests": {
+    "uniqueTotal": 62,
+    "newTests": 10,
+    "suites": [
+      {
+        "module": "agentflow-domain",
+        "class": "io.agentflow.agent.InvoiceExtractionRunTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoiceExtractionModelTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoicePdfSourceTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoicePdfInspectorTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.InvoiceExtractionXmlTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.agent.DraftAssistIntegrationTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "module": "agentflow-server",
+        "class": "io.agentflow.expense.InvoiceXmlOriginalTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "red": {
+      "suite": "InvoicePdfSourceTest",
+      "tests": 5,
+      "failures": 4,
+      "errors": 1,
+      "reason": "PDF source adapter was not implemented; supported formats rejected PDF before parsing"
+    },
+    "logs": [
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-pdf-red.log",
+        "sha256": "c5ec87b756dc6473bdacfcc3781c2fad8776f173341bef295b83290aee491bf3"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-pdf-scope.log",
+        "sha256": "4981eea221c12d1b6f6e301dc324faf89772cc6fe867588f6e697356571be99f"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-pdf-package-regression.log",
+        "sha256": "92f26420cf1d741a4c02c3d775723abb28897d5aa8c2847a1a7a80597458540b"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-pdf-packaged-probe.log",
+        "sha256": "166e50d17ebb858cdbaf0939ee1da06c29e8e4ce24e285a076117c0f5960a622"
+      }
+    ],
+    "scopeOverlap": "与 XML 阶段及领域基础阶段有重叠，不累计历轮测试数量；本轮没有更改数据库或 HTTP 契约。"
+  },
+  "packagedProbe": {
+    "status": "PASS",
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/invoice-pdf-server.jar",
+    "jarSha256": "d101f489b7e6e03f329a1ace2d96a917b5940ce9f60a6ad01504db962f914ef9",
+    "result": "PDF_PACKAGED_PROBE_OK pages=3",
+    "parentMain": "io.agentflow.agent.InvoicePdfPackagingProbe",
+    "testClassesOnlyInExternalLoaderPath": true,
+    "childMain": "io.agentflow.agent.InvoicePdfWorker",
+    "childClassPath": "same executable jar only; loader.path cleared",
+    "launcher": "org.springframework.boot.loader.launch.PropertiesLauncher",
+    "springStarted": false,
+    "pdfBoxVersion": "3.0.8",
+    "testProbeIncludedInJar": false
+  },
+  "limits": {
+    "originalBytes": 20971520,
+    "pages": 10,
+    "pageTreeDepth": 16,
+    "pageTreeNodes": 128,
+    "mediaBoxMaximumDimensionPoints": 3000,
+    "workerHeapMiB": 256,
+    "workerDirectMemoryMiB": 64,
+    "workerMetaspaceMiB": 128,
+    "workerStackKiB": 512,
+    "executionSeconds": 15,
+    "terminationWaitSeconds": 5,
+    "concurrentWorkers": 1,
+    "resultBytes": 8
+  },
+  "boundary": {
+    "encryptedPdfAccepted": false,
+    "partialDocumentSent": false,
+    "nativePdfBytesSentInFull": true,
+    "fixedTransportFilename": "invoice.pdf",
+    "embeddedMetadataRemoved": false,
+    "workerInheritsEnvironment": false,
+    "renderingPerformed": false,
+    "signatureValidated": false,
+    "taxVerified": false,
+    "osPermissionSandbox": false,
+    "allNativeMemoryBounded": false
+  },
+  "validationLimits": {
+    "syntheticPdfFixturesOnly": true,
+    "loopbackSyntheticModelHttp": true,
+    "modelEvidenceQuoteAccuracyVerified": false,
+    "newInvoiceApplicationHttp": false,
+    "realModelAccuracy": false,
+    "originalStorageMockedInSourceTests": true,
+    "existingXmlStorageAndDraftRegressionIncluded": true,
+    "pdfWorkerPidsAfterValidation": [],
+    "pdfTemporaryDirectoriesAfterValidation": [],
+    "existingRuntimeReplaced": false,
+    "preservedV99JarSha256": "48e23c291fcaf551eacc006044e7e66910546bef10d04eab2872f676e6e081d5",
+    "schemaVersionUnchanged": 99,
+    "remainingTopLevelCategories": 6
+  },
+  "sources": [
+    {
+      "title": "PDFBox 3 Getting Started",
+      "url": "https://pdfbox.apache.org/3.0/getting-started.html"
+    },
+    {
+      "title": "PDFBox Security",
+      "url": "https://pdfbox.apache.org/security.html"
+    },
+    {
+      "title": "OpenAI PDF file inputs",
+      "url": "https://developers.openai.com/api/docs/guides/file-inputs"
+    }
+  ]
+}

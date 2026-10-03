@@ -1,0 +1,178 @@
+{
+  "recordedAt": "2026-10-01T12:30:41.672164+00:00",
+  "status": "LOCAL_TERMINATION_RUNTIME_ACCEPTANCE_COMPLETE",
+  "scope": "Public root approval termination on upgraded ordinary and structured financial applications; full public subprocess feature remains pending",
+  "branch": "codex/governance-identifier-integration",
+  "backendCommit": "5ab84970128e098818b8bdeff10f43d1cf2aa7e9",
+  "backendJarSha256": "2bee6850af1360eed4154aa2a047bc470d4d3b55e564317c87a057265f33666b",
+  "frontendBaseCommit": "5ab84970128e098818b8bdeff10f43d1cf2aa7e9",
+  "frontendFix": "Read operation button ref after nextTick remount; actual rendered component red then green and browser focus verified",
+  "frontendPanelSha256": "976b3d07b644384a7ed2cf4c01ec724d033e5d7cc5bed9caf10890f849ab5b92",
+  "migration": {
+    "from": 88,
+    "to": 90,
+    "oldTables": 218,
+    "oldRows": 6284,
+    "allOldColumnsPreserved": true,
+    "filesPreserved": 11,
+    "newTables": [
+      "approval_subprocess_attachment",
+      "approval_subprocess_call"
+    ],
+    "newAttachmentContentColumn": "NULL for every original row"
+  },
+  "runtime": {
+    "database": "termination_runtime_b3fccf4610",
+    "sourceDatabase": "event_inbox_runtime_f48711e9f7",
+    "backendPort": 18225,
+    "frontendPort": 15325,
+    "syntheticFinancePort": 18226,
+    "newVersionStarts": 3,
+    "newVersionRestartsVerified": 2
+  },
+  "checks": {
+    "upgradePreservedInFlight": true,
+    "unknownBudgetPreservedAfterTerminate": true,
+    "httpComplete": true,
+    "restart1OriginalReceiptsAndBudgetQuery": true,
+    "procurementReleaseFailureRolledBack": true,
+    "procurementOriginalRequestRecovered": true,
+    "procurementOriginalAccruedInvoicePreserved": true,
+    "browserNotificationFailureRolledBack": true,
+    "concurrentHumanApprovalAndTermination": true,
+    "browserThreeTerminationsAndOriginalRecovery": true,
+    "terminatedWaitIgnoresPreviouslyReceivedEventAfterRestart": true,
+    "restart2EveryOriginalReceiptReplaysWithoutNewEffects": true,
+    "unknownFreezeConfirmedThenReleasedExactlyOnce": true,
+    "allTerminatedNativeArtifactsRemoved": true
+  },
+  "terminations": 12,
+  "browserTerminations": 3,
+  "injectedRollbackFailures": 2,
+  "scenarios": [
+    "running root",
+    "paused root and paused audience",
+    "parallel with completed manager opinion",
+    "paused timer wait",
+    "event wait",
+    "termination versus human approval",
+    "already approved rejection",
+    "expense unknown budget freeze",
+    "procurement hold release failure rollback",
+    "browser notification failure rollback and original request recovery",
+    "event received before termination ignored after restart"
+  ],
+  "budgetCommands": {
+    "FREEZE": {
+      "commandCount": 1,
+      "queryCount": 6
+    },
+    "RELEASE": {
+      "commandCount": 1,
+      "queryCount": 0
+    }
+  },
+  "procurementInvoiceRecognition": "Original procurement CONSUMED invoice remains recognized while current payable hold is released",
+  "protocol": {
+    "status": "PASS",
+    "responses": 374,
+    "requests": 130,
+    "injectedFailures": 2,
+    "runtimeReceipts": 63,
+    "runtimeViews": 25,
+    "browserRequests": 4,
+    "browserTerminations": 3,
+    "browserRecoveryUsesOriginalKey": true,
+    "servedContractMatched": true
+  },
+  "preservation": {
+    "originalServiceTables": 219,
+    "originalServiceRows": 5580,
+    "originalServiceFiles": 10,
+    "originalServiceUnmodified": true,
+    "clonedOriginalBusinessTables": 172,
+    "clonedOriginalBusinessRows": 3878,
+    "allClonedOriginalBusinessRowsPreserved": true,
+    "invoiceWalletQuotaChange": {
+      "owner": "demo/alice",
+      "uploadCountDelta": 1,
+      "usedBytesDelta": 93,
+      "matchesSingleNewInvoice": true
+    }
+  },
+  "frontend": {
+    "relatedTests": 28,
+    "redFailures": 1,
+    "typescript": "PASS",
+    "build": "PASS",
+    "openApi": {
+      "result": "PASS",
+      "operations": 280,
+      "schemas": 550,
+      "requestExamples": 109
+    },
+    "viewport": {
+      "height": 900,
+      "pageWidth": 480,
+      "regions": [
+        {
+          "clientWidth": 387,
+          "scrollWidth": 387,
+          "width": 392
+        }
+      ],
+      "viewport": 500
+    },
+    "actualCancelFocus": "BUTTON: 终止本轮审批",
+    "restartedAuditObserved": true
+  },
+  "backendTests": "Reused prior verified domain18, H2 unique143 and PostgreSQL58; this stage changed frontend only, packaged verified backend without rerunning all tests",
+  "health": {
+    "originalBackend": {
+      "status": 200,
+      "readiness": "UP"
+    },
+    "originalFrontend": {
+      "status": 200
+    },
+    "terminationBackend": {
+      "status": 200,
+      "readiness": "UP"
+    },
+    "terminationFrontend": {
+      "status": 200
+    },
+    "seedFilesUnchanged": 5
+  },
+  "verificationNotes": [
+    "Runtime fixture field names and native job columns were corrected against actual response/schema before completion; production behavior was not changed for fixture assumptions.",
+    "New synthetic invoice upload legitimately increments cloned demo/alice wallet quota by1 and93 bytes. Exact delta verified separately; all other3878 original business rows in172 tables preserved.",
+    "Procurement invoice claim is an existing accrued source, not a temporary expense reservation. Acceptance verifies retained CONSUMED identity; no invoice row was deleted.",
+    "Idempotency fingerprints original JSON bytes. Browser replays use captured raw request body and original key; reserialized whitespace was rejected409 without effects.",
+    "Initial rendered assertion inspected cyclic Vue objects; bounded identity assertion uses toRaw and same original implementation fails then corrected implementation passes."
+  ],
+  "screenshots": [
+    "/fyoung/tmp/agentflow-remaining-20260928/termination-ui-running-audit.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/termination-ui-recovery-before.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/termination-ui-paused-narrow-confirm.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/termination-ui-paused-narrow-ended.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/termination-ui-restarted-audit.jpg"
+  ],
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/termination-focus-red-final.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/termination-focus-green-final.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/termination-focus-build.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/termination-runtime-finalize2.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/termination-runtime-protocol-validation.json"
+  ],
+  "remaining": [
+    "Subprocess publication dependencies, designer, authorized family views, structured financial parent and full public runtime acceptance",
+    "Other defined failure recovery and safe batch handling",
+    "Template browser download receipt",
+    "Notification channels, mentions, preferences and escalations",
+    "Actual enterprise financial/model/IdP integration, deployment/TLS/capacity/alerts",
+    "Git remote, open PR and remote CI"
+  ],
+  "overallGoalComplete": false,
+  "remainingWorkPackages": 4
+}

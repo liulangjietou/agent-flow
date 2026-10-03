@@ -1,0 +1,440 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T05:37:50.342009+00:00",
+  "taskId": "F02",
+  "status": "LOCAL_ACCEPTANCE_COMPLETE",
+  "verifiedCommit": "7fc7813be8dc751a35d1cfd19b93991a892f5417",
+  "lastImplementationCommit": "d3e2e66984953150286ea51e344e255fe1ea48c5",
+  "branch": "codex/governance-identifier-integration",
+  "phaseEvidence": [
+    "docs/evidence/account-mapping-foundation-20261003.json",
+    "docs/evidence/account-mapping-management-backend-20261003.json",
+    "docs/evidence/account-mapping-preparation-20261003.json",
+    "docs/evidence/account-mapping-ui-20261003.json"
+  ],
+  "completionMatrix": {
+    "original_command_survives_publication": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/original_command_survives_publication"
+    },
+    "missing_key_blocks_before_erp": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/missing_key_blocks_before_erp"
+    },
+    "erp_version_and_account_echo_rejected": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/erp_version_and_account_echo_rejected"
+    },
+    "publication_during_preparation_blocks_registration": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/publication_during_preparation_blocks_registration"
+    },
+    "preparation_crash_requires_explicit_retry": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/preparation_crash_requires_explicit_retry"
+    },
+    "posting_crash_recovers_by_original_query": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/posting_crash_recovers_by_original_query"
+    },
+    "voucher_field_permissions_enforced": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/voucher_field_permissions_enforced"
+    },
+    "legacy_commands_and_three_kinds_readable": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/legacy_commands_and_three_kinds_readable"
+    },
+    "advance_accrual_uses_employee_receivable": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/advance_accrual_uses_employee_receivable"
+    },
+    "payment_uses_authorized_bank_mapping": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/payment_uses_authorized_bank_mapping"
+    },
+    "restored_running_preparation_and_original_query": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/restored_running_preparation_and_original_query"
+    },
+    "queued_precheck_survives_same_package_restart": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/queued_precheck_survives_same_package_restart"
+    },
+    "expense_approval_to_original_posted_command": {
+      "status": "PASS",
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json#checks/expense_approval_to_original_posted_command"
+    }
+  },
+  "runtime": {
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-server.jar",
+    "jarSha256": "b3ef52c9b2260123bb731a6944a744e7837d1f4a3eb8f37c1974c74aa997f062",
+    "backendSourceCommit": "09d3ad33f7de17038da1539b0687a41f8463273e",
+    "frontendSourceCommit": "d3e2e66984953150286ea51e344e255fe1ea48c5",
+    "frontendDirectory": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-web-dist-v3",
+    "frontendFiles": [
+      {
+        "path": "assets/index-CNWvvx-W.css",
+        "sha256": "224f6b794a2c21665932f17a38a1ff534f5762955fe63b58cc8e82d13d9ce551"
+      },
+      {
+        "path": "assets/index-DYl0PGPk.js",
+        "sha256": "f1402fe3d9c9724412896352e8519cfd27d3469aeb61707a409243fb7a8da774"
+      },
+      {
+        "path": "index.html",
+        "sha256": "aa6f5094f8f165321ee77e87967d63040b599e0d7732c3718a1493f90379c7f7"
+      }
+    ],
+    "schemaVersion": 104,
+    "database": "mapping_complete_86705730e8",
+    "restoredDatabase": "mapping_restore_5ba2bf5f6f",
+    "syntheticFinanceEndpoint": "http://127.0.0.1:18276/finance",
+    "targetDigest": "52e2009a8fede4b19365e096dbd26ca1a233bb7bc909d0cf75c459a930ff62d4",
+    "normalBackendPort": 18277,
+    "restoredBackendPort": 18279,
+    "backup": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-backup.sql",
+    "backupSha256": "6f03592cc068b65ee64a583df70d7e547942e50d4cc11e0e078399e78cf6b5c6",
+    "tables": 245,
+    "rows": 6276,
+    "files": 9,
+    "originalSourceUnchanged": true,
+    "legacyImmutableCommandCount": 22
+  },
+  "browser": {
+    "normal": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-browser.json",
+    "restored": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-restored-browser.json",
+    "normalChecks": {
+      "originalPostedVersionVisibleAfterRepublishAndRestart": true,
+      "evidenceMatchesActualProtectedApi": true,
+      "rawAccountCodesNotExposed": true,
+      "mobileNoHorizontalOverflow": true
+    },
+    "restoredChecks": {
+      "originalPostedVersionVisibleAfterRepublishAndRestart": true,
+      "evidenceMatchesActualProtectedApi": true,
+      "rawAccountCodesNotExposed": true,
+      "mobileNoHorizontalOverflow": true
+    },
+    "desktopAnd390pxMobileInspected": true,
+    "errors": []
+  },
+  "validation": {
+    "fixedPackageRuntimeChecks": 13,
+    "samePackageRestart": true,
+    "nonemptyPairedRestore": true,
+    "newVoucherKinds": [
+      "EXPENSE_ACCRUAL",
+      "EMPLOYEE_ADVANCE",
+      "PAYMENT"
+    ],
+    "priorScopedTests": "各阶段范围测试及 PostgreSQL 子集保留原证据，不跨阶段累计为唯一测试数。",
+    "noProductSourceChangedThisPhase": true
+  },
+  "diagnostics": {
+    "harnessCorrections": [
+      "预算占用为异步确认；脚本过早最终批准被 EXPENSE_BUDGET_NOT_CONFIRMED 正确拒绝，改为等待实际 APPLIED 后接续原任务。",
+      "借款查询的审批字段为 status，费用查询为 applicationStatus；脚本更正字段后接续原借款，无重复创建。",
+      "预检受理回执只含编号，排队状态通过实际状态端点读取。"
+    ],
+    "expectedTransportArtifacts": "强制退出后释放合成 ERP 响应时的断开属于故障注入；恢复依赖原编号查询，未再次过账。"
+  },
+  "limitations": [
+    "本地合成 ERP 与付款服务只证明契约、版本和恢复行为；企业科目、期间、过账与银行事实仍由 E06、E07 验收。",
+    "F02 完成不替代 V02 最终分支整体验收；V03 原条款查漏仍未结束。"
+  ],
+  "taskCountAfterCompletion": {
+    "knownOpen": 37,
+    "localDevelopment": 19,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot",
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-browser.json",
+      "sha256": "a6be3ceb767c7d94507a1d93957da54bcf65a408298b1826b32d87e3c1b04be6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-browser.log",
+      "sha256": "a0ba04e2718507860ddd9782e9a66e7829f27fd6593737d49ab9e597331e090e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-browser.py",
+      "sha256": "e7e7a760fd3983f06bfae8ab6c2c1f85442886b8a01fce7b2d664d6020030f9c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-clone.log",
+      "sha256": "49e3baef0f6a1f24bd0db9297ba9463b96619aa4c6bfaf755ac44ed9a4854f9a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-finance-calls.jsonl",
+      "sha256": "f56e4ddde4cc2745e108b40f50c01c643a63dc14dc66fa03188e232ce85ca6c8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-finance-receipts.json",
+      "sha256": "49f677d3ed9b221f9a1ecafdb09f3e439bdada8f15cf8206de1057b9a543cd2a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-finance-v2.py",
+      "sha256": "6fac7a159040d8160b4165f92b2a91992149d1feb3f67e02523777f75da94af8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-finance.py",
+      "sha256": "9c6420799a88e3bf9853c4c4d22e6f355384470179f3921c6d1f05aea40fbc23"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-freeze-backup.log",
+      "sha256": "db4fff8c3edb32cf11e385f1d067f156ff5711a1f5709a6b605a436b69358f65"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-guards-resume.log",
+      "sha256": "4b8eb29925c96d70d756bbad9ad3e2db9234b78a03de9041c8f75d95e360f5f7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-guards.log",
+      "sha256": "9c56a58fed6365819b7151b4898c1e130cde1f35488fa9b6531b4a68b5e362ce"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-advance-completion-resume.json",
+      "sha256": "5f5dab1748d7d40bc472b14047c83c594b84298e3ea162741ed20d60e68e2ab5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-advance-completion.json",
+      "sha256": "0be066129487168d75633a4657ee8cae8cc34f333909f70f9c474b2f416ce6fd"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-advance-source.json",
+      "sha256": "3cad00cebc2a2c2a6c5202be71d42171283b1177d495e92d3ed4f46b7e27766a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-backup-running-seed.json",
+      "sha256": "a2bbb559d829d61c94f9379d85ee381332d41b10d8c789eeb95989896e338661"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-guards-resume.json",
+      "sha256": "3cda49c6947c3ef63052329516780920dd552c58df3857147f4a06c3453efea2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-guards.json",
+      "sha256": "674d238ed4195d417c50028b387a74431bedc8559464b296d61e454171d3ef74"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-legacy-compatibility.json",
+      "sha256": "743a5bbcca0df3c671f4a916855a9af561f65247bc4733d1ed0ba3d5cfb727b5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-normal-completion.json",
+      "sha256": "6f149609869275d5e1af28d3b65104ace2643741d0f30d53a0a87622b42acb06"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-payment-completion.json",
+      "sha256": "b2d4c1e39bb416c77e1d6440df23db9422c60093c3793fb0a617cc9e5953b9e5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-posting-crash-recovery.json",
+      "sha256": "0cf4e7e750e0668c9155a963538d8e5a332ca0624b17ea025c1fda83db7368ee"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-posting-crash-seed.json",
+      "sha256": "f917b70a6ec2eec326f5283c42a97a9e93cfc925aafd717e91c6df0a80357ea7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-preparation-crash-recovery.json",
+      "sha256": "f6f0a37538a2ac48f3d81394b4f8433b63f95e66f99d12bef9cbcdf01c1a0a52"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-preparation-crash-seed.json",
+      "sha256": "3e7f87e60df28feef404e72437a5710a3d4b652bfad2da3c30f0d65a7589a807"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-restored-recovery.json",
+      "sha256": "c0e0964b289fd18dcaf90ec4845b038de5c23679102cc4535e9d1d0c36378631"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-seed-confirm.json",
+      "sha256": "299b6637179f878fb5928947c8f15b6fe423893c2b16638e6cf607827ae994cc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-http-setup.json",
+      "sha256": "e8d3e8364614d403797ca0903539f35379a24d6a5068fdf42d3091ef96d3e139"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-journey.json",
+      "sha256": "56e660760832c709498888e48eba08ea77a49a80256db15fa1f66cf6eb694733"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-payment.log",
+      "sha256": "8f201a2cbd0335a36758d7c875b74fe1766a214a8400652a55563404a89ba5b8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-preview.mjs",
+      "sha256": "5a12d7317b8267dced29ee253abed215f9c34dc7febe1407d986e226108296a3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-queued-precheck.json",
+      "sha256": "0849673e8061ab37a1ab16e954281d37a82fd2c5d342760c1df3aaf6fea5479c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-restore-database.log",
+      "sha256": "e28b038a32773a2f213036579b135599c656a548370c14b379cb2afffc2a7d00"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-restore-evidence.json",
+      "sha256": "d5f2c5c7301db9ae1fac9dab30083224b79cefb1ccac609d1fe8af350e7b1786"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-restore-runtime.json",
+      "sha256": "9bc66f46cb132105d064c5d94a4c2c4eba8d5336742930362dedd0a36f8bf861"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-restored-browser.json",
+      "sha256": "2c938dddc19151f71606748165601784f7d1895cf44935dc86835088fd0f8f0b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-restored-browser.log",
+      "sha256": "a0ba04e2718507860ddd9782e9a66e7829f27fd6593737d49ab9e597331e090e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-restored-browser.py",
+      "sha256": "0382586df6d211ecf0d5681da835a23eccd3a2fcc6b749e2eb17359bf3d7172e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-restored-preview.mjs",
+      "sha256": "f6b9d5301594c73b3cd2889fa1afe0a742b54b856cad97541965311c8d9d80d0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-restored-runtime-boot1.log",
+      "sha256": "8cfcf9c05a5ed58a36849b1ec3687585a1a21b45dfa34137875df1d3f1714728"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-restored-runtime-boot2.log",
+      "sha256": "5e87fcb99d4d08f276a12dacbbb6485fb80f03093d986092291da48387a0307c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-restored-voucher-desktop.png",
+      "sha256": "2de4cec5262cece3a3999b093985dc6ccdae550bbe55719dbf19ebf77af238f6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-restored-voucher-mobile.png",
+      "sha256": "6a2b7797116c092531c60b39f00b849491ef368e7da17ef513311a74e909c6c7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-runtime-boot1.log",
+      "sha256": "9bfcf8c966c277631eb49d2ecba340402e2830e763f9a4b7b5c713352b4f3eca"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-runtime-boot2.log",
+      "sha256": "de2c36e31375ecf55dc1fb0aa01e5c3f9f9b6fb35761934cce0892a3067b00bf"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-runtime-boot3.log",
+      "sha256": "296571621b3658d4fe2665ba0a0e5515eda9516b3ba1f846732a9adac64e47d5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-runtime-boot4.log",
+      "sha256": "882793bbe7286bee85115bc6e2cf9b695b4517db568c1978aeb7e4f1a9d2fe73"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-runtime-boot5.log",
+      "sha256": "e8ff2c5484aed6c2ad019af2a65175cc376e2a485f5887151a2c6011a6e8399a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-runtime-boot6.log",
+      "sha256": "159f23b98c898a1dd864b91dcaed6b320e924736a69f762e2654599a067b8e0b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-runtime.json",
+      "sha256": "886cabe53ccb2514adf8362b6b47dc2380fe21e621324cb41b59c6b91006d862"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-setup.log",
+      "sha256": "a89f0cdc1a5ca38de9b4544b2b86b1b17adfe67352c6c48e148fc640f9b9a4d7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-startup-preservation.json",
+      "sha256": "222fd87f26c9cf4b8214ef5f41089d7a469ce1355e2c6400dcdf7f4af77909a6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-voucher-desktop.png",
+      "sha256": "d0b255aeb50be8f8969cc265befa99edb542ac9e8e28ac009601c1f18b9e4477"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-complete-voucher-mobile.png",
+      "sha256": "755c859e90fcae7b3f338de82b1e6152d6ff13e4d950149ea01e07f9ff73d00f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-posting-crash.log",
+      "sha256": "98fb9eff6c3d3afc2643ba719135f4f83fdbb288b447f7867b0c0e47344dbfb0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account-mapping-preparation-crash.log",
+      "sha256": "3062f615b639bd7a90fda921884cd54298b3ca5d9881a559f386d3798f2467b0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/account_mapping_complete_journey.py",
+      "sha256": "b7a548d9da24f3222b365759651b25d74a75a7885916e11c16c4b6af047e757a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/expense_managed_client.py",
+      "sha256": "16595362cdf5de994c9a0f3def976dff70bb84d0a53096928393c4d4fb2fb067"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/extend-account-mapping-complete-finance.py",
+      "sha256": "208145366633eb1b4dbf3b225daa7dc75ce3b5c7a078fadd035dd1d41ad05f6c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/extend-account-mapping-payment-fixture.py",
+      "sha256": "fa60688a4506a0ad05ad1c0c05a8354983e6d4531ead80345401a1242de53809"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/freeze-account-mapping-complete-backup.py",
+      "sha256": "a9f073c2c79ffed6557def11d0b06951751f0d545f05a4726ff4b9b3bde00d00"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/prepare-account-mapping-complete-runtime.py",
+      "sha256": "4ea65fd3a3ea660c1268c7ad832dff4203e7a841edbc6482ad4a1d473cb9a930"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/record-account-mapping-complete.py",
+      "sha256": "228d4ff85c78feb349f3d3499d4332d74ef051a59e2979d6f63f37d22d8a700b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/restore-account-mapping-complete.py",
+      "sha256": "4f51e5172ff44cea1ff21fb224a83eedcff90babef273e02d6145c9e5a83f51f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/run-account-mapping-complete-restored-runtime.py",
+      "sha256": "fcec72ddafdd923b503bfd8576db46d8b01a5a64ff3c69379b2e4dc4f72b9ee7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/run-account-mapping-complete-runtime.py",
+      "sha256": "d789666b4c003682422bc1667f852d9d20252a9d4e47119384d3f046a0bf9754"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/verify-account-mapping-complete-guards-resume.py",
+      "sha256": "e7745bb29f0392fd96baebfb4d0a4317b3e586629359e2263b7d243982b029cb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/verify-account-mapping-complete-guards.py",
+      "sha256": "8403532ae492b360ff646980dcd72004a30f2fb017f0feedd7beaaa31d14ed2d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/verify-account-mapping-payment.py",
+      "sha256": "8a90932df39a88a7478442cb9d12e9a7f38429a14e1d1226bcccd3461fdbbb7d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/verify-account-mapping-posting-crash.py",
+      "sha256": "f32083b2b9abaa538d0d4220c62f5efbed11dbc995d3801a2e8ebe8232a60f54"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/verify-account-mapping-preparation-crash.py",
+      "sha256": "df76d51072330aa214c0e12c6f45507c6b941066d769642ca0ccaed7a96491d7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-complete-evidence-snapshot/wecom_runtime_common.py",
+      "sha256": "c09857a84a04482322a4a3fe66dc5679ec97b07f0116fefa2334a52366a71259"
+    }
+  ]
+}

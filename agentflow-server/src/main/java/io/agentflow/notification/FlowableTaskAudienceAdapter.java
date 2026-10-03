@@ -25,7 +25,18 @@ public class FlowableTaskAudienceAdapter implements TaskAudiencePort {
 
     @Override
     public List<Audience> pending(String tenantId, UUID applicationId) {
-        return tasks.createTaskQuery().active().processVariableValueEquals("applicationId", applicationId.toString())
+        return audience(tenantId, applicationId, true);
+    }
+
+    @Override
+    public List<Audience> unfinished(String tenantId, UUID applicationId) {
+        return audience(tenantId, applicationId, false);
+    }
+
+    private List<Audience> audience(String tenantId, UUID applicationId, boolean activeOnly) {
+        var query = tasks.createTaskQuery();
+        if (activeOnly) query.active();
+        return query.processVariableValueEquals("applicationId", applicationId.toString())
                 .includeProcessVariables().includeIdentityLinks().list().stream()
                 .filter(task -> tenantId.equals(task.getProcessVariables().get("tenantId")))
                 .map(task -> {

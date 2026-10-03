@@ -1,0 +1,25 @@
+{
+  "recordedAt": "2026-09-28T15:20:00.216461+00:00",
+  "result": "PASS",
+  "scope": "Budget command contract and destination-bound HTTP adapter; persistent execution and expense submission remain in progress",
+  "tests": {
+    "domain": 6,
+    "server": 20,
+    "serverIncludesExistingGatewayRegression": 14,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-command-green.log"
+  },
+  "evidence": [
+    "Independent Python and Java canonical command SHA-256 agree",
+    "Repeated command bytes and Idempotency-Key are identical",
+    "Query uses original operation and digest with fresh correlation id and no mutation header",
+    "Timeout write sent once then original query returns APPLIED",
+    "Target change and database transactions prevent network calls",
+    "Strict operation, digest, revision, time and outcome matching"
+  ],
+  "limits": [
+    "Synthetic loopback gateway only",
+    "No persistent budget dispatch yet",
+    "No expense formal submission endpoint yet",
+    "No remote CI or enterprise acceptance"
+  ]
+}

@@ -25,6 +25,8 @@ jobs:
       AGENTFLOW_SCHEMA_TEST_PASSWORD: isolated-ci-database-only
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare isolated test artifacts
+        run: sudo install -d -o "$(id -u)" -g "$(id -g)" /fyoung/tmp
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -40,10 +42,68 @@ jobs:
           AGENTFLOW_SESSION_TEST_PASSWORD: isolated-ci-database-only
         run: mvn -B -ntp -pl agentflow-server -am -Dtest=SharedSessionIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
 
+      - name: Verify organization, field access and financial receipt boundaries on PostgreSQL
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+          PG_TEST_DATABASE_PREFIX: agentflow_business
+          AGENTFLOW_PG_TEST_BASE_URL: jdbc:postgresql://localhost:5432/
+          PGPASSWORD: isolated-ci-database-only
+          # 每个上下文独立持有连接池，及时淘汰旧上下文，保留单池原有并发容量。
+          JAVA_TOOL_OPTIONS: -Dspring.test.context.cache.maxSize=4 -Djava.io.tmpdir=/fyoung/tmp
+        run: |
+          postgres_cases=(
+            'AGENTFLOW_ORGANIZATION_TEST:organization'
+            'AGENTFLOW_ORGANIZATION_MIGRATION:organization_migration'
+            'AGENTFLOW_CONTEXT_MIGRATION:context_migration'
+            'AGENTFLOW_FIELD_TEST:field_permissions'
+            'AGENTFLOW_QUEUE_TEST:pending_queue'
+            'AGENTFLOW_OPERATIONS_TEST:operations'
+            'AGENTFLOW_ROUND_ORGANIZATION_MIGRATION:round_organization'
+            'AGENTFLOW_ATTACHMENT_TEST:attachments'
+            'AGENTFLOW_ATTACHMENT_MIGRATION:attachment_migration'
+            'AGENTFLOW_COPY_TEST:copies'
+            'AGENTFLOW_COPY_MIGRATION:copy_migration'
+            'AGENTFLOW_EXECUTION_TEST:assist_execution'
+            'AGENTFLOW_EXECUTION_MIGRATION:assist_migration'
+            'AGENTFLOW_REPAYMENT_TEST:advance_repayments'
+            'AGENTFLOW_DISBURSEMENT_RETURN_MIGRATION:disbursement_return_migration'
+            'AGENTFLOW_ADVANCE_VOUCHER_MIGRATION:advance_voucher_migration'
+            'AGENTFLOW_VOUCHER_REVERSAL_MIGRATION:voucher_reversal_migration'
+            'AGENTFLOW_REVERSAL_EXECUTION_MIGRATION:reversal_execution_migration'
+            'AGENTFLOW_REVERSAL_RETIREMENT_MIGRATION:reversal_retirement_migration'
+            'AGENTFLOW_COUNTERSIGN_POLICY:countersign_policy'
+            'AGENTFLOW_TIMER_WAIT:timer_wait'
+            'AGENTFLOW_INSTANCE_CONTROL:instance_control'
+            'AGENTFLOW_EVENT_WAIT:event_wait'
+            'AGENTFLOW_EVENT_INBOX:event_inbox'
+            'AGENTFLOW_EVENT_INBOX_MIGRATION:event_inbox_migration'
+            'AGENTFLOW_EVENT_CONTRACT:event_contract'
+            'AGENTFLOW_EVENT_CONTRACT_MIGRATION:event_contract_migration'
+          )
+          for test_case in "${postgres_cases[@]}"; do
+            IFS=: read -r test_config_prefix test_database_suffix <<< "$test_case"
+            test_database="${PG_TEST_DATABASE_PREFIX}_${test_database_suffix}"
+            docker exec -e PGPASSWORD "$PG_CONTAINER" createdb -h 127.0.0.1 -U "$AGENTFLOW_SCHEMA_TEST_USERNAME" "$test_database"
+            export "${test_config_prefix}_URL=${AGENTFLOW_PG_TEST_BASE_URL}${test_database}"
+            export "${test_config_prefix}_USER=${AGENTFLOW_SCHEMA_TEST_USERNAME}"
+            export "${test_config_prefix}_PASSWORD=${AGENTFLOW_SCHEMA_TEST_PASSWORD}"
+            export "${test_config_prefix}_DRIVER=org.postgresql.Driver"
+          done
+          mvn -B -ntp -pl agentflow-server -am -Dtest=OrganizationApprovalIntegrationTest,OrganizationMigrationTest,FieldPermissionsIntegrationTest,PendingTaskQueueIntegrationTest,ApprovalOperationsIntegrationTest,RoundOrganizationSearchMigrationTest,AttachmentIntegrationTest,AttachmentMigrationTest,ApplicationCopyIntegrationTest,CopyMigrationTest,AssistExecutionIntegrationTest,AssistExecutionMigrationTest,AdvanceRepaymentIntegrationTest,DisbursementReturnMigrationTest,AdvanceVoucherReviewMigrationTest,VoucherReversalMigrationTest,VoucherReversalExecutionMigrationTest,VoucherReversalRetirementMigrationTest,CountersignPolicyIntegrationTest,TimerWaitIntegrationTest,InstanceControlIntegrationTest,EventWaitIntegrationTest,EventInboxIntegrationTest,EventInboxMigrationTest,EventContractIntegrationTest,EventContractMigrationTest -Dsurefire.failIfNoSpecifiedTests=false test
+          for test_case in "${postgres_cases[@]}"; do
+            IFS=: read -r test_config_prefix test_database_suffix <<< "$test_case"
+            test_database="${PG_TEST_DATABASE_PREFIX}_${test_database_suffix}"
+            actual_version=$(docker exec -e PGPASSWORD "$PG_CONTAINER" psql -h 127.0.0.1 -U "$AGENTFLOW_SCHEMA_TEST_USERNAME" -d "$test_database" -Atc 'SELECT max(version::integer) FROM flyway_schema_history')
+            test "$actual_version" -gt 0
+            printf '%s: schema V%s verified\n' "$test_database_suffix" "$actual_version"
+          done
+
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare isolated test artifacts
+        run: sudo install -d -o "$(id -u)" -g "$(id -g)" /fyoung/tmp
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -60,6 +120,8 @@ jobs:
       - name: Validate production Compose configuration
         run: |
           docker compose --env-file deploy/production/production.env.example -f compose.production.yml config --quiet
+          docker compose --env-file deploy/production/production.env.example -f compose.production.yml -f compose.attachments.yml config --quiet
+          docker compose --env-file deploy/production/production.env.example -f compose.production.yml -f compose.assist.yml config --quiet
           docker compose --env-file deploy/production/production.env.example -f compose.production.yml -f compose.monitoring.yml config --quiet
       - name: Verify monitoring configuration and alert behavior
         run: |

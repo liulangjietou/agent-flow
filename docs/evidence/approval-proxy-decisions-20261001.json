@@ -1,0 +1,234 @@
+{
+  "recordedAt": "2026-10-02T00:31:24.813220+00:00",
+  "status": "DECISION_BACKEND_AND_COMPONENTS_VERIFIED_FULL_PROXY_FEATURE_INCOMPLETE",
+  "baseCommit": "8fbd09b9cf3e1666df7dc3e7f337a240b5ab023a",
+  "scope": [
+    "proxy approve return and reject with selected original authority",
+    "application and grant row locks and fresh observation time",
+    "actual native assignee plus original historic identity link",
+    "immutable proxy audit evidence and original node historical field projection",
+    "native authority priority and no fallback from invalid explicit grant",
+    "one actual countersign vote and no readdition of completed original responsibility",
+    "request rollback and original idempotency recovery",
+    "decision identity selection and historical evidence UI"
+  ],
+  "redTest": {
+    "test": "approvalKeepsActualNativeAssigneeAndOriginalProxyEvidenceAndHistoricalAccess",
+    "tests": 1,
+    "failures": 1,
+    "errors": 0,
+    "expectedStatus": 200,
+    "actualStatus": 403
+  },
+  "h2": {
+    "status": "PASS_AFTER_TEST_FIXTURE_CORRECTIONS",
+    "uniqueTests": 140,
+    "domainTests": 8,
+    "serverTests": 132,
+    "suites": [
+      {
+        "name": "io.agentflow.approval.model.CountersignMembershipTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2.log"
+      },
+      {
+        "name": "io.agentflow.organization.ApprovalProxyDecisionIntegrationTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2-history.log"
+      },
+      {
+        "name": "io.agentflow.organization.ApprovalResponsibilitiesIntegrationTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2.log"
+      },
+      {
+        "name": "io.agentflow.organization.ApprovalProxyTaskReadIntegrationTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2.log"
+      },
+      {
+        "name": "io.agentflow.api.OpenApiContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2.log"
+      },
+      {
+        "name": "io.agentflow.approval.TaskDelegationIntegrationTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2.log"
+      },
+      {
+        "name": "io.agentflow.approval.ApplicationHistoryIntegrationTest",
+        "tests": 31,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2.log"
+      },
+      {
+        "name": "io.agentflow.approval.process.CountersignMembershipRuntimeTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2.log"
+      },
+      {
+        "name": "io.agentflow.approval.process.CountersignMembershipApiTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2.log"
+      },
+      {
+        "name": "io.agentflow.approval.CountersignPolicyIntegrationTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2-history.log"
+      },
+      {
+        "name": "io.agentflow.approval.CountersignIntegrationTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2-countersign.log"
+      }
+    ]
+  },
+  "testCorrections": [
+    "Use existing /timeline and /countersign-members routes and the additions field; existing COUNTERSIGN_MEMBER_EXISTS maps to 409.",
+    "Mockito mandatory transactional service is stubbed on its unwrapped target while requests still traverse the real transaction proxy.",
+    "Existing countersign concurrency barrier ran inside an application lock and caused a test-induced wait cycle. Moved barrier before the existing lock; original success/conflict, audit, retry and notification assertions retained. Production locking unchanged."
+  ],
+  "expiryBoundary": "Expiry test delays return from the acquired proxy row lock until after the period; real concurrent blocking is independently covered by the revocation race. This is not claimed as a competing-transaction expiry acceptance.",
+  "postgresql": {
+    "database": "approval_proxy_decision_b33f16429b",
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-postgres-b33f16429b.log",
+    "status": "PASS",
+    "exitCode": 0,
+    "tests": 22,
+    "suites": [
+      {
+        "name": "io.agentflow.organization.ApprovalProxyDecisionIntegrationTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-postgres-b33f16429b.log"
+      },
+      {
+        "name": "io.agentflow.organization.ApprovalProxyTaskReadIntegrationTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-postgres-b33f16429b.log"
+      }
+    ],
+    "counting": "Overlaps H2; do not add to unique total."
+  },
+  "frontend": {
+    "red": {
+      "tests": 12,
+      "passed": 8,
+      "failed": 4
+    },
+    "green": {
+      "tests": 51,
+      "passed": 51,
+      "failed": 0
+    },
+    "typeCheck": "PASS",
+    "productionBuild": "PASS",
+    "realBrowserAcceptance": false
+  },
+  "contracts": {
+    "result": "PASS",
+    "operations": 296,
+    "schemas": 590,
+    "requestExamples": 113
+  },
+  "javaAuthors": {
+    "files": 1297,
+    "namedTypes": 2490,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remaining": [
+    "specialized expense workflow read, receipt and reduction with explicit authority",
+    "proxy notification audience and full SLA runtime acceptance",
+    "administrator management UI",
+    "new package real HTTP/browser acceptance",
+    "nonempty upgrade, old in-flight continuity and restart",
+    "field relationship assignees and the remaining original platform requirements"
+  ],
+  "delivery": {
+    "localOnly": true,
+    "existingServicesReplaced": false,
+    "newMigrations": false,
+    "newHttpAcceptance": false,
+    "newBrowserAcceptance": false,
+    "gitRemoteConfigured": false
+  },
+  "sources": {
+    "agentflow-domain/src/main/java/io/agentflow/approval/history/HistoryEvent.java": "13332abb4208fa2b57a1aa9dfb6fe22d1d1cf0a872fa8cfb3b9b7bd1b1fe8333",
+    "agentflow-domain/src/main/java/io/agentflow/approval/model/CountersignMembership.java": "f9c035034bf1a9e7c9534fd3191a31ac146b5187b82e5b1ecad9e23db6515abd",
+    "agentflow-domain/src/main/java/io/agentflow/approval/service/TaskAuditPort.java": "abe93972afc1cca5cae5416a412c858dac5fa086761a4b5d405913bc0bbe2a73",
+    "agentflow-domain/src/main/java/io/agentflow/organization/ApprovalProxyUse.java": "044cbbfeb041df6956bc7f4246e2df88312a28728186a6c2ca756cb5e90a1950",
+    "agentflow-domain/src/test/java/io/agentflow/approval/model/CountersignMembershipTest.java": "db7e79659507a653b83c260a99d81ce393726922fef43e605bbbe87fc69c844e",
+    "agentflow-server/src/main/java/io/agentflow/approval/TaskController.java": "51562cbc2b9d6f8601a901d652737f6dcd591acd0a36ca80f8e28ee70ad44ef0",
+    "agentflow-server/src/main/java/io/agentflow/approval/history/JdbcAuditHistoryAdapter.java": "3ef74e0e89fcf2dc863ff794775f4ec648bcf3089f7c6b3f5ebefd07e337acab",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/CountersignMembershipService.java": "7d598b80cef5dc773d452423e69931944c5b1f501d477e28efec7096a095025a",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApplicationParticipantAdapter.java": "b202021d98d33b59eafc89bf8a83045833eb4b4357d886b1338feed18265b359",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalProxyAccess.java": "2b6668ea8626ae268862594741a7e2635d2faf2f52879ea66df32dcb7d4c4f78",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableCountersignRuntime.java": "8038a49118a3575d83a8b7c5cccfee5a3fdffa921b71356dcf61a91cabe141ec",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableProxyParticipation.java": "cfafa824397468fdc81f5a4be289583ffab750d20403be241bc73b4c16c20d75",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskAuthorization.java": "b40c102fba974821cb8003716fa9985050ce0b0e2a11311c2de0e45b8eaba688",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskFacade.java": "fe0de4b223ffdb100fe6d7801adf62e20f052e5915ccc6731b1c9660fafabcdd",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/JdbcTaskAuditAdapter.java": "138961ce2db70b99d96cef730832dc023aba143f06d486b6b7c98c6e6fcbd025",
+    "agentflow-server/src/main/resources/api/openapi.json": "abe754009d8187204acdff5df405fd2f90bfbb11ff1a724d9be1efbb18ee313a",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "f2fe2c5facb4e78258a5973abc207d0392d66167d038c41d3613ce004c74f0de",
+    "agentflow-server/src/test/java/io/agentflow/approval/CountersignIntegrationTest.java": "d096e53323a92f48a8bcccea34aecddc7d6a5914d1d3a5e0f5dbb7a3e71cd8af",
+    "agentflow-server/src/test/java/io/agentflow/organization/ApprovalProxyDecisionIntegrationTest.java": "ff7d6f935bc0c3313290cd0807bb41294716a7f2e4081fbbc9606a98446d0396",
+    "agentflow-server/src/test/java/io/agentflow/organization/ApprovalProxyTaskReadIntegrationTest.java": "bdc6dd92d048609bee4e5c28571d9760f687fbb94ee80acd5f42e7774152511a",
+    "agentflow-web/src/api.ts": "df347e69dfdf02b17517aaa1107ce45270d2ddfaee974d0ef2d842379e9ff2e4",
+    "agentflow-web/src/components/ApplicationHistory.vue": "8f040ab090e41d0b422d261c68f00a5754c036298d18c5fb970d7dfb985c1ff3",
+    "agentflow-web/src/components/TaskActions.vue": "6fcb5d84e0b224e9bb32f7743f7ded6aaccb47b823d88a2d8372278edcdc8ad3",
+    "agentflow-web/src/taskActions.ts": "38a248b24b28fd1e2662d8de05f24c1b8145a57ef17430adf10bce84f15130ec",
+    "agentflow-web/tests/task-action-panel.test.mjs": "38657eb78e80e68caf77c69e9bc32141251aed3ab7dacd99ed6f4c4e97d93d30",
+    "agentflow-web/tests/task-actions.test.mjs": "509bbf0052e73665f0372deb86ee788eba277916bdea178ded0bfad3ce21b509"
+  },
+  "logs": {
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2.log": "4c0ded2c5884fb9933b09e47f0a1b77b7dd7dd27f7f3da60a9965365023c472f",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2-final.log": "250a55ef95d8868ef4584ba4397ca870575aaac3735dc798ebb77c0bf56156ae",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2-history.log": "cb58898cb8444cae32121ca4886fbbd9df42894810a263084ee716b8e43821ff",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-h2-countersign.log": "abb81144ef52c1ad4f64a36b298235085ec67a51992602095441a6080696cd0f",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decisions-postgres-b33f16429b.log": "c5e7bdb81c97aa716295096d2da0f2078bcdce2829b5462c5f1435d984e37485",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decision-red.log": "520ee94be349caaf14e9bebc3b73d5c9fd2d1729faf8a503e836d15b69713943",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decision-first.log": "92dc2308522dc369ce4a4a336f26524d3bb506879c4698c3ca161c362816b463",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decision-ui-red.log": "f05719099c7d3b894bb6335edb40f5b5256b83eac7abbd4952cf1fec8e81dfc7",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decision-ui-green.log": "2470c2f26de59d72c1a39aa9ba2069cff6ff9773d42dd49356ac765fef0bc4da",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-decision-web-build.log": "a2e4e26b28c650743c5b8ff0120f461e0dd687e01c513ee0e11f4a11e2b38782"
+  }
+}

@@ -32,6 +32,7 @@ class TemplateCopyMigrationTest {
 
         var after = jdbc.queryForMap("SELECT * FROM approval_definition WHERE id=?", id);
         assertThat(after.remove("NOTIFICATION_TEXTS_JSON")).isNull();
+        assertThat(after.remove("START_ENABLED")).isEqualTo(true);
         assertThat(after).isEqualTo(before);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM template_copy", Integer.class)).isZero();
         assertThatThrownBy(() -> jdbc.update("""

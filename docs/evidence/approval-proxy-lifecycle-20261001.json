@@ -1,0 +1,271 @@
+{
+  "recordedAt": "2026-10-02T02:17:31.833149+00:00",
+  "stage": "代理生命周期通知后台、跨申请锁冲突修复和非空迁移的范围验证",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "b4bf7d7fbe686881050403a05c8a8df14af77663",
+  "scope": [
+    "暂停、恢复、撤回、终止、退回、驳回、会签移除及提前达标的最小状态通知",
+    "父子流程维持各自申请范围，暂停中的本人会签责任仍受独立席位约束",
+    "原任务销毁前捕获范围，发送前重新观察原授权；最小通知不增加申请读取权",
+    "按申请版本保存原代理来源，重复事件与原请求恢复不产生重复消息",
+    "业务、原生任务、消息、来源、外发意向、审计与幂等回执同事务回滚",
+    "外发领取和未知结果恢复只核对原代理，新授权不能复活旧消息"
+  ],
+  "reproductions": [
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-red.log",
+      "gap": "旧测试只验证待办与原 SLA，没有暂停、恢复及任务结束时的代理范围。",
+      "result": "2 项最小测试失败：应有状态提醒时返回 0 条。"
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-lock-diagnostic-red.log",
+      "gap": "单申请并发测试未覆盖两张独立 ANY 会签申请各自代批并通知对方代理。",
+      "result": "H2 在 organization_approval_proxy 的 FOR UPDATE 检测到死锁，独立审批返回 409。",
+      "fix": "生命周期通知不追加其他代理写锁；实际办理继续锁定所选代理。"
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-postgres-a187279c59.log",
+      "gap": "H2 不足以证明 PostgreSQL 来源外键的锁兼容性。",
+      "result": "移除额外写锁后，PostgreSQL INSERT 来源触发的 FOR KEY SHARE 仍与办理持有的 FOR UPDATE 形成环路。",
+      "fix": "代理主键不可变，PostgreSQL 使用 FOR NO KEY UPDATE，保留办理和撤销互斥并允许通知外键引用；H2 保留 FOR UPDATE。"
+    }
+  ],
+  "fixtureNotes": [
+    "首次生命周期验证将无申请读取权误断言为 403；按既有隐藏资源策略改为 404 NOT_FOUND，生产策略未改。",
+    "并发响应断言读取公开字段 applicationStatus，额外断言两张申请收到对方结束事件。",
+    "到期边界通过真实延迟原生消息写入，验证捕获接收范围后到期仍不建立代理来源；不是模拟锁时钟。"
+  ],
+  "tests": {
+    "h2": {
+      "status": "PASS",
+      "uniqueTests": 197,
+      "classes": {
+        "io.agentflow.organization.ApprovalProxyLifecycleMigrationTest": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyDecisionIntegrationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyPersistenceIntegrationTest": {
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyNotificationsIntegrationTest": {
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyNotificationMigrationTest": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyTaskReadIntegrationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.expense.ExpenseSubmissionIntegrationTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.notification.NotificationDeliveryIntegrationTest": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.notification.NotificationDeliveryApiIntegrationTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.notification.InboxIntegrationTest": {
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.api.OpenApiContractTest": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.approval.InstanceControlIntegrationTest": {
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.approval.CountersignPolicyIntegrationTest": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.approval.SubprocessStartIntegrationTest": {
+          "tests": 40,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.approval.process.CountersignMembershipRuntimeTest": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.approval.process.ApprovalProxyNotificationSchedulerTest": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.approval.process.CountersignMembershipApiTest": {
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.approval.process.TaskDeadlineIntegrationTest": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-h2-regression.log",
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-h2-reports"
+    },
+    "postgresLifecycle": {
+      "database": "approval_proxy_lifecycle_8d06185ebd",
+      "migrationDatabase": "approval_proxy_lifecycle_upgrade_8d06185ebd",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-postgres-8d06185ebd.log",
+      "status": "PASS",
+      "exitCode": 0,
+      "tests": 22,
+      "classes": {
+        "io.agentflow.organization.ApprovalProxyLifecycleMigrationTest": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyNotificationsIntegrationTest": {
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-postgres-reports",
+      "overlapsH2": true
+    },
+    "postgresLockRegression": {
+      "database": "approval_proxy_lock_regression_af05dea7a5",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lock-regression-postgres-af05dea7a5.log",
+      "status": "PASS",
+      "exitCode": 0,
+      "tests": 29,
+      "classes": {
+        "io.agentflow.organization.ApprovalProxyDecisionIntegrationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyPersistenceIntegrationTest": {
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.expense.ExpenseSubmissionIntegrationTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lock-regression-postgres-reports",
+      "overlapsH2": true
+    },
+    "postgresTotalOverlappingTests": 51,
+    "newTests": 11,
+    "openApi": {
+      "result": "PASS",
+      "operations": 296,
+      "schemas": 590,
+      "requestExamples": 113,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-openapi.log"
+    },
+    "authors": {
+      "result": "PASS",
+      "summary": "Java files=1304, named types=2501, missing author tags=0, parse errors=0",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-authors.log"
+    },
+    "diffCheck": "PASS"
+  },
+  "migration": {
+    "from": 97,
+    "to": 98,
+    "databases": [
+      "H2",
+      "PostgreSQL"
+    ],
+    "preservedBusinessTables": 5,
+    "preservedOldSourceColumns": true,
+    "preservedOldFlywayRows": true,
+    "oldEventVersion": 0,
+    "oldNotificationsBackfilled": false,
+    "checks": [
+      "重复生命周期使用不同申请版本并各自唯一",
+      "待办与超时限定版本零",
+      "生命周期限定正版本及明确种类",
+      "同租户代理与消息外键",
+      "消息唯一性不变",
+      "重复迁移为零且 validate 通过"
+    ]
+  },
+  "review": {
+    "method": "人工核对调用链、事务、权限、锁序及公开接口；未使用子代理",
+    "findingsResolved": [
+      "跨申请额外代理锁形成环路",
+      "PostgreSQL 通知外键 KEY SHARE 形成环路"
+    ],
+    "remainingFindings": []
+  },
+  "runtime": {
+    "changed": false,
+    "currentVersion": 97,
+    "database": "approval_proxy_runtime_9439518b65",
+    "boot": 3,
+    "backendPort": 18254,
+    "frontendPort": 15341,
+    "health": "UP",
+    "frontendHttp": 200,
+    "jarSha256": "fb3380e6fffc99e8edf2012c454e2679482cbe2565ea6018624955e750e84831"
+  },
+  "limits": [
+    "本次为真实数据库和引擎的范围验证，未打 V98 安装包或做新增实际 HTTP／浏览器验收。",
+    "非空升级为迁移测试夹具；完整运行库升级、原 SLA 真实计时、财务／多原审批人／旧在审任务仍需验收。",
+    "外发队列使用合成绑定，没有发送到企业渠道；不等于实际递送。",
+    "代理其余运行和表单字段关系选人继续；至少六类剩余事项和全量需求映射尚未关闭。",
+    "Git remote 为空，仅本地提交，不存在 PR 链接。"
+  ]
+}

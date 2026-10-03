@@ -1,0 +1,65 @@
+{
+  "date": "2026-09-28",
+  "scope": "Current finance-task expense reductions, exact resources, derived route, budget adjustment, task audit and applicant notification",
+  "parentCommit": "32289195c7197f3bd6d227c5e06e03c1579f688b",
+  "localOnly": true,
+  "checks": {
+    "domain": {
+      "tests": 41,
+      "result": "PASS"
+    },
+    "h2ServiceRegression": {
+      "tests": 96,
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-reduction-final-regression.log"
+    },
+    "postgresql": {
+      "tests": 16,
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/reduction-postgres.log",
+      "databases": {
+        "AGENTFLOW_SUBMISSION_TEST": {
+          "database": "expense_submission_test_9d938fa9",
+          "url": "jdbc:postgresql://127.0.0.1:55460/expense_submission_test_9d938fa9",
+          "user": "agentflow"
+        }
+      }
+    },
+    "openapi": {
+      "operations": 121,
+      "schemas": 202,
+      "requestExamples": 44,
+      "result": "PASS"
+    },
+    "webBuild": {
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-reduction-web-build.log"
+    }
+  },
+  "decimalRegression": {
+    "coverageGap": "Initial tests used valid decimal strings, while the new BigDecimal DTO also accepted JSON numbers",
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/expense-reduction-decimal-red.log",
+    "failure": "JSON numeric gross 50 returned 200",
+    "fix": "Explicit field deserializer shares the existing exact financial decimal string parser"
+  },
+  "scenarios": [
+    "actual current financial task and current organization eligibility",
+    "double versions and strict field whitelist",
+    "pending delegation denied",
+    "same-key replay and distinct-key concurrent reductions",
+    "original financial and approval snapshots remain unchanged",
+    "zero line releases invoice; partial amount retains invoice",
+    "exact prior request and advance reservation reduction",
+    "zero and partial budget ADJUST; approval blocked until confirmed",
+    "subsequent actual gateway follows reduced amount",
+    "duplicate active instance causes late rollback of financial resources, audit, route and notification",
+    "prior zero line cannot release another report occupation",
+    "task-bound adjustment audit and one applicant inbox notification"
+  ],
+  "limitations": [
+    "Synthetic finance facts do not prove enterprise gateway acceptance",
+    "Business expense screens are next; only notification and audit labels changed in this slice",
+    "Settlement, voucher, payment and archive remain",
+    "No Git remote is configured; no PR or remote CI"
+  ]
+}

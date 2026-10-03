@@ -1,0 +1,141 @@
+{
+  "date": "2026-09-28",
+  "feature": "运营统计按轮次冻结组织名称筛选",
+  "status": "本地功能与范围验收通过",
+  "scope": {
+    "api": "GET /api/v1/operations/approvals?organization=...",
+    "history": "each matching historical round",
+    "backlog": "current active approval round",
+    "unrecordedHistoricalRounds": "process/version only; date and organization cannot be reconstructed",
+    "organizationMatch": "case-insensitive literal contains across legal entity, department and position names",
+    "migration": "reuse V29; no new migration"
+  },
+  "tests": {
+    "redFailures": 2,
+    "h2ScopedTests": 38,
+    "postgresScopedTests": 30,
+    "databaseScopesOverlap": true,
+    "frontendTests": 35,
+    "frontendBuild": "PASS",
+    "openapi": {
+      "operations": 86,
+      "schemas": 138,
+      "requestExamples": 31
+    },
+    "authors": {
+      "files": 349,
+      "types": 541
+    },
+    "httpRequests": 21,
+    "httpBusinessReadOnly": true,
+    "browser": {
+      "oldOrganization": {
+        "historicalRounds": 3,
+        "pendingTasks": 2
+      },
+      "newOrganization": {
+        "historicalRounds": 1,
+        "pendingTasks": 1
+      },
+      "reset": {
+        "historicalRounds": 5,
+        "pendingTasks": 4
+      },
+      "preservesOrganizationOnProcessAndDaySelection": true,
+      "dirtyFilterClearsOldReport": true,
+      "narrowViewport": {
+        "requestedWidth": 390,
+        "reportedClientWidth": 500,
+        "reportedScrollWidth": 500,
+        "organizationInputAndSubmitVisible": true
+      },
+      "consoleErrors": []
+    }
+  },
+  "postgres": {
+    "queue": "ops_org_queue_3f4fb82209|PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit\n29\n29",
+    "organization": "ops_org_organization_d196a4ba85|PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit\n29\n16",
+    "operations": "ops_org_operations_c9db38a67e|PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit\n29\n91"
+  },
+  "cleanup": {
+    "serviceProcessesStopped": [
+      "server",
+      "web"
+    ],
+    "portsClosed": [
+      18193,
+      15193
+    ],
+    "postgresContainerStopped": true,
+    "dockerDesktopRestoredStopped": true,
+    "remainingBeforeDesktopStop": [
+      "d11d58535c13 xxl-job-admin",
+      "a285e913450d nacos-mysql",
+      "8ece95f5163e redis"
+    ],
+    "databasesPreserved": true,
+    "browserTabClosed": true,
+    "viewportReset": true
+  },
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/red.log",
+      "sha256": "63e687727571f6ba64d71f07bef59b5b51a8646cd65bed0ef521cc069c08071c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/backend.log",
+      "sha256": "ffe904743748ba16120a951f60250a5c1802618e6a2c25a99cbe5facddd5d87c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/frontend.log",
+      "sha256": "bae6034c21374b5621eb346da0532522812ae9f7c68f3d354f9ace6476fcaf72"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/frontend-build.log",
+      "sha256": "411cbf5a7340fb839e633c08c9fa2ab003998ec956798948927e3936b75a3727"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/openapi.log",
+      "sha256": "baef1bb73ee5937f3e8305e9a8b0f7a419f87fe32f7942177f855c4b6fe2be80"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/authors.log",
+      "sha256": "89302a3a46222b23f8134d600165475563564b7aa12e9eaff55c7fbf121067ae"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/postgres.log",
+      "sha256": "ca97a1198ee9f7317176fb05794b5c76e0aecec75c488ed4cf3688c046e8b684"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/postgres-runtime-facts.json",
+      "sha256": "f85601d90f3b9bec4c20ce76857e6b9e283d30f822871e79e681421375ef3c1a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/http-evidence.json",
+      "sha256": "e63b90f33b8126144deba397d7e80c2584b8ee022254a8c170e68d3fb7b924c5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/browser-evidence.json",
+      "sha256": "6baa1fe9e15802902f435011b68889b74a9b5fd2f46799c4998dfe11478a0b4a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/browser-operations-organization.png",
+      "sha256": "0be02ee71d71fdc5aa3d7959688888ebad2aa677152a47e06392509eeea20c75"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/browser-operations-mobile.png",
+      "sha256": "6998bfee2d3e6100249212e3cc8d3b07f92e0655697ac90f013bbc25914b4065"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-operations-organization-20260928/cleanup.json",
+      "sha256": "37c54a37560abf0c6dfd2d81fbf4d29281b912d977b1d341fbd98274233e1cc0"
+    }
+  ],
+  "delivery": {
+    "branch": "codex/governance-identifier-integration",
+    "localOnly": true,
+    "remoteConfigured": false,
+    "pullRequest": null,
+    "mainUnchanged": "60bafa082b9d35a6802e846d8b96a09989ffa97d"
+  }
+}

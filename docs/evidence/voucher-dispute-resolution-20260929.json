@@ -1,0 +1,96 @@
+{
+  "stage": "voucher dispute resolution",
+  "date": "2026-09-29",
+  "localOnly": true,
+  "migration": "V55",
+  "domainScopeTests": 22,
+  "h2ServerScopeTests": 91,
+  "postgresScopeTests": 86,
+  "frontendScopeTests": 34,
+  "scopesOverlap": true,
+  "javaAuthorCheck": {
+    "files": 698,
+    "namedTypes": 1259,
+    "missing": 0
+  },
+  "openapi": {
+    "operations": 168,
+    "schemas": 299,
+    "requestExamples": 57
+  },
+  "actualHttp": {
+    "initialRequestsIncludingLogins": 59,
+    "finalReadRequestsIncludingLogins": 5,
+    "checks": [
+      "query_does_not_clear_dispute",
+      "failed_cannot_erase_original_posting",
+      "different_original_posting_rejected",
+      "authority_strict_body_and_display_versions",
+      "explicit_finance_resolution_exact_replay_and_owner_projection",
+      "settled_advance_and_two_repayments_unchanged",
+      "original_payment_and_voucher_commands_unchanged"
+    ]
+  },
+  "browser": {
+    "result": "PASS",
+    "applicationId": "4063d04c-eb5e-4c70-9440-2ea9dee5feaf",
+    "operationId": "8eb8139a-7caa-4e73-955e-377fb021f58b",
+    "adoptedExternalRevision": 7,
+    "resultingStatus": "POSTED",
+    "priorVoucherReference": "UI-VOUCHER-8eb8139a",
+    "reference": "UI-ERP-BROWSER-002",
+    "repaymentStatus": "SETTLED",
+    "totalRepaid": "300.00",
+    "repaymentRecords": 2,
+    "desktopScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/voucher-dispute-browser-resolved.png",
+    "confirmationScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/voucher-dispute-browser-confirm.png",
+    "narrowScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/voucher-dispute-browser-narrow.png",
+    "layout": {
+      "requestedWidth": 375,
+      "actualCssWidth": 500,
+      "documentOverflow": false,
+      "accrual": {
+        "width": 412,
+        "scrollWidth": 412,
+        "columns": "412px"
+      },
+      "payment": {
+        "width": 412,
+        "scrollWidth": 412,
+        "columns": "412px"
+      }
+    },
+    "widthNote": "Requested 375 device pixels; actual CSS viewport was 500 pixels, one column and no horizontal overflow verified."
+  },
+  "database": {
+    "migration": "55",
+    "decisions": 2,
+    "decisionAudits": 2,
+    "operationRevisions": 23
+  },
+  "backup": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-before-v55.dump",
+    "bytes": 511107
+  },
+  "immutableEvidenceUnchanged": [
+    "advanceState",
+    "paymentState",
+    "repayments",
+    "voucherInputs",
+    "voucher-ui-synthetic-commands.json",
+    "payment-ui-synthetic-commands.json"
+  ],
+  "regression": {
+    "writePermissionRevoked": {
+      "red": "voucher-dispute-web-red.log",
+      "green": "voucher-dispute-web-final.log"
+    }
+  },
+  "limitations": [
+    "ERP is a synthetic loopback service, not real enterprise ERP acceptance.",
+    "Actual voucher reversals and returned funds/repayments require independent financial adjustments.",
+    "No Git remote, PR or remote CI."
+  ],
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "testDatabaseManifest": "/fyoung/tmp/agentflow-remaining-20260928/voucher-dispute-postgres-databases.json"
+}

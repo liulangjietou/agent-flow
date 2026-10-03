@@ -43,6 +43,7 @@ public final class OidcTestProvider implements AutoCloseable {
     volatile int exchanges;
     volatile String subject = "employee-42";
     volatile String tenant = "external";
+    volatile List<String> roles = List.of("staff");
     volatile int lifetimeSeconds = 300;
     volatile String sessionId;
     volatile int issuedSecondsAgo = 5;
@@ -174,7 +175,7 @@ public final class OidcTestProvider implements AutoCloseable {
                 .expirationTime(Date.from(now.plusSeconds(mode.equals("expired") ? -120 : lifetimeSeconds)))
                 .claim("nonce", mode.equals("nonce") ? "wrong-nonce" : authorization.get("nonce"))
                 .claim("tenant", mode.equals("unmappedTenant") ? "unknown" : tenant)
-                .claim("roles", mode.equals("unmappedRole") ? List.of("unmapped-admin") : List.of("staff"));
+                .claim("roles", mode.equals("unmappedRole") ? List.of("unmapped-admin") : roles);
         if (sessionId != null) claims.claim("sid", sessionId);
         SignedJWT jwt = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(key.getKeyID()).build(), claims.build());
         jwt.sign(new RSASSASigner(mode.equals("signature") ? wrongKey : key));

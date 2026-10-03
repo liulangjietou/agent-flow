@@ -1,0 +1,102 @@
+{
+  "date": "2026-09-28",
+  "scope": "补齐当前组合版本的浏览器模板导入验收",
+  "status": "PASS",
+  "sourceCommit": "7da01aac32ae8d0369db076e3fae526898378548",
+  "environment": {
+    "backend": "H2 independent local file database",
+    "browser": "Codex in-app browser",
+    "sourceDefinition": "7fc39135-e9f8-4356-8e52-51ceaff7ec43",
+    "importedDefinition": "650f9c83-837d-43b7-a80d-abb0ad5e6d6b",
+    "application": "8c0c162c-f621-4f2e-b601-2147f21d16c2",
+    "data": "synthetic local fixtures only"
+  },
+  "http": {
+    "setupRequests": 15,
+    "draftVerificationRequests": 4,
+    "runtimeVerificationRequests": 12,
+    "completionVerificationRequests": 9,
+    "failedAttempt": "Completion script initially used type instead of the documented notification kind; corrected fixture and reran read checks, no product failure or business mutation in that retry"
+  },
+  "browser": {
+    "unsupportedFormatRejected": true,
+    "fileUploadSucceeded": true,
+    "independentDraftCreated": true,
+    "publishedByBrowser": true,
+    "contextualSupervisorShown": true,
+    "fixedCalendarRevision": 1,
+    "workingMinutes": 90,
+    "rawAmountVisibleToSupervisor": true,
+    "noteHidden": true,
+    "detailAccountMasked": true,
+    "approvedBySupervisorInBrowser": true,
+    "pendingTaskRemoved": true,
+    "consoleErrors": []
+  },
+  "runtime": {
+    "requiredAppointment": true,
+    "supervisor": "role:ORG_SUPERVISOR_1",
+    "workingMinutes": 90,
+    "actualDeadlineSeconds": 5400,
+    "result": "APPROVED",
+    "sourceDefinitionUnchanged": true,
+    "originalRoundPayloadPreserved": true,
+    "notificationTextsPreserved": true
+  },
+  "cleanup": {
+    "serviceProcessesStopped": true,
+    "portsClosed": [
+      18194,
+      15194
+    ],
+    "browserTabClosed": true,
+    "databasePreserved": true,
+    "dockerStarted": false,
+    "mainEnvironmentModified": false
+  },
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-template-import-20260928/seed-evidence.json",
+      "sha256": "1bc6646aa0c48a3eba4e02206ff7bb179b2129d86fe5acb3c35b3fc058836dbb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-template-import-20260928/draft-check.json",
+      "sha256": "d1c362db8b7f64566d471ec041d4c22b1906beaab7e4e49d3a9930040e69fdcd"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-template-import-20260928/runtime-check.json",
+      "sha256": "a3d40d667a6e035d5aefd7cc22ed18d6fd80f03ec6353070055fb7412e10cf65"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-template-import-20260928/finish-check.json",
+      "sha256": "5f765d0f06d3113525d429872aa84064d4156d2f9147500ce6a7178d49cabbf8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-template-import-20260928/browser-evidence.json",
+      "sha256": "a2d079238740943e75967bb451f2d0c2857687321d3a79584b099e489c79d93d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-template-import-20260928/browser-template-published.png",
+      "sha256": "40a51677f7332f4d9f7009de48f5f16105317fe783aa5a844301c360923acae0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-template-import-20260928/browser-template-approved.png",
+      "sha256": "8b7c05b42ba87eabe7c72e5b22d1ad1e072eb5505b539a3707e92fb06fda2422"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-template-import-20260928/cleanup.json",
+      "sha256": "b201dfdfa282de835a60b88961630661f450fe7da3ffa6fcf4f64029b3859354"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-template-import-20260928/source-template.json",
+      "sha256": "e488f72fd8a61f1553dace319d11ead7b9c5e28a538d8134059556ca03c84bef"
+    }
+  ],
+  "boundaries": [
+    "No production code change",
+    "No repeated full regression gate",
+    "No new PostgreSQL run for this UI acceptance; earlier feature-specific PostgreSQL evidence remains separate",
+    "No main or primary demo deployment",
+    "No Git remote or PR"
+  ]
+}

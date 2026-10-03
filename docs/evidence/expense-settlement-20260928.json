@@ -1,0 +1,74 @@
+{
+  "date": "2026-09-28",
+  "status": "LOCAL_EXPENSE_SETTLEMENT_ACCEPTANCE_PASSED",
+  "syntheticFinance": true,
+  "enterpriseAcceptance": false,
+  "migration": "V48",
+  "tests": {
+    "h2Domain": 17,
+    "h2Server": 42,
+    "postgresql": 80,
+    "frontend": 54,
+    "scopesOverlap": true,
+    "build": "PASS",
+    "openapi": {
+      "operations": 158,
+      "schemas": 274,
+      "requestExamples": 52
+    },
+    "javaAuthors": {
+      "files": 645,
+      "namedTypes": 1151,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "regression": {
+    "previousGap": "Payment acceptance stopped at bank success without a settlement consumer",
+    "red": "expense-settlement-runtime-red.log",
+    "green": "expense-settlement-http-final.log"
+  },
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "logs": [
+    "expense-settlement-resource-scope.log",
+    "expense-settlement-persistence.log",
+    "expense-settlement-http-final.log",
+    "expense-settlement-postgres.log",
+    "expense-settlement-ui-final.log",
+    "expense-settlement-ui-build.log",
+    "expense-settlement-package.log"
+  ],
+  "httpEvidence": "expense-settlement-ui-http-evidence.json",
+  "httpChecksAfterCompletion": 13,
+  "preparationChecks": 29,
+  "browser": {
+    "reportId": "e00e96fa-24e1-4f43-a462-f754f2036187",
+    "businessNo": "UI-SETTLEMENT-237293c4",
+    "result": "PASS",
+    "screenshots": [
+      "expense-settlement-ui-completed.png",
+      "expense-settlement-ui-mobile.png"
+    ],
+    "narrowCssWidth": 480,
+    "horizontalOverflow": false,
+    "funding": "FULL_OFFSET",
+    "afterStatus": "SETTLED",
+    "invoiceAndAdvanceUnchangedAfterRetry": true,
+    "counts": {
+      "settlements": 1,
+      "settlementRevisions": 6,
+      "budgetCommands": 3,
+      "paymentAuthorizations": 0,
+      "invoiceConsumptions": 1,
+      "advanceConsumptions": 1,
+      "retryAudits": 1
+    }
+  },
+  "remaining": [
+    "Payment voucher and archive",
+    "Manual dispute resolution and refunds",
+    "Safe payment retirement and replacement",
+    "Procurement and budget adjustments",
+    "Enterprise finance acceptance"
+  ]
+}

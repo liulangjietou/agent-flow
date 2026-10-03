@@ -1,0 +1,73 @@
+{
+  "recordedAt": "2026-10-01T23:41:53.679088+00:00",
+  "status": "MANAGEMENT_API_VERIFIED_TASK_INTEGRATION_PENDING",
+  "baseCommit": "e6f79935789abf921e2b03addb31765d5fa40e09",
+  "scope": "管理员代理创建、分页、原号刷新、具名撤销与原键恢复；尚未接通任务授权和页面",
+  "tests": {
+    "h2ApiDistinctCases": 9,
+    "h2Runs": [
+      {
+        "cases": 8,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-api-h2-final.log"
+      },
+      {
+        "cases": 1,
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-api-h2-revoke.log",
+        "method": "malformedRevocationCannotChangeScopeOrConsumeOriginalRevision"
+      }
+    ],
+    "postgresApiCases": 9,
+    "postgres": {
+      "database": "approval_proxy_api_8b57080062",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-api-postgres-8b57080062.log",
+      "status": "PASS",
+      "exitCode": 0
+    },
+    "contractCases": 7,
+    "crossDatabaseCasesOverlap": true
+  },
+  "staticOpenApi": {
+    "result": "PASS",
+    "operations": 296,
+    "schemas": 588,
+    "requestExamples": 113
+  },
+  "authorGate": {
+    "javaFiles": 1292,
+    "namedTypes": 2481,
+    "missingAuthors": 0,
+    "parseErrors": 0
+  },
+  "verified": [
+    "当前 ADMIN 权限与跨租户隔离",
+    "同一快照读取期限和人员现状",
+    "稳定游标及双方人员过滤",
+    "创建与撤销原键恢复不复活原授权",
+    "角色变化后拒绝回放",
+    "修改原键请求被拒绝",
+    "未知身份/范围字段与非法撤销参数被拒绝",
+    "回执持久化失败回滚代理、审计和幂等占位；原键随后可重试"
+  ],
+  "fixtureCorrection": "首轮测试把 MockMvc 直接抛出的 ServletException 当成嵌入式服务器的 HTTP 500；已修改测试断言，未改生产异常处理。",
+  "notVerified": [
+    "任务与字段权限",
+    "代理实际办理、财务专用动作、会签独立性及批准人留痕",
+    "新安装包真实网络与浏览器",
+    "原在审升级接续和重启"
+  ],
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/organization/ApprovalProxyController.java": "caee23c6f8c11eceb061c8d1a5456ec202c792183a218052ba8f466c8de6e54a",
+    "agentflow-server/src/main/resources/api/openapi.json": "d9416f5e095558acc928c3fd9f917ea6c14cdeab1ee25d4177a1c45d82ec0af1",
+    "agentflow-server/src/test/java/io/agentflow/organization/ApprovalProxyApiIntegrationTest.java": "054785cf4d159465c7a7c959c3706f2212106d298c92b3a857abf24b2e4278ff",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "ef3aef5867a3f2082416ae3a333c6b26088436bb82267d69e6081f7fae3180c7"
+  },
+  "logSha256": {
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-api-h2.log": "08b01cda503fac1c2068ecb67d4c24b5775683dd252284ee9b5fad2ded5da8cd",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-api-h2-final.log": "0f54a21ba299c7dcd091519d70a8cc3ca21a3650421801888f27920666afcc0a",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-api-h2-revoke.log": "7b7551c002e5b53df15d26b49a13d33446fff2851b18f3c3c4cb09dd7eb00f46",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-api-postgres-8b57080062.log": "1fe876cd16c8e3ab66d92f1e5a0ab5e12e2020a5a94486290014709ac19f9d16"
+  },
+  "runtimeReplaced": false,
+  "existingRuntimeSchema": "V95",
+  "overallGoalComplete": false
+}

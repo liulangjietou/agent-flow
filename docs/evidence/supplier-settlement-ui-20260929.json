@@ -1,0 +1,126 @@
+{
+  "date": "2026-09-29",
+  "scope": "Supplier settlement UI, original V72 to V73 upgrade and local synthetic HTTP/browser acceptance",
+  "frontend": {
+    "newTests": 14,
+    "relatedTests": 67,
+    "finalSettlementTests": 14,
+    "scopesOverlap": true,
+    "productionBuild": true,
+    "typeCheck": true,
+    "java17Package": true,
+    "largeBundleWarningRemains": true
+  },
+  "upgrade": {
+    "fromVersion": 72,
+    "toVersion": 73,
+    "unchangedBusinessTables": 125,
+    "unchangedBusinessRows": 1479,
+    "unchangedAttachments": 5,
+    "unchangedCommandFiles": 14,
+    "newTablesEmpty": [
+      "supplier_settlement_preparation",
+      "supplier_settlement_preparation_revision",
+      "supplier_payable_settlement_operation",
+      "supplier_payable_settlement_revision",
+      "supplier_settlement_retirement",
+      "supplier_settlement_completion"
+    ],
+    "backupBytes": 856038,
+    "backupSha256": "148c777deeeaa4f9652d1c25fc47ef719cec9836707029b34f55478dd735c47f"
+  },
+  "business": {
+    "syntheticFinanceOnly": true,
+    "schema": 73,
+    "paymentId": "09ce297b-0811-4015-a135-eae7ed1cc2d1",
+    "operationId": "4a809a55-3302-4ba5-a33f-f1739f9a691b",
+    "amount": {
+      "value": "65.00",
+      "currency": "CNY"
+    },
+    "accountingDate": "2026-09-30",
+    "bankStatus": "SUCCEEDED",
+    "erpStatus": "SETTLED",
+    "completion": {
+      "settlementId": "4a809a55-3302-4ba5-a33f-f1739f9a691b",
+      "settlementVersion": 19,
+      "completedAt": "2026-09-30T00:32:49.178251Z"
+    },
+    "preparations": 2,
+    "periodClosedWithoutCommand": true,
+    "originalSettlementCommands": 1,
+    "sendAttempts": 2,
+    "initialAttempt": "Synthetic adapter amount-path error before acceptance; fixed adapter, queried NOT_FOUND and explicitly retried same command",
+    "acceptedSyntheticSettlements": 1,
+    "lostResponseAfterAcceptance": true,
+    "sameCommandQueryRecoveredCompletion": true,
+    "originalBankCommandUnchanged": true,
+    "originalSettlementCommandSha256": "ef703645b7046ea896988697eaa67602b963d3fb0015ac91ba5cc682bb149590",
+    "exactQuantity": "999999999999999.123456",
+    "settledBefore": "30.00",
+    "settledAfter": "95.00",
+    "unchangedOldTables": 121,
+    "expectedChanges": {
+      "audit_event": {
+        "oldRows": 195,
+        "newRows": 199,
+        "appendedRows": 4
+      },
+      "procurement_payable_reservation": {
+        "rows": 4,
+        "completedOriginalReservations": 1,
+        "otherOriginalFieldsUnchanged": true
+      },
+      "procurement_payable_reservation_revision": {
+        "oldRows": 6,
+        "newRows": 7,
+        "appendedRows": 1
+      },
+      "request_idempotency": {
+        "oldRows": 245,
+        "newRows": 249,
+        "appendedRows": 4
+      }
+    },
+    "unchangedAttachments": 5,
+    "unchangedOriginalFinancialFiles": 14,
+    "newTableCounts": {
+      "supplier_settlement_preparation": 2,
+      "supplier_settlement_preparation_revision": 6,
+      "supplier_payable_settlement_operation": 1,
+      "supplier_payable_settlement_revision": 19,
+      "supplier_settlement_retirement": 0,
+      "supplier_settlement_completion": 1
+    },
+    "auditActions": [
+      "SUPPLIER_SETTLEMENT_PREPARE",
+      "SUPPLIER_SETTLEMENT_PREPARE",
+      "SUPPLIER_SETTLEMENT_RETRY",
+      "SUPPLIER_SETTLEMENT_QUERY"
+    ],
+    "httpResponsesRecorded": 74
+  },
+  "browser": {
+    "explicitAccountingDate": true,
+    "threeIndependentFacts": true,
+    "desktopAndNarrowVisualCheck": true,
+    "screenshots": [
+      "supplier-settlement-ui-complete.png",
+      "supplier-settlement-ui-narrow.png"
+    ]
+  },
+  "limitations": [
+    "Only local synthetic ERP and bank services were exercised",
+    "No real enterprise integration or production acceptance",
+    "No configured Git remote or remote PR/CI"
+  ],
+  "artifacts": {
+    "relatedTests": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-ui-tests.log",
+    "finalTests": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-ui-final-tests.log",
+    "build": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-ui-build.log",
+    "package": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-ui-package.log",
+    "http": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-ui-http.json",
+    "runtime": "/fyoung/tmp/agentflow-remaining-20260928/run-supplier-settlement-ui-server.py",
+    "verification": "/fyoung/tmp/agentflow-remaining-20260928/verify-supplier-settlement-ui.py"
+  }
+}

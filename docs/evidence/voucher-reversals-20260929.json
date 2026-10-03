@@ -1,0 +1,150 @@
+{
+  "date": "2026-09-29",
+  "stage": "independent-voucher-reversal-verification-and-recording",
+  "schemaVersion": 61,
+  "result": "PASS",
+  "scope": "Local development and synthetic ERP only; reads existing posted reversals, does not issue reversal commands",
+  "redRegression": {
+    "tests": 1,
+    "expectedStatus": "409",
+    "actualBeforeFix": 202,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/voucher-reversal-resurrection-red.log"
+  },
+  "tests": {
+    "h2Domain": 7,
+    "h2Server": 18,
+    "postgresDomain": 29,
+    "postgresServer": 120,
+    "frontend": 27,
+    "openApiJava": 5,
+    "overlappingScopes": true
+  },
+  "openApi": {
+    "operations": 177,
+    "schemas": 330,
+    "requestExamples": 63,
+    "actualBusinessResponses": 30
+  },
+  "httpRequestsIncludingLogins": [
+    26,
+    9
+  ],
+  "upgrade": {
+    "from": 60,
+    "to": 61,
+    "unchangedTables": [
+      "advance_repayment",
+      "advance_repayment_return",
+      "advance_repayment_resolution",
+      "repayment_review_check",
+      "repayment_review_check_revision",
+      "advance_repayment_check",
+      "advance_repayment_check_revision",
+      "finance_resource",
+      "finance_resource_revision",
+      "payment_operation",
+      "payment_operation_revision",
+      "payment_authorization",
+      "voucher_operation",
+      "advance_disbursement_resolution",
+      "disbursement_return_check",
+      "disbursement_return_check_revision",
+      "advance_receipt_credit",
+      "voucher_operation_revision",
+      "voucher_dispute_resolution"
+    ],
+    "backupBytes": 575748,
+    "backupRestoredThisPhase": false
+  },
+  "finalBalance": {
+    "version": 25,
+    "status": "VOUCHER_REVIEW",
+    "paid": {
+      "value": "300.00",
+      "currency": "CNY"
+    },
+    "available": {
+      "value": "0.00",
+      "currency": "CNY"
+    },
+    "reserved": {
+      "value": "0.00",
+      "currency": "CNY"
+    },
+    "offset": {
+      "value": "0.00",
+      "currency": "CNY"
+    },
+    "repaid": {
+      "value": "130.00",
+      "currency": "CNY"
+    },
+    "outstanding": {
+      "value": "100.00",
+      "currency": "CNY"
+    },
+    "receivedRepayments": {
+      "value": "300.00",
+      "currency": "CNY"
+    },
+    "returnedRepayments": {
+      "value": "170.00",
+      "currency": "CNY"
+    },
+    "returnedDisbursements": {
+      "value": "70.00",
+      "currency": "CNY"
+    }
+  },
+  "recordId": "05ce9a05-e746-4d5c-94ba-ef7d4dd960f0",
+  "operationVersionUnchangedByRegistration": 33,
+  "balanceUnchangedByRegistration": true,
+  "loanHoldPreserved": true,
+  "unchangedTablesAfterAcceptance": [
+    "advance_repayment",
+    "advance_repayment_return",
+    "advance_repayment_resolution",
+    "repayment_review_check",
+    "repayment_review_check_revision",
+    "advance_repayment_check",
+    "advance_repayment_check_revision",
+    "payment_operation",
+    "payment_operation_revision",
+    "payment_authorization",
+    "advance_disbursement_resolution",
+    "disbursement_return_check",
+    "disbursement_return_check_revision",
+    "advance_receipt_credit",
+    "voucher_dispute_resolution"
+  ],
+  "oldRevisionRowsPreserved": true,
+  "originalCommandHashesPreserved": true,
+  "unchangedFiles": 4,
+  "browser": {
+    "explicitRegistration": true,
+    "reversalLines": 2,
+    "reversalLineAmount": "300.00",
+    "evidenceReference": "UI-VOUCHER-REVERSAL-BROWSER-001",
+    "recordedScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/voucher-reversal-browser-recorded.png",
+    "narrowScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/voucher-reversal-browser-narrow.png",
+    "responsive": {
+      "cssWidth": 500,
+      "documentScrollWidth": 500,
+      "panelWidth": 411,
+      "panelScrollWidth": 411,
+      "lineWidth": 377,
+      "lineScrollWidth": 377,
+      "viewportReset": true
+    },
+    "resetCssWidth": 1417
+  },
+  "authors": {
+    "javaFiles": 753,
+    "namedTypes": 1373,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remoteCiRun": false,
+  "realErpAcceptance": false,
+  "next": "Create and dispatch independent ERP reversal commands, then expense bank returns and remaining modules"
+}

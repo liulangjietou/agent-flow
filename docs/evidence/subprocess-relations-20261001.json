@@ -1,0 +1,256 @@
+{
+  "recordedAt": "2026-10-01T14:27:50.488699+00:00",
+  "baseCommit": "36fa7a4f2ee2a8e570921fd542463388cfaae848",
+  "scope": "Authorized direct parent and child references bound to original submitted rounds",
+  "callChain": [
+    "ApplicationRecord history tab and SubprocessRelations selected round",
+    "No-store GET source application authorization and exact saved round",
+    "Bounded JDBC call page with same-tenant parent-round cursor ownership",
+    "Independent target application authorization and original round projection",
+    "ApplicationRecord opens and scrolls to target original round; existing field and attachment authorization retained"
+  ],
+  "failureFirst": [
+    {
+      "artifact": "subprocess-relations-routes-red-valid-fixture.log",
+      "tests": 7,
+      "assertionFailures": 6,
+      "errors": 1,
+      "reason": "Missing read route; six HTTP status assertions failed and one empty 404 body could not be parsed"
+    },
+    {
+      "artifact": "subprocess-relations-original-round-red.log",
+      "tests": 8,
+      "assertionFailures": 1,
+      "reason": "Scroll ran before loading branch mounted original-round DOM; existing setup-only tests did not render that branch"
+    },
+    {
+      "artifact": "subprocess-relations-postgres.log",
+      "classification": "Fixture compatibility failure, not production query failure",
+      "reason": "PostgreSQL driver cannot bind Instant without SQL type; changed fixture to OffsetDateTime and reran same seven tests in a new database"
+    },
+    {
+      "artifacts": [
+        "subprocess-relations-red.log",
+        "subprocess-relations-routes-red.log",
+        "subprocess-relations-ui-initial.log",
+        "subprocess-relations-ui-template-red.log"
+      ],
+      "classification": "Compilation, test path or case-insensitive generated filename errors; excluded as behavioral failure evidence"
+    }
+  ],
+  "verification": {
+    "h2": {
+      "tests": 71,
+      "failures": 0,
+      "errors": 0,
+      "artifact": "subprocess-relations-backend-final.log",
+      "scope": [
+        "SubprocessRelationsIntegrationTest",
+        "SubprocessStartIntegrationTest",
+        "SubprocessPersistenceIntegrationTest",
+        "FieldPermissionsIntegrationTest",
+        "ApplicationCopyIntegrationTest",
+        "OpenApiContractTest"
+      ]
+    },
+    "h2FinalFixtureRecheck": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "artifact": "subprocess-relations-h2-fixture-final.log"
+    },
+    "postgres": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "database": "subprocess_relations_c86c149c8e",
+      "schema": 90,
+      "artifact": "subprocess-relations-postgres-final.log"
+    },
+    "frontend": {
+      "tests": 34,
+      "failures": 0,
+      "artifact": "subprocess-relations-ui-verified.log",
+      "scope": [
+        "subprocess-relations",
+        "initiator-requirements",
+        "round-diagram",
+        "instance-control"
+      ]
+    },
+    "build": {
+      "typecheckAndVite": "PASS",
+      "serverPackage": "PASS; tests skipped for packaging only after scoped tests",
+      "artifacts": [
+        "subprocess-relations-build-verified.log",
+        "subprocess-relations-package.log"
+      ]
+    },
+    "openapi": {
+      "operations": 283,
+      "schemas": 554,
+      "requestExamples": 109,
+      "artifact": "subprocess-relations-openapi.log",
+      "servedContractMatchesSource": true,
+      "actualHttpResponses": 24,
+      "actualResponseContracts": "PASS",
+      "httpArtifact": "subprocess-relations-http.json"
+    },
+    "countsOverlap": true,
+    "fullRepositorySuiteRun": false
+  },
+  "browser": {
+    "url": "http://127.0.0.1:15328/",
+    "backend": "http://127.0.0.1:18229",
+    "method": "Actual Codex in-app browser actions and DOM-backed observations",
+    "results": {
+      "originalRound": {
+        "notice": true,
+        "oldConclusion": true,
+        "openRounds": [
+          "1"
+        ],
+        "scrollTop": 177.3333282470703
+      },
+      "narrow": {
+        "dialogScrollWidth": 436,
+        "dialogWidth": 436,
+        "documentWidth": 480,
+        "relationScrollWidth": 392,
+        "relationWidth": 392,
+        "width": 500
+      },
+      "parentApprover": {
+        "containsChildId": false,
+        "links": 0,
+        "sensitiveMasked": true,
+        "unavailable": true
+      },
+      "childApprover": {
+        "containsParentBusinessNo": false,
+        "links": 0,
+        "unavailable": true
+      },
+      "administrator": {
+        "originalRoundOpen": "1",
+        "sensitiveMasked": true
+      }
+    },
+    "screenshots": [
+      "subprocess-relations-original-round.png",
+      "subprocess-relations-500.png",
+      "subprocess-relations-parent-permission.png",
+      "subprocess-relations-child-permission.png",
+      "subprocess-relations-admin.png"
+    ],
+    "viewportReset": true,
+    "businessWritesPerformed": false
+  },
+  "preservation": {
+    "readOnlyTables": {
+      "approval_application": {
+        "rows": 21,
+        "sha256": "ddf271c0ec502b6381e26fbc2f5742f5af197fba3079188d02d563684a8f1561"
+      },
+      "approval_submission_round": {
+        "rows": 22,
+        "sha256": "1be1f941d615977e6e7b607cbe6ccd686809d38eea52d9a65663ca905227320b"
+      },
+      "approval_subprocess_call": {
+        "rows": 13,
+        "sha256": "d912d287589567cdcae3eb9db7e162a1fea68a151f2bb1351dcc9585d633e5b2"
+      },
+      "request_idempotency": {
+        "rows": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "audit_event": {
+        "rows": 54,
+        "sha256": "2d8e11a4739a54cc081be49fa4b2b4c43e9f2fb94fc45a22f49a46aa63e589e9"
+      },
+      "act_ru_execution": {
+        "rows": 44,
+        "sha256": "e32d997bf96879ac418eba65c5122b40a6e63c9d2e6c4bfa2588497cbe3ae696"
+      },
+      "act_ru_task": {
+        "rows": 12,
+        "sha256": "7906cd9957d79800e1c2f0babcf65582aea13aa294d31c21d54348dbf4a8f93a"
+      }
+    },
+    "tableCount": 7,
+    "rowCount": 166,
+    "readOnlyHashesUnchanged": true,
+    "calls": 13,
+    "knownDeliberatelyInconsistentFixtureCalls": 1,
+    "inconsistentFixtureReadFails422": true,
+    "newMigration": false,
+    "existingAcceptanceServicesReplaced": false,
+    "existingServiceHealthArtifact": "subprocess-relations-preservation.json",
+    "mainUnchangedAndClean": true,
+    "seedFilesUnchanged": true,
+    "existingHistoricalDatabasesFullyRehashed": false
+  },
+  "runtime": {
+    "database": "subprocess_relations_c86c149c8e",
+    "backendPort": 18229,
+    "frontendPort": 15328,
+    "stage": "RUNNING",
+    "backendBaseCommit": "36fa7a4f2ee2a8e570921fd542463388cfaae848",
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-relations-server.jar",
+    "jarSha256": "ca60e2553bf163f00a25b3110d723fdc0b6897eb72ed77b21d55b11367b17693",
+    "workerConfiguration": {
+      "agentflow.expenses.resource-adjustment-worker-enabled": false,
+      "agentflow.advances.disbursement-return-worker-enabled": false,
+      "agentflow.advance-requests.precheck-worker-enabled": false,
+      "agentflow.invoices.verification-worker-enabled": false,
+      "agentflow.expenses.payment-return-worker-enabled": false,
+      "agentflow.expenses.partial-adjustment-worker-enabled": false,
+      "agentflow.expenses.archive-worker-enabled": false,
+      "agentflow.expenses.precheck-worker-enabled": false,
+      "agentflow.expense-plans.precheck-worker-enabled": false,
+      "agentflow.advances.repayment-worker-enabled": false,
+      "agentflow.advances.repayment-review-worker-enabled": false,
+      "agentflow.expenses.settlement-worker-enabled": false,
+      "agentflow.webhooks.worker-enabled": false,
+      "agentflow.assist.worker-enabled": false,
+      "agentflow.supplier-payments.return-worker-enabled": false,
+      "agentflow.supplier-payments.adjustment-preparation-worker-enabled": false,
+      "agentflow.supplier-payments.adjustment-worker-enabled": false,
+      "agentflow.supplier-payments.execution-worker-enabled": false,
+      "agentflow.supplier-payments.payment-worker-enabled": false,
+      "agentflow.procurement-payments.precheck-worker-enabled": false,
+      "agentflow.supplier-payments.review-worker-enabled": false,
+      "agentflow.supplier-payments.hold-worker-enabled": false,
+      "agentflow.supplier-payments.settlement-preparation-worker-enabled": false,
+      "agentflow.supplier-payments.settlement-worker-enabled": false,
+      "agentflow.payments.payee-review-worker-enabled": false,
+      "agentflow.vouchers.reversal-execution-worker-enabled": false,
+      "agentflow.vouchers.reversal-worker-enabled": false,
+      "agentflow.payments.worker-enabled": false,
+      "agentflow.vouchers.preparation-worker-enabled": false,
+      "agentflow.payments.request-worker-enabled": false,
+      "agentflow.vouchers.worker-enabled": false,
+      "agentflow.budgets.worker-enabled": false,
+      "agentflow.payment-callbacks.worker-enabled": false,
+      "agentflow.events.worker-enabled": false,
+      "agentflow.budget-adjustments.precheck-worker-enabled": false,
+      "agentflow.budget-adjustments.review-worker-enabled": false,
+      "agentflow.budget-adjustments.execution-worker-enabled": false,
+      "agentflow.sla.reminders-enabled": false,
+      "agentflow.timers.enabled": false,
+      "agentflow.events.enabled": false
+    },
+    "createdAt": "2026-10-01T14:22:23.174680+00:00",
+    "existingServicesReplaced": false,
+    "backendPid": 7247
+  },
+  "limits": [
+    "Parent and child fixtures were created internally through the formal deployment adapter, not through public subprocess save or publish",
+    "Public SUB_PROCESS save/update/publish remains closed",
+    "This read-only feature acceptance does not complete structured finance parent compatibility or public subprocess lifecycle, nonempty upgrade and restart acceptance",
+    "Real enterprise systems and remote PR/CI remain separate; Git remote is absent"
+  ],
+  "sourceHashesArtifact": "subprocess-relations-source-hashes.json",
+  "artifactRoot": "/fyoung/tmp/agentflow-remaining-20260928",
+  "remainingPackages": 4
+}

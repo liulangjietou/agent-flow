@@ -1,0 +1,102 @@
+{
+  "result": "PASS_SYNTHETIC_SUPPLIER_ADJUSTMENT_DISPUTE_RUNTIME",
+  "schema": 82,
+  "verifiedOldTables": 157,
+  "verifiedOldRows": 2820,
+  "expectedUpdatedOldRows": {
+    "supplier_payable_adjustment_operation": 2
+  },
+  "newRowsByOldTable": {
+    "audit_event": 8,
+    "request_idempotency": 8,
+    "supplier_payable_adjustment_revision": 20
+  },
+  "preservedAttachments": 7,
+  "preservedFinancialFiles": 17,
+  "newDisputeDecisions": 2,
+  "unchangedAdjustmentCommandCount": 3,
+  "invalidCandidatesRejected": [
+    "DIFFERENT_POSTING",
+    "ADJUSTMENT_ALREADY_OBSERVED",
+    "EXPIRED_EVIDENCE",
+    "NON_TERMINAL"
+  ],
+  "originalBankErpReturnsCreditsCompletionPreserved": true,
+  "laterAdjustmentPreserved": true,
+  "browserCancellationVerified": true,
+  "restartAndReplayVerified": true,
+  "browserAfterRestartVerified": true,
+  "narrow": {
+    "innerWidth": 500,
+    "pageClientWidth": 480,
+    "pageScrollWidth": 480,
+    "panelClientWidth": 357,
+    "panelScrollWidth": 357
+  },
+  "recordedResponses": 55,
+  "recordedAt": "2026-09-30T18:13:31.411712+00:00",
+  "implementationCommit": "420819c",
+  "syntheticExternalFinance": true,
+  "upgrade": {
+    "fromVersion": 81,
+    "toVersion": 82,
+    "unchangedBusinessTables": 157,
+    "unchangedBusinessRows": 2820,
+    "unchangedAttachments": 7,
+    "unchangedFinancialFiles": 17,
+    "newDisputeTableEmpty": true,
+    "preservedReceiptCredits": 12,
+    "backupBytes": 1252727,
+    "backupSha256": "8e0bcb1576f3d03466f8fdac3669e9560e8fa4d2d3e10d210d16cbd6ba25ba07"
+  },
+  "contract": {
+    "result": "PASS",
+    "responses": 55
+  },
+  "frontendResponses": {
+    "result": "PASS",
+    "actualViews": 31,
+    "actualReceipts": 3
+  },
+  "localEvidence": {
+    "supplier-adjustment-dispute-upgrade-before.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-upgrade-before.log",
+      "sha256": "2a7d3b775bbe00f874c8bd5e83fc4e4f56c707dd26cdfb35efdd936914ca2442"
+    },
+    "supplier-adjustment-dispute-upgrade-after.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-upgrade-after.log",
+      "sha256": "a209b778f047791199ae84aeb5772d1a5b2c84d604cb60bf8442e7813f10d767"
+    },
+    "supplier-adjustment-dispute-ui-http.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-ui-http.json",
+      "sha256": "af0db53c5bca68fe789434cc43d9e5ffc37e06ec717cee65b65ab798f0a32318"
+    },
+    "supplier-adjustment-dispute-preservation.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-preservation.log",
+      "sha256": "306fd59e2259317ba17e1536ea8f6e648b223e9571d25fca6b4cc112ede768d6"
+    },
+    "supplier-adjustment-dispute-browser-confirm.jpg": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-browser-confirm.jpg",
+      "sha256": "bb95b4ed9568efedafaf9a9d6e94bbd821c36fdfbf62a2b817b9f482d555d7a3"
+    },
+    "supplier-adjustment-dispute-browser-result.jpg": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-browser-result.jpg",
+      "sha256": "ede870fbea85d88fd33c1ac43ba713ee7f320f59ad719652f870bd54aa330623"
+    },
+    "supplier-adjustment-dispute-browser-500.jpg": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-browser-500.jpg",
+      "sha256": "8e3608a74b24c4022320b30d189aa841ff443207afd9d6c17c6044cb9f53b7bb"
+    },
+    "supplier-adjustment-dispute-browser-after-restart.jpg": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-adjustment-dispute-browser-after-restart.jpg",
+      "sha256": "bcd36b659833a75f8579c0ca54fac271e2b1c1b0b8bb8dee3be254348e6f6880"
+    }
+  },
+  "remaining": [
+    "Other finance adjustments including partial expense reductions",
+    "Advanced workflow",
+    "Notifications and collaboration",
+    "Real enterprise and production acceptance",
+    "Remote delivery"
+  ]
+}

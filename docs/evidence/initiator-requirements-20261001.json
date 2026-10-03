@@ -1,0 +1,396 @@
+{
+  "recordedAt": "2026-10-01T14:02:25.437362+00:00",
+  "baseCommit": "6f8ad3a5364175b71dc7e94f6b13627a8cbee5c4",
+  "scope": "Original-version initiator appointment requirements for new applications, existing bound applications and subprocess designer",
+  "callChain": [
+    "App new application / ApplicationRecord resubmission / DefinitionSubprocess selected child",
+    "No-store GET requirement query, root published visibility or existing application authorization",
+    "Application binding uses the same exact tenant, bundled and historical engine source resolver as startup",
+    "Bounded existing DefinitionInitiatorRequirements traversal returns only root key/version/boolean"
+  ],
+  "failureFirst": [
+    {
+      "artifact": "initiator-requirements-red-fixed-fixture.log",
+      "tests": 6,
+      "assertionFailures": 5,
+      "errors": 0,
+      "reason": "Read-only requirement routes did not exist"
+    },
+    {
+      "artifact": "initiator-requirements-ui-red.log",
+      "tests": 1,
+      "assertionFailures": 1,
+      "reason": "Existing ApplicationRecord submitted a contextual process without an explicitly selected appointment"
+    },
+    {
+      "artifact": "initiator-requirements-red.log",
+      "classification": "Discarded as behavioral red evidence: fixture published before initial repository save"
+    }
+  ],
+  "verification": {
+    "h2": {
+      "tests": 84,
+      "failures": 0,
+      "errors": 0,
+      "artifact": "initiator-requirements-backend-final.log",
+      "scope": [
+        "OrganizationApprovalIntegrationTest",
+        "DefinitionSecurityTest",
+        "InitiatorRequirementsQueryIntegrationTest",
+        "DefinitionInitiatorRequirementsTest",
+        "OpenApiContractTest",
+        "BundledDefinitionBindingIntegrationTest",
+        "SubprocessStartIntegrationTest"
+      ]
+    },
+    "postgres": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "database": "initiator_requirements_dd0c448ccc",
+      "artifact": "initiator-requirements-postgres.log",
+      "scope": [
+        "InitiatorRequirementsQueryIntegrationTest"
+      ],
+      "schema": 90
+    },
+    "frontend": {
+      "tests": 42,
+      "failures": 0,
+      "artifact": "initiator-requirements-ui-final.log",
+      "scope": [
+        "initiator-requirements",
+        "initiator-context",
+        "subprocess-designer",
+        "expense-actions",
+        "attachments",
+        "definition-selection"
+      ]
+    },
+    "build": {
+      "typecheckAndVite": "PASS",
+      "serverPackage": "PASS with tests skipped only for packaging after tests",
+      "existingLargeChunkWarning": true
+    },
+    "openapi": {
+      "operations": 282,
+      "schemas": 551,
+      "requestExamples": 109,
+      "servedContractMatchesSource": true,
+      "actualResponses": {
+        "result": "PASS",
+        "actualQueryResponses": 7,
+        "persistedBrowserWriteReceipts": 2,
+        "operations": [
+          "applicationInitiatorRequirements",
+          "createApplication",
+          "definitionInitiatorRequirements",
+          "submitApplication"
+        ]
+      }
+    },
+    "countsOverlap": true,
+    "fullRepositorySuiteRun": false
+  },
+  "browser": {
+    "url": "http://127.0.0.1:15327/",
+    "backend": "http://127.0.0.1:18228",
+    "method": "Actual Codex browser interaction; DOM-backed inspection and screenshots",
+    "passed": [
+      "Required descendant v1 sets required picker and prevents draft creation before submit",
+      "Static descendant v2 reports no appointment requirement",
+      "Unavailable dependency remains unknown, blocks submit and offers retry",
+      "Ordinary deployed static v2 saves a draft then submits once without appointment",
+      "Old v1 application retains its own requirement after same-key v2 publication",
+      "Existing required draft submission leaves its original version and zero rounds",
+      "Designer exact child v1/v2 selection updates requirement without changing other source definitions"
+    ],
+    "blockedNewSubmissionDatabase": {
+      "before": {
+        "applications": 6,
+        "rounds": 1,
+        "idempotency": 8,
+        "testApplication": 0,
+        "executions": 0,
+        "tasks": 0,
+        "observedAt": "2026-10-01T13:56:00.301941+00:00"
+      },
+      "after": {
+        "applications": 6,
+        "rounds": 1,
+        "idempotency": 8,
+        "testApplication": 0,
+        "executions": 0,
+        "tasks": 0
+      },
+      "status": "PASS",
+      "observedAt": "2026-10-01T13:56:39.631152+00:00"
+    },
+    "finalDatabase": {
+      "old": {
+        "id": "a6ffa211-22d5-4637-b7fa-1d07d830cf70",
+        "business_no": "REQUIREMENT-8687d519-2878-4562-8a94-cd4077ec9cd3",
+        "status": "DRAFT",
+        "definition_version": 1,
+        "version": 1
+      },
+      "new": {
+        "id": "e072d8c9-00b9-441a-8c88-688b0e3aa7d0",
+        "business_no": "REQ-UI-20261001",
+        "status": "IN_APPROVAL",
+        "definition_version": 2,
+        "version": 2
+      },
+      "oldRounds": 0,
+      "newRounds": 1,
+      "subprocessCalls": 0
+    },
+    "narrowViewport": {
+      "dialog": [
+        {
+          "clientWidth": 436,
+          "scrollWidth": 436
+        }
+      ],
+      "documentWidth": 480,
+      "innerWidth": 500,
+      "required": [
+        {
+          "label": null,
+          "required": true
+        }
+      ],
+      "scrollWidth": 480
+    },
+    "viewportOverrideReset": true,
+    "screenshots": [
+      "initiator-requirements-required.png",
+      "initiator-requirements-static-submitted.png",
+      "initiator-requirements-narrow.png",
+      "initiator-requirements-designer.png"
+    ],
+    "fixtureBoundary": "Published subprocess-parent fixtures were seeded internally by integration tests for read-only checks. The browser submitted only an ordinary deployed static process; no public subprocess release or lifecycle claim."
+  },
+  "manualReview": {
+    "result": "No blocking findings in changed scope",
+    "checked": [
+      "Tenant/resource authorization",
+      "Exact bundled versus tenant source isolation",
+      "No descendant/person/form exposure in query view",
+      "Read-only/no-store behavior",
+      "Race/timeout cancellation and unknown requirement handling",
+      "Financial dedicated entry constraints unchanged"
+    ]
+  },
+  "preservation": {
+    "recordedAt": "2026-10-01T14:00:52.277708+00:00",
+    "services": {
+      "18224": {
+        "httpStatus": 200,
+        "body": {
+          "status": "UP"
+        }
+      },
+      "18225": {
+        "httpStatus": 200,
+        "body": {
+          "status": "UP"
+        }
+      },
+      "18227": {
+        "httpStatus": 200,
+        "body": {
+          "status": "UP"
+        }
+      },
+      "18228": {
+        "httpStatus": 200,
+        "body": {
+          "status": "UP"
+        }
+      },
+      "15324": {
+        "httpStatus": 200
+      },
+      "15325": {
+        "httpStatus": 200
+      },
+      "15326": {
+        "httpStatus": 200
+      },
+      "15327": {
+        "httpStatus": 200
+      }
+    },
+    "seedSha256": {
+      "/Users/zhangfuqiang/.claude/workflows/fast_v1.json": "e974c13916018ee6a536e834c63ccef63582a9f5eba5706e331786435eed54fc",
+      "/Users/zhangfuqiang/.claude/workflows/collab_v2.json": "6d07f237a1e6f263fdd8d617ef561bab80851c11f0b54e238654adeb81096e6f",
+      "/Users/zhangfuqiang/.claude/workflows/fast_wf2_draft.js": "ec8c2831c3fba2793ef44bc13ae03306de9053bc4ba08c27fdd70f01ba96173d",
+      "/Users/zhangfuqiang/.claude/workflows/fast_wf1_prepare.js": "79d6601909806ca5d4a2f7f51d59be0f2d8c597e4ed87e16cf30060a04fc0221",
+      "/Users/zhangfuqiang/.claude/workflows/fast_wf3_review.js": "c0f6ccd4e35762e727d2356c845369bda6357cfd81c54ecb88cfea5b9c070bb3"
+    },
+    "protectedSeedsUnchanged": true,
+    "mainHead": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+    "mainClean": true,
+    "existingServicesReplaced": false,
+    "historicalDatabaseRowsComparedThisStage": false
+  },
+  "limitations": [
+    "No migration added; this increment does not claim subprocess upgrade or restart acceptance",
+    "Public SUB_PROCESS create/update/publish gate remains closed",
+    "Authorized parent-child round API/UI and structured financial parents remain unfinished",
+    "Actual enterprise systems/model/IdP/deployment and remote PR/CI remain pending",
+    "Existing accepted databases were not fully rehashed during this increment"
+  ],
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/approval/service/ProcessRuntimePort.java": "e2f5a14540e61460811011d5c29ff2a167658bc5c30a945c923328ba799e14c5",
+    "agentflow-server/src/main/java/io/agentflow/approval/ApplicationController.java": "72dce86bc737c2206d24b3363edec53467f8de6bbe9e736fc8df93790d3d2153",
+    "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java": "c8c03fe41e6d2ca5aee2d2afd2a566c7e367adc83e3d19cc3304b442998b1343",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableProcessRuntimeAdapter.java": "f3fc3290c85a471228107f28b350ea1149316952a1485bc31f06cc8ce30d1d2a",
+    "agentflow-server/src/main/java/io/agentflow/definition/DefinitionController.java": "ea30df216dcc0ff923e6141a2db34df1f12352e84f2e688b8d1b8987e3b6dad4",
+    "agentflow-server/src/main/java/io/agentflow/definition/DefinitionInitiatorRequirements.java": "dce8c5bd5072bb79434dd7bb56cdcbddd0a3189441f8531069e857ab14ec09ee",
+    "agentflow-server/src/main/resources/api/openapi.json": "30cd88fe4d4da3e7866922d16f2fc1278152f34c125b5daa5a6fe0b146a12c9d",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "26f4b2db461620a5659a78ee190903d05bb5431d68862185a3e7f364a3a76387",
+    "agentflow-server/src/test/java/io/agentflow/definition/InitiatorRequirementsQueryIntegrationTest.java": "0498806ce9cef370796542fae40e2b79193f95d2933b6d6fcb066875fb227962",
+    "agentflow-web/scripts/check-openapi.mjs": "a3b7f8b0a16d6470586e45ca4e85da4d3e9e12144a5c77cae2c5e8418af882e9",
+    "agentflow-web/scripts/test-requests.mjs": "820cb91374971d2d4a2b92ccf4a563c82cd93829b832ab83c03879d73cb7f89d",
+    "agentflow-web/src/App.vue": "541896af109cbc3daafcd099974a054acd7a44c0ccdd9912e02f1a596194d70e",
+    "agentflow-web/src/api.ts": "d42d5e74c10df389ddf811596b8b67d6b024c0f230324ed926da1be3f9372f20",
+    "agentflow-web/src/components/ApplicationRecord.vue": "31ac8bf04c5521a717159422ca7ee2bff052808b0ffe6ae6d3627f79232621fc",
+    "agentflow-web/src/components/DefinitionSubprocess.vue": "e863340ce5bc1e46901930bef873514d586bdd6612046b002c7e05b2f1f14181",
+    "agentflow-web/src/components/InitiatorRequirementNotice.vue": "86015e85899c9d4891bcf06830d51b0681d8e563fb8499c229ff5da96fe14820",
+    "agentflow-web/src/initiatorRequirements.ts": "f69ab9f6810e3fec93b17a15b2b615349b15c751b8f76c3ee715d96f425873b4",
+    "agentflow-web/tests/initiator-requirements.test.mjs": "753eb0fc9d5aa702525e62b18e22116c91a5cb0333f3838b984156848f8c4a19"
+  },
+  "localArtifactDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "artifacts": {
+    "initiator-requirements-backend-final.log": {
+      "bytes": 270850,
+      "sha256": "2c1b056cc4782790d69f1b42dd2f75850c0d219f13275312a972a50f4f0f143c"
+    },
+    "initiator-requirements-backend-initial.log": {
+      "bytes": 62046,
+      "sha256": "a08a7d2d103e0cd237ddd7ab2ce0b7bd9585c146cd7a2f698717be5cb7286c4f"
+    },
+    "initiator-requirements-bound-v1-dom.txt": {
+      "bytes": 5735,
+      "sha256": "8e0329729a98c62d23183f83cd134072273fa499f2a9e6801b7e9e19f40b03fe"
+    },
+    "initiator-requirements-browser-before.json": {
+      "bytes": 168,
+      "sha256": "58fa08eef1045ad6a13ee83e4fa8a3a8c1836c5561bd69624900405db4f3da5a"
+    },
+    "initiator-requirements-browser-database.json": {
+      "bytes": 448,
+      "sha256": "329de52739e7c82ff909c27646666838a61eca8bff8eef50ef1f7356ce381257"
+    },
+    "initiator-requirements-browser-no-writes.json": {
+      "bytes": 414,
+      "sha256": "b0356eb5b87001b02d3869e745a613540965a04a822cb5576415c95e85cc8acd"
+    },
+    "initiator-requirements-browser-receipts.json": {
+      "bytes": 1111,
+      "sha256": "dd3521b2f82c34b662f59dc793e794970bb058c73ab9d9411f3fe60111b6737b"
+    },
+    "initiator-requirements-build.log": {
+      "bytes": 781,
+      "sha256": "5fe2a3755813dcc5e0bb355d6908a06fdacc3f727eb8b5e60d7e8b1a4155e209"
+    },
+    "initiator-requirements-designer-v1-dom.txt": {
+      "bytes": 12129,
+      "sha256": "621ba7c99c46ccad88baa502bffc507b805458debd3e9a4fa9b5e2b407c5af00"
+    },
+    "initiator-requirements-designer-v2-dom.txt": {
+      "bytes": 12090,
+      "sha256": "d94d1241ee469b6e92ac0c28f8dd60beafbaab06a42aac2ce62b65ed448397d5"
+    },
+    "initiator-requirements-designer.png": {
+      "bytes": 92028,
+      "sha256": "0f576a7ff0e41a0989519d05be2a1c35d0a81441fc31b1b7369f7ea160bc12d1"
+    },
+    "initiator-requirements-http-contracts.json": {
+      "bytes": 241,
+      "sha256": "35408fe5d9e21a033bfdeadee05fc4f04b6d49671f520ab5a9b0df6780aef8f8"
+    },
+    "initiator-requirements-http.json": {
+      "bytes": 3083,
+      "sha256": "8ef8a2a6dc02067d7ccd88a83035adbba46c792a760740d1fbafdce7d511e392"
+    },
+    "initiator-requirements-narrow.json": {
+      "bytes": 229,
+      "sha256": "15b666adfa3bb9355f189bc38705459feb0d10ee79398f2866406aeec531162d"
+    },
+    "initiator-requirements-narrow.png": {
+      "bytes": 42128,
+      "sha256": "1dfa2e3bfd3f36e0868e92b212293330e19926e9bedb2c474581fa0cf583623d"
+    },
+    "initiator-requirements-openapi.log": {
+      "bytes": 141,
+      "sha256": "3cbaedd096b6c3667074a2f94b932837aebdd960a65fbed1257750d3226d1ffd"
+    },
+    "initiator-requirements-optional-dom.txt": {
+      "bytes": 3964,
+      "sha256": "37ce56010c159294e7b26ac911656892a53c5ee7fb95378cbac74c21c9bd139e"
+    },
+    "initiator-requirements-package.log": {
+      "bytes": 9613,
+      "sha256": "266e1925dd3db287e6b8c478b23fc2cf942d1b5413f767c1f01a542451e7c688"
+    },
+    "initiator-requirements-postgres.json": {
+      "bytes": 129,
+      "sha256": "24bc213181c142e05bb0f8ca1c4020de464de17acbfcc67035b637b241becfff"
+    },
+    "initiator-requirements-postgres.log": {
+      "bytes": 34902,
+      "sha256": "2d9d1cce6063aadcecc982aa3b038099c1bb527d14100d7d98229bdc8b11a729"
+    },
+    "initiator-requirements-red-fixed-fixture.log": {
+      "bytes": 61512,
+      "sha256": "4106cf16f5fb66a0c39109f66142a49b56f04d81cf6b5b183ac9a97f51b5d852"
+    },
+    "initiator-requirements-red.log": {
+      "bytes": 59493,
+      "sha256": "c280426b80c7b668dd1b2a1f950e2fff3e5ab68eee8b220ffc1c59e0f3ea2c52"
+    },
+    "initiator-requirements-required-dom.txt": {
+      "bytes": 4075,
+      "sha256": "828d1b9febd1347314ef3c0ce129618541b6a9fc796b2facd968fef88b4ae437"
+    },
+    "initiator-requirements-required.png": {
+      "bytes": 71264,
+      "sha256": "e307e60d424b03608956c76d7772a2a1be59aba275c2679a203e38aa8149b4b4"
+    },
+    "initiator-requirements-runtime-health.json": {
+      "bytes": 1510,
+      "sha256": "41be56e8e53511098d307f77ccd3337babbb6b71797e20af5e28407703726b05"
+    },
+    "initiator-requirements-source-hashes.json": {
+      "bytes": 2454,
+      "sha256": "21139de4d5984bf41731ce911e54676eefb75aadae8e6a4e9c901f74fd6bcf8a"
+    },
+    "initiator-requirements-static-submitted-dom.txt": {
+      "bytes": 5423,
+      "sha256": "56a4ef1fe907bc3ebda982b461a106de5336d67fc5120f759fdb9a19eeb0c0ef"
+    },
+    "initiator-requirements-static-submitted.png": {
+      "bytes": 91437,
+      "sha256": "e877f0b3366dcf8134b4520215058252f21065fee658b14560504e49acee6ae0"
+    },
+    "initiator-requirements-ui-final.log": {
+      "bytes": 4269,
+      "sha256": "cdf1753afda5bb83269d7738fc9da8fef334d752fabc1d4d81d3d25f664d4340"
+    },
+    "initiator-requirements-ui-initial.log": {
+      "bytes": 1294,
+      "sha256": "89a85aa7391bbad5336ba9bd48a732cf6a56e2d4795e653daa5c0f6cd5ee3b12"
+    },
+    "initiator-requirements-ui-red.log": {
+      "bytes": 918,
+      "sha256": "63969bb539558ed22df3f08177d7ea8392626ca43b6231707aff61fe76a71e00"
+    },
+    "initiator-requirements-unavailable-dom.txt": {
+      "bytes": 4163,
+      "sha256": "15671f2587b29aac0bafec9e2e5dc5a3b96914acad5900cd76a13a898bd36916"
+    }
+  }
+}

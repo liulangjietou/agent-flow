@@ -1,0 +1,175 @@
+{
+  "status": "PASS_LOCAL_HTTP_POSTGRESQL_RESTART_BROWSER",
+  "syntheticFinanceOnly": true,
+  "schema": 78,
+  "newApprovedRequests": 2,
+  "originalBankCommands": 2,
+  "originalErpCommands": 2,
+  "decisions": 3,
+  "restartVerified": true,
+  "browserDecisionVerified": true,
+  "browserOriginalQueryVerified": true,
+  "actualCssWidth": 500,
+  "horizontalOverflow": false,
+  "preservedOldRows": 2006,
+  "unchangedTables": 118,
+  "tablesWithOnlyNewRows": {
+    "approval_application": {
+      "oldRows": 27,
+      "newRows": 29
+    },
+    "approval_submission_round": {
+      "oldRows": 30,
+      "newRows": 32
+    },
+    "audit_event": {
+      "oldRows": 271,
+      "newRows": 300
+    },
+    "invoice_active_claim": {
+      "oldRows": 5,
+      "newRows": 7
+    },
+    "notification_inbox": {
+      "oldRows": 110,
+      "newRows": 118
+    },
+    "procurement_payable_reservation": {
+      "oldRows": 4,
+      "newRows": 6
+    },
+    "procurement_payable_reservation_revision": {
+      "oldRows": 7,
+      "newRows": 11
+    },
+    "procurement_payment": {
+      "oldRows": 4,
+      "newRows": 6
+    },
+    "procurement_payment_check_job": {
+      "oldRows": 7,
+      "newRows": 9
+    },
+    "procurement_payment_check_revision": {
+      "oldRows": 21,
+      "newRows": 27
+    },
+    "procurement_payment_revision": {
+      "oldRows": 12,
+      "newRows": 18
+    },
+    "request_idempotency": {
+      "oldRows": 331,
+      "newRows": 360
+    },
+    "supplier_payable_hold_operation": {
+      "oldRows": 1,
+      "newRows": 3
+    },
+    "supplier_payable_hold_revision": {
+      "oldRows": 6,
+      "newRows": 12
+    },
+    "supplier_payable_review": {
+      "oldRows": 1,
+      "newRows": 3
+    },
+    "supplier_payable_review_revision": {
+      "oldRows": 4,
+      "newRows": 12
+    },
+    "supplier_payable_settlement_operation": {
+      "oldRows": 1,
+      "newRows": 3
+    },
+    "supplier_payable_settlement_revision": {
+      "oldRows": 19,
+      "newRows": 27
+    },
+    "supplier_payment_authorization": {
+      "oldRows": 1,
+      "newRows": 3
+    },
+    "supplier_payment_execution_request": {
+      "oldRows": 1,
+      "newRows": 3
+    },
+    "supplier_payment_execution_revision": {
+      "oldRows": 3,
+      "newRows": 9
+    },
+    "supplier_payment_operation": {
+      "oldRows": 1,
+      "newRows": 3
+    },
+    "supplier_payment_revision": {
+      "oldRows": 28,
+      "newRows": 63
+    },
+    "supplier_settlement_completion": {
+      "oldRows": 1,
+      "newRows": 3
+    },
+    "supplier_settlement_preparation": {
+      "oldRows": 2,
+      "newRows": 4
+    },
+    "supplier_settlement_preparation_revision": {
+      "oldRows": 6,
+      "newRows": 12
+    }
+  },
+  "unchangedAttachments": 6,
+  "preservedOriginalFinancialFiles": 16,
+  "financialFilesWithOnlyTwoNewEntries": [
+    "supplier-finance-ui-synthetic-holds.json",
+    "supplier-cashier-ui-synthetic-payments.json",
+    "supplier-settlement-ui-synthetic-settlements.json"
+  ],
+  "businessResponses": 142,
+  "loginCalls": 30,
+  "captureCorrection": {
+    "responseIndexes": [
+      0,
+      62
+    ],
+    "source": "Persisted exact idempotency response_body",
+    "reason": "Fixture metadata shared the response dictionary; recovered the two original receipts and deep-copied subsequent captures."
+  },
+  "bankAfter": {
+    "b08e4fce-84ed-43ac-bcbd-c0c60312d10b": "SUCCEEDED",
+    "c6cad3b9-e5c1-4504-91bc-db3402d2ac87": "REVERSED"
+  },
+  "originalErpAndLocalCompletionPreserved": true,
+  "upgrade": {
+    "fromVersion": 77,
+    "toVersion": 78,
+    "unchangedBusinessTables": 144,
+    "unchangedBusinessRows": 2006,
+    "unchangedAttachments": 6,
+    "unchangedFinancialFiles": 16,
+    "newDecisionTableEmpty": true,
+    "backupBytes": 1026083,
+    "backupSha256": "cddfc0e45d305d7aa25a61daffbc28a8bd483e1433311730756277add74bee0c"
+  },
+  "contract": {
+    "result": "PASS",
+    "responses": 142
+  },
+  "frontendActualResponses": {
+    "status": "PASS",
+    "actualViews": 37,
+    "actualDecisionReceipts": 13,
+    "actualSettlementViews": 15
+  },
+  "implementationCommit": "071fff69b098d3bac7d2f39c5c2c697cb6859aea",
+  "date": "2026-09-30",
+  "screenshots": [
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-dispute-browser-completed.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-dispute-browser-narrow.jpg"
+  ],
+  "remaining": [
+    "Supplier real-return independent financial adjustment and ERP settlement disputes",
+    "Real enterprise financial gateway acceptance"
+  ]
+}

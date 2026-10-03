@@ -1,0 +1,98 @@
+import { amountMinor, expenseTypes, type ExpenseContent, type ExpenseLine, type ExpensePolicySelection } from './expenses.js'
+import { readPolicyConstraints, expenseUnits, type PolicyConstraints } from './expenseConfiguration.js'
+import type { FinanceCatalog } from './expenseDraft'
+
+export interface PolicyGuidanceContext {
+  legalEntityId: string; reportType: ExpenseContent['type']; categoryCode: string; cityCode: string
+  incurredOn: string; currency: string; unit: ExpenseLine['unit']
+}
+export interface PolicyGuidance {
+  policyId: string; policyVersion: number; policyName: string; ruleKey: string; ruleName: string
+  constraints: PolicyConstraints; factSourceReference: string; validUntil: string; selection: ExpensePolicySelection | null
+}
+export interface PolicyGuidanceView { context: PolicyGuidanceContext; guidance: PolicyGuidance }
+const dimensions = ['legalEntityId', 'reportType', 'categoryCode', 'cityCode', 'incurredOn', 'currency', 'unit'] as const
+const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)
+const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
+const positive = (value: unknown) => Number.isSafeInteger(value) && (value as number) > 0
+const text = (value: unknown, max: number): value is string => typeof value === 'string' && !!value.trim() && value === value.trim() && value.length <= max && !/[\x00-\x1f\x7f]/.test(value)
+const day = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value
+
+/** 只在本人目录内的匹配条件完整后查询，金额和数量变化无需重复访问外部系统。 */
+export function policyGuidanceContext(legalEntityId: string, reportType: ExpenseContent['type'], line: ExpenseLine, catalog: FinanceCatalog): PolicyGuidanceContext | null {
+  if (!uuid(legalEntityId) || !catalog.legalEntities.some(entity => entity.id === legalEntityId) || !Object.prototype.hasOwnProperty.call(expenseTypes, reportType)
+    || !catalog.categories.some(category => category.code === line.categoryCode && category.units.includes(line.unit))
+    || !catalog.cities.some(city => city.code === line.cityCode) || !day(line.incurredOn) || !/^[A-Z]{3}$/.test(line.claimedGross.currency)) return null
+  return { legalEntityId, reportType, categoryCode: line.categoryCode, cityCode: line.cityCode, incurredOn: line.incurredOn, currency: line.claimedGross.currency, unit: line.unit }
+}
+
+/** 查询参数只投影固定的七个维度，不接受员工、职级或制度覆盖。 */
+export function policyGuidanceQuery(context: PolicyGuidanceContext): string {
+  return new URLSearchParams(dimensions.map(key => [key, context[key]])).toString()
+}
+
+/** 响应必须绑定本次输入和仍有效的版本，畸形内容不能显示为可用制度。 */
+export function readPolicyGuidance(value: unknown, expected: PolicyGuidanceContext, now = Date.now()): PolicyGuidanceView {
+  const invalid = () => { throw { status: 0, code: 'RESPONSE_UNREADABLE', message: '制度提示响应不完整，请刷新重试。' } }
+  if (!object(value) || !object(value.context) || !object(value.guidance)) return invalid()
+  const context = value.context
+  if (!dimensions.every(key => context[key] === expected[key])) return invalid()
+  const advice = value.guidance as unknown as PolicyGuidance
+  if (!uuid(advice.policyId) || !positive(advice.policyVersion) || !text(advice.policyName, 128) || !text(advice.ruleKey, 64)
+    || !text(advice.ruleName, 128) || !text(advice.factSourceReference, 128) || !(Date.parse(advice.validUntil) > now)) return invalid()
+  const selection = advice.selection ?? null
+  if (selection && (!object(selection) || selection.policyId !== advice.policyId || selection.policyVersion !== advice.policyVersion
+    || !positive(selection.categoryRevision) || !positive(selection.activeRevision) || typeof selection.definitionDigest !== 'string'
+    || !/^[a-f0-9]{64}$/.test(selection.definitionDigest))) return invalid()
+  let constraints: PolicyConstraints
+  try {
+    constraints = readPolicyConstraints(advice.constraints, expected.currency)
+    if (constraints.unitPriceLimit) amountMinor(constraints.unitPriceLimit.value)
+  } catch { return invalid() }
+  return { context: { ...expected }, guidance: { policyId: advice.policyId, policyVersion: advice.policyVersion, policyName: advice.policyName,
+    ruleKey: advice.ruleKey, ruleName: advice.ruleName, constraints, factSourceReference: advice.factSourceReference,
+    validUntil: advice.validUntil, selection: selection ? { ...selection } : null } }
+}
+
+export interface GuidanceMessage { code: string; warning: boolean; text: string }
+/** 只比较用户正在输入的金额与规则；不生成任何税额、批准或票据查验事实。 */
+export function policyGuidanceMessages(advice: PolicyGuidance, line: ExpenseLine): GuidanceMessage[] {
+  const c = advice.constraints, messages: GuidanceMessage[] = []
+  const add = (code: string, warning: boolean, text: string) => messages.push({ code, warning, text })
+  if (c.effect === 'DENY') { add('DENIED', true, '该规则禁止此项报销，请核对费用内容或联系财务。'); return messages }
+  if (c.unitPriceLimit) {
+    const cap = c.unitPriceLimit
+    add('CAP', false, `单价上限 ${cap.currency} ${cap.value} / ${expenseUnits[c.limitUnit!]}`)
+    if (line.unit !== c.limitUnit || line.claimedGross.currency !== cap.currency) add('UNIT_MISMATCH', true, '本行单位或币种与上限不同，请核对后预检。')
+    else {
+      try {
+        const inputQuantity = String(line.quantity)
+        if (!/^\d{1,7}(?:\.\d{1,3})?$/.test(inputQuantity)) throw new Error('Invalid quantity')
+        const [whole, fraction = ''] = inputQuantity.split('.'), quantity = BigInt(whole!) * 1000n + BigInt(fraction.padEnd(3, '0'))
+        const gross = amountMinor(line.claimedGross.value)
+        if (quantity <= 0n || quantity > 1_000_000_000n || gross <= 0n) throw new Error('Incomplete amounts')
+        if (gross * 1000n > amountMinor(cap.value) * quantity) add('AMOUNT', true, '按当前数量，本行金额超过单价上限，请填写超标说明；是否可报由预检和审批确认。')
+        else add('AMOUNT_INPUT', false, '当前输入未超过本规则的单价上限，票据、税额与其他条件仍需预检。')
+      } catch { add('AMOUNT_INCOMPLETE', false, '填写有效金额和数量后，将在此比较单价上限。') }
+    }
+  }
+  if (c.priorRequestRequired) add('PRIOR_REQUEST', !line.priorRequest, line.priorRequest
+    ? '已选择事前申请，批准状态和可用额度仍需预检确认。' : '该规则要求事前申请，请选择对应的有效批准行。')
+  if (c.invoiceMaxAgeDays !== null) add('INVOICE_AGE', false, `票据时限 ${c.invoiceMaxAgeDays} 天；${c.invoiceAgeAction === 'REJECT' ? '超期阻断' : '超期需说明'}，由查验票据事实确认。`)
+  if (c.allowedServiceLevels.length) add('SERVICE_LEVEL', false, `允许等级：${c.allowedServiceLevels.join('、')}；具体票据等级由预检核对。`)
+  if (!messages.length) add('RULE', false, '当前适用规则未配置金额上限；完整可报结论仍需预检。')
+  return messages
+}
+
+/** 对不可用、换版和未匹配分别提示，不把查询失败显示为不限额。 */
+export function policyGuidanceError(cause: unknown): string {
+  const error = cause as { code?: string; message?: string }
+  if (error?.code === 'POLICY_CONFIGURATION_CHANGED') return '费用制度已更新，请刷新本行提示。'
+  if (error?.code === 'FINANCE_TARGET_CHANGED') return '财务连接已变化，请刷新财务目录后重试。'
+  if (error?.code === 'EXPENSE_GUIDANCE_CONTEXT_UNAVAILABLE') return '本人可用目录已变化，请刷新财务目录。'
+  if (error?.code === 'FINANCE_RULE_REJECTED' && error.message === 'POLICY_NOT_FOUND') return '当前条件没有匹配的费用制度，请核对输入或联系财务。'
+  if (error?.code === 'RESPONSE_UNREADABLE') return '制度提示响应不完整，请刷新重试。'
+  if (error?.code === 'GUIDANCE_TIMEOUT') return '制度提示读取超时，请刷新重试。'
+  if (error?.code === 'INVALID_EXPENSE_GUIDANCE_QUERY') return '请核对日期、币种和单位；当前仅支持两位精度的有效币种。'
+  return '暂时无法读取费用标准，可继续填写；保存后仍须通过预检。'
+}

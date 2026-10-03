@@ -44,3 +44,11 @@ test('审批人读取带认证和取消信号，不使用业务幂等键', async
   assert.equal(requests[0].headers.get('Authorization'), 'Bearer test-token')
   assert.equal(requests[0].headers.has('Idempotency-Key'), false)
 })
+
+test('本地组织选项展示目录名称，不向配置人暴露技术角色标识', () => {
+  assert.equal(assigneeLabel('role:ORG_UNIT_123', '部门 · 审核部'), '部门 · 审核部')
+  assert.equal(assigneeLabel('role:ORG_PERSON_456', '人员 · 主管'), '人员 · 主管')
+  assert.equal(assigneeLabel('role:ORG_UNIT_123'), '本地组织成员')
+  assert.equal(assigneeLabel('role:ORG_PERSON_456'), '本地指定人员')
+  assert.equal(assigneeLabel('role:FINANCE', 'FINANCE'), '财务审批组')
+})

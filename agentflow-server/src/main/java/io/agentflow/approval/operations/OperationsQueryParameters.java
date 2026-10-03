@@ -14,7 +14,8 @@ import java.util.Set;
 public final class OperationsQueryParameters {
     private static final int DEFAULT_DAYS = 30;
     private static final int MAX_DAYS = 366;
-    private static final Set<String> ALLOWED = Set.of("from", "to", "processKey", "definitionVersion");
+    private static final int MAX_ORGANIZATION_LENGTH = 128;
+    private static final Set<String> ALLOWED = Set.of("from", "to", "processKey", "definitionVersion", "organization");
     private OperationsQueryParameters() { }
 
     /** 日期均为 UTC 自然日，默认包含今天的近三十天，最长三百六十六天。 */
@@ -24,16 +25,18 @@ public final class OperationsQueryParameters {
             LocalDate to = raw.containsKey("to") ? LocalDate.parse(raw.get("to")) : today;
             LocalDate from = raw.containsKey("from") ? LocalDate.parse(raw.get("from")) : to.minusDays(DEFAULT_DAYS - 1);
             String key = raw.getOrDefault("processKey", "").strip();
+            String organization = raw.getOrDefault("organization", "").strip();
             Long version = raw.containsKey("definitionVersion") ? Long.valueOf(raw.get("definitionVersion")) : null;
             if (from.isAfter(to) || to.isAfter(today) || from.getYear() < 1
                     || ChronoUnit.DAYS.between(from, to) >= MAX_DAYS || key.length() > 128
                     || key.chars().anyMatch(Character::isISOControl)
+                    || organization.length() > MAX_ORGANIZATION_LENGTH || organization.chars().anyMatch(Character::isISOControl)
                     || version != null && (version < 1 || version > Integer.MAX_VALUE || key.isEmpty())) throw invalid();
-            return new ApprovalOperationsReadPort.Query(from, to, key, version);
+            return new ApprovalOperationsReadPort.Query(from, to, key, version, organization);
         } catch (DateTimeException | NumberFormatException exception) { throw invalid(); }
     }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_OPERATIONS_QUERY", "Invalid UTC date range or process filter");
+        return new DomainException("INVALID_OPERATIONS_QUERY", "Invalid UTC date range, process or organization filter");
     }
 }

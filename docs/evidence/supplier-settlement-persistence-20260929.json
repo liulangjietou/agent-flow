@@ -1,0 +1,93 @@
+{
+  "date": "2026-09-29",
+  "scope": "supplier settlement preparation and V73 persistence",
+  "baseCommit": "4d8327dd3942e2bd0f779a822a43320eab495ffe",
+  "migration": "V73__supplier_payable_settlements.sql",
+  "newTables": [
+    "supplier_settlement_preparation",
+    "supplier_settlement_preparation_revision",
+    "supplier_payable_settlement_operation",
+    "supplier_payable_settlement_revision",
+    "supplier_settlement_retirement",
+    "supplier_settlement_completion"
+  ],
+  "tests": {
+    "domain": {
+      "tests": 39,
+      "failed": 0,
+      "newPreparationTests": 6
+    },
+    "h2AndLoopbackHttp": {
+      "tests": 75,
+      "failed": 0,
+      "newPersistenceTests": 14
+    },
+    "postgresql": {
+      "tests": 58,
+      "failed": 0,
+      "engine": "17.11",
+      "databases": {
+        "AGENTFLOW_SUPPLIER_SETTLEMENT": {
+          "database": "supplier_settle_supplier_settlement_626fd623",
+          "url": "jdbc:postgresql://127.0.0.1:55460/supplier_settle_supplier_settlement_626fd623",
+          "user": "agentflow"
+        },
+        "AGENTFLOW_SUPPLIER_PAYMENT": {
+          "database": "supplier_settle_supplier_payment_56052f72",
+          "url": "jdbc:postgresql://127.0.0.1:55460/supplier_settle_supplier_payment_56052f72",
+          "user": "agentflow"
+        },
+        "AGENTFLOW_PROCUREMENT_PERSISTENCE": {
+          "database": "supplier_settle_procurement_persistence_fe849ec6",
+          "url": "jdbc:postgresql://127.0.0.1:55460/supplier_settle_procurement_persistence_fe849ec6",
+          "user": "agentflow"
+        },
+        "AGENTFLOW_PROCUREMENT_WORKFLOW": {
+          "database": "supplier_settle_procurement_workflow_f4bb32f5",
+          "url": "jdbc:postgresql://127.0.0.1:55460/supplier_settle_procurement_workflow_f4bb32f5",
+          "user": "agentflow"
+        }
+      }
+    },
+    "redBeforeFix": {
+      "tests": 1,
+      "failures": 1,
+      "case": "completionTimeCannotPrecedeItsActualBankEvidenceRevision"
+    },
+    "authorCheck": {
+      "javaFiles": 931,
+      "namedTypes": 1729,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "verified": [
+    "actual paid bank revision and explicit finance/date intent",
+    "one active preparation and immutable settlement per bank",
+    "READY and command registration rollback together",
+    "lease recovery rejects late preparation results",
+    "safe retirement frees only the original attempt and preserves history",
+    "unknown or already-settled rejection cannot forge retirement",
+    "retired commands cannot be queried or resumed",
+    "actual ERP completion and local payable completion commit together",
+    "failed reservation revision rolls back ERP result and completion proof",
+    "current bank change blocks completion; historical proof survives later queries",
+    "completion time cannot precede referenced bank revision",
+    "V72 to V73 preserves existing bank, approval, procurement, invoice and command records"
+  ],
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-completion-time-red.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-persistence-h2.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-persistence-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-persistence-authors.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-postgres-verification.json"
+  ],
+  "limitations": [
+    "internal persistence only; public finance settlement endpoints and workers are next",
+    "existing browser acceptance service remains on V72",
+    "synthetic financial fixtures do not establish real bank or ERP integration",
+    "no configured Git remote; no remote PR or CI"
+  ],
+  "remainingMajorPackages": 4,
+  "countsOverlap": true
+}

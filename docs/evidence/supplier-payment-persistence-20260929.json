@@ -1,0 +1,75 @@
+{
+  "date": "2026-09-29",
+  "scope": "Supplier cashier intent, original bank command persistence, workers and V71 migration",
+  "domainTests": {
+    "SupplierPaymentExecutionRequestTest": 6,
+    "SupplierPaymentOperationTest": 14
+  },
+  "h2Tests": {
+    "SupplierPaymentPersistenceTest": 16
+  },
+  "postgresRegression": {
+    "SupplierPaymentPersistenceTest": 16,
+    "SupplierPayableHoldPersistenceTest": 15,
+    "SupplierPayableReviewPersistenceTest": 11,
+    "SupplierFinanceWorkflowTest": 8
+  },
+  "otherRegression": {
+    "OpenApiContractTest": 5,
+    "PaymentAccessTest": 4
+  },
+  "postgresRunTotal": 79,
+  "failed": 0,
+  "skipped": 0,
+  "databases": {
+    "AGENTFLOW_SUPPLIER_PAYMENT": {
+      "database": "supplier_bank_supplier_payment_3a3cfe4a",
+      "url": "jdbc:postgresql://127.0.0.1:55460/supplier_bank_supplier_payment_3a3cfe4a",
+      "user": "agentflow"
+    },
+    "AGENTFLOW_SUPPLIER_HOLD": {
+      "database": "supplier_bank_supplier_hold_15d52ffe",
+      "url": "jdbc:postgresql://127.0.0.1:55460/supplier_bank_supplier_hold_15d52ffe",
+      "user": "agentflow"
+    },
+    "AGENTFLOW_SUPPLIER_FINANCE": {
+      "database": "supplier_bank_supplier_finance_46499618",
+      "url": "jdbc:postgresql://127.0.0.1:55460/supplier_bank_supplier_finance_46499618",
+      "user": "agentflow"
+    }
+  },
+  "verification": [
+    "V70 to V71 preserves existing approval, invoice claims, original authorization and ERP hold rows",
+    "Concurrent cashier selections and bank claims have one winner",
+    "Bank queue and preparation READY roll back together on revision failure",
+    "Possible bank send commits before transport and timeout only queries original command",
+    "Original source and current finance or cashier appointment loss prevents new send but does not stop unknown recovery",
+    "Expired leases preserve exact original selection and command; late results cannot overwrite newer claims",
+    "Authoritative NOT_FOUND requires explicit original command retry and new evidence",
+    "SQL foreign keys reject READY without command and unrelated source revisions",
+    "Current operation restoration rejects command digest tampering"
+  ],
+  "authors": {
+    "javaFiles": 912,
+    "namedTypes": 1685,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "logs": {
+    "domainAndCompile": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-persistence-compile.log",
+    "h2": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-persistence-h2.log",
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-persistence-postgres.log",
+    "authors": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-persistence-authors.log"
+  },
+  "acceptanceRuntime": {
+    "schema": 70,
+    "upgradedToV71": false,
+    "realBankOrErp": false
+  },
+  "remaining": [
+    "Cashier scoped public API and UI",
+    "ERP original payable settlement",
+    "Supplier bank disputes and subsequent return or adjustment workflows",
+    "Real enterprise integration acceptance"
+  ]
+}

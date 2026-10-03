@@ -1,0 +1,16 @@
+# 与 compose.production.yml 或 compose.demo.yml 合用，显式挂载同一主机持久目录。
+services:
+  server:
+    environment:
+      AGENTFLOW_ATTACHMENT_DIRECTORY: /var/lib/agentflow/attachments
+      AGENTFLOW_ATTACHMENT_MAX_FILE_BYTES: ${AGENTFLOW_ATTACHMENT_MAX_FILE_BYTES:-20971520}
+      AGENTFLOW_ATTACHMENT_MAX_APPLICATION_BYTES: ${AGENTFLOW_ATTACHMENT_MAX_APPLICATION_BYTES:-268435456}
+      AGENTFLOW_ATTACHMENT_MAX_APPLICATION_UPLOADS: ${AGENTFLOW_ATTACHMENT_MAX_APPLICATION_UPLOADS:-100}
+      AGENTFLOW_INVOICE_MAX_WALLET_BYTES: ${AGENTFLOW_INVOICE_MAX_WALLET_BYTES:-1073741824}
+      AGENTFLOW_INVOICE_MAX_WALLET_UPLOADS: ${AGENTFLOW_INVOICE_MAX_WALLET_UPLOADS:-1000}
+    volumes:
+      - type: bind
+        source: ${AGENTFLOW_ATTACHMENT_HOST_DIRECTORY:?Set the prepared absolute attachment directory on this host}
+        target: /var/lib/agentflow/attachments
+        bind:
+          create_host_path: false

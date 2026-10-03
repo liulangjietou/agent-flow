@@ -2,13 +2,14 @@
 export interface ApplicationComment {
   id: string; applicationId: string; author: string; content: string; roundNo: number
   applicationVersion: number; applicationStatus: string; createdAt: string
+  mentions?: string[]
 }
 /** 单申请评论游标页。@author owlzhangfq@gmail.com */
 export interface CommentPage { items: ApplicationComment[]; nextCursor?: string | null }
 /** 评论筛选只作用于读取，不改变新评论关联的当前申请上下文。@author owlzhangfq@gmail.com */
 export interface CommentQuery { roundNo?: number; limit?: number; cursor?: string }
 /** 尚未发送的本页草稿，固定开始编辑时的申请版本。@author owlzhangfq@gmail.com */
-export interface CommentDraft { content: string; expectedVersion: number }
+export interface CommentDraft { content: string; expectedVersion: number; mentions?: string[] }
 
 /**
  * 待办和申请弹窗共享本页草稿，切换账号后不可见；不写入浏览器持久存储。
@@ -19,25 +20,26 @@ export class CommentDrafts {
   private key(scope: string, id: string) { return JSON.stringify([scope, id]) }
   get(scope: string, id: string): CommentDraft | null {
     const value = this.entries.get(this.key(scope, id))
-    return value ? { ...value } : null
+    return value ? { ...value, ...(value.mentions ? { mentions: [...value.mentions] } : {}) } : null
   }
   /** 后续刷新不能自动把旧评论草稿绑定到新版本。 */
-  put(scope: string, id: string, content: string, version: number) {
+  put(scope: string, id: string, content: string, version: number, mentions: string[] = []) {
     if (!scope || !id) return
     const key = this.key(scope, id), previous = this.entries.get(key)
-    if (!content.trim()) this.entries.delete(key)
-    else this.entries.set(key, { content, expectedVersion: previous?.expectedVersion ?? version })
+    if (!content.trim() && !mentions.length) this.entries.delete(key)
+    else this.entries.set(key, { content, expectedVersion: previous?.expectedVersion ?? version, ...(mentions.length ? { mentions: [...mentions] } : {}) })
   }
   /** 用户核对最新申请后显式更新上下文，保留正文。 */
   adopt(scope: string, id: string, version: number) {
     const value = this.entries.get(this.key(scope, id))
-    if (value) value.expectedVersion = version
+    if (value) { value.expectedVersion = version; delete value.mentions }
   }
   discard(scope: string, id: string) { this.entries.delete(this.key(scope, id)) }
   /** 只清除已经确认的原请求，不能误删发送后的另一份内容。 */
   acknowledge(scope: string, id: string, sent: CommentDraft) {
     const current = this.get(scope, id)
-    if (current?.expectedVersion === sent.expectedVersion && current.content.trim() === sent.content.trim()) this.discard(scope, id)
+    if (current?.expectedVersion === sent.expectedVersion && current.content.trim() === sent.content.trim()
+        && JSON.stringify(current.mentions ?? []) === JSON.stringify(sent.mentions ?? [])) this.discard(scope, id)
   }
   hasDrafts() { return this.entries.size > 0 }
 }

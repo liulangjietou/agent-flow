@@ -1,0 +1,41 @@
+{
+  "date": "2026-09-29",
+  "stage": "expense-resource-adjustment-domain",
+  "result": "PASS_DOMAIN_AND_LEGACY_COMPATIBILITY_ONLY",
+  "tests": {
+    "domainScope": 70,
+    "h2ExistingResourceVerificationAndRepaymentScope": 67,
+    "newDomainTests": 16,
+    "newLegacyCompatibilityTests": 2,
+    "scopeOverlap": true
+  },
+  "accountMappingFix": {
+    "redTest": 1,
+    "cause": "Tests used the same payable account for accrual and payment; equal totals concealed a changed payment mapping",
+    "guard": "Original payment debit and bank return credit must use the original accrual payable account",
+    "redLog": "expense-resource-adjustment-account-red.log",
+    "greenLog": "expense-resource-adjustment-domain-green.log"
+  },
+  "authors": {
+    "javaFiles": 808,
+    "namedTypes": 1488,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "databaseMigrationAdded": false,
+  "publicApiOrUiAdded": false,
+  "liveAcceptanceSchema": 64,
+  "remaining": [
+    "Persistence and immutable source references",
+    "Preparation and explicit authorization",
+    "Budget reversal worker and atomic resource updates",
+    "Safe retirement and renewed authorization",
+    "Public API, UI and PostgreSQL/live acceptance"
+  ],
+  "logs": [
+    "expense-resource-adjustment-domain-green.log",
+    "expense-resource-adjustment-compatibility.log",
+    "expense-resource-adjustment-authors.log"
+  ],
+  "localEvidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928"
+}

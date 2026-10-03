@@ -1,0 +1,52 @@
+{
+  "date": "2026-09-30",
+  "scope": "Original supplier bank dispute public authorization, idempotent decisions and finance workspace",
+  "status": "PASS_SCOPED_TESTS_AND_BUILD",
+  "api": {
+    "newWorkflowTests": 6,
+    "h2ServerTests": 35,
+    "postgresWorkflowTests": 29,
+    "h2ContractTestsInPostgresRun": 6,
+    "permissionsRecheckedBeforeReplay": true,
+    "queryAndDecisionAuditFailureAtomicity": true,
+    "originalBankCommandPreserved": true,
+    "completedErpSettlementPreserved": true,
+    "initialFixtureFailure": "The audit failure check constraint also matched earlier test records; restricted the fixture to the current original payment and reran the complete workflow scope."
+  },
+  "frontend": {
+    "newTests": 14,
+    "relatedTests": 52,
+    "build": "PASS",
+    "identityChangeClearsFacts": true,
+    "unknownWriteUsesOriginalIdempotencyKey": true,
+    "evidenceExpiryChecked": true,
+    "decisionRefreshesSettlement": true
+  },
+  "contract": {
+    "operations": 238,
+    "schemas": 464,
+    "requestExamples": 86,
+    "existingOpenApiBytesPreserved": true
+  },
+  "sourceChecks": {
+    "javaFiles": 1020,
+    "namedTypes": 1925,
+    "missingAuthorTags": 0,
+    "parseErrors": 0
+  },
+  "logs": [
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-dispute-api-h2-green.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-dispute-api-postgres.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-dispute-ui-tests.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-dispute-ui-build.log",
+    "/fyoung/tmp/agentflow-remaining-20260928/supplier-dispute-api-authors.log"
+  ],
+  "runtimeSchemaAtCheckpoint": 77,
+  "pending": [
+    "Existing acceptance database V77 to V78 upgrade and actual HTTP with fresh supplier payments",
+    "Actual browser and narrow layout acceptance; browser policy check unavailable",
+    "Real enterprise financial gateway acceptance"
+  ],
+  "testScopesOverlap": true,
+  "remoteDelivery": "No Git remote configured; local development first"
+}

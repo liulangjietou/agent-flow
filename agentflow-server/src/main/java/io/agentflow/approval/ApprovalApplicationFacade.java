@@ -1,6 +1,14 @@
 package io.agentflow.approval;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.approval.process.SubprocessProgressService;
+import io.agentflow.approval.process.SubprocessStopService;
+import io.agentflow.approval.model.BusinessReference;
+import io.agentflow.expense.ExpenseFormContract;
+import io.agentflow.expense.ExpensePlanFormContract;
+import io.agentflow.expense.AdvanceRequestFormContract;
+import io.agentflow.procurement.ProcurementPaymentFormContract;
+import io.agentflow.budget.BudgetAdjustmentFormContract;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
@@ -13,8 +21,11 @@ import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionDraftRepository;
 import io.agentflow.definition.DefinitionModels;
+import io.agentflow.definition.DefinitionInitiatorRequirements;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.ApprovalNotificationService;
+import io.agentflow.organization.OrganizationInitiatorDirectory;
+import io.agentflow.attachment.AttachmentReferenceService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,12 +49,19 @@ public class ApprovalApplicationFacade {
     private final DefinitionDraftRepository definitions;
     private final ProcessRuntimePort processRuntime;
     private final ApprovalNotificationService notifications;
+    private final OrganizationInitiatorDirectory initiators;
+    private final AttachmentReferenceService attachments;
+    private final SubprocessExecutionLocks executionLocks;
+    private final SubprocessProgressService subprocesses;
+    private final SubprocessStopService subprocessStops;
 
     /** 创建应用服务。 */
     public ApprovalApplicationFacade(ApplicationRepository repository, ProcessRuntimePort processRuntime,
                                      CurrentActor currentActor, List<ApplicationParticipantPort> participantPorts,
                                      SubmissionRoundRepository rounds, ApplicationAuditPort audit, DefinitionDraftRepository definitions,
-                                     ApprovalNotificationService notifications) {
+                                     ApprovalNotificationService notifications, OrganizationInitiatorDirectory initiators, AttachmentReferenceService attachments,
+                                     SubprocessExecutionLocks executionLocks, SubprocessProgressService subprocesses,
+                                     SubprocessStopService subprocessStops) {
         this.repository = repository;
         this.currentActor = currentActor;
         this.service = new ApprovalApplicationService(repository, processRuntime, rounds, audit);
@@ -52,49 +70,130 @@ public class ApprovalApplicationFacade {
         this.definitions = definitions;
         this.processRuntime = processRuntime;
         this.notifications = notifications;
+        this.initiators = initiators;
+        this.attachments = attachments;
+        this.executionLocks = executionLocks;
+        this.subprocesses = subprocesses;
+        this.subprocessStops = subprocessStops;
     }
 
     /** 创建申请草稿。 */
     @Transactional
     public Application create(String businessNo, String processKey, long definitionVersion, String title,
                               Map<String, Object> payload) {
+        return createBound(businessNo, processKey, definitionVersion, title, payload, null);
+    }
+
+    /** 业务应用服务创建绑定申请，此入口不直接暴露为 HTTP 请求。 */
+    @Transactional
+    public Application createBusiness(String businessNo, String processKey, long definitionVersion, String title,
+                                      Map<String, Object> payload, BusinessReference reference) {
+        return createBound(businessNo, processKey, definitionVersion, title, payload, java.util.Objects.requireNonNull(reference));
+    }
+
+    private Application createBound(String businessNo, String processKey, long definitionVersion, String title,
+                                     Map<String, Object> payload, BusinessReference reference) {
         Actor actor = currentActor.actor();
-        DefinitionModels.DefinitionDraft definition = definitions.findPublished(actor.tenantId(), processKey, definitionVersion).orElse(null);
+        DefinitionModels.DefinitionDraft definition = definitions.lockPublished(actor.tenantId(), processKey, definitionVersion).orElse(null);
         // classpath 内置报销 v1 是唯一没有平台定义行的公开 legacy 模板。
         if (definition == null && !(BUNDLED_LEGACY_PROCESS.equals(processKey) && definitionVersion == BUNDLED_LEGACY_VERSION)) {
             throw new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published process definition is not available");
         }
+        if (definition != null) definition.requireStartEnabled();
         FormSchema formSchema = definition == null ? null : definition.formSchema();
+        if (reference == null && (ExpenseFormContract.structured(formSchema) || ExpensePlanFormContract.structured(formSchema)
+                || AdvanceRequestFormContract.structured(formSchema) || ProcurementPaymentFormContract.structured(formSchema)
+                || BudgetAdjustmentFormContract.structured(formSchema))) throw businessEndpointRequired();
+        if (reference != null) {
+            switch (reference.type()) {
+                case EXPENSE -> ExpenseFormContract.requireSchema(formSchema);
+                case EXPENSE_PLAN -> ExpensePlanFormContract.requireSchema(formSchema);
+                case ADVANCE_REQUEST -> AdvanceRequestFormContract.requireSchema(formSchema);
+                case PROCUREMENT_PAYMENT -> ProcurementPaymentFormContract.requireSchema(formSchema);
+                case BUDGET_ADJUSTMENT -> BudgetAdjustmentFormContract.requireSchema(formSchema);
+            }
+        }
         String runtimeDefinitionId = processRuntime.resolveDefinition(actor.tenantId(), processKey, definitionVersion, definition == null);
-        return service.create(actor.tenantId(), businessNo, processKey, definitionVersion, actor.userId(), title, payload,
-                formSchema, runtimeDefinitionId, definition == null ? null : definition.notificationTexts());
+        var application = service.create(actor.tenantId(), businessNo, processKey, definitionVersion, actor.userId(), title, payload,
+                formSchema, runtimeDefinitionId, definition == null ? null : definition.notificationTexts(), reference);
+        attachments.validate(application, false);
+        return application;
     }
 
     /** 提交申请并启动流程。 */
     @Transactional
     public Application submit(UUID id, long expectedVersion) {
+        return submit(id, expectedVersion, null);
+    }
+
+    /** 选择任职只允许当前申请人，内容在当前提交轮次内冻结。 */
+    @Transactional
+    public Application submit(UUID id, long expectedVersion, UUID initiatorAppointmentId) {
+        return submitBound(id, expectedVersion, initiatorAppointmentId, null);
+    }
+
+    /** 结构化提交前由业务服务完成占用、预检和路由投影。 */
+    @Transactional
+    public Application submitBusiness(UUID id, long expectedVersion, UUID initiatorAppointmentId, BusinessReference reference) {
+        return submitBound(id, expectedVersion, initiatorAppointmentId, java.util.Objects.requireNonNull(reference));
+    }
+
+    private Application submitBound(UUID id, long expectedVersion, UUID initiatorAppointmentId, BusinessReference reference) {
         Actor actor = currentActor.actor();
-        requireApplicant(actor, id);
-        Application application = service.submit(actor.tenantId(), id, expectedVersion, actor.userId());
+        var initial = executionLocks.lock(requireApplicant(actor, id));
+        requireWriteBinding(initial, reference);
+        var context = initiators.snapshot(actor, initiatorAppointmentId);
+        var before = subprocesses.before(initial);
+        Application application = service.submit(actor.tenantId(), id, expectedVersion, actor.userId(), context);
+        // 校验实际提交的聚合，避免二次读取跨版本；失败时申请、引擎及轮次一并回滚。
+        attachments.validate(application, true);
+        attachments.freeze(application);
         notifications.submitted(application, actor.userId());
+        subprocesses.afterSubmit(before, application);
         return application;
     }
 
     /** 只有发起人可以补正内容，补正及版本更新处于同一事务。 */
     @Transactional
     public Application revise(UUID id, long expectedVersion, String title, Map<String, Object> payload) {
+        return reviseBound(id, expectedVersion, title, payload, null);
+    }
+
+    /** 结构化草稿与服务端路由字段通过同一申请版本更新。 */
+    @Transactional
+    public Application reviseBusiness(UUID id, long expectedVersion, String title, Map<String, Object> payload, BusinessReference reference) {
+        return reviseBound(id, expectedVersion, title, payload, java.util.Objects.requireNonNull(reference));
+    }
+
+    private Application reviseBound(UUID id, long expectedVersion, String title, Map<String, Object> payload, BusinessReference reference) {
         Actor actor = currentActor.actor();
-        requireApplicant(actor, id);
-        return service.revise(actor.tenantId(), id, expectedVersion, title, payload, actor.userId());
+        requireWriteBinding(executionLocks.lock(requireApplicant(actor, id)), reference);
+        var application = service.revise(actor.tenantId(), id, expectedVersion, title, payload, actor.userId());
+        attachments.validate(application, false);
+        return application;
     }
 
     /** 仅发起人可以撤回审批中的申请，全部写入与引擎终止共用事务。 */
     @Transactional
     public Application withdraw(UUID id, long expectedVersion, String comment) {
+        return withdrawBound(id, expectedVersion, comment, null);
+    }
+
+    /** 业务申请撤回由业务服务核对财务版本，保留本轮资源供补正重提。 */
+    @Transactional
+    public Application withdrawBusiness(UUID id, long expectedVersion, String comment, BusinessReference reference) {
+        return withdrawBound(id, expectedVersion, comment, java.util.Objects.requireNonNull(reference));
+    }
+
+    private Application withdrawBound(UUID id, long expectedVersion, String comment, BusinessReference reference) {
         Actor actor = currentActor.actor();
-        requireApplicant(actor, id);
-        var previous = notifications.beforeWithdrawal(service.get(actor.tenantId(), id));
+        var initial = executionLocks.lock(requireApplicant(actor, id));
+        requireWriteBinding(initial, reference);
+        initial.checkVersion(expectedVersion);
+        var stopping = subprocessStops.before(initial);
+        var previous = notifications.pendingAudience(service.get(actor.tenantId(), id));
         Application application = service.withdraw(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
+        subprocessStops.after(stopping, application, actor.userId());
         notifications.withdrawn(application, actor.userId(), previous);
         return application;
     }
@@ -102,9 +201,38 @@ public class ApprovalApplicationFacade {
     /** 仅申请人可作废未在审批中的单据；申请版本与审计在同一事务内提交。 */
     @Transactional
     public Application cancel(UUID id, long expectedVersion, String comment) {
+        return cancelBound(id, expectedVersion, comment, null);
+    }
+
+    /** 业务作废需要同事务释放资源，此入口只执行申请自身状态与审计。 */
+    @Transactional
+    public Application cancelBusiness(UUID id, long expectedVersion, String comment, BusinessReference reference) {
+        return cancelBound(id, expectedVersion, comment, java.util.Objects.requireNonNull(reference));
+    }
+
+    private Application cancelBound(UUID id, long expectedVersion, String comment, BusinessReference reference) {
         Actor actor = currentActor.actor();
-        requireApplicant(actor, id);
+        requireWriteBinding(executionLocks.lock(requireApplicant(actor, id)), reference);
         return service.cancel(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
+    }
+
+    /** 内部财务结果使用明确系统身份退回，不冒用申请人或某个人工审批任务。 */
+    @Transactional
+    public Application returnBusiness(String tenant, UUID id, long expectedVersion, BusinessReference reference, String actor, String comment) {
+        var initial = executionLocks.lock(service.get(tenant, id));
+        requireWriteBinding(initial, java.util.Objects.requireNonNull(reference));
+        initial.checkVersion(expectedVersion);
+        var stopping = subprocessStops.before(initial);
+        var application = service.returnToApplicant(tenant, id, expectedVersion, actor, comment);
+        subprocessStops.after(stopping, application, actor);
+        notifications.returned(application, actor); return application;
+    }
+
+    /** 仅供已经完成业务任务授权的核定服务调用，不向普通修改申请接口开放。 */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public Application adjustBusiness(UUID id, long expectedVersion, BusinessReference reference, Map<String, Object> payload) {
+        var actor = currentActor.actor();
+        return service.adjustBusiness(actor.tenantId(), id, expectedVersion, reference, payload);
     }
 
     /** 轮次与详情使用同一可见性规则，不因历史接口绕过资源授权。 */
@@ -123,6 +251,17 @@ public class ApprovalApplicationFacade {
         return application;
     }
 
+    /** 发起提示复用详情授权与原定义来源，不读取最新同名版本，也不写入申请或轮次。 */
+    public DefinitionInitiatorRequirements.View initiatorRequirements(UUID id) {
+        var application = get(id);
+        var previous = application.runtimeDefinitionId() == null
+                ? rounds.findByRound(application.tenantId(), id, application.roundNo()).orElse(null) : null;
+        var binding = new ProcessRuntimePort.DefinitionBinding(application.tenantId(), id, application.processKey(), application.definitionVersion(),
+                application.runtimeDefinitionId(), previous == null ? null : previous.processInstanceId());
+        return new DefinitionInitiatorRequirements.View(application.processKey(), application.definitionVersion(),
+                processRuntime.requiresInitiatorAppointment(binding));
+    }
+
     /** 获取当前租户申请。 */
     public List<Application> list() {
         Actor actor = currentActor.actor();
@@ -136,10 +275,25 @@ public class ApprovalApplicationFacade {
         return participantPorts.stream().anyMatch(port -> port.isParticipant(actor.tenantId(), application.id(), actor));
     }
 
-    private void requireApplicant(Actor actor, UUID id) {
+    private Application requireApplicant(Actor actor, UUID id) {
         Application application = service.get(actor.tenantId(), id);
         if (!application.createdBy().equals(actor.userId())) {
             throw new DomainException("FORBIDDEN", "Only the applicant can revise, submit, withdraw or cancel this application");
         }
+        executionLocks.requireRoot(application);
+        return application;
+    }
+
+    /** 附件写入复用申请人的资源授权，状态与版本由申请聚合继续判断。 */
+    public Application requireApplicant(UUID id) {
+        return requireApplicant(currentActor.actor(), id);
+    }
+
+    private static void requireWriteBinding(Application application, BusinessReference reference) {
+        if (!java.util.Objects.equals(application.businessReference(), reference)) throw businessEndpointRequired();
+    }
+
+    private static DomainException businessEndpointRequired() {
+        return new DomainException("USE_BUSINESS_ENDPOINT", "Structured business applications must use their own write endpoint");
     }
 }

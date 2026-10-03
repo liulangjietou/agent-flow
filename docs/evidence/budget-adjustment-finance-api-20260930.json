@@ -1,0 +1,71 @@
+{
+  "date": "2026-09-30",
+  "scope": "原预算批准下的财务复核、明确授权、原号恢复和执行历史 API",
+  "endpoints": [
+    "/api/v1/budget-adjustments/{id}/execution",
+    "/api/v1/budget-adjustments/{id}/execution/history",
+    "/api/v1/budget-adjustments/{id}/execution/reviews",
+    "/api/v1/budget-adjustments/{id}/execution/authorizations",
+    "/api/v1/budget-adjustment-operations/{id}/actions"
+  ],
+  "contract": {
+    "operations": 235,
+    "schemas": 458,
+    "requestExamples": 84,
+    "newOperations": 5,
+    "newSchemas": 11,
+    "responseRecordMappings": 8,
+    "existingContractBytesUnchanged": true
+  },
+  "security": [
+    "完整原轮次字段权限先于幂等回放",
+    "独立 FINANCE 和原法人当前有效任职",
+    "申请人、管理员不能借角色读取敏感明细或自行授权",
+    "本人最新复核、固定批准双版本与持久指令",
+    "浏览器响应 no-store，回执仅定位决定",
+    "严格拒绝客户端额度、目标、角色或结果注入"
+  ],
+  "workflowScenarios": [
+    "实际 Flowable 批准不触发外部调整，读取也不自动授权",
+    "最新台账变化逐分进入明确授权，调拨两端共同生效",
+    "任职与字段权限失效阻止旧成功回放",
+    "严格输入、旧版本、跨申请复核和原号范围",
+    "新复核使旧复核不可再消费",
+    "未知只查询原号，NOT_FOUND 后明确重发同一字节命令",
+    "相互矛盾结果保留原事实与活动占用",
+    "从未发送的指令安全结束，替换需要新复核并保留分页历史",
+    "退回旧轮次不能办理或读取当前轮次执行",
+    "审计失败使复核、指令、消费和幂等成功一起回滚",
+    "并发授权只有一条持久指令",
+    "原台账读取失败或目标变化不能授权"
+  ],
+  "verification": {
+    "h2": {
+      "domainTests": 5,
+      "serverTests": 43,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-finance-api-h2-final.log"
+    },
+    "postgres": {
+      "serverTests": 29,
+      "financeWorkflowTests": 11,
+      "approvalWorkflowTests": 16,
+      "precisionTests": 2,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-finance-api-postgres.log",
+      "databaseRecord": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-finance-api-postgres-databases.json"
+    },
+    "javaAuthors": {
+      "files": 1016,
+      "namedTypes": 1912,
+      "missing": 0,
+      "parseErrors": 0,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-finance-api-authors.log"
+    }
+  },
+  "limitations": [
+    "实际浏览器安全检查仍不可用，未使用绕行方案",
+    "财务页面正在实现，未计入本次服务端验收",
+    "原运行服务仍为 V76，尚未升级至 V77 或执行旧申请",
+    "外部预算网关使用合成回环 HTTP，非企业生产联调",
+    "仓库未配置远端，尚无 PR"
+  ]
+}

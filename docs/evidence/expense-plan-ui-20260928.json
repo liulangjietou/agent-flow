@@ -1,0 +1,149 @@
+{
+  "recordedAt": "2026-09-28T20:05:50.533597+00:00",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "syntheticFinance": true,
+  "enterpriseAcceptance": false,
+  "backendCommit": "b27a72043ad036069201f5ced9089d0634b903da",
+  "branch": "codex/governance-identifier-integration",
+  "database": "expense_ui_b8e8e035f6",
+  "migration": "V40 to V41 applied by packaged application",
+  "tests": {
+    "planUi": 21,
+    "frontendScopeIncludingPlan": 95,
+    "scopesOverlap": true,
+    "build": "PASS",
+    "openapi": {
+      "operations": 136,
+      "schemas": 231,
+      "examples": 46
+    }
+  },
+  "approval": {
+    "phase": "approved",
+    "planId": "0a9fdaef-faed-4b15-972f-53b7270de575",
+    "applicationId": "847f2e14-2e26-4683-ad04-c3a415b61a32",
+    "status": "APPROVED",
+    "roundNo": 2,
+    "currentAmount": {
+      "value": "120.00",
+      "currency": "CNY"
+    },
+    "previousAmount": {
+      "value": "100.00",
+      "currency": "CNY"
+    },
+    "credits": [
+      {
+        "id": "0a9fdaef-faed-4b15-972f-53b7270de575",
+        "applicationId": "847f2e14-2e26-4683-ad04-c3a415b61a32",
+        "legalEntityId": "4a8a3aac-f4d3-4486-b6c0-7aaabd8bb51a",
+        "version": 1,
+        "closed": false,
+        "lines": [
+          {
+            "lineNo": 1,
+            "approved": {
+              "value": "120.00",
+              "currency": "CNY"
+            },
+            "limit": {
+              "value": "120.00",
+              "currency": "CNY"
+            },
+            "available": {
+              "value": "120.00",
+              "currency": "CNY"
+            },
+            "reserved": {
+              "value": "0.00",
+              "currency": "CNY"
+            },
+            "consumed": {
+              "value": "0.00",
+              "currency": "CNY"
+            }
+          }
+        ]
+      }
+    ],
+    "unrelatedUserStatus": 404,
+    "sensitiveAdminStatus": 403,
+    "synthetic": true
+  },
+  "reference": {
+    "reportId": "d1443b18-17f5-4193-b95b-2c91369942f9",
+    "applicationId": "7ec6b5d4-a869-4c31-b013-d14b51c73fd4",
+    "status": "IN_APPROVAL",
+    "priorRequest": {
+      "requestId": "0a9fdaef-faed-4b15-972f-53b7270de575",
+      "lineNo": 1
+    },
+    "claim": {
+      "value": "100.00",
+      "currency": "CNY"
+    },
+    "credit": {
+      "id": "0a9fdaef-faed-4b15-972f-53b7270de575",
+      "applicationId": "847f2e14-2e26-4683-ad04-c3a415b61a32",
+      "legalEntityId": "4a8a3aac-f4d3-4486-b6c0-7aaabd8bb51a",
+      "version": 2,
+      "closed": false,
+      "lines": [
+        {
+          "lineNo": 1,
+          "approved": {
+            "value": "120.00",
+            "currency": "CNY"
+          },
+          "limit": {
+            "value": "120.00",
+            "currency": "CNY"
+          },
+          "available": {
+            "value": "20.00",
+            "currency": "CNY"
+          },
+          "reserved": {
+            "value": "100.00",
+            "currency": "CNY"
+          },
+          "consumed": {
+            "value": "0.00",
+            "currency": "CNY"
+          }
+        }
+      ]
+    }
+  },
+  "browserScenarios": [
+    "create and save",
+    "explicit appointment and precheck",
+    "confirmed submit",
+    "withdraw and correct",
+    "round one remains 100; round two is 120",
+    "actual manager approval",
+    "applicant credit listing",
+    "quote approved plan in actual reimbursement and reserve 100"
+  ],
+  "responsive": {
+    "requestedViewportWidth": 375,
+    "actualCssViewportWidth": 500,
+    "documentScrollWidth": 500,
+    "dialogClientWidth": 476,
+    "dialogScrollWidth": 476,
+    "overflow": false
+  },
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "screenshots": [
+    "expense-plan-ui-precheck.png",
+    "expense-plan-ui-rounds.png",
+    "expense-plan-ui-approved.png",
+    "expense-plan-ui-reserved.png",
+    "expense-plan-ui-mobile.png"
+  ],
+  "limitations": [
+    "Loopback synthetic finance is not enterprise integration",
+    "Payment and consumption have not occurred",
+    "Remote and PR are not configured"
+  ]
+}

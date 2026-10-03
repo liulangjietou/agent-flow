@@ -1,0 +1,311 @@
+{
+  "recordedAt": "2026-10-02T03:05:35.775674+00:00",
+  "stage": "财务代理与旧在审接续的实际 HTTP、浏览器及重启验收",
+  "localProxyAcceptance": "COMPLETE",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "99d6f3407b930c900e973f518ad55210b20828fe",
+  "noProductCodeChanged": true,
+  "runtime": {
+    "database": "approval_proxy_lifecycle_runtime_559296c6c1",
+    "backendPort": 18255,
+    "frontendPort": 15342,
+    "boot": 5,
+    "backendPid": 24079,
+    "jarSha256": "1897a355b43b2a2a9046ec486dc4ca897d87bd1b14e801a3413b6f2c30fdb6ed",
+    "enabledWorkers": [
+      "approval-proxy-reminders",
+      "sla-reminders",
+      "expense-precheck",
+      "budget-operation"
+    ],
+    "financeGateway": "http://127.0.0.1:18256/finance",
+    "externalEnterpriseDeliveryEnabled": false,
+    "invoiceVoucherAndPaymentWorkersEnabled": false
+  },
+  "financial": {
+    "reportId": "249265fb-c511-4d83-bcfb-b2b4b618c301",
+    "applicationId": "36623bfc-ca1e-4b7e-b01b-ced4dc6d4433",
+    "status": "APPROVED",
+    "claimedGross": "100.00",
+    "claimedTax": "6.00",
+    "approvedGross": "60.00",
+    "approvedTax": "3.60",
+    "currency": "CNY",
+    "paperSigner": "bob",
+    "paperPrincipal": "finance",
+    "reductionActor": "admin",
+    "reductionPrincipal": "finance",
+    "finalApprover": "finance",
+    "receiptDidNotClaimTask": true,
+    "reductionDidNotClaimTask": true,
+    "ownFinanceRoleGuard": {
+      "readStatus": 404,
+      "decisionStatus": 403,
+      "readCode": "NOT_FOUND",
+      "decisionCode": "FORBIDDEN"
+    },
+    "budgetPendingApprovalCode": "EXPENSE_BUDGET_NOT_CONFIRMED",
+    "budgetConfirmedUsingOriginalOperation": true,
+    "actualBudgetWriteCommands": 2,
+    "revokedProxyApprovalCode": "FORBIDDEN",
+    "adminEligibilityRestored": true,
+    "preservedOldFinancialTables": 114,
+    "preservedOldFinancialRows": 77,
+    "paperAndAdjustmentHistoryRetained": true
+  },
+  "oldInflight": {
+    "sourceSchemaVersion": 95,
+    "targetSchemaVersion": 98,
+    "applicationId": "5e0724a1-12e9-4707-b08a-c41b5f4986bd",
+    "taskId": "7211c7e2-bdc9-11f1-b351-96c24671ac1a",
+    "definitionVersion": 1,
+    "roundNo": 1,
+    "status": "APPROVED",
+    "actualApprover": "bob",
+    "principal": "manager",
+    "version2DidNotAuthorizeVersion1": true,
+    "originalInstanceAndDueDatePreserved": true,
+    "originalDueDate": "2026-10-01T14:54:52.493",
+    "originalVersion2TasksPreserved": 2,
+    "historyReadableAfterRevocation": true,
+    "grantsRevoked": true
+  },
+  "restart": {
+    "status": "PASS",
+    "recordedAt": "2026-10-02T03:03:52.044683+00:00",
+    "boot": 5,
+    "database": "approval_proxy_lifecycle_runtime_559296c6c1",
+    "jarSha256": "1897a355b43b2a2a9046ec486dc4ca897d87bd1b14e801a3413b6f2c30fdb6ed",
+    "tables": 228,
+    "rows": 3550,
+    "files": 3,
+    "allRowsAndFilesPreserved": true,
+    "sourceV95Unchanged": true,
+    "sourceV97Unchanged": true,
+    "financialHistoryPreserved": true,
+    "oldInflightHistoryPreserved": true,
+    "revokedFinancialAccessDenied": true,
+    "actualBudgetWrites": 2
+  },
+  "sources": {
+    "V95": {
+      "database": "approval_responsibilities_runtime_46c956a446",
+      "tables": 226,
+      "rows": 2703,
+      "files": 3,
+      "unchanged": true
+    },
+    "V97": {
+      "database": "approval_proxy_runtime_9439518b65",
+      "tables": 228,
+      "rows": 2773,
+      "files": 3,
+      "unchanged": true
+    }
+  },
+  "contracts": {
+    "status": "PASS_RESPONSES_WITH_REQUEST_FIXTURE_DEVIATION",
+    "responseStatus": "PASS",
+    "files": {
+      "approval-proxy-lifecycle-browser-responses.json": {
+        "responses": 103,
+        "successfulRequests": 7
+      },
+      "approval-proxy-lifecycle-http-browser-decisions.json": {
+        "responses": 13,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-financial-authority-end.json": {
+        "responses": 6,
+        "successfulRequests": 2
+      },
+      "approval-proxy-lifecycle-http-financial-final.json": {
+        "responses": 6,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-financial-fixture.json": {
+        "responses": 7,
+        "successfulRequests": 6
+      },
+      "approval-proxy-lifecycle-http-financial-old-restart.json": {
+        "responses": 8,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-financial-receipt-resumed.json": {
+        "responses": 11,
+        "successfulRequests": 3
+      },
+      "approval-proxy-lifecycle-http-financial-receipt.json": {
+        "responses": 5,
+        "successfulRequests": 1
+      },
+      "approval-proxy-lifecycle-http-financial-reduction.json": {
+        "responses": 5,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-financial-report.json": {
+        "responses": 13,
+        "successfulRequests": 4
+      },
+      "approval-proxy-lifecycle-http-multiple-setup-bob.json": {
+        "responses": 18,
+        "successfulRequests": 12
+      },
+      "approval-proxy-lifecycle-http-multiple-setup.json": {
+        "responses": 1,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-old-inflight-final-resumed.json": {
+        "responses": 7,
+        "successfulRequests": 2
+      },
+      "approval-proxy-lifecycle-http-old-inflight-final.json": {
+        "responses": 3,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-old-inflight-prepare.json": {
+        "responses": 9,
+        "successfulRequests": 2
+      },
+      "approval-proxy-lifecycle-http-other-lifecycle.json": {
+        "responses": 49,
+        "successfulRequests": 25
+      },
+      "approval-proxy-lifecycle-http-pause-resume-withdraw.json": {
+        "responses": 15,
+        "successfulRequests": 12
+      },
+      "approval-proxy-lifecycle-http-sla-original-due.json": {
+        "responses": 6,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-sla-resume.json": {
+        "responses": 8,
+        "successfulRequests": 1
+      },
+      "approval-proxy-lifecycle-http-sla-resumed-due-confirmed.json": {
+        "responses": 3,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-sla-resumed-due.json": {
+        "responses": 3,
+        "successfulRequests": 0
+      },
+      "approval-proxy-lifecycle-http-sla-setup.json": {
+        "responses": 14,
+        "successfulRequests": 9
+      }
+    },
+    "totalResponses": 313,
+    "requestDeviations": [
+      {
+        "file": "approval-proxy-lifecycle-http-financial-report.json",
+        "path": "/api/v1/expense-reports",
+        "method": "POST",
+        "errors": [
+          {
+            "instancePath": "/content/lines/0/quantity",
+            "schemaPath": "#/properties/quantity/type",
+            "keyword": "type",
+            "params": {
+              "type": "number"
+            },
+            "message": "must be number"
+          }
+        ],
+        "originalRequestPreserved": true,
+        "correctedFixtureValidated": true,
+        "note": "验收脚本数量误用字符串，后台接受；原请求不计入合法请求样本。脚本已改为数值，校正副本仅作静态检查，没有冒充重新发出的请求。"
+      }
+    ]
+  },
+  "browser": {
+    "responses": 103,
+    "captureGaps": 3,
+    "financialScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-financial-approved.png",
+    "oldInflightScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-old-inflight-audit.png",
+    "temporaryViewportOverride": false
+  },
+  "acceptanceMatrix": [
+    {
+      "scope": "组织管理、实际创建撤销、普通代批、窄屏与非空升级",
+      "evidence": "approval-proxy-manager-20261001.json"
+    },
+    {
+      "scope": "生命周期、原 SLA 实际计时、暂停剩余工时与多原审批人选择",
+      "evidence": "approval-proxy-lifecycle-browser-20261001.json"
+    },
+    {
+      "scope": "财务签收、核减、原预算确认、角色及撤销隔离",
+      "evidence": "本文件：实际 HTTP 与浏览器；approval-proxy-expense-20261001.json：并发锁、到期、回滚、原键和资源边界"
+    },
+    {
+      "scope": "旧 V95 在审原 v1 任务、不同版本隔离、原轮次／实例／期限与重启",
+      "evidence": "本文件"
+    },
+    {
+      "scope": "同一版本竞争、职责分离、父子流程、会签独立性、字段与附件历史权限",
+      "evidence": "approval-proxy-decisions-20261001.json、approval-proxy-expense-20261001.json、approval-proxy-lifecycle-20261001.json：自动化范围，不声称每种组合均由浏览器重跑"
+    }
+  ],
+  "qaCorrections": [
+    {
+      "kind": "request fixture",
+      "detail": "首笔合成报销请求 quantity 为字符串，后台接受但不符合 OpenAPI。原始证据保留；该请求单列，不计入合法请求样本。脚本改为数值，校正副本静态校验通过，未改写原始请求。"
+    },
+    {
+      "kind": "authorization expectation",
+      "detail": "无财务资格的 bob 读取后续财务专用入口返回 404，任务决定返回 403；修正夹具对读取状态的预期，没有放宽产品权限。"
+    },
+    {
+      "kind": "version expectation",
+      "detail": "原任务批准并结束流程包含 recordTaskAction 和 approve 两次版本增长，且轮次追加 reason。按原调用链修正验收断言，不改产品版本规则。"
+    }
+  ],
+  "acceptanceLimits": [
+    "此次财务运行使用本地合成纸件费用，无电子发票和借款抵扣；相关并发资源及失败回滚由已有范围测试覆盖，没有伪称本次浏览器完成全部组合。",
+    "累计响应数包含此前阶段；3 处浏览器缓存缺口单列，只校验已捕获响应。1 条成功请求存在上述夹具类型差异。",
+    "没有调用真实企业预算、ERP、银行、发票、IM 或 SMTP 服务。",
+    "此次没有生产代码变化，不重复已通过的后端和前端范围测试；保留原证据引用。",
+    "组织审批仍需表单字段关系选人；其余 Agent、组织同步／电子签及企业验收继续。全量需求映射未完成，七条顶层待办保持。",
+    "Git remote 为空，只保留本地提交，未创建远端 PR 或执行远端 CI。"
+  ],
+  "artifacts": {
+    "approval-proxy-financial-state.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-financial-state.json",
+      "sha256": "0dcb0f637b5bd939be48f64459cdb33e5ee44f211f16115f4298baf48c298423"
+    },
+    "approval-proxy-old-inflight-state.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-old-inflight-state.json",
+      "sha256": "f51a07a5ae582cc3681f6ed913d59592be941f3c9f9c3341dc770be9af76e7d2"
+    },
+    "approval-proxy-financial-gateway-calls.jsonl": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-financial-gateway-calls.jsonl",
+      "sha256": "7be6a2ba419209b532c7d899ba3860976f525c6f851cf85429ca9b67d76018cb"
+    },
+    "approval-proxy-financial-completion-restart.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-financial-completion-restart.json",
+      "sha256": "7d19300d4f86ec636efed9727e5658cc705e6865eff3e729ba3a7fadb2ae63ca"
+    },
+    "approval-proxy-lifecycle-contracts.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-contracts.json",
+      "sha256": "8b407d26fa0f5ff29e49b205b37ab51c9c551d5b191cc4ffb4de740bf6515343"
+    },
+    "approval-proxy-lifecycle-browser-responses.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-browser-responses.json",
+      "sha256": "a0d86153d7605bc121ef166037e100eee0365ba55caa92e582ec548ca82e15ee"
+    },
+    "approval-proxy-lifecycle-browser-capture-gaps.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-lifecycle-browser-capture-gaps.json",
+      "sha256": "1bfb840f15bb6756b276ab78313835b8caebef2bd94770456ba14d4b87491dfd"
+    },
+    "approval-proxy-financial-approved.png": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-financial-approved.png",
+      "sha256": "c62f75bca246ba2afe4ac5681cd25fb6ec8c76bfcbdda397257e429cb999eb93"
+    },
+    "approval-proxy-old-inflight-audit.png": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-old-inflight-audit.png",
+      "sha256": "fac088658884ef2377fc33da8045a6e0b75a1a9f9d5bc9f71bcbde63639a02cf"
+    }
+  }
+}

@@ -1,0 +1,518 @@
+{
+  "feature": "待办按本轮组织名称筛选",
+  "verifiedAt": "2026-09-28",
+  "baseCommit": "4304e0bbd9a6332fb3119f6045d4788bad792274",
+  "worktree": "/fyoung/tmp/agentflow-governance-identifier-integration",
+  "branch": "codex/governance-identifier-integration",
+  "scope": [
+    "组织名称包含匹配与字面量转义",
+    "只读取当前轮次的法人、部门、岗位名称",
+    "旧申请与历史快照不随组织改名或重提改写",
+    "原授权、单次查询和分页总数保持",
+    "任务卡片及列表/看板共用筛选"
+  ],
+  "red": {
+    "failures": 1,
+    "errors": 1,
+    "reason": [
+      "organization 参数原先返回400",
+      "V29迁移不存在"
+    ]
+  },
+  "verification": {
+    "h2Scoped": {
+      "tests": 49,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "h2FinalBoundaries": {
+      "tests": 2,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "overlapsScoped": true
+    },
+    "finalMigrationAndBuild": {
+      "tests": 1,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "overlapsScoped": true,
+      "note": "只将固定校验长度和读取批量值提为常量，随后重新编译及验证迁移"
+    },
+    "postgres": {
+      "tests": 24,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "overlapsH2": true,
+      "actualRuntimeFacts": {
+        "queue": "org_filter_queue_b43c7eab0c|PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit\n29\n29",
+        "organization": "org_filter_organization_288f71a1e4|PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit\n29\n16",
+        "migration": "org_filter_migration_b7faed6ec0|PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit\n29\n5"
+      },
+      "migration": "V28 to V29 preserves prior round/application columns and migration history; repeated migration no-op"
+    },
+    "frontend": {
+      "tests": 31,
+      "failed": 0,
+      "scope": [
+        "task-queue.test.mjs",
+        "task-deadline.test.mjs",
+        "requests.test.mjs"
+      ]
+    },
+    "build": {
+      "mavenVerify": "PASS",
+      "vueTypecheckAndVite": "PASS",
+      "existingChunkWarning": true
+    },
+    "openapi": {
+      "operations": 86,
+      "schemas": 138,
+      "requestExamples": 31,
+      "result": "PASS"
+    },
+    "authors": {
+      "javaFiles": 348,
+      "namedTypes": 540,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "runtimeHttp": {
+    "result": "PASS",
+    "seedRequestCount": 26,
+    "acceptanceRequestCount": 24,
+    "seedRequests": [
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "finance",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/organization/initialize",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/units",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/units",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/units",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/units",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/people",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/appointments",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/people",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/appointments",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/people",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/appointments",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/organization/appointments",
+        "actor": "admin",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/e69f786c-efc3-4f41-8919-3404d17ce3bf/publish",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/applications",
+        "actor": "alice",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/applications/1751b387-0dd9-41aa-a031-ee4ebb6a0c4d/submit",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/applications",
+        "actor": "alice",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/applications/3dcc1994-34fb-468b-ac1f-e2519fcf7ba4/submit",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/applications",
+        "actor": "alice",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/applications/5e7169c7-cb8c-49fa-9a23-cc758c0d5091/submit",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/applications",
+        "actor": "alice",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/applications/c7af5deb-f687-4964-a2e2-ce697391c82a/submit",
+        "actor": "alice",
+        "status": 200
+      }
+    ],
+    "acceptanceRequests": [
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 400
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "finance",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "anonymous",
+        "status": 401
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 400
+      },
+      {
+        "method": "PUT",
+        "path": "/organization/units/57af01b6-dc36-4caa-8a5f-b2ab92b398b4",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/applications/5e7169c7-cb8c-49fa-9a23-cc758c0d5091/withdraw",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/applications/5e7169c7-cb8c-49fa-9a23-cc758c0d5091/submit",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/applications/5e7169c7-cb8c-49fa-9a23-cc758c0d5091/rounds",
+        "actor": "manager",
+        "status": 200
+      }
+    ],
+    "assertions": [
+      "real appointment submission snapshots",
+      "case-insensitive literal name search",
+      "2 plus 1 paging and cursor binding",
+      "deadline intersection",
+      "unrelated users and anonymous excluded",
+      "directory rename preserves queued organization",
+      "withdraw and resubmit uses new current-round organization",
+      "old snapshot retains original department"
+    ]
+  },
+  "httpFixtureRepair": {
+    "initialRun": "definition publish returned 422",
+    "cause": "test fixture used demo user rule after enabling local directory",
+    "repair": "use local ORG_PERSON rule; production code unchanged",
+    "oldDatabase": "database.mv.db",
+    "acceptanceDatabase": "database-acceptance.mv.db"
+  },
+  "browser": {
+    "result": "PASS",
+    "baseUrl": "http://127.0.0.1:15192/",
+    "cases": [
+      "%_! 匹配旧轮次2条",
+      "编辑未提交条件保留2条旧结果",
+      "工程二部仅匹配第二轮1条",
+      "看板保持筛选",
+      "清空显示全部4条含未记录组织",
+      "退出并切换finance队列为0"
+    ],
+    "consoleErrors": 0,
+    "screenshot": "/fyoung/tmp/agentflow-organization-filter-20260928/browser-organization-result.png"
+  },
+  "cleanup": {
+    "18192": "stopped",
+    "15192": "stopped",
+    "testPostgres": "stopped; databases and volume retained",
+    "dockerDesktop": "original stopped state restored",
+    "otherContainersUnmodified": true
+  },
+  "delivery": {
+    "localOnly": true,
+    "migration": "V29",
+    "remoteConfigured": false,
+    "pullRequest": null,
+    "remoteCI": "not run",
+    "mainUnchanged": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+    "fullProductComplete": false
+  },
+  "files": {
+    "red.log": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/red.log",
+      "sha256": "ea13434d161da374fa7d40a1b3450a85df422491691fc0814ec6dd902a666bf8"
+    },
+    "backend.log": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/backend.log",
+      "sha256": "c2eda304ca0978bb94ee9559e53839163acc1f4aae634c8d93742dafc26cd68e"
+    },
+    "backend-final-boundaries.log": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/backend-final-boundaries.log",
+      "sha256": "f1ee272cc6a41de972dfaa10093120c20d2ac43101689edd0fb65640cf5b6d42"
+    },
+    "final-migration-build.log": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/final-migration-build.log",
+      "sha256": "1dc17f25ad6f00006b815d11b91e779a275340420b954febd7599cf834aa2877"
+    },
+    "postgres.log": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/postgres.log",
+      "sha256": "b345b58fc9c9dea27ec70fc451c3110b20690aad026adc9795a5f129f27c8e53"
+    },
+    "postgres-runtime-facts.json": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/postgres-runtime-facts.json",
+      "sha256": "14f4b41b6d93ad3af39403153a15991a928b21773e9e3abf511f04400e521242"
+    },
+    "frontend.log": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/frontend.log",
+      "sha256": "f3d4157727f14b7173a06cfc86e726010c95d54b23d067071a3bd7e1548bccec"
+    },
+    "frontend-build.log": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/frontend-build.log",
+      "sha256": "b7ca4c43039a294cefd6df6297fe921e7f9443d8bda6e0eae1d1dc4b971ea31f"
+    },
+    "openapi.log": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/openapi.log",
+      "sha256": "baef1bb73ee5937f3e8305e9a8b0f7a419f87fe32f7942177f855c4b6fe2be80"
+    },
+    "authors.log": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/authors.log",
+      "sha256": "c6931a7f081e25750bd25f5f4e993c3690444f0690e5d69eef8ddb105c6acaff"
+    },
+    "http-evidence.json": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/http-evidence.json",
+      "sha256": "45c50e8ef53b42ef663ffdbb831488ca248d82f8f84de7deba44d8397079b511"
+    },
+    "http-fixture-repair.json": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/http-fixture-repair.json",
+      "sha256": "33ebdb4e7379648e51aec0b2f8bff184fe213e3d5222b913f6be5cfbbae705b3"
+    },
+    "browser-literal-old-organization.txt": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/browser-literal-old-organization.txt",
+      "sha256": "9ceb6ad5dc2f8b066bf786845622540a7a08ed819b53d6370e00cf677ca94086"
+    },
+    "browser-dirty.txt": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/browser-dirty.txt",
+      "sha256": "c829a46be32c1770527163bb68eaac9f210222027eac9c5526a0fe22b79752e6"
+    },
+    "browser-current-round-board.txt": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/browser-current-round-board.txt",
+      "sha256": "84c24f02654f1116190b43527a93ee6a29cdf6c277dee76ba779db574c029c19"
+    },
+    "browser-reset.txt": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/browser-reset.txt",
+      "sha256": "74ee62b7bfd2f5eaa933910c9b3bb461d90fb669a13e388adfc223348e4bb73c"
+    },
+    "browser-other-account.txt": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/browser-other-account.txt",
+      "sha256": "39a3e420c06c22fe31ddf0afee42771370b8a4625458274c18c143941642cac9"
+    },
+    "browser-organization-result.png": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/browser-organization-result.png",
+      "sha256": "5adc9864000e30ba923c4ed7a03219095a0a7d702cfccaa83eb68c129b42f014"
+    },
+    "cleanup.json": {
+      "path": "/fyoung/tmp/agentflow-organization-filter-20260928/cleanup.json",
+      "sha256": "808d2fe2cf571cc4455a011f4d913b7bf0809f69f36925922729a58cf4b37466"
+    }
+  }
+}

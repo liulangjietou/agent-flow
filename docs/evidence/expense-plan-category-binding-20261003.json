@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T02:42:15.894641+00:00",
+  "taskId": "F01",
+  "status": "PLAN_CATEGORY_BINDING_PHASE_VERIFIED_TASK_OPEN",
+  "implementationCommit": "6753285e1f1eeb20c8582b65953326ea777c787c",
+  "baseCommit": "4a13ee11f35f5bf705d468d31b54fb62520112da",
+  "branch": "codex/governance-identifier-integration",
+  "scope": [
+    "事前申请预检在目录请求前固定类别修订，落库和读取 READY 时复核。",
+    "类别启用或修订变化后旧检查不可提交，最终提交与类别修改共用配置头事务锁。",
+    "预检候选和正式轮次保存 managedCategoryRevision；原 JSON 缺字段保持可读。",
+    "仅发布费用金额制度不影响类别未变的事前计划；审批使用原轮次依据。",
+    "页面展示类别修订并提供明确的刷新重查提示。"
+  ],
+  "red": {
+    "backend": {
+      "log": "expense-plan-category-binding-red-fixed-fixture.log",
+      "tests": 3,
+      "failures": 3,
+      "errors": 0,
+      "rootCause": "原计划只冻结目录字符串，既未保存平台类别修订，也未在提交时与管理员配置修改串行化。"
+    },
+    "frontend": {
+      "log": "expense-plan-category-binding-web-red.log",
+      "failure": "新错误码原先显示通用提示，未说明类别变化与重新检查。"
+    }
+  },
+  "diagnostics": [
+    "首次后端 RED 的清理顺序违反配置外键，造成后续用例污染；修正测试夹具后 3 个用例均为业务断言失败，原始日志保留。"
+  ],
+  "java": {
+    "uniqueTests": 46,
+    "results": [
+      {
+        "class": "io.agentflow.api.OpenApiContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.expense.ExpensePlanContractTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.expense.ExpensePlanIntegrationTest",
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.expense.ExpensePlanTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "postgresSubset": {
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "database": "expense_plan_category_5eabd93a4a",
+      "class": "io.agentflow.expense.ExpensePlanIntegrationTest"
+    },
+    "scenarios": [
+      "首次启用类别使旧未管理检查失效",
+      "类别修订使旧 READY 失效，金额制度单独发布保持可用",
+      "汇率网络等待期间的类别修改不能产生可用结果",
+      "类别事务未提交时正式提交等待，完成后返回 409 且不产生轮次或额度",
+      "金额制度单独发布后仍可提交，后续类别停用不改写批准轮次",
+      "历史缺少类别字段的 JSON 仍可读取",
+      "类别修订只能为空或正数，非法修订不能改变聚合状态"
+    ]
+  },
+  "web": {
+    "uniqueTests": 43,
+    "expensePlanTests": 22,
+    "expenseConfigurationTests": 21,
+    "typecheck": "PASS",
+    "productionBuild": "PASS",
+    "warning": "保留既有 bundle 大于 500 kB 提示",
+    "generatedJavascriptUnderSrc": 0
+  },
+  "contract": {
+    "pathCount": 285,
+    "operationCount": 322,
+    "schemaCount": 643,
+    "requestExamples": 121,
+    "result": "PASS"
+  },
+  "authors": {
+    "javaFiles": 1420,
+    "namedTypes": 2734,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "runtime": {
+    "newPackagedAcceptance": false,
+    "newBrowserAcceptance": false,
+    "previousManagementRuntimePreserved": true,
+    "note": "本阶段验证真实 HTTP 财务夹具、认证、PostgreSQL 和 Flowable 集成；新的类别绑定未做固定安装包浏览器验收，纳入 F01 后续完整链路。"
+  },
+  "remaining": [
+    "填报时制度提示及与提交相同的权威来源",
+    "管理制度下报销实际提交与并发发布的完整业务验收",
+    "结合新增链路的最终安装包、恢复和旧数据兼容验收"
+  ],
+  "taskCount": {
+    "knownOpen": 39,
+    "localDevelopment": 21,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "remote": {
+    "configured": false,
+    "pullRequest": null,
+    "ci": null
+  },
+  "sourceHashes": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePlan.java": "8839b922d4f860b6a0caa58d9ad065168361f36d4afdfb69f7b29bf17016c373",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePlanRound.java": "9b2fecd6df1b562b4a4acb9e795083e58f9e5d09e000a07cf4926982a05e53e5",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpensePlanTest.java": "ae3abb3e765a66d7474ab83a9c0bce8d56f0a649ede9ee39337babdade41081c",
+    "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java": "8b43335f9f0470b0a1ef5c8f211e3b292514ae5a6716125b06fb4d219bc55a27",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanCheckEvaluator.java": "ddad761431cd529dc5fdc3eccea612befabf88e74b7aeb2c93c7e3ff04388a61",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanCheckService.java": "922ef51e105c2ad8dce72a978f95e455f1aeb7c67bc46bbce87785d84dcb68fd",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanSubmissionService.java": "61af143f9f4caf5b421801c99ffa13155f188be565c71bf27c1020ff8377ef1c",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePolicyConfiguration.java": "c279d9cff3182b4567be9c4074935e2015bd64c29d639af452072cf4639e5bbc",
+    "agentflow-server/src/main/resources/api/openapi.json": "bcf588a35e4487a145ca3d6c03b9a24cf06169663abe470f20731068177c0ec9",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpensePlanIntegrationTest.java": "58f41927b4f15e305fe3db1eda29455788f5ebca192363feb1ae4eaad69bc971",
+    "agentflow-web/src/components/ExpensePlanLines.vue": "74593ad313d155f19338e33914a59a1f18e8bf7a86884515f1b129de0dda7197",
+    "agentflow-web/src/expensePlan.ts": "af1d6a342b98d511c5032594f2fd9d8901f52f25df84009a83055255c44aec04",
+    "agentflow-web/tests/expense-plan.test.mjs": "14c0589ba4a31a67d3ed2599c4cd0bd089da72f5654728b8575e4194774efc3a"
+  },
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/expense-plan-category-binding-authors.log",
+      "bytes": 73,
+      "sha256": "ceb39096f0f460bf86746fba95d8926ba1f950e9ce2ff5e954629d2be450e69f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/expense-plan-category-binding-h2-green1.log",
+      "bytes": 72092,
+      "sha256": "4f3f6d650e5529437ff47c8ae1882107fcd9d21d02bdff2f91b1b9a8815c3531"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/expense-plan-category-binding-openapi.log",
+      "bytes": 71,
+      "sha256": "1f16b641e48460b365294784492059468bffca2777d76093feeaff0c8b836b12"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/expense-plan-category-binding-pg-green1.json",
+      "bytes": 220,
+      "sha256": "b3a4049d73e09e27ff61c8de0c9a0091564776d9b018f024ddae3fa4d7c3bd0f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/expense-plan-category-binding-pg-green1.log",
+      "bytes": 36224,
+      "sha256": "7caa2ccd812e5b0f48d06fc4beca32c8bbfb82485dc94c972d68d6386d907884"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/expense-plan-category-binding-red-fixed-fixture.log",
+      "bytes": 44835,
+      "sha256": "bdd9f0f85a87d96196ada1dabf503703c3c02ec92306f7c0a7466b9e46432dfb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/expense-plan-category-binding-red.log",
+      "bytes": 56794,
+      "sha256": "7f126531718936097654b2c0efa0a5b79a3369dc1e16441ed83e945bb1e65f81"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/expense-plan-category-binding-web-build.log",
+      "bytes": 781,
+      "sha256": "d1fdce69a3cf9578f3dd23db19918c6cbac0ae5cda26fcda82d82900210ab304"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/expense-plan-category-binding-web-green1.log",
+      "bytes": 4465,
+      "sha256": "2efc946c7f748757f8af211c8d0cce2bc73c059565dd0d78930a1ab720f17018"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/expense-plan-category-binding-web-red.log",
+      "bytes": 3325,
+      "sha256": "6b3cf5b0b9d6e8aa5084dc0a882e3f0d40d71df11c2ca41b374cb821c0c4c9a6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/h2/TEST-io.agentflow.api.OpenApiContractTest.xml",
+      "bytes": 72783,
+      "sha256": "f23635ee8e14650164b11cec63d755e1a09d479c4a28230af7c06b981208e504"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/h2/TEST-io.agentflow.expense.ExpensePlanContractTest.xml",
+      "bytes": 10809,
+      "sha256": "7e78209574fb21dad936c48bca4afb060b3e7e220d935fbd0bdbdb31ccd49082"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/h2/TEST-io.agentflow.expense.ExpensePlanIntegrationTest.xml",
+      "bytes": 75120,
+      "sha256": "defdb567f9a529fd212861287f1d8f122ab25d04325c535a4f70d9f45b0c8046"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/h2/TEST-io.agentflow.expense.ExpensePlanTest.xml",
+      "bytes": 11580,
+      "sha256": "5e42cc6600da2804074948a8d7e33ef7dfdd5b261e9a693221794d4b9fccc0ff"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/postgres/TEST-io.agentflow.expense.ExpensePlanIntegrationTest.xml",
+      "bytes": 74862,
+      "sha256": "56f1517103b537c8d36a09ad580894c335bf8b18d7489a2e07e36934bfff8297"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-evidence-snapshot/run-expense-plan-category-pg-tests.py",
+      "bytes": 1704,
+      "sha256": "efa0576986d043d96bd339d536e0d31da02ec5370331abe72201ba5f693351cb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-web-dist/assets/index-IL0cydYE.js",
+      "bytes": 1629516,
+      "sha256": "bdee76d261e73f338967c0f89095c5ae52b10046c041d4d6a37d79c23b37aa71"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-web-dist/assets/index-phTvhVl0.css",
+      "bytes": 372616,
+      "sha256": "6364891662e49c413c5d8a7ff32ae6e66160e09e13f9c6607ce3a409aa3fd7cc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-plan-category-binding-web-dist/index.html",
+      "bytes": 420,
+      "sha256": "afd8c690d38fa637ae2481817e2a6947b7f116af2146587d687756628f1e2612"
+    }
+  ]
+}

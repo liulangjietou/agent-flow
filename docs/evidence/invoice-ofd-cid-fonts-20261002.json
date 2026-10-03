@@ -1,0 +1,876 @@
+{
+  "recordedAt": "2026-10-02T10:50:10.931116+00:00",
+  "status": "CID_FONT_SCOPE_PASSED_FULL_OFD_INCOMPLETE",
+  "baseCommit": "f8212f21e56eb42b59992d26a87648909afb0421",
+  "remainingTopLevelCategories": 6,
+  "preciseSmallTaskCountKnown": false,
+  "callerChain": "InvoiceOfdText Unicode/CGTransform (also text clips) -> InvoiceOfdFont -> FontBox outline -> complete PNG pages",
+  "responsibility": "Font rendering infrastructure; no business/API/schema/runtime changes",
+  "rootCauses": [
+    "CFFCIDFont getType2CharString expects CID, while the former adapter supplied OpenType GID",
+    "FontBox 3.0.8 folds the first FD matrix into its top matrix result; the former adapter reused it for all glyphs"
+  ],
+  "red": {
+    "selectedTests": 8,
+    "failures": 8,
+    "errors": 0,
+    "missingCoverage": "Existing CFF fixture was not CID-keyed; no nonidentity CID charset or distinct FD matrices"
+  },
+  "implemented": [
+    "Map GID to actual unique CID for both Unicode cmap and explicit CGTransform glyph IDs",
+    "Select per-GID FD; compose local FD then original top matrix including translations/shear",
+    "Preserve absent-top versus explicit-top semantics; both matrices absent uses 0.001 scale",
+    "Reject invalid/duplicate charsets, ranges, dictionary selectors, missing Private and inconsistent glyph counts",
+    "Read only bounded CFF1 metadata; existing FontBox remains glyph program interpreter"
+  ],
+  "sources": [
+    {
+      "url": "https://adobe-type-tools.github.io/font-tech-notes/pdfs/5176.CFF.pdf",
+      "sections": "4-5, 18-19"
+    },
+    {
+      "url": "https://www.adobe.com/jp/print/postscript/pdfs/PLRM.pdf",
+      "section": "5.11.3",
+      "printedPages": [
+        374,
+        375
+      ]
+    },
+    {
+      "url": "https://raw.githubusercontent.com/apache/pdfbox/3.0.8/fontbox/src/main/java/org/apache/fontbox/cff/CFFCIDFont.java",
+      "lines": [
+        225,
+        234
+      ]
+    },
+    {
+      "url": "https://raw.githubusercontent.com/apache/pdfbox/3.0.8/fontbox/src/main/java/org/apache/fontbox/cff/CFFParser.java",
+      "lines": [
+        675,
+        706
+      ]
+    }
+  ],
+  "limits": {
+    "rawCffBytes": 33554432,
+    "dictionaryBytes": 65536,
+    "dictionaryOperands": 48,
+    "realCharacters": 64,
+    "fontDictionaries": 256,
+    "glyphCount": 65535
+  },
+  "scopeBoundaries": {
+    "fullCffValidator": false,
+    "newRuntimeDependencies": false,
+    "upstreamCodeCopied": false,
+    "publicOfdApiEnabled": false,
+    "isolatedWorkerWired": false,
+    "applicationFontConfigurationWired": false,
+    "modelCalled": false,
+    "runtimeReplaced": false,
+    "schemaChanged": false,
+    "nonDefaultTextWeightItalicSupported": false,
+    "signaturesSupported": false,
+    "allOriginalProductRequirementsAccepted": false
+  },
+  "tests": {
+    "scopedTotal": 119,
+    "newTests": 16,
+    "priorScopeOverlap": 103,
+    "suites": [
+      {
+        "name": "io.agentflow.agent.InvoiceOfdArchiveTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdArchiveTest.xml",
+          "bytes": 43640,
+          "sha256": "dff5916cd06ea4d54d987bc4017d92812929393df7a6507a50612c7920d426b2"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdCffDataTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdCffDataTest.xml",
+          "bytes": 43444,
+          "sha256": "b07f10100bbece1f3d1031a0406044d275dbd4cb27c29c3c0fb7bedac83b2d6b"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdCidFontTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdCidFontTest.xml",
+          "bytes": 43838,
+          "sha256": "3c23c13956f421aa3c6f46eb0a7f2f1329b2cc8dc703769e7093c405a05ba048"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdDeployedFontsTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdDeployedFontsTest.xml",
+          "bytes": 44782,
+          "sha256": "0f1eef47283b8985b97d8d102b044866defb9c46305301cba171c7d66ea79b4c"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdDocumentTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdDocumentTest.xml",
+          "bytes": 44292,
+          "sha256": "aed2449277e4db5f009b814b6cbe8d7c9e81822525a74ed5a0fdcfa4a405cbd6"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdDrawingTest",
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdDrawingTest.xml",
+          "bytes": 45022,
+          "sha256": "2afa1f1584e7bc959f931a9d39eeb573bbfc002d850910c82bfa452b24097b59"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdFontTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdFontTest.xml",
+          "bytes": 43494,
+          "sha256": "ca79be397a402893e09f6249ba33b6690f342abd748d5a064d6c1f61255466ca"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdPathTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdPathTest.xml",
+          "bytes": 43453,
+          "sha256": "24963b7294e0abe7224740911430b394ffcea1f8291010704c42004c6c18049b"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdRendererTest",
+        "tests": 20,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdRendererTest.xml",
+          "bytes": 45388,
+          "sha256": "5294b34977ab8e3309b6f9418caabd5bc7c02cb1de813189687da06431e5806e"
+        }
+      },
+      {
+        "name": "io.agentflow.agent.InvoiceOfdTemplateTest",
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "report": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdTemplateTest.xml",
+          "bytes": 44826,
+          "sha256": "c26f840555880f27514458ed55d48096bc3c326d76bb389b6dfa7e1b7e849514"
+        }
+      }
+    ]
+  },
+  "fontFixtures": {
+    "deterministicFonts": 21,
+    "unchangedOriginalFonts": 6,
+    "charsetFormats": {
+      "cid-subset.otf": 0,
+      "cid-range1.otf": 1,
+      "cid-range2.otf": 2
+    },
+    "sha256": {
+      "outline.otf": "cfac5797299beb53f2c0c3279d91298a47585f569eb71eb6eb8a0fe41a07fdad",
+      "a.ttf": "c4defdae7080edd927769589069c13461641d86eb38491e1f5be2303b61731a2",
+      "cid-inconsistent-count.otf": "5ca412ae4d5e1d6b85126e63981278ce72ac221b2eb66319467ea6310b57a1c1",
+      "cid-invalid-range-sentinel.otf": "6e30a5ff990d5854590512c3f6ee1c8428364dfabd7a59791b8e1ce96e270e0f",
+      "b.ttf": "0aba9e88cb6b576340ff182260f6e4a09e767bd9131dcdf16759ba222b6196c3",
+      "legacy-cmap.ttf": "a1085d41f1c7c9dec33a9793719a92390d73935742f366fd46ce251885c4244f",
+      "ambiguous-faces.ttc": "612f164d3ac6c7925c77fb517ee29b1998558a72bef8a583799ab15e754bd776",
+      "cid-invalid-fd.otf": "eb6221ebd0265ba77455d2ad235574b8102d880ebfbf1f6a4772340d089149b8",
+      "cid-range1.otf": "723bfba697c31c824362175b24a2c05aebb1e0e912af8ac02dffb180acec6ac0",
+      "two-faces.ttc": "cea23660fa07caa6bdc5e01cc338017a7b5c73ee29020465b5934a6b06ed2f7d",
+      "cid-range2.otf": "0c73b4640b9d866a419ec89d6c99e5499adaf504ae0dcc765feb27e8cd88bf32",
+      "cid-missing-private.otf": "e5c26f298eb398b7c6759ca7ddc39fc47dbe510b9bc630c91c85c23b3b5d06b3",
+      "cid-matrices.otf": "fd72cab9a95c1878f14e01a5ec911e972ab4b5440688ad40ebeed4ca070aa8fd",
+      "cid-invalid-range-start.otf": "8c9ebbf812ba3614cc9e56c95e9b4637c0baee58b4e7550dd31e39f84c0059b3",
+      "cid-range-cid-overflow.otf": "e53bcd8ff93cf2a82069d3a4ffcfa47da00e92fa116f5cc3dd8d3debf8071bf8",
+      "cid-duplicate-cid.otf": "4267b91553fcec5795d68d1b274a72593f4fb450facadd5cf1649e13be1e2a2e",
+      "cid-fd-only.otf": "a8fe28b5845450fc303af3a46da11388501bcfaaad365e5a0e32c2f1deb13c80",
+      "cid-range-overflow.otf": "ecbd17e219d6aa48fe18d63767ca5d9c5a47c97b5a41a2b33b9d6be739cff228",
+      "cid-top-only.otf": "2ea3dccece2e4632449373c4b5d92364f82083eb356bdc0729a935f31fb73b04",
+      "cid-singular-matrix.otf": "f7533bb627b98faf38d77e8146e7a88cec66e02b466b5b8ac0ed399449195dc4",
+      "cid-subset.otf": "18de6388133b68626c6494ad1c5b9ff57c63696967904b3644406fa93cbe037c"
+    }
+  },
+  "independentCidProbe": {
+    "pages": 4,
+    "numericalGlyphBoxesVerified": 12,
+    "actualImagesInspected": 4,
+    "results": [
+      {
+        "pages": 1,
+        "gid2_3_4BoundsEm": [
+          [
+            0.0,
+            0.0,
+            0.30000001192092896,
+            0.699999988079071
+          ],
+          [
+            0.0,
+            0.0,
+            0.6000000238418579,
+            0.699999988079071
+          ],
+          [
+            0.0,
+            0.0,
+            0.800000011920929,
+            0.699999988079071
+          ]
+        ],
+        "font": "cid-subset.otf",
+        "png": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-subset.otf.png",
+        "dimensions": [
+          567,
+          341
+        ],
+        "nonWhiteBounds": [
+          28,
+          192,
+          431,
+          273
+        ],
+        "visuallyInspected": true,
+        "image": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-subset.otf.png",
+          "bytes": 1867,
+          "sha256": "b6789e79ba93922b0a091e9c36818e6cbeffc72766d660e9469fd6997e096b57"
+        }
+      },
+      {
+        "pages": 1,
+        "gid2_3_4BoundsEm": [
+          [
+            0.10000000149011612,
+            0.20000000298023224,
+            0.30000001192092896,
+            0.699999988079071
+          ],
+          [
+            0.20000000298023224,
+            0.4000000059604645,
+            0.30000001192092896,
+            1.0500000715255737
+          ],
+          [
+            0.20000000298023224,
+            0.4000000059604645,
+            0.40000003576278687,
+            1.0500000715255737
+          ]
+        ],
+        "font": "cid-matrices.otf",
+        "png": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-matrices.otf.png",
+        "dimensions": [
+          567,
+          341
+        ],
+        "nonWhiteBounds": [
+          39,
+          107,
+          443,
+          250
+        ],
+        "visuallyInspected": true,
+        "image": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-matrices.otf.png",
+          "bytes": 1951,
+          "sha256": "98940afc017d2c9d548112e9fd4a3f95cc4275665d87ea827866a58d16e39793"
+        }
+      },
+      {
+        "pages": 1,
+        "gid2_3_4BoundsEm": [
+          [
+            0.0,
+            0.0,
+            0.30000001192092896,
+            0.699999988079071
+          ],
+          [
+            0.05000000074505806,
+            0.15000000596046448,
+            0.4399999976158142,
+            1.399999976158142
+          ],
+          [
+            0.05000000074505806,
+            0.15000000596046448,
+            0.5399999618530273,
+            1.399999976158142
+          ]
+        ],
+        "font": "cid-fd-only.otf",
+        "png": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-fd-only.otf.png",
+        "dimensions": [
+          567,
+          341
+        ],
+        "nonWhiteBounds": [
+          28,
+          96,
+          431,
+          273
+        ],
+        "visuallyInspected": true,
+        "image": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-fd-only.otf.png",
+          "bytes": 2337,
+          "sha256": "91b46e6508724df0787fb13dda64cdf4db73972176cb88cf10e67b87bf89a70f"
+        }
+      },
+      {
+        "pages": 1,
+        "gid2_3_4BoundsEm": [
+          [
+            0.20000000298023224,
+            -0.10000000149011612,
+            0.6000000238418579,
+            2.0999999046325684
+          ],
+          [
+            0.20000000298023224,
+            -0.10000000149011612,
+            1.1999999284744263,
+            2.0999999046325684
+          ],
+          [
+            0.20000000298023224,
+            -0.10000000149011612,
+            1.5999999046325684,
+            2.0999999046325684
+          ]
+        ],
+        "font": "cid-top-only.otf",
+        "png": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-top-only.otf.png",
+        "dimensions": [
+          567,
+          341
+        ],
+        "nonWhiteBounds": [
+          51,
+          45,
+          488,
+          284
+        ],
+        "visuallyInspected": true,
+        "image": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-top-only.otf.png",
+          "bytes": 3011,
+          "sha256": "1597112372df470fb638054adb0c5b59e63fec033af50dc6e21f19ff595aa2a9"
+        }
+      }
+    ],
+    "representsRealInvoiceQuality": false
+  },
+  "publicProbe": {
+    "syntheticPixelChecks": 4,
+    "syntheticPages": 4,
+    "publicSamples": [
+      {
+        "file": "helloworld.ofd",
+        "pages": 1,
+        "rendered": true,
+        "renderedPages": 1,
+        "original": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/helloworld.ofd",
+          "bytes": 1651,
+          "sha256": "a7b6f9eceb7ca4eafc73a318ac06f5476af6010d0dbcc99337912049748e141e"
+        },
+        "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-converter/src/test/resources/helloworld.ofd",
+        "originalUnchanged": true,
+        "png": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-public-probe/helloworld.ofd/page-1.png",
+          "bytes": 13418,
+          "sha256": "564233710156ad06df5deba0b595a8f50ec22c319e7e26c75fd5c7279e901f34"
+        },
+        "byteIdenticalToPreviousProbe": true
+      },
+      {
+        "file": "chineseDir.ofd",
+        "pages": 1,
+        "rendered": true,
+        "renderedPages": 1,
+        "original": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/chineseDir.ofd",
+          "bytes": 2097,
+          "sha256": "c6defec84b241c74679a0d424634ff4a8605ccecc480d9736ef89218d806ac09"
+        },
+        "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-reader/src/test/resources/chineseDir.ofd",
+        "originalUnchanged": true,
+        "png": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-public-probe/chineseDir.ofd/page-1.png",
+          "bytes": 13418,
+          "sha256": "564233710156ad06df5deba0b595a8f50ec22c319e7e26c75fd5c7279e901f34"
+        },
+        "byteIdenticalToPreviousProbe": true
+      },
+      {
+        "exception": "java.io.IOException: OFD drawing data is invalid, unsupported or exceeds rendering limits",
+        "stack": [
+          "io.agentflow.agent.InvoiceOfdXml.invalid(InvoiceOfdXml.java:112)",
+          "io.agentflow.agent.InvoiceOfdXml.shape(InvoiceOfdXml.java:52)",
+          "io.agentflow.agent.InvoiceOfdRenderer.inspectDrawingScope(InvoiceOfdRenderer.java:75)",
+          "io.agentflow.agent.InvoiceOfdRenderer.render(InvoiceOfdRenderer.java:57)",
+          "io.agentflow.agent.InvoiceOfdDeployedFontsProbe.main(InvoiceOfdDeployedFontsProbe.java:32)"
+        ],
+        "file": "draw_param_ref.ofd",
+        "pages": 5,
+        "rendered": false,
+        "original": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/draw_param_ref.ofd",
+          "bytes": 33402,
+          "sha256": "525eba2e09a4d7ac01a05bc176146ee9ecf5b1184fa3b909cc15599803493700"
+        },
+        "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-converter/src/test/resources/draw_param_ref.ofd",
+        "originalUnchanged": true
+      },
+      {
+        "exception": "java.io.IOException: OFD drawing data is invalid, unsupported or exceeds rendering limits",
+        "stack": [
+          "io.agentflow.agent.InvoiceOfdXml.invalid(InvoiceOfdXml.java:112)",
+          "io.agentflow.agent.InvoiceOfdXml.shape(InvoiceOfdXml.java:52)",
+          "io.agentflow.agent.InvoiceOfdRenderer.inspectDrawingScope(InvoiceOfdRenderer.java:75)",
+          "io.agentflow.agent.InvoiceOfdRenderer.render(InvoiceOfdRenderer.java:57)",
+          "io.agentflow.agent.InvoiceOfdDeployedFontsProbe.main(InvoiceOfdDeployedFontsProbe.java:32)"
+        ],
+        "file": "DigitalSign.ofd",
+        "pages": 1,
+        "rendered": false,
+        "original": {
+          "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/DigitalSign.ofd",
+          "bytes": 3041,
+          "sha256": "5b5bec16c539aa041ef3784d47a5665c03cf7f2e228551df87f13ee28d122989"
+        },
+        "source": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-sign/src/test/resources/DigitalSign.ofd",
+        "originalUnchanged": true
+      }
+    ]
+  },
+  "authorGate": {
+    "javaFiles": 1375,
+    "namedTypes": 2638,
+    "missingAuthorTags": 0,
+    "parseErrors": 0
+  },
+  "remaining": [
+    "Non-default text Weight/Italic and remaining graph/clip/color behavior",
+    "Annotations, signatures, nested stamp resources and complete invoice quality acceptance",
+    "Application font configuration, isolated OFD worker, ordered complete-page model inputs",
+    "Model execution/restart acceptance, precheck advice, structured finance Agent entry",
+    "Other five top-level unfinished categories"
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdArchiveTest.xml",
+      "bytes": 43640,
+      "sha256": "dff5916cd06ea4d54d987bc4017d92812929393df7a6507a50612c7920d426b2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdCffDataTest.xml",
+      "bytes": 43444,
+      "sha256": "b07f10100bbece1f3d1031a0406044d275dbd4cb27c29c3c0fb7bedac83b2d6b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdCidFontTest.xml",
+      "bytes": 43838,
+      "sha256": "3c23c13956f421aa3c6f46eb0a7f2f1329b2cc8dc703769e7093c405a05ba048"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdDeployedFontsTest.xml",
+      "bytes": 44782,
+      "sha256": "0f1eef47283b8985b97d8d102b044866defb9c46305301cba171c7d66ea79b4c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdDocumentTest.xml",
+      "bytes": 44292,
+      "sha256": "aed2449277e4db5f009b814b6cbe8d7c9e81822525a74ed5a0fdcfa4a405cbd6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdDrawingTest.xml",
+      "bytes": 45022,
+      "sha256": "2afa1f1584e7bc959f931a9d39eeb573bbfc002d850910c82bfa452b24097b59"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdFontTest.xml",
+      "bytes": 43494,
+      "sha256": "ca79be397a402893e09f6249ba33b6690f342abd748d5a064d6c1f61255466ca"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdPathTest.xml",
+      "bytes": 43453,
+      "sha256": "24963b7294e0abe7224740911430b394ffcea1f8291010704c42004c6c18049b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdRendererTest.xml",
+      "bytes": 45388,
+      "sha256": "5294b34977ab8e3309b6f9418caabd5bc7c02cb1de813189687da06431e5806e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-reports/TEST-io.agentflow.agent.InvoiceOfdTemplateTest.xml",
+      "bytes": 44826,
+      "sha256": "c26f840555880f27514458ed55d48096bc3c326d76bb389b6dfa7e1b7e849514"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-subset.otf.png",
+      "bytes": 1867,
+      "sha256": "b6789e79ba93922b0a091e9c36818e6cbeffc72766d660e9469fd6997e096b57"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-subset.otf.ofd",
+      "bytes": 1879,
+      "sha256": "0b631f3be8603376b4eceb957b6c83746e9489d5d0246139d940df7902446d70"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-matrices.otf.png",
+      "bytes": 1951,
+      "sha256": "98940afc017d2c9d548112e9fd4a3f95cc4275665d87ea827866a58d16e39793"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-matrices.otf.ofd",
+      "bytes": 1931,
+      "sha256": "2b3293f63ba38c31c1234ea61110fbdcf0cf85f8fa8a48edcf7ef604f2b8fedd"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-fd-only.otf.png",
+      "bytes": 2337,
+      "sha256": "91b46e6508724df0787fb13dda64cdf4db73972176cb88cf10e67b87bf89a70f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-fd-only.otf.ofd",
+      "bytes": 1917,
+      "sha256": "5c6357525a7c7887904cd5897f6c2d645074a4c0599889d40e79d053ecda38d3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-top-only.otf.png",
+      "bytes": 3011,
+      "sha256": "1597112372df470fb638054adb0c5b59e63fec033af50dc6e21f19ff595aa2a9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/cid-top-only.otf.ofd",
+      "bytes": 1910,
+      "sha256": "8106aafb950e954ceb6b069ac7171f5fd0b84e38fdb0c2c5474f02bbe158467e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/helloworld.ofd",
+      "bytes": 1651,
+      "sha256": "a7b6f9eceb7ca4eafc73a318ac06f5476af6010d0dbcc99337912049748e141e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-public-probe/helloworld.ofd/page-1.png",
+      "bytes": 13418,
+      "sha256": "564233710156ad06df5deba0b595a8f50ec22c319e7e26c75fd5c7279e901f34"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/chineseDir.ofd",
+      "bytes": 2097,
+      "sha256": "c6defec84b241c74679a0d424634ff4a8605ccecc480d9736ef89218d806ac09"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-public-probe/chineseDir.ofd/page-1.png",
+      "bytes": 13418,
+      "sha256": "564233710156ad06df5deba0b595a8f50ec22c319e7e26c75fd5c7279e901f34"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/draw_param_ref.ofd",
+      "bytes": 33402,
+      "sha256": "525eba2e09a4d7ac01a05bc176146ee9ecf5b1184fa3b909cc15599803493700"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/DigitalSign.ofd",
+      "bytes": 3041,
+      "sha256": "5b5bec16c539aa041ef3784d47a5665c03cf7f2e228551df87f13ee28d122989"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-public-probe/AgentFlowSyntheticA-1.png",
+      "bytes": 354,
+      "sha256": "c958dfe82dff5ea822dd9ffd11401f81f6d32f8e5380843a432adc096b41d62b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-public-probe/AgentFlowSyntheticA-2.png",
+      "bytes": 354,
+      "sha256": "c958dfe82dff5ea822dd9ffd11401f81f6d32f8e5380843a432adc096b41d62b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-public-probe/AgentFlowSyntheticB-1.png",
+      "bytes": 354,
+      "sha256": "30ded12f530d2b1192c5a851c6d2fca44666b241c5f71a3ce5cfd16d9c7e8271"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-public-probe/AgentFlowSyntheticB-2.png",
+      "bytes": 354,
+      "sha256": "30ded12f530d2b1192c5a851c6d2fca44666b241c5f71a3ce5cfd16d9c7e8271"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-red.log",
+      "bytes": 21107,
+      "sha256": "dfb4f6a1f4d99401ce7004670f6395261710a71cfb6f76fc240274415c7f54ff"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-focused.log",
+      "bytes": 13154,
+      "sha256": "493991e68c40caa71b945e30a7f41afaa7582bb1b1c4155848fb23a39afd322d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-scope.log",
+      "bytes": 14494,
+      "sha256": "2f38b4a03fc4304adbc16fcdbf7e1e274c4eddf3fd0a2cfe02d6121a829a1b9b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-authors.log",
+      "bytes": 131,
+      "sha256": "248aba3a421b4c5c7cdad486dd566ac255ce4e8f58960cf373fcdab0acd475d8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-font-fixtures.log",
+      "bytes": 67,
+      "sha256": "6454d142bd61d9009ed30c75846e15a480d83cb24c9e517146464d9ac983616a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-font-fixtures-reproducibility.json",
+      "bytes": 2150,
+      "sha256": "17f3ae8ddfb0d3e2fe7b87d6060d5da758756dc9ec5d999197908ad308397ed8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe.log",
+      "bytes": 1455,
+      "sha256": "fca91b407933cacb724c61ef475d8d1d91d9b75e7daabcdb07b2a0195bb41d85"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-probe/results.json",
+      "bytes": 1421,
+      "sha256": "8835c171126a015e1a42da51b7b5314def1c57b829f33d4480b6352970b4e7e6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-public-probe/results.json",
+      "bytes": 1316,
+      "sha256": "8172b992d3d4ea5623b52dd1bdd5fa1c2ac20b441215815de9e486ac580181db"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/InvoiceOfdCidFontsProbe.java",
+      "bytes": 2561,
+      "sha256": "d82c910eeea0518dcf02e9d1b2b8cf2db14e43f93dd7fa6f68a803143547fae4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/InvoiceOfdDeployedFontsProbe.java",
+      "bytes": 3815,
+      "sha256": "dceb6d1c4316115f1b8a805304931db9f31c4984873114bc5fac440970ed404c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-deployed-fonts-probe/font-provenance.json",
+      "bytes": 574,
+      "sha256": "8df3eb2e53766c43d4df26899362ff1e484c3f34c4503f830057cf372d86146b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-cid-fonts-public-probe/fonts.json",
+      "bytes": 512,
+      "sha256": "d115acfcb18348bcc3e61f698c5a9ed812047e32b0a02dcd3bb0044d568d509a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/README.md",
+      "bytes": 2192,
+      "sha256": "7d07b0060394ec6a37cbe4d45ca9ad704b31a16b7679374f987a08d9b9a1f263"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/a.ttf",
+      "bytes": 920,
+      "sha256": "c4defdae7080edd927769589069c13461641d86eb38491e1f5be2303b61731a2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/ambiguous-faces.ttc",
+      "bytes": 1408,
+      "sha256": "612f164d3ac6c7925c77fb517ee29b1998558a72bef8a583799ab15e754bd776"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/b.ttf",
+      "bytes": 920,
+      "sha256": "0aba9e88cb6b576340ff182260f6e4a09e767bd9131dcdf16759ba222b6196c3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-duplicate-cid.otf",
+      "bytes": 1016,
+      "sha256": "4267b91553fcec5795d68d1b274a72593f4fb450facadd5cf1649e13be1e2a2e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-fd-only.otf",
+      "bytes": 1088,
+      "sha256": "a8fe28b5845450fc303af3a46da11388501bcfaaad365e5a0e32c2f1deb13c80"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-inconsistent-count.otf",
+      "bytes": 1016,
+      "sha256": "5ca412ae4d5e1d6b85126e63981278ce72ac221b2eb66319467ea6310b57a1c1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-invalid-fd.otf",
+      "bytes": 1016,
+      "sha256": "eb6221ebd0265ba77455d2ad235574b8102d880ebfbf1f6a4772340d089149b8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-invalid-range-sentinel.otf",
+      "bytes": 1100,
+      "sha256": "6e30a5ff990d5854590512c3f6ee1c8428364dfabd7a59791b8e1ce96e270e0f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-invalid-range-start.otf",
+      "bytes": 1100,
+      "sha256": "8c9ebbf812ba3614cc9e56c95e9b4637c0baee58b4e7550dd31e39f84c0059b3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-matrices.otf",
+      "bytes": 1100,
+      "sha256": "fd72cab9a95c1878f14e01a5ec911e972ab4b5440688ad40ebeed4ca070aa8fd"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-missing-private.otf",
+      "bytes": 1076,
+      "sha256": "e5c26f298eb398b7c6759ca7ddc39fc47dbe510b9bc630c91c85c23b3b5d06b3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-range-cid-overflow.otf",
+      "bytes": 5412,
+      "sha256": "e53bcd8ff93cf2a82069d3a4ffcfa47da00e92fa116f5cc3dd8d3debf8071bf8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-range-overflow.otf",
+      "bytes": 1052,
+      "sha256": "ecbd17e219d6aa48fe18d63767ca5d9c5a47c97b5a41a2b33b9d6be739cff228"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-range1.otf",
+      "bytes": 1052,
+      "sha256": "723bfba697c31c824362175b24a2c05aebb1e0e912af8ac02dffb180acec6ac0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-range2.otf",
+      "bytes": 5412,
+      "sha256": "0c73b4640b9d866a419ec89d6c99e5499adaf504ae0dcc765feb27e8cd88bf32"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-singular-matrix.otf",
+      "bytes": 1088,
+      "sha256": "f7533bb627b98faf38d77e8146e7a88cec66e02b466b5b8ac0ed399449195dc4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-subset.otf",
+      "bytes": 1016,
+      "sha256": "18de6388133b68626c6494ad1c5b9ff57c63696967904b3644406fa93cbe037c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/cid-top-only.otf",
+      "bytes": 1080,
+      "sha256": "2ea3dccece2e4632449373c4b5d92364f82083eb356bdc0729a935f31fb73b04"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/legacy-cmap.ttf",
+      "bytes": 836,
+      "sha256": "a1085d41f1c7c9dec33a9793719a92390d73935742f366fd46ce251885c4244f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/outline.otf",
+      "bytes": 928,
+      "sha256": "cfac5797299beb53f2c0c3279d91298a47585f569eb71eb6eb8a0fe41a07fdad"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/resources/ofd-fonts/two-faces.ttc",
+      "bytes": 1612,
+      "sha256": "cea23660fa07caa6bdc5e01cc338017a7b5c73ee29020465b5934a6b06ed2f7d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdFont.java",
+      "bytes": 8435,
+      "sha256": "7af8e95a7a7708348e32ec860624b16326fb2f72dba5cbbfc88ba341a2254e66"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdCidFont.java",
+      "bytes": 5074,
+      "sha256": "8c5332d361e5bb07a502cd34bc76701ca628286c363f8eeedf4f99df9c1bef00"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdCffData.java",
+      "bytes": 7102,
+      "sha256": "1567a5ab35b1321e48996536a197b91982e7e507e105bfdd35f0fbc77c7b6662"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdCidFontTest.java",
+      "bytes": 5451,
+      "sha256": "6d67e149efe640f830c74a8256ff3d45aaf4551f42c50adbb7020f12c4424cac"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdCffDataTest.java",
+      "bytes": 4799,
+      "sha256": "ff38d5c5dfbd6cd1f3eb5cee3da752e5ccb608e8868a97c4ace3ae5c013b7c7f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/scripts/generate-ofd-font-fixtures.py",
+      "bytes": 7441,
+      "sha256": "42218f3516f72c5ae8d32ba792aa008a0f1dc3cc98ba46e3b5735c6e0f3af7eb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/cff/CFFFont.java",
+      "bytes": 5311,
+      "sha256": "0d6a5b660d62771fea12b21179b1b74352a09814b4524ab1222b118aa502b46f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/cff/CFFCIDFont.java",
+      "bytes": 8064,
+      "sha256": "39478628dbce89ac47fa53462e73d78f337ee0fa0796adc9b07c2615858dd8aa"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/cff/CFFParser.java",
+      "bytes": 58860,
+      "sha256": "573627204c3f015ef6b97388ae58b2869e67ca7e1d0ba38d341c538e446e192e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/cff/5176.CFF.pdf",
+      "bytes": 1062494,
+      "sha256": "60e0696c4fac326de597722af37bcdbbd688e0337a548709a287405ff3b3996a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/gbt33190-2016.pdf",
+      "bytes": 4331919,
+      "sha256": "dae45301d0a3c906f8f172a2def2dee14df3bd2b62783bca402ca0a9ec4f9e13"
+    }
+  ]
+}

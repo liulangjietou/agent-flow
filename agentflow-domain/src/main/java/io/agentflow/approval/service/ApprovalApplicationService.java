@@ -1,6 +1,7 @@
 package io.agentflow.approval.service;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
@@ -8,6 +9,7 @@ import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.NotificationTexts;
+import io.agentflow.organization.InitiatorContext;
 
 import java.time.Instant;
 import java.util.Map;
@@ -55,11 +57,22 @@ public class ApprovalApplicationService {
     public Application create(String tenantId, String businessNo, String processKey, long definitionVersion,
                               String userId, String title, Map<String, Object> payload, FormSchema formSchema,
                               String runtimeDefinitionId, NotificationTexts notificationTexts) {
+        return create(tenantId, businessNo, processKey, definitionVersion, userId, title, payload, formSchema,
+                runtimeDefinitionId, notificationTexts, null);
+    }
+
+    /** 结构化业务绑定由相应应用服务产生，与创建审计在同一事务保存。 */
+    public Application create(String tenantId, String businessNo, String processKey, long definitionVersion,
+                              String userId, String title, Map<String, Object> payload, FormSchema formSchema,
+                              String runtimeDefinitionId, NotificationTexts notificationTexts, BusinessReference businessReference) {
         if (repository.findByBusinessNo(tenantId, businessNo).isPresent()) {
             throw new DomainException("BUSINESS_NO_EXISTS", "Business number already exists");
         }
-        Application application = Application.draft(UUID.randomUUID(), tenantId, businessNo, processKey,
-                definitionVersion, userId, title, payload, formSchema, runtimeDefinitionId, notificationTexts);
+        Application application = businessReference == null
+                ? Application.draft(UUID.randomUUID(), tenantId, businessNo, processKey, definitionVersion, userId, title, payload,
+                    formSchema, runtimeDefinitionId, notificationTexts)
+                : Application.draftBusiness(UUID.randomUUID(), tenantId, businessNo, processKey, definitionVersion, userId, title, payload,
+                    formSchema, runtimeDefinitionId, notificationTexts, businessReference);
         repository.save(application);
         recordApplicationOperation(application, userId, ApplicationAuditPort.Action.CREATE, null, null, null);
         return application;
@@ -67,6 +80,11 @@ public class ApprovalApplicationService {
 
     /** 提交申请；流程启动失败时由上层事务回滚本地状态。 */
     public Application submit(String tenantId, UUID id, long expectedVersion, String submittedBy) {
+        return submit(tenantId, id, expectedVersion, submittedBy, null);
+    }
+
+    /** 把服务端确认的任职同时交给运行端口和轮次仓储，不把它混入用户表单。 */
+    public Application submit(String tenantId, UUID id, long expectedVersion, String submittedBy, InitiatorContext initiatorContext) {
         Application application = repository.findById(tenantId, id)
                 .orElseThrow(() -> new DomainException("NOT_FOUND", "Application not found"));
         ApplicationStatus previousStatus = application.status();
@@ -75,9 +93,9 @@ public class ApprovalApplicationService {
         application.submit(expectedVersion);
         ProcessRuntimePort.StartedProcess started = processRuntime.start(new ProcessRuntimePort.StartProcessCommand(tenantId, id, application.processKey(),
                 application.definitionVersion(), application.roundNo(), application.businessNo(), application.payload(), application.formSchema(),
-                application.runtimeDefinitionId(), previousRound == null ? null : previousRound.processInstanceId()));
+                application.runtimeDefinitionId(), previousRound == null ? null : previousRound.processInstanceId(), initiatorContext));
         repository.update(application, expectedVersion);
-        rounds.append(SubmissionRound.submitted(application, started.processInstanceId(), submittedBy, Instant.now()));
+        rounds.append(SubmissionRound.submitted(application, started.processInstanceId(), submittedBy, Instant.now(), initiatorContext, started.risk()));
         recordApplicationOperation(application, submittedBy, ApplicationAuditPort.Action.SUBMIT, previousStatus,
                 started.processInstanceId(), null);
         return application;
@@ -121,6 +139,38 @@ public class ApprovalApplicationService {
         application.cancel(expectedVersion);
         repository.update(application, expectedVersion);
         recordApplicationOperation(application, actor, ApplicationAuditPort.Action.CANCEL, previousStatus, null, comment);
+        return application;
+    }
+
+    /** 系统业务结论退回当前轮次，仍需精确终止对应实例并保存真实系统操作者。 */
+    public Application returnToApplicant(String tenantId, UUID id, long expectedVersion, String actor, String comment) {
+        Application application = get(tenantId, id); ApplicationStatus previousStatus = application.status();
+        application.returnToApplicant(expectedVersion);
+        var round = rounds.findByRound(tenantId, id, application.roundNo()).orElseThrow(
+                () -> new DomainException("CONCURRENCY_CONFLICT", "Active submission round not found"));
+        if (round.status() != SubmissionRound.Status.IN_APPROVAL || round.definitionVersion() != application.definitionVersion()) {
+            throw new DomainException("CONCURRENCY_CONFLICT", "Submission round no longer matches the active application");
+        }
+        String instanceId = processRuntime.withdraw(new ProcessRuntimePort.WithdrawProcessCommand(tenantId, id, application.roundNo(),
+                round.processInstanceId(), "RETURN by " + actor));
+        repository.update(application, expectedVersion);
+        rounds.complete(tenantId, id, application.roundNo(), instanceId, SubmissionRound.Status.RETURNED, comment, actor, Instant.now());
+        recordApplicationOperation(application, actor, ApplicationAuditPort.Action.RETURN, previousStatus, instanceId, comment);
+        return application;
+    }
+
+    /** 已授权的业务核定只更新当前路由，不改写提交快照；具体任务证据由业务用例追加。 */
+    public Application adjustBusiness(String tenantId, UUID id, long expectedVersion, BusinessReference reference,
+            Map<String, Object> payload) {
+        var application = get(tenantId, id);
+        application.adjustBusinessPayload(expectedVersion, reference, payload);
+        var round = rounds.findByRound(tenantId, id, application.roundNo()).orElseThrow(
+                () -> new DomainException("CONCURRENCY_CONFLICT", "Active submission round not found"));
+        if (round.status() != SubmissionRound.Status.IN_APPROVAL || round.definitionVersion() != application.definitionVersion()) {
+            throw new DomainException("CONCURRENCY_CONFLICT", "Submission round no longer matches the active application");
+        }
+        processRuntime.updateBusinessPayload(new ProcessRuntimePort.UpdateBusinessPayload(tenantId, id, application.roundNo(), round.processInstanceId(), application.payload()));
+        repository.update(application, expectedVersion);
         return application;
     }
 

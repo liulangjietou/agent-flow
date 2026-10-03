@@ -1,5 +1,15 @@
 /** 来源仅是不透明标识与内容指纹，不是可执行地址。@author owlzhangfq@gmail.com */
 export interface AssistReference { sourceId: string; contentDigest: string }
+/** 已通过服务端权限投影的可选模型来源。@author owlzhangfq@gmail.com */
+export interface AssistSource { reference: AssistReference; label: string; content: string }
+/** 模型配置只暴露用于确认目的地的非秘密信息。@author owlzhangfq@gmail.com */
+export interface AssistInputOptions { applicationVersion: number; enabled: boolean; unavailableCode: string | null; providerId: string | null; model: string | null; destination: string | null; targetDigest: string | null; sources: AssistSource[] }
+/** 写回执不含摘要正文，恢复操作后仍需重新授权读取。@author owlzhangfq@gmail.com */
+export interface AssistReceipt { id: string; status: AssistStatus; version: number }
+/** 客户端只选择来源，原文由服务器冻结。@author owlzhangfq@gmail.com */
+export interface AssistGenerateRequest { taskId: string; expectedVersion: number; targetDigest: string; sourceIds: string[] }
+/** 复核与申请审批分别操作。@author owlzhangfq@gmail.com */
+export interface AssistReviewRequest { taskId: string; expectedVersion: number; expectedRunVersion: number; action: 'ADOPT' | 'DISMISS'; acceptedText?: string; comment?: string }
 /** 摘要运行状态独立于审批结论。@author owlzhangfq@gmail.com */
 export type AssistStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'ADOPTED' | 'DISMISSED'
 /** 目录不含模型正文，选择一条后才读取详情。@author owlzhangfq@gmail.com */

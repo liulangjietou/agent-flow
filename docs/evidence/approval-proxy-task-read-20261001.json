@@ -1,0 +1,151 @@
+{
+  "recordedAt": "2026-10-02T00:01:45.669261+00:00",
+  "status": "BACKEND_READ_SCOPE_VERIFIED_PROXY_FEATURE_INCOMPLETE",
+  "baseCommit": "b4859b483e6a520c131fa7098d81166363eb3fb3",
+  "scope": [
+    "direct timed proxy read authority",
+    "exact published version and native current round",
+    "pending pagination counts filters and deduplication",
+    "field masking and original attachment access",
+    "actual roles and current eligibility",
+    "native delegation, duties and countersign independence",
+    "no task assignment or due date changes"
+  ],
+  "redTest": {
+    "test": "effectiveProxyReadsTheNativeTaskAndApplicationWithoutClaimingIt",
+    "expectedStatus": 200,
+    "actualStatus": 403,
+    "tests": 1,
+    "failures": 1,
+    "errors": 0
+  },
+  "h2": {
+    "status": "PASS_AFTER_FIXTURE_CORRECTION",
+    "uniqueTests": 70,
+    "focused": [
+      {
+        "name": "io.agentflow.organization.ApprovalProxyTaskReadIntegrationTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "related": [
+      {
+        "name": "io.agentflow.organization.ApprovalResponsibilitiesIntegrationTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.attachment.AttachmentIntegrationTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.api.OpenApiContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.approval.TaskDelegationIntegrationTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.approval.PendingTaskQueueIntegrationTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.approval.FieldPermissionsIntegrationTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "initialFixtureError": "Finance node test initially omitted the required structured expense form. Corrected only the fixture to use a real published expense schema and native task with frozen application/round facts. No production validation was weakened.",
+    "financeBoundary": "Read authorization only; not an expense submission or financial proxy action acceptance."
+  },
+  "postgresql": {
+    "database": "approval_proxy_read_313336fa07",
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-task-read-postgres-313336fa07.log",
+    "status": "PASS",
+    "exitCode": 0,
+    "tests": 26,
+    "suites": [
+      {
+        "name": "io.agentflow.organization.ApprovalProxyTaskReadIntegrationTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.approval.PendingTaskQueueIntegrationTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "counting": "Overlaps H2; do not add to unique count."
+  },
+  "contracts": {
+    "result": "PASS",
+    "operations": 296,
+    "schemas": 588,
+    "requestExamples": 113,
+    "publicDtoChanges": false
+  },
+  "javaAuthors": {
+    "files": 1294,
+    "namedTypes": 2485,
+    "missing": 0,
+    "parseErrors": 0
+  },
+  "remaining": [
+    "proxy selection and fresh grant row lock after application lock",
+    "actual decision actor plus original proxy evidence and historical access",
+    "expense receipt and reduction and other specialized finance entry points",
+    "notification audiences without SLA reset",
+    "management and decision UI",
+    "real HTTP/browser upgrade restart acceptance",
+    "field relationship assignees and other original goal gaps"
+  ],
+  "delivery": {
+    "localOnly": true,
+    "existingServicesReplaced": false,
+    "newMigrations": false,
+    "newBrowserAcceptance": false,
+    "gitRemoteConfigured": false
+  },
+  "sources": {
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalProxyAccess.java": "173655520b59f40ddd8f6460d7dd33e194bd94796803966aee2e30192211ae4f",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskAuthorization.java": "bdf319f2646523bf0dca6566a606c68d46e8cd5e8755f88f9c92f4afa4d16581",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskFacade.java": "9cb234840471e345fd0471c079d7f533329e70058b5679dac4688bd74a83bcee",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApplicationParticipantAdapter.java": "87cc87ee2fa83e89987f1fe43d89d9c760a93556318a0d168a190dda82d30a06",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableCountersignRuntime.java": "0f68ea7490e7974fe18392a9428b1b69d43580a12423b2b7eb5a9682a3372818",
+    "agentflow-server/src/main/java/io/agentflow/approval/workspace/FlowablePendingTaskReadAdapter.java": "13d2affe155e52c889d4ca870ddff847f5b7d2a722c3c3460ec246d807d0785a",
+    "agentflow-server/src/test/java/io/agentflow/organization/ApprovalProxyTaskReadIntegrationTest.java": "37930fb3108d20647900e09f7ee74e8792a3f6a982f58d0661b5b4c6ff033705",
+    "agentflow-server/src/test/java/io/agentflow/approval/PendingTaskQueueIntegrationTest.java": "c4d846ffc12072bc3664297bfebd41ba6203193b812a98815ed5ad8cd5988627"
+  },
+  "logs": {
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-task-read-red.log": "26e803745670c84087499c2b9fab203cac23751161a373f7b2677a1ba151d076",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-task-read-first.log": "2247b5e0cd42fdaedc14a9816e6b350a66e63f61dba763ab34138b2fdbbe38ab",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-task-read-h2.log": "dc3c9f8a4e2544019c06830ee4911aeb443feebfa4f359c896d91f67c7cfd86b",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-task-read-h2-final.log": "89b91d17667b852c8114df0e0a299554fd1d216170b181558c12cee48ac1195c",
+    "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-task-read-postgres-313336fa07.log": "0b3566000fb3cc847d13edf3dba99761abdcc5d83ca32c96e9945c7cc136a301"
+  }
+}

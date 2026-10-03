@@ -1,5 +1,9 @@
 package io.agentflow.approval.workspace;
 
+import io.agentflow.approval.service.TaskRecipientDirectory;
+import io.agentflow.approval.process.FlowableApprovalProxyAccess;
+import io.agentflow.common.JsonUtil;
+import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.common.Actor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -20,23 +24,32 @@ import java.util.Locale;
 @Repository
 public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
     private final JdbcTemplate jdbc;
+    private final JsonUtil json;
+    private final TaskRecipientDirectory recipients;
+    private final FlowableApprovalProxyAccess proxies;
 
     /** 共享审批与引擎数据源；所有写入仍通过原审批应用服务。 */
-    public FlowablePendingTaskReadAdapter(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public FlowablePendingTaskReadAdapter(JdbcTemplate jdbc, TaskRecipientDirectory recipients, JsonUtil json,
+                                          FlowableApprovalProxyAccess proxies) {
+        this.jdbc = jdbc; this.recipients = recipients; this.json = json;
+        this.proxies = proxies;
+    }
 
     /** 将授权分页和完整计数组合读取，空的后续页在同一只读事务内补取计数。 */
     @Override
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Result read(Actor actor, Query query) {
-        if (!actor.hasRole("APPROVER")) return new Result(List.of(), 0);
+        if (!actor.hasRole("APPROVER") || !recipients.eligible(actor.tenantId(), actor.userId())) return new Result(List.of(), 0);
+        var proxyTaskIds = proxies.forActor(actor, query.deadlineAt()).taskIds();
         var parameters = new ArrayList<Object>();
         // 窗口先统计全部授权匹配项，外层再应用游标与上限，避免翻页后总数缩水。
         StringBuilder sql = new StringBuilder("""
                 SELECT p.* FROM (
-                    SELECT t.ID_,t.NAME_,t.ASSIGNEE_,t.OWNER_,t.DELEGATION_,t.CREATE_TIME_,
+                    SELECT t.ID_,t.NAME_,t.ASSIGNEE_,t.OWNER_,t.DELEGATION_,t.CREATE_TIME_,t.DUE_DATE_,
                            a.id,a.business_no,a.title,a.process_key,a.definition_version,a.created_by,a.search_amount,a.round_no,
+                           r.initiator_legal_entity_name,r.initiator_department_name,r.initiator_position_name,r.risk_json,
                            COUNT(*) OVER () AS matching_total
-                """).append(where(actor, query, parameters)).append(") p");
+                """).append(where(actor, query, proxyTaskIds, parameters)).append(") p");
         if (query.afterTime() != null) {
             sql.append(" WHERE (p.CREATE_TIME_>? OR (p.CREATE_TIME_=? AND p.ID_>?))");
             parameters.addAll(List.of(Timestamp.from(query.afterTime()), Timestamp.from(query.afterTime()), query.afterId()));
@@ -55,7 +68,7 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
         if (!page.items().isEmpty() || query.afterTime() == null) return page;
         // 后续页可能因办理完成而变空；同一只读事务内补取总数，不能把前面的待办误报为零。
         parameters.clear();
-        long total = jdbc.queryForObject("SELECT COUNT(*) " + where(actor, query, parameters), Long.class, parameters.toArray());
+        long total = jdbc.queryForObject("SELECT COUNT(*) " + where(actor, query, proxyTaskIds, parameters), Long.class, parameters.toArray());
         return new Result(List.of(), total);
     }
 
@@ -66,33 +79,58 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
                 row.getString("title"), row.getString("process_key"), row.getLong("definition_version"), row.getString("created_by"),
                 amount == null ? null : amount.stripTrailingZeros().toPlainString(), row.getInt("round_no"),
                 row.getString("ASSIGNEE_"), row.getString("OWNER_"), delegation == null ? "NONE" : delegation,
-                row.getTimestamp("CREATE_TIME_").toInstant());
+                row.getTimestamp("CREATE_TIME_").toInstant(),
+                row.getTimestamp("DUE_DATE_") == null ? null : row.getTimestamp("DUE_DATE_").toInstant(),
+                row.getString("initiator_legal_entity_name"), row.getString("initiator_department_name"), row.getString("initiator_position_name"),
+                row.getString("risk_json") == null ? SubmissionRisk.unassessed()
+                        : json.read(row.getString("risk_json"), SubmissionRisk.class));
     }
 
-    private StringBuilder where(Actor actor, Query query, List<Object> parameters) {
-        var sql = new StringBuilder(io.agentflow.approval.process.FlowableActiveTaskSql.fromCurrentApplications()); parameters.add(actor.tenantId());
+    private StringBuilder where(Actor actor, Query query, List<String> proxyTaskIds, List<Object> parameters) {
+        var sql = new StringBuilder(io.agentflow.approval.process.FlowableActiveTaskSql.fromCurrentApplicationsWithRound()); parameters.add(actor.tenantId());
         sql.append(" AND (t.ASSIGNEE_=? OR (t.ASSIGNEE_ IS NULL AND EXISTS (SELECT 1 FROM ACT_RU_IDENTITYLINK i WHERE i.TASK_ID_=t.ID_ AND i.TYPE_='candidate' AND (i.USER_ID_=?");
         parameters.add(actor.userId()); parameters.add(actor.userId());
         if (!actor.roles().isEmpty()) {
             sql.append(" OR i.GROUP_ID_ IN (").append(String.join(",", Collections.nCopies(actor.roles().size(), "?"))).append(")");
             parameters.addAll(actor.roles().stream().sorted().toList());
         }
-        sql.append("))))");
+        sql.append(")))");
+        if (!proxyTaskIds.isEmpty()) {
+            sql.append(" OR t.ID_ IN (").append(String.join(",", Collections.nCopies(proxyTaskIds.size(), "?"))).append(")");
+            parameters.addAll(proxyTaskIds);
+        }
+        sql.append(")");
         switch (query.assignment()) {
             case "assigned" -> sql.append(" AND t.ASSIGNEE_ IS NOT NULL");
             case "unclaimed" -> sql.append(" AND t.ASSIGNEE_ IS NULL");
             case "delegated" -> sql.append(" AND t.DELEGATION_='PENDING'");
             default -> { }
         }
+        // 列表、窗口计数和空后续页补计数共用同一个服务端时刻。
+        switch (query.deadline()) {
+            case OVERDUE -> { sql.append(" AND t.DUE_DATE_<=?"); parameters.add(Timestamp.from(query.deadlineAt())); }
+            case PENDING -> { sql.append(" AND t.DUE_DATE_>?"); parameters.add(Timestamp.from(query.deadlineAt())); }
+            case UNRECORDED -> sql.append(" AND t.DUE_DATE_ IS NULL");
+            case ALL -> { }
+        }
+        if (query.risk() != null) {
+            sql.append(" AND COALESCE(r.risk_level,'UNASSESSED')=?");
+            parameters.add(query.risk().name());
+        }
         if (!query.text().isEmpty()) {
-            String pattern = "%" + query.text().toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+            String pattern = literalPattern(query.text());
             sql.append(" AND (LOWER(a.title) LIKE ? ESCAPE '!' OR LOWER(a.business_no) LIKE ? ESCAPE '!' OR LOWER(t.NAME_) LIKE ? ESCAPE '!')");
             parameters.addAll(List.of(pattern, pattern, pattern));
         }
+        io.agentflow.approval.RoundOrganizationSearchSql.append(sql, parameters, query.organization());
         if (!query.processKey().isEmpty()) { sql.append(" AND a.process_key=?"); parameters.add(query.processKey()); }
         if (!query.applicant().isEmpty()) { sql.append(" AND a.created_by=?"); parameters.add(query.applicant()); }
         if (query.minAmount() != null) { sql.append(" AND a.search_amount>=?"); parameters.add(query.minAmount()); }
         if (query.maxAmount() != null) { sql.append(" AND a.search_amount<=?"); parameters.add(query.maxAmount()); }
         return sql;
+    }
+
+    private static String literalPattern(String value) {
+        return "%" + value.toLowerCase(Locale.ROOT).replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
     }
 }

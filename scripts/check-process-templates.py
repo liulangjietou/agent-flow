@@ -1,4 +1,4 @@
-"""验证演示环境中模板复制、租户草稿隔离及全部样例的真实流程，不删除已有记录。"""
+"""验证演示环境中通用表单模板复制、租户草稿隔离及样例真实流程，不删除已有记录。"""
 import copy
 import json
 import sys
@@ -38,7 +38,8 @@ assert {"leave-request", "seal-application", "contract-review"}.issubset({item["
 request("GET", "/process-templates", token=employee, expected=403)
 results = []
 
-for template in catalog:
+# 通用表单验收不能绕过采购的任职、财务预检与原应付占用；采购由独立工作流用例验收。
+for template in (item for item in catalog if item["businessType"] == "FORM"):
     template_key = template["key"]
     copy_path = "/process-templates/" + template_key + "/copy"
     body = {"key": "verify-" + prefix + "-" + template_key, "name": template["name"] + " HTTP验收", "templateVersion": template["templateVersion"]}

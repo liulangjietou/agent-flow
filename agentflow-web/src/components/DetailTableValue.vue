@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import AttachmentField from './AttachmentField.vue'
+import type { AttachmentContext } from '../attachments'
 import { displayFields, isDetailRow, rawValueLabel, type FormField } from '../formSchema'
 
-const props = defineProps<{ field: FormField; value: unknown }>()
+const props = defineProps<{ field: FormField; value: unknown; attachmentContext?: AttachmentContext }>()
 const columns = computed(() => (props.field.columns ?? []).filter(column => column.type !== 'TABLE'))
 const rows = computed(() => Array.isArray(props.value) ? props.value.map(row => {
   const cells = isDetailRow(row) ? displayFields({ schemaVersion: 1, fields: columns.value }, row) : null
@@ -14,7 +16,7 @@ const rows = computed(() => Array.isArray(props.value) ? props.value.map(row => 
   <div v-if="rows.length" class="detail-value">
     <div class="detail-scroll" role="region" :aria-label="`${field.label}数据表`" tabindex="0">
       <table><caption>{{ field.label }} · {{ rows.length }} 行</caption><thead><tr><th scope="col">序号</th><th v-for="column in columns" :key="column.key" scope="col">{{ column.label }}</th></tr></thead>
-        <tbody><tr v-for="(row, index) in rows" :key="index"><th scope="row">{{ index + 1 }}</th><template v-if="row.cells"><td v-for="cell in row.cells" :key="cell.key">{{ cell.value }}</td></template><td v-else :colspan="columns.length">{{ rawValueLabel(row.raw) }}</td></tr></tbody>
+        <tbody><tr v-for="(row, index) in rows" :key="index"><th scope="row">{{ index + 1 }}</th><template v-if="row.cells"><td v-for="cell in row.cells" :key="cell.key"><AttachmentField v-if="columns.find(column => column.key === cell.key)?.type === 'ATTACHMENT' && isDetailRow(row.raw)" :model-value="row.raw[cell.key]" :field-path="field.key + '.' + cell.key" :context="attachmentContext" readonly /><template v-else>{{ cell.value }}</template></td></template><td v-else :colspan="columns.length">{{ rawValueLabel(row.raw) }}</td></tr></tbody>
       </table>
     </div>
     <template v-for="(row, index) in rows" :key="index"><p v-if="row.extras?.length" class="detail-extra">第 {{ index + 1 }} 行其他已保存字段：{{ row.extras.map(cell => `${cell.label}：${cell.value}`).join('；') }}</p></template>

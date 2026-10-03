@@ -1,0 +1,169 @@
+{
+  "recordedAt": "2026-10-02T01:12:53.334843+00:00",
+  "stage": "有期限代理的待办与原 SLA 提醒后台范围验证",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "c9eae31181bf9afbaed24b2f8c974e8e91d4917a",
+  "scope": [
+    "有界游标覆盖新任务、在审新增授权和未来期限生效",
+    "申请与代理锁后重新检查原责任、当前授权和任务，不伪造身份源角色",
+    "通用最小提醒不复制申请标题、单号、节点名称或表单正文",
+    "消息、原代理来源与外发意向同事务保存，并发 worker 去重",
+    "原 SLA 到期事件通知当时有效代理，不修改原期限或任务归属",
+    "外发领取及人工恢复复核原代理，到期或撤销后新授权不能复活旧消息"
+  ],
+  "regressionOrigin": {
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-notifications-lock-red.log",
+    "previousCoverageGap": "既有领取验证没有覆盖真实组织行锁等待跨过代理结束时刻；资格复核拒绝正确，但抑制事实沿用进入方法的旧时间。",
+    "red": "抑制时间 2026-10-02T01:06:02.455116Z 早于代理结束 2026-10-02T01:06:07.395848Z，断言失败。",
+    "fix": "取得目录、偏好和投递锁后重新观察时间，用于到期、租约与抑制记录。"
+  },
+  "fixtureCorrection": {
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-notifications-first.log",
+    "detail": "首次9项中8项通过，1项在流程结束后读取已删除 execution 构造候选失败；改为办理前保存候选，未放宽生产规则。"
+  },
+  "tests": {
+    "h2": {
+      "result": "PASS",
+      "uniqueTests": 78,
+      "classes": {
+        "io.agentflow.notification.NotificationDeliveryApiIntegrationTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyDecisionIntegrationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyNotificationMigrationTest": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.approval.process.TaskDeadlineIntegrationTest": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.api.OpenApiContractTest": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyNotificationsIntegrationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyTaskReadIntegrationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.notification.InboxIntegrationTest": {
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.approval.process.ApprovalProxyNotificationSchedulerTest": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.notification.NotificationDeliveryIntegrationTest": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-notifications-h2.log",
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-notifications-h2-reports"
+    },
+    "postgres": {
+      "database": "approval_proxy_notice_4bae3e443f",
+      "migrationDatabase": "approval_proxy_notice_upgrade_4bae3e443f",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-notifications-postgres-4bae3e443f.log",
+      "status": "PASS",
+      "exitCode": 0,
+      "tests": 12,
+      "overlapsH2": true,
+      "classes": {
+        "io.agentflow.organization.ApprovalProxyNotificationMigrationTest": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyNotificationsIntegrationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-notifications-postgres-reports"
+    },
+    "openApi": {
+      "result": "PASS",
+      "operations": 296,
+      "schemas": 590,
+      "requestExamples": 113,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-notifications-openapi.log"
+    },
+    "authors": {
+      "result": "PASS",
+      "javaFiles": 1302,
+      "namedTypes": 2497,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "compose": {
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-notifications-compose.log",
+      "values": [
+        "true",
+        "false"
+      ],
+      "servicesStarted": false
+    }
+  },
+  "migration": {
+    "from": 96,
+    "to": 97,
+    "databases": [
+      "H2",
+      "PostgreSQL"
+    ],
+    "preservedBusinessTables": 5,
+    "preservedOldFlywayRows": true,
+    "oldNotificationsBackfilled": false,
+    "checks": [
+      "跨租户消息外键",
+      "不存在的代理外键",
+      "消息种类限制",
+      "重复来源限制",
+      "再次迁移无变更"
+    ]
+  },
+  "limits": [
+    "新代理场景使用真实数据库和引擎，但外发绑定为合成数据，没有实际网络发送。",
+    "原 SMTP 与企业微信协议投递回归在78项范围内；不等于企业最终递送验收。",
+    "新代理 SLA 夹具指定已到期任务时间；既有日历范围另回归，未新增真实日历计时验收。",
+    "未改前端，无新组件或浏览器验收。",
+    "未打新安装包、替换长期服务或做运行升级与重启。",
+    "暂停、恢复、取消等其余生命周期通知的代理覆盖仍需核对。",
+    "管理员页面、完整运行及字段关系选人仍未完成，原至少六类剩余范围保持。",
+    "Git remote 仍为空，未创建 PR。"
+  ]
+}

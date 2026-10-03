@@ -1,0 +1,77 @@
+{
+  "result": "PASS",
+  "database": "deadline_integration_90def69a20",
+  "definitionId": "3228d9de-4c04-46b8-be6a-69183c0401b2",
+  "publishedVersion": 1,
+  "calendarId": "98431e34-1d75-4956-a3f6-24a495093a54",
+  "currentCalendarRevision": 2,
+  "boundCalendarRevision": 1,
+  "workingMinutes": 960,
+  "threeCalendarEndpoints": "PASS",
+  "anonymousAndEmployeeDenied": "PASS",
+  "unknownTenantQueryRejected": "PASS",
+  "missingRevisionRejected": "PASS",
+  "missingReferencePublicationRejectedWithoutEngineDeployment": "PASS",
+  "publishedDefinitionImmutable": "PASS",
+  "unrelatedNodePropertiesPreserved": "PASS",
+  "limitations": [
+    "Synthetic demo identity",
+    "Actual task timing and reminders not implemented",
+    "No production deployment"
+  ],
+  "verifiedAt": "2026-09-25T00:03:15.339258-04:00",
+  "baseline": "44ccf936933f1496e382f51cf37d526ed10fe12c",
+  "branch": "codex/task-deadlines-integration",
+  "schemaVersion": "23",
+  "jarSha256": "31870e7ab0b67d850a45271d0c7b6df3c13f231c15948573a81151a3b68b209c",
+  "tests": {
+    "javaDomain": 190,
+    "javaServer": 551,
+    "javaFailures": 0,
+    "javaErrors": 0,
+    "javaSkipped": 0,
+    "frontend": 258,
+    "frontendBuild": "PASS",
+    "openapiOperations": 68,
+    "tools": 38,
+    "javaFiles": 299,
+    "namedTypes": 471,
+    "missingAuthors": 0
+  },
+  "browser": {
+    "engine": "Chrome",
+    "beforeFixQuickDeadlineControls": 0,
+    "beforeFixAdvancedDeadlineControls": 1,
+    "quickToAdvancedMinutes": 480,
+    "advancedToQuickMinutes": 960,
+    "undoMinutes": 480,
+    "redoMinutes": 960,
+    "clearAndUndo": "PASS",
+    "refreshAndReload": "PASS",
+    "retainedCalendarRevisionAfterNewVersion": 1,
+    "publishedDeadlineEditable": false,
+    "checkboxLayout": "corrected and visually verified",
+    "createdTabClosed": true,
+    "inAppBrowser": "attach timeout; no tab created"
+  },
+  "delivery": {
+    "committed": false,
+    "merged": false,
+    "deployed": false,
+    "mainUnchanged": true,
+    "originalWorktreeUnchanged": true,
+    "pendingRule": "Task timing start and pause/escalation policies",
+    "fixtureStopped": true,
+    "dataRetained": true
+  },
+  "mainHealth": {
+    "http://127.0.0.1:8080/actuator/health": {
+      "status": 200,
+      "body": "{\"status\":\"UP\",\"groups\":[\"liveness\",\"readiness\"]}"
+    },
+    "http://127.0.0.1:8180/healthz": {
+      "status": 200,
+      "body": "ok"
+    }
+  }
+}

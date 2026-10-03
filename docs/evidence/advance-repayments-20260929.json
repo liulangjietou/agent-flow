@@ -1,0 +1,101 @@
+{
+  "stage": "advance repayments and closure",
+  "date": "2026-09-29",
+  "localOnly": true,
+  "migration": "V54",
+  "domainScopeTests": 40,
+  "h2ServerScopeTests": 33,
+  "h2FinalIntegrationTests": 13,
+  "postgresScopeTests": 113,
+  "frontendScopeTests": 62,
+  "scopesOverlap": true,
+  "javaAuthorCheck": {
+    "files": 693,
+    "namedTypes": 1247,
+    "missing": 0
+  },
+  "openapi": {
+    "operations": 167,
+    "schemas": 294,
+    "requestExamples": 56,
+    "actualBusinessResponses": 28
+  },
+  "actualHttp": {
+    "initialRequestsIncludingLogins": 33,
+    "finalReadRequestsIncludingLogins": 6,
+    "checks": [
+      "old_advance_restored_with_zero_repayments",
+      "owner_admin_cashier_unrelated_actor_unknown_fields_and_query_boundaries",
+      "oversized_external_receipt_does_not_change_balance",
+      "query_reads_funds_and_posting_without_applying",
+      "explicit_confirm_and_exact_idempotency_replay",
+      "partial_repayment_owner_summary_and_no_offset_rewrite",
+      "original_payment_and_voucher_commands_unchanged"
+    ]
+  },
+  "browser": {
+    "result": "PASS",
+    "advanceId": "16361344-85c2-4c30-b3e5-16af04216141",
+    "applicationId": "4063d04c-eb5e-4c70-9440-2ea9dee5feaf",
+    "beforeRepayment": "100.00",
+    "confirmedInBrowser": "200.00",
+    "totalRepaid": "300.00",
+    "outstanding": "0.00",
+    "status": "SETTLED",
+    "historyRecords": 2,
+    "desktopScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/advance-repayment-browser-settled.png",
+    "confirmationScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/advance-repayment-browser-confirm.png",
+    "narrowScreenshot": "/fyoung/tmp/agentflow-remaining-20260928/advance-repayment-browser-narrow.png",
+    "layout": {
+      "pageWidth": 500,
+      "requestedWidth": 375,
+      "sections": [
+        {
+          "columns": "181px 181px",
+          "fields": [
+            "实际放款",
+            "已报销冲销",
+            "已还款",
+            "未还款",
+            "当前预留",
+            "可用余额"
+          ],
+          "scrollWidth": 412,
+          "width": 412
+        }
+      ],
+      "viewport": 500
+    },
+    "widthNote": "Requested 375 device width; browser zoom yielded 500 CSS pixels. Two balance columns and no horizontal overflow verified; do not claim 375 CSS pixel acceptance."
+  },
+  "database": {
+    "migration": "54",
+    "paymentRevisions": 18,
+    "repayments": 2,
+    "recordAudits": 2,
+    "checkRevisions": 11
+  },
+  "backup": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-ui-before-v54.dump",
+    "bytes": 494034
+  },
+  "originalCommandHashesUnchanged": true,
+  "paymentVoucherUnchanged": "UI-VOUCHER-67ab2422",
+  "regressions": {
+    "readPermissionLostDuringPagination": {
+      "red": "advance-repayment-ui-permission-red.log",
+      "green": "advance-repayment-ui-permission-green.log"
+    },
+    "nullQueuedReceipt": {
+      "red": "advance-repayment-receipt-red.log",
+      "green": "advance-repayment-h2.log"
+    }
+  },
+  "limitations": [
+    "External finance evidence is loopback synthetic data; no real incoming funds, payroll or ERP integration certified.",
+    "Repayment reversals remain frozen pending independent financial adjustment and dispute resolution.",
+    "No Git remote, PR or remote CI."
+  ],
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "testDatabaseManifest": "/fyoung/tmp/agentflow-remaining-20260928/advance-repayment-postgres-databases.json"
+}

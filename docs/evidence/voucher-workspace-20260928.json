@@ -1,0 +1,73 @@
+{
+  "recordedAt": "2026-09-28T22:39:20.364023+00:00",
+  "status": "LOCAL_API_AND_UI_ACCEPTANCE_PASSED",
+  "syntheticErp": true,
+  "enterpriseAcceptance": false,
+  "tests": {
+    "h2FinalScope": 62,
+    "postgresqlScope": 62,
+    "frontendScope": 57,
+    "scopesOverlap": true,
+    "frontendBuild": "PASS",
+    "openapi": {
+      "operations": 149,
+      "schemas": 254,
+      "requestExamples": 48
+    },
+    "javaAuthors": {
+      "files": 592,
+      "namedTypes": 1046,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "regressions": [
+    {
+      "case": "Unknown action fields rejected",
+      "firstResult": "400 expected, 202 observed",
+      "resolution": "Input rejects unknown fields at JSON boundary"
+    },
+    {
+      "case": "Nullable voucher HTTP fields preserved",
+      "red": "voucher-null-contract-red.log",
+      "green": "voucher-null-contract-green.log",
+      "previousGap": "Tree reads did not assert field presence; record shape check did not exercise null serialization"
+    },
+    {
+      "case": "Recovery requires fresh voucher version",
+      "red": "voucher-recovery-refresh-red.log",
+      "green": "voucher-ui-final-tests.log",
+      "previousGap": "Recovery test refreshed explicitly without asserting writes remain blocked before refresh"
+    }
+  ],
+  "qaDirectory": "/fyoung/tmp/agentflow-remaining-20260928",
+  "logs": [
+    "voucher-api-third-tests.log",
+    "voucher-api-postgres.log",
+    "voucher-null-contract-green.log",
+    "voucher-ui-final-tests.log",
+    "voucher-ui-final-build.log",
+    "voucher-openapi.log",
+    "voucher-api-authors.log"
+  ],
+  "httpEvidence": "voucher-ui-http-evidence.json",
+  "screenshots": [
+    "voucher-ui-posted.png",
+    "voucher-ui-mobile.png"
+  ],
+  "browser": {
+    "result": "PASS",
+    "queryPreservedOriginalVoucher": true,
+    "actualPaidBalances": 0,
+    "requestedNarrowWidth": 390,
+    "observedViewportWidth": 500,
+    "voucherWidth": 412,
+    "voucherScrollWidth": 412
+  },
+  "remaining": [
+    "Persistent payment authorization and cashier execution",
+    "Consumption and zero-payable closure",
+    "Archive and enterprise adapters",
+    "Explicit voucher retirement and conflict resolution"
+  ]
+}

@@ -1,0 +1,201 @@
+{
+  "date": "2026-10-02",
+  "status": "RENDERER_FEASIBILITY_PROBED_PRODUCT_INCOMPLETE",
+  "baselineCommit": "15f3370827f22a415e7cbdd75f6a76b756915c31",
+  "remainingTopLevelCategories": 6,
+  "scope": "Standalone experiments on public upstream fixtures only; not an application adapter or production acceptance.",
+  "library": {
+    "coordinates": "org.ofdrw:ofdrw-converter:2.4.0",
+    "upstreamCommit": "7459e35082170061efa6b399a6518dbc219f08ac",
+    "sources": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofdrw-converter-2.4.0-sources.jar",
+      "bytes": 140397,
+      "sha256": "524003e6061560bce5dd8604a8d00ea1f1c920263513ac7d6634cd18a0cd21a8"
+    },
+    "pdfboxAndFontboxVersion": "3.0.8",
+    "excluded": [
+      "com.itextpdf:kernel",
+      "com.itextpdf:layout",
+      "com.itextpdf:font-asian",
+      "org.junit.jupiter:junit-jupiter-api"
+    ],
+    "runtimeClasspath": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/classpath.txt",
+      "bytes": 3058,
+      "sha256": "b6de62b84bd303be4804035aec27187f62ed70e8048313b8776e545b24773706"
+    },
+    "pom": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/pom.xml",
+      "bytes": 1123,
+      "sha256": "0fca7775bfa1a05a9c9634440a01449dff815db5933f55c4fd9c43d9d1e9d5f8"
+    }
+  },
+  "constraints": {
+    "heapMiB": 256,
+    "stackKiB": 512,
+    "directMemoryMiB": 64,
+    "metaspaceMiB": 128,
+    "timeoutSecondsPerInvocation": 30,
+    "headless": true,
+    "inheritedEnvironmentCleared": true,
+    "publicPreflightAcceptedSourcesOnly": true,
+    "osPermissionSandbox": false,
+    "usesUpstreamAutoUnzipForPublicProbeOnly": true
+  },
+  "binaryProbe": {
+    "fixtures": [
+      "helloworld.ofd",
+      "draw_param_ref.ofd"
+    ],
+    "bothExitCodes": 1,
+    "failure": "NoClassDefFoundError: org/apache/pdfbox/pdmodel/graphics/blend/SeparableBlendMode",
+    "log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/result.json",
+      "bytes": 1264,
+      "sha256": "00afcbff5ca83963f64b030427000fdee13a76055167e45b6ab0171c371fcfbb"
+    }
+  },
+  "sourceExperiment": {
+    "productionSourceModified": false,
+    "namespace": "probe.ofd",
+    "files": [
+      "AWTMaker.java",
+      "FontLoader.java",
+      "ImageMaker.java"
+    ],
+    "changes": [
+      "Compile AWT drawing references against PDFBox 3.0.8.",
+      "Remove the three iText font export methods, associated imports, field and default initialization.",
+      "Replace the single CommonUtil.dpiToPpm call with equivalent arithmetic; CommonUtil itself has an iText Color method signature.",
+      "Use collection-aware font loading for the explicit default font experiment."
+    ],
+    "patch": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/image-only-experiment.patch",
+      "bytes": 7045,
+      "sha256": "f9055f3e6e4c6d958109ec207afaacd4c3ff1fa942551b46c29f0da72c8a43bb"
+    },
+    "firstImageOnlyResults": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/image-only-result.json",
+      "bytes": 796,
+      "sha256": "b9a2941dc531c780e684f1001606a2bac6b4c08e06bd858de7daba6413ea4c8c"
+    }
+  },
+  "fontProbe": {
+    "requiredCharacters": "中文金额税0123456789",
+    "automaticDefault": "Trattatello",
+    "missingRequiredGlyphs": 5,
+    "baselineExitCode": 1,
+    "baselineLog": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/font-coverage-red.log",
+      "bytes": 388,
+      "sha256": "7b5ce98f4c23e25ccb9e83d800b6144c49605793c647901dd98af9862cca518c"
+    },
+    "collectionLoadingWithoutExplicitFontStillFailed": true,
+    "collectionOnlyLog": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/font-coverage-ttc-only.log",
+      "bytes": 388,
+      "sha256": "7b5ce98f4c23e25ccb9e83d800b6144c49605793c647901dd98af9862cca518c"
+    },
+    "explicitFontPath": "/System/Library/Fonts/STHeiti Light.ttc",
+    "explicitSelectedFace": "STHeitiTC-Light",
+    "explicitMissingRequiredGlyphs": 0,
+    "explicitExitCode": 0,
+    "explicitLog": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/font-explicit-coverage.log",
+      "bytes": 252,
+      "sha256": "4bd14452889fb5845da1175ae8d19cf084059d4fbe82526990d3439a3c4b8401"
+    },
+    "fontsCopiedOrDistributed": false,
+    "allDocumentGlyphsValidated": false
+  },
+  "renderProbe": {
+    "fixture": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/draw_param_ref.ofd",
+      "bytes": 33402,
+      "sha256": "525eba2e09a4d7ac01a05bc176146ee9ecf5b1184fa3b909cc15599803493700"
+    },
+    "originalSourceMetadata": "/fyoung/tmp/agentflow-remaining-20260928/invoice-standard-research/ofd-fixtures/sources.json",
+    "renderExitCode": 0,
+    "log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/font-explicit-render.log",
+      "bytes": 435,
+      "sha256": "67e12084f663e79893e621736bf92ece8c2675eac3688688d0b97c4bde9565d2"
+    },
+    "pagesGenerated": 5,
+    "visuallyInspectedPages": [
+      1,
+      2
+    ],
+    "observed": "Chinese invoice text was absent with automatic fallback and visible on pages 1 and 2 after explicit TTC font selection.",
+    "images": [
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/font-explicit-draw_param_ref/page-1.png",
+        "bytes": 222131,
+        "sha256": "0ec23c52ab13bb91efb4274081b56e6619a90072b0b1b91fb8ee367793034913",
+        "width": 1654,
+        "height": 1102
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/font-explicit-draw_param_ref/page-2.png",
+        "bytes": 341878,
+        "sha256": "8124998689e4e2004886e3543fc8acc0ff23eacc18336ca32963c47741e1b7c2",
+        "width": 1654,
+        "height": 2339
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/font-explicit-draw_param_ref/page-3.png",
+        "bytes": 346080,
+        "sha256": "a5c148d171c17e1d95e2e26ee02873d2cbecab55dbdd6ef810c04a431107ee00",
+        "width": 1654,
+        "height": 2339
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/font-explicit-draw_param_ref/page-4.png",
+        "bytes": 346135,
+        "sha256": "256df2f96979fe4bbfd2aaf9343af5beb45130541bc56ae85301f769e73bde2c",
+        "width": 1654,
+        "height": 2339
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/ofd-render-probe/font-explicit-draw_param_ref/page-5.png",
+        "bytes": 319584,
+        "sha256": "8f6850c09a889f313c17cb5be589f14e8984eb2487d6ea353377e0c20297b12e",
+        "width": 1654,
+        "height": 2339
+      }
+    ],
+    "fullRenderingCompletenessProven": false,
+    "signatureValidated": false,
+    "modelCalled": false
+  },
+  "notAccepted": [
+    "Default system font scanning and silent missing glyphs.",
+    "Partial drawing or image/stamp errors being ignored.",
+    "Nested OFD seal processing without the bounded archive and XML preflight.",
+    "Unverified arcs, clipping, alpha, glyph-id and supplementary-code-point handling.",
+    "Use of a macOS font in place of a deployable explicit font configuration.",
+    "Any claim of exact visual equivalence or authentic invoice recognition."
+  ],
+  "next": [
+    "Choose a maintainable image-only adapter boundary preserving upstream provenance.",
+    "Implement controlled fonts and rejection of incomplete page output.",
+    "Integrate all document pages, nested-resource limits and the bounded subprocess before enabling OFD.",
+    "Continue invoice persistence, API, owner-only confirmation UI and complete local acceptance."
+  ],
+  "application": {
+    "dependenciesChanged": false,
+    "ofdFormatEnabled": false,
+    "databaseMigrationAdded": false,
+    "v99RuntimeReplaced": false,
+    "invoicePersistenceApiUiComplete": false
+  },
+  "verification": {
+    "applicationTestsRerun": false,
+    "reason": "Only standalone probes and documentation were changed; the earlier 64 preflight scope tests remain historical evidence."
+  },
+  "sources": [
+    "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-converter/pom.xml",
+    "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-converter/src/main/java/org/ofdrw/converter/FontLoader.java",
+    "https://github.com/ofdrw/ofdrw/blob/2.4.0/ofdrw-converter/src/main/java/org/ofdrw/converter/AWTMaker.java"
+  ]
+}

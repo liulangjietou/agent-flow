@@ -1,5 +1,5 @@
-/** 运营查询按 UTC 提交日期和精确流程版本筛选。@author owlzhangfq@gmail.com */
-export interface OperationsFilter { from: string; to: string; processKey?: string; definitionVersion?: number }
+/** 运营查询按 UTC 提交日期、精确流程版本和提交时组织名称筛选。@author owlzhangfq@gmail.com */
+export interface OperationsFilter { from: string; to: string; processKey?: string; definitionVersion?: number; organization?: string }
 /** 无有效样本时比例与平均时长缺省，不用零代替未知。@author owlzhangfq@gmail.com */
 export interface OperationsMetrics {
   submittedRounds: number; applications: number; inApproval: number; approved: number; returned: number
@@ -11,14 +11,31 @@ export interface OperationsProcess { processKey: string; definitionVersion: numb
 /** 当前积压任务摘要，管理员从此打开申请原有详情。@author owlzhangfq@gmail.com */
 export interface OperationsTask {
   taskId: string; taskName: string; applicationId: string; businessNo: string; title: string; processKey: string
-  definitionVersion: number; roundNo: number; assignee?: string; createdAt: string; waitingSeconds: number
+  definitionVersion: number; roundNo: number; assignee?: string; createdAt: string; waitingSeconds: number; dueAt?: string | null
+}
+/** 已办理任务的历史期限事实，缺失和取消不会记作按时完成。@author owlzhangfq@gmail.com */
+export interface OperationsSla {
+  decidedTasks: number; timedTasks: number; violatedTasks: number; withoutDeadlineTasks: number
+  invalidTimingTasks: number; cancelledTasks: number; unfinishedTasks: number; unrecordedDecisionTasks: number; unverifiedRounds: number
+  violationRatePercent?: number
+}
+/** 按投递记录及追加历史去重汇总，不展示收件人和正文。@author owlzhangfq@gmail.com */
+export interface OperationsNotifications {
+  deliveries: number; accepted: number; failed: number; retryWaiting: number; unknown: number
+  suppressed: number; pending: number; inFlight: number; previouslyFailed: number
+}
+/** 人工采纳率只使用已经复核的运行。@author owlzhangfq@gmail.com */
+export interface OperationsAgent {
+  runs: number; queued: number; running: number; awaitingReview: number; failed: number
+  adopted: number; dismissed: number; reviewedRuns: number; adoptionRatePercent?: number
 }
 /** 提交窗口与当前积压来自同一查询快照，但日期口径分别标明。@author owlzhangfq@gmail.com */
 export interface OperationsReport extends OperationsFilter {
   generatedAt: string; timeZone: 'UTC'; metrics: OperationsMetrics
+  sla: OperationsSla; notifications: OperationsNotifications; agent: OperationsAgent
   daily: Array<{ date: string; submittedRounds: number }>
-  processes: OperationsProcess[]; moreProcesses: boolean; pendingTasks: number
-  waitingNodes: Array<{ processKey: string; definitionVersion: number; nodeId: string; nodeName: string; tasks: number; oldestCreatedAt: string; oldestWaitSeconds: number }>
+  processes: OperationsProcess[]; moreProcesses: boolean; pendingTasks: number; overdueTasks: number
+  waitingNodes: Array<{ processKey: string; definitionVersion: number; nodeId: string; nodeName: string; tasks: number; oldestCreatedAt: string; oldestWaitSeconds: number; overdueTasks: number }>
   moreWaitingNodes: boolean; oldestTasks: OperationsTask[]; moreOldestTasks: boolean; unrecordedHistoricalRounds: number
 }
 
@@ -29,11 +46,11 @@ const MAX_DAYS = 366
 export function defaultOperationsFilter(now = new Date()): OperationsFilter {
   const to = now.toISOString().slice(0, 10)
   const from = new Date(Date.parse(to) - 29 * DAY_MILLIS).toISOString().slice(0, 10)
-  return { from, to, processKey: '' }
+  return { from, to, processKey: '', organization: '' }
 }
 
 /** 在发出查询前给出可修正的表单错误，权威校验仍在服务端入口。 */
-export function operationsFilter(from: string, to: string, processKey: string, version: string, now = new Date()): OperationsFilter {
+export function operationsFilter(from: string, to: string, processKey: string, version: string, organization = '', now = new Date()): OperationsFilter {
   const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && value >= '0001-01-01'
     && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value
   if (!validDate(from) || !validDate(to) || from > to || to > now.toISOString().slice(0, 10)
@@ -41,10 +58,14 @@ export function operationsFilter(from: string, to: string, processKey: string, v
     throw new Error('请选择有效的 UTC 日期，结束日期不晚于今天，范围最多 366 天。')
   }
   const key = processKey.trim()
+  const organizationName = organization.trim()
+  if (organizationName.length > 128 || /[\x00-\x1f\x7f-\x9f]/.test(organizationName)) {
+    throw new Error('组织名称最多 128 字，不能包含控制字符。')
+  }
   if (version && (!key || !/^[1-9]\d*$/.test(version) || Number(version) > 2_147_483_647)) {
     throw new Error('请先选择流程，再输入有效的正整数版本。')
   }
-  return { from, to, processKey: key, ...(version ? { definitionVersion: Number(version) } : {}) }
+  return { from, to, processKey: key, organization: organizationName, ...(version ? { definitionVersion: Number(version) } : {}) }
 }
 
 /** 用实际秒数显示经过时长；此值未套用工作日历。 */

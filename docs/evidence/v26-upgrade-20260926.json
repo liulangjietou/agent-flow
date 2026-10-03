@@ -1,0 +1,178 @@
+{
+  "result": "PASS",
+  "sourceContainer": "agentflow-identifier-postgres",
+  "cloneContainer": "agentflow-v26-upgrade-20260926",
+  "sourceRevision": "d65b625",
+  "candidateRevision": "9b521e9f30d6eb5dafa1109ab17484920a9cf8f5",
+  "oldJarSha256": "dcf6ee5a0591fddd826820c36bd44c0db7b0a30b1a81e7380af4afb8d263308c",
+  "candidateJarSha256": "b85f4c0f0c0913e0ec3c836d43f5a4b40fc132a1e54b8281864b6ae7fd07756c",
+  "operations": [
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/applications",
+      "status": 201
+    },
+    {
+      "method": "POST",
+      "path": "/applications/2bbfb47e-d3f2-4472-bdd8-ee49bf2f2d4a/submit",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/applications/2bbfb47e-d3f2-4472-bdd8-ee49bf2f2d4a",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/tasks",
+      "status": 200
+    },
+    {
+      "method": "POST",
+      "path": "/tasks/fbcc0407-b9a5-11f1-a61d-de09b6b384bb/actions",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "path": "/applications/2bbfb47e-d3f2-4472-bdd8-ee49bf2f2d4a",
+      "status": 200
+    }
+  ],
+  "sourceTablesUnchanged": 67,
+  "backupSha256": "bcd137023a8f88cb336a4f1705c05406bca750cccf148108fd73070641772cf6",
+  "old-validate-v24": {
+    "exitCode": 0,
+    "summary": [
+      "Schema validate completed; business migrations and Flowable schema verified"
+    ]
+  },
+  "applicationId": "2bbfb47e-d3f2-4472-bdd8-ee49bf2f2d4a",
+  "current-migrate-v26": {
+    "exitCode": 0,
+    "summary": [
+      "Schema migrate completed; business migrations and Flowable schema verified"
+    ]
+  },
+  "legacyTablesPreserved": 66,
+  "historyPrefixPreserved": true,
+  "newVersions": [
+    "25",
+    "26"
+  ],
+  "newDirectoriesEmpty": true,
+  "old-validate-v26": {
+    "exitCode": 1,
+    "summary": [
+      "Schema command failed, errorCode=DATABASE_SCHEMA_FAILED, phase=validate, errorType=FlywayValidateException"
+    ]
+  },
+  "current-validate-v26": {
+    "exitCode": 0,
+    "summary": [
+      "Schema validate completed; business migrations and Flowable schema verified"
+    ]
+  },
+  "current-repeat-migrate": {
+    "exitCode": 0,
+    "summary": [
+      "Schema migrate completed; business migrations and Flowable schema verified"
+    ]
+  },
+  "validationAndRepeatMigrationUnchangedTables": 73,
+  "oldInFlightApproved": true,
+  "runtimeProfile": "default with demo authentication",
+  "sourceStopped": true,
+  "cloneStopped": true,
+  "recordedAt": "2026-09-26T12:31:04.112276+00:00",
+  "evidenceFiles": [
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/clone-restored.json",
+      "sha256": "c3e66386322665ff357b0664c21a7d73ab820c7c715ed4440a2c9b358b59dbe8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/current-migrate-v26.log",
+      "sha256": "46b23896cd5e926ca924105036fd068ae5f793ae02d251e7f6dbfd49ffc9095b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/current-repeat-migrate.log",
+      "sha256": "46b23896cd5e926ca924105036fd068ae5f793ae02d251e7f6dbfd49ffc9095b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/current-v26.log",
+      "sha256": "8559b698cab4066b814e9c8b9d455cb04caa0f2277d1bdaaef6906e9a53861e5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/current-validate-v26.log",
+      "sha256": "23697f56b8928a54b44fda0581e39f627d286c059dd0f674ce5587e593e7896a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/old-v24.log",
+      "sha256": "a0dc6b98ef590ec5b7c738643fb35af2da3f7b01d25e90eb34d84dfc85702b51"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/old-validate-v24.log",
+      "sha256": "23697f56b8928a54b44fda0581e39f627d286c059dd0f674ce5587e593e7896a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/old-validate-v26.log",
+      "sha256": "c27a305ec078582e084d0346a965e79a3dd7d39c1af66f69e35e3eff33f4e1e6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/probe.py",
+      "sha256": "78466e33b4baf9142cd962e0425a8b46b58fe9cd43642ffe19005d386720a1b7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/report.json",
+      "sha256": "bb4c28a52b88a415a6935798435c0803e3704fe48b46f64bb2933c92750f1da9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/source-after.json",
+      "sha256": "c3e66386322665ff357b0664c21a7d73ab820c7c715ed4440a2c9b358b59dbe8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/source-before.json",
+      "sha256": "c3e66386322665ff357b0664c21a7d73ab820c7c715ed4440a2c9b358b59dbe8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/strict-after.json",
+      "sha256": "15deb040e53a3a75c3ef15665d36e8105fec8191cb6d79400fb22039f83962ce"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/strict-before.json",
+      "sha256": "15deb040e53a3a75c3ef15665d36e8105fec8191cb6d79400fb22039f83962ce"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/v24-application.json",
+      "sha256": "8ef19bc150afa0ea2a5dbc6e06f84f6bb92b447ff3572e62f9ff5a73c923e378"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/v24-before.json",
+      "sha256": "ba04db2b7a710994b835b4019c6f45b57e5f3f31f7bc084a358a7d7430031702"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/v26-after-legacy.json",
+      "sha256": "6216d980b2d507435a21b05cf828d961a5eb2342b249f46b12852e118e07f45e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-v26-upgrade-20260926/v26-approved.json",
+      "sha256": "421299b089aa450ad888ef85214463c8b00ef94e1957426d5709b8475a4674b6"
+    }
+  ],
+  "fullGoalComplete": false,
+  "productionDeployed": false
+}

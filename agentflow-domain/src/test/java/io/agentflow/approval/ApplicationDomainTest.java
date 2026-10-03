@@ -108,6 +108,25 @@ class ApplicationDomainTest {
     }
 
     @Test
+    void businessRoutingAdjustmentRequiresMatchingBindingAndPreservesTheOriginalRound() {
+        var reference = new io.agentflow.approval.model.BusinessReference(io.agentflow.approval.model.BusinessReference.Type.EXPENSE, UUID.randomUUID());
+        var application = Application.draftBusiness(UUID.randomUUID(), "demo", "synthetic", "expense", 1, "alice", "费用",
+                Map.of("amount", "100.00"), null, null, io.agentflow.notification.NotificationTexts.EMPTY, reference);
+        assertThatThrownBy(() -> application.adjustBusinessPayload(1, reference, Map.of("amount", "50.00"))).isInstanceOf(DomainException.class);
+        application.submit(1); var submitted = SubmissionRound.submitted(application, "instance", "alice", Instant.now());
+        var wrong = new io.agentflow.approval.model.BusinessReference(reference.type(), UUID.randomUUID());
+        assertThatThrownBy(() -> application.adjustBusinessPayload(2, wrong, Map.of("amount", "50.00"))).isInstanceOf(DomainException.class);
+        assertThat(application.version()).isEqualTo(2);
+        application.adjustBusinessPayload(2, reference, Map.of("amount", "50.00"));
+        assertThat(application.version()).isEqualTo(3); assertThat(application.roundNo()).isEqualTo(1);
+        assertThat(application.status()).isEqualTo(ApplicationStatus.IN_APPROVAL);
+        assertThat(submitted.payload()).containsEntry("amount", "100.00");
+        application.approve(3);
+        assertThatThrownBy(() -> application.adjustBusinessPayload(4, reference, Map.of("amount", "0.00"))).isInstanceOf(DomainException.class);
+        assertThat(application.payload()).containsEntry("amount", "50.00");
+    }
+
+    @Test
     void submissionSnapshotFreezesNestedMapsAndLists() {
         Map<String, Object> line = new HashMap<>(Map.of("amount", 6000));
         List<Object> lines = new ArrayList<>(List.of(line));

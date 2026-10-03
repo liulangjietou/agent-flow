@@ -5,7 +5,7 @@ import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionApplicationService;
-import io.agentflow.approval.service.ProcessRuntimePort;
+import io.agentflow.approval.process.ApprovalCompletionService;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.junit.jupiter.api.Test;
@@ -19,6 +19,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.util.AopTestUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class CountersignIntegrationTest {
     @Autowired MockMvc mvc;
     @MockitoSpyBean AuthService auth;
-    @MockitoSpyBean ProcessRuntimePort runtime;
+    @MockitoSpyBean ApprovalCompletionService completion;
     @Autowired JsonUtil json;
     @Autowired DefinitionApplicationService definitions;
     @Autowired TaskService tasks;
@@ -190,10 +191,10 @@ class CountersignIntegrationTest {
         String id = submitted();
         Task finance = assigned(id, "finance"), admin = assigned(id, "admin");
         CyclicBarrier barrier = new CyclicBarrier(2);
+        var completionTarget = AopTestUtils.<ApprovalCompletionService>getUltimateTargetObject(completion);
+        // 在申请锁之前同步两个已读取的请求；锁后等待另一请求会由测试本身制造死锁。
         doAnswer(invocation -> { barrier.await(5, TimeUnit.SECONDS); return invocation.callRealMethod(); })
-                .when(runtime).complete(any());
-        doAnswer(invocation -> { barrier.await(5, TimeUnit.SECONDS); return invocation.callRealMethod(); })
-                .when(runtime).terminate(any());
+                .when(completionTarget).lock(any());
         var executor = Executors.newFixedThreadPool(2);
         try {
             var first = executor.submit(() -> act(finance, "finance", "APPROVE", 2, null).andReturn().getResponse());
@@ -203,8 +204,7 @@ class CountersignIntegrationTest {
         } finally {
             executor.shutdownNow();
             assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
-            doCallRealMethod().when(runtime).complete(any());
-            doCallRealMethod().when(runtime).terminate(any());
+            doCallRealMethod().when(completionTarget).lock(any());
         }
         assertThat(taskAuditCount(finance) + taskAuditCount(admin)).isEqualTo(1);
         assertThat(application(id).path("version").asLong()).isEqualTo(3);

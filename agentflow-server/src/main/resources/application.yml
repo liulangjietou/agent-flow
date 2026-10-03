@@ -24,6 +24,53 @@ flowable:
   process-definition-location-prefix: classpath:/processes/
 
 agentflow:
+  notifications:
+    proxy-reminders-enabled: ${AGENTFLOW_PROXY_REMINDERS_ENABLED:true}
+    delivery-worker-enabled: ${AGENTFLOW_NOTIFICATION_DELIVERY_WORKER_ENABLED:false}
+    public-url: ${AGENTFLOW_NOTIFICATION_PUBLIC_URL:}
+    smtp-servers: {}
+    bindings: {}
+  events:
+    enabled: ${AGENTFLOW_EVENTS_ENABLED:false}
+    worker-enabled: ${AGENTFLOW_EVENTS_WORKER_ENABLED:true}
+    sources: {}
+  budgets:
+    worker-enabled: ${AGENTFLOW_BUDGET_WORKER_ENABLED:true}
+    lease-seconds: ${AGENTFLOW_BUDGET_LEASE_SECONDS:90}
+  advances:
+    overdue:
+      reminders-enabled: ${AGENTFLOW_ADVANCE_OVERDUE_REMINDERS_ENABLED:true}
+      reminder-delay-ms: ${AGENTFLOW_ADVANCE_OVERDUE_REMINDER_DELAY_MS:60000}
+      # 按租户显式设置 tenants.<tenant>.block-new-requests；缺省不自动阻断。
+      tenants: {}
+  expenses:
+    precheck-worker-enabled: ${AGENTFLOW_EXPENSE_PRECHECK_WORKER_ENABLED:true}
+    precheck-timeout-seconds: ${AGENTFLOW_EXPENSE_PRECHECK_TIMEOUT_SECONDS:300}
+  invoices:
+    extraction-worker-enabled: ${AGENTFLOW_INVOICE_EXTRACTION_WORKER_ENABLED:true}
+    verification-worker-enabled: ${AGENTFLOW_INVOICE_VERIFICATION_WORKER_ENABLED:true}
+    max-wallet-bytes: ${AGENTFLOW_INVOICE_MAX_WALLET_BYTES:1073741824}
+    max-wallet-uploads: ${AGENTFLOW_INVOICE_MAX_WALLET_UPLOADS:1000}
+  finance-gateway:
+    enabled: ${AGENTFLOW_FINANCE_GATEWAY_ENABLED:false}
+    tenants: {}
+  payment-callbacks:
+    enabled: ${AGENTFLOW_PAYMENT_CALLBACKS_ENABLED:false}
+    worker-enabled: ${AGENTFLOW_PAYMENT_CALLBACKS_WORKER_ENABLED:true}
+    tenants: {}
+  assist:
+    enabled: ${AGENTFLOW_ASSIST_ENABLED:false}
+    worker-enabled: ${AGENTFLOW_ASSIST_WORKER_ENABLED:true}
+    endpoint: ${AGENTFLOW_ASSIST_ENDPOINT:}
+    provider-id: ${AGENTFLOW_ASSIST_PROVIDER:openai-compatible}
+    model: ${AGENTFLOW_ASSIST_MODEL:}
+    api-key: ${AGENTFLOW_ASSIST_API_KEY:}
+    timeout-seconds: ${AGENTFLOW_ASSIST_TIMEOUT_SECONDS:45}
+  attachments:
+    directory: ${AGENTFLOW_ATTACHMENT_DIRECTORY:}
+    max-file-bytes: ${AGENTFLOW_ATTACHMENT_MAX_FILE_BYTES:20971520}
+    max-application-bytes: ${AGENTFLOW_ATTACHMENT_MAX_APPLICATION_BYTES:268435456}
+    max-application-uploads: ${AGENTFLOW_ATTACHMENT_MAX_APPLICATION_UPLOADS:100}
   monitoring:
     enabled: ${AGENTFLOW_METRICS_ENABLED:false}
     expected-instances: ${AGENTFLOW_EXPECTED_INSTANCES:1}

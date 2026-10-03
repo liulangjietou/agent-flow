@@ -1,0 +1,24 @@
+{
+  "date": "2026-09-29",
+  "stage": "procurement-persistence-prechecks-and-local-payable-reservations",
+  "result": "PASS_INTERNAL_FOUNDATION_ONLY",
+  "tests": {"domain": 17, "h2PersistenceAndMigration": 9, "postgresScope": 33, "postgresBreakdown": {"persistence": 8, "migration": 1, "advanceAndFormGuard": 19, "openApi": 5}},
+  "verified": [
+    "V65 to V66 preserves legacy applications and expense rows",
+    "Request identity and revisions enforce actual business binding",
+    "Persisted check content, versions, lease and evidence cannot be rebound",
+    "Two concurrent transactions competing for one payable produce exactly one reservation",
+    "Failed resubmission restores the original held reservation and request revision",
+    "Successful resubmission preserves both original round histories",
+    "Return, withdrawal and approval retain the payable reservation",
+    "Only actual rejection or cancellation permits lifecycle release",
+    "Generic application HTTP rejects the reserved procurement form without creating a row"
+  ],
+  "migration": 66,
+  "liveAcceptanceSchema": 65,
+  "publicWorkflow": false,
+  "externalSystem": "Synthetic read-only finance fixture; local holds do not reserve external ERP balances",
+  "remaining": ["Submission and approval orchestration", "Independent supplier authorization and payment settlement", "Templates and UI", "Live database and browser acceptance"],
+  "logs": ["procurement-precheck-domain.log", "procurement-reservations.log", "procurement-persistence-postgres.log", "procurement-persistence-authors.log"],
+  "localEvidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928"
+}

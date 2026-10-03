@@ -17,6 +17,16 @@ class DefinitionDiffServiceTest {
     private final DefinitionDiffService service = new DefinitionDiffService();
 
     @Test
+    void permissionChangesAreExplicitInPublicationReview() {
+        var oldField = new FormSchema.Field("amount", "金额", FormSchema.FieldType.NUMBER, false, null, null, null, null, null);
+        var newField = new FormSchema.Field("amount", "金额", FormSchema.FieldType.NUMBER, false, null, null, null, null, null, null, null,
+                true, Map.of("review", io.agentflow.form.FieldVisibility.MASKED));
+        var graph = graph(List.of());
+        assertThat(service.compare(snapshot(graph, new FormSchema(1, List.of(oldField))), snapshot(graph, new FormSchema(1, List.of(newField)))))
+                .extracting(Change::property).containsExactly("sensitive", "nodeAccess");
+    }
+
+    @Test
     void conditionLanguageVersionIsAnExplicitRoutingChange() {
         Graph old = graph(List.of());
         Graph upgraded = new Graph(old.nodes(), old.edges(), 2);

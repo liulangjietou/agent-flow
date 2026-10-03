@@ -1,0 +1,138 @@
+{
+  "date": "2026-09-30",
+  "status": "PASS_LOCAL_BROWSER_AND_POSTGRESQL",
+  "codeCommit": "ef3188faa67b39d14270fc5cd44a85f535326229",
+  "syntheticFinanceOnly": true,
+  "browserScenarios": [
+    "create_and_save",
+    "precheck_expiry_blocks_submission",
+    "explicit_submit",
+    "withdraw_and_revise",
+    "second_round_submission",
+    "immutable_first_round",
+    "applicant_read_only_execution",
+    "finance_review",
+    "explicit_finance_authorization",
+    "applied_result",
+    "execution_history",
+    "500_css_pixel_layout"
+  ],
+  "approvalViaActualHttp": true,
+  "browserSubmissionObservation": "A prior click produced no durable submission; after a fresh READY precheck, both first and second round submissions succeeded. No product defect was reproduced and no code change was made.",
+  "actualHttpSchema": {
+    "result": "PASS",
+    "responses": 17
+  },
+  "actualFrontendResponses": {
+    "status": "PASS",
+    "actualViews": 3,
+    "actualHistoryPages": 1,
+    "actualDecisionReceipts": 0
+  },
+  "verification": {
+    "status": "PASS_LOCAL_BROWSER",
+    "requestId": "7c430276-22b2-4dd7-a55d-41f71ee882d0",
+    "applicationId": "bf0fe4ac-b6eb-4d92-8e80-e3f8403b3f28",
+    "operationId": "590600a1-edae-4ff7-9d32-2386c4f7e4ea",
+    "roundNo": 2,
+    "previousRoundAmount": "20.03",
+    "executedAmount": "20.04",
+    "appliedLimits": [
+      "979.96",
+      "820.04"
+    ],
+    "originalAtomicCommandCalls": [
+      {
+        "operation": "budget-adjustment-command",
+        "operationId": "590600a1-edae-4ff7-9d32-2386c4f7e4ea",
+        "correlationId": "590600a1-edae-4ff7-9d32-2386c4f7e4ea",
+        "at": "2026-09-30T07:11:00.058379+00:00",
+        "status": 200
+      }
+    ],
+    "oldTablesUnchanged": [
+      "budget_adjustment_retirement",
+      "budget_consumption_reversal_operation",
+      "budget_consumption_reversal_operation_revision",
+      "budget_occupation",
+      "budget_occupation_revision",
+      "budget_operation",
+      "budget_operation_revision",
+      "procurement_payable_reservation",
+      "procurement_payable_reservation_revision",
+      "procurement_payment",
+      "procurement_payment_check_job",
+      "procurement_payment_check_revision",
+      "procurement_payment_revision",
+      "supplier_authorization_retirement",
+      "supplier_payable_hold_operation",
+      "supplier_payable_hold_revision",
+      "supplier_payable_review",
+      "supplier_payable_review_revision",
+      "supplier_payable_settlement_operation",
+      "supplier_payable_settlement_revision",
+      "supplier_payment_authorization",
+      "supplier_payment_dispute_resolution",
+      "supplier_payment_execution_request",
+      "supplier_payment_execution_revision",
+      "supplier_payment_operation",
+      "supplier_payment_revision",
+      "supplier_settlement_completion",
+      "supplier_settlement_preparation",
+      "supplier_settlement_preparation_revision",
+      "supplier_settlement_retirement"
+    ],
+    "oldTablesOnlyAppended": [
+      "budget_adjustment",
+      "budget_adjustment_check_job",
+      "budget_adjustment_check_revision",
+      "budget_adjustment_operation",
+      "budget_adjustment_operation_revision",
+      "budget_adjustment_review",
+      "budget_adjustment_review_revision",
+      "budget_adjustment_revision"
+    ],
+    "oldRowsRetained": 481,
+    "originalBudgetCommandsPreserved": 4,
+    "originalSupplierFilesPreserved": 3,
+    "viewport": {
+      "documentWidth": 480,
+      "height": 1000,
+      "panels": [
+        {
+          "label": null,
+          "left": 12,
+          "right": 468,
+          "scrollWidth": 436,
+          "width": 436
+        },
+        {
+          "label": "预算调整申请明细",
+          "left": 34,
+          "right": 426,
+          "scrollWidth": 392,
+          "width": 392
+        },
+        {
+          "label": "预算调整财务办理",
+          "left": 34,
+          "right": 426,
+          "scrollWidth": 391,
+          "width": 391
+        }
+      ],
+      "width": 500
+    },
+    "businessResponses": 17,
+    "logins": 36
+  },
+  "screenshots": [
+    "/fyoung/tmp/agentflow-remaining-20260928/budget-browser-history.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/budget-browser-completed.jpg",
+    "/fyoung/tmp/agentflow-remaining-20260928/budget-browser-narrow.jpg"
+  ],
+  "limitations": [
+    "real enterprise budget integration remains unverified",
+    "wide ledger tables scroll within their own bounded container"
+  ]
+}

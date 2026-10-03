@@ -1,7 +1,34 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-const { NotificationInboxQuery } = await import(process.env.AGENTFLOW_TEST_NOTIFICATIONS)
+const { NotificationInboxQuery, isTaskNotification } = await import(process.env.AGENTFLOW_TEST_NOTIFICATIONS)
+const { createNavigation } = await import(process.env.AGENTFLOW_TEST_NOTIFICATION_NAVIGATION)
 const item = id => ({ id, kind: 'TASK_PENDING' })
+
+test('结束或移除会签的消息直接打开申请，不请求已取消任务，也不显示待办异常提示', async () => {
+  for (const kind of ['TASK_COUNTERSIGN_COMPLETED', 'TASK_COUNTERSIGN_REMOVED', 'APPLICATION_PAUSED', 'APPLICATION_RESUMED', 'APPLICATION_CANCELLED', 'ADVANCE_OVERDUE']) {
+    let requests = 0
+    const deps = { busy: { value: false }, writesBlocked: { value: false }, actorScope: { value: 'demo:finance' },
+      recordApplicationId: { value: '' }, notice: { value: '' }, api: { task: async () => { requests++; throw { status: 404 } } } }
+    await createNavigation(deps)({ kind, taskId: 'ended', applicationId: 'approved', roundNo: 1 })
+    assert.equal(requests, 0, '结束通知不应先读取不存在的任务')
+    assert.equal(deps.recordApplicationId.value, 'approved')
+    assert.equal(deps.notice.value, '')
+    assert.equal(isTaskNotification({ kind }), false)
+  }
+})
+
+test('实际待办消息仍实时复核，抄送保持专用轮次读取入口', async () => {
+  const selected = [], current = { taskId: 'task', applicationId: 'application' }
+  const deps = { busy: { value: false }, writesBlocked: { value: false }, actorScope: { value: 'demo:finance' },
+    recordApplicationId: { value: '' }, selectedCopy: { value: null }, notice: { value: '' }, page: { value: 'notifications' },
+    api: { task: async id => { assert.equal(id, 'task'); return current } }, selectTask: async task => selected.push(task) }
+  const open = createNavigation(deps)
+  await open({ kind: 'TASK_PENDING', taskId: 'task', applicationId: 'application' })
+  assert.deepEqual(selected, [current]); assert.equal(deps.page.value, 'workbench')
+  await open({ kind: 'APPLICATION_COPIED', applicationId: 'copied', roundNo: 2 })
+  assert.deepEqual(deps.selectedCopy.value, { applicationId: 'copied', roundNo: 2 })
+  assert.equal(deps.recordApplicationId.value, '')
+})
 
 test('切换账号与未读筛选清空消息和计数，迟到成功或失败不能回填', async () => {
   const requests = []

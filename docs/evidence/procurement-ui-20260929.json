@@ -1,0 +1,102 @@
+{
+  "date": "2026-09-29",
+  "scope": "Procurement template and origination UI local acceptance",
+  "migration": 66,
+  "template": {
+    "key": "procurement-payment",
+    "version": 1,
+    "path": [
+      "start",
+      "supervisor",
+      "finance",
+      "end"
+    ],
+    "financeBindingRequired": true
+  },
+  "tests": {
+    "h2Related": 71,
+    "postgresRelated": 43,
+    "frontendRelated": 56,
+    "frontendProcurement": 28,
+    "overlappingScopes": true,
+    "build": "PASS",
+    "openapi": {
+      "operations": 201,
+      "schemas": 387,
+      "requestExamples": 74
+    }
+  },
+  "actualHttp": {
+    "businessResponses": 66,
+    "logins": 24,
+    "schemaValidated": 66,
+    "syntheticFinance": true
+  },
+  "upgrade": {
+    "schema": 66,
+    "preservedTables": 109,
+    "preservedFiles": 5,
+    "backupBytes": 745705
+  },
+  "afterAcceptance": {
+    "unchangedPriorRowsTables": 107,
+    "intentionalOrganizationUpdates": [
+      "alice supervisor appointment",
+      "organization revision"
+    ],
+    "files": 5,
+    "unchangedCommandFiles": 5,
+    "newProcurementVouchers": 0
+  },
+  "browser": {
+    "businessNo": "UI-PROCUREMENT-BROWSER-20260929",
+    "requestId": "88259d13-04b9-4648-af74-49f4d57eb106",
+    "applicationId": "8660ddcf-c73e-4af6-a907-cdc5b5fdcbe5",
+    "round": 2,
+    "approvedAmount": {
+      "value": "65.00",
+      "currency": "CNY"
+    },
+    "historicalWithdrawnAmount": {
+      "value": "70.00",
+      "currency": "CNY"
+    },
+    "approvedBy": "finance",
+    "preciseQuantity": "999999999999999.123456",
+    "narrow": {
+      "detail": [
+        {
+          "scrollWidth": 285,
+          "width": 285
+        }
+      ],
+      "documentWidth": 356,
+      "quantity": [
+        "999999999999999.123456",
+        "999999999999999.123456",
+        "999999999999999.123456"
+      ],
+      "width": 376
+    }
+  },
+  "artifacts": {
+    "http": "/fyoung/tmp/agentflow-remaining-20260928/procurement-ui-http.json",
+    "httpSchemas": "/fyoung/tmp/agentflow-remaining-20260928/procurement-ui-http-schema.json",
+    "before": "/fyoung/tmp/agentflow-remaining-20260928/procurement-ui-before.json",
+    "backup": "/fyoung/tmp/agentflow-remaining-20260928/procurement-ui-before-v65.dump",
+    "frontend": "/fyoung/tmp/agentflow-remaining-20260928/procurement-ui-tests.log",
+    "template": "/fyoung/tmp/agentflow-remaining-20260928/procurement-template.log",
+    "postgres": "/fyoung/tmp/agentflow-remaining-20260928/procurement-workflow-postgres.log",
+    "screenshot": "/fyoung/tmp/agentflow-remaining-20260928/procurement-browser-approved.png",
+    "narrow": "/fyoung/tmp/agentflow-remaining-20260928/procurement-browser-narrow.png"
+  },
+  "remaining": [
+    "cross-business canonical invoice safeguards",
+    "independent supplier payment authorization and execution",
+    "external original payable reservation and settlement",
+    "real enterprise finance acceptance"
+  ],
+  "additionalFrontendExpenseRegressionTests": 22,
+  "allTemplateReadOnlySimulationScenarios": 18,
+  "genericTemplateScriptScope": "FORM only; parsed and checked against the actual four-template catalog"
+}

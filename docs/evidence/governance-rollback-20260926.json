@@ -1,0 +1,297 @@
+{
+  "scope": "synthetic V25 database clone only",
+  "sourceContainer": "agentflow-governance-identifier-postgres",
+  "cloneContainer": "agentflow-governance-rollback-20260926",
+  "oldJarSha256": "dcf6ee5a0591fddd826820c36bd44c0db7b0a30b1a81e7380af4afb8d263308c",
+  "candidateJarSha256": "72e79459d986c1d0c4a0608ed93ac0bdcdbd76f6c0bb5238d89cb896ae5241c3",
+  "checks": {
+    "candidateInitialCreateBlocked": true,
+    "candidateInitialFirstSubmitBlocked": true,
+    "oldCreateBypassedDisabledGuard": true,
+    "oldFirstSubmitBypassedDisabledGuard": true,
+    "oldDefinitionApiExposesStartEnabled": false,
+    "disabledDefinitionFullyPreserved": true,
+    "availabilityAuditFullyPreserved": true,
+    "oldBypassedSubmittedApplicationPreserved": true,
+    "candidateRestoredCreateBlocked": true,
+    "candidateRestoredOriginalFirstSubmitBlocked": true,
+    "candidateRestoredOldCreatedFirstSubmitBlocked": true,
+    "allFlywayHistoryFullyPreserved": true,
+    "schemaRemainsV25": true
+  },
+  "startupComparisons": {
+    "restoredToCandidate": {
+      "identicalTables": true,
+      "changedTables": {},
+      "identicalFlywayHistory": true
+    },
+    "candidateToOldStartup": {
+      "identicalTables": true,
+      "changedTables": {},
+      "identicalFlywayHistory": true
+    },
+    "oldToCandidateStartup": {
+      "identicalTables": true,
+      "changedTables": {},
+      "identicalFlywayHistory": true
+    }
+  },
+  "sourceStoppedAfterBackup": true,
+  "backupSha256": "780bf2bd285a12d63c7d00aacd0863f466ea27a31e89960777db7fe4356f5077",
+  "tableCount": 68,
+  "result": "DEFAULT_PROFILE_GUARD_BYPASS_CONFIRMED;STRICT_OLD_SCHEMA_VALIDATE_REJECTED",
+  "risk": "仅 default profile + demo auth 下实测旧程序忽略停用标记，允许停用定义创建申请和草稿首次提交；恢复候选后已启动流程保留。严格 --schema=validate 下旧发布包拒绝 V25，候选通过。源码 prod 配置复用严格检查，因此不能把 demo/default 绕过结论泛化为 prod 可启动或可绕过；未启动企业身份链路。",
+  "cleanup": {
+    "applicationStopped": true,
+    "cloneStatus": "exited",
+    "sourceStatus": "exited",
+    "backupPreserved": true,
+    "processEvidence": {
+      "candidate-initial": {
+        "pid": 70908,
+        "processExists": false
+      },
+      "old": {
+        "pid": 71172,
+        "processExists": false
+      },
+      "candidate-restored": {
+        "pid": 71337,
+        "processExists": false
+      }
+    }
+  },
+  "expectedOldProbeWrites": {
+    "purpose": "旧版两次登录、停用定义新建一条草稿、停用前草稿首次提交一次；这些差异为主动探针写入，不属于重启数据丢失。",
+    "changedTables": {
+      "act_ge_bytearray": {
+        "before": {
+          "count": 13,
+          "md5": "5fcf8840d38f4218685bc7e7de7f79ba"
+        },
+        "after": {
+          "count": 17,
+          "md5": "82deea34f40983e886cb834f917517c1"
+        }
+      },
+      "act_hi_actinst": {
+        "before": {
+          "count": 34,
+          "md5": "e091867d7b94df12ed0e99caa8c4353d"
+        },
+        "after": {
+          "count": 37,
+          "md5": "ebd1c33b7b02e95e949845729f328e6e"
+        }
+      },
+      "act_hi_identitylink": {
+        "before": {
+          "count": 12,
+          "md5": "11f28ac3e95f50691fb396a1cd0e6202"
+        },
+        "after": {
+          "count": 14,
+          "md5": "d144e5d4024cc443187f24db35275c45"
+        }
+      },
+      "act_hi_procinst": {
+        "before": {
+          "count": 4,
+          "md5": "04005cc24e081f37c36bd17d0b521093"
+        },
+        "after": {
+          "count": 5,
+          "md5": "69d528d2b80635cfd4edec86144e1462"
+        }
+      },
+      "act_hi_taskinst": {
+        "before": {
+          "count": 6,
+          "md5": "9867bd7d39e174673418309be4400ab9"
+        },
+        "after": {
+          "count": 7,
+          "md5": "614c16c8e8dc461e26748f761870d74f"
+        }
+      },
+      "act_hi_varinst": {
+        "before": {
+          "count": 25,
+          "md5": "48467e17a4dc490a073f8504a3ebc8cf"
+        },
+        "after": {
+          "count": 31,
+          "md5": "8418345e30251d95335b1caf30a47bc5"
+        }
+      },
+      "act_ru_actinst": {
+        "before": {
+          "count": 0,
+          "md5": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "after": {
+          "count": 3,
+          "md5": "ca02922b79c442bdb2eab54a083ac392"
+        }
+      },
+      "act_ru_execution": {
+        "before": {
+          "count": 0,
+          "md5": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "after": {
+          "count": 2,
+          "md5": "b0f26a560c715d09830a0e06acb38030"
+        }
+      },
+      "act_ru_identitylink": {
+        "before": {
+          "count": 0,
+          "md5": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "after": {
+          "count": 1,
+          "md5": "cc20afb40a8eb7484a917f3d0745615c"
+        }
+      },
+      "act_ru_task": {
+        "before": {
+          "count": 0,
+          "md5": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "after": {
+          "count": 1,
+          "md5": "1739898a0e44d3b108572a939dbdbae1"
+        }
+      },
+      "act_ru_variable": {
+        "before": {
+          "count": 0,
+          "md5": "d41d8cd98f00b204e9800998ecf8427e"
+        },
+        "after": {
+          "count": 6,
+          "md5": "db1827dd25286d7cc5f2823ffd639065"
+        }
+      },
+      "approval_application": {
+        "before": {
+          "count": 7,
+          "md5": "c47a7e847c593607e8762f9e55f09bab"
+        },
+        "after": {
+          "count": 8,
+          "md5": "69feea50149b1e9c66214e905eba0b1f"
+        }
+      },
+      "approval_submission_round": {
+        "before": {
+          "count": 4,
+          "md5": "0bf5327fb2c59702075a528f704d0027"
+        },
+        "after": {
+          "count": 5,
+          "md5": "5dd130989b6ba761a136604d247c809c"
+        }
+      },
+      "audit_event": {
+        "before": {
+          "count": 19,
+          "md5": "f8d877784310c935e61064cd6adbf5c5"
+        },
+        "after": {
+          "count": 21,
+          "md5": "f7352020add2174bd07762479f2dcbfa"
+        }
+      },
+      "notification_inbox": {
+        "before": {
+          "count": 15,
+          "md5": "c99ce8f93c95a890837f34e300d05222"
+        },
+        "after": {
+          "count": 17,
+          "md5": "93860fcdc33af7db2aeeeafc0b60bc5b"
+        }
+      },
+      "request_idempotency": {
+        "before": {
+          "count": 48,
+          "md5": "91890106de653fa2bed91404ade48bba"
+        },
+        "after": {
+          "count": 50,
+          "md5": "126b4d1b64c69cc699802829de90f3c2"
+        }
+      }
+    }
+  },
+  "httpObservations": [
+    {
+      "stage": "candidateInitial",
+      "action": "createDisabledDefinitionApplication",
+      "httpStatus": 409,
+      "code": "DEFINITION_DISABLED"
+    },
+    {
+      "stage": "candidateInitial",
+      "action": "firstSubmitDisabledDefinitionDraft",
+      "httpStatus": 409,
+      "code": "DEFINITION_DISABLED"
+    },
+    {
+      "stage": "old",
+      "action": "createDisabledDefinitionApplication",
+      "httpStatus": 201,
+      "status": "DRAFT"
+    },
+    {
+      "stage": "old",
+      "action": "firstSubmitDisabledDefinitionDraft",
+      "httpStatus": 200,
+      "status": "IN_APPROVAL"
+    },
+    {
+      "stage": "candidateRestored",
+      "action": "createDisabledDefinitionApplication",
+      "httpStatus": 409,
+      "code": "DEFINITION_DISABLED"
+    },
+    {
+      "stage": "candidateRestored",
+      "action": "firstSubmitOriginalDraft",
+      "httpStatus": 409,
+      "code": "DEFINITION_DISABLED"
+    },
+    {
+      "stage": "candidateRestored",
+      "action": "firstSubmitOldCreatedDraft",
+      "httpStatus": 409,
+      "code": "DEFINITION_DISABLED"
+    }
+  ],
+  "runtimeProfile": {
+    "springProfile": "default",
+    "demoAuth": true,
+    "productionRuntimeNotStarted": true,
+    "evidence": "candidate-initial.log / old.log / candidate-restored.log: No active profile set; falling back to default profile"
+  },
+  "strictSchemaValidation": {
+    "old": {
+      "exitCode": 1,
+      "safeOutput": [
+        "Schema command failed, errorCode=DATABASE_SCHEMA_FAILED, phase=validate, errorType=FlywayValidateException"
+      ]
+    },
+    "candidate": {
+      "exitCode": 0,
+      "safeOutput": [
+        "Schema validate completed; business migrations and Flowable schema verified"
+      ]
+    },
+    "all68TablesUnchanged": true,
+    "changedTables": {},
+    "cloneStatus": "exited",
+    "sourceStatus": "exited"
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "date": "2026-09-29",
+  "stage": "budget-adjustment-public-api-and-approval",
+  "status": "LOCAL_API_WORKFLOW_VERIFIED_UI_AND_EXECUTION_PENDING",
+  "foundationCommit": "e86f4aab42f24cd056e5ef85bb05f25efad60a24",
+  "behavior": [
+    "Applicant-only drafts, lists and precheck history with dual versions",
+    "Durable claim and completion transactions separated from HTTP reads",
+    "Frozen appointment and latest unexpired ledger evidence required for actual submission",
+    "Sensitive details and historical rounds retain original field permissions including administrators",
+    "Actual final Flowable approval seals budget evidence in the same transaction; no external budget writes",
+    "Unknown outcomes replay the original idempotent public request; stale claims do not regain readiness"
+  ],
+  "validation": {
+    "h2": {
+      "serverTests": 49,
+      "newBudgetWorkflowTests": 15,
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-api-workflow-h2.log"
+    },
+    "postgresql": {
+      "databaseAndApprovalTests": 44,
+      "h2ContractTestsInSameRun": 6,
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-api-postgres.log"
+    },
+    "openApi": {
+      "newOperations": 11,
+      "newSchemas": 18,
+      "operations": 230,
+      "schemas": 447,
+      "requestExamples": 81,
+      "result": "PASS"
+    },
+    "authors": {
+      "javaFiles": 989,
+      "namedTypes": 1858,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "cases": [
+      "increase, decrease and transfer final approval",
+      "return and resubmit with original historical access",
+      "withdraw, reject and cancel without external adjustment",
+      "budget and request version conflicts",
+      "one concurrent worker read, crashed claim timeout and late response exclusion",
+      "edit during external wait without retaining database transaction",
+      "destination, appointment and evidence expiry invalidation",
+      "submission round failure and final approval audit failure roll back Flowable and budget state",
+      "unauthorized and admin reads, generic form write protection",
+      "missing configuration versus explicit budget rejection"
+    ],
+    "overlappingScopes": true
+  },
+  "pending": [
+    "Template catalog entry and applicant/approver UI",
+    "Original acceptance database upgrade and HTTP/browser acceptance",
+    "Independent finance execution authorization and atomic budget command/query protocol",
+    "Real enterprise budget system acceptance"
+  ],
+  "runtime": {
+    "version": 75,
+    "port": 18214,
+    "upgraded": false
+  },
+  "mainChanged": false,
+  "remoteConfigured": false,
+  "prCreated": false,
+  "remainingLargeWorkPackages": 4
+}

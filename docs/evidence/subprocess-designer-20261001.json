@@ -1,0 +1,345 @@
+{
+  "recordedAt": "2026-10-01T13:37:19.456265+00:00",
+  "baseCommit": "b33f00f4d0775436af0011de33bb3c34334a8e4d",
+  "scope": "Fixed-version subprocess design, explicit input mapping and portable template roundtrip",
+  "callChain": [
+    "QuickDesigner and advanced App canvas",
+    "DefinitionSubprocess shared representation component",
+    "DefinitionPicker bounded tenant catalogue and DefinitionSelection exact-version read",
+    "designerGraph shared save/preflight/simulation/comparison snapshot",
+    "PortableTemplate strict file contract",
+    "existing DefinitionApplicationService read-only preflight and public readiness gate"
+  ],
+  "responsibility": "Representation owns editing, cancellation, hints, template parsing and download. Existing domain and application layers remain authoritative for dependency, input, permission and readiness validation.",
+  "affectedScenarios": [
+    "explicit fixed child version selection",
+    "switching editor views and undo",
+    "stale account/node/reference reads",
+    "missing or disabled original versions",
+    "sensitive and table-column input mappings",
+    "template export/import preflight"
+  ],
+  "behavior": [
+    "No automatic latest-version fallback or same-name input mapping",
+    "Explicit new version clears old inputs; same-version refresh preserves them",
+    "Invalid original references and stale mappings remain visible until explicitly changed",
+    "Input edits do not reload the immutable selected definition",
+    "Changing scope, reference, lock or unmounting cancels pending selection",
+    "Restricted input requires readable source and retained sensitivity",
+    "Template rejects engine properties, identity fields, paths and expressions; at most 50 mapped fields"
+  ],
+  "redBeforeChanges": [
+    {
+      "artifact": "subprocess-designer-red.log",
+      "reason": "Existing graph editor, quick mode, exact version read and portable parser did not support the intended call configuration"
+    },
+    {
+      "artifact": "subprocess-designer-green.log",
+      "reason": "Watching a fresh reference tuple reloaded the child on every mapping replacement, preventing the next explicit correction",
+      "fix": "Watch individual scope/key/version sources; 72 tests passed after correction"
+    },
+    {
+      "artifact": "subprocess-designer-label-red.json",
+      "reason": "Existing quick-inspector deep label rule overrode child grid layout; setup tests do not execute CSS",
+      "fix": "Scope the new mapping label rule to its component; real browser computed grid and narrow layout passed"
+    }
+  ],
+  "validation": {
+    "uniqueFrontendTestsPassed": 163,
+    "reports": [
+      {
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-fixed.log",
+        "testFiles": [
+          "agentflow-web/tests/subprocess-designer.test.mjs",
+          "agentflow-web/tests/designer-graph.test.mjs",
+          "agentflow-web/tests/quick-designer.test.mjs",
+          "agentflow-web/tests/portable-template.test.mjs",
+          "agentflow-web/tests/definition-selection.test.mjs"
+        ],
+        "tests": 72,
+        "pass": 72,
+        "fail": 0,
+        "skipped": 0
+      },
+      {
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-regression.log",
+        "testFiles": [
+          "agentflow-web/tests/event-ui.test.mjs",
+          "agentflow-web/tests/forms.test.mjs",
+          "agentflow-web/tests/templates.test.mjs",
+          "agentflow-web/tests/designer-validation.test.mjs",
+          "agentflow-web/tests/layout.test.mjs",
+          "agentflow-web/tests/simulation.test.mjs",
+          "agentflow-web/tests/comparison.test.mjs",
+          "agentflow-web/tests/round-comparison.test.mjs"
+        ],
+        "tests": 74,
+        "pass": 74,
+        "fail": 0,
+        "skipped": 0
+      },
+      {
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-permissions.log",
+        "testFiles": [
+          "agentflow-web/tests/field-editor.test.mjs",
+          "agentflow-web/tests/field-preview.test.mjs",
+          "agentflow-web/tests/definition-catalog.test.mjs",
+          "agentflow-web/tests/definition-assignees.test.mjs"
+        ],
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "skipped": 0
+      }
+    ],
+    "build": {
+      "command": "npm run build",
+      "passed": true,
+      "includesTypeCheck": true,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-build-final.log",
+      "existingWarning": "main JS bundle larger than 500 kB"
+    },
+    "openapi": {
+      "passed": true,
+      "operations": 280,
+      "schemas": 550,
+      "requestExamples": 109
+    },
+    "backend": {
+      "sourceUnchanged": true,
+      "newTestsRun": false,
+      "package": "Maven -DskipTests package passed; not counted as test execution"
+    }
+  },
+  "browser": {
+    "origin": "http://127.0.0.1:15326",
+    "backendPort": 18227,
+    "backendSourceCommit": "b33f00f4d0775436af0011de33bb3c34334a8e4d",
+    "isolatedDatabase": "subprocess_designer_bf093f652e",
+    "httpFixtureWrites": 5,
+    "fixtureWrites": [
+      "create child v1",
+      "publish child v1",
+      "create child v2",
+      "publish child v2",
+      "create ordinary parent draft"
+    ],
+    "verified": [
+      "Select v1 while v2 is present",
+      "Map total to amount; privateCost disabled without readable source permission",
+      "Quick and advanced view preserve v1 and mapping",
+      "Explicit v2 selection clears mapping",
+      "Undo restores v1 and amount",
+      "Real backend preflight returns only SUBPROCESS_RUNTIME_NOT_READY",
+      "Download file confirmed on filesystem with correct time, content and SHA-256",
+      "Actual file chooser imports the downloaded file and preflight keeps create disabled",
+      "500 CSS pixel document and input panel have no horizontal overflow",
+      "CSS label display changed from block to grid after fix"
+    ],
+    "viewport": {
+      "documentClient": 480,
+      "documentScroll": 480,
+      "innerWidth": 500,
+      "labelDisplay": "grid",
+      "panelClient": 391,
+      "panelScroll": 391
+    },
+    "viewportReset": true,
+    "finalInput": {
+      "options": [
+        {
+          "disabled": false,
+          "label": "请选择父表单字段",
+          "value": ""
+        },
+        {
+          "disabled": false,
+          "label": "申请金额 · 数字",
+          "value": "amount"
+        },
+        {
+          "disabled": true,
+          "label": "敏感成本 · 数字 · 调用节点须具有此字段的只读权限",
+          "value": "privateCost"
+        }
+      ],
+      "value": "amount"
+    },
+    "downloadReceipt": {
+      "filename": "agentflow-process-template (2).json",
+      "originalPath": "/Users/zhangfuqiang/Downloads/agentflow-process-template (2).json",
+      "modifiedAt": "2026-10-01T13:27:02.136710+00:00",
+      "bytes": 2146,
+      "sha256": "73786724d721f75f9ef80e65588e920912d553d7fca4af1da53aae1e5660a2ad",
+      "eventWait": "TIMED_OUT",
+      "fileReceiptVerified": true,
+      "format": "agentflow-process-template",
+      "formatVersion": 2,
+      "processKey": "subprocess-ui-parent",
+      "call": {
+        "id": "node-189577eb-f043-40b0-bfb9-4c50ff6dad91",
+        "name": "子流程",
+        "type": "SUB_PROCESS",
+        "properties": {
+          "subprocessKey": "subprocess-ui-child",
+          "subprocessVersion": "1",
+          "subprocessInput.total": "amount"
+        }
+      },
+      "savedPath": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-downloaded-template.json",
+      "otherDownloadFilesModified": false
+    },
+    "parentEditsSaved": false,
+    "databaseCheck": {
+      "database": "subprocess_designer_bf093f652e",
+      "schemaVersion": 90,
+      "definitions": 3,
+      "applications": 0,
+      "rounds": 0,
+      "calls": 0,
+      "parentStatus": "DRAFT",
+      "parentNodes": 3,
+      "parentCallNodes": 0
+    }
+  },
+  "preservation": {
+    "healthEvidence": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-runtime-health.json",
+    "existingServicesReplaced": false,
+    "protectedSeedsUnchanged": true,
+    "mainCommit": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+    "mainClean": true,
+    "priorDatabaseRowHashesComparedThisStage": false
+  },
+  "boundaries": [
+    "Public subprocess create/update/publish gate remains closed",
+    "No subprocess application was created by this designer acceptance",
+    "Actual per-definition descendant appointment hint still pending",
+    "Permissioned parent-child API and pages still pending",
+    "Structured finance parent and full public lifecycle HTTP/browser/upgrade/restart acceptance pending",
+    "Download event wait timed out; successful file receipt verified separately",
+    "No enterprise environment, remote PR or CI claim"
+  ],
+  "sourceSha256": {
+    "agentflow-web/scripts/test-requests.mjs": "0a110e9e96ee42d7a45b07d27c534aac559e50d047d1be5af3d96ca3a02fdbde",
+    "agentflow-web/src/App.vue": "2a8c23cf854ee8ce7716a6268c329ab1b4df93d6b6bce3176ef5d62cc8f79d2f",
+    "agentflow-web/src/components/DefinitionSubprocess.vue": "dd5af67fb15d831cfc17e08e79d7ea9ee0635887f3b82768b5962e6bf9e38983",
+    "agentflow-web/src/components/PortableTemplate.vue": "2efa8b58c764826906e50f243c30dfcbba33b3d734f1e14acd4330aa066412e8",
+    "agentflow-web/src/components/QuickDesigner.vue": "2fd505ceddfc041f9f45aa0bf2492784a20f8c24036645745e939dd9addc13d6",
+    "agentflow-web/src/components/QuickSequence.vue": "d950b7e933ebb4d609e8074cdbe37e746b2ef93ee47e7668fe4c58417af560ed",
+    "agentflow-web/src/components/RoundDiagram.vue": "3df7e80bca806cd61fc67f3620994a500fc4c5857b34bee89df501813ea7f773",
+    "agentflow-web/src/definitionComparison.ts": "05758fe049f6359b85c3e292dccc4d99f941c196f5e818b6817d295bca9b15bb",
+    "agentflow-web/src/definitionSelection.ts": "18f02bffc415afbb6e0feb220604eec81f8b8713e8f8aeabc2284c31a8d516d6",
+    "agentflow-web/src/definitionSimulation.ts": "36751ce7d010e71df46d58111e5b1a35fa41bbd444203d326f587844ffa8c517",
+    "agentflow-web/src/designerGraph.ts": "bfa76fe49d5dd34599f79e8b3be454171f5e0b6a593f826b1f6ccc164b0c05aa",
+    "agentflow-web/src/portableTemplate.ts": "080cea5ae3a923467f1ed1009fe2f00f18a83b56854db30af91ab69c6d970ef9",
+    "agentflow-web/src/quickDesigner.ts": "6b4326073a68be868b1cf4d828251b22daeaf38b1e980f0e18920ccf59258d82",
+    "agentflow-web/src/subprocessDesigner.ts": "dd78192286071429defc38a097b48ba17eaae7bc9175236fdd22046923ad999a",
+    "agentflow-web/tests/definition-selection.test.mjs": "f4eb924501fdfc2c8000cad40997cd2bc492ee5ef5861a260c7cb900a7568ef7",
+    "agentflow-web/tests/designer-graph.test.mjs": "8bc31dfd0d35154064afdc6eec30f80cca4486029ef710b5b213a91cbcb4e141",
+    "agentflow-web/tests/portable-template.test.mjs": "81c7dba23493e3c15174736f9d35e94385b3bd170d30365cf8851fce75bead4a",
+    "agentflow-web/tests/quick-designer.test.mjs": "e6db9ed85ba085a049750be5f196209fbddb20b83e278c94c3f681bdcca4f24a",
+    "agentflow-web/tests/subprocess-designer.test.mjs": "678a84ffeab32696bb46e77ffd6f3c32eb46435be4245841c20f7144a3314c2c"
+  },
+  "artifacts": {
+    "subprocess-designer-fixed.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-fixed.log",
+      "bytes": 7205,
+      "sha256": "ecca1df244694d57f774275d2fb2ed7209d35a708e419c96be3efab3ed47e04b"
+    },
+    "subprocess-designer-regression.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-regression.log",
+      "bytes": 7556,
+      "sha256": "7342ea6c203552db68654d25fa38823fc6b6e016a1eed309ccc3565209ccde33"
+    },
+    "subprocess-designer-permissions.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-permissions.log",
+      "bytes": 1706,
+      "sha256": "a041298bc800f77550a6ce322b9125442475fddf91d602631aa3e1816fe02a8b"
+    },
+    "subprocess-designer-red.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-red.log",
+      "bytes": 10161,
+      "sha256": "481c5ab19b467e5624092a7f11b4f63548e3ccb28bdd858563f84142b6946300"
+    },
+    "subprocess-designer-green.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-green.log",
+      "bytes": 7978,
+      "sha256": "b13ba96c075bd2d5071cc4aa012d74191063f04595985f1f8a7bdcd04de87c88"
+    },
+    "subprocess-designer-build-final.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-build-final.log",
+      "bytes": 781,
+      "sha256": "841ebc0fac207750cea26a96abfa7f201880e2c1b3864ce947bd8724a38b9f0e"
+    },
+    "subprocess-designer-openapi.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-openapi.log",
+      "bytes": 141,
+      "sha256": "58d765e64c2651c76d65ea05fee9df6db2c4eeec54c4d94ab06576cc96ad65b6"
+    },
+    "subprocess-designer-label-red.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-label-red.json",
+      "bytes": 64,
+      "sha256": "4881f5be8d73877780c79236691c2d9e2f6d02ef88ecc392621f2d882581325a"
+    },
+    "subprocess-designer-label-green.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-label-green.json",
+      "bytes": 62,
+      "sha256": "cd6011f67fbdcd7a32dc4031b363028f97f7bad71ee66b31a1a904fb2f473203"
+    },
+    "subprocess-designer-browser.jpg": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-browser.jpg",
+      "bytes": 88752,
+      "sha256": "f1a4d8c5780b0b4e52c6609241ff8b82c5d1bf1161edc061558fd64918cfd21f"
+    },
+    "subprocess-designer-browser.txt": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-browser.txt",
+      "bytes": 11301,
+      "sha256": "8c3316f649d0a521ee7374cc8e7264563f628348eddbb34cd20ff07d7215f058"
+    },
+    "subprocess-designer-500px.jpg": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-500px.jpg",
+      "bytes": 24136,
+      "sha256": "654ea142f1abedef467754cd78de0b9705a652edb29551359d723b77c71ba36c"
+    },
+    "subprocess-designer-500px-green.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-500px-green.json",
+      "bytes": 143,
+      "sha256": "57ce24bd481c9b1de632d4552f2c38100ffcc556f07275c5acd066cd0086395e"
+    },
+    "subprocess-template-browser.jpg": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-template-browser.jpg",
+      "bytes": 110183,
+      "sha256": "818bc1e189af615f2b2ff5f567ec310179d3cc3ff8ade23f3ac76948cca6db26"
+    },
+    "subprocess-template-browser.txt": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-template-browser.txt",
+      "bytes": 5009,
+      "sha256": "56b77ce9be63cd228e3e1afbad04337cdaf9ee97e700d0f749236ad4a2943e4c"
+    },
+    "subprocess-designer-downloaded-template.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-downloaded-template.json",
+      "bytes": 2146,
+      "sha256": "73786724d721f75f9ef80e65588e920912d553d7fca4af1da53aae1e5660a2ad"
+    },
+    "subprocess-designer-download-receipt.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-download-receipt.json",
+      "bytes": 866,
+      "sha256": "4179cbf9441cda179fadca9a919fa7c171f7c2aca6f1bbfd7584591f2469cfeb"
+    },
+    "subprocess-designer-final-input.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-final-input.json",
+      "bytes": 400,
+      "sha256": "e3786aca82928625a5ee680b4b7dcb9fa8e43ce902c8293ad490fb10b40e3871"
+    },
+    "subprocess-designer-database-check.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-database-check.json",
+      "bytes": 215,
+      "sha256": "357f66c0c38f95acff9e1880a7c433f6f230bfa7ce27476db29f5dfd00bf3f57"
+    },
+    "subprocess-designer-runtime-health.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-designer-runtime-health.json",
+      "bytes": 1291,
+      "sha256": "28ba95fa12aebbcedcae21df1bbe87a85a58d3e38e4172000b39b7fb796f9dbf"
+    }
+  }
+}

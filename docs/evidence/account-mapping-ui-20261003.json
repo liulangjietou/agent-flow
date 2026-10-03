@@ -1,0 +1,305 @@
+{
+  "recordedAt": "2026-10-03T05:13:35.682006+00:00",
+  "status": "PASS_WITH_REMAINING_FULL_F02_ACCEPTANCE",
+  "taskId": "F02",
+  "baselineCommit": "75e6d25d070229888fff31760f9975beb0275080",
+  "implementationCommit": "09d3ad33f7de17038da1539b0687a41f8463273e",
+  "verifiedCommit": "d3e2e66984953150286ea51e344e255fe1ea48c5",
+  "scope": [
+    "财务配置角色导航、法人币种筛选、草稿修订、三版本发布确认、不可变发布与草稿历史、生效记录",
+    "原请求结果未知时按原键恢复，主体隔离与全局编辑锁期间的只读刷新",
+    "授权凭证工作区投影原准备或原命令的科目身份、修订、定义摘要及 ERP 来源版本"
+  ],
+  "tests": {
+    "uniqueScoped": 110,
+    "web": 100,
+    "java": 10,
+    "postgresSubset": 3,
+    "postgresIsSubsetNotAdditionalUniqueTests": true,
+    "junitReports": {
+      "account-mapping-ui-io.agentflow.api.OpenApiContractTest-green.xml": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "account-mapping-ui-io.agentflow.expense.ExpenseSubmissionIntegrationTest-green.xml": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "account-mapping-ui-postgres-20261003.xml": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 332,
+      "schemas": 662,
+      "requestExamples": 123
+    },
+    "javaAuthors": "Java files=1441, named types=2776, missing author tags=0, parse errors=0",
+    "frontendBuild": "PASS_WITH_EXISTING_LARGE_CHUNK_WARNING"
+  },
+  "redEvidence": [
+    {
+      "artifact": "account-mapping-evidence-red-20261003.xml",
+      "tests": 2,
+      "failures": 2,
+      "reason": "旧工作区缺少原科目选择投影；新断言先失败后实现。"
+    },
+    {
+      "artifact": "account-mapping-recovery-lock-red-20261003.log",
+      "tests": 44,
+      "failures": 1,
+      "reason": "模拟原请求恢复仍持有全局锁，已确认第二修订仍显示第一修订。费用制度对照用例原本通过，未改动其实现。"
+    }
+  ],
+  "browser": {
+    "artifact": "account-mapping-ui-browser-v4-20261003.json",
+    "checks": {
+      "mobileNoHorizontalOverflow": true,
+      "realDraftAndThreeVersionPublication": true,
+      "immutablePublishedAndDraftHistory": true,
+      "scopeActivationHistory": true,
+      "committedDraftLostReceiptOriginalKeyRecovery": true,
+      "financeWithoutConfigRoleDenied": true,
+      "noUnexpectedPageErrors": true
+    },
+    "visuallyInspected": [
+      "account-mapping-ui-v4-publish-desktop.png",
+      "account-mapping-ui-v4-publish-mobile.png",
+      "account-mapping-ui-v4-recovered-desktop.png"
+    ],
+    "harnessCorrections": [
+      "select 的标签包含选项文字，定位改为标签前缀",
+      "等待恢复按钮结束发送后再核对回执丢失注入次数"
+    ],
+    "implementationCorrections": [
+      "局部 header 与表单控件样式隔离全局 CSS，补隐藏 legend 样式",
+      "读取刷新不受全局编辑锁阻止，仍保留本地编辑基线、身份隔离和写入锁"
+    ]
+  },
+  "runtime": {
+    "backendSourceCommit": "09d3ad33f7de17038da1539b0687a41f8463273e",
+    "frontendSourceCommit": "d3e2e66984953150286ea51e344e255fe1ea48c5",
+    "metadata": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-runtime.json",
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-server.jar",
+    "jarSha256": "b3ef52c9b2260123bb731a6944a744e7837d1f4a3eb8f37c1974c74aa997f062",
+    "frontendDirectory": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-web-dist-v3",
+    "frontendSha256": {
+      "index.html": "aa6f5094f8f165321ee77e87967d63040b599e0d7732c3718a1493f90379c7f7",
+      "assets/index-DYl0PGPk.js": "f1402fe3d9c9724412896352e8519cfd27d3469aeb61707a409243fb7a8da774",
+      "assets/index-CNWvvx-W.css": "224f6b794a2c21665932f17a38a1ff534f5762955fe63b58cc8e82d13d9ce551"
+    },
+    "database": "mapping_ui_24d586ba86",
+    "backendPort": 18275,
+    "frontendPort": 15354,
+    "businessWorkersEnabled": false,
+    "upgrade": {
+      "at": "2026-10-03T05:07:08.713404+00:00",
+      "sourceDatabase": "expense_managed_255a048601",
+      "database": "mapping_ui_24d586ba86",
+      "beforeTables": 240,
+      "afterTables": 245,
+      "changedExistingTables": {
+        "flyway_schema_history": {
+          "before": {
+            "rows": 103,
+            "md5": "24a0c9b84234cd85b7508606a5543809"
+          },
+          "after": {
+            "rows": 104,
+            "md5": "415d1562e76421fc1ea80c785e9a5b3f"
+          }
+        }
+      },
+      "addedTables": [
+        "account_mapping_activation",
+        "account_mapping_draft",
+        "account_mapping_draft_revision",
+        "account_mapping_scope",
+        "account_mapping_version"
+      ],
+      "attachmentsPreserved": true,
+      "sourceUnchanged": true
+    }
+  },
+  "sources": {
+    "agentflow-server/src/main/java/io/agentflow/finance/VoucherWorkspace.java": "5fdea11ce1e5b4c560a344e5d6b5d109865efaf8b6fe56b19f7f39608996be09",
+    "agentflow-server/src/main/resources/api/openapi.json": "0e5ddba353ffaa62d5dde6a11d05d574d320ac823b67b0b0cef16e8d868df85a",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "4efb6779f84f9db193c94bdc5cacae1e21b0b6292be7fad7c65fb286fe1558ce",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java": "c49df3d4f2b7618549d117003c33b0fcba3bee1aa8425226561f92dded94eb80",
+    "agentflow-web/scripts/test-requests.mjs": "af9ada56d0bb4365f8e87b4c24d09b666dbcb2503172f357c8fc93134d3b9685",
+    "agentflow-web/src/App.vue": "25428ab14a6e78eaab453e50fe6f31bce5c334f0127f40809574813a217f50bd",
+    "agentflow-web/src/accountMappingDrafts.ts": "af4abf972b8811042ca3688adbb9540ce04c105b1334b8c3ceeb5350e1c71ce3",
+    "agentflow-web/src/accountMappings.ts": "5b4f26ba6ee1eaacb92aaa17ec0e769e8d2784658fa1617c2fc4aa2c565b7139",
+    "agentflow-web/src/api.ts": "c6a02e9eb82b450d43f1a660e8d71bd64dda9ba957fe16a6f05dc03b5a9c79f1",
+    "agentflow-web/src/components/AccountMappingEntries.vue": "e046367b1622315d681846de23e64cb71fba842ed7f85c31452d2c43a7ad5972",
+    "agentflow-web/src/components/AccountMappingHistory.vue": "8baef149701033b7c4cb071f7b5501caa33803e464e5d26fb7c00a0b778da3b6",
+    "agentflow-web/src/components/AccountMappingManager.vue": "d473114eeb0cf4b3b7cd77488c0afaeacecfd9e91d4650bd8970b471e42f3c43",
+    "agentflow-web/src/components/VoucherStatus.vue": "fce8e0ee093ca484052f9b0732961680e39a73272310c17b84449bd46b980750",
+    "agentflow-web/src/expenseConfigurationRead.ts": "3a73eac48ed144e4a45b811ecc958d28184f91b0ff3ea3768e8014de40f6c224",
+    "agentflow-web/src/vouchers.ts": "37076cb9b1013cb25ebdfc9a780a70a82b20cd248de7406b24afcd661edbe49d",
+    "agentflow-web/src/workspaceNavigation.ts": "b73c8eed9bef3bc4dbd18b3d49eece43e97e6dcd1d4ff334214bdd50b6b3ab62",
+    "agentflow-web/tests/account-mappings.test.mjs": "f88acbfecc28452b3c530a93a58a8c242685ccc0641903f67398f08ce047bda2",
+    "agentflow-web/tests/expense-configuration.test.mjs": "edfef2b8e39c15b1cafe9b865f216c280741d4e617eb0e64eb5e56df7de22ae9",
+    "agentflow-web/tests/vouchers.test.mjs": "4ed7f2d36b37ff64399196079f756c61e6ed00ba3536fa76009eae10989cf98c"
+  },
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot",
+  "artifacts": {
+    "account-mapping-web-final-20261003.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-web-final-20261003.log",
+      "sha256": "7480e3b8e2fcb5ed913c4c81e6a8f5567eaed7df06b254dcfb9d695d847440f2"
+    },
+    "account-mapping-web-build-v3-20261003.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-web-build-v3-20261003.log",
+      "sha256": "890363b86af1b9c5b20662b1ed5de0ebae36d7a3d086708c59d4097d208c29fe"
+    },
+    "account-mapping-ui-openapi-20261003.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-openapi-20261003.log",
+      "sha256": "007cb336f4ad7de39c2fe15640722a6a991e606370a5e1f44e7d370d1b44371b"
+    },
+    "account-mapping-ui-authors-20261003.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-authors-20261003.log",
+      "sha256": "fbdebdfca0fcaa0fa8351173ab42abc21f89d571575d51f412e6804de054d56a"
+    },
+    "account-mapping-evidence-red-20261003.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-evidence-red-20261003.log",
+      "sha256": "9bf43015af375f8ac41d58b9fb91bf1121fc72a7a573ecdad4e0658cfd1589c2"
+    },
+    "account-mapping-evidence-red-20261003.xml": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-evidence-red-20261003.xml",
+      "sha256": "bb66eb753195577c0be59213c29fbb71945147c9f31603cdef17f9e3bcd1ccf6"
+    },
+    "account-mapping-evidence-green-20261003.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-evidence-green-20261003.log",
+      "sha256": "013fb57e315789fb5561292f71e5c771f67090dd6a59e4ce4e3f9000284a7002"
+    },
+    "account-mapping-recovery-lock-red-20261003.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-recovery-lock-red-20261003.log",
+      "sha256": "b3825bcda3e87318ea91ed38f407faf14d5f638e44fbd64fb48781c0d945aa0c"
+    },
+    "account-mapping-ui-io.agentflow.api.OpenApiContractTest-green.xml": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-io.agentflow.api.OpenApiContractTest-green.xml",
+      "sha256": "817771577d6e7f0df853a736e1dc4a7c47071a5974ab159646d003427861670c"
+    },
+    "account-mapping-ui-io.agentflow.expense.ExpenseSubmissionIntegrationTest-green.xml": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-io.agentflow.expense.ExpenseSubmissionIntegrationTest-green.xml",
+      "sha256": "6f511df484c5d7266db0d55b5b6efb054c841ff30659e2a1a7b1ad77f2d1c7cf"
+    },
+    "account-mapping-ui-postgres-20261003.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-postgres-20261003.log",
+      "sha256": "44477f8420ccfd7c08d3b38f52cd9c88938cf39620e76f9037779d15152df39e"
+    },
+    "account-mapping-ui-postgres-20261003.xml": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-postgres-20261003.xml",
+      "sha256": "2267244a6ff870b86d8ac919fc00ea99a258cd10a5f28a3a478c42559734b659"
+    },
+    "account-mapping-ui-postgres-database.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-postgres-database.json",
+      "sha256": "940b73a195188ab85bc203394fdcef855e5f3665f5bb50a89bcfb21188208828"
+    },
+    "account-mapping-ui-startup-preservation.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-startup-preservation.json",
+      "sha256": "646482c73f2f4bf72e2ffe453970d82ce68a7755eee6abb6ad0d983ca7209208"
+    },
+    "account-mapping-ui-runtime.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-runtime.json",
+      "sha256": "ca7ac5fb33b5627b9c7049a1e1e649fa08d5f0d0cac48e351163605f7c845fa6"
+    },
+    "account-mapping-ui-browser-20261003.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-browser-20261003.json",
+      "sha256": "0cc9b065c6af8e4faeeb1cc582e1cf610461364c7457e0ba47117827d916898c"
+    },
+    "account-mapping-ui-browser-v2-20261003.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-browser-v2-20261003.json",
+      "sha256": "cafaa4000aa3f223c2d4e458670d2d8f502f3a02134c64c5e6efb3b926ae7635"
+    },
+    "account-mapping-ui-browser-v3-20261003.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-browser-v3-20261003.json",
+      "sha256": "03c18871adf7b625d759af71eb1503a618f46c04db24cca8c3c6885e4659dd0b"
+    },
+    "account-mapping-ui-browser-v4-20261003.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-browser-v4-20261003.json",
+      "sha256": "8732e0fc29514ef8bfb0cda6e7c8f4f312df3598ccf57995d995263b1cc3d14b"
+    },
+    "account-mapping-ui-browser-v4-20261003.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-browser-v4-20261003.log",
+      "sha256": "51f4639e2ba9a1f2cdef2fb622c9189af4a03a1e6f31e38bc9a927d47371a483"
+    },
+    "account-mapping-ui-browser-v4.py": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-browser-v4.py",
+      "sha256": "f27ae2cd3bd2b19fada32d3f895bd2afc64b0a598b3fbd7c7eab9e134cff4ad7"
+    },
+    "account-mapping-ui-http-v4-20261003.json": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-http-v4-20261003.json",
+      "sha256": "e8b513826f5ad1bdc29d3c78de46b07d96655ce307978412e6bcb118edc024b8"
+    },
+    "account-mapping-ui-v4-publish-desktop.png": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-v4-publish-desktop.png",
+      "sha256": "cff12f8ee7493ec3859a6a6ec6066debd38b7feb7e51bdd3303a7c0ff1c9accf"
+    },
+    "account-mapping-ui-v4-publish-mobile.png": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-v4-publish-mobile.png",
+      "sha256": "667e92f05169ea308a56819308d853bfae76713cc72f0f25931361f2f66e1282"
+    },
+    "account-mapping-ui-v4-recovered-desktop.png": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-v4-recovered-desktop.png",
+      "sha256": "74d8d4dda990ac7d805500ddb8cc84d4f41d79af44a04a4cbff8713163f170f9"
+    },
+    "account-mapping-ui-browser-failure.png": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-browser-failure.png",
+      "sha256": "0b47350587c5ab05e3943ac11a994ec3fd06f3deec118b7de89d59eddd9c03b7"
+    },
+    "account-mapping-ui-browser-v3-failure.png": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-browser-v3-failure.png",
+      "sha256": "3e60b1c40a783cc4389e58db5d812b6d85a568d2a9aa9e980baffb73f63c932b"
+    },
+    "prepare-account-mapping-ui-runtime.py": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/prepare-account-mapping-ui-runtime.py",
+      "sha256": "48d1d0e06d8ab20046bbd986aafe67f2fe4433496796c478a274203eb69cef2a"
+    },
+    "run-account-mapping-ui-runtime.py": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/run-account-mapping-ui-runtime.py",
+      "sha256": "dbbaec8979828cb27dcb164a3dab1570a21a869b8c3fae75a596850224b0f664"
+    },
+    "run-account-mapping-ui-postgres.py": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/run-account-mapping-ui-postgres.py",
+      "sha256": "4b5470381d43c4e5b7958daa92cfb135cf10dfe5071a0debd4ff93d8bc00839f"
+    },
+    "account-mapping-ui-preview-v3.mjs": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/account-mapping-ui-preview-v3.mjs",
+      "sha256": "0c37f897e6efdb767ea4a29ee3af2971a301937ffab9b4c4a7d47554aa688752"
+    },
+    "expense_managed_client.py": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-ui-evidence-snapshot/expense_managed_client.py",
+      "sha256": "16595362cdf5de994c9a0f3def976dff70bb84d0a53096928393c4d4fb2fb067"
+    }
+  },
+  "remaining": [
+    "当前固定包批准到映射准备、ERP 原回执与凭证摘要的实际 HTTP 和页面闭环",
+    "缺项、错误版本、准备期间发布竞争的固定安装包验收",
+    "同安装包在排队或处理中重启、旧记录接续与数据库和原件配套恢复",
+    "F02 完整验收后才可关闭任务，F13 随后接续；企业 ERP 联调仍由 E06 验收"
+  ],
+  "delivery": {
+    "localDevelopmentOnly": true,
+    "originConfigured": "https://github.com/liulangjietou/agent-flow.git",
+    "prCreatedByThisPhase": false,
+    "remoteDeliveryTask": "E15 depends on V02"
+  },
+  "taskLedger": {
+    "knownOpenTaskCount": 38,
+    "byKind": {
+      "LOCAL_DEVELOPMENT": 20,
+      "LOCAL_VERIFICATION": 3,
+      "EXTERNAL_ACCEPTANCE": 15
+    },
+    "completeInventory": false
+  }
+}

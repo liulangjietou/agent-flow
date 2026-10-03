@@ -1,0 +1,79 @@
+{
+  "status": "PASS_ATOMIC_RESOURCES_AND_CONSECUTIVE_ADJUSTMENTS",
+  "date": "2026-09-30",
+  "runtimeSchemaUnchanged": 82,
+  "testSchema": 84,
+  "publicPartialExpenseWorkflowComplete": false,
+  "backgroundExecutionImplemented": false,
+  "tests": {
+    "newCompletionIntegration": 7,
+    "relatedDomain": 39,
+    "h2Server": 86,
+    "postgresqlServer": 86,
+    "financialResourceRepository": 16,
+    "expenseSubmissionAndReversals": 62,
+    "nonemptyMigration": 1,
+    "crossBusinessInvoiceClaims": 7,
+    "failures": 0,
+    "errors": 0,
+    "scopesOverlap": true
+  },
+  "initialMissingCapability": "expense-partial-completion-red.log: integration tests could not compile before the completion service and repository entry point existed",
+  "green": [
+    "expense-partial-completion-second-h2.log",
+    "expense-partial-completion-consecutive-h2.log",
+    "expense-partial-completion-regression-h2.log",
+    "expense-partial-completion-v84-postgres.log"
+  ],
+  "atomicity": [
+    "Original application/report lock, stable resource locks and a single transaction for all local effects",
+    "Exact original consumption, preceding net amount and current delta required for each resource",
+    "Invoice release, prior quota, advance offset, complete bank-entry consumption and accepted completion commit together",
+    "Failure at the final advance journal rolls back earlier invoice and prior-quota effects",
+    "Failure at the final adjustment revision rolls back resource effects and all completion markers",
+    "Two concurrent completion callers and repeated stale candidates produce only one resource effect",
+    "Incorrect difference or unrelated resource-state change is rejected",
+    "Generic state update cannot fabricate resource completion"
+  ],
+  "immutableProof": [
+    "Dedicated partial resource journal references actual adjacent resource revisions",
+    "Dedicated completion references actual before/after adjustment revisions and the original accepted budget/accrual observations",
+    "Bank entry consumption references the recorded completion revision",
+    "Historical completion reads validate the accepted transition and compatible source evidence",
+    "Any completed historical adjustment under review blocks later new effects, including a dispute older than the immediate predecessor"
+  ],
+  "consecutiveAdjustments": {
+    "originalExpense": "100.00",
+    "remainingExpense": ["80.00", "60.00", "0.00"],
+    "newBankReturns": ["20.00", "20.00", "10.00"],
+    "priorQuotaDeltas": ["20.00", "20.00", "60.00"],
+    "finalAdvanceRestored": "50.00",
+    "originalConsumptionRetained": "100.00",
+    "invoiceReleasedOnce": true,
+    "allThreeCompletedBankEntriesRemainDistinct": true
+  },
+  "zeroPayable": {
+    "originalOffset": "100.00",
+    "remainingOffset": "80.00",
+    "advanceOutstandingAfter": "120.00",
+    "bankWrites": 0,
+    "fabricatedBankEntries": 0
+  },
+  "migration": {
+    "steps": ["82-to-83", "83-to-84"],
+    "v84NewTables": 2,
+    "oldFinancialTablesCompared": 10,
+    "existingAdjustmentAndCommandRowsPreserved": true,
+    "repeatNoOpAndValidationPass": true,
+    "h2AndPostgreSql": true,
+    "longLivedRuntimeUpgradePerformed": false
+  },
+  "authorCheck": {"files": 1109, "namedTypes": 2119, "missing": 0, "parseErrors": 0},
+  "remaining": [
+    "Durable preparation and fresh source/period evidence",
+    "Independent finance authorization services, background writes, original-id queries and local completion recovery",
+    "Explicit dispute decisions, current role/field access, APIs, audit and UI",
+    "Long-lived runtime upgrade, actual HTTP/browser/restart and archive/file preservation acceptance",
+    "Real enterprise budget and ERP integration"
+  ]
+}

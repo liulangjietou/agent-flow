@@ -1,0 +1,131 @@
+{
+  "recordedAt": "2026-10-01T10:25:58.461332+00:00",
+  "status": "NATIVE_START_VERIFIED_LIFECYCLE_INCOMPLETE",
+  "baseCommit": "bd002f920e652dd9cf705214f1c185d383f5899a",
+  "scope": "Actual fixed-version native child start with separate platform applications and rounds; publication remains gated",
+  "compile": "PASS",
+  "tests": {
+    "domainScopePassed": 32,
+    "earlierH2ServerScopePassed": 17,
+    "h2RegressionPassed": 72,
+    "newStartCases": 10,
+    "postgresStartCasesPassed": 10,
+    "scopesOverlap": true,
+    "h2Suites": [
+      {
+        "suite": "io.agentflow.api.OpenApiContractTest",
+        "tests": 6
+      },
+      {
+        "suite": "io.agentflow.approval.ApplicationResubmissionIntegrationTest",
+        "tests": 14
+      },
+      {
+        "suite": "io.agentflow.approval.CountersignPolicyIntegrationTest",
+        "tests": 12
+      },
+      {
+        "suite": "io.agentflow.approval.EventWaitIntegrationTest",
+        "tests": 15
+      },
+      {
+        "suite": "io.agentflow.approval.SubprocessStartIntegrationTest",
+        "tests": 10
+      },
+      {
+        "suite": "io.agentflow.approval.TimerWaitIntegrationTest",
+        "tests": 9
+      },
+      {
+        "suite": "io.agentflow.approval.copy.ApplicationCopyIntegrationTest",
+        "tests": 6
+      }
+    ]
+  },
+  "postgres": {
+    "database": "subprocess_start_43b2390e8a",
+    "status": "PASS",
+    "existingDatabasesModified": false,
+    "pid": 68121,
+    "exitCode": 0,
+    "databaseEvidence": {
+      "schemaVersion": "89",
+      "applications": 18,
+      "rounds": 17,
+      "calls": 8,
+      "parentRoundBindings": 8,
+      "childRoundBindings": 8,
+      "nativeCallBindings": 8,
+      "childAuditRecords": 16,
+      "logicalChildAttachments": 1,
+      "physicalAttachments": 1,
+      "attachmentProvenance": 1,
+      "nativeProcessHistory": 17,
+      "secondParentRoundCalls": 1
+    }
+  },
+  "verified": [
+    "first submission creates separate child identity and actual human task",
+    "published newer version does not change child binding",
+    "later activation inherits the original initiator snapshot",
+    "nested native calls persist intermediate applications before continuing",
+    "real uploaded attachment receives separate child reference and round grant",
+    "failure after child persistence rolls back root submission and all new business rows and instances",
+    "disabled original version rolls back parent decision",
+    "native variable inheritance and a wrong called version are rejected",
+    "changed engine payload cannot override authoritative parent data",
+    "new parent submission round is bound without changing withdrawn history",
+    "public create and validation refuse incomplete subprocess runtime"
+  ],
+  "testFixtureCorrections": [
+    "Use ProcessInstanceQuery.superProcessInstanceId because ProcessInstance has no getSuperProcessInstanceId in pinned Flowable 7.2.0",
+    "Inject persistence failure on the underlying spy target to preserve mandatory transaction proxy",
+    "Use an isolated tenant for the initialized organization scenario; do not depend on test order or demo directory fallback"
+  ],
+  "postTestSourceEdits": "Comments and removal of one unused import only",
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionModels.java": "fe61987e136f58390df59c45386446037055f7316df615023480cbb942e0957e",
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java": "627fca2fb2545e9c8b281be9f0b371965af0ded60156f0c740a1c668b1d01d42",
+    "agentflow-server/src/main/java/io/agentflow/approval/SubprocessStartService.java": "d3e9a01be361a3cd44c6dd5f6252c3267c800a98195c359ee577cc5edb9d5935",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableSubprocessStartInterceptor.java": "b404cf71d8c00d63ebc985626d61d50bd4495bd00413669fc4125fac839ad908",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/SubprocessStartConfiguration.java": "ff8ef3b2d33ede80d72301f517e1e7c29f500cda4f816e17e0f4ce8d360e090e",
+    "agentflow-server/src/test/java/io/agentflow/approval/SubprocessStartIntegrationTest.java": "b5967546b64bcd74b5132fb4a8a2327b48e6cfa05509b1522dc186063c22e65e"
+  },
+  "logs": {
+    "subprocess-native-compile.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-native-compile.log",
+      "sha256": "a8e00bcee30e4a28e9e5b45a4bfd87712fa7c91fb38eba7bb6c08f52adc72aa1"
+    },
+    "subprocess-native-start-h2-final.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-native-start-h2-final.log",
+      "sha256": "26067664d441961abe8199dd4c7489253251a41bc7cdd340c4c2158ba35dd41b"
+    },
+    "subprocess-native-start-h2-regression-final.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-native-start-h2-regression-final.log",
+      "sha256": "a230fc9f28abaef1733e106e29f885eb93bac851ba502f0ae2c349613feba2e9"
+    },
+    "subprocess-native-start-postgres.log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/subprocess-native-start-postgres.log",
+      "sha256": "c0782a66f913c6b497c867fa1ce84aaa2e74ec51b7a7ced92c8131afc6411c61"
+    }
+  },
+  "existingRuntimeChanged": false,
+  "currentAcceptanceSchema": 88,
+  "testSchema": 89,
+  "newMigration": false,
+  "actualBrowserAcceptance": false,
+  "restartAcceptance": false,
+  "remoteDelivery": false,
+  "remaining": [
+    "child approval and actual parent completion in one transaction",
+    "root-to-leaf locks across lifecycle entrypoints",
+    "negative results, withdrawal and audited termination of descendants",
+    "coordinated pause/resume, remaining SLA, timers and events",
+    "child pending notifications and parent advancement notifications",
+    "dependency/publication validation, designer, templates, authorized parent-child views and OpenAPI",
+    "actual HTTP/browser/upgrade/restart acceptance",
+    "template download receipt",
+    "expired local test TLS certificate verification",
+    "other advanced workflow, collaboration, real enterprise finance/model/IdP/production and remote delivery"
+  ]
+}

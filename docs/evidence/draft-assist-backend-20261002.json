@@ -1,0 +1,168 @@
+{
+  "stage": "BACKEND_AND_API_VERIFIED_UI_PENDING",
+  "recordedDate": "2026-10-02",
+  "baseCommit": "24fc1f2ff1ecb96c212bdce471b22c3e89c2b105",
+  "summaryEligibilityFixCommit": "3e7d64d9da9ea98928cedf36d0e8f2a71ede1918",
+  "scope": "普通已保存版本化表单申请的草稿建议后台、原申请人接口与持久化；不代表页面或整个 Agent 工作包完成",
+  "remainingTopLevelItems": 6,
+  "overallGoalComplete": false,
+  "verified": [
+    "明确说明及已有字段选择，敏感字段、附件及含受限列整表排除",
+    "每字段来源、目标及类型约束，错误模型输出拒绝",
+    "模型事务外执行，领取及发送前目标复核，超时与晚到结果不重发",
+    "原申请人、管理员不可绕过、跨申请与跨租户拒绝、读取禁止缓存",
+    "原版本采纳，部分修改保留未选值与模型原文，放弃不改申请",
+    "申请修改、审计、建议与幂等保存原子回滚，原键恢复",
+    "并发领取唯一执行人，采纳与手工修改竞争只成功一次",
+    "草稿、在审阻断、撤回新版本；旧无表单申请拒绝",
+    "V98到V99非空迁移保持旧申请、摘要和外发授权，无自动生成，租户与状态约束",
+    "原摘要权限撤销结算失败，不回滚失败记录"
+  ],
+  "validations": {
+    "javaH2": {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-backend-regression.log",
+      "sha256": "cdce877b11e545e4a4ea19f148ea8effdf05f128a5b2b20f713e76308ac1b16d",
+      "tests": [
+        {
+          "name": "io.agentflow.agent.DraftAssistRunTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "io.agentflow.organization.ApprovalProxyTaskReadIntegrationTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "io.agentflow.agent.AssistConfigurationTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "io.agentflow.agent.DraftAssistMigrationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "io.agentflow.agent.AssistExecutionIntegrationTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "io.agentflow.agent.AssistSchedulingTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "io.agentflow.agent.DraftAssistIntegrationTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "io.agentflow.api.OpenApiContractTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "total": 59
+    },
+    "postgresql": {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-postgres-5cc0017351.log",
+      "sha256": "575426784f9ad4e36d61edd2eee71e4f001a4edf7283828d75bac83464c92011",
+      "tests": [
+        {
+          "name": "io.agentflow.agent.DraftAssistMigrationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "io.agentflow.agent.AssistExecutionIntegrationTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "name": "io.agentflow.agent.DraftAssistIntegrationTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "total": 27
+    },
+    "postgresDatabases": {
+      "test": "draft_test_5cc0017351",
+      "migration": "draft_migration_5cc0017351",
+      "summary": "draft_summary_5cc0017351"
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 302,
+      "schemas": 602,
+      "requestExamples": 115
+    },
+    "uniqueJavaCases": 59,
+    "note": "PostgreSQL 27 项是 H2 范围的重复执行，不累计为独立用例。"
+  },
+  "redGreen": [
+    {
+      "test": "AssistExecutionIntegrationTest.revokedEligibilitySettlesFailureWithoutRollingBackTheClaim",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/assist-eligibility-rollback-red-test.log",
+      "red": "UnexpectedRollbackException",
+      "cause": "任务读取事务将预期失权异常传播给外层领取事务，使失败状态回滚",
+      "fix": "在任务读取事务内将资格不可用转换为布尔结果；调用方保留原权限要求"
+    },
+    {
+      "test": "DraftAssistIntegrationTest.disablingModelAfterClaimReturnsStableUnavailableWithoutSending",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/draft-assist-disabled-target-red.log",
+      "red": "DomainException escaped instead of stable ModelFailure",
+      "cause": "领取之后停用模型的配置异常未转换为模型端口失败分类",
+      "fix": "发送前配置不可用统一返回 MODEL_UNAVAILABLE"
+    }
+  ],
+  "fixtureCorrections": [
+    "首轮草稿预编号误断言为0，改为保持原轮次且未创建流程实例",
+    "沿用不可编辑状态的422规则",
+    "MockMvc 故障注入直接抛出 ServletException，核对原事务回滚后再原键恢复",
+    "审计查询使用真实 audit_event 存储"
+  ],
+  "manualReview": [
+    "领域拥有建议状态与目标校验；应用层编排申请、审计与模型队列",
+    "真实发送仅用受控配置与冻结来源；模型输出不解释为动作",
+    "锁顺序与乐观版本保护人工修改，读取不依赖管理员豁免"
+  ],
+  "migrationsAdded": [
+    "V99__draft_assist_runs.sql"
+  ],
+  "existingRuntimeUpgraded": false,
+  "mainChanged": false,
+  "remoteConfigured": false,
+  "pullRequest": null,
+  "pending": [
+    "草稿页面：目的地与来源选择、字段逐项核对和保存",
+    "身份切换、迟到响应和原请求恢复的前端验证",
+    "运营指标口径核对",
+    "独立运行副本升级、实际 HTTP／浏览器与重启接续",
+    "票据抽取与预检建议及结构化财务业务 Agent 入口"
+  ]
+}

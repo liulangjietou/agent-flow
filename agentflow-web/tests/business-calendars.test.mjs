@@ -80,3 +80,22 @@ test('模拟浏览器不支持服务端时区别名时回退为明确 UTC 值', 
   t.mock.method(Intl, 'DateTimeFormat', function () { throw new RangeError('Unsupported time zone') })
   assert.equal(calendarInstant('2026-09-29T02:30:00Z','SystemV/EST5EDT'),'2026-09-29T02:30:00Z（UTC；浏览器无法显示 SystemV/EST5EDT）')
 })
+
+test('设计器日历查询使用只读接口与固定修订，取消信号和分页游标完整传递', async () => {
+  globalThis.localStorage = { getItem: () => 'designer-calendar-token' }
+  const { api } = await import(process.env.AGENTFLOW_TEST_API)
+  const requests = [], controller = new AbortController()
+  globalThis.fetch = async (url, init) => { requests.push({ url, ...init }); return Response.json({ items: [] }) }
+  await api.definitionCalendars('a+/=', controller.signal)
+  await api.definitionCalendarVersions('one/id', 2, controller.signal)
+  await api.definitionCalendarVersion('one/id', '1', controller.signal)
+  assert.equal(new URL(requests[0].url, 'http://localhost').searchParams.get('afterKey'), 'a+/=')
+  assert.match(requests[1].url, /\/process-definitions\/calendar-options\/one%2Fid\/versions\?beforeRevision=2&limit=30$/)
+  assert.match(requests[2].url, /\/process-definitions\/calendar-options\/one%2Fid\/versions\/1$/)
+  for (const request of requests) {
+    assert.equal(request.signal, controller.signal)
+    assert.equal(request.headers.get('Authorization'), 'Bearer designer-calendar-token')
+    assert.equal(request.headers.has('Idempotency-Key'), false)
+    assert.equal(request.body, undefined)
+  }
+})

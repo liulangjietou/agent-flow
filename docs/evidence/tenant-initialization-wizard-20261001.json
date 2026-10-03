@@ -1,0 +1,235 @@
+{
+  "recordedAt": "2026-10-01T22:27:58.499898+00:00",
+  "status": "LOCAL_ACCEPTANCE_PASSED",
+  "backendCommit": "3fa3e18574a699f95892790bfe367b3e32ede821",
+  "worktree": "/fyoung/tmp/agentflow-governance-identifier-integration",
+  "branch": "codex/governance-identifier-integration",
+  "syntheticLocalAcceptanceOnly": true,
+  "feature": "租户初始化五步向导、原请求恢复和首条流程",
+  "frontend": {
+    "tests": 64,
+    "testFiles": [
+      "tenant-initialization.test.mjs",
+      "first-workflow.test.mjs",
+      "notification-preferences.test.mjs",
+      "requests.test.mjs",
+      "business-calendars.test.mjs"
+    ],
+    "newInitializationTests": 13,
+    "typecheck": "PASS",
+    "build": "PASS",
+    "existingLargeChunkWarning": true
+  },
+  "backendStageEvidence": "tenant-initialization-backend-20261001.json",
+  "actualContracts": {
+    "status": "PASS",
+    "files": {
+      "tenant-initialization-browser-responses.json": {
+        "responses": 92,
+        "successfulRequests": 0
+      },
+      "tenant-initialization-http-existing.json": {
+        "responses": 14,
+        "successfulRequests": 7
+      },
+      "tenant-initialization-http-old-workflow.json": {
+        "responses": 6,
+        "successfulRequests": 1
+      },
+      "tenant-initialization-http-restart3.json": {
+        "responses": 3,
+        "successfulRequests": 0
+      }
+    },
+    "totalResponses": 115,
+    "originalWriteRequests": 4,
+    "originalRecoveryPairs": 2
+  },
+  "browser": {
+    "newTenant": "init-wizard",
+    "newWorkflow": "wizard-leave",
+    "businessNo": "APP-1790893135391",
+    "initializationOrganizationAndCalendarCreated": true,
+    "templateConfiguredAndPublishedThroughUi": true,
+    "applicationSubmittedWithInitializedAppointment": true,
+    "actualManagerApprovalAfterRestart": true,
+    "firstWorkflowProgressAllFourStepsCompleted": true,
+    "existingTenant": "demo",
+    "existingFixturePreparation": "通过公开 API 准备本人已有任职和两版日历，初始化采用过程由真实页面完成",
+    "originalCalendarVersionSelected": 1,
+    "latestCalendarVersionPreserved": 2,
+    "existingPersonApprovalEligiblePreserved": false,
+    "organizationAndCalendarTablesUnchangedByAdoption": true,
+    "draftPreservedAcrossPageNavigation": true,
+    "baselineChangeRequiresExplicitReview": true,
+    "twoLostResponsesRecoveredWithOriginalKeysAndBodies": true,
+    "narrowViewportCssPixels": 500,
+    "narrowDocumentWidth": 480,
+    "narrowClientWidth": 480,
+    "viewportOverrideReset": true,
+    "faultInterceptionCleared": true
+  },
+  "bugs": [
+    {
+      "problem": "原请求恢复后残留结果未知提示",
+      "cause": "读取完成记录时未清除页面上一次写入错误",
+      "reproduction": "真实响应 201 后注入连接失败并恢复；补充原恢复测试断言，12 通过、1 失败",
+      "fix": "仅在读到已完成初始化事实时清除旧写入错误和待核对标记",
+      "verification": "64 项范围测试通过；第二个租户真实恢复后 alert 为空"
+    },
+    {
+      "problem": "窄屏标题与完成记录重叠",
+      "cause": "组件 header 继承全局导航栏的固定高度与内边距",
+      "reproduction": {
+        "buttonBottom": 467.3645935058594,
+        "headerHeight": 58,
+        "nextTop": 408.1145935058594,
+        "overlaps": true,
+        "viewport": 500
+      },
+      "fix": "在向导局部样式恢复自适应高度和独立内边距",
+      "verification": {
+        "buttonBottom": 467.3645935058594,
+        "clientWidth": 480,
+        "documentWidth": 480,
+        "headerHeight": 140.25,
+        "nextTop": 490.3645935058594,
+        "overlaps": false,
+        "viewport": 500
+      }
+    }
+  ],
+  "runtime": {
+    "database": "tenant_initialization_runtime_054c2beaf4",
+    "sourceDatabase": "submission_risk_runtime_dedd014b96",
+    "backendPort": 18252,
+    "frontendPort": 15339,
+    "jarSha256": "a5a5a8c6386429707367802e1c1c6ac69e2d1daecc1c55146ea14474803f218a",
+    "boot": 4,
+    "demoTenant": "demo"
+  },
+  "upgrade": {
+    "recordedAt": "2026-10-01T22:15:05.055187+00:00",
+    "oldVersion": 94,
+    "newVersion": 95,
+    "sourceTables": 225,
+    "sourceRows": 2472,
+    "changedBusinessTables": [],
+    "newTables": [
+      "tenant_initialization"
+    ],
+    "oldFilesPreserved": 3,
+    "sourceUnchanged": true,
+    "oldTenantsInitialized": false
+  },
+  "restarts": [
+    {
+      "number": 1,
+      "tables": 226,
+      "rows": 2545,
+      "files": 3,
+      "allTablesAndFilesUnchanged": true
+    },
+    {
+      "number": 2,
+      "tables": 226,
+      "rows": 2538,
+      "files": 3,
+      "allTablesAndFilesUnchanged": true
+    },
+    {
+      "number": 3,
+      "tables": 226,
+      "rows": 2555,
+      "files": 3,
+      "allTablesAndFilesUnchanged": true
+    }
+  ],
+  "priorV94Workflow": {
+    "applicationId": "b7f938d6-9c46-4db3-8fd7-24c4c9ec742f",
+    "taskId": "3e92dcb0-bddd-11f1-aa89-a2790d9f0460",
+    "status": "APPROVED",
+    "originalRoundAndRiskPreserved": true
+  },
+  "delivery": {
+    "mainUnchanged": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+    "gitRemoteConfigured": false,
+    "pullRequest": null,
+    "remoteCi": null
+  },
+  "remaining": "至少六类：组织审批规则、Agent 其余能力、组织同步与电子签、真实通知、真实财务接口、企业环境及远端交付。全量原需求证据映射继续。",
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-wizard-tests-final.log",
+      "sha256": "4b61b82a2aea32a82279af7a153835552f19223e22a1b6a0d1af8728cdb20a6f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-wizard-build-accepted.log",
+      "sha256": "6a0d772fb778e222d4394ca009da1ee49cb1f7146ec49c00038b85905e68b473"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-contracts.json",
+      "sha256": "f037d0247c3d5d01ca4deeca2e62c8eb424b5d0ab536c47651b8536b702dc12e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-upgrade.json",
+      "sha256": "4b9f6e89bca2cd152378257d809cf12088776916d8d73cb33592e06fd8ebf6f2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-browser-original-writes.json",
+      "sha256": "790c4b0a7b0362abf50b37afc50daf23b676c051a928d3f9f69a4ef4cee01044"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-existing-before.json",
+      "sha256": "7abd1f6598f25bc55f20d909205c7a933ff9e5174e1fab4cb77862fe05034847"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-existing-after.json",
+      "sha256": "58038d4cfc5c47b6b646d4ec8a1002deed00013ad9ff7130fda907833a582314"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-header-before.json",
+      "sha256": "b91e75b8bbf8de23d06a431b913e72e431d1510063170f59f2fa3857f4207672"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-header-after.json",
+      "sha256": "018704a88cf256fae0f738a1478d82d53c06e7772b8fdc4b315a955029cd426b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-final.png",
+      "sha256": "1b14a686499e46c15ea9058f1c9a40713181c29aab1474a6a3c0cb66d91c958c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-first-workflow.png",
+      "sha256": "ae437636b784a376409e67799993cf6d8a6ee8b9bce6f8556ab0590628256805"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-existing-500-fixed.png",
+      "sha256": "ee620e9641cc022abbd7328c48250ade6c4625dfad226d3501001745a45d25ec"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-restart1-before.json",
+      "sha256": "5d427f011c403d73e257cc33e35c6d75b05abfc8d4b69942499e2c4fc34f8459"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-restart1-after.json",
+      "sha256": "f51bcd6d16316bb0e008ecc34043f23f35b06e2f124247902762a5e25c261d53"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-restart2-before.json",
+      "sha256": "fbf1486763f20de82bc418d56cb1be2ac7b94a540bf43428ecad4941ae2439f8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-restart2-after.json",
+      "sha256": "8b636266920479da4e2b92544a7b68fe747b65ac1696e8093b8e5ed492cfae4d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-restart3-before.json",
+      "sha256": "26f6153566b9fa73c9fc542c1ff9a762bca00b4abaa7e45ce2c672348532eaad"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/tenant-initialization-restart3-after.json",
+      "sha256": "3b06ad291f1a3764c25d44cb0825ad70bee2fe10bafc57e0675a9cde9b06bc54"
+    }
+  ]
+}

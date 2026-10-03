@@ -22,6 +22,7 @@ public final class Application {
     private final String runtimeDefinitionId;
     private final NotificationTexts notificationTexts;
     private final String createdBy;
+    private final BusinessReference businessReference;
     private String title;
     private Map<String, Object> payload;
     private ApplicationStatus status;
@@ -59,6 +60,16 @@ public final class Application {
                 title, payload, ApplicationStatus.DRAFT, 1, 1, formSchema, runtimeDefinitionId, notificationTexts);
     }
 
+    /** 业务应用服务创建不可变结构化绑定；普通表单入口不能传入该引用。 */
+    public static Application draftBusiness(UUID id, String tenantId, String businessNo, String processKey,
+                                            long definitionVersion, String createdBy, String title, Map<String, Object> payload,
+                                            FormSchema formSchema, String runtimeDefinitionId, NotificationTexts notificationTexts,
+                                            BusinessReference businessReference) {
+        if (formSchema != null) formSchema.validateDraft(payload);
+        return new Application(id, tenantId, businessNo, processKey, definitionVersion, createdBy, title, payload,
+                ApplicationStatus.DRAFT, 1, 1, formSchema, runtimeDefinitionId, notificationTexts, Objects.requireNonNull(businessReference));
+    }
+
     /** 从仓储恢复聚合。 */
     public static Application restore(UUID id, String tenantId, String businessNo, String processKey,
                                       long definitionVersion, String createdBy, String title,
@@ -93,6 +104,15 @@ public final class Application {
                 title, payload, status, roundNo, version, formSchema, runtimeDefinitionId, notificationTexts);
     }
 
+    /** 结构化绑定从独立数据库列恢复，不由表单内容推断。 */
+    public static Application restore(UUID id, String tenantId, String businessNo, String processKey,
+                                      long definitionVersion, String createdBy, String title, Map<String, Object> payload,
+                                      ApplicationStatus status, int roundNo, long version, FormSchema formSchema,
+                                      String runtimeDefinitionId, NotificationTexts notificationTexts, BusinessReference businessReference) {
+        return new Application(id, tenantId, businessNo, processKey, definitionVersion, createdBy, title, payload,
+                status, roundNo, version, formSchema, runtimeDefinitionId, notificationTexts, businessReference);
+    }
+
     private Application(UUID id, String tenantId, String businessNo, String processKey, long definitionVersion,
                         String createdBy, String title, Map<String, Object> payload, ApplicationStatus status,
                         int roundNo, long version, FormSchema formSchema, String runtimeDefinitionId) {
@@ -103,6 +123,14 @@ public final class Application {
     private Application(UUID id, String tenantId, String businessNo, String processKey, long definitionVersion,
                         String createdBy, String title, Map<String, Object> payload, ApplicationStatus status,
                         int roundNo, long version, FormSchema formSchema, String runtimeDefinitionId, NotificationTexts notificationTexts) {
+        this(id, tenantId, businessNo, processKey, definitionVersion, createdBy, title, payload, status, roundNo, version,
+                formSchema, runtimeDefinitionId, notificationTexts, null);
+    }
+
+    private Application(UUID id, String tenantId, String businessNo, String processKey, long definitionVersion,
+                        String createdBy, String title, Map<String, Object> payload, ApplicationStatus status,
+                        int roundNo, long version, FormSchema formSchema, String runtimeDefinitionId,
+                        NotificationTexts notificationTexts, BusinessReference businessReference) {
         this.id = Objects.requireNonNull(id);
         this.tenantId = Objects.requireNonNull(tenantId);
         this.businessNo = require(businessNo, "businessNo");
@@ -112,6 +140,7 @@ public final class Application {
         this.runtimeDefinitionId = runtimeDefinitionId;
         this.notificationTexts = notificationTexts == null ? NotificationTexts.EMPTY : notificationTexts;
         this.createdBy = require(createdBy, "createdBy");
+        this.businessReference = businessReference;
         this.title = require(title, "title");
         this.payload = copyPayload(payload);
         this.status = Objects.requireNonNull(status);
@@ -122,25 +151,16 @@ public final class Application {
     /** 提交草稿并进入审批。 */
     public void submit(long expectedVersion) {
         checkVersion(expectedVersion);
-        if (status != ApplicationStatus.DRAFT && status != ApplicationStatus.RETURNED
-                && status != ApplicationStatus.WITHDRAWN) {
-            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be submitted");
-        }
+        int submittingRound = nextSubmissionRound();
         if (formSchema != null) formSchema.validateSubmission(payload);
-        if (status != ApplicationStatus.DRAFT) {
-            roundNo++;
-        }
+        roundNo = submittingRound;
         status = ApplicationStatus.IN_APPROVAL;
         version++;
     }
 
     /** 补正可编辑申请；提交时才递增轮次，原业务标识和定义版本保持不变。 */
     public void revise(long expectedVersion, String title, Map<String, Object> payload) {
-        checkVersion(expectedVersion);
-        if (status != ApplicationStatus.DRAFT && status != ApplicationStatus.RETURNED
-                && status != ApplicationStatus.WITHDRAWN) {
-            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be revised");
-        }
+        requireEditable(expectedVersion);
         String revisedTitle = require(title, "title");
         if (formSchema != null) formSchema.validateDraft(payload);
         Map<String, Object> revisedPayload = copyPayload(payload);
@@ -148,6 +168,35 @@ public final class Application {
         this.payload = revisedPayload;
         version++;
     }
+
+    /** 结构化业务在审批中更新派生路由；业务实体负责证明变化合法，原提交轮次不被覆盖。 */
+    public void adjustBusinessPayload(long expectedVersion, BusinessReference reference, Map<String, Object> payload) {
+        checkVersion(expectedVersion); requireInApproval();
+        if (businessReference == null || !businessReference.equals(reference)) {
+            throw new DomainException("USE_BUSINESS_ENDPOINT", "A matching structured business reference is required");
+        }
+        if (formSchema != null) formSchema.validateSubmission(payload);
+        this.payload = copyPayload(payload); version++;
+    }
+
+    /** 正文与附件共用可编辑状态，上传不能借草稿入口修改审批中的证据。 */
+    public void requireEditable(long expectedVersion) {
+        checkVersion(expectedVersion);
+        if (!editable()) {
+            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be revised");
+        }
+    }
+
+    /** 是否仍允许申请人修改本次内容；历史轮次始终不可变。 */
+    public boolean editable() { return status == ApplicationStatus.DRAFT || status == ApplicationStatus.RETURNED || status == ApplicationStatus.WITHDRAWN; }
+
+    /** 草稿已经预编号为第一轮；退回或撤回后才在下次提交时增加轮次。 */
+    public int nextSubmissionRound() {
+        if (!editable()) throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be submitted");
+        return status == ApplicationStatus.DRAFT ? roundNo : roundNo + 1;
+    }
+
+    public BusinessReference businessReference() { return businessReference; }
 
     /** 退回申请人并保留原轮次审计。 */
     public void returnToApplicant(long expectedVersion) {
@@ -180,6 +229,13 @@ public final class Application {
         version++;
     }
 
+    /** 记录等待节点推进、失败、重试及实例暂停恢复，不将运维动作伪装成人工审批意见。 */
+    public void recordRuntimeAction(long expectedVersion) {
+        checkVersion(expectedVersion);
+        requireInApproval();
+        version++;
+    }
+
     /** 申请人撤回未结束的申请。 */
     public void withdraw(long expectedVersion) {
         checkVersion(expectedVersion);
@@ -201,6 +257,19 @@ public final class Application {
         version++;
     }
 
+    /** 父调用停止时取消尚未决定的子申请；已经形成的结论不可被连带操作覆盖。 */
+    public void cancelWithParent(long expectedVersion) {
+        terminateApproval(expectedVersion);
+    }
+
+    /** 终止当前在审轮次并进入不可重提的终态；已形成的结论不可被运维操作覆盖。 */
+    public void terminateApproval(long expectedVersion) {
+        checkVersion(expectedVersion);
+        requireInApproval();
+        status = ApplicationStatus.CANCELLED;
+        version++;
+    }
+
     private void requireInApproval() {
         if (status != ApplicationStatus.IN_APPROVAL) {
             throw new DomainException("DOMAIN_RULE_VIOLATION", "Application is not in approval");
@@ -213,7 +282,8 @@ public final class Application {
         requireInApproval();
     }
 
-    private void checkVersion(long expectedVersion) {
+    /** 取锁后先核对原操作版本，避免并发结束的任务被误报为从未存在。 */
+    public void checkVersion(long expectedVersion) {
         if (version != expectedVersion) {
             throw new DomainException("CONCURRENCY_CONFLICT", "Application version has changed");
         }

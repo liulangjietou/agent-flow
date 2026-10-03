@@ -58,7 +58,7 @@ class SystemChecksIntegrationTest {
     }
 
     @Test
-    void administratorSeesRealChecksAndUnimplementedCapabilities() throws Exception {
+    void administratorSeesRealChecksAndDisabledAdapters() throws Exception {
         mvc.perform(get("/api/v1/system/checks").header("Authorization", token("admin")))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Cache-Control", "no-store"))
@@ -69,9 +69,13 @@ class SystemChecksIntegrationTest {
                 .andExpect(jsonPath("checks[?(@.id == 'flowable')].status").value("UP"))
                 .andExpect(jsonPath("checks[?(@.id == 'templates')].status").value("UP"))
                 .andExpect(jsonPath("checks[?(@.id == 'authentication')].code").value("DEMO_AUTH_ONLY"))
-                .andExpect(jsonPath("checks[?(@.id == 'notifications')].code").value("IN_APP_ONLY"))
+                .andExpect(jsonPath("checks[?(@.id == 'notifications')].code").value("NOTIFICATION_WORKER_DISABLED"))
                 .andExpect(jsonPath("checks[?(@.id == 'sessionStorage')].code").value("JDBC_SESSIONS_DISABLED"))
-                .andExpect(jsonPath("checks[?(@.status == 'NOT_IMPLEMENTED')]").value(org.hamcrest.Matchers.hasSize(3)));
+                .andExpect(jsonPath("checks[?(@.id == 'organization')].code").value("LOCAL_ORGANIZATION_NOT_INITIALIZED"))
+                .andExpect(jsonPath("checks[?(@.id == 'objectStorage')].code").value("ATTACHMENT_STORAGE_NOT_CONFIGURED"))
+                .andExpect(jsonPath("checks[?(@.id == 'model')].status").value("WARNING"))
+                .andExpect(jsonPath("checks[?(@.id == 'model')].code").value("AGENT_MODEL_DISABLED"))
+                .andExpect(jsonPath("checks[?(@.status == 'NOT_IMPLEMENTED')]").value(org.hamcrest.Matchers.empty()));
     }
 
     private String token(String username) {

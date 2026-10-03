@@ -1,0 +1,360 @@
+{
+  "recordedAt": "2026-09-28T03:29:00.792414+00:00",
+  "baseline": "d07c03c0fbc79206cc64a9c750754d1aa222d724",
+  "branch": "codex/governance-identifier-integration",
+  "scope": [
+    "initiator appointment frozen per submission round",
+    "dynamic supervisor and department head selection",
+    "node field visibility and masked read projections"
+  ],
+  "backendRegression": {
+    "tests": 114,
+    "domainTests": 42,
+    "serverTests": 72,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "database": "isolated H2",
+    "classes": [
+      {
+        "class": "io.agentflow.form.FormSchemaTest",
+        "tests": 33
+      },
+      {
+        "class": "io.agentflow.definition.DefinitionDiffServiceTest",
+        "tests": 9
+      },
+      {
+        "class": "io.agentflow.organization.OrganizationApprovalIntegrationTest",
+        "tests": 9
+      },
+      {
+        "class": "io.agentflow.organization.OrganizationIntegrationTest",
+        "tests": 7
+      },
+      {
+        "class": "io.agentflow.organization.OrganizationMigrationTest",
+        "tests": 2
+      },
+      {
+        "class": "io.agentflow.agent.AssistRunQueryIntegrationTest",
+        "tests": 21
+      },
+      {
+        "class": "io.agentflow.api.OpenApiContractTest",
+        "tests": 5
+      },
+      {
+        "class": "io.agentflow.approval.VersionedFormsIntegrationTest",
+        "tests": 15
+      },
+      {
+        "class": "io.agentflow.approval.PendingTaskQueueIntegrationTest",
+        "tests": 9
+      },
+      {
+        "class": "io.agentflow.approval.FormSchemaMigrationTest",
+        "tests": 1
+      },
+      {
+        "class": "io.agentflow.approval.FieldPermissionsIntegrationTest",
+        "tests": 3
+      }
+    ]
+  },
+  "frontendRegression": {
+    "tests": 94,
+    "failures": 0,
+    "scope": "affected request, form, organization and actual Vue component tests"
+  },
+  "redTest": {
+    "area": "form editor field type conversion",
+    "expected": "sensitive=true",
+    "actual": "sensitive missing",
+    "fix": "preserve sensitive and nodeAccess on field type conversion"
+  },
+  "openapi": {
+    "result": "PASS",
+    "operations": 85,
+    "schemas": 136,
+    "requestExamples": 30
+  },
+  "build": {
+    "java": "PASS after final source binding fix (Maven verify)",
+    "vueTypeScriptVite": "PASS",
+    "warning": "existing bundle larger than 500 kB"
+  },
+  "authors": {
+    "javaFiles": 345,
+    "namedTypes": 536,
+    "missingTags": 0,
+    "parseErrors": 0
+  },
+  "migration": {
+    "h2V26ToV28": "PASS with legacy data retained",
+    "postgresV27V28": "NOT_RUN: Docker daemon unavailable"
+  },
+  "realHttp": {
+    "result": "PASS",
+    "assertions": [
+      "selected appointment fixed to round",
+      "missing context rejected",
+      "dynamic supervisor assigned",
+      "manager raw amount and hidden note",
+      "admin masked amount",
+      "detail cell masked",
+      "amount filter cannot reveal restricted value"
+    ],
+    "requests": [
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/auth/login",
+        "actor": "finance",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/organization",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/organization/my-appointments",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/process-definitions/c76bafcb-5c12-4c96-9752-59bf859691cc/publish",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/applications",
+        "actor": "alice",
+        "status": 201
+      },
+      {
+        "method": "POST",
+        "path": "/applications/c4465c18-f5b4-4b40-81a9-50566c2f4511/submit",
+        "actor": "alice",
+        "status": 422
+      },
+      {
+        "method": "POST",
+        "path": "/applications/c4465c18-f5b4-4b40-81a9-50566c2f4511/submit",
+        "actor": "alice",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/applications/c4465c18-f5b4-4b40-81a9-50566c2f4511",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/applications/c4465c18-f5b4-4b40-81a9-50566c2f4511",
+        "actor": "admin",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/applications/c4465c18-f5b4-4b40-81a9-50566c2f4511/rounds",
+        "actor": "manager",
+        "status": 200
+      },
+      {
+        "method": "GET",
+        "path": "/workspace/tasks",
+        "actor": "manager",
+        "status": 200
+      }
+    ],
+    "timing": "Before final backend source binding fix"
+  },
+  "completionHttp": {
+    "result": "PASS",
+    "applicationId": "c4465c18-f5b4-4b40-81a9-50566c2f4511",
+    "steps": [
+      {
+        "actor": "manager",
+        "node": "直属主管审批",
+        "action": "APPROVE"
+      },
+      {
+        "actor": "finance",
+        "node": "部门负责人审批",
+        "action": "APPROVE"
+      }
+    ],
+    "finalStatus": "APPROVED",
+    "browserSubmitApplicationId": "9da901d5-9633-4b14-986d-2c41f15ffae8",
+    "browserSubmitRoundHasSelectedAppointment": true
+  },
+  "browser": {
+    "result": "PASS",
+    "origin": "http://127.0.0.1:15188",
+    "checks": [
+      "主管队列收到动态任职任务",
+      "主管详情隐藏备注并脱敏明细账号",
+      "管理员详情及轮次均脱敏",
+      "历史轮次显示固定任职",
+      "部门负责人配置显示指定任职",
+      "发布版本字段权限只读展示",
+      "浏览器选择任职并成功提交",
+      "主管和部门负责人实际批准后页面显示已批准"
+    ],
+    "timing": "Before final backend source binding fix; frontend unchanged; final fix covered by 45 automated tests"
+  },
+  "testServicesStopped": true,
+  "testDataRetained": true,
+  "mainUnchanged": "60bafa082b9d35a6802e846d8b96a09989ffa97d",
+  "mainDeploymentChanged": false,
+  "fullProjectSuiteRun": false,
+  "fullGoalComplete": false,
+  "remoteConfigured": false,
+  "pullRequest": null,
+  "remoteCi": "NOT_RUN",
+  "gitnexus": "Repository is not indexed; callers and read paths reviewed in source",
+  "files": [
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/final-scope-regression.log",
+      "sha256": "477a32266126541b759c94c1c3849bae73b5191364918a2031eeb89b4ad37b2e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/final-web-focused.log",
+      "sha256": "74d83fa2a95e1bcbef5600c1133440f197e87392c9171d080a255db0a7d8c72b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/final-package.log",
+      "sha256": "37d5ce8bd59fb3fb4771d6992267f8783e04fb187b9b7c760f0e79ed32140494"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/final-web-build.log",
+      "sha256": "1b1227662b51ab2265ada2dab0ab4bf09a9811e7b9f81853db5891e26df144d0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/final-openapi.log",
+      "sha256": "df01be0b543f821ed101bcbab38aaed591d43c2f0a061406a485126e9d7d8fe0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/final-authors.log",
+      "sha256": "3ac90c7fce128672ea80fa161008c67aa31a21aaf03c8168ea77c676e9659bf7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/field-editor-red.log",
+      "sha256": "e0cf51c582234727bcbbfe899ad58ecbbd25a319b4108e6928a2ae449ba00386"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-20260927/http-evidence.json",
+      "sha256": "f5f705e0d3ab8af5716a7f704e1b605c2b89f22f14304d715258bfc2335c119f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-20260927/completion-http-evidence.json",
+      "sha256": "fb575b02a48e92d6ff06cf7afa2023aeeaa76e451aceace22f7c178ec9644003"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-20260927/browser-evidence.json",
+      "sha256": "6e6debf3abae3be8f84a41eff67785bc8f44f2805369afbca82f554bb2f8d852"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-20260927/manager-fields.png",
+      "sha256": "5f545dcd776196ee8053ef692cca83efa9f87626c775f49c333fbd003f137856"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-20260927/admin-round-masked.png",
+      "sha256": "daa31ebb24bffcf7dea9206361dd7ce50cab3254fd41e1e50198fdd6713fd977"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-20260927/browser-submit.png",
+      "sha256": "38831ef3e09fd418450ad58bb92a48276106128e60a1f5e259174e88994387b0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-context-fields-20260927/browser-completed.png",
+      "sha256": "25f1cfbb3bd623326ffe41a033122c25c6a05910ebe75da20fab6debdaa18b17"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/context-binding-red.log",
+      "sha256": "1f35d16d0ce16f35bd4d0932016aa24b4226ad02c03877f7c2537c84c452e86a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/context-binding-regression.log",
+      "sha256": "3736e8991c0314e2663595ec206b42e712def1b0eed00272b29c35ad69e07894"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/context-binding-authors.log",
+      "sha256": "3ac90c7fce128672ea80fa161008c67aa31a21aaf03c8168ea77c676e9659bf7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-system-status-20260927/context-fields-doc-links.json",
+      "sha256": "a7a613dd4b9ef0fc6405dbbcbeb5cffa167ca9c6d081ad5af3dcb3bdf98c9a3c"
+    }
+  ],
+  "updatedAt": "2026-09-28T03:33:25.630772+00:00",
+  "followUpRegression": {
+    "tests": 45,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "overlapsEarlierRegression": true,
+    "scope": "bound definition context check after source resolution",
+    "classes": [
+      {
+        "class": "io.agentflow.organization.OrganizationApprovalIntegrationTest",
+        "tests": 10
+      },
+      {
+        "class": "io.agentflow.definition.DefinitionAvailabilityIntegrationTest",
+        "tests": 13
+      },
+      {
+        "class": "io.agentflow.approval.VersionedFormsIntegrationTest",
+        "tests": 15
+      },
+      {
+        "class": "io.agentflow.approval.BundledDefinitionBindingIntegrationTest",
+        "tests": 4
+      },
+      {
+        "class": "io.agentflow.approval.FieldPermissionsIntegrationTest",
+        "tests": 3
+      }
+    ]
+  },
+  "followUpRedTest": {
+    "tests": 1,
+    "failures": 1,
+    "expectedHttp": 200,
+    "actualHttp": 422,
+    "trigger": "later tenant dynamic definition with same key/version must not affect earlier bundled application",
+    "fix": "check context after resolving bound process source; reuse tenant definition lock"
+  },
+  "followUpPostgresEvidence": "organization-context-postgres-20260927.json"
+}

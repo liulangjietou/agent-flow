@@ -1,0 +1,141 @@
+{
+  "recordedAt": "2026-10-02T00:51:16.429356+00:00",
+  "stage": "报销任务代理的后台、组件与契约范围验证",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "53ffd8c430d3c04955034de8ed3aa9e03545c354",
+  "scope": [
+    "真实报销提交后的代理控制读取、纸质原件签收和财务核减",
+    "原生责任不因非最终签收或核减转交，实际办理人与原授权分别保留",
+    "财务核减先取得报销资源行锁，再锁内重新核实代理期限和当前资格",
+    "代理人自己的 FINANCE 角色、纸件及当前金额预算确认仍是必要条件",
+    "签收与核减表单明确选择原审批人，保留双版本、原键恢复，权限变化清空旧意图",
+    "旧签收 JSON 缺少代理事实继续读取，不补造授权"
+  ],
+  "regressionOrigin": {
+    "javaRedLog": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-expense-red.log",
+    "javaRed": "有效代理访问真实报销 workflow 得到 403，预期 200；专用入口仍只接受原生任务身份。",
+    "frontendRedLog": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-expense-ui-red.log",
+    "frontendRedTests": 3,
+    "previousCoverageGap": "此前通用任务代理验证未走真实报销专用 workflow、receive 和 reduce 入口。"
+  },
+  "tests": {
+    "h2": {
+      "result": "PASS",
+      "uniqueTests": 77,
+      "domainTests": 9,
+      "serverTests": 68,
+      "includesFocusedNewTests": 8,
+      "classes": {
+        "io.agentflow.expense.ExpenseSubmissionIntegrationTest": {
+          "tests": 27,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyDecisionIntegrationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.api.OpenApiContractTest": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.finance.VoucherSourceTest": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.expense.ExpenseProcessPolicyTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.approval.ExpenseSubprocessIntegrationTest": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.agentflow.organization.ApprovalProxyTaskReadIntegrationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-expense-h2-regression.log"
+    },
+    "postgres": {
+      "database": "approval_proxy_expense_11217139c8",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-expense-postgres-11217139c8.log",
+      "status": "PASS",
+      "exitCode": 0,
+      "tests": 27,
+      "overlapsH2": true,
+      "evidence": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-expense-postgres-11217139c8.json",
+      "xml": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-expense-postgres.xml"
+    },
+    "frontend": {
+      "result": "PASS",
+      "tests": 37,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-expense-ui-final.log",
+      "files": [
+        "expense-actions.test.mjs",
+        "expenses.test.mjs",
+        "task-actions.test.mjs",
+        "task-action-panel.test.mjs"
+      ]
+    },
+    "openApi": {
+      "result": "PASS",
+      "operations": 296,
+      "schemas": 590,
+      "requestExamples": 113,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-expense-openapi.log"
+    },
+    "typecheckAndBuild": {
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-expense-build.log",
+      "note": "现有单包大小提示仍存在，不是本次新增的构建失败。"
+    },
+    "authors": {
+      "result": "PASS",
+      "javaFiles": 1297,
+      "namedTypes": 2490,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/approval-proxy-expense-authors.log"
+    }
+  },
+  "criticalCases": [
+    "数据库真实财务资源行锁等待期间，撤销完成后核减返回 403；资源和预算无新效果",
+    "数据库真实财务资源行锁等待期间到期，核减返回 403；金额、资源、申请版本及审计保持",
+    "代理非 FINANCE 人员可以签收但不能办理财务审核；有 FINANCE 也不能绕过纸件和预算确认",
+    "显式无效代理不能退回为本人原生财务权限",
+    "签收响应落库失败回滚控制记录、授权证明、版本和幂等；原键可恢复一次",
+    "核减响应落库失败回滚金额、占用、路由、预算、通知和审计；原键只产生一条调整",
+    "撤销后不能借签收或核减取得的任务身份继续批准；原财务仍可继续",
+    "既有归档原件与历史字段读取、财务子流程和通用代理决策回归通过"
+  ],
+  "testNotes": [
+    "故障注入在幂等响应保存点；MockMvc 抛出 Servlet 异常，断言根因后检查真实事务回滚。",
+    "首次扩大专项用例有三处测试夹具错误：同一原审批人重叠授权一处、MockMvc 异常断言两处；按既有规则修正夹具，没有放宽生产约束。",
+    "行锁用例的 spy 只标记调用位置，数据库锁、角色、审批和资源写入使用真实实现。"
+  ],
+  "noNewMigration": true,
+  "main": {
+    "unchanged": true,
+    "commit": "60bafa082b9d35a6802e846d8b96a09989ffa97d"
+  },
+  "acceptanceLimits": [
+    "本阶段是 Spring MVC/真实引擎/真实数据库及前端组件验证，尚无本阶段独立 JAR 网络 HTTP、浏览器、在审升级或重启验收。",
+    "没有替换现有 V95 运行服务，没有操作真实企业财务系统。",
+    "代理通知、管理员配置页面和完整运行验收继续；代理有效期整体仍未完成。",
+    "其余至少六类项目剩余范围保持，原目标全量证据映射继续。",
+    "Git remote 为空，本阶段仅本地交付，未创建 PR 或执行远端 CI。"
+  ]
+}

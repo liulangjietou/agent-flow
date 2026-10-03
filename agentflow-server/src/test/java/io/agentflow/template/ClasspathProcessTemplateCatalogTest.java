@@ -9,6 +9,7 @@ import io.agentflow.form.FormSchemaJsonDeserializer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.ResourceLoader;
@@ -31,12 +32,31 @@ class ClasspathProcessTemplateCatalogTest {
             new SimpleModule().addDeserializer(FormSchema.class, new FormSchemaJsonDeserializer())));
 
     @Test
-    void loadsExactlyThreeTemplatesAndVerifiesEveryScenario() {
+    void loadsDeliveredTemplatesAndVerifiesEveryScenario() {
         var catalog = new ClasspathProcessTemplateCatalog(resources, json);
-        assertThat(catalog.list()).extracting(ProcessTemplate::key).containsExactly("leave-request", "seal-application", "contract-review");
-        assertThat(catalog.list().stream().mapToInt(template -> template.scenarios().size()).sum()).isEqualTo(15);
+        assertThat(catalog.list()).extracting(ProcessTemplate::key).containsExactly("leave-request", "seal-application", "contract-review", "procurement-payment", "budget-adjustment");
+        assertThat(catalog.list().stream().mapToInt(template -> template.scenarios().size()).sum()).isEqualTo(21);
         catalog.list().forEach(ProcessTemplate::verifyScenarios);
         assertThatThrownBy(catalog.list()::clear).isInstanceOf(UnsupportedOperationException.class);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"procurement-payment,business-type", "procurement-payment,masked", "procurement-payment,missing-sensitive",
+            "budget-adjustment,business-type", "budget-adjustment,masked", "budget-adjustment,missing-sensitive"})
+    void structuredTemplateCannotMislabelItsBusinessOrHideEvidenceFromApprovers(String templateKey, String corruption) throws Exception {
+        String location = "classpath:process-templates/" + templateKey + ".json";
+        ObjectNode template;
+        try (var input = resources.getResource(location).getInputStream()) { template = json.read(new String(input.readAllBytes(), StandardCharsets.UTF_8), ObjectNode.class); }
+        var field = (ObjectNode) template.at("/formSchema/fields/0");
+        switch (corruption) {
+            case "business-type" -> template.put("businessType", "FORM");
+            case "masked" -> ((ObjectNode) field.path("nodeAccess")).put("finance", "MASKED");
+            default -> field.put("sensitive", false);
+        }
+        ResourceLoader replaced = mock(ResourceLoader.class);
+        when(replaced.getResource(anyString())).thenAnswer(call -> location.equals(call.getArgument(0))
+                ? new ByteArrayResource(json.write(template).getBytes(StandardCharsets.UTF_8)) : resources.getResource(call.getArgument(0)));
+        assertThatThrownBy(() -> new ClasspathProcessTemplateCatalog(replaced, json)).isInstanceOf(IllegalStateException.class).hasMessageContaining(location);
     }
 
     @Test
