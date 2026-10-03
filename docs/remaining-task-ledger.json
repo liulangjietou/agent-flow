@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T23:22:35.827556+00:00",
+  "recordedAt": "2026-10-03T23:38:39.983155+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,7 +1630,7 @@
           ]
         }
       ],
-      "observed": "原 17 类通知已有固定后端运行与独立恢复证据；本轮补齐第 18 类供应商应付复核、ERP 预留及实际安全结束来源，原复核/预留编号、同事务消息与外发意向、当前权限和只读页面已接通。301 个 Java、200 个前端范围用例及构建/契约通过。新增来源固定包运行与来源核对仍待继续；浏览器与 PostgreSQL 补验保持待办。",
+      "observed": "18 类财务通知的来源、原记录详情与当前权限已接通。供应商应付新范围在固定包中完成三张采购单非空升级、两次强退、原授权只查询不重发及安全结束后重新授权；4 条合成 IM 受理、5 条失权抑制。独立恢复保留 253 张表、460 条记录；206 份实际响应及 47 份请求通过契约。浏览器与 PostgreSQL 补验保留，全项目条款核对仍由 V03 负责。",
       "references": [
         {
           "path": "docs/payment-notifications.md",
@@ -1790,6 +1790,14 @@
         },
         {
           "path": "docs/evidence/supplier-payable-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/supplier-payable-notifications-runtime.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/supplier-payable-notifications-runtime-20261003.json",
           "line": 1
         }
       ],
@@ -3562,9 +3570,10 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "W01",
-    "F04",
-    "F05"
+    "F11",
+    "F12",
+    "A03",
+    "I01"
   ],
   "externalDelivery": {
     "remoteConfigured": true,
@@ -3590,10 +3599,10 @@
   },
   "latestProgress": {
     "taskId": "F17",
-    "status": "SUPPLIER_PAYABLE_SOURCES_AND_UI_SCOPE_VERIFIED_TASK_OPEN",
-    "recordedAt": "2026-10-03T23:22:35.827556+00:00",
+    "status": "FIXED_PACKAGE_RUNTIME_AND_RESTORE_VERIFIED_TASK_OPEN",
+    "recordedAt": "2026-10-03T23:38:39.983155+00:00",
     "sourceCommit": "24b0096108349599c3feec7c1347376249821288",
-    "evidence": "docs/evidence/supplier-payable-notifications-20261003.json",
+    "evidence": "docs/evidence/supplier-payable-notifications-runtime-20261003.json",
     "knownOpenTaskCount": 34
   }
 }
