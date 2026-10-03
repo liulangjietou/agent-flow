@@ -12,6 +12,12 @@ ajv.addFormat('binary', true)
 ajv.addSchema({ $id: 'agentflow', components: spec.components })
 // 历史页明确序列化 null，不能与其他列表的省略语义混淆。
 validate({ $ref: '#/components/schemas/HistoryPage' }, { items: [], nextCursor: null })
+// 解释来源必须带内容摘要，人工复核不能夹带财务或审批写入字段。
+validate({ $ref: '#/components/schemas/AssistReference' }, { sourceId: 'precheck:finding[0]', contentDigest: 'a'.repeat(64) })
+const explanationReview = { expectedRunVersion: 3, action: 'ADOPT', selectedIssueIds: ['precheck:finding[0]'] }
+validate({ $ref: '#/components/schemas/ReviewPrecheckExplanationRequest' }, explanationReview)
+assert.equal(validator({ $ref: '#/components/schemas/ReviewPrecheckExplanationRequest' })({ ...explanationReview, approved: true }), false)
+assert.equal(validator({ $ref: '#/components/schemas/ReviewPrecheckExplanationRequest' })({ ...explanationReview, selectedIssueIds: ['precheck:finding[0]', 'precheck:finding[0]'] }), false)
 // 服务目录末页的空游标会被服务器省略；版本必须保持文本。
 validate({ $ref: '#/components/schemas/ServiceTaskDirectory' }, { items: [] })
 validate({ $ref: '#/components/schemas/ServiceTaskVersionPage' }, { items: [] })
