@@ -1,0 +1,265 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3072" height="2360" viewBox="0 0 3072 2360" role="img" aria-labelledby="title desc">
+<title id="title">AgentFlow 审批与财务协同平台全景架构</title>
+<desc id="desc">AgentFlow 源码快照 fec4a87，已实现、可选配置和待完成边界分别标注。</desc>
+<defs>
+<marker id="arrow-168dc5" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,4 L0,8 Z" fill="#168dc5"/></marker>
+<marker id="arrow-0d9766" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,4 L0,8 Z" fill="#0d9766"/></marker>
+<marker id="arrow-e88720" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,4 L0,8 Z" fill="#e88720"/></marker>
+<marker id="arrow-8065b7" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,4 L0,8 Z" fill="#8065b7"/></marker>
+</defs>
+<g font-family="'PingFang SC','Heiti SC','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+<rect x="0" y="0" width="3072" height="2360" rx="0" fill="#ffffff" stroke="#ffffff" stroke-width="1.6"/>
+<text x="1536" y="83" font-size="58" fill="#193e73" font-weight="700" text-anchor="middle">AgentFlow 审批与财务协同平台全景架构</text>
+<text x="1536" y="136" font-size="31" fill="#193e73" font-weight="400" text-anchor="middle">模板与表单 → 可信提交 → 人工审批 → 受控财务执行 → 归档与运营</text>
+<text x="3048" y="28" font-size="19" fill="#627c9e" font-weight="400" text-anchor="end">源码快照 2026-10-03 · fec4a87</text>
+<rect x="24" y="172" width="3024" height="125" rx="6" fill="#edf6ff" stroke="#b9d9ef" stroke-width="1.6"/>
+<text x="46" y="215" font-size="31" fill="#193e73" font-weight="700" text-anchor="start">安全与治理贯穿全链路</text>
+<text x="522" y="214" font-size="29" fill="#193e73" font-weight="700" text-anchor="start">可信身份</text>
+<text x="522" y="259" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">认证主体 / 角色 / 有效任职</text>
+<text x="1020" y="214" font-size="29" fill="#193e73" font-weight="700" text-anchor="start">数据边界</text>
+<text x="1020" y="259" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">租户隔离 / 字段显隐与脱敏</text>
+<text x="1518" y="214" font-size="29" fill="#193e73" font-weight="700" text-anchor="start">业务控制</text>
+<text x="1518" y="259" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">职责分离 / 双版本 / 证据有效期</text>
+<text x="2016" y="214" font-size="29" fill="#193e73" font-weight="700" text-anchor="start">执行安全</text>
+<text x="2016" y="259" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">原命令 / 幂等 / 租约 / 原号查询</text>
+<text x="2514" y="214" font-size="29" fill="#193e73" font-weight="700" text-anchor="start">全程依据</text>
+<text x="2514" y="259" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">审计 / 不可变修订 / 历史原件</text>
+<text x="32" y="334" font-size="25" fill="#426792" font-weight="700" text-anchor="start">统一前后端：各栏表示职责与协作；实际业务按照已发布定义及当前权限执行</text>
+<rect x="24" y="355" width="592" height="1436" rx="6" fill="#ffffff" stroke="#2977a7" stroke-width="1.6"/>
+<rect x="24" y="355" width="592" height="110" rx="6" fill="#2977a7" stroke="#2977a7" stroke-width="1.6"/>
+<rect x="40" y="374" width="47" height="59" rx="6" fill="#ffffff" stroke="#ffffff" stroke-width="1.6"/>
+<text x="63" y="418" font-size="44" fill="#2977a7" font-weight="700" text-anchor="middle">1</text>
+<text x="102" y="400" font-size="33" fill="#ffffff" font-weight="700" text-anchor="start">用户入口与业务建模</text>
+<text x="102" y="443" font-size="21" fill="#ffffff" font-weight="400" text-anchor="start">agentflow-web · Vue 3 / TypeScript / Vite</text>
+<rect x="38" y="483" width="564" height="239" rx="6" fill="#eff8ff" stroke="#2977a7" stroke-width="1.6"/>
+<text x="56" y="521" font-size="27" fill="#2977a7" font-weight="700" text-anchor="start">角色与统一工作台</text>
+<text x="56" y="565" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">申请人 / 审批人 / 财务 / 独立出纳</text>
+<text x="56" y="598" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">流程管理员 / 组织管理员 / 配置管理员</text>
+<text x="56" y="631" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">我的草稿、已发起、待办、已办、消息</text>
+<text x="56" y="664" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">菜单只是入口，服务端逐次校验权限</text>
+<rect x="38" y="740" width="564" height="239" rx="6" fill="#eff8ff" stroke="#2977a7" stroke-width="1.6"/>
+<text x="56" y="778" font-size="27" fill="#2977a7" font-weight="700" text-anchor="start">模板与流程设计器</text>
+<text x="56" y="822" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">5 个内置模板 + JSON 导入 / 导出</text>
+<text x="56" y="855" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">复制 → 独立草稿 → 修订保护与恢复</text>
+<text x="56" y="888" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">流程 / 表单 / 通知配置一起发布</text>
+<text x="56" y="921" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">校验、样例模拟、分支覆盖、版本比较</text>
+<rect x="38" y="997" width="564" height="239" rx="6" fill="#eff8ff" stroke="#2977a7" stroke-width="1.6"/>
+<text x="56" y="1035" font-size="27" fill="#2977a7" font-weight="700" text-anchor="start">表单与历史原件</text>
+<text x="56" y="1079" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">类型 / 必填 / 组织选项 / 明细表格</text>
+<text x="56" y="1112" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">节点显隐、只读、脱敏与字段选人</text>
+<text x="56" y="1145" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">附件元数据与私有原文件分别保存</text>
+<text x="56" y="1178" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">发起任职及提交内容固定到审批轮次</text>
+<rect x="38" y="1254" width="564" height="239" rx="6" fill="#eff8ff" stroke="#2977a7" stroke-width="1.6"/>
+<text x="56" y="1292" font-size="27" fill="#2977a7" font-weight="700" text-anchor="start">财务专用入口</text>
+<text x="56" y="1336" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">事前申请、报销、借款、采购付款</text>
+<text x="56" y="1369" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">个人票夹、发票确认、费用分摊</text>
+<text x="56" y="1402" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">预算调整、凭证、付款、核销及归档</text>
+<text x="56" y="1435" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">费用制度与科目映射的版本化管理</text>
+<rect x="38" y="1511" width="564" height="239" rx="6" fill="#eff8ff" stroke="#2977a7" stroke-width="1.6"/>
+<text x="56" y="1549" font-size="27" fill="#2977a7" font-weight="700" text-anchor="start">交互与写入恢复</text>
+<text x="56" y="1593" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">按需取摘要，再加载选中的完整配置</text>
+<text x="56" y="1626" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">有界分页 / 移动导航 / 确认后操作</text>
+<text x="56" y="1659" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">携带 Idempotency-Key 和预期版本</text>
+<text x="56" y="1692" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">未知写入恢复原请求，再读取最新状态</text>
+<polyline points="617,988 632,988" fill="none" stroke="#168dc5" stroke-width="3" marker-end="url(#arrow-168dc5)" stroke-linejoin="round"/>
+<polyline points="632,1164 617,1164" fill="none" stroke="#0d9766" stroke-width="3" marker-end="url(#arrow-0d9766)" stroke-linejoin="round"/>
+<rect x="632" y="355" width="592" height="1436" rx="6" fill="#ffffff" stroke="#1588ad" stroke-width="1.6"/>
+<rect x="632" y="355" width="592" height="110" rx="6" fill="#1588ad" stroke="#1588ad" stroke-width="1.6"/>
+<rect x="648" y="374" width="47" height="59" rx="6" fill="#ffffff" stroke="#ffffff" stroke-width="1.6"/>
+<text x="671" y="418" font-size="44" fill="#1588ad" font-weight="700" text-anchor="middle">2</text>
+<text x="710" y="400" font-size="33" fill="#ffffff" font-weight="700" text-anchor="start">可信接入与用例编排</text>
+<text x="710" y="443" font-size="21" fill="#ffffff" font-weight="400" text-anchor="start">agentflow-server · Spring Boot 3.5.6 / MVC</text>
+<rect x="646" y="483" width="564" height="239" rx="6" fill="#edfaff" stroke="#1588ad" stroke-width="1.6"/>
+<text x="664" y="521" font-size="27" fill="#1588ad" font-weight="700" text-anchor="start">身份、租户与会话</text>
+<text x="664" y="565" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">演示 Bearer / 企业 OIDC 登录</text>
+<text x="664" y="598" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">可信 Actor：租户、用户与角色</text>
+<text x="664" y="631" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">可选 JDBC 共享会话与后通道注销</text>
+<text x="664" y="664" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">认证身份与组织任职分开管理</text>
+<rect x="646" y="740" width="564" height="239" rx="6" fill="#edfaff" stroke="#1588ad" stroke-width="1.6"/>
+<text x="664" y="778" font-size="27" fill="#1588ad" font-weight="700" text-anchor="start">REST 与写入边界</text>
+<text x="664" y="822" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">/api/v1 · DTO 校验 · 稳定错误码</text>
+<text x="664" y="855" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">角色 + 参与关系 + 字段权限</text>
+<text x="664" y="888" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">幂等键绑定主体、角色与请求摘要</text>
+<text x="664" y="921" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">成功响应与业务变更同事务保存</text>
+<rect x="646" y="997" width="564" height="239" rx="6" fill="#edfaff" stroke="#1588ad" stroke-width="1.6"/>
+<text x="664" y="1035" font-size="27" fill="#1588ad" font-weight="700" text-anchor="start">审批用例与事务</text>
+<text x="664" y="1079" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">Controller → Facade → 领域用例</text>
+<text x="664" y="1112" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">解析发布版本、原件、任职与权限</text>
+<text x="664" y="1145" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">状态 / 引擎 / 轮次 / 审计共同提交</text>
+<text x="664" y="1178" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">expectedVersion / revision 防止覆盖</text>
+<rect x="646" y="1254" width="564" height="239" rx="6" fill="#edfaff" stroke="#1588ad" stroke-width="1.6"/>
+<text x="664" y="1292" font-size="27" fill="#1588ad" font-weight="700" text-anchor="start">结构化财务提交</text>
+<text x="664" y="1336" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">双版本 + 最新预检 + 外部证据时效</text>
+<text x="664" y="1369" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">锁内重读，冻结本轮金额及资源引用</text>
+<text x="664" y="1402" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">本地资源预留、审批启动、预算排队</text>
+<text x="664" y="1435" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">同一短事务成功，或全部回滚</text>
+<rect x="646" y="1511" width="564" height="239" rx="6" fill="#edfaff" stroke="#1588ad" stroke-width="1.6"/>
+<text x="664" y="1549" font-size="27" fill="#1588ad" font-weight="700" text-anchor="start">外部执行的事务边界</text>
+<text x="664" y="1593" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">短事务：领取 / 租约 / 固定原命令</text>
+<text x="664" y="1626" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">事务外：模型、预算、ERP、资金 HTTP</text>
+<text x="664" y="1659" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">短事务：复核来源 / 落库 / 本地消费</text>
+<text x="664" y="1692" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">外部已发生事实不会因本地失败被抹去</text>
+<polyline points="1225,988 1240,988" fill="none" stroke="#168dc5" stroke-width="3" marker-end="url(#arrow-168dc5)" stroke-linejoin="round"/>
+<polyline points="1240,1164 1225,1164" fill="none" stroke="#0d9766" stroke-width="3" marker-end="url(#arrow-0d9766)" stroke-linejoin="round"/>
+<rect x="1240" y="355" width="592" height="1436" rx="6" fill="#ffffff" stroke="#8065b7" stroke-width="1.6"/>
+<rect x="1240" y="355" width="592" height="110" rx="6" fill="#8065b7" stroke="#8065b7" stroke-width="1.6"/>
+<rect x="1256" y="374" width="47" height="59" rx="6" fill="#ffffff" stroke="#ffffff" stroke-width="1.6"/>
+<text x="1279" y="418" font-size="44" fill="#8065b7" font-weight="700" text-anchor="middle">3</text>
+<text x="1318" y="400" font-size="33" fill="#ffffff" font-weight="700" text-anchor="start">领域规则与审批运行时</text>
+<text x="1318" y="443" font-size="21" fill="#ffffff" font-weight="400" text-anchor="start">agentflow-domain → 端口 → Flowable 7.2.0</text>
+<rect x="1254" y="483" width="564" height="239" rx="6" fill="#f6f2ff" stroke="#8065b7" stroke-width="1.6"/>
+<text x="1272" y="521" font-size="27" fill="#8065b7" font-weight="700" text-anchor="start">DDD 模块与聚合</text>
+<text x="1272" y="565" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">common：Actor / JsonUtil / 错误码</text>
+<text x="1272" y="598" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">domain：状态、金额、策略与业务端口</text>
+<text x="1272" y="631" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">server：跨聚合编排与基础设施适配</text>
+<text x="1272" y="664" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">领域不引入 Flowable 运行类型</text>
+<rect x="1254" y="740" width="564" height="239" rx="6" fill="#f6f2ff" stroke="#8065b7" stroke-width="1.6"/>
+<text x="1272" y="778" font-size="27" fill="#8065b7" font-weight="700" text-anchor="start">9 种已开放流程节点</text>
+<text x="1272" y="822" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">开始、结束、人工任务、抄送</text>
+<text x="1272" y="855" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">排他网关、结构化并行网关</text>
+<text x="1272" y="888" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">定时等待、事件等待、固定子流程</text>
+<text x="1272" y="921" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">受限条件 AST；服务任务尚未开放</text>
+<rect x="1254" y="997" width="564" height="239" rx="6" fill="#f6f2ff" stroke="#8065b7" stroke-width="1.6"/>
+<text x="1272" y="1035" font-size="27" fill="#8065b7" font-weight="700" text-anchor="start">发布与运行时绑定</text>
+<text x="1272" y="1079" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">Graph / FormSchema → 校验与版本发布</text>
+<text x="1272" y="1112" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">Flowable 适配器生成并部署 BPMN</text>
+<text x="1272" y="1145" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">申请绑定不透明 runtimeDefinitionId</text>
+<text x="1272" y="1178" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">提交轮次保留任职、表单及风险依据</text>
+<rect x="1254" y="1254" width="564" height="239" rx="6" fill="#f6f2ff" stroke="#8065b7" stroke-width="1.6"/>
+<text x="1272" y="1292" font-size="27" fill="#8065b7" font-weight="700" text-anchor="start">动态选人与人工协作</text>
+<text x="1272" y="1336" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">角色 / 用户 / 任职主管 / 字段选人</text>
+<text x="1272" y="1369" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">节点激活固定名单：全员 / 任一 / 比例</text>
+<text x="1272" y="1402" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">领取、释放、转交、委派、回交、代理</text>
+<text x="1272" y="1435" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">职责分离 / 业务日历 / 超时与升级</text>
+<rect x="1254" y="1511" width="564" height="239" rx="6" fill="#f6f2ff" stroke="#8065b7" stroke-width="1.6"/>
+<text x="1272" y="1549" font-size="27" fill="#8065b7" font-weight="700" text-anchor="start">生命周期与历史查询</text>
+<text x="1272" y="1593" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">草稿 → 在审 → 批准 / 驳回 / 退回</text>
+<text x="1272" y="1626" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">撤回、补正重提、作废与实例控制</text>
+<text x="1272" y="1659" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">申请状态与付款、凭证状态分别表达</text>
+<text x="1272" y="1692" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">原轮次 / 历史轨迹 / 原文件不被新版本覆盖</text>
+<polyline points="1833,988 1848,988" fill="none" stroke="#168dc5" stroke-width="3" marker-end="url(#arrow-168dc5)" stroke-linejoin="round"/>
+<polyline points="1848,1164 1833,1164" fill="none" stroke="#0d9766" stroke-width="3" marker-end="url(#arrow-0d9766)" stroke-linejoin="round"/>
+<rect x="1848" y="355" width="592" height="1436" rx="6" fill="#ffffff" stroke="#4f935c" stroke-width="1.6"/>
+<rect x="1848" y="355" width="592" height="110" rx="6" fill="#4f935c" stroke="#4f935c" stroke-width="1.6"/>
+<rect x="1864" y="374" width="47" height="59" rx="6" fill="#ffffff" stroke="#ffffff" stroke-width="1.6"/>
+<text x="1887" y="418" font-size="44" fill="#4f935c" font-weight="700" text-anchor="middle">4</text>
+<text x="1926" y="400" font-size="33" fill="#ffffff" font-weight="700" text-anchor="start">Agent 辅助与财务执行</text>
+<text x="1926" y="443" font-size="21" fill="#ffffff" font-weight="400" text-anchor="start">人工决策 · 权威事实 · 持久命令与回执</text>
+<rect x="1862" y="483" width="564" height="239" rx="6" fill="#f0f9f2" stroke="#4f935c" stroke-width="1.6" stroke-dasharray="9 6"/>
+<text x="1880" y="521" font-size="27" fill="#4f935c" font-weight="700" text-anchor="start">受控 Agent 辅助 · 可选</text>
+<text x="1880" y="565" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">摘要：明确选输入 → 队列 → 模型 → 复核</text>
+<text x="1880" y="598" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">普通表单草稿建议、票据抽取及确认填报</text>
+<text x="1880" y="631" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">目标指纹 / 严格 JSON / 来源与版本核验</text>
+<text x="1880" y="664" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">模型不批准、不授权付款，不替代原查验</text>
+<rect x="1862" y="740" width="564" height="239" rx="6" fill="#f0f9f2" stroke="#4f935c" stroke-width="1.6"/>
+<text x="1880" y="778" font-size="27" fill="#4f935c" font-weight="700" text-anchor="start">费用与资源事实</text>
+<text x="1880" y="822" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">制度 / 类别 / 汇率 / 税额 / 账户</text>
+<text x="1880" y="855" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">原件验票、明细分摊、额度与借款冲销</text>
+<text x="1880" y="888" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">事前额度、借款到账、还款及逾期控制</text>
+<text x="1880" y="921" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">预检是证据；排队不等于预算已冻结</text>
+<rect x="1862" y="997" width="564" height="239" rx="6" fill="#f0f9f2" stroke="#4f935c" stroke-width="1.6"/>
+<text x="1880" y="1035" font-size="27" fill="#4f935c" font-weight="700" text-anchor="start">预算、凭证与映射</text>
+<text x="1880" y="1079" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">预算冻结 / 调整 / 释放 / 消费独立确认</text>
+<text x="1880" y="1112" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">批准后准备：期间 + 已发布科目选择</text>
+<text x="1880" y="1145" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">版本复核后登记原 ERP 过账命令</text>
+<text x="1880" y="1178" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">未知查原操作；冲回与争议保留原账</text>
+<rect x="1862" y="1254" width="564" height="239" rx="6" fill="#f0f9f2" stroke="#4f935c" stroke-width="1.6"/>
+<text x="1880" y="1292" font-size="27" fill="#4f935c" font-weight="700" text-anchor="start">付款授权与独立出纳</text>
+<text x="1880" y="1336" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">财务显式短期授权，绑定批准和挂账</text>
+<text x="1880" y="1369" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">出纳选付款账户，复查后登记执行</text>
+<text x="1880" y="1402" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">收款人 / 授权财务 / 出纳职责分离</text>
+<text x="1880" y="1435" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">超时、冲突、退票需原交易查询与复核</text>
+<rect x="1862" y="1511" width="564" height="239" rx="6" fill="#f0f9f2" stroke="#4f935c" stroke-width="1.6"/>
+<text x="1880" y="1549" font-size="27" fill="#4f935c" font-weight="700" text-anchor="start">核销、凭证与归档</text>
+<text x="1880" y="1593" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">真实到账 → 借款余额 / 费用核销</text>
+<text x="1880" y="1626" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">本地消费资源，再确认预算实际消费</text>
+<text x="1880" y="1659" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">付款凭证单独过账，归档核对完整依据</text>
+<text x="1880" y="1692" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">零应付有明确路径；不制造零额付款</text>
+<polyline points="2441,988 2456,988" fill="none" stroke="#168dc5" stroke-width="3" marker-end="url(#arrow-168dc5)" stroke-linejoin="round"/>
+<polyline points="2456,1164 2441,1164" fill="none" stroke="#0d9766" stroke-width="3" marker-end="url(#arrow-0d9766)" stroke-linejoin="round"/>
+<rect x="2456" y="355" width="592" height="1436" rx="6" fill="#ffffff" stroke="#ed881c" stroke-width="1.6"/>
+<rect x="2456" y="355" width="592" height="110" rx="6" fill="#ed881c" stroke="#ed881c" stroke-width="1.6"/>
+<rect x="2472" y="374" width="47" height="59" rx="6" fill="#ffffff" stroke="#ffffff" stroke-width="1.6"/>
+<text x="2495" y="418" font-size="44" fill="#ed881c" font-weight="700" text-anchor="middle">5</text>
+<text x="2534" y="400" font-size="33" fill="#ffffff" font-weight="700" text-anchor="start">运营集成与持续交付</text>
+<text x="2534" y="443" font-size="21" fill="#ffffff" font-weight="400" text-anchor="start">统一后端 / 统一 Web · 各能力显式配置</text>
+<rect x="2470" y="483" width="564" height="239" rx="6" fill="#fff7ed" stroke="#ed881c" stroke-width="1.6"/>
+<text x="2488" y="521" font-size="27" fill="#ed881c" font-weight="700" text-anchor="start">组织与版本治理</text>
+<text x="2488" y="565" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">本地组织目录、人员、任职与主管关系</text>
+<text x="2488" y="598" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">流程版本停用 / 恢复与固定历史依据</text>
+<text x="2488" y="631" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">发布说明、实际发布者与版本比较</text>
+<text x="2488" y="664" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">配置管理员管理制度及科目映射版本</text>
+<rect x="2470" y="740" width="564" height="239" rx="6" fill="#fff7ed" stroke="#ed881c" stroke-width="1.6"/>
+<text x="2488" y="778" font-size="27" fill="#ed881c" font-weight="700" text-anchor="start">消息与可选外发通知</text>
+<text x="2488" y="822" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">站内消息、抄送、评论提及与偏好</text>
+<text x="2488" y="855" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">事务 outbox → 持久租约 → 外发结果</text>
+<text x="2488" y="888" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">SMTP / 企业微信 / 签名 Webhook</text>
+<text x="2488" y="921" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">外发最小内容，接收方仍须按权限读取</text>
+<rect x="2470" y="997" width="564" height="239" rx="6" fill="#fff7ed" stroke="#ed881c" stroke-width="1.6" stroke-dasharray="9 6"/>
+<text x="2488" y="1035" font-size="27" fill="#ed881c" font-weight="700" text-anchor="start">事件集成与权威系统 · 可选</text>
+<text x="2488" y="1079" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">事件契约 / HMAC / 去重 inbox</text>
+<text x="2488" y="1112" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">持久事件领取后关联当前等待节点</text>
+<text x="2488" y="1145" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">财务网关：主数据、验票、预算、ERP、资金</text>
+<text x="2488" y="1178" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">外部组织同步和电子签业务仍待开发</text>
+<rect x="2470" y="1254" width="564" height="239" rx="6" fill="#fff7ed" stroke="#ed881c" stroke-width="1.6"/>
+<text x="2488" y="1292" font-size="27" fill="#ed881c" font-weight="700" text-anchor="start">运营、审计与可观测性</text>
+<text x="2488" y="1336" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">申请 / 待办 / 参与者查询与摘要导出</text>
+<text x="2488" y="1369" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">轮次路径、风险、SLA、结果与 Agent 采纳</text>
+<text x="2488" y="1402" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">Actuator 健康 / 可选 Prometheus 指标</text>
+<text x="2488" y="1435" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">7 条告警规则，企业阈值与接收链需验收</text>
+<rect x="2470" y="1511" width="564" height="239" rx="6" fill="#fff7ed" stroke="#ed881c" stroke-width="1.6"/>
+<text x="2488" y="1549" font-size="27" fill="#ed881c" font-weight="700" text-anchor="start">构建、维护与恢复</text>
+<text x="2488" y="1593" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">Java 17 / Maven · Vue 类型检查与构建</text>
+<text x="2488" y="1626" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">GitHub Actions：完整回归及 PostgreSQL</text>
+<text x="2488" y="1659" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">同一发布 jar：schema migrate / validate</text>
+<text x="2488" y="1692" font-size="23" fill="#193e73" font-weight="400" text-anchor="start">数据库 + 原件配套备份，隔离恢复后接续</text>
+<rect x="24" y="1810" width="3024" height="62" rx="6" fill="#fbfdff" stroke="#c9deee" stroke-width="1.6"/>
+<text x="44" y="1850" font-size="25" fill="#193e73" font-weight="700" text-anchor="start">图例</text>
+<polyline points="150,1840 222,1840" fill="none" stroke="#168dc5" stroke-width="3" marker-end="url(#arrow-168dc5)" stroke-linejoin="round"/>
+<text x="245" y="1850" font-size="24" fill="#193e73" font-weight="400" text-anchor="start">调用与协作</text>
+<polyline points="518,1840 590,1840" fill="none" stroke="#0d9766" stroke-width="3" marker-end="url(#arrow-0d9766)" stroke-linejoin="round"/>
+<text x="613" y="1850" font-size="24" fill="#193e73" font-weight="400" text-anchor="start">真实结果反馈</text>
+<rect x="930" y="1829" width="52" height="23" rx="6" fill="#ffffff" stroke="#8065b7" stroke-width="1.6" stroke-dasharray="9 6"/>
+<text x="1002" y="1850" font-size="24" fill="#193e73" font-weight="400" text-anchor="start">可选能力，须明确配置</text>
+<text x="1790" y="1850" font-size="27" fill="#e88720" font-weight="700" text-anchor="start">批准 ≠ 已过账 ≠ 已付款 ≠ 已核销 ≠ 已归档</text>
+<rect x="24" y="1891" width="3024" height="171" rx="6" fill="#fbfdff" stroke="#a9c8e4" stroke-width="1.6" stroke-dasharray="9 6"/>
+<text x="46" y="1928" font-size="28" fill="#193e73" font-weight="700" text-anchor="start">业务闭环：从模板到运行与运营反馈</text>
+<rect x="44" y="1947" width="410" height="95" rx="6" fill="#f3f9ff" stroke="#168dc5" stroke-width="1.6"/>
+<text x="62" y="1978" font-size="24" fill="#168dc5" font-weight="700" text-anchor="start">1  模板与发布</text>
+<text x="62" y="2012" font-size="20" fill="#193e73" font-weight="400" text-anchor="start">校验、模拟及冻结版本</text>
+<polyline points="457,1994 473,1994" fill="none" stroke="#168dc5" stroke-width="3" marker-end="url(#arrow-168dc5)" stroke-linejoin="round"/>
+<rect x="474" y="1947" width="410" height="95" rx="6" fill="#f3f9ff" stroke="#168dc5" stroke-width="1.6"/>
+<text x="492" y="1978" font-size="24" fill="#168dc5" font-weight="700" text-anchor="start">2  发起与填报</text>
+<text x="492" y="2012" font-size="20" fill="#193e73" font-weight="400" text-anchor="start">专用入口、原件、任职</text>
+<polyline points="887,1994 903,1994" fill="none" stroke="#168dc5" stroke-width="3" marker-end="url(#arrow-168dc5)" stroke-linejoin="round"/>
+<rect x="904" y="1947" width="410" height="95" rx="6" fill="#f3f9ff" stroke="#168dc5" stroke-width="1.6"/>
+<text x="922" y="1978" font-size="24" fill="#168dc5" font-weight="700" text-anchor="start">3  可信提交</text>
+<text x="922" y="2012" font-size="20" fill="#193e73" font-weight="400" text-anchor="start">最新预检、双版本及幂等</text>
+<polyline points="1317,1994 1333,1994" fill="none" stroke="#168dc5" stroke-width="3" marker-end="url(#arrow-168dc5)" stroke-linejoin="round"/>
+<rect x="1334" y="1947" width="410" height="95" rx="6" fill="#f3f9ff" stroke="#168dc5" stroke-width="1.6"/>
+<text x="1352" y="1978" font-size="24" fill="#168dc5" font-weight="700" text-anchor="start">4  人工审批</text>
+<text x="1352" y="2012" font-size="20" fill="#193e73" font-weight="400" text-anchor="start">动态选人、会签与财务复核</text>
+<polyline points="1747,1994 1763,1994" fill="none" stroke="#168dc5" stroke-width="3" marker-end="url(#arrow-168dc5)" stroke-linejoin="round"/>
+<rect x="1764" y="1947" width="410" height="95" rx="6" fill="#f3f9ff" stroke="#168dc5" stroke-width="1.6"/>
+<text x="1782" y="1978" font-size="24" fill="#168dc5" font-weight="700" text-anchor="start">5  异步执行</text>
+<text x="1782" y="2012" font-size="20" fill="#193e73" font-weight="400" text-anchor="start">预算、ERP 与独立出纳</text>
+<polyline points="2177,1994 2193,1994" fill="none" stroke="#168dc5" stroke-width="3" marker-end="url(#arrow-168dc5)" stroke-linejoin="round"/>
+<rect x="2194" y="1947" width="410" height="95" rx="6" fill="#f3f9ff" stroke="#168dc5" stroke-width="1.6"/>
+<text x="2212" y="1978" font-size="24" fill="#168dc5" font-weight="700" text-anchor="start">6  核销与归档</text>
+<text x="2212" y="2012" font-size="20" fill="#193e73" font-weight="400" text-anchor="start">真实回执、资源消费、原件</text>
+<polyline points="2607,1994 2623,1994" fill="none" stroke="#168dc5" stroke-width="3" marker-end="url(#arrow-168dc5)" stroke-linejoin="round"/>
+<rect x="2624" y="1947" width="410" height="95" rx="6" fill="#f3f9ff" stroke="#168dc5" stroke-width="1.6"/>
+<text x="2642" y="1978" font-size="24" fill="#168dc5" font-weight="700" text-anchor="start">7  运营反馈</text>
+<text x="2642" y="2012" font-size="20" fill="#193e73" font-weight="400" text-anchor="start">消息、审计、SLA 与指标</text>
+<rect x="24" y="2082" width="3024" height="61" rx="6" fill="#f2f8ff" stroke="#b9d9ef" stroke-width="1.6"/>
+<text x="46" y="2121" font-size="28" fill="#193e73" font-weight="700" text-anchor="start">存储与证据</text>
+<text x="314" y="2121" font-size="25" fill="#193e73" font-weight="400" text-anchor="start">PostgreSQL / H2 开发库 · Flyway V104 · 业务与 Flowable 同数据源 · JDBC 队列 / outbox / 可选共享会话</text>
+<rect x="24" y="2157" width="3024" height="61" rx="6" fill="#f2f8ff" stroke="#b9d9ef" stroke-width="1.6"/>
+<text x="46" y="2196" font-size="28" fill="#193e73" font-weight="700" text-anchor="start">文件与部署</text>
+<text x="314" y="2196" font-size="25" fill="#193e73" font-weight="400" text-anchor="start">可选单机私有持久目录 · HTTPS / Nginx / Web 静态资源 · 可配置后端副本 · 同主机共用物理原件目录</text>
+<rect x="24" y="2232" width="3024" height="61" rx="6" fill="#fff7ec" stroke="#efbd80" stroke-width="1.6"/>
+<text x="46" y="2271" font-size="28" fill="#e88720" font-weight="700" text-anchor="start">可选与待完成</text>
+<text x="314" y="2271" font-size="25" fill="#193e73" font-weight="400" text-anchor="start">模型 / 财务 / SMTP / IM / 事件 / 指标需显式接入；OFD 公开抽取、组织同步、电子签及服务任务等仍待完成</text>
+<text x="44" y="2340" font-size="21" fill="#607a9a" font-weight="400" text-anchor="start">事实来源及可维护内容：docs/architecture/source-map.json；企业验收与未完成目标：docs/remaining-task-ledger.md</text>
+</g>
+</svg>

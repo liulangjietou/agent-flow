@@ -1,28 +1,384 @@
 # AgentFlow
 
-AgentFlow 是面向 OA、财务和表单审批的 DDD 工作流平台骨架。领域层表达审批、流程定义与工作日历规则，Flowable 作为基础设施防腐层运行 BPMN，Web 层提供租户隔离后的 REST API，Vue 设计器负责流程图编辑。
+AgentFlow 是面向 OA、表单审批和结构化财务业务的 DDD 工作流平台。Vue 工作台承载设计、填报、审批与财务操作；Java 领域模型维护状态和业务不变量；Flowable 运行已发布流程；持久执行器通过受控适配器连接模型、预算、ERP 和资金系统。
 
-当前已贯通官方模板复制、流程草稿编辑、版本化基础表单配置、校验、版本发布、申请提交和人工审批。本开发分支还包含[本地组织与选人](docs/local-organization.md)、[流程版本停用与恢复](docs/definition-availability.md)、[实际任务期限及站内超时提醒](docs/confirmed-rules-runtime.md)，以及[发起任职、动态主管和节点字段权限](docs/organization-context-and-field-permissions.md)、[表单附件及历史原文件保留](docs/field-attachments.md)。[Agent 审批摘要](docs/agent-execution.md)、财务执行链路和多项高级流程已有本地范围验收；原方案中的部分 Agent、费用管理/规则/模板/报表、组织同步、电子签和服务任务仍有本地开发。2026-10-02 已确认至少 **41 项**未完成（23 项本地开发、3 项本地验收与核对、15 项企业联调及交付），详见[当前任务台账](docs/remaining-task-ledger.md)。
+平台以**可信身份、固定版本、人工决策、权威外部事实及可恢复的原操作**组织整条链路。Agent 提供摘要、普通表单草稿和票据建议，审批、金额核定、付款授权及资金事实仍由各自业务用例负责。
 
-截至 2026-10-02，上述本地成果位于 `codex/governance-identifier-integration`，尚未合入 `main`，也未部署主演示；`main` 为 `60bafa0`，Git 远端未配置，尚无 PR 或远程 CI。历史部署记录只证明记录中的版本。当前版本用于本地开发验收；[系统自检](docs/system-adapter-checks.md)区分存储查询、适配器配置与实际企业验收，不能用健康状态推定完整平台已上线。
+本文与图中的源码核对基线为 [`fec4a87`](https://github.com/liulangjietou/agent-flow/commit/fec4a87c6c785ddabf40ad2584060e264abddd2f)，日期为 **2026-10-03**。已完成任务的代码已通过 [PR #1](https://github.com/liulangjietou/agent-flow/pull/1) 合入 `main`。图示表达源码中已有的本地实现；企业实际接入、部署和业务效果的验收范围见[未完成任务台账](docs/remaining-task-ledger.md)。
 
-“流程管理”提供[流程目录](docs/definition-catalog.md)，支持名称、状态、准确流程标识及版本筛选，分批加载草稿和发布版本；打开时读取最新配置并保护未保存修改。
+## 阅读导航
 
-申请、首次引导、版本比较和筛选也已接入[按需流程选择](docs/definition-selection.md)：列表只读摘要，选择后再取得所需配置；Web 不再启动时加载全部流程图和表单。
+- [全景架构图](#全景架构图)：五个层次、治理横条、业务闭环与部署底座。
+- [端到端流程图](#端到端流程图)：从流程发布到审批、财务执行、核销、归档及 Agent 辅助。
+- [模块边界与职责](#模块边界与职责)：编译依赖、用例编排、领域端口与适配器。
+- [流程定义与人工审批](#流程定义与人工审批)：发布、版本绑定、动态选人、会签及申请生命周期。
+- [结构化财务链路](#结构化财务链路)：预检、提交、预算、凭证、付款、核销与异常恢复。
+- [Agent 辅助链路](#agent-辅助链路)：输入选择、持久运行、模型校验与人工复核。
+- [安全与一致性](#安全与一致性)：身份、字段权限、职责分离、幂等与时间证据。
+- [存储与部署](#存储与部署)：数据源、原件、生产迁移、实例和备份恢复。
+- [快速启动](#快速启动)、[验证](#验证)、[能力边界](#能力边界)与[详细文档](#详细文档)。
 
-待办办理支持[批准意见填写与确认](docs/approval-comments.md)：意见选填，确认后提交；支持取消、原请求恢复和会签分别留痕，可在已办记录与操作审计追溯。
+## 全景架构图
 
-[Agent 审批摘要](docs/agent-execution.md)支持当前审批人显式选择允许发送的字段，通过持久队列调用受控模型服务，再由有效审批人采纳修订或拒绝。结果不能代替批准；[运行记录](docs/agent-summary-records.md)保留原文、证据与人工复核历史。适配器默认关闭，真实模型连接和输出质量仍需目标环境验收。
+[![AgentFlow 全景架构：用户入口、可信接入、领域与审批运行时、Agent 与财务执行、运营集成与交付](docs/assets/agentflow-panorama.png)](docs/assets/agentflow-panorama.png)
 
-管理员“操作审计”支持按操作人、动作、来源、申请及 UTC 时间跨申请检索追加事件，保留缺失元数据的旧记录，并可下钻原申请详情。详见[管理员操作审计](docs/audit-search.md)。
+[查看高分辨率 PNG](docs/assets/agentflow-panorama.png) · [打开可缩放 SVG](docs/assets/agentflow-panorama.svg) · [内容与源码索引](docs/architecture/source-map.json) · [图稿维护说明](docs/architecture/README.md)
 
-操作审计可按已查询条件[导出审计摘要 Excel](docs/audit-export.md)，一次最多 10,000 条；保留操作事实、原始标识和 UTC 时间，旧事件缺失信息留空，不包含表单正文和审批意见。
+全景图以职责分栏。蓝色箭头表示调用与协作，绿色箭头表示真实结果反馈；虚线卡片标出需要显式配置的可选能力。一次业务不必依次经过所有栏目，具体入口和节点由业务类型及已发布流程决定。
 
-管理员“申请记录”支持标题/单号、状态、流程版本、申请人和 UTC 创建日期筛选，并通过有界摘要分页定位历史申请。详情仍使用原授权接口，普通用户权限不扩展；详见[管理员申请检索](docs/application-search.md)。
+| 层次 | 主要调用方与入口 | 核心职责 | 下游与持久结果 |
+| --- | --- | --- | --- |
+| 用户入口与业务建模 | 申请人、审批人、财务、出纳、流程及配置管理员 | 工作空间、模板复制、流程/表单设计、专用财务填报、版本冲突与原请求恢复 | `/api/v1` REST；浏览器只提交允许的输入和预期版本 |
+| 可信接入与用例编排 | Spring MVC Controller、定时调度及事件消费者 | 认证主体、业务授权、幂等响应、跨聚合锁与事务、来源复核 | 领域聚合、Flowable 端口、JDBC 仓储及持久任务 |
+| 领域规则与审批运行时 | 发布、提交、办理、等待及实例控制用例 | 状态变更、条件 AST、节点策略、选人依据、会签门槛及业务日历 | 发布版本、引擎实例、真实待办、提交轮次、轨迹与审计 |
+| Agent 辅助与财务执行 | 显式模型运行、最新预检、人工批准、财务授权及出纳执行 | 受控输入、金额与资源、预算、凭证、资金命令、未知恢复、核销及归档 | 模型原文和复核记录；外部回执、本地账本及原件清单 |
+| 运营集成与持续交付 | 组织管理员、运营查询、集成管理员及部署维护人员 | 目录治理、消息/outbox、事件/inbox、查询导出、指标、迁移与恢复 | 外部适配器、追加审计、监控采集、发布包及隔离恢复点 |
 
-管理员可按相同筛选[导出申请摘要 Excel](docs/application-export.md)，一次导出全部匹配记录，保留单号、状态及 UTC 时间；最多 10,000 份，超过时要求缩小筛选。单号和标题按文本保存，不包含表单正文或审批意见。
+## 端到端流程图
 
-## 单命令演示安装
+[![AgentFlow 端到端业务流程：设计发布、可信提交、人工审批、独立财务执行、核销归档及 Agent 侧路](docs/assets/agentflow-business-flow.png)](docs/assets/agentflow-business-flow.png)
+
+[查看高分辨率 PNG](docs/assets/agentflow-business-flow.png) · [打开可缩放 SVG](docs/assets/agentflow-business-flow.svg)
+
+图中使用**专用报销链路**展示详细流程。事前申请、借款、采购付款和预算调整复用审批与执行基础设施，并保留自己的聚合、来源和金额规则。纸件签收、业务会签、财务审核与复核的具体要求来自发布定义及法人配置。
+
+```mermaid
+flowchart LR
+    A["模板 / 独立草稿"] --> B["流程、表单与策略校验"]
+    B --> C["模拟 / 版本比较 / 发布"]
+    C --> D["专用填报 / 原件 / 任职"]
+    D --> E["事务外预检<br/>固定双版本与证据"]
+    E --> F{"预检最新且有效?"}
+    F -- "否" --> D
+    F -- "是" --> G["提交短事务<br/>冻结本轮资源 / 启动审批 / 预算排队"]
+    G --> H["真实人工审批<br/>选人 / 会签 / 签收 / 财务复核"]
+    G --> I["后台预算原命令"]
+    I -- "明确不足" --> R["退回当前轮次"]
+    I -- "确认事实" --> H
+    H -- "退回 / 撤回" --> R
+    R --> D
+    H -- "最终批准" --> J["持久凭证准备与 ERP 原操作"]
+    J --> K["财务短期授权 → 独立出纳执行"]
+    K --> L{"权威资金结果?"}
+    L -- "未知" --> Q["原交易查询 / 明确恢复"]
+    Q --> L
+    L -- "成功" --> M["资源核销与预算消费"]
+    L -- "成功" --> N["独立付款凭证"]
+    M --> O["核验必要终态与原件 → 归档"]
+    N --> O
+    J -- "零应付独立来源" --> M
+    O --> P["消息 / 审计 / 运营反馈"]
+    H -. "明确选择输入" .-> AI["可选 Agent 建议"]
+    AI -. "人工采纳或拒绝；批准另行办理" .-> H
+```
+
+**批准、已过账、已付款、已核销和已归档分别表示不同事实。** 提交回执只证明本地事务成功及外部任务已登记；凭证准备 `READY` 不代表 ERP 已过账；`SETTLED` 还要求本地资源和预算实际消费完成。
+
+## 模块边界与职责
+
+| 模块 | 实际职责 | 代表源码 |
+| --- | --- | --- |
+| `agentflow-common` | `Actor`、当前主体、统一 `JsonUtil`、稳定领域错误 | [Actor](agentflow-common/src/main/java/io/agentflow/common/Actor.java)、[JsonUtil](agentflow-common/src/main/java/io/agentflow/common/JsonUtil.java) |
+| `agentflow-domain` | 定义图、条件、表单、申请与轮次、组织、日历、财务聚合和端口；表达状态与业务不变量 | [Application](agentflow-domain/src/main/java/io/agentflow/approval/model/Application.java)、[DefinitionValidator](agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java)、[领域依赖](agentflow-domain/pom.xml) |
+| `agentflow-server` | Spring MVC 接口；认证和权限；跨聚合编排；Flowable、Flyway、JDBC、文件与 HTTP 适配；持久执行器 | [ApprovalApplicationFacade](agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java)、[运行适配器](agentflow-server/src/main/java/io/agentflow/approval/process/FlowableProcessRuntimeAdapter.java) |
+| `agentflow-web` | Vue 工作空间、设计器、表单、财务工作台；按需查询、确认写入、身份切换和原请求恢复 | [入口菜单](agentflow-web/src/workspaceNavigation.ts)、[请求恢复](agentflow-web/src/pendingWrites.ts)、[按需定义选择](agentflow-web/src/definitionSelection.ts) |
+
+```mermaid
+flowchart TB
+    WEB["agentflow-web<br/>Vue 3 / TypeScript / Vite"]
+    SERVER["agentflow-server<br/>Spring Boot 3.5.6 / Spring MVC"]
+    DOMAIN["agentflow-domain<br/>聚合 / 策略 / 用例 / 仓储与运行端口"]
+    COMMON["agentflow-common<br/>Actor / JsonUtil / 错误"]
+    ENGINE["Flowable 7.2.0<br/>BPMN / 实例 / 任务 / 历史"]
+    JDBC["JDBC / Flyway<br/>业务事实 / 任务队列 / outbox / inbox"]
+    EXTERNAL["受控 HTTP 适配器<br/>模型 / 财务权威系统 / 通知"]
+    WEB -- "REST" --> SERVER
+    SERVER -- "编译依赖" --> DOMAIN
+    SERVER -- "编译依赖" --> COMMON
+    DOMAIN -- "编译依赖" --> COMMON
+    SERVER -- "运行端口的基础设施实现" --> ENGINE
+    SERVER --> JDBC
+    SERVER --> EXTERNAL
+```
+
+职责按业务归属划分：实体判断和改变自身状态；跨聚合读取、锁和外部资源编排位于用例层；适配器处理引擎、数据库、文件和远端协议。领域层通过 `ProcessRuntimePort`、仓储和财务端口调用下游，不把 Flowable 类型带入业务模型。
+
+`agentflow-domain` 的直接业务依赖是 `agentflow-common`；部分领域对象使用由 common 传入的 Spring `CollectionUtils`，因此不能把当前实现描述为完全没有 Spring 依赖。Spring MVC、事务容器和 Flowable 适配均位于 server。
+
+同一个 `agentflow-server` 承载这些上下文；图中的领域分栏不是多个独立微服务。后台持久执行器使用平台自己的调度和租约，配置中的 Flowable 异步执行器默认关闭。
+
+## 流程定义与人工审批
+
+### 定义从草稿到发布
+
+内置目录当前包含 **5 个模板**：请假、用印、合同审批、采购付款、预算调整。模板复制产生独立草稿并保存来源，已有副本不会被目录升级覆盖。事前申请、报销和借款已有专用运行入口，其可复制财务模板包仍在当前台账的 F13 中。
+
+```mermaid
+flowchart LR
+    T["只读模板目录"] --> C["按所见目录版本复制"]
+    C --> D["独立草稿<br/>图 / 表单 / 通知 / revision"]
+    D --> V{"结构与类型校验"}
+    V -- "不通过" --> D
+    V -- "通过" --> I["身份 / 日历 / 事件 / 子流程依据核对"]
+    I --> S["模拟、分支覆盖与版本差异"]
+    S --> P["发布事务<br/>分配业务版本 / 保存发布事实"]
+    P --> B["Graph → BPMN → Flowable 部署"]
+    B --> F["固定发布版本与 runtimeDefinitionId"]
+    F --> X{"该发布版本启用?"}
+    X -- "是 / 管理员恢复" --> A["新申请绑定该版本；原申请按原版本重提"]
+    X -- "否 / 管理员停用" --> STOP["阻断新建与重提；既有在审实例继续"]
+```
+
+发布由 [DefinitionApplicationService](agentflow-server/src/main/java/io/agentflow/definition/DefinitionApplicationService.java) 编排，经过 [DefinitionValidator](agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java)、引用核对、分支覆盖和同一套条件求值器，再调用 [FlowableDefinitionDeploymentAdapter](agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java) 生成 BPMN。定义、部署和发布记录在同一事务内成功或回滚。
+
+当前开放节点：
+
+| 节点 | 运行含义 | 关键约束 |
+| --- | --- | --- |
+| `START / END` | 明确开始和结束 | 图结构及可达性必须合法 |
+| `USER_TASK` | 真实人工任务 | 当前可办理权限、固定选人依据、版本和决策意见 |
+| `COPY` | 只读抄送 | 收件范围与字段读取权限；不授予批准权 |
+| `EXCLUSIVE_GATEWAY` | 有顺序的排他分支 | 白名单条件 AST、默认分支与覆盖检查 |
+| `PARALLEL_GATEWAY` | 结构化并行与汇合 | 校验分支结构，历史保留真实执行路径 |
+| `TIMER_WAIT` | 到期后的受控恢复 | 固定等待实例及当前轮次 |
+| `EVENT_WAIT` | 等待契约匹配的可信事件 | 来源、签名、去重及等待绑定 |
+| `SUB_PROCESS` | 引用固定发布子流程 | 版本、输入和关系可追溯，不任意调用流程 |
+
+`SERVICE_TASK` 虽在类型枚举中存在，当前发布校验明确拒绝；抄送内部实现使用引擎服务节点，不等于开放任意服务任务。条件不执行用户输入的 JUEL、Java 或脚本。
+
+### 申请生命周期与轮次
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT: 创建申请
+    DRAFT --> IN_APPROVAL: 提交并建立轮次
+    IN_APPROVAL --> APPROVED: 最终批准
+    IN_APPROVAL --> REJECTED: 驳回
+    IN_APPROVAL --> RETURNED: 退回补正
+    IN_APPROVAL --> WITHDRAWN: 本人撤回，业务守卫允许
+    RETURNED --> IN_APPROVAL: 重新提交，新轮次
+    WITHDRAWN --> IN_APPROVAL: 重新提交，新轮次
+    DRAFT --> CANCELLED: 作废
+    RETURNED --> CANCELLED: 作废
+    WITHDRAWN --> CANCELLED: 作废
+    IN_APPROVAL --> CANCELLED: 管理员具名终止当前根实例
+    APPROVED --> [*]
+    REJECTED --> [*]
+    CANCELLED --> [*]
+```
+
+[ApprovalApplicationFacade](agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java) 解析发布版本、认证主体、任职和原件依据，再调用领域 [ApprovalApplicationService](agentflow-domain/src/main/java/io/agentflow/approval/service/ApprovalApplicationService.java)。提交通过运行端口启动真实实例，同时保存申请版本、`SubmissionRound` 和操作审计。
+
+申请人只在 **DRAFT / RETURNED / WITHDRAWN** 编辑。重提继续使用原绑定的流程与表单版本；原版本被停用时先恢复该版本，不静默切换最新版。每次提交建立新的任职和内容快照，旧轮次保持不变。结构化财务的撤回、核减和撤销还要通过其资源及执行状态守卫；生命周期不能单独推定预算、银行或 ERP 已撤销。
+
+管理员只可具名终止当前在审根轮次及尚未完成的后代，结果为 `CANCELLED`，不能恢复或重提；已经批准或驳回的结论保持。暂停和恢复仍保持 `IN_APPROVAL`，属于运行状态变化。`REVOKED` 目前存在于状态枚举，本图不把它描述为已开放的撤销路径。
+
+### 动态选人、会签与任务办理
+
+- 发起时明确选择有效任职并固定到该轮次。主管、部门负责人或字段选人依据来自可信目录及提交快照。
+- 全员、任一人、比例会签在节点激活时固定名单和门槛；达标结束剩余待办，保留已经发生的批准和意见。
+- 领取、释放、转交、委派、受托回交和期限代理分别授权。委派协助不替代原审批人的最终责任。
+- 职责分离过滤冲突人员；无人可审批时阻断。费用自动上溯、相邻重复审批人自动通过等额外策略仍见台账，不能从“动态主管”推定已实现。
+- 任务期限从真实创建时刻按固定业务日历计算。转交和委派不重置已经开始的期限；超时、升级和代理保留实际依据。
+
+真实动作由 [TaskController](agentflow-server/src/main/java/io/agentflow/approval/TaskController.java) → [FlowableTaskFacade](agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskFacade.java) → 运行端口办理；[OrganizationAssigneeResolver](agentflow-server/src/main/java/io/agentflow/organization/OrganizationAssigneeResolver.java) 负责组织依据解析。界面显示的可操作按钮只是提示，写接口重新校验。
+
+## 结构化财务链路
+
+### 业务聚合各自负责自己的事实
+
+| 业务 | 本地生命周期与主要事实 | 审批后的后续处理 |
+| --- | --- | --- |
+| 事前申请 | 计划草稿、目录/汇率预检、冻结轮次、实际批准和事前额度 | 本人额度关闭、报销引用与并发预留 |
+| 费用报销 | 精确明细、税额和分摊；票据、事前额度、借款冲销；制度版本和财务轮次 | 预算、审核核减、凭证、付款或零应付、核销、归档 |
+| 员工借款 | 借款申请、账户、金额、还款日及法人时区 | 放款凭证与资金执行、到账余额、还款、退回复核和逾期控制 |
+| 采购付款 | 采购申请与真实应付来源、原应付预留、供应商账户和职责分离 | 独立供应商银行指令、结算、调整、争议与退票 |
+| 预算调整 | 预算来源、调整预检、人工批准与授权 | 独立原调整命令、结果查询、异常复核及财务终态 |
+
+客户端不能用普通表单、金额总数或“已成功”标志替代这些业务事实。不同业务通过 `BusinessReference` 关联审批申请，财务金额和版本由专用服务派生。
+
+### 预检与正式提交
+
+预检读取外部主数据、账户、汇率、制度、原件查验及预算预检，保存完整请求、目标指纹、双版本和证据有效期。制度提示服务提供填报依据，正式预检仍要使用实际费用行和票据执行权威规则判定。
+
+正式提交由 [ExpenseSubmissionService](agentflow-server/src/main/java/io/agentflow/expense/ExpenseSubmissionService.java) 在本地短事务中完成：
+
+1. 校验本人、申请版本、财务版本及最新 `READY` 预检，锁定并重读资源。
+2. 核对预检时效、制度发布选择、原流程可启动性及必要财务阶段。
+3. 冻结轮次金额、税额、账户、分摊及资源预留；保存当前财务状态。
+4. 启动原绑定版本的真实审批，固定任职和提交轮次。
+5. 登记预算原命令；再检查证据时效，将业务变化、审计与幂等回执共同提交。
+
+任何末尾失败整体回滚。提交事务不等待外部预算 HTTP，排队结果不是预算成功。预算明确不足会退回匹配的当前轮次；旧轮次结果不能退回已重提的新轮次。
+
+### 凭证、付款、核销与归档
+
+| 阶段 | 实际触发与执行 | 成功事实 | 失败或未知的处理 |
+| --- | --- | --- | --- |
+| 预算操作 | 固定本轮分摊及原目标，后台冻结/调整/释放/消费 | 对应预算命令的权威确认 | 依赖不可用与业务拒绝分开；未知查询原操作 |
+| 挂账准备 | 最终批准同事务登记准备任务；事务外读取会计期间和科目 | 原批准来源、有效期间及已发布科目选择复核通过 | 配置发布竞争或来源改变阻断登记；人工刷新准备 |
+| ERP 过账 | 保存唯一原凭证命令，后台发送并记录修订 | 权威凭证号和过账回执 | 未知查询原命令；查无后按规则明确原号重发；冲回及争议单独留存 |
+| 付款授权 | 财务按刚查看的批准、业务及凭证版本显式授权 | 短期授权及原收款账户依据 | 过期、来源改变及安全结束不与银行未知混同 |
+| 出纳执行 | 独立出纳选付款账户，事务外复查，登记原付款 | 银行/资金权威成功修订 | 超时、迟到、冲突及退票原查询；不能换号绕过 |
+| 资源核销 | 真实付款、全额借款冲销或零额核定具有独立来源 | 本地资源已消费且预算实际消费成功 | 重试保留已消费标记；争议冻结不恢复旧资源 |
+| 付款凭证 | 实际银行成功单独登记 `PAYMENT` 准备与过账 | 对应银行事实的会计结果 | ERP 不可用不能把银行到账改为未付款 |
+| 归档 | 核对必要审批、财务终态和原件；事务外读文件后再锁内复核 | 不可变清单与受字段权限约束的 ZIP | 不造外部成功、不覆盖原件；后续争议保留原清单 |
+
+[科目映射管理](docs/account-mapping-configuration.md)按照法人及类别管理发布版本。凭证准备领取时固定选择，登记前与配置发布共用锁复核；已经登记的原凭证保留原映射与摘要，新版本不会改写旧会计依据。
+
+**零应付是独立业务路径。** 全额借款冲销或零额核定不生成零额银行付款；核销仍核对真实资源及预算事实。只有实际银行付款才需要对应付款凭证。
+
+### 持久执行与未知结果恢复
+
+```mermaid
+sequenceDiagram
+    participant U as 人工授权用例
+    participant DB as JDBC 持久事实
+    participant W as 后台执行器
+    participant X as 原外部权威系统
+    U->>DB: 短事务保存原命令、来源、目标及审计
+    W->>DB: 短事务锁内复核并领取租约
+    DB-->>W: 固定原输入与执行版本
+    W->>X: 事务外发送原命令
+    alt 权威结果明确
+        X-->>W: 成功或业务拒绝回执
+        W->>DB: 短事务重验来源与版本、追加修订和本地消费
+    else 超时、连接中断或结果不确定
+        W->>DB: 保留未知状态及原命令身份
+        W->>X: 原交易 / 原凭证 / 原预算操作查询
+        X-->>W: 原操作的权威结果
+        W->>DB: 记录结果或继续等待明确处置
+    end
+    Note over W,X: 权威查无与明确人工恢复才允许原号重发；不另造命令绕过
+```
+
+代表执行器：[BudgetOperationWorker](agentflow-server/src/main/java/io/agentflow/finance/BudgetOperationWorker.java)、[VoucherPreparationWorker](agentflow-server/src/main/java/io/agentflow/finance/VoucherPreparationWorker.java)、[VoucherOperationWorker](agentflow-server/src/main/java/io/agentflow/finance/VoucherOperationWorker.java)、[PaymentOperationWorker](agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationWorker.java)。
+
+本地数据库事务不会跨越外部网络请求。原命令唯一身份、固定目标、租约、来源版本和追加回执共同解决不确定性；它们不能把多个企业系统变成一个分布式 ACID 事务。资金已经发生而本地确认失败时恢复原查询，原事实持续保留。
+
+## Agent 辅助链路
+
+| 能力 | 允许输入与输出 | 人工及权限边界 |
+| --- | --- | --- |
+| 审批摘要 | 当前有效审批人明确选择可读字段/附件来源，生成结构化摘要与来源引用 | 采纳、修订或拒绝保留模型原文；最终批准另行执行 |
+| 普通表单草稿 | 按发布表单和当前可编辑状态提出建议 | 逐项确认并走原草稿保存；结构化财务整单填报仍有专用能力缺口 |
+| 票据抽取与辅助填报 | 使用服务器原件、摘要和受控格式，保留原文及候选值 | 确认抽取结果不等于发票真实；金额填报与权威查验分别进行 |
+
+```mermaid
+sequenceDiagram
+    participant A as 当前有效审批人
+    participant API as AssistExecutionService
+    participant DB as 运行与持久任务
+    participant W as AssistWorker
+    participant M as 受控模型端点
+    A->>API: 读取当前可用来源及模型目标指纹
+    A->>API: 明确选择来源，提交任务与申请版本
+    API->>DB: 保存来源、轮次、运行与排队任务
+    W->>API: 短事务领取、复核当前来源并建立租约
+    W->>M: 事务外、非流式、严格 JSON 请求
+    M-->>W: 模型原文及结构化建议
+    W->>API: 核验租约、版本、来源引用及输出契约
+    API->>DB: 保存原文、结果或稳定失败分类
+    A->>API: 人工修订、采纳或拒绝
+    API->>DB: 再核对权限与版本，追加复核历史
+    Note over A,API: 采纳建议不批准申请，不授权付款，不产生权威财务事实
+```
+
+[AssistExecutionService](agentflow-server/src/main/java/io/agentflow/agent/AssistExecutionService.java) 固定输入及运行版本，[AssistWorker](agentflow-server/src/main/java/io/agentflow/agent/AssistWorker.java) 在事务外调用模型，[OpenAiTextClient](agentflow-server/src/main/java/io/agentflow/agent/OpenAiTextClient.java) 校验原目标、响应结构和有界正文。
+
+模型目标来自部署配置，浏览器只能确认目标指纹。身份、来源、任务或版本变化后重新授权；过期租约不能接受迟到结果。超时及进程中断不盲目重发模型调用。默认 `AGENTFLOW_ASSIST_ENABLED=false`，合成模型验证只证明协议与权限链路，真实模型连接和样本质量仍需验收。
+
+## 安全与一致性
+
+### 权限分层
+
+| 层面 | 实际判断 | 业务影响 |
+| --- | --- | --- |
+| 认证主体 | 演示 Bearer 或 OIDC 生成可信 `Actor` | 请求不能自带任意租户、用户或系统角色 |
+| 系统角色 | `PROCESS_ADMIN / FINANCE_CONFIG_ADMIN / FINANCE / CASHIER / ADMIN` 等能力 | 角色只授予相应功能入口，不替代本人、参与者或组织范围规则 |
+| 组织与职责 | 人员、部门、岗位、有效任职、主管关系、代理及冲突人员 | 选人依据可追溯，认证身份与组织目录分别管理 |
+| 数据读取 | 当前参与关系、轮次与节点字段显隐、只读、脱敏 | 管理员、财务及出纳仍受敏感字段规则约束 |
+| 文件读取 | 元数据所属租户、申请、字段及当前授权 | 无匿名原件 URL；移除当前引用不删除历史原件 |
+| 决策与执行 | 可办理任务、双版本、证据时效、原目标及职责分离 | 页面提示不能代替写接口检查，付款需独立出纳 |
+
+### 写入、快照与时间证据
+
+- 业务写接口要求 `Idempotency-Key`。原键绑定租户、主体、角色摘要、方法、路径、查询和原始正文，成功响应与本地业务变更同事务保存。不同请求或权限变化不能复用原回执。
+- `expectedVersion`、草稿 `revision`、申请/财务双版本和运行版本解决各自的并发覆盖。幂等解决重复操作，版本解决所见事实是否仍然成立。
+- 发布流程、表单、通知、日历修订、任职、风险、金额、制度和科目选择按各自业务边界固定；历史依据不能由今天的配置推断或补造。
+- 金额以精确十进制文本及币种表达，分摊按业务规则平衡；未知结果不转成业务拒绝或成功。
+- 业务截止时刻保留原始精度。JDBC 的 `TIMESTAMP(6)` 使用显式微秒投影校验，冻结 JSON 保留纳秒证据，避免数据库舍入改变授权截止判断。
+- 模型、财务和通知目标由可信配置指定；远端身份、协议回显、来源、摘要、时效和结果分类由适配器核对。
+
+实现入口：[IdempotencyExecutor](agentflow-server/src/main/java/io/agentflow/api/idempotency/IdempotencyExecutor.java)、[ApplicationFieldViews](agentflow-server/src/main/java/io/agentflow/approval/ApplicationFieldViews.java)、[JdbcTimestampPrecision](agentflow-server/src/main/java/io/agentflow/jdbc/JdbcTimestampPrecision.java)。
+
+## 存储与部署
+
+### 数据与运行底座
+
+| 内容 | 当前位置与配置 | 运行约束 |
+| --- | --- | --- |
+| 业务事实 | JDBC 仓储，PostgreSQL；本地开发默认 H2 文件库 | 申请、财务聚合、轮次和修订以租户及来源约束关联 |
+| 工作流运行 | 同数据源 Flowable 表 | 与申请/轮次的本地事务共同提交，不将引擎状态等同于财务终态 |
+| 结构迁移 | Flyway，当前源码最高业务迁移 `V104` | 生产用维护命令迁移；服务启动校验已迁移结构 |
+| 持久后台任务 | JDBC 任务、租约、执行状态和回执修订 | 副本竞争原任务；网络请求在事务外 |
+| 外发与事件 | 通知/Webhook outbox，可信事件 inbox | 持久去重、最小外发、签名、租约与结果恢复 |
+| 企业会话 | 可选 Spring Session JDBC | 多实例 OIDC 需要统一共享会话配置，支持跨实例回调及注销 |
+| 原件 | 可选单机私有持久目录与数据库元数据 | 同主机副本共用同一物理目录；跨主机独立目录不支持当前附件方案 |
+| 可观测性 | Actuator 健康，可选专用凭证 Prometheus 入口 | 不暴露表单正文；企业容量目标、阈值和告警接收链另行验收 |
+
+当前实现使用 JDBC 队列和原件目录；部署图按已有 Compose 及维护命令组织。
+
+```mermaid
+flowchart TB
+    B["浏览器 / 企业用户"]
+    IDP["可信企业 IdP<br/>显式配置 OIDC"]
+    W["HTTPS / Nginx<br/>Vue 静态资源与 API 代理"]
+    S["agentflow-server 同版本副本<br/>MVC / 领域用例 / Flowable / 持久执行器"]
+    PG["外部 PostgreSQL<br/>业务 / 引擎 / 队列 / 可选共享会话"]
+    FILE["可选私有原件目录<br/>同主机共用同一物理存储"]
+    EXT["显式配置的模型 / 财务 / 通知 / 事件系统"]
+    OPS["同一发布包维护命令<br/>schema migrate / validate"]
+    METRICS["可选 Prometheus<br/>专用凭证、逐实例采集与告警"]
+    BACKUP["停写后的配套备份<br/>恢复到新库与新目录并核验"]
+    B --> W --> S
+    B -. "企业登录" .-> IDP
+    IDP -. "认证与注销协议" .-> S
+    S --> PG
+    S --> FILE
+    S --> EXT
+    OPS --> PG
+    S -. "仅指标" .-> METRICS
+    PG --> BACKUP
+    FILE --> BACKUP
+```
+
+### 启用与部署方式
+
+| 能力 | 默认状态或入口 | 配套说明 |
+| --- | --- | --- |
+| 开发与 Docker 演示 | 开发 H2；`compose.demo.yml` 使用 PostgreSQL 17，入口 `8180` | [演示安装](docs/demo-installation.md) |
+| 企业身份 | 开发演示认证启用；`prod` 关闭演示，OIDC 需可信配置 | [OIDC](docs/enterprise-oidc.md)、[共享会话](docs/shared-enterprise-sessions.md) |
+| Agent 模型 | `AGENTFLOW_ASSIST_ENABLED=false` | `compose.assist.yml`；[受控模型执行](docs/agent-execution.md) |
+| 财务权威系统 | `AGENTFLOW_FINANCE_GATEWAY_ENABLED=false` | 按租户显式目标与凭据；[财务网关](docs/finance-gateway.md) |
+| 附件与票据原件 | 未配置 `AGENTFLOW_ATTACHMENT_DIRECTORY` 时关闭 | `compose.attachments.yml`；[原件与配套恢复](docs/field-attachments.md) |
+| 外发通知 | 外发 worker 默认关闭；目的地、绑定和凭据显式配置 | [通知投递](docs/notification-delivery.md)、[Webhook](docs/webhook-delivery.md) |
+| 事件集成 | `AGENTFLOW_EVENTS_ENABLED=false` | [事件契约](docs/event-contracts.md)、[事件工作区](docs/event-workspace.md) |
+| Prometheus | `AGENTFLOW_METRICS_ENABLED=false` | `compose.monitoring.yml`；[监控与告警](docs/production-monitoring.md) |
+| 企业 HTTPS | `compose.production.yml` 默认外部端口 `443`，后端副本默认 1 | [生产容器](docs/production-container-deployment.md)、[多实例](docs/multi-instance-deployment.md) |
+
+生产数据库生命周期使用**同一个发布 jar**：
+
+```bash
+java -jar agentflow-server.jar --schema=migrate
+java -jar agentflow-server.jar --schema=validate
+```
+
+维护命令使用对应数据库身份；`prod` 应用启动只检查既有结构，未迁移则拒绝启动。备份、只读校验、数据库和文件配套恢复分别见[数据库生命周期](docs/production-database-lifecycle.md)、[生产备份恢复](docs/production-backup-recovery.md)和[原件恢复](docs/field-attachments.md#数据库与文件配套恢复)。恢复到独立新资源并核验原待办接续，生产切流及 RPO/RTO 以目标环境验收为准。
+
+## 快速启动
+
+### 单命令 Docker 演示
 
 Docker 已启动时，在仓库根目录执行：
 
@@ -30,186 +386,99 @@ Docker 已启动时，在仓库根目录执行：
 docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
 ```
 
-打开 `http://127.0.0.1:8180`，以 `demo / admin / demo` 登录。“系统自检”显示真实依赖状态，并提供模板和流程管理入口。数据库使用持久卷，仅 Web 入口开放到本机。首次构建需要网络，停止时保留数据卷。详见[演示安装与系统自检](docs/demo-installation.md)。
+打开 `http://127.0.0.1:8180`，租户 `demo`，用户 `admin`，密码 `demo`。数据库持久卷保留数据；停止环境时不需要删除卷。首次构建需要网络。系统自检显示依赖配置和实际查询状态；可选模型、财务和文件能力仍按上表启用。
 
-演示 PostgreSQL 支持[完整备份与隔离恢复](docs/demo-backup-recovery.md)：校验归档后使用原镜像恢复到新项目、新卷及新端口，保留旧实例；恢复后可继续办理未完成会签任务。工具不会覆盖已有数据，当前不包含生产灾备、跨版本升级或 H2 备份。
+### 本地 Java 与 Vue
 
-历史上，本地 Docker 演示完成了[阶段 70 → 75 升级与回退验收](docs/demo-stage75-upgrade.md)：隔离恢复和原待办继续办理通过，主入口切换前后 67 张表及原待办／定义响应一致，数据库保持 V23。该记录仅覆盖这次同结构版本升级。
-
-生产部署使用[独立数据库迁移命令](docs/production-database-lifecycle.md)：同一发布 jar 提供 `--schema=migrate` 和 `--schema=validate`，前者初始化或升级业务及引擎结构，后者使用 PostgreSQL 只读连接校验。`prod` 服务启动只检查已迁移结构，未迁移时拒绝启动；生产安装、升级和备份流程见该文档。
-
-[企业 HTTPS 容器部署](docs/production-container-deployment.md)提供独立 `compose.production.yml`、文件密钥、PostgreSQL CA、企业 OIDC 配置和 HTTPS 代理；连接外部数据库，迁移仅由维护命令执行。正式企业身份、组织和完整上线验收仍需完成。
-
-[生产指标采集与告警](docs/production-monitoring.md)提供默认关闭的专用凭证入口、Prometheus DNS 逐实例采集及七条告警规则，包括副本数不足。指标不包含表单正文，控制台只绑定本机；企业通知渠道、生产阈值和监控高可用仍需目标环境验收。
-
-[多实例部署与故障接续](docs/multi-instance-deployment.md)说明同版本副本配置、统一 HTTPS 入口、请求重放边界和升级停写要求；已有流程的幂等及租约竞争通过双实例测试，不代表组织接入或完整生产高可用已完成。
-
-[生产数据库备份与隔离恢复](docs/production-backup-recovery.md)提供外部 PostgreSQL 17 的完整逻辑备份、离线校验和随机新库恢复，强制 TLS 主机名校验并保留失败现场。原待办已通过隔离恢复后的办理验证；对象存储、生产切流、异地副本和 RTO/RPO 仍需独立验收。
-
-已启用附件的部署使用[数据库与文件配套备份恢复](docs/field-attachments.md#数据库与文件配套恢复)：停写后备份数据库和全部已发布原文件，逐文件核对摘要，恢复到全新数据库及目录；不自动删除历史原文或切换生产入口。
-
-## 本地启动
-
-需要 Java 17+、Maven 3.9+ 和 Node.js 20.19+ 或 22.12+。默认使用 H2 文件库，首次启动会由 Flyway 创建业务表，Flowable 自动创建引擎表并部署 `expense-reimbursement` 示例流程。
+需要 Java 17+、Maven 3.9+，以及 Node.js 20.19+ 或 22.12+。
 
 ```bash
-cd /Volumes/fyoung/code/AI/flow/agentflow
+git clone https://github.com/liulangjietou/agent-flow.git
+cd agent-flow
+
+# macOS：选择已安装的 JDK 17；其他系统使用自己的 JDK 路径
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+
 mvn -pl agentflow-server -am package
 java -jar agentflow-server/target/agentflow-server-0.1.0-SNAPSHOT.jar
 ```
 
-另开终端启动前端：
+另开终端，在同一仓库执行：
 
 ```bash
-cd /Volumes/fyoung/code/AI/flow/agentflow
 cd agentflow-web
 npm ci
 npm run dev -- --host 127.0.0.1
 ```
 
-开发服务器会把 `/api` 请求代理到 `http://127.0.0.1:8080` 并保留同源 Host；使用 `http://127.0.0.1:5173` 访问前端。直接调用其他后端地址时，设置 `VITE_API_BASE` 指向完整 API 前缀，并将 `AGENTFLOW_WEB_ORIGIN` 设置为实际前端来源。
+打开 `http://127.0.0.1:5173`。Vite 将 `/api` 代理到 `http://127.0.0.1:8080` 并保持同源 Host。直接调用另一后端时设置 `VITE_API_BASE` 为完整 API 前缀，后端 `AGENTFLOW_WEB_ORIGIN` 与实际前端来源一致。
 
-演示认证默认开启：租户 `demo`，用户 `admin` / `finance` / `manager` / `employee` / `alice` / `bob`，密码统一为 `demo`。生产环境应设置 `AGENTFLOW_DEMO_AUTH=false` 并接入企业 OIDC。
-
-## 模块边界
-
-- `agentflow-common`：认证主体、统一 JSON 和稳定错误码。
-- `agentflow-domain`：流程定义、受限条件 AST、流程模拟、审批申请、组织实体与日历聚合及仓储/运行时端口。
-- `agentflow-server`：Spring Boot、Flowable/Flyway/JDBC 适配器、认证过滤器和 REST API。
-- `agentflow-web`：Vue 3 + TypeScript 的任务中心、申请表单和流程设计器。
-
-流程设计器接受 `START`、`END`、`USER_TASK`、`COPY`、`TIMER_WAIT`、`EVENT_WAIT`、`SUB_PROCESS`、`EXCLUSIVE_GATEWAY` 和 `PARALLEL_GATEWAY` 节点；条件使用白名单语法（例如 `amount >= 1000 AND department == 'finance'`），不会执行用户输入的 JUEL、脚本或 Java 代码。
-
-高级画布支持[并行拆分与汇合](docs/parallel-gateways.md)：同时启动多个审批分支，全部完成后进入后续步骤；支持嵌套、分支内会签与条件选择，发布前阻止缺分支或交叉汇合造成的永久等待。
-
-Web 端的流程管理、申请记录和待办动作均调用服务端接口。流程设计器从当前租户选人目录读取有效成员，发布前重新检查静态规则的无人审批节点。显式启用本地目录后，可配置指定人员、部门、岗位成员，以及基于本轮发起任职的主管和部门负责人；单人候选和会签名单均在节点激活时冻结。动态规则在节点激活时校验实际关系，无有效人员则回滚推进。Agent 与财务的本地能力及真实企业接入边界见[当前剩余清单](docs/remaining-local-work.md)。详见[审批人配置与发布检查](docs/designer-assignees.md)。
-
-申请记录支持申请人撤回当前审批、查看退回或撤回说明、保存补正和重新提交；每次提交保存独立轮次快照及实际流程实例，后续修改不覆盖旧轮次。详见[申请撤回、补正与重新提交](docs/approval-resubmission.md)。
-
-申请人可[作废](docs/application-cancellation.md)草稿、已退回或已撤回的申请，保留正文、旧轮次与审计，作废后不能再修改或提交。未保存内容先明确处理；作废结果未知时恢复原请求，不能重复执行或改写已有审批结论。
-
-个人工作台提供“我发起”“我的草稿”“已办记录”，按本人归属和真实办理事实查询，支持搜索、筛选、分页及继续填写；转交后仍能查看参与过的申请。详见[个人工作台](docs/personal-workspace.md)。
-
-待办支持[列表与看板视图](docs/task-board.md)，按待领取、已指派和待回交分栏；两种视图共用筛选、分页和详情，列内按进入待办时间排列。
-
-待办支持委派、回交、转交、领取和释放。受托人填写意见并回交后，由原审批人最终决定；接收人从当前身份源读取，操作审计和已办保留双方办理事实。详见[任务委派与回交](docs/task-delegation.md)。
-
-消息中心提供真实站内提醒、全部/未读筛选、未读总数、分页和已读操作，可从消息定位当前待办或申请。审批与消息共同提交，消息不扩大原申请权限。[个人偏好](docs/notification-preferences.md)、[邮件投递与恢复](docs/notification-delivery.md)、[企业微信参考发送器](docs/wecom-notifications.md)及[超时升级](docs/task-escalation.md)已完成本地验收；外发只使用通用提醒，真实企业渠道和最终递送另行验收。详见[站内消息中心](docs/notification-inbox.md)。
-
-待办与申请详情支持真实审批轨迹、操作审计、轮次与动作/时间筛选及游标分页。新操作在业务事务内保存当时的操作人、转交接收人和申请状态变化；旧记录没有的信息不补造。详见[审批轨迹与操作审计](docs/approval-history.md)。
-
-申请详情还提供按实际轮次绑定的[流程图](docs/round-process-diagram.md)，展示当前节点、已离开节点、会签剩余任务以及实际流转路径与连线记录；后续发布和重提不会替换旧轮次的图。
-
-待办与申请详情提供[提交轮次内容对比](docs/submission-round-comparison.md)，并排核对任意两轮的标题、版本、字段和表单配置，保留精确金额、空值及字段增删。对比仅使用提交快照，不包含尚未提交的修改。
-
-审批中申请支持协作评论，按申请权限读取并保留当时的轮次和状态，支持分页、草稿保留、幂等恢复及对本轮已有读取权限人员的 @ 提醒；已结束申请保持只读。详见[申请协作评论](docs/application-comments.md)。
-
-管理员可维护工作日历、节假日与调休，保留不可变修订并按固定版本试算到期时间。流程节点绑定明确日历修订后，新任务从创建时起计算期限；转交、委派和回交不重置，旧任务不补造期限。详见[工作日历与期限试算](docs/business-calendars.md)与[任务期限](docs/task-deadlines.md)。
-
-所有申请、评论、日历管理、组织维护、任务动作、流程定义和模板复制写接口要求 `Idempotency-Key`。服务端在业务事务内保存成功响应，前端在网络结果未确认时保留原请求供恢复；详见[业务写请求幂等协议](docs/request-idempotency.md)。
-
-流程管理支持文本、长文本、数字、日期、单选、布尔字段配置和填写预览。申请可先保存不完整草稿，提交时由服务端检查必填与类型；申请及每轮历史各自保留绑定表单，不随新版本改变。数字字段使用十进制字符串保留精度，分支只能引用已声明字段；详见[版本化申请表单](docs/versioned-forms.md)。
-
-模板中心提供请假、用印和合同审批模板，包含表单、流程图、角色说明和路由样例。流程管理员复制后得到当前租户的独立草稿，可编辑后发布；模板复制记录保留来源版本，模板更新不覆盖旧副本。演示审批角色与阈值需按实际制度配置；详见[流程模板中心](docs/process-templates.md)。
-
-设计器支持[随版本发布的申请人站内通知文案](docs/definition-notification-texts.md)：配置提交、退回和批准三类纯文本，申请创建时冻结，历史消息保持原文；模板 v2 复制和模板文件 v2 导入导出携带配置。[本地演示 8180 已完成 V24 升级](docs/demo-notification-upgrade.md)，独立回退、旧待办接续及原数据保留验收通过。
-
-流程配置支持[模板文件导入与导出](docs/portable-process-templates.md)：预览 JSON 文件、检查当前审批人、创建独立草稿；已保存与未保存设计均可导出，同标识的新发布不覆盖原版本。
-
-设计器提供[快速步骤与高级画布](docs/quick-workflow-designer.md)两种视图：快速插入审批和嵌套条件、调整分支顺序、按表单字段配置条件；[并行步骤](docs/quick-parallel-designer.md)支持自动配对汇合、增删分支与条件合流。复杂流程保留在高级画布编辑，两种模式共用保存、撤销、模拟和发布链路。
-
-本地 8180 已完成[快速并行设计器部署](docs/demo-quick-parallel-upgrade.md)：恢复副本升级、回退、原待办接续，以及主数据库和业务响应保留验证通过。
-
-设计器支持[版本化组合条件](docs/condition-language.md)：枚举 IN 多选、括号、取反及混合且/或表达式；旧草稿显式等价升级，已发布流程继续原语义，语法错误显示字符位置并定位连线。
-
-设计器支持[数字分支覆盖与重叠检查](docs/branch-coverage.md)：遗漏输入阻止发布，重叠保留顺序并提醒；诊断提供精确示例，发布时保存提醒，校验面板打开后随编辑自动检查。
-
-组合条件、覆盖诊断及中文条件编辑已完成[隔离环境浏览器补充验收](docs/designer-browser-acceptance.md)，记录实际操作、发布留档和仍待验证的浏览器边界。
-
-设计器有未保存修改时，切换、新建、复制模板、打开副本、退出及恢复定义操作会显示应用内确认框；取消继续保留原内容，确认后重新检查会话和操作锁。详见[未保存流程修改的确认](docs/unsaved-design-confirmation.md)。
-
-设计器支持对当前未保存的流程和表单运行路径模拟，显示条件分支依据、节点与连线高亮并可定位配置错误。修改设计或测试数据后旧结果立即清除，模拟不创建业务记录；详见[流程设计器模拟运行](docs/designer-simulation.md)。
-
-画布支持 50%–160% 缩放、适应画布和可撤销的自动布局。缩放只改变视图；自动布局只修改节点坐标，长连线按当前坐标绕开节点，保存后再次打开仍可展示。详见[流程画布与自动布局](docs/designer-canvas.md)。
-
-设计器编辑停顿 2 秒后自动保存草稿，可关闭；保存期间继续输入不会被迟到响应覆盖。版本冲突保留本地设计，支持另存草稿或确认后加载服务端版本；请求结果不确定时暂停并恢复原操作。详见[草稿自动保存与冲突恢复](docs/designer-autosave.md)。
-
-版本比较可将当前设计与同一流程的已发布版本对照，按节点、审批人规则、连线条件、分支顺序、表单和布局显示修改前后的内容。比较只读，已有申请保持其原版本；详见[流程版本比较](docs/definition-comparison.md)。
-
-发布时必须填写变更说明，成功后展示真实发布者、时间、权限依据和校验摘要；历史缺失记录不补造。详见[流程发布说明与发布记录](docs/definition-publication.md)。
+演示租户为 `demo`，账号 `admin / finance / cashier / manager / employee / alice / bob`，密码统一为 `demo`。`cashier` 为独立出纳；账户、角色与组织任职仍按各自规则检查。生产关闭演示认证并接入企业 OIDC，不能把演示身份作为企业目录。
 
 ## 验证
 
+### 构建与全量门禁
+
 ```bash
-export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 "$JAVA_HOME/bin/java" scripts/CheckAuthors.java .
 mvn -B -ntp verify
+
 cd agentflow-web
+npm ci
 npm run test:requests
 npm run build
 ```
 
-全部 Java 命名类型（包括接口、枚举、record、内部类型和测试类）必须在所属 Javadoc 中包含 `@author owlzhangfq@gmail.com`。检查器解析源码语法树，缺失作者或语法错误均返回非零退出码。
+`test:requests` 包含前端请求/状态测试及 OpenAPI 校验；`build` 先执行 Vue/TypeScript 类型检查，再生成生产资源。Java 作者检查覆盖全部命名类型与语法，包括内部类、record 和测试；Javadoc 必须包含 `@author owlzhangfq@gmail.com`。
 
-本地前后端启动后，执行 `python3 scripts/check-web-proxy.py`，检查带浏览器 Origin 的演示登录成功，以及未允许来源被拒绝。省略 Origin 的 curl 请求无法覆盖这类代理问题。
+GitHub Actions 还执行 PostgreSQL 迁移与共享会话、组织/字段/财务边界测试、维护脚本保护、四组生产 Compose 配置、监控规则及告警行为、代理故障与一次性认证回调检查。接口契约以实际路由和公开 DTO 对照，详见 [OpenAPI](docs/openapi-reference.md)。
 
-在代码仓库根目录执行 `python3 scripts/check-idempotency.py`，验证演示环境中原有 8 个申请、任务与定义写接口的响应回放和关键操作的并发幂等。可用第一个参数指定后端地址，例如 `http://127.0.0.1:8081`。脚本会创建带随机业务号的演示申请与流程定义，并完成两轮审批，不删除既有数据。
+源码基线的合并前 [push CI](https://github.com/liulangjietou/agent-flow/actions/runs/37101509363) 和 [PR CI](https://github.com/liulangjietou/agent-flow/actions/runs/37101512381) 均通过：后端 3,439 项、前端 1,100 项；每轮 PostgreSQL 207 项及 27 个业务数据库检查；OpenAPI 332 个操作、662 个结构、123 个请求示例。它们是该固定提交的门禁结果，不是所有企业场景的上线验收。
 
-执行 `python3 scripts/check-versioned-forms.py` 验证表单发布、必填校验、精确数字与单选条件、V1/V2 隔离及补正历史。它同样接受后端地址参数，只生成带随机前缀的演示记录。
+### 接口和运行验收入口
 
-需要额外验证内置与租户同名定义的来源绑定时，执行 `python3 scripts/check-versioned-forms.py http://127.0.0.1:8080 --check-bundled-binding`。此选项会保留一个固定 key 为 `expense-reimbursement` 的租户定义，仅用于尚无同名已发布模板的验收环境；登录后会先检查前置条件，再创建业务记录。详见[来源绑定验收说明](docs/versioned-forms.md#ui-与验收)。
+| 脚本或文档 | 验证对象 | 执行条件 |
+| --- | --- | --- |
+| `scripts/check-web-proxy.py` | 浏览器 Origin、同源代理与拒绝未允许来源 | 本地前后端已启动 |
+| `scripts/check-idempotency.py` | 原写接口回放和并发幂等 | 演示服务；产生并保留随机业务记录 |
+| `scripts/check-versioned-forms.py` | 表单契约、精确值、版本隔离及补正历史 | 独立验收服务 |
+| `scripts/check-process-templates.py` | 通用模板复制、场景、真实审批与来源 | 独立验收服务 |
+| `scripts/check-designer-simulation.py` | 当前设计、样例和业务数据只读性 | 本地服务 |
+| `scripts/check-assist-execution.py` | 受控合成模型、输入授权与执行恢复 | 显式回环夹具；不能作为真实质量评估 |
+| [PostgreSQL 发布门禁](docs/postgres-release-gate.md) | 非空迁移、运行时与业务一致性 | 固定发布版本及隔离 PostgreSQL |
+| [容量基线](docs/capacity-baseline.md) | 真实 API 负载、分位延迟、并发与资源 | 独立负载环境；保留数据与报告 |
+| [图稿维护](docs/architecture/README.md) | 图文、源码索引、SVG/PNG 与本地链接 | 文档改动时同步核对 |
 
-执行 `python3 scripts/check-process-templates.py` 验证三个通用表单模板的权限、复制幂等、样例模拟、真实审批路径、独立副本和来源记录；可用第一个参数指定后端地址。脚本会创建带随机前缀的定义与申请并完成审批，保留所有验收数据。
+运行写入验收使用独立环境，脚本通常保留生成的数据及历史记录。分阶段证据证明其记录中的版本和场景；目标版本升级、恢复后原待办接续和真实企业链路分别验收。
 
-执行 `python3 scripts/check-designer-simulation.py` 验证当前设计模拟、全部模板样例、精确边界、权限和错误定位；可用第一个参数指定后端地址。该脚本只读业务数据，并检查定义、申请、任务和模板列表前后相等。
+## 能力边界
 
-已有发布流程时，执行 `python3 scripts/check-definition-comparison.py` 验证真实版本基线、未保存修改、权限、重复标识拒绝和业务数据只读性；同样接受后端地址参数。
+源码中已经实现审批、组织选人、字段权限、多个财务聚合、受控 Agent、持久集成及部署维护能力，不能由某个接口存在推定整个平台已经完成企业上线。
 
-在独立验收库执行 `python3 scripts/check-personal-workspace.py http://127.0.0.1:8082`，创建随机流程和申请，验证个人分页、草稿、真实办理与读取权限；保留所有验收数据。
+| 状态 | 当前范围 |
+| --- | --- |
+| 已有本地实现与相应范围证据 | 流程/表单版本、9 种开放节点、选人与会签、任职快照、字段与原件权限、审批协作、费用/借款/采购/预算业务、制度与映射管理、凭证/资金/核销/归档、Agent 建议、消息事件及维护部署 |
+| 已实现适配，需显式配置及企业验收 | OIDC/共享会话与注销、模型、财务主数据、验票、预算、ERP、资金、SMTP、企业 IM、目标部署、容量与告警接收链 |
+| 仍有本地开发与完整验收目标 | OFD 公开抽取、模型预检解释、结构化财务助手、费用风险建议、组织同步、电子签、补贴及跨单路由、部分额度/预算策略、费用模板/报表、白名单服务任务等 |
 
-在独立验收库执行 `python3 scripts/check-task-delegation.py http://127.0.0.1:8082`，验证委派、受托回交、原审批人最终批准、四请求并发幂等和历史参与权限；保留另一张待办供浏览器验收。
+截至台账的 2026-10-03 基线，已确认至少 **37 项**未完成交付目标：19 项本地开发、3 项本地验收与核对、15 项企业联调或最终发布目标。部分远程交付已通过 PR #1 实现；全产品最终发布仍与 V02 关联。准确状态和逐项验收终点以[任务台账](docs/remaining-task-ledger.md)及其中证据为准，未完成全条款核对前不提供完成百分比。
 
-在独立验收库执行 `python3 scripts/check-notifications.py http://127.0.0.1:8082`，验证真实动作产生消息、接收范围、并发已读和权限隔离，保留全部测试数据与一张浏览器待办。
+## 详细文档
 
-GitHub Actions 将执行作者检查、后端 `verify`、备份恢复保护测试、前端请求测试和构建；推送前的本地验证与远端 CI 状态分别记录。
-
-- [待办检索与分页](docs/pending-task-queue.md)
-
-开放 API 与集成：[接口契约、调用顺序与验收](docs/openapi-reference.md)。登录后从“接口文档”进入，下载当前部署的 OpenAPI JSON。
-
-人工审批节点支持[任一人通过和比例会签](docs/countersign-policies.md)，按固定名单计算门槛，达标后结束其他待办并保留真实意见；[全员会签](docs/all-countersign.md)继续要求全部同意才流转，任一驳回结束整轮。设计器可配置，待办展示实际完成进度；名单在节点激活时固定，支持委派协助后回交。
-
-审批运营的指标、权限、日期边界和验证方式见 [审批运营统计](docs/approval-operations.md)。
-
-管理员的首次使用入口、真实运行进度和样例预览见 [首次流程使用引导](docs/first-workflow-guide.md)；企业租户及身份初始化仍待接入。
-
-- [Webhook 可靠投递](docs/webhook-delivery.md)：部署目的地、签名接入、事务 outbox、失败重试、管理员页面与本地验收示例。
-
-- [集成投递概况](docs/webhook-overview.md)：按租户、目的地和申请统计完整当前状态，点击状态卡片筛选明细；重试不增加投递总量。
-
-- [参与者申请检索：当前权限、历史办理与有界分页](docs/participant-application-search.md)
-
-- [重复明细表单：列配置、行编辑与历史快照](docs/detail-table-forms.md)
-
-流程设计器支持[条件中文说明与字段插入](docs/readable-conditions.md)，以本版本表单标签解释条件，保留原始表达式与执行顺序。
-
-流程设计器支持[可视化嵌套条件组](docs/visual-condition-groups.md)，可配置分组且/或、整组与单项取反，共用原有校验、模拟及发布链路。
-
-部署验收提供 [PostgreSQL 容量基线](docs/capacity-baseline.md)：新建隔离容器，通过真实申请与审批 API 生成负载，记录延迟、并发吞吐和业务一致性，结束后停止并保留数据。报告按实际资源与负载解释，不代替生产容量目标验收。
-
-[参与者检索性能验证](docs/participant-search-performance.md) 记录大量不可见申请导致重复扫描的根因、授权等价性、双库回归与修复前后的执行计划。
-
-[运营统计查询性能验证](docs/operations-query-performance.md) 记录完整待办总数与节点分组合并聚合、展示截断回归及同参数容量对比。
-
-[移动端工作空间导航](docs/mobile-workspace-navigation.md)：窄屏完整文字抽屉、键盘焦点、角色菜单和退出确认，桌面侧栏共用同一份入口配置。
-
-[待办分页查询性能验证](docs/pending-query-performance.md)：合并页面与完整总数的重复联查，保持当前权限、游标和空后续页的计数语义。
-
-企业登录协议接入和部署边界见 [企业 OIDC 登录](docs/enterprise-oidc.md)。默认演示入口保持演示认证，启用 OIDC 必须提供显式可信配置并关闭演示认证。
-
-企业多实例部署可显式启用 [JDBC 共享会话](docs/shared-enterprise-sessions.md)，支持跨实例回调、登录恢复和平台退出同步；系统自检展示会话存储状态。真实企业身份源、组织同步和生产集群仍需另行验收。
-
-企业认证支持可选的 [OIDC 后通道注销](docs/oidc-backchannel-logout.md)：身份源签名通知按用户或会话跨实例生效，覆盖延迟登录回调和重复投递；需启用 JDBC 共享会话。
-
-企业身份源支持时，工作台提供明确选择的 [主动退出企业账号](docs/provider-initiated-logout.md)，使用固定返回地址和表单 POST，保留原有仅退出平台的行为。
+| 主题 | 入口文档 |
+| --- | --- |
+| 首次使用、目录与模板 | [首次引导](docs/first-workflow-guide.md)、[按需定义选择](docs/definition-selection.md)、[流程目录](docs/definition-catalog.md)、[模板目录](docs/process-templates.md)、[可携带模板](docs/portable-process-templates.md) |
+| 设计器、表单与发布 | [画布](docs/designer-canvas.md)、[快速设计](docs/quick-workflow-designer.md)、[自动保存](docs/designer-autosave.md)、[版本化表单](docs/versioned-forms.md)、[明细表格](docs/detail-table-forms.md)、[模拟](docs/designer-simulation.md)、[版本比较](docs/definition-comparison.md)、[发布记录](docs/definition-publication.md) |
+| 条件与高级节点 | [条件语言](docs/condition-language.md)、[中文说明](docs/readable-conditions.md)、[可视化条件组](docs/visual-condition-groups.md)、[分支覆盖](docs/branch-coverage.md)、[并行](docs/parallel-gateways.md)、[子流程](docs/subprocesses.md)、[定时等待](docs/timer-waits.md)、[事件等待](docs/event-workspace.md) |
+| 组织、选人与权限 | [本地组织](docs/local-organization.md)、[任职与字段权限](docs/organization-context-and-field-permissions.md)、[字段选人](docs/form-assignees.md)、[职责分离](docs/approval-responsibilities.md)、[期限代理](docs/approval-proxies.md)、[业务日历](docs/business-calendars.md)、[版本停用恢复](docs/definition-availability.md) |
+| 人工审批与历史 | [批准意见](docs/approval-comments.md)、[会签模式](docs/countersign-policies.md)、[全员会签](docs/all-countersign.md)、[会签名单](docs/countersign-membership.md)、[委派与回交](docs/task-delegation.md)、[期限](docs/task-deadlines.md)、[升级](docs/task-escalation.md)、[补正重提](docs/approval-resubmission.md)、[实例控制](docs/instance-control.md) |
+| 申请、检索与运营 | [个人工作空间](docs/personal-workspace.md)、[移动导航](docs/mobile-workspace-navigation.md)、[参与者检索](docs/participant-application-search.md)、[待办分页](docs/pending-task-queue.md)、[管理员申请](docs/application-search.md)、[申请导出](docs/application-export.md)、[审计查询](docs/audit-search.md)、[审计导出](docs/audit-export.md)、[运营统计](docs/approval-operations.md)、[轮次路径](docs/round-process-diagram.md) |
+| 费用填报与配置 | [结构化财务](docs/structured-finance.md)、[费用制度](docs/expense-configuration.md)、[制度提示与权威查询](docs/finance-gateway.md)、[填报](docs/expense-origination.md)、[持久预检](docs/expense-precheck.md)、[正式提交](docs/expense-submission.md)、[核减](docs/expense-resource-adjustments.md)、[事前申请](docs/expense-plan.md)、[额度关闭](docs/expense-request-closure.md) |
+| 原件、票夹与模型 | [附件](docs/field-attachments.md)、[个人票夹](docs/invoice-wallet.md)、[票夹页面](docs/invoice-wallet-ui.md)、[XML 原件](docs/invoice-xml-originals.md)、[权威验票](docs/invoice-verification.md)、[票据抽取](docs/invoice-extraction.md)、[Agent 执行](docs/agent-execution.md)、[摘要历史](docs/agent-summary-records.md)、[普通草稿助手](docs/draft-assist.md) |
+| 借款、还款与退回 | [借款申请](docs/advance-request-ui.md)、[实际到账](docs/advance-disbursement.md)、[冲销建议](docs/advance-offset-suggestion.md)、[逾期控制](docs/advance-overdue-controls.md)、[还款结清](docs/advance-repayments.md)、[还款复核](docs/advance-repayment-review.md)、[部分退回](docs/partial-repayment-returns.md)、[放款退回](docs/advance-disbursement-returns.md) |
+| 预算、凭证与付款 | [预算原操作](docs/budget-operations.md)、[科目映射管理](docs/account-mapping-configuration.md)、[会计端口](docs/accounting-ports.md)、[挂账准备](docs/voucher-preparation.md)、[凭证工作区](docs/voucher-workspace.md)、[付款授权与出纳](docs/payment-workspace.md)、[原付款执行](docs/payment-execution.md)、[付款凭证](docs/payment-vouchers.md)、[核销](docs/expense-settlement.md)、[归档](docs/expense-archives.md) |
+| 财务异常与原账 | [凭证争议](docs/voucher-dispute-resolution.md)、[付款争议](docs/payment-dispute-resolution.md)、[付款安全结束](docs/payment-retirement.md)、[账户变更复核](docs/payment-payee-review.md)、[回调](docs/payment-callbacks.md)、[凭证冲回](docs/voucher-reversal-commands.md)、[报销退票](docs/expense-payment-returns.md)、[供应商付款](docs/supplier-payments.md) |
+| 消息、事件与集成 | [站内通知](docs/notification-inbox.md)、[偏好](docs/notification-preferences.md)、[外发投递](docs/notification-delivery.md)、[企业微信](docs/wecom-notifications.md)、[Webhook](docs/webhook-delivery.md)、[投递概况](docs/webhook-overview.md)、[事件契约](docs/event-contracts.md)、[开放 API](docs/openapi-reference.md) |
+| 企业身份与系统自检 | [OIDC 登录](docs/enterprise-oidc.md)、[共享会话](docs/shared-enterprise-sessions.md)、[后通道注销](docs/oidc-backchannel-logout.md)、[企业账号退出](docs/provider-initiated-logout.md)、[租户初始化](docs/tenant-initialization.md)、[自检边界](docs/system-adapter-checks.md) |
+| 安装、恢复与运行维护 | [演示安装](docs/demo-installation.md)、[演示备份](docs/demo-backup-recovery.md)、[生产迁移](docs/production-database-lifecycle.md)、[生产容器](docs/production-container-deployment.md)、[多实例接续](docs/multi-instance-deployment.md)、[监控](docs/production-monitoring.md)、[生产恢复](docs/production-backup-recovery.md)、[容量](docs/capacity-baseline.md) |
+| 已知缺口与图稿维护 | [当前未完成台账](docs/remaining-task-ledger.md)、[原需求核对](docs/product-goal-gap-audit.md)、[图稿与源码索引维护](docs/architecture/README.md) |
