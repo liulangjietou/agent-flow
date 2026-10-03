@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T19:53:18.416270+00:00",
+  "recordedAt": "2026-10-03T20:09:56.624854+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,7 +1630,7 @@
           ]
         }
       ],
-      "observed": "员工及供应商付款、原凭证、费用预算、独立冲销、外部冲销核对及报销结算通知已接通。本阶段补齐供应商结算准备、执行、人工裁决、安全结束与实际本地完成通知及原编号详情，186 项 Java、114 项前端用例通过；ERP 成功与本地完成分开，旧消息不会借用后一次结算凭据。其他独立财务恢复来源、固定包和环境验收仍待完成。",
+      "observed": "员工及供应商付款、原凭证、费用预算、独立冲销、外部冲销核对、报销及供应商结算通知已接通。本阶段补齐供应商回款查询、实际登记及原编号详情，225 项 Java、138 项前端用例通过；原银行候选、实际登记与 ERP 应付调整分别表达，旧查询不借用后一次登记。其他独立财务恢复来源、固定包和环境验收仍待完成。",
       "references": [
         {
           "path": "docs/payment-notifications.md",
@@ -1702,6 +1702,14 @@
         },
         {
           "path": "docs/evidence/supplier-settlement-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/supplier-return-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/supplier-return-notifications-20261003.json",
           "line": 1
         }
       ],
@@ -3502,9 +3510,9 @@
   },
   "latestProgress": {
     "taskId": "F17",
-    "status": "SUPPLIER_SETTLEMENT_NOTIFICATIONS_BACKEND_UI_VERIFIED_FULL_F17_PENDING",
-    "implementationCommit": "6e327ff6558c522adcf6f7526e5af7c8908a5f11",
-    "evidence": "docs/evidence/supplier-settlement-notifications-20261003.json",
-    "recordedAt": "2026-10-03T19:53:18.416270+00:00"
+    "status": "SUPPLIER_RETURN_NOTIFICATIONS_BACKEND_UI_SCOPE_VERIFIED",
+    "implementationCommit": "48a5aad1d9bef329e2b195c9aa804a6a3f6334c3",
+    "evidence": "docs/evidence/supplier-return-notifications-20261003.json",
+    "recordedAt": "2026-10-03T20:09:56.624854+00:00"
   }
 }
