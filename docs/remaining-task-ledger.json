@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T00:52:33.984396+00:00",
+  "recordedAt": "2026-10-03T01:19:16.562171+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 40,
+    "knownOpenTaskCount": 39,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 22,
+      "LOCAL_DEVELOPMENT": 21,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 40,
+    "projectRemainingLowerBound": 39,
     "completionPercentage": null,
     "notes": [
-      "40 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "39 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
@@ -1215,7 +1215,7 @@
       "id": "F08",
       "kind": "LOCAL_DEVELOPMENT",
       "group": "费用与财务产品",
-      "status": "OPEN",
+      "status": "COMPLETED",
       "title": "逾期借款提醒与新借款控制配置",
       "sourceRefs": [
         {
@@ -1227,19 +1227,26 @@
           ]
         }
       ],
-      "observed": "EmployeeAdvance.overdue 能判断逾期，服务端生产调用链没有使用；现有 SLA 催办针对审批任务，不能当作借款逾期提醒。",
+      "observed": "已实现法人当地日期与真实未还余额检查；租户配置三态在页面明确展示，预检和提交读取当前规则；一次性提醒、回滚、并发、权限、迁移与实际页面/重启经本地验收。",
       "references": [
         {
-          "path": "agentflow-domain/src/main/java/io/agentflow/expense/EmployeeAdvance.java",
-          "line": 80
+          "path": "docs/advance-overdue-controls.md",
+          "line": 1
         },
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRequestCheckEvaluator.java",
+          "path": "docs/evidence/advance-overdue-controls-20261003.json",
           "line": 1
         }
       ],
       "acceptance": "按法人日期和实际未还余额生成一次性/可追溯提醒；还款后停止；是否阻止新借款显式配置并由服务端执行，未配置不声称生效。",
-      "dependsOn": []
+      "dependsOn": [],
+      "completion": {
+        "implementationCommit": "70faba5e0ee416f31b08a3a5011a964cc46ca061",
+        "verifiedAt": "2026-10-03T01:19:16.562171+00:00",
+        "evidence": "docs/evidence/advance-overdue-controls-20261003.json",
+        "scope": "LOCAL_ACCEPTANCE_COMPLETE",
+        "authority": "本人本法人实际借款；租户部署配置；原轮次法人时区和原借款申请入口"
+      }
     },
     {
       "id": "F09",
@@ -3264,7 +3271,6 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F08",
     "F01",
     "F02",
     "F13"
@@ -3275,11 +3281,11 @@
     "ci": null
   },
   "latestProgress": {
-    "taskId": "F07",
-    "implementationCommit": "2ab9a3815fbde185c9042c11cce7370113822ece",
-    "completedAt": "2026-10-03T00:52:33.984396+00:00",
+    "taskId": "F08",
+    "implementationCommit": "70faba5e0ee416f31b08a3a5011a964cc46ca061",
+    "completedAt": "2026-10-03T01:19:16.562171+00:00",
     "openapiPathCount": 274,
     "openapiOperationCount": 309,
-    "evidence": "docs/evidence/advance-offset-suggestion-20261002.json"
+    "evidence": "docs/evidence/advance-overdue-controls-20261003.json"
   }
 }

@@ -1,0 +1,583 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F08",
+  "status": "LOCAL_ACCEPTANCE_COMPLETE",
+  "recordedAt": "2026-10-03T01:18:48.361955+00:00",
+  "implementationCommit": "70faba5e0ee416f31b08a3a5011a964cc46ca061",
+  "baselineCommit": "879be5f1b26523d64e09a8b60cfb98be3063f5d0",
+  "branch": "codex/governance-identifier-integration",
+  "requirements": [
+    {
+      "document": "05-费用报销领域设计.md",
+      "section": "6.2",
+      "lines": [
+        258,
+        264
+      ]
+    }
+  ],
+  "rules": {
+    "policyScope": "EXACT_TENANT_AND_APPLICANT_AND_SELECTED_LEGAL_ENTITY",
+    "currencies": "ALL_WITHIN_LEGAL_ENTITY",
+    "unconfiguredPolicy": "UNCONFIGURED_NO_AUTOMATIC_BLOCK",
+    "configuredBooleanRequired": true,
+    "checkDate": "CURRENT_CATALOG_LEGAL_ENTITY_TIME_ZONE",
+    "reminderDate": "ORIGINAL_ADVANCE_ROUND_LEGAL_ENTITY_TIME_ZONE",
+    "balance": "ACTUAL_OUTSTANDING_INCLUDING_RESERVATIONS",
+    "reminderDeduplication": "ONE_PER_TENANT_AND_ADVANCE",
+    "settledBeforeScan": "NO_MESSAGE",
+    "settledAfterMessage": "PRESERVE_HISTORICAL_MESSAGE_NO_REPEAT",
+    "externalDelivery": "EXISTING_PREFERENCES_AND_OUTBOX_NO_ENTERPRISE_DELIVERY_CLAIM"
+  },
+  "rootCause": "原逾期领域判断未接入预检、正式提交与通知；原测试没有预检通过后出现逾期余额的场景。",
+  "red": {
+    "java": "Original submit returned 200 when the new overdue case expected a rejection",
+    "web": "Original component displayed only the generic error for ADVANCE_OVERDUE",
+    "logs": [
+      "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-red.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-web-red.log"
+    ]
+  },
+  "java": {
+    "scopeTestCount": 81,
+    "scopeReports": [
+      {
+        "class": "io.agentflow.api.OpenApiContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.api.OpenApiContractTest.xml"
+      },
+      {
+        "class": "io.agentflow.expense.AdvanceOverdueConfigurationTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.AdvanceOverdueConfigurationTest.xml"
+      },
+      {
+        "class": "io.agentflow.expense.AdvanceOverdueMigrationTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.AdvanceOverdueMigrationTest.xml"
+      },
+      {
+        "class": "io.agentflow.expense.AdvanceOverdueSchedulingTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.AdvanceOverdueSchedulingTest.xml"
+      },
+      {
+        "class": "io.agentflow.expense.AdvanceRepaymentTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.AdvanceRepaymentTest.xml"
+      },
+      {
+        "class": "io.agentflow.expense.AdvanceRequestIntegrationTest",
+        "tests": 27,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.AdvanceRequestIntegrationTest.xml"
+      },
+      {
+        "class": "io.agentflow.expense.ExpenseResourcesTest",
+        "tests": 18,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.ExpenseResourcesTest.xml"
+      },
+      {
+        "class": "io.agentflow.expense.FinancialResourceRepositoryTest",
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.FinancialResourceRepositoryTest.xml"
+      }
+    ],
+    "postgresRunnerTestCount": 29,
+    "postgresBackedTestCount": 28,
+    "postgresRunnerH2CorruptMigrationTestCount": 1,
+    "postgresVersion": "17.11",
+    "postgresReports": [
+      {
+        "class": "io.agentflow.expense.AdvanceOverdueMigrationTest",
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-pg-reports/TEST-io.agentflow.expense.AdvanceOverdueMigrationTest.xml"
+      },
+      {
+        "class": "io.agentflow.expense.AdvanceRequestIntegrationTest",
+        "tests": 27,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-pg-reports/TEST-io.agentflow.expense.AdvanceRequestIntegrationTest.xml"
+      }
+    ]
+  },
+  "web": {
+    "testCount": 31,
+    "build": "PASS",
+    "typeCheck": "PASS",
+    "knownWarning": "Existing bundle exceeds 500 kB warning"
+  },
+  "openapi": {
+    "pathCount": 274,
+    "operationCount": 309,
+    "schemaCount": 619,
+    "contract": "PASS"
+  },
+  "authors": {
+    "javaFiles": 1402,
+    "namedTypes": 2681,
+    "missingAuthorTags": 0,
+    "parseErrors": 0
+  },
+  "upgrade": {
+    "result": "PASS",
+    "changedOriginalTables": [
+      "employee_advance_order",
+      "flyway_schema_history"
+    ],
+    "originalBusinessRowsPreserved": true,
+    "originalTables": 233,
+    "upgradedTables": 234,
+    "indexedAdvances": 6,
+    "originalFilesUnchanged": 9,
+    "sourceUnchanged": true
+  },
+  "fixturePreparation": {
+    "status": "PREPARED",
+    "fixtureOnly": true,
+    "database": "expense_overdue_6788c53a66",
+    "advanceId": "15b71173-0aef-4d0f-a89e-292e9951dc71",
+    "applicationId": "fbd0c472-4a8f-40f3-8c72-142b0a64ea41",
+    "originalDueOn": "2026-10-12",
+    "syntheticDueOn": "2026-10-02",
+    "changedOnlyDueDatesInClonedBusinessFacts": true,
+    "sourceUnchanged": true,
+    "counts": {
+      "advance_request:state_json": 1,
+      "advance_request_revision:state_json": 3,
+      "finance_resource:context_json": 1,
+      "finance_resource:state_json": 1,
+      "finance_resource_revision:state_json": 4
+    }
+  },
+  "http": {
+    "allow": {
+      "result": "PASS",
+      "requestId": "d0391bc0-9693-4a14-a3d8-4a795e7b209d",
+      "applicationId": "b51b4e91-cd1f-4322-9823-99ced27b2bed",
+      "businessNo": "OVERDUE-LOCAL-0a82c20c",
+      "precheckId": "6d540815-1713-4477-b3ac-7d714b8a821b",
+      "appointmentId": "ac0e2ae4-3cf2-4e2b-9bf2-e27d69124cc7",
+      "policy": "ALLOW",
+      "ready": true,
+      "applicationVersion": 1,
+      "requestVersion": 1,
+      "reminderId": "313a6f95-34c3-3c8d-a51e-b216f0b552b5",
+      "reminderSourceApplicationId": "fbd0c472-4a8f-40f3-8c72-142b0a64ea41",
+      "observedOn": "2026-10-03",
+      "outstanding": "200.0",
+      "legalTimeZone": "UTC",
+      "sourceUnchanged": true
+    },
+    "blockAfterRestart": {
+      "result": "PASS",
+      "policy": "BLOCK",
+      "previousReadyNowUnusable": true,
+      "directSubmissionStatus": 409,
+      "directSubmissionCode": "ADVANCE_OVERDUE",
+      "unchangedDraftAndVersions": true,
+      "otherActorsCannotRead": true,
+      "reminderOnlyOwner": true,
+      "restartPreservedAllTables": 234,
+      "restartPreservedRows": 5026,
+      "restartPreservedFiles": 9,
+      "remindersStillOne": true,
+      "sourceUnchanged": true
+    },
+    "freshPrecheck": {
+      "result": "PASS",
+      "newPrecheckId": "1a0f003f-c993-4c92-9910-55e54e605e98",
+      "status": "BLOCKED",
+      "code": "ADVANCE_OVERDUE",
+      "usable": false
+    }
+  },
+  "browser": {
+    "allow": {
+      "result": "PASS",
+      "phase": "allow",
+      "desktopWidth": 1440,
+      "mobileWidth": 500,
+      "horizontalOverflow": false,
+      "pageErrors": [],
+      "noSubmissionWrites": true,
+      "policyText": "本租户已明确允许有逾期借款时提交新借款，逾期提醒仍独立执行。"
+    },
+    "block": {
+      "result": "PASS",
+      "phase": "block",
+      "desktopWidth": 1440,
+      "mobileWidth": 500,
+      "horizontalOverflow": false,
+      "pageErrors": [],
+      "noSubmissionWrites": true,
+      "policyText": "本租户已启用逾期控制：本人在本次法人下存在逾期借款时，不能提交新借款。正式提交时会再次核对。"
+    },
+    "inbox": {
+      "result": "PASS",
+      "reminderCount": 1,
+      "readActionWorks": true,
+      "opensOriginalAdvance": true,
+      "desktopWidth": 1440,
+      "mobileWidth": 500,
+      "horizontalOverflow": false,
+      "pageErrors": []
+    },
+    "visuallyInspected": [
+      "advance-overdue-block-mobile.png",
+      "advance-overdue-inbox-mobile.png"
+    ]
+  },
+  "finalRuntime": {
+    "result": "PASS",
+    "overdueMessageCount": 1,
+    "evidenceCount": 1,
+    "readCount": 1,
+    "noFinancialMutationsDuringChecksAndReminders": true,
+    "sourceUnchanged": true,
+    "originalFilesUnchanged": true,
+    "currentTables": 234,
+    "currentRows": 5032,
+    "currentFiles": 9
+  },
+  "delivery": {
+    "localOnly": true,
+    "remoteConfigured": false,
+    "pullRequest": null,
+    "ci": null
+  },
+  "remaining": {
+    "knownOpenTaskCount": 39,
+    "localDevelopment": 21,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "inventoryComplete": false,
+    "lowerBound": 39
+  },
+  "limitations": [
+    "V03 原规范逐条验收未完成，39 是已确认下界。",
+    "已有合成历史在独立数据库副本中调整归还日；未修改源数据库，迁移保持与场景夹具分开核验。",
+    "没有声称真实企业渠道或财务系统已经验收。",
+    "尚未运行最终整个分支发布门禁 V02。"
+  ],
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java": "9e33796a513d95e7eea6197de0d79a96e39db17f83fad500b9c5d3d47836f76c",
+    "agentflow-server/src/main/java/db/migration/V102__Advance_overdue_reminders.java": "9abdaf34c730ea1bf39508d831f10f802e0153c32b4240c2cf8193d3f159dfbc",
+    "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java": "2db70bac3e60bc2862bba0e9e1cf36d5d27ead1fa9c6669285444624b3eae06b",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceOverdueChecks.java": "2d4d22077929ca8126bf8d6bccb69297491041f64d74de5ebb31ff6714a8c87e",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceOverdueConfiguration.java": "039df922e8e4b3d997eade1ac0dd11e7b213a3e1929c4b9caa06e8ee5814a830",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceOverdueReminders.java": "c5c9c5fa7113e3b8436663a6e90da3937e6324a1ee37c58f943ad6a61329cb49",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceOverdueScheduling.java": "2ddc3d25cbee5999cbd81309f8f33b74e207697ffd61ce4b691401c7658ec880",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRequestCheckEvaluator.java": "5d0cedb9ab8f15396a97af9e421bccebdcbed070fd547c79efffad7e955e5e3d",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRequestCheckService.java": "7f9c927cb099801e1f856c9bfa5295273b3c73f8583059ddc34268806e15ffe4",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcAdvanceOverdueRepository.java": "86822746f35fd0fad241f2c2391bc8f7089e2efb8102adb398884c46c33b983d",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcEmployeeAdvanceRepository.java": "6b272627283ae792f37c7310228888608915119044312aa548cfe46566c8e8d5",
+    "agentflow-server/src/main/resources/api/openapi.json": "51dc677081ead59932d67f851d75eb770432f7376b794e95d5db00a43f78fcab",
+    "agentflow-server/src/main/resources/application.yml": "750bbcafe511f110c570d7d79325a72a2ffebcf05539af99b79add57b3f9d898",
+    "agentflow-server/src/test/java/io/agentflow/expense/AdvanceOverdueConfigurationTest.java": "0d6f01e9ce1debaaab66992fcb39c61c3e1c9e4c9622d26c76ad9acc4b1a29d8",
+    "agentflow-server/src/test/java/io/agentflow/expense/AdvanceOverdueMigrationTest.java": "aadb726c3c1582e740825cf753e8ea444e3e01c315fc57567e84bcbed92921a0",
+    "agentflow-server/src/test/java/io/agentflow/expense/AdvanceOverdueSchedulingTest.java": "d3a00b96ae60f8d0b221e1258502d48f9c86558c454fbe6a182af9514bd9f278",
+    "agentflow-server/src/test/java/io/agentflow/expense/AdvanceRequestIntegrationTest.java": "dd38fa835595f77a4486507fde136fbf3b9972218ffac2d378b24429276b11b1",
+    "agentflow-web/src/advanceRequest.ts": "fceefbcd59a6eecca32c5a7732ebeffb8daa6511a9c20c7ed28e874ea7597183",
+    "agentflow-web/src/api.ts": "1b05d7c968fd030e49bafb181888c447ed69d39867b9aefab55ae393d7559847",
+    "agentflow-web/src/components/AdvanceRequestSubmission.vue": "800730be2fd6abc98f2415221be0e566b319771d6ae49775f7217dded7acc623",
+    "agentflow-web/src/notificationInbox.ts": "51a879317d0f3fecafc4bed1013727ffc4bcf5592ce94b3177d8f28041c8ae6c",
+    "agentflow-web/tests/advance-request.test.mjs": "c4e052373d662f2634cab785504a24085fe121fa11071e23bebd96cb677348ee",
+    "agentflow-web/tests/notifications.test.mjs": "fabe81721daf6e6861db3d9f06a8646d59326c889e100f4db2e7c74e5f7f1488",
+    "docs/advance-overdue-controls.md": "4730c6b9d279dcf52969a666ab3ae331045be56b459efc631ed006957efe915a"
+  },
+  "artifacts": {
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-allow-desktop.png": {
+      "sha256": "f70cb9fcee1ba553da1f51d1c6324485796d6f41b5cbd566c76ed00e4f13adc1",
+      "bytes": 115725
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-allow-mobile.png": {
+      "sha256": "284594220f14f51eb9fc1a56ea917003aeed6c67f647add4ff256a737d25f012",
+      "bytes": 108805
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-authors.log": {
+      "sha256": "3e4aa94691d1d7f9e372cc1dda60b2a621f46650ad04cc957f49baa30deb1a3c",
+      "bytes": 73
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-before-boot2.json": {
+      "sha256": "da29e908ce4350674a796edbbbcbe08bff4318fb948c1d0400d1bcc9662409d7",
+      "bytes": 26036
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-before-boot3.json": {
+      "sha256": "d7c1d1e0a2c75aa8b65cd6c2d5777deb375e3b4ef3bb04bbb815d17133a013c8",
+      "bytes": 26036
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-block-desktop.png": {
+      "sha256": "d32b4c757419a49021893c15c2725e4a5058edacb3a95f9a1e6be03804d3ec1d",
+      "bytes": 88503
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-block-http.json": {
+      "sha256": "45282c84cd7db1dfe042cc9834c848cc77560b465d43f858e8675152c751bcb3",
+      "bytes": 411
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-block-mobile.png": {
+      "sha256": "c875b3b9c4d932dbd1fdf8b0a21d4eba83e0f9312b28c6f9f26ab2914b9a51ca",
+      "bytes": 121432
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-browser-allow.json": {
+      "sha256": "0bcaece04b2d24032c938729a63e9bbfa0132f27d993de95dad29d26f745327a",
+      "bytes": 280
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-browser-block.json": {
+      "sha256": "94cf3481e3497da08ee30c32f03442f522cc4967c8898a9abbfbb1f0e6c53c46",
+      "bytes": 328
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-browser-recon.py": {
+      "sha256": "12588a6c84f04f9eb5559b9326ab2eb99f1839128b437128d36bbd88e3b92e58",
+      "bytes": 1039
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-final-check.json": {
+      "sha256": "873883fb082b4fff97e8c00ff33a12f752f7da3c92e02fce96c5499ba193e153",
+      "bytes": 28225
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-finance-calls.jsonl": {
+      "sha256": "80f63acecab27339a9d274f5639fcbc3136e0ae95ec8d1e32996d6f90fb321a3",
+      "bytes": 487
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-finance.py": {
+      "sha256": "e640c379e38a4d2e52c0ac97bbebffcd5006ded0dd13444562245f96dd2a5750",
+      "bytes": 3233
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-fixture.json": {
+      "sha256": "d744b8e092c6715082683588f2a4837dc628ebd75614364eb5891347e6378dd8",
+      "bytes": 56477
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-fresh-precheck.json": {
+      "sha256": "c4e54891e2cad9d61b4152c51456d4898188513ec515d8267bec895e435db61a",
+      "bytes": 153
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-http-seed.json": {
+      "sha256": "ec2d58c686ef0d5575460cdd441e162673fa16a5ab721709c8355372f8c5d923",
+      "bytes": 620
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-inbox-browser.json": {
+      "sha256": "d76ec6ec2217cd03638d2aee211b90eaba9275a3aa4dad36f5d7c688cf5696af",
+      "bytes": 201
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-inbox-desktop.png": {
+      "sha256": "73320e8fc529f3d6fa82abba14c2eea4d685bd55830c234cfba667a48725d4a3",
+      "bytes": 47746
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-inbox-mobile.png": {
+      "sha256": "a200926e5470fe99a3da1e5cc518ce8009dab6699e68aa6895c3e5c226f0b2ed",
+      "bytes": 41970
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-openapi.log": {
+      "sha256": "a66a70e11e1b9b63e302e02bf62757ac0958b8a98c3081709cd2b7e8ed39a7eb",
+      "bytes": 71
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-pg-green.json": {
+      "sha256": "f7b4cc06b19f8710d56fc8129b57c9c997a1e0a9016e3e050dc8bf7c70ef57ca",
+      "bytes": 229
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-pg-green.log": {
+      "sha256": "1fd163a2b39937e0e5d38942a252d1420174a44d3ae0f1d1b18524b0aa8acf0d",
+      "bytes": 90375
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-pg-reports/TEST-io.agentflow.expense.AdvanceOverdueMigrationTest.xml": {
+      "sha256": "151c3dc283c944ba22fadfb9e37c90efd50137d333edd0ca202bfc9c711244f7",
+      "bytes": 90416
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-pg-reports/TEST-io.agentflow.expense.AdvanceRequestIntegrationTest.xml": {
+      "sha256": "4f285eacfc4a64921990bd01360c254c0d90d23786aaca1ac93f7fb300949e8e",
+      "bytes": 75841
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-preview.config.mjs": {
+      "sha256": "32717b999a9bde7f49c171debbca78ab897581d8d6cf9d3dabf3f7280aa75703",
+      "bytes": 230
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-red.log": {
+      "sha256": "4ab50fda6f4d6539c1c99428b13361635ea244a1cb51b33ce76f7e1cbc6bc6ae",
+      "bytes": 43095
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-restore.log": {
+      "sha256": "21dda9e28b45646791ba748c5a525afd6d994d084788cdf0eb7968c33e4b06b8",
+      "bytes": 17907
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-runtime-boot1.log": {
+      "sha256": "637857e34beef839b1548df9613dac24ddb043d30a7e52dfd650c973357b2490",
+      "bytes": 8265
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-runtime-boot2.log": {
+      "sha256": "bf984cec80927acfa0d229c5a5e6f11579fa0865c3cbf1e3f7ce80b9d5a6a21c",
+      "bytes": 8024
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-runtime-boot3.log": {
+      "sha256": "e6ee940c0da6b4bef60b3c3d559409dd855f693bf48964b24ab826eb9872b944",
+      "bytes": 7350
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-runtime.json": {
+      "sha256": "cb5085b1e192ccc834d1311075af9e9760d830e998b7e2a03dfffc57cea81b09",
+      "bytes": 28762
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.api.OpenApiContractTest.xml": {
+      "sha256": "852aa77e06d84763612ce5a4a93fa6c3356cd4c360463046751ce61136a9d060",
+      "bytes": 72716
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.AdvanceOverdueConfigurationTest.xml": {
+      "sha256": "2e263d963855ac7f499275409434e6cf70559d972a6ab3be557e4a60f98ce49e",
+      "bytes": 43357
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.AdvanceOverdueMigrationTest.xml": {
+      "sha256": "48d697ec9df0104f7c149580fc50a576f7a30db5d46cf5cfa7ef9b87a0c8441d",
+      "bytes": 91780
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.AdvanceOverdueSchedulingTest.xml": {
+      "sha256": "e252a1dd1682f8429045dd235da866f692912e419bb03a94a23f0f32929c370d",
+      "bytes": 60271
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.AdvanceRepaymentTest.xml": {
+      "sha256": "1ef7d8d55af03bf52c52df5084e5233f42dfb7548c29f399b2e728f3b916334d",
+      "bytes": 11291
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.AdvanceRequestIntegrationTest.xml": {
+      "sha256": "4f7d0379b5feb84ddb0ca60b70115277faad6df0d6fddfe4920731d7a426cc5f",
+      "bytes": 76092
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.ExpenseResourcesTest.xml": {
+      "sha256": "c1868a0c26ac3e78ecc54eae6d4d80a86faadd095b684c58e29757b7a2e71270",
+      "bytes": 12905
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope-reports/TEST-io.agentflow.expense.FinancialResourceRepositoryTest.xml": {
+      "sha256": "307bd350b3385e67c7592b4b21e8cc5cef6663e88e9142ad5ae4caace5fc7304",
+      "bytes": 73978
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-scope.log": {
+      "sha256": "495cfe6b526a84a9835765cc2fdebf20bbc88913c595ffbe5fbfadeff69e979c",
+      "bytes": 166785
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-seed-progress.json": {
+      "sha256": "2faa1e9932cdec919cd92a31341505a3d75d00ed66026dbb8e42b4d49c93eeaf",
+      "bytes": 190
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-source.sql": {
+      "sha256": "9b4402fabbedbc3ef2bb17db7ca612b4fb9d03e66d4e59431f9363b7f53521b2",
+      "bytes": 16058688
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-upgrade-check.json": {
+      "sha256": "c792a3583b698081a636b1ea947e188e4cb47f9627cb92dd4dbb1f2567b4df87",
+      "bytes": 28236
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-web-build.log": {
+      "sha256": "0de02cb1aa9b130c9b8e688da07130de0481a84bb8ee38e10319d5036a96c202",
+      "bytes": 781
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-web-red.log": {
+      "sha256": "9ac8ee2b966b4970b9f12a56a6fbcde083d3fa1644cde0bc78d3d3a19e0f7162",
+      "bytes": 3525
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-evidence-snapshot/advance-overdue-web.log": {
+      "sha256": "8cf38b862d8f960c54cf7fd40df2ce330852773e1e2236f410af67fe6da2336f",
+      "bytes": 3317
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-server.jar": {
+      "sha256": "2774f5da14b085ead99c123f18ad32476ad83df30bfafd32b0328d067825cea0",
+      "bytes": 78663111
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-web-dist/assets/index-75UDz8Or.js": {
+      "sha256": "d65ecb72f7056ee98ad69e82d5039e960afc8d48517e8c87c4e1846c6ec66d5a",
+      "bytes": 1581998
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-web-dist/assets/index-DfsdB6ZD.css": {
+      "sha256": "19736e1bfc37070fd2dd40d9f95e61302f685c62c3a7964e79cd6bec949963ec",
+      "bytes": 363024
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-web-dist/index.html": {
+      "sha256": "8ff9a5ae5c9ae60e27254f918658006b2166727c8d06b9f00d17c56cc9a28871",
+      "bytes": 420
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-browser-recon.py": {
+      "sha256": "12588a6c84f04f9eb5559b9326ab2eb99f1839128b437128d36bbd88e3b92e58",
+      "bytes": 1039
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/advance-overdue-finance.py": {
+      "sha256": "e640c379e38a4d2e52c0ac97bbebffcd5006ded0dd13444562245f96dd2a5750",
+      "bytes": 3233
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/check-advance-overdue-block-http.py": {
+      "sha256": "310a7f09ee1bfab346a740640fd0e884c2b347cd2c311113694c8e206004e35f",
+      "bytes": 2080
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/check-advance-overdue-browser.py": {
+      "sha256": "97e585e4864f4f79143a83702f3b97d2b172c16477c504382b61fc80a68e5313",
+      "bytes": 2703
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/check-advance-overdue-final.py": {
+      "sha256": "8e2def3fd78ac852253ad10cada631a7af706c0ecbd69976c61e01d55cc513a1",
+      "bytes": 1350
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/check-advance-overdue-fresh-precheck.py": {
+      "sha256": "decf31c67e0effcb5a3bb78de2996ee846344c67b312a4c3f3526b57bb354cd7",
+      "bytes": 1093
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/check-advance-overdue-inbox-browser.py": {
+      "sha256": "9284315ead7939e5edc18a4832fad55e42bedd906c43a78f9e86f98af9861d7b",
+      "bytes": 2132
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/check-advance-overdue-upgrade.py": {
+      "sha256": "46d3535f9dedc34dc2f4882d2957053adbbfabafc085ee443b72f5c41f04af66",
+      "bytes": 1530
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/prepare-advance-overdue-fixture.py": {
+      "sha256": "27120bc48b8502e84a19c00eee0f7a09f4e21ff9096cb6b47945a30ace761154",
+      "bytes": 2824
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/prepare-advance-overdue-runtime.py": {
+      "sha256": "83c8bc29f9981eae91a7322001ec8ffc8191a169ad84cc76bc2537268722eccb",
+      "bytes": 2173
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/record-advance-overdue-evidence.py": {
+      "sha256": "0cf5a1caf576570c7312e16727d4b33de152ad39ffd7d96f610d64d6878e7e94",
+      "bytes": 5809
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/run-advance-overdue-pg-tests.py": {
+      "sha256": "78549cb7256bf448eec2026f7e1d3e3a246bdbbe6395c2c82d051a558c465f55",
+      "bytes": 1578
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/run-advance-overdue-runtime.py": {
+      "sha256": "e70c412772c73df8e4eb2654493a921a15d8dcbbc9ffb2b2a6b75d8cf2af95bc",
+      "bytes": 4188
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/seed-advance-overdue-http.py": {
+      "sha256": "844f2fee1c243aafd8f79c4ef8b4906f5ec48bc26a596d2eaeb1331e48520e77",
+      "bytes": 3228
+    },
+    "/fyoung/tmp/agentflow-remaining-20260928/stop-advance-overdue-runtime.py": {
+      "sha256": "b6547f11e83ff851ead2e4969ee98525d4876509c7e94df55ce32a13d8c9ee67",
+      "bytes": 1227
+    }
+  }
+}
