@@ -1,0 +1,715 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F06",
+  "status": "LOCAL_ACCEPTANCE_COMPLETE",
+  "recordedAt": "2026-10-03T00:17:43.505380+00:00",
+  "implementationCommit": "414b5d7e99b204abd897ebd27cc676b7338dc6f9",
+  "worktree": "/Volumes/fyoung/tmp/agentflow-governance-identifier-integration",
+  "branch": "codex/governance-identifier-integration",
+  "businessScope": {
+    "authority": "Original applicant only; administrator or finance role does not override ownership",
+    "resource": "Approved prior expense credit",
+    "reasonRequired": true,
+    "sharedReservationRowLock": true,
+    "auditAndReceiptAtomic": true,
+    "closureDoesNotRevokeApproval": true,
+    "existingReservationReductionReleaseMoveSettlementAllowed": true,
+    "newOrIncreasedReservationsRejected": true,
+    "reopenSupported": false,
+    "newDatabaseMigration": false,
+    "externalFinanceEnabledInRuntime": false
+  },
+  "redEvidence": {
+    "missingHttpEntry": {
+      "testCount": 1,
+      "failureCount": 1,
+      "expectedStatus": 200,
+      "actualStatus": 404,
+      "log": "expense-request-close-red.log"
+    },
+    "numericReasonCoercion": {
+      "expectedStatus": [
+        400,
+        422
+      ],
+      "actualStatus": 200,
+      "report": "expense-request-close-boundaries-red.xml"
+    },
+    "frontendMissingEntry": {
+      "failure": "api.closeExpenseRequest is not a function",
+      "log": "expense-request-close-web-red.log"
+    },
+    "fixtureFailures": "The initial boundary report also includes Mockito transactional proxy stubbing failures; these are test fixture corrections, not additional product defects."
+  },
+  "verification": {
+    "javaH2AndDomain": {
+      "total": 325,
+      "suites": [
+        {
+          "name": "io.agentflow.expense.ExpenseRequestClosureIntegrationTest",
+          "tests": "10",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "io.agentflow.expense.ExpenseResourcesTest",
+          "tests": "17",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "io.agentflow.expense.ExpenseSubmissionResourcesTest",
+          "tests": "23",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "io.agentflow.expense.FinancialResourceRepositoryTest",
+          "tests": "16",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "io.agentflow.expense.ExpenseResourcePlanIntegrationTest",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "io.agentflow.expense.ExpensePlanIntegrationTest",
+          "tests": "15",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+          "tests": "224",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "io.agentflow.api.OpenApiContractTest",
+          "tests": "7",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "io.agentflow.approval.operations.AuditSearchIntegrationTest",
+          "tests": "5",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "io.agentflow.approval.operations.AuditExportIntegrationTest",
+          "tests": "5",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        }
+      ]
+    },
+    "postgres": {
+      "newSuiteTests": 10,
+      "failures": 0,
+      "errors": 0,
+      "database": "expense_close_test_70358db0ff"
+    },
+    "frontend": {
+      "scopeTests": 75,
+      "newTestsIncluded": 10,
+      "afterErrorMessageAdjustment": 10,
+      "overlap": true,
+      "build": "PASS",
+      "existingLargeChunkWarning": true
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 308,
+      "schemas": 617,
+      "requestExamples": 118
+    },
+    "authors": {
+      "files": 1390,
+      "namedTypes": 2663,
+      "missingAuthorTags": 0,
+      "parseErrors": 0
+    }
+  },
+  "runtime": {
+    "v100UnchangedBoot": {
+      "status": "PASS",
+      "schemaVersion": 100,
+      "tables": 232,
+      "rows": 4064,
+      "files": 6,
+      "allTablesAndFilesUnchanged": true,
+      "sourceUntouched": true,
+      "jarSha256": "8c9da21571a5a0ebc1180500f8545183dde2ef554141a9742f3e3c9f96957866"
+    },
+    "v86Upgrade": {
+      "status": "PASS",
+      "fromSchema": 86,
+      "toSchema": 100,
+      "oldTables": 214,
+      "newTables": 232,
+      "criticalRowsAndFilesUnchanged": true,
+      "sourceUntouched": true,
+      "migrationChanges": {
+        "flyway_schema_history": {
+          "before": {
+            "rows": 86,
+            "md5": "185283c270861eef514bc9a103e02b8c"
+          },
+          "after": {
+            "rows": 100,
+            "md5": "882c061a4ffb99c97aa402116c3ee0f1"
+          }
+        },
+        "approval_submission_round": {
+          "before": {
+            "rows": 43,
+            "md5": "60c017623cfc4000ebd40d6915f48236"
+          },
+          "after": {
+            "rows": 43,
+            "md5": "dd3f5ab952a96149d040c5d49cf6d004"
+          }
+        }
+      },
+      "oldRoundColumnsUnchanged": true,
+      "addedRoundRiskColumnsNull": true
+    },
+    "browser": {
+      "status": "PASS",
+      "writeCount": 2,
+      "explicitConfirmation": true,
+      "cancelAndBlankProducedNoWrite": true,
+      "firstResultDeliberatelyLost": true,
+      "sameKeyAndBodyReplayed": true,
+      "closedCardHasNoCloseButton": true,
+      "mobileWidths": [
+        500
+      ],
+      "horizontalOverflow": false,
+      "pageErrors": []
+    },
+    "closure": {
+      "status": "PASS",
+      "credit": {
+        "id": "0a9fdaef-faed-4b15-972f-53b7270de575",
+        "applicationId": "847f2e14-2e26-4683-ad04-c3a415b61a32",
+        "legalEntityId": "4a8a3aac-f4d3-4486-b6c0-7aaabd8bb51a",
+        "version": 3,
+        "closed": true,
+        "lines": [
+          {
+            "lineNo": 1,
+            "approved": {
+              "value": "120.00",
+              "currency": "CNY"
+            },
+            "limit": {
+              "value": "120.00",
+              "currency": "CNY"
+            },
+            "available": {
+              "value": "20.00",
+              "currency": "CNY"
+            },
+            "reserved": {
+              "value": "100.00",
+              "currency": "CNY"
+            },
+            "consumed": {
+              "value": "0.00",
+              "currency": "CNY"
+            }
+          }
+        ]
+      },
+      "sourceApplicationUnchanged": true,
+      "sourcePlanAndRoundsUnchanged": true,
+      "reservationRowsUnchanged": true,
+      "auditCount": 1,
+      "closeRevisionCount": 1,
+      "adminMetadataOnly": true,
+      "sourceDatabaseUntouched": true,
+      "receipt": {
+        "requestId": "0a9fdaef-faed-4b15-972f-53b7270de575",
+        "applicationId": "847f2e14-2e26-4683-ad04-c3a415b61a32",
+        "version": 3,
+        "closed": true,
+        "eventId": "f4642fc5-6a49-4f1d-9cf2-1062853195a5"
+      }
+    },
+    "restart": {
+      "status": "PASS",
+      "oldPid": 62232,
+      "newPid": 63005,
+      "tables": 232,
+      "rows": 4938,
+      "files": 9,
+      "allTablesAndFilesUnchanged": true,
+      "closureAndReservationRetained": true,
+      "originalKeyReplayAfterRestart": true,
+      "sameReceipt": true,
+      "sourceUntouched": true,
+      "jarSha256": "8c9da21571a5a0ebc1180500f8545183dde2ef554141a9742f3e3c9f96957866"
+    },
+    "jar": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-plan-server.jar",
+      "sha256": "8c9da21571a5a0ebc1180500f8545183dde2ef554141a9742f3e3c9f96957866",
+      "bytes": 78630892
+    }
+  },
+  "acceptanceMapping": [
+    {
+      "requirement": "Original applicant; no administrator or finance ownership bypass; tenant isolation",
+      "evidence": [
+        "ExpenseRequestClosureIntegrationTest.otherEmployeesFinanceAndAdministratorsCannotCloseAnotherApplicantsCredit",
+        "expense-request-close-before.json"
+      ]
+    },
+    {
+      "requirement": "Positive integer version, textual reason, known fields only",
+      "evidence": [
+        "ExpenseRequestClosureIntegrationTest.invalidNumbersReasonsAndAdditionalPropertiesDoNotCloseTheCredit",
+        "expense-request-close-boundaries-red.xml"
+      ]
+    },
+    {
+      "requirement": "Audit and state atomic; original body/key safely replayed",
+      "evidence": [
+        "ExpenseRequestClosureIntegrationTest.auditFailureRollsBackTheResourceVersionAndSuccessReceiptBeforeOriginalKeyRetry",
+        "expense-request-close-browser.json",
+        "expense-request-close-restart.json"
+      ]
+    },
+    {
+      "requirement": "Concurrent closure and reservation cannot overwrite balances",
+      "evidence": [
+        "ExpenseRequestClosureIntegrationTest.concurrentCloseRequestsProduceOneStateChangeAndOneAudit",
+        "ExpenseRequestClosureIntegrationTest.closeWaitsForReservationAndRejectsTheNowStaleVersionWithoutLosingItsBalance",
+        "expense-request-close-postgres.xml"
+      ]
+    },
+    {
+      "requirement": "New/increased reservation rejected; original reservation can reduce, move, release or settle",
+      "evidence": [
+        "ExpenseRequestClosureIntegrationTest.closedCreditPreservesExistingReservationAndAllowsItsReductionAndSettlement",
+        "ExpenseResourcesTest",
+        "ExpenseSubmissionResourcesTest",
+        "FinancialResourceRepositoryTest"
+      ]
+    },
+    {
+      "requirement": "Actual owner confirmation page, closed balance label, original request recovery",
+      "evidence": [
+        "expense-request-close.test.mjs",
+        "expense-request-close-browser.json",
+        "expense-request-close-mobile-confirm.png",
+        "expense-request-close-closed.png"
+      ]
+    },
+    {
+      "requirement": "Old actual approval and original reservation preserved through closure and process restart",
+      "evidence": [
+        "expense-request-close-after.json",
+        "expense-request-close-restart.json"
+      ]
+    }
+  ],
+  "sourceFileSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseRequestRepository.java": "10761e899310b59d4066a04e2ebc05d0160256c571ce22ad3968ddddab277768",
+    "agentflow-server/src/main/java/io/agentflow/approval/operations/AuditSearchParameters.java": "f042c8a863c0444505ca12eb8253ddff9605d235428cfb85ea756bbcac24a403",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseRequestClosureAudit.java": "ed1ad170996988d204db33be5097c16631dfe35e455d255896348d104a0285c1",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseRequestClosureController.java": "b0eb85e7509e04cc3422d751da487c04d5df38f5978b8e1ca7a995b1d5ab25b0",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseRequestClosureService.java": "04daab5f8e5aabb2bb626f455f5bad64d7d5f37cc08456655535c769e6dc05c7",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseRequestRepository.java": "d8064ac98456b7b270926abe86b8d835d0e0d7ca0ebda86545679fe5f27958ef",
+    "agentflow-server/src/main/resources/api/openapi.json": "f33df27ab2065f2ca7dd7552a14837965775ff5ca7c6eccf860fd8ce69918dcc",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "26a52e649a82ee9b27379c9ad2b70fd0c08bcc7b4ae87ea27e25122914f5baf9",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseRequestClosureIntegrationTest.java": "4923d3b95cc881c17cdd05e02219e2055d85630106294cc96a22839d5feb5014",
+    "agentflow-web/scripts/test-requests.mjs": "d892d491e012be623ea557da051d5e8714ad665a0a7968934d40b8da2ef7c405",
+    "agentflow-web/src/App.vue": "76c3aeccac348967f508e2dfc41a125d3d57d62fdb17c42ca706670cc817cd1a",
+    "agentflow-web/src/api.ts": "9272503026e98c0f5cae5d63d85418cb05f428297b49c44acbbae14b65276bd8",
+    "agentflow-web/src/components/AuditSearch.vue": "47d82369de56b8e91be6b3f1ea8b75922cb08c1a4e5b9cac11f4a3dc24ff82bb",
+    "agentflow-web/src/components/ExpenseRequestClose.vue": "859411db13d48a1a7b059a62cc505be88784fa679b9798deee1365bd164216ed",
+    "agentflow-web/src/components/ExpenseWorkspace.vue": "e4410ed0342ede83f0d50b35e6ea6d0fbab1933a32620caf936acc1bd58214f4",
+    "agentflow-web/src/expenseRequestClosure.ts": "f14d20eec521eb120933c59a96738f0b2779b26956986286c40d48f004fc55fb",
+    "agentflow-web/tests/expense-request-close.test.mjs": "e74a3c0300fcf50a497e4e4d21226362b296ebbe3b475b4a123da131fee9dd77",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseRequest.java": "68e167f258d7549c3c8f7b9098caf13306a22e69d61c88f2c95bd0530b848c30",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckResources.java": "5ec034a3a483cb2e1c728534c1ec098e5d936197bd99370a98142c019b90a23c",
+    "agentflow-server/src/main/java/io/agentflow/expense/FinancialResourceStore.java": "f30216434ce294f935fd826b79c1aef2d26392eb52b6fc9b89a539de5ce1ee93",
+    "agentflow-web/src/pendingWrites.ts": "b4690b30d6f0fb908d1be17f1d71f70350fe91b32eae84de6d3f42dc1f37b85b"
+  },
+  "builtFrontendSha256": {
+    "agentflow-web/dist/index.html": "813ff43d8bd93879eaf07a7aeccd679548535232308b9b569e4e02ed6c432106",
+    "agentflow-web/dist/assets/index-nvvkRY7e.js": "722f68db3afa6f3a3e491234ea953938d7cc8ce425f81d4399be9fdfab7c3795",
+    "agentflow-web/dist/assets/index-D1dU5hoN.css": "2e744674b291e8fd1f743f316cb03421a5060185a73a71775850b649dcc88bf0"
+  },
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/check-expense-request-close-after.py",
+      "sha256": "4889446576247047af1bbb71d9b718c932b2ec7bc486cf23d58dbf906f3bb892",
+      "bytes": 2361
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/check-expense-request-close-before.py",
+      "sha256": "83d72773fea69abe3fe3e88b0fe673e0c2bc769bb374c17fa290da1f8a47efae",
+      "bytes": 1801
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/check-expense-request-close-browser.py",
+      "sha256": "92a891d9a8ebba56cda921b57f989cf84472e887b432448dde490a80f0c4bcd9",
+      "bytes": 4339
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/check-expense-request-close-restart.py",
+      "sha256": "153ad93df8e560acb37a55cfaeeb28640416e86699cca47d47e2223e05855cec",
+      "bytes": 1825
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-after.json",
+      "sha256": "0bedd867b9b3cbeab1c57db9f7eaeeb9118e97e57e850ab0f2d327431e6a1cf7",
+      "bytes": 1208
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-authors.log",
+      "sha256": "417f48c7623e1af9a2b43ae54e3426d2e7f98e28262f3a44bd3b06105686d2e0",
+      "bytes": 73
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-before.json",
+      "sha256": "b8dce8687ff452cd1906fbfee08dd149677c038725b72d649686ccefda667418",
+      "bytes": 12597
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-before.png",
+      "sha256": "4cacb56ae9a451fde3f66547e0bb25dd83d32b1f8741e3ad040dbf2df08ed41c",
+      "bytes": 98053
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-boundaries-green.log",
+      "sha256": "c315a631b40451057eb5d80dfc2f0ea0706e6c7b96f23466a5d23f2fd87b80ce",
+      "bytes": 41209
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-boundaries-red.log",
+      "sha256": "b01d5037fb53db08a36f763b0c201b86d6810e36d3ea4175625b3d6cd892025c",
+      "bytes": 75363
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-boundaries-red.xml",
+      "sha256": "2c36c5bd93451750a288b422081389292e3d4dbdae5ea417cbb145bdef8d8f3f",
+      "bytes": 105295
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-browser-install.log",
+      "sha256": "4748ef423839bf131fe65102b817ecb8536811b815d03f456b1fad265577af80",
+      "bytes": 764
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-browser.json",
+      "sha256": "2548246e84a9e073c6ca6d34af71bb3a8eac3e81501a39efeccbc4f48f19319e",
+      "bytes": 1376
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-closed.png",
+      "sha256": "f8cefbf20c3cb52a1040d1ba6fb10be78eeda491962efda22fdf2533bb28d268",
+      "bytes": 113071
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-first-green.log",
+      "sha256": "b256e3c08c30be15b5db39c17a97d0badd2ba1d2daf1eec8343b51a2e7f8772b",
+      "bytes": 41445
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-h2-reports/TEST-io.agentflow.api.OpenApiContractTest.xml",
+      "sha256": "66b5f6fc72f395474c12696277925924522a6699f5e19e9fcc39031db5b4d1dd",
+      "bytes": 72268
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-h2-reports/TEST-io.agentflow.approval.operations.AuditExportIntegrationTest.xml",
+      "sha256": "f06c66872321c087e46aded45be0f5af0337d0d15de841d7ecccf269b54de185",
+      "bytes": 72185
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-h2-reports/TEST-io.agentflow.approval.operations.AuditSearchIntegrationTest.xml",
+      "sha256": "c7251a1b36cb6351755b19c7f7d13e76a3726ef8eecc9d765fbc6dd2a406b0ca",
+      "bytes": 72165
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-h2-reports/TEST-io.agentflow.expense.ExpensePlanIntegrationTest.xml",
+      "sha256": "15f27de26d151fb8021b4540b105477de63983360c01f77bd3619e1da43bf231",
+      "bytes": 73698
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-h2-reports/TEST-io.agentflow.expense.ExpenseRequestClosureIntegrationTest.xml",
+      "sha256": "6a170f6409c39bc6609472b8a9adce452a11a9e94393bd04cb119f3b7818b098",
+      "bytes": 73126
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-h2-reports/TEST-io.agentflow.expense.ExpenseResourcePlanIntegrationTest.xml",
+      "sha256": "41995234bb9b1cb914241e3930f0b236ed8f22682eed3858b769525c2c82daf6",
+      "bytes": 71407
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-h2-reports/TEST-io.agentflow.expense.ExpenseResourcesTest.xml",
+      "sha256": "36f3c485ad403a2a1cd791607728436b8c5702dfd4cda77e8d63a3eebfeb6920",
+      "bytes": 12804
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-h2-reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "sha256": "564b3a4108e879a7f6f0f6402fe96248484624bfeca25e4f28487a796637dbbd",
+      "bytes": 111179
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-h2-reports/TEST-io.agentflow.expense.ExpenseSubmissionResourcesTest.xml",
+      "sha256": "6638510ba05a362e09af36f53c62eef72ef4b1c49471555af213ba5fb2747c67",
+      "bytes": 14094
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-h2-reports/TEST-io.agentflow.expense.FinancialResourceRepositoryTest.xml",
+      "sha256": "fd187f1384e39eacf2b1825eea0e9f38e3f2e5fcb5010cf90df1800388363df4",
+      "bytes": 73529
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-h2-reports/summary.json",
+      "sha256": "92485630c2186373b2d3d486b14e5244dd3991de429b7b547d67f31cdcc6b583",
+      "bytes": 1540
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-loaded.png",
+      "sha256": "4cacb56ae9a451fde3f66547e0bb25dd83d32b1f8741e3ad040dbf2df08ed41c",
+      "bytes": 98053
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-login.png",
+      "sha256": "f37c2e1b746e86ae27b94003a3f8b1d8d1557f68a79ba15b8041be9b4384f2ca",
+      "bytes": 54061
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-mobile-closed.png",
+      "sha256": "fc14377b581f21e6fc0d16eafd44e8d06e9e1df169afd513e31df80805cd17b7",
+      "bytes": 74307
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-mobile-confirm.png",
+      "sha256": "4f5e917578ec292aa5700979ef98ba1b5afde6c1a896f0aa15e9043a8486e1b2",
+      "bytes": 79954
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-openapi.log",
+      "sha256": "18456bd471e60ec7b289d587df14fe5ab2455dc8b9de0168248428af65f0d260",
+      "bytes": 71
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-package.log",
+      "sha256": "c01c1d14f79f85f9987dc8d48432904e568ae96a814f650bb98a13b20d49bc36",
+      "bytes": 13929
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-plan-before-boot2.json",
+      "sha256": "ee0e5010ffb35b25ecf7de5920516c8a386b17e50b773be4fe571cba16deba9f",
+      "bytes": 25824
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-plan-before-ui.json",
+      "sha256": "809a1f133378a223b60135a87cf3ba1d92e05b80378fb49790ed5b7187cbf0f8",
+      "bytes": 25824
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-plan-boot1-pid.json",
+      "sha256": "ddd525c729ed732fb057bd67ebccc0cfb37c8848cbebccb04b488ab93d336d31",
+      "bytes": 22
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-plan-restore.log",
+      "sha256": "e75c1846742e8c269765ec3b51ab8983db11da037b17fbaf2ae703cdd1684f62",
+      "bytes": 16599
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-evidence-snapshot/expense-request-close-plan-runtime-boot1.log",
+      "sha256": "e7b8e061e48328604da04f61385111004bf9b87af53448b602793057539a8bdf",
+      "bytes": 10792
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-evidence-snapshot/expense-request-close-plan-runtime-boot2.log",
+      "sha256": "301f30d009001cc572c2f0c32b1dfbb2cd81d0ff08b3656c351370e6bb5040c2",
+      "bytes": 7365
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-evidence-snapshot/expense-request-close-plan-runtime.json",
+      "sha256": "a6e207815f69a451172f3c41c1e95130d6bdfcc712ce2948e43a484f2b15185c",
+      "bytes": 26536
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-plan-server.jar",
+      "sha256": "8c9da21571a5a0ebc1180500f8545183dde2ef554141a9742f3e3c9f96957866",
+      "bytes": 78630892
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-postgres.json",
+      "sha256": "51284a76e78b690a9e0285b82dc4b6a1da6b7c15c2bb7ef54d70b7e13bb8234d",
+      "bytes": 118
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-postgres.log",
+      "sha256": "5e8d541ebe1c4ebec3ea9de6af48cfed9d0631797837fd799b6628f869ace1d3",
+      "bytes": 35706
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-postgres.xml",
+      "sha256": "de55bdfee156e607be6c3cf970843f4672725c7fa4204cfb1b789eb0ebfdc0b1",
+      "bytes": 72738
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-evidence-snapshot/expense-request-close-preview.log",
+      "sha256": "0802167fbaf0a8fc150b721736f9b31deb4eafbbb68140658c574e3e03145d66",
+      "bytes": 40
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-red.log",
+      "sha256": "1d44dc55bce12937c42ae5f0cf11287e35cc143037cc272bb01de0550eb041cf",
+      "bytes": 42749
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-response-lost.png",
+      "sha256": "80e24bc3d161057510da5a433b82741a47437c61f931e6666ba7169020b349cc",
+      "bytes": 131887
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-restart.json",
+      "sha256": "b8872928224f65574ff405f8f1ef05bee04ef68bf0088d5e729e31bd570fc562",
+      "bytes": 361
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-restore.log",
+      "sha256": "1097255dbc9dc47fda06dfbd5a333423b2d9f40102fbcbab346ab859494881e7",
+      "bytes": 17809
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-evidence-snapshot/expense-request-close-runtime-boot1.log",
+      "sha256": "6fd2323a0be90ba795dc3705ef0030b6b8119a6923c1594d9f725f560ab4bee1",
+      "bytes": 7363
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-evidence-snapshot/expense-request-close-runtime.json",
+      "sha256": "f48a2853e1d3d87383e6112c971edbb469e337225b5be363d4bd90be04c6bb7d",
+      "bytes": 28205
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-scope.log",
+      "sha256": "6a7849414f6b9808197fdf666218a4d476bc95985c7eceb0025570e20c907ca9",
+      "bytes": 240460
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-server.jar",
+      "sha256": "8c9da21571a5a0ebc1180500f8545183dde2ef554141a9742f3e3c9f96957866",
+      "bytes": 78630892
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-test-compile.log",
+      "sha256": "29cedebde2e1dce34f2bdfaeaee2b381b73dc163168b9cd237964575f2ca9dcb",
+      "bytes": 14145
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-v100-boot.json",
+      "sha256": "a933e14fb11ec25ee5d0c61a3fde94858c325c95d7e4985ed19a573c350ede87",
+      "bytes": 242
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-v86-upgrade.json",
+      "sha256": "9d555b0f3aabb614383d4bca0c3cbaa93304b3394ca75f66e7c54153f0bf1d7d",
+      "bytes": 736
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-web-build.log",
+      "sha256": "9c8491b371a9f7829e7c424e08a74c2ca84ca570c9a44b33be94f2752c18dc43",
+      "bytes": 781
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-web-final.log",
+      "sha256": "56ae80494ff610c02216caf9fe945a939ab3816eb1632128a68b2fc8dd491ff5",
+      "bytes": 1098
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-web-first-green.log",
+      "sha256": "8e176090c11cbfafc3bd49ccdb57c18ece5cd3904da26ccd2340631c3584563f",
+      "bytes": 1458
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-web-red.log",
+      "sha256": "3bbe6319bddf6f1ba3c6151c7bcd3900e33074b9433d4c8a877cfc324a8e01eb",
+      "bytes": 863
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-web-scope.log",
+      "sha256": "b82e92c75790d614c3de3426b3032ad2b55863bd95a6b4f039d84e3dc913ccd8",
+      "bytes": 7326
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense_request_close_client.py",
+      "sha256": "b0b66da37a34ca044a88c2e5cbcc80237ddc64edebdad7e5986d6f967aa4ff1f",
+      "bytes": 1106
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/prepare-expense-request-close-plan-runtime.py",
+      "sha256": "47c3df0768c89c90b5af356042039d27ca56c72a3a1c6ad687f1c56cbd5feace",
+      "bytes": 2204
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/prepare-expense-request-close-runtime.py",
+      "sha256": "13e9d4165c3fbf2d651fabb944dbd148121dc72d8593d9508ce52e9d896d83cf",
+      "bytes": 2171
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/run-expense-request-close-plan-runtime.py",
+      "sha256": "4cc7bc99c2340340d79b6943ec4463b4fed238788bdf506477e2f0378c8ad6bb",
+      "bytes": 3811
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/run-expense-request-close-postgres.py",
+      "sha256": "c65eb57623866a6b4b0512aade864d1256350cd49ccbb1b45fd29aca9ddb5171",
+      "bytes": 2121
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/run-expense-request-close-runtime.py",
+      "sha256": "adb6cbc9d7cdb82908be65b230291b3457c6f95122eb2fb28a58e2448f50ae72",
+      "bytes": 3796
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/stop-expense-request-close-plan-runtime.py",
+      "sha256": "f1f0146e9e7baf9a884d2358f70df2d7edd03a08ee3657d3aa1ce2d97b6e9878",
+      "bytes": 1252
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/wecom_runtime_common.py",
+      "sha256": "c09857a84a04482322a4a3fe66dc5679ec97b07f0116fefa2334a52366a71259",
+      "bytes": 1943
+    }
+  ],
+  "limits": [
+    "Scope is F06 local acceptance, not complete project or enterprise acceptance.",
+    "No enterprise finance, real payment or model quality acceptance is claimed.",
+    "Current Git remote is absent; PR and remote CI remain E15.",
+    "V03 original clause-by-clause audit is incomplete; remaining 41 is a lower bound."
+  ],
+  "builtFrontendArtifact": {
+    "directory": "/fyoung/tmp/agentflow-remaining-20260928/expense-request-close-web-dist",
+    "files": {
+      "index.html": "813ff43d8bd93879eaf07a7aeccd679548535232308b9b569e4e02ed6c432106",
+      "assets/index-nvvkRY7e.js": "722f68db3afa6f3a3e491234ea953938d7cc8ce425f81d4399be9fdfab7c3795",
+      "assets/index-D1dU5hoN.css": "2e744674b291e8fd1f743f316cb03421a5060185a73a71775850b649dcc88bf0"
+    }
+  }
+}
