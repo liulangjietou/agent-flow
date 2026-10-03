@@ -21,19 +21,28 @@ public class GatewayAccounting implements AccountingPeriodPort, AccountMappingPo
     }
     /** 返回映射必须完整匹配原法人、币种和所需用途。 */
     @Override public FinanceResult<Mapping> mapping(String tenantId, String targetDigest, AccountMappingPort.Request request) {
+        if (!matchesManagedTarget(request, tenantId, targetDigest)) return new FinanceResult.Unavailable<>(FinanceResult.Failure.TARGET_CHANGED);
         return client.readAccounting(tenantId, targetDigest, FinanceGatewayClient.Operation.ACCOUNT_MAPPING, request,
                 Mapping.class, value -> value.matches(request, Instant.now()));
     }
     /** 过期证据不能继续发起新过账，ERP 还须在过账事务内复核版本。 */
     @Override public FinanceResult<VoucherObservation> post(String targetDigest, VoucherCommand command) {
+        if (!matchesManagedTarget(command.mapping().request(), command.tenantId(), targetDigest)) return new FinanceResult.Unavailable<>(FinanceResult.Failure.TARGET_CHANGED);
         command.requireSendAt(Instant.now());
         return client.postVoucher(command.tenantId(), targetDigest, command.id(), new Post(command, command.digest()),
                 VoucherObservation.class, value -> value.matches(command, false, Instant.now()));
     }
     /** 即使原科目或期间证据到期，仍可查询之前已受理的原凭证。 */
     @Override public FinanceResult<VoucherObservation> query(String targetDigest, VoucherCommand command) {
+        if (!matchesManagedTarget(command.mapping().request(), command.tenantId(), targetDigest)) return new FinanceResult.Unavailable<>(FinanceResult.Failure.TARGET_CHANGED);
         return client.queryVoucher(command.tenantId(), targetDigest, new Query(command.id(), command.digest()),
                 VoucherObservation.class, value -> value.matches(command, true, Instant.now()));
+    }
+
+    // 配置可能早于本次调用固定；先核对发布时的租户和目标，再让客户端核对当前目的地。
+    private static boolean matchesManagedTarget(AccountMappingPort.Request request, String tenant, String target) {
+        var managed = request.managedMapping();
+        return managed == null || managed.tenantId().equals(tenant) && managed.selection().targetDigest().equals(target);
     }
 
     /**

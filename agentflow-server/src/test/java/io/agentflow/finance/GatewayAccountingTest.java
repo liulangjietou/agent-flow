@@ -115,6 +115,79 @@ class GatewayAccountingTest {
     }
 
     @Test
+    void managedMappingReadsRequireExactEchoAndPublishedAccountCodes() {
+        var request = managedRequest("tenant-a", target);
+        var mapping = new AccountMappingPort.Mapping(request, "erp-managed-v1", command.mapping().observedAt(), command.mapping().validUntil(), command.mapping().entries());
+        answer(mapping);
+        assertThat(accounting.mapping("tenant-a", target, request).requireValue()).isEqualTo(mapping);
+        assertThat(json.read(received.get(), JsonNode.class).at("/data/managedMapping/selection/targetDigest").asText()).isEqualTo(target);
+        answer(command.mapping());
+        assertThat(accounting.mapping("tenant-a", target, request)).isEqualTo(unavailable(FinanceResult.Failure.INVALID_RESPONSE));
+        corrupt(mapping, body -> ((ObjectNode) body.path("entries").get(0)).put("accountCode", "unexpected-account"));
+        assertThat(accounting.mapping("tenant-a", target, request)).isEqualTo(unavailable(FinanceResult.Failure.INVALID_RESPONSE));
+        corrupt(mapping, body -> ((ObjectNode) body.at("/request/managedMapping/selection")).put("mappingVersion", 2));
+        assertThat(accounting.mapping("tenant-a", target, request)).isEqualTo(unavailable(FinanceResult.Failure.INVALID_RESPONSE));
+    }
+
+    @Test
+    void managedMappingCannotSendAnotherTenantsConfigurationOrSwitchFinanceTarget() {
+        var otherTenant = managedRequest("tenant-b", target);
+        var otherTarget = managedRequest("tenant-a", "b".repeat(64));
+        assertThat(accounting.mapping("tenant-a", target, otherTenant)).isEqualTo(unavailable(FinanceResult.Failure.TARGET_CHANGED));
+        assertThat(accounting.mapping("tenant-a", target, otherTarget)).isEqualTo(unavailable(FinanceResult.Failure.TARGET_CHANGED));
+        assertThat(requests.get()).isZero();
+    }
+
+    @Test
+    void managedVoucherJsonRetainsSelectionAndCannotSendOrQueryAtAnotherBoundTarget() {
+        var request = managedRequest("tenant-a", "b".repeat(64));
+        var mapping = new AccountMappingPort.Mapping(request, command.mapping().sourceVersion(), command.mapping().observedAt(), command.mapping().validUntil(), command.mapping().entries());
+        var managed = new VoucherCommand(command.id(), command.tenantId(), command.kind(), command.binding(), command.legalEntityId(), command.employeeId(),
+                command.accountingDate(), command.totals(), command.period(), mapping, command.lines(), command.payment(), command.createdAt(), command.expiresAt());
+        assertThat(json.read(json.write(managed), VoucherCommand.class)).isEqualTo(managed);
+        answer(posted(managed, VoucherObservation.Status.POSTED));
+        assertThat(accounting.post(target, managed)).isEqualTo(unavailable(FinanceResult.Failure.TARGET_CHANGED));
+        assertThat(accounting.query(target, managed)).isEqualTo(unavailable(FinanceResult.Failure.TARGET_CHANGED));
+        assertThat(requests.get()).isZero();
+    }
+
+    @Test
+    void legacyMappingJsonOmitsManagedFieldAndRestoresOriginalVoucherDigest() {
+        String encoded = json.write(command);
+        assertThat(encoded).doesNotContain("managedMapping");
+        var restored = json.read(encoded, VoucherCommand.class);
+        assertThat(restored).isEqualTo(command);
+        assertThat(restored.digest()).isEqualTo(command.digest());
+        answer(command.mapping());
+        assertThat(accounting.mapping("tenant-a", target, command.mapping().request()).requireValue()).isEqualTo(command.mapping());
+        assertThat(received.get()).doesNotContain("managedMapping");
+    }
+
+    private AccountMappingPort.Request managedRequest(String tenant, String destination) {
+        var original = command.mapping().request();
+        var definition = new AccountMappingDefinition("本地契约样例", original.legalEntityId(), original.currency(), command.mapping().entries());
+        var selection = new AccountMappingSelection(UUID.randomUUID(), 1, 0, 1, definition.digest(), destination);
+        return new AccountMappingPort.Request(original.legalEntityId(), original.currency(), original.keys(),
+                new ManagedAccountMapping(tenant, original.legalEntityId(), original.currency(), selection, command.mapping().entries()));
+    }
+
+    @Test
+    void managedVoucherPostAndOriginalQueryKeepTheFrozenSelection() {
+        var request = managedRequest("tenant-a", target);
+        var mapping = new AccountMappingPort.Mapping(request, command.mapping().sourceVersion(), command.mapping().observedAt(), command.mapping().validUntil(), command.mapping().entries());
+        var managed = new VoucherCommand(command.id(), command.tenantId(), command.kind(), command.binding(), command.legalEntityId(), command.employeeId(),
+                command.accountingDate(), command.totals(), command.period(), mapping, command.lines(), command.payment(), command.createdAt(), command.expiresAt());
+        answer(posted(managed, VoucherObservation.Status.POSTED));
+        assertThat(accounting.post(target, managed).requireValue().status()).isEqualTo(VoucherObservation.Status.POSTED);
+        var sent = json.read(received.get(), JsonNode.class);
+        assertThat(json.read(sent.at("/data/command").toString(), VoucherCommand.class)).isEqualTo(managed);
+        assertThat(sent.at("/data/commandDigest").asText()).isEqualTo(managed.digest()).isNotEqualTo(command.digest());
+        assertThat(accounting.query(target, managed).requireValue().commandDigest()).isEqualTo(managed.digest());
+        assertThat(json.read(received.get(), JsonNode.class).at("/data/commandDigest").asText()).isEqualTo(managed.digest());
+        assertThat(path.get()).isEqualTo("/finance/voucher-query");
+    }
+
+    @Test
     void notFoundIsOnlyAnOriginalOperationQueryAndMissingRevisionIsInvalid() {
         var missing = new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.NOT_FOUND, 0L, Instant.now().minusSeconds(1), null, null, null, null, null, null, null, null);
         answer(missing); assertThat(accounting.post(target, command)).isEqualTo(unavailable(FinanceResult.Failure.INVALID_RESPONSE));

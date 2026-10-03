@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -9,7 +10,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 版本化会计科目映射来自 ERP，平台不为企业猜测科目代码。
+ * ERP 校验本次科目映射；平台发布配置时固定版本意图，不能猜测或替代 ERP 科目事实。
  * @author owlzhangfq@gmail.com
  */
 public interface AccountMappingPort {
@@ -39,13 +40,17 @@ public interface AccountMappingPort {
      * 同一法人和本位币的必要科目集合。
      * @author owlzhangfq@gmail.com
      */
-    record Request(UUID legalEntityId, String currency, List<Key> keys) {
+    record Request(UUID legalEntityId, String currency, List<Key> keys,
+                   @JsonInclude(JsonInclude.Include.NON_NULL) ManagedAccountMapping managedMapping) {
+        /** 旧调用继续使用 ERP 管理的映射，未启用平台版本时不添加传输字段。 */
+        public Request(UUID legalEntityId, String currency, List<Key> keys) { this(legalEntityId, currency, keys, null); }
         /** 排序保证同一集合的规范表示稳定，重复键直接拒绝。 */
         public Request {
             if (legalEntityId == null || CollectionUtils.isEmpty(keys) || keys.size() > MAX_KEYS || keys.stream().anyMatch(java.util.Objects::isNull)
                     || keys.stream().distinct().count() != keys.size()) throw invalid();
             Money.zero(currency);
-            keys = keys.stream().sorted(order()).toList();
+            keys = keys.stream().sorted(keyOrder()).toList();
+            if (managedMapping != null) managedMapping.requireScope(legalEntityId, currency, keys);
         }
     }
 
@@ -67,8 +72,9 @@ public interface AccountMappingPort {
         public Mapping {
             if (request == null || invalidText(sourceVersion) || observedAt == null || validUntil == null || !validUntil.isAfter(observedAt)
                     || entries == null || entries.size() != request.keys().size() || entries.stream().anyMatch(java.util.Objects::isNull)) throw invalid();
-            entries = entries.stream().sorted(Comparator.comparing(Entry::key, order())).toList();
+            entries = entries.stream().sorted(Comparator.comparing(Entry::key, keyOrder())).toList();
             if (!entries.stream().map(Entry::key).toList().equals(request.keys())) throw invalid();
+            if (request.managedMapping() != null && !entries.equals(request.managedMapping().entries())) throw invalid();
         }
         /** 本次查询必须原法人、原币种、原必要科目，且仍在时效内。 */
         public boolean matches(Request expected, Instant now) {
@@ -78,7 +84,8 @@ public interface AccountMappingPort {
         public String account(Key key) { return entries.stream().filter(value -> value.key().equals(key)).findFirst().orElseThrow(AccountMappingPort::invalid).accountCode(); }
     }
 
-    private static Comparator<Key> order() { return Comparator.comparing((Key key) -> key.role().name()).thenComparing(Key::selector); }
+    /** 配置、请求与回执采用同一排序，规范摘要不依赖输入集合顺序。 */
+    static Comparator<Key> keyOrder() { return Comparator.comparing((Key key) -> key.role().name()).thenComparing(Key::selector); }
     private static boolean invalidText(String value) { return StringUtils.isBlank(value) || value.length() > 128; }
     private static DomainException invalid() { return new DomainException("INVALID_ACCOUNT_MAPPING", "Account mapping must cover exactly the requested legal entity, currency and accounting roles"); }
 }
