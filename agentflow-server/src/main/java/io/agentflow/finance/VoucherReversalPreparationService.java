@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
@@ -38,12 +39,13 @@ public class VoucherReversalPreparationService {
     private final VoucherReversalExecutionService execution;
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
+    private final ApplicationEventPublisher events;
     /** 独立财务、原字段权限和当前任职继续复用原凭证边界。 */
     public VoucherReversalPreparationService(CurrentActor actors, VoucherDisputeService access, VoucherReversalSources sources,
             PaymentPersonnel personnel, JdbcVoucherReversalPreparationRepository preparations, JdbcVoucherReversalOperationRepository operations,
-            JdbcVoucherReversalRecordRepository records, VoucherReversalExecutionService execution, JdbcTemplate jdbc, JsonUtil json) {
+            JdbcVoucherReversalRecordRepository records, VoucherReversalExecutionService execution, JdbcTemplate jdbc, JsonUtil json, ApplicationEventPublisher events) {
         this.actors = actors; this.access = access; this.sources = sources; this.personnel = personnel; this.preparations = preparations;
-        this.operations = operations; this.records = records; this.execution = execution; this.jdbc = jdbc; this.json = json;
+        this.operations = operations; this.records = records; this.execution = execution; this.jdbc = jdbc; this.json = json; this.events = events;
     }
     /** 幂等回放也必须复核原轮次完整字段权限与当前独立财务身份。 */
     public void authorizeAccess(UUID applicationId, UUID operationId, int round) { access.requireFinance(applicationId, operationId, round); }
@@ -67,7 +69,7 @@ public class VoucherReversalPreparationService {
         var actor = actors.actor(); var prepared = preparations.find(actor.tenantId(), input.preparationId()).orElseThrow(VoucherReversalPreparationService::conflict);
         if (prepared.version() != input.preparationVersion() || !prepared.input().requestedBy().equals(actor.userId())
                 || !preparations.latest(actor.tenantId(), operationId, actor.userId()).filter(value -> value.input().id().equals(prepared.input().id())).isPresent()) throw conflict();
-        requirePreparedSource(prepared, source); var now = time(Instant.now()); var consumed = prepared.authorize(now); preparations.update(consumed);
+        requirePreparedSource(prepared, source); var now = time(Instant.now()); var consumed = prepared.authorize(now); persist(prepared, consumed);
         var operation = execution.register(consumed, now); var event = audit(consumed, operation.version(), "VOUCHER_REVERSAL_AUTHORIZE", input.comment(), now);
         return receipt(consumed, source.current().version() + 1, operation, event);
     }
@@ -89,28 +91,28 @@ public class VoucherReversalPreparationService {
     public VoucherReversalPreparation claim(String tenant, UUID id, Instant at) {
         var initial = preparations.find(tenant, id).orElse(null); if (initial == null || !initial.active()) return null;
         var source = sources.locked(tenant, initial.input().source().command().id()); var current = preparations.find(tenant, id).orElseThrow(); var now = time(at);
-        if (current.expired(now)) { preparations.update(current.fail("TIMEOUT", now)); return null; }
+        if (current.expired(now)) { persist(current, current.fail("TIMEOUT", now)); return null; }
         if (current.status() != VoucherReversalPreparation.Status.QUEUED || !available(current, source, now)) return null;
-        var claimed = current.claim(now, LEASE); preparations.update(claimed); return claimed;
+        var claimed = current.claim(now, LEASE); persist(current, claimed); return claimed;
     }
     /** 原件与期间只能形成候选，完成读取不会自动登记冲销命令。 */
     @Transactional
     public void finish(VoucherReversalPreparation claimed, FinanceResult<VoucherObservation> original, FinanceResult<AccountingPeriodPort.OpenPeriod> period, Instant at) {
         var source = sources.locked(claimed.input().source().command().tenantId(), claimed.input().source().command().id()); var current = current(claimed); if (current == null) return; var now = time(at);
         if (!available(current, source, now)) return;
-        if (current.expired(now)) { preparations.update(current.fail("TIMEOUT", now)); return; }
-        if (!(original instanceof FinanceResult.Success<VoucherObservation> posted)) { preparations.update(current.fail(failure(original), now)); return; }
-        if (!(period instanceof FinanceResult.Success<AccountingPeriodPort.OpenPeriod> opened)) { preparations.update(current.fail(failure(period), now)); return; }
+        if (current.expired(now)) { persist(current, current.fail("TIMEOUT", now)); return; }
+        if (!(original instanceof FinanceResult.Success<VoucherObservation> posted)) { persist(current, current.fail(failure(original), now)); return; }
+        if (!(period instanceof FinanceResult.Success<AccountingPeriodPort.OpenPeriod> opened)) { persist(current, current.fail(failure(period), now)); return; }
         VoucherReversalPreparation next;
         try { next = current.ready(posted.value(), opened.value(), now); }
         catch (DomainException invalid) { next = current.fail("INVALID_RESPONSE", now); }
-        preparations.update(next);
+        persist(current, next);
     }
     /** 失败只保存稳定分类，晚到任务不能覆盖已经消费的授权。 */
     @Transactional
     public void fail(VoucherReversalPreparation claimed, Instant at) {
         sources.locked(claimed.input().source().command().tenantId(), claimed.input().source().command().id()); var current = current(claimed);
-        if (current != null) preparations.update(current.fail("INTERNAL_ERROR", time(at)));
+        if (current != null) persist(current, current.fail("INTERNAL_ERROR", time(at)));
     }
     /** 页面和写入口共享候选边界；当前权限由各自读取入口先行检查。 */
     public String authorizationIssue(VoucherReversalPreparation prepared, VoucherReversalSources.Source source, Instant now) {
@@ -135,13 +137,16 @@ public class VoucherReversalPreparationService {
     }
     private boolean available(VoucherReversalPreparation value, VoucherReversalSources.Source source, Instant now) {
         try { requirePreparedSource(value, source); return true; }
-        catch (DomainException changed) { preparations.update(value.voidSource(now)); return false; }
+        catch (DomainException changed) { persist(value, value.voidSource(now)); return false; }
     }
     private VoucherReversalPreparation current(VoucherReversalPreparation claimed) {
         return preparations.find(claimed.input().source().command().tenantId(), claimed.input().id()).filter(value -> value.equals(claimed) && value.status() == VoucherReversalPreparation.Status.RUNNING).orElse(null);
     }
     private void requireVersions(VoucherAccess.Context context, VoucherReversalSources.Source source, long application, long business, long operation) {
         if (context.application().version() != application || context.businessVersion() != business || source.current().version() != operation) throw conflict();
+    }
+    private void persist(VoucherReversalPreparation previous, VoucherReversalPreparation next) {
+        preparations.update(next); events.publishEvent(new VoucherReversalPreparationChanged(previous, next));
     }
     private String failure(FinanceResult<?> result) {
         if (result instanceof FinanceResult.Unavailable<?> value) return value.failure().name();

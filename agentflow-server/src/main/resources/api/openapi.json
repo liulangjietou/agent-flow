@@ -46370,6 +46370,111 @@
           }
         ]
       }
+    },
+    "/api/v1/notifications/{id}/reversal-target": {
+      "get": {
+        "operationId": "reversalNotificationTarget",
+        "tags": [
+          "消息"
+        ],
+        "summary": "读取本人消息对应的原独立冲销记录",
+        "description": "固定原冲销准备、执行命令和安全结束身份，新的尝试不替换旧消息。读取重新核验原消息接收人、原法人任职和原轮次字段权限；管理员不能绕过。只返回摘要，不返回反向分录、账户、理由材料或办理动作。拒绝查询参数，响应 no-store。",
+        "x-access": "原消息接收人及当前原轮次财务读取权限",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReversalNotificationTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -52930,7 +53035,9 @@
               "VOUCHER_RESULT",
               "VOUCHER_ATTENTION",
               "BUDGET_RESULT",
-              "BUDGET_ATTENTION"
+              "BUDGET_ATTENTION",
+              "REVERSAL_RESULT",
+              "REVERSAL_ATTENTION"
             ]
           },
           "actor": {
@@ -80348,6 +80455,277 @@
               "null"
             ],
             "format": "date-time"
+          }
+        }
+      },
+      "ReversalNotificationPreparation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "requestedAt",
+          "updatedAt",
+          "accountingDate",
+          "issue"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "READY",
+              "AUTHORIZED",
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z_]{1,64}$"
+          }
+        }
+      },
+      "ReversalNotificationOperation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status",
+          "attempts",
+          "highestRevision",
+          "updatedAt",
+          "expiresAt",
+          "observedStatus",
+          "issue",
+          "disputed",
+          "voucherReference",
+          "postedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "POSTING",
+              "QUERYING",
+              "UNKNOWN",
+              "POSTED",
+              "FAILED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "highestRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observedStatus": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "PENDING",
+              "POSTED",
+              "FAILED",
+              "NOT_FOUND",
+              null
+            ]
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[A-Z_]{1,64}$"
+          },
+          "disputed": {
+            "type": "boolean"
+          },
+          "voucherReference": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "postedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "ReversalNotificationRetirement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "retiredAt",
+          "basis"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "retiredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "NEVER_DISPATCHED",
+              "CONFIRMED_FAILED"
+            ]
+          }
+        }
+      },
+      "ReversalNotificationTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "messageId",
+          "reversalId",
+          "operationId",
+          "applicationId",
+          "businessId",
+          "roundNo",
+          "kind",
+          "originalStatus",
+          "originalHeld",
+          "preparation",
+          "operation",
+          "retirement"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reversalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "EMPLOYEE_ADVANCE",
+              "EXPENSE_ACCRUAL",
+              "PAYMENT"
+            ]
+          },
+          "originalStatus": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "POSTING",
+              "QUERYING",
+              "UNKNOWN",
+              "POSTED",
+              "FAILED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING",
+              "REVERSED"
+            ]
+          },
+          "originalHeld": {
+            "type": "boolean",
+            "description": "原凭证当前有冲销绑定，可能来自另一次冲销；不是本次冲销已过账或已退款的标记。"
+          },
+          "preparation": {
+            "$ref": "#/components/schemas/ReversalNotificationPreparation"
+          },
+          "operation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReversalNotificationOperation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "retirement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReversalNotificationRetirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       }

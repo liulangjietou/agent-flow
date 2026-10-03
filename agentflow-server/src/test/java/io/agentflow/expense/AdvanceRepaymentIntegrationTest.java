@@ -198,6 +198,12 @@ class AdvanceRepaymentIntegrationTest {
         try { reversalRetirement.retire(app(loan).id(), original.input().command().id(), new VoucherReversalRetirementService.Input(1, app(loan).version(), request(loan).version(), original.version(),
                 reversal.input().command().id(), reversal.version(), "LOAN-RETIRE-PROOF", "核对原件后只结束本次未发送冲销")); }
         finally { actors.clear(); }
+        String key = "reversal:" + reversal.input().command().id() + ":RETIRED";
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class, key)).containsExactlyInAnyOrder("alice", "finance");
+        String message = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", String.class, key);
+        var detail = ok(read("/api/v1/notifications/" + message + "/reversal-target", "alice"), 200);
+        assertThat(detail.path("kind").asText()).isEqualTo(kind.name()); assertThat(detail.path("reversalId").asText()).isEqualTo(reversal.input().command().id().toString());
+        assertThat(detail.at("/retirement/basis").asText()).isEqualTo("NEVER_DISPATCHED");
     }
 
     @ParameterizedTest @EnumSource(value = VoucherCommand.Kind.class, names = {"EMPLOYEE_ADVANCE", "PAYMENT"})

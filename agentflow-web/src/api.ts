@@ -219,7 +219,7 @@ export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; statu
 /** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
 export interface InboxMessage {
   id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
-  kind: 'BUDGET_RESULT' | 'BUDGET_ATTENTION' | 'VOUCHER_RESULT' | 'VOUCHER_ATTENTION' | 'SUPPLIER_PAYMENT_RESULT' | 'SUPPLIER_PAYMENT_ATTENTION' | 'PAYMENT_RESULT' | 'PAYMENT_ATTENTION' | 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
+  kind: 'REVERSAL_RESULT' | 'REVERSAL_ATTENTION' | 'BUDGET_RESULT' | 'BUDGET_ATTENTION' | 'VOUCHER_RESULT' | 'VOUCHER_ATTENTION' | 'SUPPLIER_PAYMENT_RESULT' | 'SUPPLIER_PAYMENT_ATTENTION' | 'PAYMENT_RESULT' | 'PAYMENT_ATTENTION' | 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
   taskId?: string; nodeName?: string; createdAt: string; readAt?: string; content?: string | null
 }
 /** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */
@@ -239,6 +239,14 @@ export interface BudgetNotificationTarget {
   action: 'FREEZE' | 'ADJUST' | 'RELEASE' | 'CONSUME'; status: 'QUEUED' | 'EXECUTING' | 'UNKNOWN' | 'QUERYING' | 'APPLIED' | 'REJECTED'
   version: number; attempts: number; updatedAt: string; observedStatus: 'PENDING' | 'NOT_FOUND' | 'APPLIED' | 'REJECTED' | null
   issue: string | null; ledgerRevision: number | null; reference: string | null; appliedAt: string | null
+}
+/** 固定原冲销准备或命令；安全结束记录与 ERP 结果分别展示。 */
+export interface ReversalNotificationTarget {
+  messageId: string; reversalId: string; operationId: string; applicationId: string; businessId: string; roundNo: number
+  kind: VoucherView['kind']; originalStatus: NonNullable<VoucherView['operation']>['status']; originalHeld: boolean
+  preparation: { id: string; version: number; status: 'QUEUED' | 'RUNNING' | 'READY' | 'AUTHORIZED' | 'UNAVAILABLE' | 'VOIDED'; requestedAt: string; updatedAt: string; accountingDate: string; issue: string | null }
+  operation: { id: string; version: number; status: 'QUEUED' | 'POSTING' | 'QUERYING' | 'UNKNOWN' | 'POSTED' | 'FAILED' | 'NOT_FOUND' | 'EXPIRED' | 'VOIDED' | 'RECONCILING'; attempts: number; highestRevision: number; updatedAt: string; expiresAt: string; observedStatus: 'PENDING' | 'POSTED' | 'FAILED' | 'NOT_FOUND' | null; issue: string | null; disputed: boolean; voucherReference: string | null; postedAt: string | null } | null
+  retirement: { id: string; retiredAt: string; basis: 'NEVER_DISPATCHED' | 'CONFIRMED_FAILED' } | null
 }
 /** 已读筛选与稳定分页游标。@author owlzhangfq@gmail.com */
 export interface InboxQuery { read?: 'all' | 'unread'; limit?: number; cursor?: string }
@@ -827,6 +835,7 @@ export const api = {
   readNotification: (id: string) => write<InboxMessage>(`/notifications/${encodeURIComponent(id)}/read`, 'POST', '标记消息已读', {}),
   paymentNotificationTarget: (id: string, signal: AbortSignal) => request<PaymentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/payment-target`, { signal, cache: 'no-store' }),
   supplierPaymentNotificationTarget: (id: string, signal: AbortSignal) => request<SupplierPaymentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/supplier-payment-target`, { signal, cache: 'no-store' }),
+  reversalNotificationTarget: (id: string, signal: AbortSignal) => request<ReversalNotificationTarget>(`/notifications/${encodeURIComponent(id)}/reversal-target`, { signal, cache: 'no-store' }),
   budgetNotificationTarget: (id: string, signal: AbortSignal) => request<BudgetNotificationTarget>(`/notifications/${encodeURIComponent(id)}/budget-target`, { signal, cache: 'no-store' }),
   voucherNotificationTarget: (id: string, signal: AbortSignal) => request<VoucherNotificationTarget>(`/notifications/${encodeURIComponent(id)}/voucher-target`, { signal, cache: 'no-store' }),
   taskRecipients: (taskId: string, signal: AbortSignal) => request<string[]>(`/tasks/${encodeURIComponent(taskId)}/recipients`, { signal }),

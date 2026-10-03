@@ -1,9 +1,11 @@
-import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget, SupplierPaymentNotificationTarget, VoucherNotificationTarget, BudgetNotificationTarget } from './api'
+import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget, SupplierPaymentNotificationTarget, VoucherNotificationTarget, BudgetNotificationTarget, ReversalNotificationTarget } from './api'
 import { validatePayment } from './payments.js'
 import { validateSupplierCashier } from './supplierCashier.js'
 import { preparationLabels, operationLabels } from './vouchers.js'
+import { reversalPreparationLabels, reversalExecutionLabels } from './voucherReversalExecution.js'
 
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
+  REVERSAL_RESULT: '独立冲销结果更新', REVERSAL_ATTENTION: '独立冲销需核对',
   BUDGET_RESULT: '预算操作结果更新', BUDGET_ATTENTION: '预算操作需核对',
   VOUCHER_RESULT: '凭证结果更新', VOUCHER_ATTENTION: '凭证处理需核对',
   SUPPLIER_PAYMENT_RESULT: '供应商付款结果更新', SUPPLIER_PAYMENT_ATTENTION: '供应商付款需核对',
@@ -21,6 +23,46 @@ export const isTaskNotification = (item: InboxMessage) => ['TASK_PENDING', 'TASK
 export const isSupplierPaymentNotification = (item: InboxMessage) => ['SUPPLIER_PAYMENT_RESULT', 'SUPPLIER_PAYMENT_ATTENTION'].includes(item.kind)
 export const isPaymentNotification = (item: InboxMessage) => ['PAYMENT_RESULT', 'PAYMENT_ATTENTION'].includes(item.kind) || isSupplierPaymentNotification(item)
 export const isVoucherNotification = (item: InboxMessage) => ['VOUCHER_RESULT', 'VOUCHER_ATTENTION'].includes(item.kind)
+
+export const isReversalNotification = (item: InboxMessage) => ['REVERSAL_RESULT', 'REVERSAL_ATTENTION'].includes(item.kind)
+/** 原冲销准备、命令和安全结束不能被新的尝试或办理权限替换。 */
+export function readReversalNotificationTarget(value: ReversalNotificationTarget, message: InboxMessage): ReversalNotificationTarget {
+  const invalid = () => { throw new Error('消息对应的冲销记录不一致，请刷新消息后重新读取。') }
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v)
+  const positive = (v: number) => Number.isSafeInteger(v) && v > 0
+  const natural = (v: number) => Number.isSafeInteger(v) && v >= 0
+  const instant = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v))
+  const issue = (v: unknown) => v === null || typeof v === 'string' && /^[A-Z_]{1,64}$/.test(v)
+  const closed = (v: object, keys: string[]) => Object.keys(v).every(key => keys.includes(key))
+  if (!value || !isReversalNotification(message) || value.messageId !== message.id || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || ![value.messageId, value.reversalId, value.operationId, value.applicationId, value.businessId].every(uuid) || !positive(value.roundNo)
+      || value.reversalId === value.operationId || !['EMPLOYEE_ADVANCE', 'EXPENSE_ACCRUAL', 'PAYMENT'].includes(value.kind)
+      || !Object.prototype.hasOwnProperty.call(operationLabels, value.originalStatus) || typeof value.originalHeld !== 'boolean'
+      || !closed(value, ['messageId', 'reversalId', 'operationId', 'applicationId', 'businessId', 'roundNo', 'kind', 'originalStatus', 'originalHeld', 'preparation', 'operation', 'retirement'])) invalid()
+  const preparation = value.preparation, operation = value.operation, retirement = value.retirement
+  if (!preparation || typeof preparation !== 'object' || Array.isArray(preparation)
+      || operation !== null && (typeof operation !== 'object' || Array.isArray(operation))
+      || retirement !== null && (typeof retirement !== 'object' || Array.isArray(retirement))
+      || preparation.id !== value.reversalId || !positive(preparation.version)
+      || !Object.prototype.hasOwnProperty.call(reversalPreparationLabels, preparation.status) || !instant(preparation.requestedAt) || !instant(preparation.updatedAt)
+      || !/^\d{4}-\d{2}-\d{2}$/.test(preparation.accountingDate) || !issue(preparation.issue)
+      || ['UNAVAILABLE', 'VOIDED'].includes(preparation.status) !== (preparation.issue !== null) || (preparation.status === 'AUTHORIZED') !== !!operation
+      || !closed(preparation, ['id', 'version', 'status', 'requestedAt', 'updatedAt', 'accountingDate', 'issue'])) invalid()
+  if (operation && (operation.id !== value.reversalId || !positive(operation.version) || !natural(operation.attempts) || !natural(operation.highestRevision)
+      || !Object.prototype.hasOwnProperty.call(reversalExecutionLabels, operation.status) || !instant(operation.updatedAt) || !instant(operation.expiresAt)
+      || !issue(operation.issue) || typeof operation.disputed !== 'boolean' || operation.status === 'RECONCILING' && !operation.disputed
+      || operation.observedStatus !== null && !['PENDING', 'POSTED', 'FAILED', 'NOT_FOUND'].includes(operation.observedStatus)
+      || (operation.observedStatus === 'POSTED' ? typeof operation.voucherReference !== 'string' || !operation.voucherReference.trim() || operation.voucherReference.length > 128 || !instant(operation.postedAt)
+        : operation.voucherReference !== null || operation.postedAt !== null)
+      || operation.status === 'POSTED' && operation.observedStatus !== 'POSTED' || operation.status === 'FAILED' && operation.observedStatus !== 'FAILED'
+      || operation.status === 'NOT_FOUND' && operation.observedStatus !== 'NOT_FOUND'
+      || !closed(operation, ['id', 'version', 'status', 'attempts', 'highestRevision', 'updatedAt', 'expiresAt', 'observedStatus', 'issue', 'disputed', 'voucherReference', 'postedAt']))) invalid()
+  if (retirement && (!operation || !uuid(retirement.id) || !instant(retirement.retiredAt)
+      || !['NEVER_DISPATCHED', 'CONFIRMED_FAILED'].includes(retirement.basis)
+      || (retirement.basis === 'NEVER_DISPATCHED' ? operation.attempts !== 0 || !['VOIDED', 'EXPIRED'].includes(operation.status) : operation.status !== 'FAILED')
+      || !closed(retirement, ['id', 'retiredAt', 'basis']))) invalid()
+  return value
+}
 
 export const isBudgetNotification = (item: InboxMessage) => ['BUDGET_RESULT', 'BUDGET_ATTENTION'].includes(item.kind)
 export const budgetActionLabels = { FREEZE: '冻结', ADJUST: '调整冻结', RELEASE: '释放', CONSUME: '消费' }
