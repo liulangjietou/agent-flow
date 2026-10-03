@@ -1,6 +1,6 @@
 # 剩余工作实施方案
 
-A02 的权威时效依据、本人来源选择、持久模型队列、严格带来源输出、人工复核及 5 个公开接口已接通；132 项后端相关用例和 OpenAPI 通过。费用页、原请求恢复交互和固定包运行验收仍待完成，A02 保持 OPEN。见[实施记录](precheck-explanation.md)和[后端阶段证据](evidence/precheck-explanation-backend-20261003.json)。
+A02 的本人费用页面已接通明确来源选择、原检查与解释分离、历史来源核对、人工采纳／放弃及原请求恢复；118 项前端及共享请求范围用例、类型检查、构建和 OpenAPI 通过。后端阶段另有 132 项相关用例证据。固定包升级、实际运行、重启、浏览器与 PostgreSQL 补验仍待完成，A02 保持 OPEN。见[实施记录](precheck-explanation.md)和[页面阶段证据](evidence/precheck-explanation-ui-20261003.json)。
 
 2026-10-03 V02 子问题：编号字符校验已接入共用结构校验，原非法草稿可读取并显式修正，固定包升级保留原人工待办并完成批准。106 项 Java、36 项前端范围测试及 42 次 HTTP 检查通过，见[验收证据](evidence/definition-identifier-syntax-20261003.json)。这不关闭 V02 或增加独立待办，仍至少 34 项未完成。
 

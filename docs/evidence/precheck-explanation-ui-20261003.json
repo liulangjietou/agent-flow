@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 1,
+  "taskId": "A02",
+  "stage": "EXPENSE_EXPLANATION_UI_AND_REQUEST_RECOVERY",
+  "status": "STAGE_VERIFIED_TASK_OPEN",
+  "taskClosed": false,
+  "recordedAt": "2026-10-03T13:39:57.860192+00:00",
+  "implementationCommit": "8ecc84fe2549eb5c16e4b804099938bfd35ec4e3",
+  "branch": "codex/governance-identifier-integration",
+  "implementation": {
+    "entryPoints": [
+      "Saved applicant expense editor",
+      "Current applicant expense detail; no reviewer/task or historical-round entry"
+    ],
+    "explicitSources": "No source preselected; result and selected findings required; at most 20 findings, 64 sources, 64 KiB UTF-8.",
+    "review": "Manual selection records original issue IDs and comment only; no financial version, amount, authoritative check or approval mutation.",
+    "freshness": "Both versions, latest precheck ID and deadline gate adoption. Refresh closes old adoption immediately. Stale detail remains readable and dismissible.",
+    "recovery": "Receipt validated before pending deletion. Original bytes and key survive unknown outcome and authentication failure. Recovery notifies matching mounted panel without replacing expense draft.",
+    "privacy": "Owner-only entry; identity/resource generation guards; no-store reads bounded at 12 seconds; 401/403/404 reads clear all private panel state.",
+    "presentation": "Vue text rendering escapes model/source text; original source strings retained without money recomputation."
+  },
+  "verification": {
+    "result": "PASS",
+    "verifiedUniqueCases": 118,
+    "directScopeCases": 18,
+    "relatedRegressionCases": 100,
+    "testFiles": [
+      "agentflow-web/tests/precheck-explanation.test.mjs",
+      "agentflow-web/tests/draft-assist.test.mjs",
+      "agentflow-web/tests/expense-origination.test.mjs",
+      "agentflow-web/tests/expense-actions.test.mjs",
+      "agentflow-web/tests/expense-invoice-fill.test.mjs",
+      "agentflow-web/tests/requests.test.mjs",
+      "agentflow-web/tests/authentication.test.mjs"
+    ],
+    "countMethod": "118 distinct passing cases in one final invocation across 7 files, including parameterized cases. Earlier executions and 132 previous-stage Java cases are not added.",
+    "typecheck": "PASS: vue-tsc --noEmit",
+    "build": "PASS: vite build",
+    "buildWarning": "Existing bundle size warning remains; no code splitting change in this scope.",
+    "openapi": {
+      "result": "PASS",
+      "operations": 342,
+      "schemas": 687,
+      "requestExamples": 125
+    },
+    "template": "Actual compiled Vue template SSR escaping check; not interactive browser acceptance.",
+    "initialFailures": [
+      "Initial test named PrecheckExplanationInput instead of actual PrecheckExplanationInputOptions.",
+      "New UI incorrectly treated CSRF_INVALID as definitive; reused platform isDefinitiveWriteFailure after reproduction.",
+      "A new precheck with unchanged expense versions left old adoption enabled; failing test added before requiring current input and matching precheck ID.",
+      "Intermediate timeout test selected the first timer, which could be an expiry timer. It now chooses the 12000 ms read deadline and clears real handles. Intermediate cancelled tests do not count as passing."
+    ],
+    "java": "NOT_RERUN_NO_JAVA_CHANGES; previous backend evidence remains separate",
+    "actualPackagedUpgrade": "NOT_RUN",
+    "actualProcessRestart": "NOT_RUN",
+    "browser": "NOT_RUN_EXISTING_ADMIN_POLICY_BLOCKER",
+    "postgres": "NOT_RUN_EXISTING_DOCKER_LAYER_IO_BLOCKER",
+    "enterpriseModelQuality": "NOT_RUN_E08"
+  },
+  "remaining": [
+    "Fixed installation package and nonempty upgrade",
+    "Queued and running restart, timeout and late-result HTTP acceptance",
+    "Original-key replay against actual package",
+    "Browser and PostgreSQL checks after existing blockers resolve"
+  ],
+  "counting": {
+    "knownOpenTasks": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false,
+    "completionPercentage": null
+  },
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/precheck-explanation-ui-evidence-snapshot",
+  "artifactCount": 9,
+  "artifacts": [
+    {
+      "path": "dist/assets/index-DPbAvMlE.css",
+      "size": 391143,
+      "sha256": "e50b466409de8dd49792ab73f78028176f8b13e6e2e11a34b271f016b3a7200a"
+    },
+    {
+      "path": "dist/assets/index-HIz_zcGT.js",
+      "size": 1738944,
+      "sha256": "8f87fd5096cfe5472d6834c8d1b18a9de4b579f6475a439225356cae57ecd8bb"
+    },
+    {
+      "path": "dist/index.html",
+      "size": 420,
+      "sha256": "e6040cbafe45be723284f01f65c8787c577af7bcc369935ce9e2d324172f89c6"
+    },
+    {
+      "path": "precheck-explanation-ui-final-build.log",
+      "size": 781,
+      "sha256": "2f48b59c24b91d33e24766afba5fccc159afcf3b7d2a14464d806a43ce4bf868"
+    },
+    {
+      "path": "precheck-explanation-ui-first.log",
+      "size": 4470,
+      "sha256": "a3ec151d1745f6515dae9cf1c8454f2086a93d45379cb8c417b92e93a808cb50"
+    },
+    {
+      "path": "precheck-explanation-ui-gate.log",
+      "size": 11838,
+      "sha256": "5b0f153d03024836cab6b916fd0fc907077915f400b96c5a9237908906b4a78e"
+    },
+    {
+      "path": "precheck-explanation-ui-newer-check-red.log",
+      "size": 4164,
+      "sha256": "9b13c45549b95329540ed3e7dc12bc15777377324a6a3a1386e7beec4f30a022"
+    },
+    {
+      "path": "precheck-explanation-ui-openapi.log",
+      "size": 71,
+      "sha256": "ddfa2e60843f16b570c51f2cd74fa235ae652e10a396823675f89424b771c24e"
+    },
+    {
+      "path": "precheck-explanation-ui-regression.log",
+      "size": 10092,
+      "sha256": "e140356be6fc04b37622c6b332803cdedc50e7c41f4f6571a7709c7acdcf7faa"
+    }
+  ],
+  "sourceCount": 18,
+  "sources": [
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "size": 70701,
+      "sha256": "3826e43d4cb520822166129090e32d2ad7d8bf1d193cda6b04c2ffde44595c2a"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "size": 135465,
+      "sha256": "a86897628c6b56844cd0a3226306fe53acdfa541af8b4029a69ad2b24dd70009"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "size": 117336,
+      "sha256": "f3cbb73e241fe2914b56a4220ddce43eecefe309721a2d9c2f8b87a0b3a9fcd6"
+    },
+    {
+      "path": "agentflow-web/src/components/ApplicationRecord.vue",
+      "size": 39618,
+      "sha256": "e7ea2a6575324b3f457731145cce81c0ff1835de30dae6e0d20176ca698be279"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseDetail.vue",
+      "size": 18667,
+      "sha256": "7e0c671b812d12666eaaa91e7caa9573917c1cb0b1e14f2aa112c4679203b00b"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseEditor.vue",
+      "size": 18645,
+      "sha256": "9a74b49eefc7f7c295f73116c162b391a2e571fbb358f0333496d70a2c06577a"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseSubmission.vue",
+      "size": 13765,
+      "sha256": "aeb47d6c9b999a1a0d9a307b3b08db39f07f2e4e16e1f3ff19ac230fb85ee507"
+    },
+    {
+      "path": "agentflow-web/src/components/PrecheckExplanationPanel.vue",
+      "size": 21717,
+      "sha256": "459b0f01506ba5bce2f2bf590b42e74c10eafb233e42870dad10a993e245ab77"
+    },
+    {
+      "path": "agentflow-web/src/precheckExplanation.ts",
+      "size": 14527,
+      "sha256": "c0e8ad63c39884ba2a8ac44352204f58152adaa5de035aa7da4c7d0f013c73ab"
+    },
+    {
+      "path": "agentflow-web/tests/precheck-explanation.test.mjs",
+      "size": 23024,
+      "sha256": "e7c44118a4951024616bcb99e33720e7bccb24415cf9e9cb2e7354d3aacfd764"
+    },
+    {
+      "path": "agentflow-web/tests/draft-assist.test.mjs",
+      "size": 21041,
+      "sha256": "bd4806c41db3366c082b7cd031762b83b1a3037021ac6d5497d16ab56f4b977a"
+    },
+    {
+      "path": "agentflow-web/tests/expense-origination.test.mjs",
+      "size": 22462,
+      "sha256": "8b681c843c0ed800a5afe04a293da628e02432cbe38919a2ad91363de06a9dbc"
+    },
+    {
+      "path": "agentflow-web/tests/expense-actions.test.mjs",
+      "size": 14253,
+      "sha256": "1e85f724ae8a4e8b3945f7307f71052110593e3522fdc75e3fe8c6d077bc026e"
+    },
+    {
+      "path": "agentflow-web/tests/expense-invoice-fill.test.mjs",
+      "size": 16052,
+      "sha256": "d7cbb4a9dfd46caca44514a6b8a4513c8d0cd1dfef3742c9919c77ab56807eac"
+    },
+    {
+      "path": "agentflow-web/tests/requests.test.mjs",
+      "size": 22588,
+      "sha256": "107788511ec45fc65d7c223645b0a3d8f48a32f3c224076b3a5d3d8398f90d5f"
+    },
+    {
+      "path": "agentflow-web/tests/authentication.test.mjs",
+      "size": 6411,
+      "sha256": "2961da449e54cdcf48215400cd46245327532b684d9f1085c8c236899fa49405"
+    },
+    {
+      "path": "agentflow-web/package.json",
+      "size": 618,
+      "sha256": "34864352efdf65949a94ccb9fbf34c0426fe38a0da3a11a8cb1519b1fdec2af4"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "size": 2358119,
+      "sha256": "ebdc1d32da378d91a9e57fe76803c644d697ca3712c9689260a830777b59d2a2"
+    }
+  ]
+}
