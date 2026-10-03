@@ -753,26 +753,14 @@
           ]
         }
       ],
-      "observed": "已保存失败预检的制度、依赖摘要及解释截止时间，并检查换版、重验、同票号占用、输入修改及新预检替代。283 项相关用例验证完成，旧记录保持可读且不回填。专用模型输入选择、生成队列、人工复核、公开接口与页面仍待接通。",
+      "observed": "权威时效依据、本人明确选择来源、持久队列、严格带来源输出、人工复核及 5 个公开接口已接通；132 项后端相关用例和 OpenAPI 通过。费用页、原请求恢复交互与固定包运行验收仍待完成。",
       "references": [
-        {
-          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java",
-          "line": 1
-        },
-        {
-          "path": "docs/draft-assist.md",
-          "line": 3
-        },
-        {
-          "path": "docs/agent-execution.md",
-          "line": 1
-        },
         {
           "path": "docs/precheck-explanation.md",
           "line": 1
         },
         {
-          "path": "docs/evidence/precheck-explanation-freshness-20261003.json",
+          "path": "docs/evidence/precheck-explanation-backend-20261003.json",
           "line": 1
         }
       ],
@@ -3436,8 +3424,8 @@
   },
   "latestProgress": {
     "taskId": "A02",
-    "status": "FRESHNESS_FOUNDATION_VERIFIED_TASK_OPEN",
-    "implementationCommit": "3481d10b096d8bba60feb86a7a5bcf7cf8981c43",
-    "evidence": "docs/evidence/precheck-explanation-freshness-20261003.json"
+    "status": "BACKEND_API_VERIFIED_TASK_OPEN",
+    "implementationCommit": "c6de5f110418fd4b6842d2225acd49581dea4f24",
+    "evidence": "docs/evidence/precheck-explanation-backend-20261003.json"
   }
 }

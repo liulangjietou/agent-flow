@@ -1,6 +1,6 @@
 # 剩余工作实施方案
 
-A02 已补齐模型解释所需的权威时效依据，制度换版、重新验票、同票号占用、草稿修改和新预检都会使旧解释失效；283 项相关用例验证完成。专用模型、队列、人工复核与页面仍待接通，A02 保持 OPEN。见[实施记录](precheck-explanation.md)和[阶段证据](evidence/precheck-explanation-freshness-20261003.json)。
+A02 的权威时效依据、本人来源选择、持久模型队列、严格带来源输出、人工复核及 5 个公开接口已接通；132 项后端相关用例和 OpenAPI 通过。费用页、原请求恢复交互和固定包运行验收仍待完成，A02 保持 OPEN。见[实施记录](precheck-explanation.md)和[后端阶段证据](evidence/precheck-explanation-backend-20261003.json)。
 
 2026-10-03 V02 子问题：编号字符校验已接入共用结构校验，原非法草稿可读取并显式修正，固定包升级保留原人工待办并完成批准。106 项 Java、36 项前端范围测试及 42 次 HTTP 检查通过，见[验收证据](evidence/definition-identifier-syntax-20261003.json)。这不关闭 V02 或增加独立待办，仍至少 34 项未完成。
 
