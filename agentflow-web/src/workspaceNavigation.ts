@@ -1,5 +1,5 @@
 /** 工作空间已有页面标识；导航展示不授予业务权限。@author owlzhangfq@gmail.com */
-export type WorkspacePage = 'expense-configuration' | 'organization' | 'proxies' | 'webhooks' | 'audit' | 'transfer' | 'calendars' | 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'assist' | 'expense' | 'cashier' | 'system'
+export type WorkspacePage = 'account-mappings' | 'expense-configuration' | 'organization' | 'proxies' | 'webhooks' | 'audit' | 'transfer' | 'calendars' | 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'assist' | 'expense' | 'cashier' | 'system'
 
 /** 同一份菜单供桌面侧栏与窄屏抽屉使用。@author owlzhangfq@gmail.com */
 export interface WorkspaceMenuItem { label: string; icon: string; page?: WorkspacePage; access?: 'manage' | 'inspect' | 'cashier' | 'finance-config' }
@@ -22,6 +22,7 @@ export const workspaceMenu: { label: string; items: WorkspaceMenuItem[] }[] = [
     { page: 'cashier', label: '出纳付款', icon: '↗', access: 'cashier' }
   ] },
   { label: '管理与集成', items: [
+    { page: 'account-mappings', label: '科目映射', icon: '⇄', access: 'finance-config' },
     { page: 'expense-configuration', label: '费用制度', icon: '▤', access: 'finance-config' },
     { page: 'api', label: '接口文档', icon: '⌁' },
     { page: 'webhooks', label: '集成投递', icon: '↗', access: 'inspect' },

@@ -344,6 +344,7 @@ class OpenApiContractTest {
                 java.util.Map.entry("PaymentDebitAccount", io.agentflow.finance.PaymentAccountsPort.DebitAccount.class),
                 java.util.Map.entry("CashierPaymentReceipt", io.agentflow.finance.CashierPaymentActions.Receipt.class),
                 java.util.Map.entry("VoucherWorkspace", io.agentflow.finance.VoucherWorkspace.View.class),
+                java.util.Map.entry("VoucherMappingEvidence", io.agentflow.finance.VoucherWorkspace.MappingEvidence.class),
                 java.util.Map.entry("VoucherPreparationSummary", io.agentflow.finance.VoucherWorkspace.Preparation.class),
                 java.util.Map.entry("VoucherOperationSummary", io.agentflow.finance.VoucherWorkspace.Operation.class),
                 java.util.Map.entry("VoucherActionOptions", io.agentflow.finance.VoucherWorkspace.Actions.class),

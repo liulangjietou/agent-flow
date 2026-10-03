@@ -58371,7 +58371,8 @@
           "operation",
           "actions",
           "kind",
-          "dispute"
+          "dispute",
+          "mapping"
         ],
         "properties": {
           "applicationId": {
@@ -58441,6 +58442,17 @@
                 "type": "null"
               }
             ]
+          },
+          "mapping": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VoucherMappingEvidence"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "原凭证命令或准备记录的科目版本证据；没有保存选择的历史准备返回 null。"
           }
         }
       },
@@ -76006,6 +76018,106 @@
           "nextBeforeVersion"
         ],
         "additionalProperties": false
+      },
+      "VoucherMappingEvidence": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "PLATFORM_PUBLISHED 提供全部平台身份与修订，ERP_MANAGED 的平台字段为 null；erpSourceVersion 仅在原命令登记后提供。摘要不含目标、科目和账户。",
+        "required": [
+          "source",
+          "legalEntityId",
+          "currency",
+          "mappingId",
+          "mappingVersion",
+          "categoryRevision",
+          "activeRevision",
+          "definitionDigest",
+          "erpSourceVersion"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "ERP_MANAGED",
+              "PLATFORM_PUBLISHED"
+            ]
+          },
+          "legalEntityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "mappingId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mappingVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "categoryRevision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "activeRevision": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "definitionDigest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "erpSourceVersion": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       }
     }
   }

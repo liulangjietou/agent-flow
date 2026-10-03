@@ -21,6 +21,28 @@ const disputedView = () => {
   return value
 }
 const decisionReceipt = input => ({ applicationId: 'app', operationId: 'operation', roundNo: 2, kind: 'EXPENSE_ACCRUAL', resolutionId: 'decision', operationVersion: input.operationVersion + 1, outcome: input.outcome, auditEventId: 'audit' })
+
+test('凭证科目摘要区分平台发布和 ERP 管理，原命令必须带实际 ERP 来源版本', () => {
+  const value = view(), mappingId = '00000000-0000-4000-8000-000000000001'
+  value.mapping = { source: 'PLATFORM_PUBLISHED', legalEntityId: mappingId, currency: 'CNY', mappingId, mappingVersion: 2, categoryRevision: 1, activeRevision: 3, definitionDigest: 'a'.repeat(64), erpSourceVersion: 'erp-v1' }
+  assert.equal(validateVoucherView(value, binding()).mapping.mappingVersion, 2)
+  for (const change of [{ mappingVersion: 0 }, { categoryRevision: -1 }, { activeRevision: null }, { definitionDigest: 'short' }, { mappingId: 'invalid' },
+    { source: 'CURRENT_CONFIGURATION' }, { erpSourceVersion: null }, { legalEntityId: 'foreign' }, { currency: 'cny' }]) {
+    assert.throws(() => validateVoucherView({ ...value, mapping: { ...value.mapping, ...change } }, binding()))
+  }
+  const unmanaged = { source: 'ERP_MANAGED', legalEntityId: mappingId, currency: 'CNY', mappingId: null, mappingVersion: null, categoryRevision: null, activeRevision: null, definitionDigest: null, erpSourceVersion: 'legacy-v1' }
+  assert.equal(validateVoucherView({ ...value, mapping: unmanaged }, binding()).mapping.erpSourceVersion, 'legacy-v1')
+  assert.throws(() => validateVoucherView({ ...value, mapping: { ...unmanaged, mappingVersion: 1 } }, binding()))
+})
+
+test('准备中的科目选择尚无 ERP 来源，旧接口省略摘要仍可读取', () => {
+  const value = view(); assert.doesNotThrow(() => validateVoucherView(value, binding()))
+  value.operation = null; value.preparation.status = 'RUNNING'; value.mapping = { source: 'ERP_MANAGED', legalEntityId: '00000000-0000-4000-8000-000000000001', currency: 'CNY', mappingId: null, mappingVersion: null, categoryRevision: null, activeRevision: null, definitionDigest: null, erpSourceVersion: null }
+  assert.equal(validateVoucherView(value, binding()).mapping.source, 'ERP_MANAGED')
+  assert.throws(() => validateVoucherView({ ...value, mapping: { ...value.mapping, erpSourceVersion: 'unconfirmed' } }, binding()))
+  value.preparation.status = 'QUEUED'; assert.throws(() => validateVoucherView(value, binding()))
+  value.mapping = null; assert.doesNotThrow(() => validateVoucherView(value, binding()))
+})
 function panel(overrides = {}) {
   const props = reactive({ ...binding(), scopeKey: `finance-${++scope}`, locked: false, ...overrides }), events = [], changes = []
   const app = renderer.createApp({ ...Component, setup: (_, context) => Component.setup(props, context), render: () => null }, { ...props, onBusy: value => events.push(value), onChanged: () => changes.push(true) })
