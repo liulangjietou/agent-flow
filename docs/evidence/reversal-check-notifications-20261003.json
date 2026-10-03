@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F17",
+  "taskStatus": "OPEN",
+  "stage": "EXTERNAL_REVERSAL_CHECK_AND_RECORD_NOTIFICATIONS_BACKEND_AND_UI",
+  "recordedAt": "2026-10-03T19:14:17.342072+00:00",
+  "implementationCommit": "1a190f15236de7fcb78cc898ab51a166e8b99399",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/Volumes/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "Persisted UNAVAILABLE, SOURCE_CHANGED, UNRESOLVED and RECORDED facts notify original applicant and original verifier. A complete unconsumed query remains a quiet candidate.",
+    "Consumed check and immutable record precede notification event in one transaction; rollback removes check consumption, record, inbox and dispatch intent together.",
+    "Minimal original-check endpoint and actual Vue detail keep old failed checks separate from later registrations, enforce original-round field and current entity permissions, and expose no financial write action.",
+    "Explicit registration preserves legal nanosecond ERP receipt evidence while microsecond SQL indexes accept normalized writes and legacy database rounding. Unrelated timestamp differences still fail closed."
+  ],
+  "validation": {
+    "java": {
+      "result": "PASS",
+      "distinctTests": 154,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "path": "TEST-io.agentflow.api.OpenApiContractTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.expense.AdvanceRepaymentIntegrationTest.xml",
+          "tests": 40,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+          "tests": 45,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalCommandTest.xml",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalExecutionMigrationTest.xml",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalMigrationTest.xml",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalOperationTest.xml",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalPreparationTest.xml",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalRetirementMigrationTest.xml",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalRetirementTest.xml",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.ReversalCheckNoticeTest.xml",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/reversal-check-notifications-final-reports"
+    },
+    "web": {
+      "result": "PASS",
+      "tests": 125,
+      "files": 12,
+      "newCheckTests": 10,
+      "logs": [
+        "/fyoung/tmp/agentflow-remaining-20260928/reversal-check-notifications-web-final.log"
+      ]
+    },
+    "typecheck": "PASS",
+    "build": "PASS",
+    "openapi": {
+      "result": "PASS",
+      "operations": 348,
+      "schemas": 698,
+      "requestExamples": 125
+    },
+    "authors": {
+      "javaFiles": 1557,
+      "namedTypes": 2989,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "diffCheck": "PASS"
+  },
+  "reproductions": [
+    {
+      "result": "EXPECTED_BEHAVIORAL_FAILURE",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/reversal-check-notifications-red.log",
+      "tests": 2,
+      "failures": 2,
+      "errors": 0,
+      "reason": "Actual recipient queries were empty for failed check and explicit record."
+    },
+    {
+      "result": "EXPECTED_BEHAVIORAL_FAILURE",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/reversal-check-notifications-web-red.log",
+      "tests": 1,
+      "reason": "Actual Inbox did not render original-check entry."
+    },
+    {
+      "result": "EXPECTED_BEHAVIORAL_FAILURE",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/reversal-check-notifications-precision-red.log",
+      "tests": 2,
+      "failures": 0,
+      "errors": 2,
+      "reason": "Both legal nanosecond receipts reached CHECKED; explicit registration failed with persisted identity inconsistency before commit."
+    }
+  ],
+  "corrections": [
+    "Initial web command used a root-relative path for a script under agentflow-web; corrected execution path. Setup error is not counted as behavioral RED.",
+    "Two loan cases initially compared EmployeeAdvance object identity rather than immutable persisted State; corrected fixture assertion. Production loan behavior unchanged; all 40 loan cases passed.",
+    "Original reversal-record mapper compared raw nanosecond evidence with a microsecond SQL timestamp. Existing fixtures used only microseconds. Matched RED preceded repository-only precision fix; tests preserve full evidence, read legacy rounding and reject a two-microsecond index change."
+  ],
+  "sourceEvidence": {
+    "files": 21,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/reversal-check-notifications-evidence-snapshot/sources.json",
+    "verifiedAgainstCommit": "1a190f15236de7fcb78cc898ab51a166e8b99399"
+  },
+  "artifactEvidence": {
+    "files": 56,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/reversal-check-notifications-evidence-snapshot/artifacts.json"
+  },
+  "boundaries": [
+    "H2, synthetic finance protocol, Spring MockMvc and actual Vue host renderer. No fixed installed package, real browser, PostgreSQL or enterprise environment acceptance claimed.",
+    "Existing browser administrator-policy block and PostgreSQL Docker image-layer I/O block remain; no bypass or environment repair attempted.",
+    "Expense and supplier settlements, independent budget recovery/adjustment and remaining financial recovery sources still require scope audit and implementation under F17.",
+    "Fixed-version HTTP, nonempty runtime upgrade, restart and paired restore remain pending for full F17.",
+    "Local development only; no push or PR. E15 remains dependent on final V02 acceptance."
+  ],
+  "goalCounting": {
+    "knownOpen": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "sessions": {
+    "47152": "EXIT_1_EXPECTED_BACKEND_RED",
+    "49216": "EXIT_1_EXPECTED_WEB_RED",
+    "39867": "EXIT_1_LOAN_FIXTURE_IDENTITY_FIXED",
+    "57842": "EXIT_0",
+    "11774": "EXIT_0",
+    "81415": "EXIT_0",
+    "39527": "EXIT_0",
+    "12429": "EXIT_0",
+    "93880": "EXIT_0",
+    "74885": "EXIT_0",
+    "67087": "EXIT_1_EXPECTED_PRECISION_RED",
+    "17005": "EXIT_0",
+    "54891": "EXIT_0"
+  }
+}

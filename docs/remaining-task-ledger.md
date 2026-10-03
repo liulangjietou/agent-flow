@@ -16,7 +16,7 @@ V02 的编号字符校验子问题已修复：草稿预检、保存和发布提�
 
 A02 后端与本人费用页面已接通，前阶段分别有 132 项 Java、118 项前端用例证据。固定包 V106→V107 保留 250 张旧表及 109 行；8 次启动完成实际断线后的原键恢复、执行中强退不重发、超时迟到与真实到期，以及排队后修改阻断。365 份实际响应中，解释接口 274 份通过契约及页面解析核对。浏览器与 PostgreSQL 补验仍待完成，A02 保持 OPEN。见[实施记录](precheck-explanation.md)、[页面阶段证据](evidence/precheck-explanation-ui-20261003.json)和[运行阶段证据](evidence/precheck-explanation-runtime-20261003.json)。
 
-F17 已接通员工及供应商付款、原凭证和费用预算通知。本阶段补齐独立冲销准备、执行、安全结束及原记录页面，145 项 Java、115 项前端用例、构建和 OpenAPI 通过；旧消息不随新尝试替换，安全结束经办人只接收其实际结束事实。人工外部冲销核对、业务结算及其他恢复来源、固定包和环境验收仍待完成，F17 保持 OPEN，总数仍为 34。见[独立冲销通知说明](reversal-notifications.md)和[阶段证据](evidence/reversal-notifications-20261003.json)。
+F17 已接通员工及供应商付款、原凭证、费用预算与独立冲销通知。本阶段补齐人工外部冲销核对、明确登记及原记录页面，154 项 Java、125 项前端用例、构建和 OpenAPI 通过；旧失败查询不被新登记替换，合法纳秒回执可完整保存并兼容旧索引舍入。业务结算及其他恢复来源、固定包和环境验收仍待完成，F17 保持 OPEN，总数仍为 34。见[外部冲销核对通知说明](reversal-check-notifications.md)和[阶段证据](evidence/reversal-check-notifications-20261003.json)。
 
 机器可读原表：[remaining-task-ledger.json](remaining-task-ledger.json)。原始规范为相邻 `doc/00` 至 `doc/05`，路径、SHA-256、规范行范围保存在原表；后附历史进度不再重复计为新需求。
 
@@ -51,7 +51,7 @@ F17 已接通员工及供应商付款、原凭证和费用预算通知。本阶�
 | F14 | 项目分摊驱动的项目负责人会签 | FinanceCatalog.Project 只有法人、代码、名称；ExpenseFormContract 仅有明细入口、金额、币种、超标四类字段，未有项目负责人来源和按所有项目生成的会签。 [FinanceCatalog.java:80](../agentflow-domain/src/main/java/io/agentflow/finance/FinanceCatalog.java#L80)、[ExpenseFormContract.java:17](../agentflow-domain/src/main/java/io/agentflow/expense/ExpenseFormContract.java#L17) | 由可信项目目录解析每个实际分摊项目负责人并冻结；去重不丢项目责任；空匹配阻断；多项目必须全部完成且不能绕过字段权限。 原依据：05 §9。 |
 | F15 | 费用财务专用报表 | 当前运营统计涵盖审批均时、退回、SLA、通知和 Agent 采纳；没有费用 P50/P90、超标核减、查验重复拦截、借款账龄和计划执行率的读模型。 [ApprovalOperationsReadPort.java:36](../agentflow-domain/src/main/java/io/agentflow/approval/operations/ApprovalOperationsReadPort.java#L36)、[operations-outcome-metrics.md:1](operations-outcome-metrics.md#L1) | 按法人/部门/类别提供提交至批准至付款 P50/P90、超标核减和退回原因、查验失败和重复拦截、借款账龄/计划执行率、凭证/付款失败积压；口径、未知样本与权限可核验。 原依据：05 §17。 |
 | F16 | 出纳工作台法人/账户/到期日筛选 | CashierPaymentWorkspace.list 只接受 limit、beforeId，支付条款也没有付款到期日；选支付账户和批次逐笔检查已经存在。 [CashierPaymentWorkspace.java:81](../agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java#L81)、[payment-batches.md:1](payment-batches.md#L1) | 定义可信付款到期事实并接入筛选/排序；法人和实际支付账户筛选与总数、分页一致；保持逐笔复核及当前权限；不能把借款归还日当付款到期日。 原依据：05 §10.2；01 费用报销页面。 |
-| F17 | 付款结果与财务异常业务通知 | 员工及供应商付款、原凭证、费用预算与独立冲销通知已有本地代码及页面证据；人工外部冲销核对、结算及其他恢复来源、固定包和环境验收待完成。 [reversal-notifications.md](reversal-notifications.md)、[阶段证据](evidence/reversal-notifications-20261003.json)。 | 真实结果与冲突驱动最小通知；原参与关系、当前字段权限、重复与迟到去重、未知语义、旧库和恢复完整验收。 |
+| F17 | 付款结果与财务异常业务通知 | 员工及供应商付款、凭证、费用预算、独立冲销及人工外部冲销核对通知已接通。当前阶段 154 项 Java、125 项前端用例通过；业务结算及其他恢复来源、固定包和环境验收待完成。 [外部冲销核对通知](reversal-check-notifications.md)、[阶段证据](evidence/reversal-check-notifications-20261003.json)。 | 真实结果与冲突驱动最小通知；原参与关系、当前字段权限、重复与迟到去重、未知语义、旧库和恢复完整验收。 |
 | W01 | 白名单服务任务的设计与执行 | 公开目录、设计绑定、主子流程预检、两种设计视图及授权运行记录接口与页面已接通。固定包三轮强退、原号状态读取及数据库/合成接收方配套恢复通过；真实浏览器和 PostgreSQL 新范围补测待完成。 [公开设计证据](evidence/service-task-public-design-20261003.json)、[实现说明](service-tasks.md)。 | 仅可信已声明操作可设计、验证、模拟和发布；后台调用事务外执行，结果有界且幂等，未知可恢复；不允许任意 URL、Bean 或脚本。 原依据：04 §3.D；02 §7。 |
 
 ### 本地验收与核对
