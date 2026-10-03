@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T12:19:31.628929+00:00",
+  "recordedAt": "2026-10-03T12:35:45.773723+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1766,7 +1766,7 @@
           ]
         }
       ],
-      "observed": "现有 256 份分阶段证据，验证对象为各自提交。最新组件范围验证不是所有待开发功能完成后的整体验收，旧部署记录也不等于当前分支已发布。",
+      "observed": "已具备分阶段验收证据；本轮修复流程/节点/连线编号字符校验缺口，106 项 Java、36 项前端范围测试及固定包 42 次 HTTP 升级检查通过，旧草稿可修正、原在审接续成功。全部本地待办尚未完成，最终固定版本整体验收及发布资料仍待完成。",
       "references": [
         {
           "path": "docs/postgres-release-gate.md",
@@ -1779,10 +1779,19 @@
         {
           "path": "README.md",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/definition-identifier-syntax-20261003.json",
+          "line": 1
         }
       ],
       "acceptance": "全部本地待办完成后，以固定提交和安装包运行适当完整 Java/Web/工具门禁、OpenAPI、非空升级/回退与原在审接续，更新运行文档和验收矩阵。",
-      "dependsOn": []
+      "dependsOn": [],
+      "identifierSyntaxSubissue": {
+        "status": "VERIFIED",
+        "implementationCommit": "1a46d5d99486604bd9557587b351afb094d1344d",
+        "evidence": "docs/evidence/definition-identifier-syntax-20261003.json"
+      }
     },
     {
       "id": "V03",
@@ -3413,9 +3422,10 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "W01",
-    "status": "PAIRED_H2_AND_SYNTHETIC_RECEIVER_RESTORE_VERIFIED",
-    "implementationCommit": "6effa2349c60248d17921e5d57a9099af236961f",
-    "evidence": "docs/evidence/service-task-paired-restore-20261003.json"
+    "taskId": "V02",
+    "subissue": "definition identifier syntax",
+    "status": "SUBISSUE_VERIFIED_TASK_OPEN",
+    "implementationCommit": "1a46d5d99486604bd9557587b351afb094d1344d",
+    "evidence": "docs/evidence/definition-identifier-syntax-20261003.json"
   }
 }
