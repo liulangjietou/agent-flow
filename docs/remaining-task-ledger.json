@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T02:42:15.894641+00:00",
+  "recordedAt": "2026-10-03T03:11:24.650103+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -951,7 +951,7 @@
           ]
         }
       ],
-      "observed": "版本化后端、13 个管理操作、专用权限、管理页面、三版本发布确认、原请求恢复及历史查询已完成阶段验证；事前申请类别修订绑定、旧预检失效、提交并发与历史轮次保护已完成阶段验证，本阶段通过 46 条 Java 回归（21 条同时在 PostgreSQL 通过）、43 条前端回归及构建通过。填报提示和管理制度完整业务安装包验收仍待完成，F01 仍为 OPEN。",
+      "observed": "版本化后端、13 个管理操作、专用权限、管理页面、发布确认、原请求恢复和历史查询已完成阶段验证；事前申请类别修订绑定、旧预检失效与提交并发已验证。填报同版提示及来源展示已通过 44 条 Java 用例（13 条同时在 PostgreSQL 通过）、51 条前端用例、类型检查和构建；管理制度完整业务安装包验收仍待完成，F01 仍为 OPEN。",
       "references": [
         {
           "path": "docs/expense-configuration.md",
@@ -968,19 +968,22 @@
         {
           "path": "docs/evidence/expense-plan-category-binding-20261003.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-policy-guidance-20261003.json",
+          "line": 1
         }
       ],
       "acceptance": "租户可管理类别和制度版本，覆盖法人、类别、城市等级、职级、日期、币种等条件；发布后不可覆盖；填报反馈与提交结论可追溯到同一权威源；不硬编码企业标准。",
       "dependsOn": [],
       "progress": {
-        "stage": "MANAGEMENT_UI_PHASE_VERIFIED",
-        "implementationCommit": "e7e0ce9cb0b24b60e1196f3925b0adf2e1ffd078",
-        "evidence": "docs/evidence/expense-configuration-management-20261003.json",
+        "stage": "FILL_TIME_GUIDANCE_PHASE_VERIFIED_TASK_OPEN",
+        "implementationCommit": "440704e4969d0ba421d00e3037e61b7206ad29d9",
+        "evidence": "docs/evidence/expense-policy-guidance-20261003.json",
         "remaining": [
-          "同版本填报提示及来源展示",
-          "事前申请类别修订变化后的旧预检失效",
-          "采用管理制度的实际提交、并发发布与不可变轮次完整链路",
-          "结合新增链路完成最终安装包验收和恢复兼容性核对"
+          "管理制度下实际报销提交、并发发布与不可变历史轮次的完整业务验收",
+          "将填报提示及事前申请类别绑定纳入固定安装包浏览器验收",
+          "结合上述链路的同包重启、恢复与旧数据兼容性核对"
         ]
       }
     },
@@ -3301,10 +3304,10 @@
   },
   "latestInProgress": {
     "taskId": "F01",
-    "stage": "PLAN_CATEGORY_BINDING_PHASE_VERIFIED_TASK_OPEN",
-    "implementationCommit": "6753285e1f1eeb20c8582b65953326ea777c787c",
-    "evidence": "docs/evidence/expense-plan-category-binding-20261003.json",
-    "openapiPathCount": 285,
-    "openapiOperationCount": 322
+    "stage": "FILL_TIME_GUIDANCE_PHASE_VERIFIED_TASK_OPEN",
+    "implementationCommit": "440704e4969d0ba421d00e3037e61b7206ad29d9",
+    "evidence": "docs/evidence/expense-policy-guidance-20261003.json",
+    "openapiPathCount": 286,
+    "openapiOperationCount": 323
   }
 }
