@@ -83,6 +83,95 @@ class ServiceTaskPublicApiIntegrationTest {
     @AfterEach void close() { provider.close(); configuration.setEnabled(false); }
 
     @Test
+    void runtimeReadsReuseApplicationAuthorizationAndNeverExposeOriginalInputsOrReceipts() throws Exception {
+        declaration.setVersion(Long.MAX_VALUE); catalog.install();
+        contract = configuration.find("demo", declaration.getKey(), Long.MAX_VALUE).orElseThrow().contract();
+        String id = application(publish(create(graph("service", "review"), schema(true, FieldVisibility.READ_ONLY))), payload());
+        submit(id, 200);
+        var operation = operation(id); String url = runtimeUrl(id, 1);
+        for (String user : List.of("alice", "admin")) {
+            var response = send(get(url), user, null);
+            assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+            var value = tree(response, 200); var item = value.path("items").get(0);
+            assertThat(item.path("status").asText()).isEqualTo("QUEUED");
+            assertThat(item.path("operationVersion").asText()).isEqualTo(Long.toString(Long.MAX_VALUE));
+            assertThat(item.path("operationVersion").isTextual()).isTrue();
+            assertThat(item.path("version").isTextual()).isTrue();
+            assertThat(item.path("operationName").asText()).isEqualTo(contract.name());
+            assertThat(value.toString()).doesNotContain("public-original", "never-send", "inputs", "targetDigest", "commandDigest",
+                    "contractDigest", "observation", "reference", "endpoint", "token", "127.0.0.1");
+        }
+        assertThat(send(get(url), "catalog-designer", null).getStatus()).isEqualTo(404);
+        assertThat(send(get(url), "catalog-other", null).getStatus()).isEqualTo(404);
+        assertThat(operationStore.find("demo", operation.input().command().id()).orElseThrow().operation()).isEqualTo(operation);
+        assertThat(provider.calls).isEmpty();
+        complete(operation);
+        var approved = tree(send(get(url), "finance", null), 200).path("items").get(0);
+        assertThat(approved.path("status").asText()).isEqualTo("APPLIED");
+        assertThat(approved.path("progress").asText()).isEqualTo("ADVANCED");
+        assertThat(approved.has("completedAt")).isTrue();
+        assertThat(approved.has("progressedAt")).isTrue();
+        assertThat(approved.toString()).doesNotContain("reference", "observation", "inputs", "public-original");
+    }
+
+    @Test
+    void oldRoundUnknownResultsRemainVisibleWithoutAdvancingOrMixingTheResubmittedRound() throws Exception {
+        String id = application(publish(create(graph("service", "review"), schema(false, null))), payload());
+        submit(id, 200);
+        var original = operation(id); var operationId = original.input().command().id();
+        var claimed = operations.claim("demo", operationId, Instant.now());
+        operations.finish(claimed, new ServiceTaskGateway.Unavailable(ServiceTaskOperation.Failure.TIMEOUT), Instant.now());
+        tree(send(post("/api/v1/applications/" + id + "/withdraw"), "alice",
+                Map.of("expectedVersion", app(id).path("version").asLong(), "comment", "核对旧轮次结果")), 200);
+        submit(id, 200);
+        var previous = tree(send(get(runtimeUrl(id, 1)), "alice", null), 200);
+        var current = tree(send(get(runtimeUrl(id, 2)), "alice", null), 200);
+        assertThat(previous.path("roundStatus").asText()).isEqualTo("WITHDRAWN");
+        assertThat(previous.path("items").get(0).path("status").asText()).isEqualTo("UNKNOWN");
+        assertThat(previous.path("items").get(0).path("failure").asText()).isEqualTo("TIMEOUT");
+        assertThat(current.path("roundStatus").asText()).isEqualTo("IN_APPROVAL");
+        assertThat(current.path("items").get(0).path("status").asText()).isEqualTo("QUEUED");
+        assertThat(current.path("items").get(0).path("id").asText()).isNotEqualTo(operationId.toString());
+        assertThat(send(get(runtimeUrl(id, 2) + "?afterId=" + operationId), "alice", null).getStatus()).isEqualTo(400);
+        assertThat(operationStore.find("demo", operationId).orElseThrow().operation().status()).isEqualTo(ServiceTaskOperation.Status.UNKNOWN);
+        assertThat(provider.calls).isEmpty();
+    }
+
+    @Test
+    void runtimePagesKeepOriginalNamesAndRejectCursorsFromAnotherApplication() throws Exception {
+        var published = publish(create(graph("service", "service-second", "review"), schema(false, null)));
+        String id = application(published, payload()); submit(id, 200);
+        var first = operation(id); complete(first);
+        declaration.setName("当前配置新名称");
+        var page = tree(send(get(runtimeUrl(id, 1) + "?limit=1"), "alice", null), 200);
+        assertThat(page.path("items").size()).isEqualTo(1);
+        assertThat(page.path("nextAfterId").asText()).isEqualTo(first.input().command().id().toString());
+        var entry = page.path("items").get(0);
+        assertThat(entry.path("operationName").asText()).isEqualTo(contract.name());
+        assertThat(entry.path("configurationAvailable").asBoolean()).isFalse();
+        var next = tree(send(get(runtimeUrl(id, 1) + "?limit=1&afterId=" + page.path("nextAfterId").asText()), "alice", null), 200);
+        assertThat(next.path("items").size()).isEqualTo(1);
+        assertThat(next.path("items").get(0).path("nodeId").asText()).isEqualTo("service-second");
+        assertThat(next.has("nextAfterId")).isFalse();
+        declaration.setName(contract.name());
+        String other = application(published, payload()); submit(other, 200);
+        assertThat(send(get(runtimeUrl(other, 1) + "?afterId=" + first.input().command().id()), "alice", null).getStatus()).isEqualTo(400);
+    }
+
+    @Test
+    void runtimeQueryRejectsInvalidPagingAndDistinguishesMissingRoundsFromEmptyRecords() throws Exception {
+        String id = application(publish(create(graph("review"), schema(false, null))), payload()); submit(id, 200);
+        assertThat(tree(send(get(runtimeUrl(id, 1)), "alice", null), 200).path("items").isEmpty()).isTrue();
+        assertThat(send(get(runtimeUrl(id, 2)), "alice", null).getStatus()).isEqualTo(404);
+        for (String query : List.of("?tenantId=other", "?limit=0", "?limit=101", "?limit=1&limit=2", "?afterId=", "?afterId=1-1-1-1-1", "?afterId=" + UUID.randomUUID())) {
+            assertThat(send(get(runtimeUrl(id, 1) + query), "alice", null).getStatus()).as(query).isEqualTo(400);
+        }
+        for (String round : List.of("0", "01", "2147483648")) {
+            assertThat(send(get("/api/v1/applications/" + id + "/rounds/" + round + "/service-tasks"), "alice", null).getStatus()).isEqualTo(400);
+        }
+    }
+
+    @Test
     void directoryIsTenantScopedAndNeverDisclosesDeploymentTargetOrCredentials() throws Exception {
         var foreign = provider.declaration(contract.key()); foreign.setVersion(2); foreign.setName("另一租户专用契约");
         configuration.setTenants(Map.of("demo", List.of(declaration), "other", List.of(foreign))); catalog.install();
@@ -199,6 +288,9 @@ class ServiceTaskPublicApiIntegrationTest {
         String id = application(parent, payload()); submit(id, 200);
         String childId = childId(id); var operation = operation(childId);
         assertThat(operation.input().command().binding().applicationId().toString()).isEqualTo(childId).isNotEqualTo(id);
+        assertThat(tree(send(get(runtimeUrl(id, 1)), "alice", null), 200).path("items").isEmpty()).isTrue();
+        assertThat(tree(send(get(runtimeUrl(childId, 1)), "alice", null), 200).path("items").get(0).path("id").asText())
+                .isEqualTo(operation.input().command().id().toString());
         control(id, "pause"); assertThat(operations.claim("demo", operation.input().command().id(), Instant.now())).isNull();
         assertThat(provider.calls).isEmpty(); control(id, "resume"); complete(operation); approve(childId);
         assertThat(tasks.createTaskQuery().processVariableValueEquals("applicationId", id).count()).isEqualTo(1);
@@ -259,6 +351,7 @@ class ServiceTaskPublicApiIntegrationTest {
     private String childId(String parent) { return jdbc.queryForObject("SELECT child_application_id FROM approval_subprocess_call WHERE tenant_id='demo' AND parent_application_id=?", String.class, parent); }
     private int countOperations() { return jdbc.queryForObject("SELECT COUNT(*) FROM service_task_operation WHERE tenant_id='demo' AND operation_key=?", Integer.class, contract.key()); }
     private String option(long version) { return OPTIONS + "/" + contract.key() + "/versions/" + version; }
+    private static String runtimeUrl(String id, int round) { return "/api/v1/applications/" + id + "/rounds/" + round + "/service-tasks"; }
     private MockHttpServletResponse send(MockHttpServletRequestBuilder request, String user, Object input) throws Exception {
         String token = user.startsWith("catalog-") ? user : auth.login("demo", user, "demo").token();
         request.header("Authorization", "Bearer " + token).header("Idempotency-Key", UUID.randomUUID().toString());
@@ -280,7 +373,7 @@ class ServiceTaskPublicApiIntegrationTest {
     private Graph graph(String... steps) {
         var nodes = new ArrayList<Node>(); var edges = new ArrayList<Edge>(); nodes.add(new Node("start", "开始", NodeType.START, Map.of())); String previous = "start";
         for (String step : steps) {
-            nodes.add(new Node(step, step, step.equals("service") ? NodeType.SERVICE_TASK : NodeType.USER_TASK, step.equals("service") ? serviceProperties() : Map.of("assigneeRule", "user:finance")));
+            nodes.add(new Node(step, step, step.startsWith("service") ? NodeType.SERVICE_TASK : NodeType.USER_TASK, step.startsWith("service") ? serviceProperties() : Map.of("assigneeRule", "user:finance")));
             edges.add(new Edge("edge" + edges.size(), previous, step, "")); previous = step;
         }
         nodes.add(new Node("end", "结束", NodeType.END, Map.of())); edges.add(new Edge("edge" + edges.size(), previous, "end", "")); return new Graph(nodes, edges);

@@ -72,6 +72,7 @@ export function serviceTaskInputIssue(source: FormField | undefined, parameter: 
 
 /** 当前账号、定义或引用变化时取消旧读取，迟到响应不能重建已清除的目录。@author owlzhangfq@gmail.com */
 export class ServiceTaskRead<T> {
+  constructor(private readonly failureMessage = '服务任务目录暂时不可访问，请刷新后核对原引用。') {}
   value: T | null = null
   loading = false
   error = ''
@@ -87,7 +88,7 @@ export class ServiceTaskRead<T> {
         timer = setTimeout(() => { controller.abort(); reject(new Error('服务任务目录读取超时，请重试。')) }, 12_000)
       })])
       if (generation === this.generation) { this.value = result; return result }
-    } catch { if (generation === this.generation) this.error = '服务任务目录暂时不可访问，请刷新后核对原引用。' }
+    } catch { if (generation === this.generation) this.error = this.failureMessage }
     finally { clearTimeout(timer); if (generation === this.generation) { this.loading = false; this.controller = null } }
   }
 }

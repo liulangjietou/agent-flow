@@ -13,6 +13,7 @@ import ProcurementPaymentDetail from './ProcurementPaymentDetail.vue'
 import BudgetAdjustmentDetail from './BudgetAdjustmentDetail.vue'
 import RoundComparison from './RoundComparison.vue'
 import ApplicationHistory from './ApplicationHistory.vue'
+import ServiceTaskRuntimePanel from './ServiceTaskRuntimePanel.vue'
 import ApplicationComments from './ApplicationComments.vue'
 import AssistRunRecords from './AssistRunRecords.vue'
 import DraftAssistPanel from './DraftAssistPanel.vue'
@@ -38,7 +39,7 @@ const runtimeBlocked = computed(() => application.value?.status === 'IN_APPROVAL
   || runtimeState.value.applicationVersion !== application.value.version || runtimeState.value.state !== 'RUNNING'))
 const businessLocked = computed(() => saving.value || writesBlocked.value || runtimeBusy.value || runtimeBlocked.value)
 const rounds = ref<SubmissionRound[]>([])
-const historyTab = ref<'rounds' | 'relations' | 'compare' | 'diagram' | 'timeline' | 'audit' | 'comments' | 'assist'>('rounds')
+const historyTab = ref<'rounds' | 'relations' | 'compare' | 'diagram' | 'timeline' | 'audit' | 'comments' | 'assist' | 'services'>('rounds')
 const title = ref('')
 const initiatorAppointmentId = ref('')
 const initiatorRequirements = reactive(new InitiatorRequirements(api.definitionInitiatorRequirements, api.applicationInitiatorRequirements))
@@ -324,7 +325,7 @@ onUnmounted(() => { initiatorRequirements.clear(); returnFocus?.focus() })
           </form>
         </section>
         <p v-if="initialRoundNo" class="field-help">关联入口指向第 {{ initialRoundNo }} 轮提交记录；上方显示申请当前状态。</p>
-        <div class="record-history-tabs" role="group" aria-label="选择申请历史视图"><button type="button" :aria-pressed="historyTab === 'rounds'" @click="historyTab = 'rounds'">提交轮次</button><button type="button" :aria-pressed="historyTab === 'relations'" @click="historyTab = 'relations'">父子流程</button><button type="button" :aria-pressed="historyTab === 'compare'" @click="historyTab = 'compare'">内容对比</button><button type="button" :aria-pressed="historyTab === 'diagram'" @click="historyTab = 'diagram'">流程图</button><button type="button" :aria-pressed="historyTab === 'timeline'" @click="historyTab = 'timeline'">审批轨迹</button><button type="button" :aria-pressed="historyTab === 'audit'" @click="historyTab = 'audit'">操作审计</button><button type="button" :aria-pressed="historyTab === 'comments'" @click="historyTab = 'comments'">协作评论</button><button type="button" :aria-pressed="historyTab === 'assist'" @click="historyTab = 'assist'">Agent 摘要</button></div>
+        <div class="record-history-tabs" role="group" aria-label="选择申请历史视图"><button type="button" :aria-pressed="historyTab === 'rounds'" @click="historyTab = 'rounds'">提交轮次</button><button type="button" :aria-pressed="historyTab === 'relations'" @click="historyTab = 'relations'">父子流程</button><button type="button" :aria-pressed="historyTab === 'compare'" @click="historyTab = 'compare'">内容对比</button><button type="button" :aria-pressed="historyTab === 'diagram'" @click="historyTab = 'diagram'">流程图</button><button type="button" :aria-pressed="historyTab === 'timeline'" @click="historyTab = 'timeline'">审批轨迹</button><button type="button" :aria-pressed="historyTab === 'audit'" @click="historyTab = 'audit'">操作审计</button><button type="button" :aria-pressed="historyTab === 'comments'" @click="historyTab = 'comments'">协作评论</button><button type="button" :aria-pressed="historyTab === 'assist'" @click="historyTab = 'assist'">Agent 摘要</button><button type="button" :aria-pressed="historyTab === 'services'" @click="historyTab = 'services'">服务运行</button></div>
         <section v-if="historyTab === 'rounds'" class="round-history" aria-label="提交轮次记录">
           <div class="record-history-heading"><h3>提交轮次</h3><span>{{ rounds.length }} 条记录</span></div>
           <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : application.status === 'CANCELLED' ? '此申请没有提交轮次记录。作废不会补造审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
@@ -337,6 +338,7 @@ onUnmounted(() => { initiatorRequirements.clear(); returnFocus?.focus() })
         <RoundComparison v-else-if="historyTab === 'compare'" :application-id="application.id" :scope-key="scopeKey" :version="application.version" />
         <RoundDiagram v-else-if="historyTab === 'diagram'" :application-id="application.id" :rounds="rounds" :scope-key="scopeKey" :version="application.version" :locked="writesBlocked" @changed="load(); emit('changed')" />
         <AssistRunRecords v-else-if="historyTab === 'assist'" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :round-no="application.roundNo" />
+        <ServiceTaskRuntimePanel v-else-if="historyTab === 'services'" :application-id="application.id" :version="application.version" :scope-key="scopeKey" :rounds="rounds" :initial-round-no="initialRoundNo" @changed="load(); emit('changed')" />
         <ApplicationHistory v-else-if="historyTab !== 'comments'" :application-id="application.id" :mode="historyTab" :round-no-max="application.roundNo" :version="application.version" />
         <ApplicationComments v-else :application-id="application.id" :scope-key="scopeKey" :version="application.version" :status="application.status" :round-no="application.roundNo" :locked="saving || loading || writesBlocked" :refresh-version="commentRefreshVersion" @posted="emit('commentPosted')" @refresh-application="load" />
       </template>

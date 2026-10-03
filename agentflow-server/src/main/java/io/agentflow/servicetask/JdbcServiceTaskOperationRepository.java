@@ -84,6 +84,17 @@ public class JdbcServiceTaskOperationRepository {
         return jdbc.query("SELECT * FROM service_task_operation WHERE tenant_id=? AND id=?", row(), tenant, id.toString()).stream().findFirst();
     }
 
+    /** 使用既有轮次索引按不可变创建时间和标识翻页，查询上限由已校验的入口传入。 */
+    public List<Stored> forRound(String tenant, UUID applicationId, int roundNo, ServiceTaskOperation after, int limit) {
+        String base = "SELECT * FROM service_task_operation WHERE tenant_id=? AND application_id=? AND round_no=?";
+        if (after == null) {
+            return jdbc.query(base + " ORDER BY created_at,id LIMIT ?", row(), tenant, applicationId.toString(), roundNo, limit);
+        }
+        return jdbc.query(base + " AND (created_at>? OR (created_at=? AND id>?)) ORDER BY created_at,id LIMIT ?", row(),
+                tenant, applicationId.toString(), roundNo, timestamp(after.createdAt()), timestamp(after.createdAt()),
+                after.input().command().id().toString(), limit);
+    }
+
     /** 调用方先取得根到叶申请锁，再锁操作记录。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public Optional<Stored> lock(String tenant, UUID id) {

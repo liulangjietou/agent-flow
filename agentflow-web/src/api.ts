@@ -32,6 +32,7 @@ import { validateTimerReceipt, type TimerView, type TimerRetryInput, type TimerR
 import { validateInstanceReceipt, type InstanceControlAction, type InstanceControlInput, type InstanceControlView } from './instanceControl.js'
 import type { AuditSearchFilters, AuditSearchPage } from './auditSearch'
 import type { ApplicationSearchFilters, ApplicationSearchPage } from './applicationSearch'
+import { readServiceTaskRuntime, type ServiceTaskRuntimeView } from './serviceTaskRuntime.js'
 import type { DefinitionCatalogFilters, DefinitionCatalogPage } from './definitionCatalog'
 import { workbookType, type ApplicationExportFilters } from './applicationExport.js'
 import type { AuditExportFilters } from './auditSearch'
@@ -751,6 +752,7 @@ export const api = {
   initializeTenant: (input: InitializationRequest) => write<InitializationReceipt>('/system/initialization', 'POST', '初始化工作区', input),
   systemChecks: (signal: AbortSignal) => request<SystemCheckReport>('/system/checks', { signal }),
   applicationTimeline: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/timeline' + historyQuery(query)),
+  serviceTaskRuntime: (id: string, round: number, afterId: string | undefined, signal: AbortSignal) => request<ServiceTaskRuntimeView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/service-tasks` + historyQuery({ limit: 25, afterId }), { signal, cache: 'no-store' }).then(value => readServiceTaskRuntime(value, id, round, afterId)),
   draftAssistInput: (id: string, signal: AbortSignal) => request(draftAssistPath(id) + '/input', { signal, cache: 'no-store' }).then(readDraftInput),
   draftAssistRuns: (id: string, page: number, signal: AbortSignal) => request(draftAssistPath(id) + '?page=' + page + '&pageSize=20', { signal, cache: 'no-store' }).then(value => readDraftPage(value, page)),
   draftAssistRun: (id: string, runId: string, signal: AbortSignal) => request(draftAssistPath(id) + '/' + encodeURIComponent(runId), { signal, cache: 'no-store' }).then(value => readDraftDetail(value, runId)),

@@ -196,6 +196,13 @@ def exercise(runtime, receiver, cycle):
     runtime.request("POST", "/applications/" + identity + "/submit", {"expectedVersion": application["version"]}, user="alice")
     if not receiver.recorded.wait(15):
         raise AssertionError("Receiver did not persist the synthetic effect")
+    status_path = "/applications/" + identity + "/rounds/1/service-tasks"
+    before = runtime.request("GET", status_path, user="alice")
+    if len(before["items"]) != 1 or before["items"][0]["status"] != "EXECUTING":
+        raise AssertionError("Runtime status did not expose the committed executing claim")
+    if any(key in json.dumps(before) for key in ("synthetic-original", "synthetic-not-sent", "targetDigest", "commandDigest", "inputs", "observation", "token")):
+        raise AssertionError("Runtime status exposed execution inputs or deployment details")
+    save(runtime.directory / f"status-before-crash-{cycle}.json", before)
     runtime.stop(force=True)
     receiver.release.set()
     runtime.start()
@@ -221,6 +228,10 @@ def exercise(runtime, receiver, cycle):
         raise AssertionError("Recovery changed the original command digest")
     if "command" in related[1]["request"] or "inputs" in related[1]["request"]:
         raise AssertionError("Recovery query sent execution inputs")
+    recovered = runtime.request("GET", status_path, user="finance")
+    if len(recovered["items"]) != 1 or recovered["items"][0]["id"] != operation or recovered["items"][0]["status"] != "APPLIED" or recovered["items"][0]["progress"] != "ADVANCED":
+        raise AssertionError("Runtime status did not retain the recovered original operation")
+    save(runtime.directory / f"status-after-recovery-{cycle}.json", recovered)
     current = runtime.request("GET", "/applications/" + identity, user="alice")
     runtime.request("POST", "/tasks/" + tasks[0]["taskId"] + "/actions", {"action": "APPROVE", "expectedVersion": current["version"], "comment": "核对原操作恢复"}, user="finance")
     if runtime.request("GET", "/applications/" + identity, user="alice")["status"] != "APPROVED":

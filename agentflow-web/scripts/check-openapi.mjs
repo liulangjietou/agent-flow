@@ -16,6 +16,10 @@ validate({ $ref: '#/components/schemas/HistoryPage' }, { items: [], nextCursor: 
 validate({ $ref: '#/components/schemas/ServiceTaskDirectory' }, { items: [] })
 validate({ $ref: '#/components/schemas/ServiceTaskVersionPage' }, { items: [] })
 assert.equal(validator({ $ref: '#/components/schemas/ServiceTaskVersionPage' })({ items: [], nextBeforeVersion: 2 }), false)
+// 运行状态使用明确白名单，空页不强制游标，命令原文不能混入响应。
+const serviceRuntime = { applicationId: '00000000-0000-0000-0000-000000000001', applicationVersion: 2, roundNo: 1, roundStatus: 'IN_APPROVAL', items: [] }
+validate({ $ref: '#/components/schemas/ServiceTaskRuntimeView' }, serviceRuntime)
+assert.equal(validator({ $ref: '#/components/schemas/ServiceTaskRuntimeView' })({ ...serviceRuntime, inputs: { secret: 'not-public' } }), false)
 // 组织启用后动态规则尚未解析本轮任职；静态目录仍须具有实际可用成员。
 const assigneeSchema = { $ref: '#/components/schemas/AssigneeOption' }
 validate(assigneeSchema, { rule: 'role:ORG_SUPERVISOR_1', label: '本次任职一级主管', memberCount: 0, contextual: true })
