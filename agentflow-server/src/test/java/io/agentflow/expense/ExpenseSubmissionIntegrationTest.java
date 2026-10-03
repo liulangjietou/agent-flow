@@ -135,6 +135,7 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired MockMvc mvc;
     @Autowired JsonUtil json;
     @Autowired io.agentflow.notification.VoucherNotificationAccess voucherNotificationAccess;
+    @Autowired io.agentflow.notification.ExpenseReturnNotificationAccess expenseReturnNotificationAccess;
     @Autowired io.agentflow.notification.BudgetNotificationAccess budgetNotificationAccess;
     @Autowired io.agentflow.notification.ReversalNotificationAccess reversalNotificationAccess;
     @Autowired io.agentflow.notification.ReversalCheckNotificationAccess reversalCheckNotificationAccess;
@@ -1615,6 +1616,131 @@ class ExpenseSubmissionIntegrationTest {
         return entries;
     }
 
+    @Test void expenseReturnNotificationUnavailableQueryKeepsItsOwnOutcomeAfterRetry() throws Exception {
+        var report = archiveReadyExpense(); var queued = queueExpenseReturn(report);
+        assertThat(expenseReturnNoticeRecipients(queued, "UNAVAILABLE")).isEmpty();
+        var claimed = expenseReturns.claim("demo", queued.input().id(), Instant.now()); expenseReturns.fail(claimed, Instant.now());
+        assertThat(expenseReturnNoticeRecipients(queued, "UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
+        var oldPath = expenseReturnNoticePath(queued, "UNAVAILABLE", "alice");
+        var fresh = queryExpenseReturn(report); assertThat(fresh.receipt().status()).isEqualTo(ExpensePaymentReturnPort.Status.CONFIRMED);
+        var response = read(oldPath, "alice"); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        var detail = ok(response, 200); assertThat(detail.path("checkId").asText()).isEqualTo(queued.input().id().toString());
+        assertThat(detail.path("status").asText()).isEqualTo("UNAVAILABLE"); assertThat(detail.path("observation").isNull()).isTrue();
+        assertThat(detail.path("registration").isNull()).isTrue(); assertThat(expenseReturnNoticeRecipients(fresh, "RECORDED")).isEmpty();
+    }
+
+    @Test void expenseReturnNotificationCandidateDoesNotClaimFundsWereRegistered() throws Exception {
+        var report = archiveReadyExpense(); var resources = resourceVersions(report);
+        expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED; expenseReturnRows = List.of(expenseReturnItem(report, "notice-candidate", "20"));
+        var checked = queryExpenseReturn(report);
+        assertThat(expenseReturnNoticeRecipients(checked, "RETURN_REVIEW")).containsExactlyInAnyOrder("alice", "finance");
+        var detail = ok(read(expenseReturnNoticePath(checked, "RETURN_REVIEW", "finance"), "finance"), 200);
+        assertThat(detail.path("fact").asText()).isEqualTo("RETURN_REVIEW"); assertThat(detail.path("status").asText()).isEqualTo("CHECKED");
+        assertThat(detail.at("/observation/outcome").asText()).isEqualTo("PARTIALLY_RETURNED"); assertThat(detail.path("registration").isNull()).isTrue();
+        assertThat(expenseReturnLedgers.find("demo", report.id()).orElseThrow().entries()).isEmpty(); assertThat(resourceVersions(report)).isEqualTo(resources);
+        assertThat(detail.toString()).doesNotContain("amount", "accountDigest", "payableAccountCode", "canRegister", "evidenceReference");
+    }
+
+    @Test void expenseReturnNotificationRegistrationUsesOriginalCheckAndDeduplicatesHttpReplay() throws Exception {
+        var report = archiveReadyExpense(); var resources = resourceVersions(report);
+        expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED; expenseReturnRows = List.of(expenseReturnItem(report, "notice-register", "20"));
+        var checked = queryExpenseReturn(report); var input = expenseReturnInput(report, checked); var key = UUID.randomUUID().toString();
+        var action = ok(send(path(report) + "/payment-return/registrations", "finance", key, input), 202);
+        assertThat(ok(send(path(report) + "/payment-return/registrations", "finance", key, input), 202)).isEqualTo(action);
+        assertThat(expenseReturnNoticeRecipients(checked, "RECORDED")).containsExactlyInAnyOrder("alice", "finance");
+        for (String fact : List.of("RETURN_REVIEW", "RECORDED")) {
+            var detail = ok(read(expenseReturnNoticePath(checked, fact, "alice"), "alice"), 200);
+            assertThat(detail.path("checkId").asText()).isEqualTo(checked.input().id().toString()); assertThat(detail.path("status").asText()).isEqualTo("RESOLVED");
+            assertThat(detail.at("/registration/id")).isEqualTo(action.path("registrationId"));
+            assertThat(detail.at("/registration/returnVersion")).isEqualTo(action.path("returnVersion"));
+        }
+        var oldPath = expenseReturnNoticePath(checked, "RECORDED", "alice"); var old = ok(read(oldPath, "alice"), 200);
+        expenseReturnRevision++; expenseReturnRows = List.of(expenseReturnRows.get(0), expenseReturnItem(report, "notice-later", "10"));
+        registerExpenseReturn(report, queryExpenseReturn(report));
+        assertThat(ok(read(oldPath, "alice"), 200)).isEqualTo(old);
+        var originalId = UUID.fromString(action.path("registrationId").asText());
+        assertThat(expenseReturnRegistrations.find("foreign", originalId)).isEmpty();
+        var version = action.path("returnVersion").asLong();
+        jdbc.update("UPDATE expense_payment_return_registration SET return_version=? WHERE tenant_id='demo' AND id=?", version - 1, originalId.toString());
+        try { assertThatThrownBy(() -> expenseReturnRegistrations.find("demo", originalId)).isInstanceOf(io.agentflow.common.DomainException.class); }
+        finally { jdbc.update("UPDATE expense_payment_return_registration SET return_version=? WHERE tenant_id='demo' AND id=?", version, originalId.toString()); }
+        assertThat(resourceVersions(report)).isEqualTo(resources); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void expenseReturnNotificationRechecksRecipientRoleFieldsTenantAndOriginalFact() throws Exception {
+        hideBusinessDetails = true; var report = archiveReadyExpense(); expenseReturnStatus = ExpensePaymentReturnPort.Status.UNRESOLVED;
+        var checked = queryExpenseReturn(report); var own = expenseReturnNoticePath(checked, "UNRESOLVED", "finance");
+        var messageId = UUID.fromString(own.split("/")[4]);
+        assertThat(ok(read(own, "finance"), 200).path("registration").isNull()).isTrue();
+        for (String actor : List.of("admin", "cashier", "bob", "alice")) assertThat(read(own, actor).getStatus()).isIn(403, 404);
+        assertThat(read(own + "?roundNo=1", "finance").getStatus()).isEqualTo(400);
+        actors.set(new Actor("demo", "finance", Set.of("ADMIN")));
+        try { assertThatThrownBy(() -> expenseReturnNotificationAccess.target(messageId)).isInstanceOf(io.agentflow.common.DomainException.class); }
+        finally { actors.clear(); }
+        actors.set(new Actor("foreign", "finance", Set.of("FINANCE", "APPROVER")));
+        try { assertThatThrownBy(() -> expenseReturnNotificationAccess.target(messageId)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                failure -> assertThat(failure.code()).isEqualTo("NOT_FOUND")); } finally { actors.clear(); }
+        String event = "expense-return:" + checked.input().id() + ":UNRESOLVED";
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "expense-return:" + checked.input().id() + ":RETURN_REVIEW", messageId.toString());
+        try { assertThat(read(own, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", event, messageId.toString()); }
+        tx().executeWithoutResult(status -> applicationEvents.publishEvent(new ExpensePaymentReturnChanged(checked)));
+        assertThat(expenseReturnNoticeRecipients(checked, "UNRESOLVED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(jdbc.queryForObject("SELECT read_at FROM notification_inbox WHERE id=?", java.sql.Timestamp.class, messageId.toString())).isNull();
+    }
+
+    @Test void expenseReturnNotificationSourceRevocationStopsQueryAndExcludesInactiveFinance() throws Exception {
+        var report = archiveReadyExpense(); var queued = queueExpenseReturn(report);
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try {
+            expenseReturnWorker.poll(); assertThat(expenseReturnChecks.find("demo", queued.input().id()).orElseThrow().status()).isEqualTo(ExpensePaymentReturnCheck.Status.VOIDED);
+            assertThat(expenseReturnNoticeRecipients(queued, "SOURCE_CHANGED")).containsExactly("alice");
+            assertThat(ok(read(expenseReturnNoticePath(queued, "SOURCE_CHANGED", "alice"), "alice"), 200).path("fact").asText()).isEqualTo("SOURCE_CHANGED");
+        } finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }
+    }
+
+    @Test void expenseReturnNotificationFailureRollsBackFundsAndDispatchThenRevokedAppointmentSuppressesDelivery() throws Exception {
+        var report = archiveReadyExpense(); expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED;
+        expenseReturnRows = List.of(expenseReturnItem(report, "notice-atomic", "20")); var checked = queryExpenseReturn(report);
+        var before = expenseReturnLedgers.find("demo", report.id()).orElseThrow(); var settlement = settlements.find("demo", report.id()).orElseThrow();
+        var financeActor = new Actor("demo", "finance", Set.of("FINANCE", "APPROVER")); var applicant = new Actor("demo", "alice", Set.of("EMPLOYEE"));
+        var financePreference = notificationPreferences.get(financeActor); var applicantPreference = notificationPreferences.get(applicant);
+        notificationPreferences.revise(financeActor, financePreference.version(), true, false); notificationPreferences.revise(applicant, applicantPreference.version(), true, false);
+        String event = "expense-return:" + checked.input().id() + ":RECORDED";
+        try {
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT expense_return_notice_failure CHECK (NOT (event_key='" + event + "' AND recipient_id='finance'))");
+            try { assertThatThrownBy(() -> registerExpenseReturn(report, checked)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT expense_return_notice_failure"); }
+            assertThat(expenseReturnLedgers.find("demo", report.id())).contains(before); assertThat(settlements.find("demo", report.id())).contains(settlement);
+            assertThat(expenseReturnChecks.find("demo", checked.input().id())).contains(checked); assertThat(expenseReturnRegistrations.history("demo", report.id())).isEmpty();
+            assertThat(expenseReturnNoticeRecipients(checked, "RECORDED")).isEmpty();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_receipt_credit WHERE tenant_id='demo' AND business_id=?", Integer.class, report.id().toString())).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='EXPENSE_PAYMENT_RETURN_REGISTER'", Integer.class, report.applicationId().toString())).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox i ON i.id=d.inbox_id WHERE i.event_key=?", Integer.class, event)).isZero();
+            registerExpenseReturn(report, checked); var path = expenseReturnNoticePath(checked, "RECORDED", "finance");
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, path.split("/")[4]));
+            var appointments = jdbc.queryForList("SELECT id FROM organization_appointment WHERE tenant_id='demo' AND person_id=? AND active=TRUE", String.class, finance.toString());
+            for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            try {
+                assertThat(read(path, "finance").getStatus()).isEqualTo(404); assertThat(notificationDeliveries.claim(deliveryId, Instant.now())).isNull();
+                assertThat(notificationDeliveryStore.find(deliveryId).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+            } finally { for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id); }
+        } finally {
+            notificationPreferences.revise(financeActor, notificationPreferences.get(financeActor).version(), financePreference.emailEnabled(), financePreference.enterpriseImEnabled());
+            notificationPreferences.revise(applicant, notificationPreferences.get(applicant).version(), applicantPreference.emailEnabled(), applicantPreference.enterpriseImEnabled());
+        }
+    }
+
+    private List<String> expenseReturnNoticeRecipients(ExpensePaymentReturnCheck check, String fact) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? ORDER BY recipient_id", String.class,
+                "expense-return:" + check.input().id() + ":" + fact);
+    }
+    private String expenseReturnNoticePath(ExpensePaymentReturnCheck check, String fact, String recipient) {
+        return "/api/v1/notifications/" + jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id=?", String.class,
+                "expense-return:" + check.input().id() + ":" + fact, recipient) + "/expense-return-target";
+    }
+
     @Test void expensePaymentReturnCumulativelyRegistersBankFundsAndPreservesConsumedResourcesAndArchive() throws Exception {
         var report = archiveReadyExpense(); pollArchive(); var archive = archives.find("demo", report.id(), 1).orElseThrow();
         var bytes = archiveDownload(report, "finance"); var resources = resourceVersions(report); var original = settlements.find("demo", report.id()).orElseThrow();
@@ -1656,6 +1782,9 @@ class ExpenseSubmissionIntegrationTest {
         expenseReturnRevision++; expenseReturnStatus = ExpensePaymentReturnPort.Status.CONFIRMED; var confirmed = queryExpenseReturn(report);
         assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
         registerExpenseReturn(report, confirmed);
+        assertThat(expenseReturnNoticeRecipients(confirmed, "RECORDED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(ok(read(expenseReturnNoticePath(unresolved, "UNRESOLVED", "alice"), "alice"), 200).path("registration").isNull()).isTrue();
+        assertThat(ok(read(expenseReturnNoticePath(confirmed, "RECORDED", "alice"), "alice"), 200).at("/registration/outcome").asText()).isEqualTo("CONFIRMED");
         var recovered = settlements.find("demo", report.id()).orElseThrow(); assertThat(recovered.status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
         assertThat(settlementNoticeRecipients(report, recovered.version())).containsExactlyInAnyOrder("alice", "finance");
         var detail = ok(read(oldNotice, "alice"), 200); assertThat(detail.at("/notice/status").asText()).isEqualTo("REVIEW_REQUIRED");
@@ -1707,6 +1836,7 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(expenseReturnChecks.find("demo", claimed.input().id()).orElseThrow().issue()).isEqualTo(ExpensePaymentReturnCheck.Issue.TIMEOUT);
         expenseReturns.finish(claimed, new FinanceResult.Success<>(expenseReturnReceipt(claimed.input().request())), claimed.leaseUntil().plusSeconds(1));
         assertThat(expenseReturnChecks.find("demo", claimed.input().id()).orElseThrow().issue()).isEqualTo(ExpensePaymentReturnCheck.Issue.TIMEOUT);
+        assertThat(expenseReturnNoticeRecipients(queued, "UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
         var person = organizationRepository.person("demo", finance).orElseThrow(); var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
         try { assertThatThrownBy(() -> queueExpenseReturn(report)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class, failure -> assertThat(failure.code()).isEqualTo("FORBIDDEN")); }
         finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }

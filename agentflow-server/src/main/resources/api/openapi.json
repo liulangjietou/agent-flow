@@ -47000,6 +47000,111 @@
           }
         ]
       }
+    },
+    "/api/v1/notifications/{id}/expense-return-target": {
+      "get": {
+        "operationId": "expenseReturnNotificationTarget",
+        "tags": [
+          "消息"
+        ],
+        "summary": "读取本人消息对应的原报销退回核对",
+        "description": "固定本次原银行查询及其实际消费的财务登记。响应区分当时消息事实、查询原件和明确登记；旧消息不跟随后一次查询或累计账本变化。当前原轮次敏感字段、原参与关系及法人任职重新核验，管理员不能绕过。拒绝查询参数，响应 no-store，不查询银行、不登记资金、不调整预算或其他资源，不提供金额、账户、流水、证据正文或办理许可。",
+        "x-access": "原消息接收人及当前原轮次财务读取权限",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseReturnNotificationTarget"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突、定义绑定冲突、委派状态冲突或幂等键复用/过期",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前角色、字段或消息归属不允许读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -53572,7 +53677,9 @@
               "SUPPLIER_RETURN_RESULT",
               "SUPPLIER_RETURN_ATTENTION",
               "SUPPLIER_ADJUSTMENT_RESULT",
-              "SUPPLIER_ADJUSTMENT_ATTENTION"
+              "SUPPLIER_ADJUSTMENT_ATTENTION",
+              "EXPENSE_RETURN_RESULT",
+              "EXPENSE_RETURN_ATTENTION"
             ]
           },
           "actor": {
@@ -82283,6 +82390,190 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "ExpenseReturnNotificationTarget": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "messageId",
+          "checkId",
+          "paymentId",
+          "reportId",
+          "applicationId",
+          "roundNo",
+          "fact",
+          "version",
+          "status",
+          "requestedAt",
+          "updatedAt",
+          "issue",
+          "observation",
+          "registration"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "checkId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "paymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "fact": {
+            "type": "string",
+            "enum": [
+              "UNAVAILABLE",
+              "SOURCE_CHANGED",
+              "UNRESOLVED",
+              "RETURN_REVIEW",
+              "RECORDED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "CHECKED",
+              "RESOLVED",
+              "UNAVAILABLE",
+              "VOIDED"
+            ]
+          },
+          "requestedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "NOT_CONFIGURED",
+              "TARGET_CHANGED",
+              "TIMEOUT",
+              "CONNECTION",
+              "AUTHENTICATION",
+              "REMOTE_FAILURE",
+              "INVALID_RESPONSE",
+              "RESPONSE_TOO_LARGE",
+              "INTERNAL_ERROR",
+              "SOURCE_UNAVAILABLE",
+              "SOURCE_CHANGED",
+              null
+            ]
+          },
+          "observation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseReturnNotificationObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "registration": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseReturnNotificationRegistration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExpenseReturnNotificationObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome",
+          "revision",
+          "observedAt",
+          "validUntil"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "UNRESOLVED",
+              "CONFIRMED",
+              "PARTIALLY_RETURNED",
+              "RETURNED"
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "observedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ExpenseReturnNotificationRegistration": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "returnVersion",
+          "outcome",
+          "registeredAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "returnVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "CONFIRMED",
+              "PARTIALLY_RETURNED",
+              "RETURNED"
+            ]
+          },
+          "registeredAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }

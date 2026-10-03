@@ -84,6 +84,7 @@ public class ExpensePaymentReturnService {
         var next = ledger.register(decision); ledgers.update(next);
         var settlement = decision.applyTo(source.settlement()); if (!settlement.equals(source.settlement())) settlementChanges.persist(source.settlement(), settlement);
         var resolved = check.resolve(decision, now); checks.update(resolved); registrations.create(decision, next);
+        events.publishEvent(new ExpensePaymentReturnChanged(resolved));
         events.publishEvent(new ExpensePaymentReturnRegistered(decision, next));
         var event = audit.record(source.authorization(), decision.id(), next.version(), "FINANCE", "EXPENSE_PAYMENT_RETURN_REGISTER", check.status().name(), resolved.status().name(), input.comment(), now);
         return new ActionReceipt(reportId, check.input().id(), resolved.version(), decision.id(), next.version(), settlements.find(actor.tenantId(), reportId).orElseThrow().version(), event);
@@ -117,9 +118,9 @@ public class ExpensePaymentReturnService {
     public ExpensePaymentReturnCheck claim(String tenant, UUID id, Instant at) {
         var initial = checks.find(tenant, id).orElse(null); if (initial == null || !initial.active()) return null;
         var source = sources.locked(tenant, initial.input().request().command().binding().businessId()); var current = checks.find(tenant, id).orElseThrow(); var now = time(at);
-        if (current.expired(now)) { checks.update(current.fail(ExpensePaymentReturnCheck.Issue.TIMEOUT, now)); return null; }
+        if (current.expired(now)) { persistCheck(current.fail(ExpensePaymentReturnCheck.Issue.TIMEOUT, now)); return null; }
         if (current.status() != ExpensePaymentReturnCheck.Status.QUEUED || !available(current, source, now)) return null;
-        var claimed = current.claim(now, QUERY_LEASE); checks.update(claimed); return claimed;
+        var claimed = current.claim(now, QUERY_LEASE); persistCheck(claimed); return claimed;
     }
     /** 新入款或不一致结果先冻结；只有独立财务登记才能追加账本或解除无退回疑点。 */
     @Transactional
@@ -127,7 +128,7 @@ public class ExpensePaymentReturnService {
         var input = claimed.input(); var reportId = input.request().command().binding().businessId();
         var source = sources.locked(input.tenantId(), reportId); var current = current(claimed); if (current == null) return; var now = time(at);
         if (!available(current, source, now)) return;
-        var completed = current.complete(result, now); checks.update(completed); if (completed.receipt() == null) return;
+        var completed = current.complete(result, now); persistCheck(completed); if (completed.receipt() == null) return;
         var receipt = completed.receipt(); var ledger = ledgers.find(input.tenantId(), reportId).orElseThrow(ExpensePaymentReturnService::conflict);
         var proofs = ledger.entries().stream().map(ExpensePaymentReturns.Entry::proof).toList();
         boolean same = receipt.status() != ExpensePaymentReturnPort.Status.UNRESOLVED && receipt.returns().size() == proofs.size() && receipt.returns().containsAll(proofs)
@@ -142,14 +143,17 @@ public class ExpensePaymentReturnService {
     @Transactional
     public void fail(ExpensePaymentReturnCheck claimed, Instant at) {
         sources.locked(claimed.input().tenantId(), claimed.input().request().command().binding().businessId()); var current = current(claimed);
-        if (current != null) checks.update(current.fail(ExpensePaymentReturnCheck.Issue.INTERNAL_ERROR, time(at)));
+        if (current != null) persistCheck(current.fail(ExpensePaymentReturnCheck.Issue.INTERNAL_ERROR, time(at)));
     }
     private boolean available(ExpensePaymentReturnCheck check, ExpensePaymentReturnSources.Source source, Instant now) {
         try { sources.requireCheck(check, source); personnel.requireEligible(check.input().tenantId(), check.input().requestedBy(), source.request().command().payee().legalEntityId()); return true; }
-        catch (DomainException changed) { checks.update(check.voidSource(now)); return false; }
+        catch (DomainException changed) { persistCheck(check.voidSource(now)); return false; }
     }
     private ExpensePaymentReturnCheck current(ExpensePaymentReturnCheck claimed) {
         return checks.find(claimed.input().tenantId(), claimed.input().id()).filter(value -> value.equals(claimed) && value.status() == ExpensePaymentReturnCheck.Status.RUNNING).orElse(null);
+    }
+    private void persistCheck(ExpensePaymentReturnCheck value) {
+        checks.update(value); events.publishEvent(new ExpensePaymentReturnChanged(value));
     }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed expense settlement, return ledger or query changed"); }
