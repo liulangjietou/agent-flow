@@ -14,10 +14,10 @@ import java.util.UUID;
  * @author owlzhangfq@gmail.com
  */
 public record BudgetCommand(UUID id, String tenantId, Action action, BudgetPrecheckPort.Request position, Expected expected) {
-    /** 首次冻结没有前置台账，后续命令必须指向上次确认的预算版本及凭据。 */
+    /** 首次冻结没有前置台账；释放后的重新冻结及其他后续命令沿用上次确认的版本和凭据。 */
     public BudgetCommand {
         if (id == null || StringUtils.isBlank(tenantId) || tenantId.length() > 64 || action == null || position == null
-                || (action == Action.FREEZE) != (expected == null)) throw invalid();
+                || action != Action.FREEZE && expected == null) throw invalid();
     }
 
     /**

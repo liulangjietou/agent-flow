@@ -8,6 +8,7 @@ import VoucherStatus from './VoucherStatus.vue'
 import FinancePaymentStatus from './FinancePaymentStatus.vue'
 import ExpenseSettlementStatus from './ExpenseSettlementStatus.vue'
 import ExpenseArchiveStatus from './ExpenseArchiveStatus.vue'
+import ExpenseBudgetRetentionStatus from './ExpenseBudgetRetentionStatus.vue'
 const props = defineProps<{ reportId: string; applicationId: string; scopeKey: string; version?: number; taskId?: string; roundNo?: number; locked?: boolean }>()
 const emit = defineEmits<{ changed: []; busy: [value: boolean] }>()
 const query = reactive(new ExpenseDetailQuery(api.expenseReport, api.expenseWorkflow))
@@ -55,6 +56,7 @@ const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
       <p v-if="query.workflow?.paper?.received" class="financial-caption">{{ query.workflow.paper.receivedBy }} 于 {{ timeLabel(query.workflow.paper.receivedAt!) }} 签收</p>
       <p v-if="query.workflow?.paper?.proxyUse" class="financial-caption">签收时代理 {{ query.workflow.paper.proxyUse.principal }} 办理，授权核对时间 {{ timeLabel(query.workflow.paper.proxyUse.authorizedAt) }}</p>
       <p v-if="query.workflow?.budget.issue" class="expense-error">{{ budgetIssues[query.workflow.budget.issue] ?? '预算结果尚未确认' }}，请核对后刷新。</p>
+      <ExpenseBudgetRetentionStatus :retention="query.detail.budgetRetention" :stopped="roundNo === undefined && ['RETURNED', 'WITHDRAWN'].includes(query.detail.applicationStatus)" />
       <p v-if="query.workflow?.task?.reductionUnavailable === 'TASK_DELEGATION_PENDING'" class="expense-empty">当前任务处于委派办理期间，回交后再办理财务操作。</p>
       <p v-if="!query.detail.content.lines.length" class="expense-empty">尚未填写费用明细。</p>
       <article v-for="line in query.detail.content.lines" :key="line.lineNo" class="expense-line">

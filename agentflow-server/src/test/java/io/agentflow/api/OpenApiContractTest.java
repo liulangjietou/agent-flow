@@ -458,6 +458,7 @@ class OpenApiContractTest {
                 java.util.Map.entry("ExpensePolicyActivation", io.agentflow.expense.JdbcExpenseConfigurationRepository.Activation.class),
                 java.util.Map.entry("ExpensePolicyActivationPage", io.agentflow.expense.ExpenseConfigurationService.ActivationPage.class),
                 java.util.Map.entry("ExpenseResponse", io.agentflow.expense.ExpenseResponse.class),
+                java.util.Map.entry("ExpenseBudgetRetention", io.agentflow.expense.ExpenseResponse.BudgetRetention.class),
                 java.util.Map.entry("ExpenseFinancialRound", io.agentflow.expense.ExpenseResponse.FinancialRound.class),
                 java.util.Map.entry("CopySnapshot", io.agentflow.approval.copy.CopyReadService.Snapshot.class),
                 java.util.Map.entry("AttachmentMetadata", io.agentflow.attachment.AttachmentService.Metadata.class),

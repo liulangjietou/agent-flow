@@ -21,11 +21,14 @@ public class ExpenseDraftService {
     private final ApplicationFieldViews fields;
     private final CurrentActor actors;
     private final ExpenseAllowancePreparation allowances;
+    private final JdbcExpenseBudgetRetentionRepository retentions;
 
     /** 注入已有申请授权及字段投影，不根据 ADMIN 角色放宽财务读取。 */
     public ExpenseDraftService(ExpenseReportRepository reports, ApprovalApplicationFacade applications,
-                                ApplicationFieldViews fields, CurrentActor actors, ExpenseAllowancePreparation allowances) {
+                                ApplicationFieldViews fields, CurrentActor actors, ExpenseAllowancePreparation allowances,
+                                JdbcExpenseBudgetRetentionRepository retentions) {
         this.reports = reports; this.applications = applications; this.fields = fields; this.actors = actors; this.allowances = allowances;
+        this.retentions = retentions;
     }
 
     /** 创建一对一业务绑定、空或完整费用草稿和财务版本证据。 */
@@ -78,10 +81,12 @@ public class ExpenseDraftService {
         return reports.find(actors.actor().tenantId(), id).orElseThrow(ExpenseDraftService::notFound);
     }
 
-    private static ExpenseResponse response(Application application, ExpenseReport report, ExpenseRound round, boolean editable) {
+    private ExpenseResponse response(Application application, ExpenseReport report, ExpenseRound round, boolean editable) {
+        int selected = round == null ? application.roundNo() : round.roundNo();
+        var retention = retentions.find(report.tenantId(), report.id(), selected).map(ExpenseResponse.BudgetRetention::from).orElse(null);
         return new ExpenseResponse(report.id(), application.id(), application.businessNo(), application.status(), application.version(),
-                report.version(), round == null ? application.roundNo() : round.roundNo(), editable,
-                round == null ? report.content() : round.content(), round == null ? null : ExpenseResponse.FinancialRound.from(round));
+                report.version(), selected, editable, round == null ? report.content() : round.content(),
+                round == null ? null : ExpenseResponse.FinancialRound.from(round), retention);
     }
 
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense report or round not found"); }

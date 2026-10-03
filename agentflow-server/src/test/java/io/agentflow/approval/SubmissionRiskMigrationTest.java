@@ -48,7 +48,7 @@ class SubmissionRiskMigrationTest {
         var upgradedHistory = jdbc.queryForList("SELECT * FROM \"flyway_schema_history\" ORDER BY \"installed_rank\"");
         assertThat(upgradedHistory).hasSize(history.size() + 1);
         assertThat(upgradedHistory.subList(0, history.size())).isEqualTo(history);
-        var repository = new JdbcSubmissionRoundRepository(jdbc, new JsonUtil(new ObjectMapper().findAndRegisterModules()));
+        var repository = new JdbcSubmissionRoundRepository(jdbc, new JsonUtil(new ObjectMapper().findAndRegisterModules()), event -> { });
         assertThat(repository.findByRound("retained", UUID.fromString(id), 1).orElseThrow().risk()).isEqualTo(SubmissionRisk.unassessed());
         assertThatThrownBy(() -> jdbc.update("UPDATE approval_submission_round SET risk_level='LOW'"))
                 .isInstanceOf(DataIntegrityViolationException.class);

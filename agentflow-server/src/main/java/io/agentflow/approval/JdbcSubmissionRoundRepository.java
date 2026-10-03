@@ -8,8 +8,11 @@ import io.agentflow.common.JsonUtil;
 import io.agentflow.form.FormSchema;
 import io.agentflow.organization.InitiatorContext;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -28,11 +31,13 @@ import java.util.UUID;
 public class JdbcSubmissionRoundRepository implements SubmissionRoundRepository {
     private final JdbcTemplate jdbc;
     private final JsonUtil jsonUtil;
+    private final ApplicationEventPublisher events;
 
     /** 使用审批事务共用的数据源保存轮次。 */
-    public JdbcSubmissionRoundRepository(JdbcTemplate jdbc, JsonUtil jsonUtil) {
+    public JdbcSubmissionRoundRepository(JdbcTemplate jdbc, JsonUtil jsonUtil, ApplicationEventPublisher events) {
         this.jdbc = jdbc;
         this.jsonUtil = jsonUtil;
+        this.events = events;
     }
 
     @Override
@@ -71,6 +76,7 @@ public class JdbcSubmissionRoundRepository implements SubmissionRoundRepository 
     }
 
     @Override
+    @Transactional(propagation = Propagation.MANDATORY)
     public void complete(String tenantId, UUID applicationId, int roundNo, String processInstanceId,
                          SubmissionRound.Status status, String reason, String completedBy, Instant completedAt) {
         status.requireTerminal();
@@ -84,6 +90,7 @@ public class JdbcSubmissionRoundRepository implements SubmissionRoundRepository 
                 """, Boolean.class, tenantId, applicationId.toString(), roundNo))) {
             throw new DomainException("CONCURRENCY_CONFLICT", "Submission round is already completed or belongs to another instance");
         }
+        if (updated == 1) events.publishEvent(new SubmissionRoundCompleted(tenantId, applicationId, roundNo, status));
     }
 
     private SubmissionRound map(ResultSet row, int rowNumber) throws SQLException {

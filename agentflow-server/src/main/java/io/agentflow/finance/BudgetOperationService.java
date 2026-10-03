@@ -41,7 +41,8 @@ public class BudgetOperationService {
         if (report.version() != financialVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Financial version changed before budget registration");
         var occupation = occupations.find(tenant, reportId).orElse(null);
         var command = new BudgetCommand(UUID.randomUUID(), tenant,
-                occupation == null || occupation.confirmed() == null ? BudgetCommand.Action.FREEZE : BudgetCommand.Action.ADJUST,
+                occupation == null || occupation.confirmed() == null || occupation.status() == BudgetOccupation.Status.RELEASED
+                        ? BudgetCommand.Action.FREEZE : BudgetCommand.Action.ADJUST,
                 BudgetPrecheckPort.Request.fromCurrent(report, date), occupation == null || occupation.confirmed() == null ? null : occupation.confirmed().expected());
         return register(occupation, new BudgetOperation.Input(command, targetDigest), now);
     }

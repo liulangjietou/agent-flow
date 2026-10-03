@@ -212,6 +212,24 @@ class BudgetOperationIntegrationTest {
     }
 
     @Test
+    void releasedLedgerRefreezesANewRoundWithTheOriginalReleaseReceipt() {
+        var report = report(true); reserve(report); worker.poll();
+        tx().executeWithoutResult(transaction -> execution.finalizeOccupation("demo", report.id(), BudgetCommand.Action.RELEASE, now()));
+        worker.poll(); var released = occupation(report).confirmed();
+        long previous = report.version(); freeze(report); reports.update(report, previous, "alice", "SYNTHETIC_RESUBMIT");
+        var next = reserve(report);
+        assertThat(next.input().command().action()).isEqualTo(BudgetCommand.Action.FREEZE);
+        assertThat(next.input().command().expected()).isEqualTo(released.expected());
+        assertThat(occupation(report).status()).isEqualTo(BudgetOccupation.Status.RELEASED);
+        assertThat(occupation(report).frozenFor(position(report))).isFalse();
+        worker.poll();
+        assertThat(occupation(report).frozenFor(position(report))).isTrue();
+        assertThat(occupation(report).confirmed().revision()).isEqualTo(3);
+        assertThat(operations.find("demo", next.input().command().id()).orElseThrow().status()).isEqualTo(BudgetOperation.Status.APPLIED);
+        assertThat(WRITES.get()).isEqualTo(3);
+    }
+
+    @Test
     void destinationChangeRetainsUnknownOperationAndDatabaseProtectsImmutableInputAndActiveUniqueness() {
         var report = report(true); var job = reserve(report);
         configuration.getTenants().get("demo").setEndpoint(ENDPOINT + "/changed"); worker.poll();
@@ -244,7 +262,7 @@ class BudgetOperationIntegrationTest {
     private void freeze(ExpenseReport report) {
         var assessment = new ExpenseAssessment(new ExpenseExchangeRate("CNY", "CNY", BigDecimal.ONE, "synthetic-rate", DATE),
                 new ExpensePolicySnapshot(UUID.randomUUID(), 1, money("100"), money("100"), ExpensePolicySnapshot.Decision.WITHIN_LIMIT, "synthetic-tax", "synthetic-policy"), money("0"));
-        report.freeze(1, 1, "CNY", new EmployeeAccountSnapshot(ENTITY, "alice", "synthetic-account", "****1234", "a".repeat(64), "v1"), Map.of(1, assessment), "alice", now());
+        report.freeze(report.version(), report.rounds().size() + 1, "CNY", new EmployeeAccountSnapshot(ENTITY, "alice", "synthetic-account", "****1234", "a".repeat(64), "v1"), Map.of(1, assessment), "alice", now());
     }
     private BudgetOperation reserve(ExpenseReport report) { return tx().execute(transaction -> execution.reserve("demo", report.id(), report.version(), DATE, target(), now())); }
     private BudgetOccupation occupation(ExpenseReport report) { return occupations.find("demo", report.id()).orElseThrow(); }

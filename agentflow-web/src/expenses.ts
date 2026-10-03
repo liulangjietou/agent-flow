@@ -40,7 +40,12 @@ export interface FinancialRound {
   originalLines: FrozenExpenseLine[]; approvedLines: ApprovedLine[]; advanceOffsets: AdvanceOffset[]; adjustments: ExpenseAdjustment[]
   approvedGross: Money; approvedTax: Money; offsetTotal: Money; payable: Money
 }
-export interface ExpenseDetail { id: string; applicationId: string; businessNo: string; applicationStatus: string; applicationVersion: number; financialVersion: number; roundNo: number; editable: boolean; content: ExpenseContent; financialRound: FinancialRound | null }
+export interface ExpenseBudgetRetentionView {
+  roundNo: number; stoppedStatus: 'RETURNED' | 'WITHDRAWN'; retainedAt: string; retentionDays: number; expiresAt: string
+  status: 'RETAINED' | 'RECONCILING' | 'RELEASE_QUEUED' | 'RELEASED' | 'SUPERSEDED' | 'NO_FROZEN_BUDGET' | 'RELEASE_REJECTED'
+  releaseOperationId: string | null; issue: string | null; updatedAt: string
+}
+export interface ExpenseDetail { id: string; applicationId: string; businessNo: string; applicationStatus: string; applicationVersion: number; financialVersion: number; roundNo: number; editable: boolean; content: ExpenseContent; financialRound: FinancialRound | null; budgetRetention?: ExpenseBudgetRetentionView | null }
 export interface ExpenseVersions { applicationVersion: number; financialVersion: number }
 export interface ExpenseCommand extends ExpenseVersions { comment: string }
 export interface ReductionLine { lineNo: number; approvedGross: string; approvedTax: string }

@@ -139,7 +139,7 @@ class GatewayBudgetSystemTest {
         answer(rejected); assertThat(budgets.execute(target, command).requireValue()).isEqualTo(rejected);
         var pending = new BudgetObservation(command.id(), command.digest(), BudgetObservation.Status.PENDING, null, null, null, null);
         answer(pending); assertThat(budgets.execute(target, command).requireValue()).isEqualTo(pending);
-        for (var action : List.of(BudgetCommand.Action.ADJUST, BudgetCommand.Action.RELEASE, BudgetCommand.Action.CONSUME)) {
+        for (var action : List.of(BudgetCommand.Action.FREEZE, BudgetCommand.Action.ADJUST, BudgetCommand.Action.RELEASE, BudgetCommand.Action.CONSUME)) {
             var next = new BudgetCommand(UUID.randomUUID(), "tenant-a", action, command.position(), new BudgetCommand.Expected(4, "ledger-v4"));
             answer(applied(next, 5)); assertThat(budgets.execute(target, next).requireValue().ledgerRevision()).isEqualTo(5);
             answer(applied(next, 4)); assertThat(budgets.execute(target, next)).isEqualTo(unavailable(FinanceResult.Failure.INVALID_RESPONSE));

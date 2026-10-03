@@ -74,7 +74,7 @@ class FormSchemaMigrationTest {
         assertThat(restoredApplication.formSchema()).isNull();
         assertThat(restoredApplication.runtimeDefinitionId()).isNull();
         assertThat(restoredApplication.businessReference()).isNull();
-        var restoredRound = new JdbcSubmissionRoundRepository(jdbc, json).findAll("demo", UUID.fromString(applicationId)).get(0);
+        var restoredRound = new JdbcSubmissionRoundRepository(jdbc, json, event -> { }).findAll("demo", UUID.fromString(applicationId)).get(0);
         assertThat(restoredRound.formSchema()).isNull();
         assertThat(restoredRound.initiatorContext()).isNull();
         assertThat(restoredRound.risk()).isEqualTo(SubmissionRisk.unassessed());

@@ -55498,6 +55498,17 @@
                 "type": "null"
               }
             ]
+          },
+          "budgetRetention": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseBudgetRetention"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "已授权所选轮次的预算保留期限；未配置或未发生退回撤回时为空。"
           }
         },
         "required": [
@@ -77254,6 +77265,74 @@
         ],
         "additionalProperties": false,
         "description": "随费用修订及审批轮次保留的补贴依据。保存时服务端重新匹配本人规则，忽略客户端来源声明；拒绝手改天数、金额、税额或关联发票。"
+      },
+      "ExpenseBudgetRetention": {
+        "type": "object",
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "stoppedStatus": {
+            "type": "string",
+            "enum": [
+              "RETURNED",
+              "WITHDRAWN"
+            ]
+          },
+          "retainedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retentionDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3660
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "RETAINED",
+              "RECONCILING",
+              "RELEASE_QUEUED",
+              "RELEASED",
+              "SUPERSEDED",
+              "NO_FROZEN_BUDGET",
+              "RELEASE_REJECTED"
+            ]
+          },
+          "releaseOperationId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "issue": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "roundNo",
+          "stoppedStatus",
+          "retainedAt",
+          "retentionDays",
+          "expiresAt",
+          "status",
+          "updatedAt"
+        ],
+        "additionalProperties": false
       }
     }
   }

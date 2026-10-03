@@ -61,6 +61,7 @@ class ExpenseDraftIntegrationTest {
     @Autowired ExpenseReportRepository reports;
     @Autowired ExpenseDraftService drafts;
     @Autowired ExpenseAllowancePreparation allowances;
+    @Autowired ExpenseBudgetRetentionConfiguration retentionConfiguration;
     @Autowired JdbcTemplate jdbc;
     @Autowired TaskService tasks;
 
@@ -191,6 +192,38 @@ class ExpenseDraftIntegrationTest {
         assertThat(old.at("/content/title").asText()).isEqualTo("费用草稿");
         assertThat(old.toString()).doesNotContain("本轮补正的私密内容");
         assertThat(old.path("editable").asBoolean()).isFalse();
+    }
+
+    @Test
+    void capturedRetentionUsesOriginalRoundPermissionsAndSurvivesDraftAndConfigurationChanges() throws Exception {
+        var previous = retentionConfiguration.getTenants();
+        try {
+            for (var visibility : List.of(FieldVisibility.READ_ONLY, FieldVisibility.MASKED)) {
+                var policy = new ExpenseBudgetRetentionConfiguration.Tenant(); policy.setEnabled(true); policy.setRetentionDays(3);
+                retentionConfiguration.setTenants(Map.of("demo", policy));
+                var draft = ok(send(post("/api/v1/expense-reports"), "alice", createBody(published(visibility), content("期限权限场景", "10"))), 201);
+                submitFixture(draft);
+                var task = tasks.createTaskQuery().processVariableValueEquals("applicationId", draft.path("applicationId").asText()).singleResult();
+                var returned = ok(send(post("/api/v1/tasks/" + task.getId() + "/actions"), "manager",
+                        Map.of("action", "RETURN", "comment", "补齐凭据", "expectedVersion", 3)), 200);
+                var captured = ok(send(get(path(draft)), "alice", null), 200).path("budgetRetention");
+                assertThat(captured.path("roundNo").asInt()).isEqualTo(1);
+                assertThat(captured.path("retentionDays").asInt()).isEqualTo(3);
+                assertThat(captured.path("status").asText()).isEqualTo("RETAINED");
+                policy.setRetentionDays(9);
+                var revised = ok(send(post(path(draft) + "/revise"), "alice",
+                        revision(returned.path("version").asLong(), 2, content("已补正内容", "20"))), 200);
+                assertThat(revised.path("budgetRetention")).isEqualTo(captured);
+                var historyPath = path(draft) + "?roundNo=1";
+                assertThat(ok(send(get(historyPath), "alice", null), 200).path("budgetRetention")).isEqualTo(captured);
+                if (visibility == FieldVisibility.READ_ONLY) {
+                    assertThat(ok(send(get(historyPath), "manager", null), 200).path("budgetRetention")).isEqualTo(captured);
+                } else assertThat(send(get(historyPath), "manager", null).getStatus()).isEqualTo(403);
+                assertThat(send(get(historyPath), "admin", null).getStatus()).isEqualTo(403);
+                assertThat(send(get(path(draft)), "manager", null).getStatus()).isEqualTo(404);
+                assertThat(send(get(historyPath), "bob", null).getStatus()).isEqualTo(404);
+            }
+        } finally { retentionConfiguration.setTenants(previous); }
     }
 
     @Test
