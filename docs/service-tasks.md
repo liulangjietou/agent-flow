@@ -1,6 +1,6 @@
 # 白名单服务任务
 
-W01 仍未完成。可信目录、公开设计绑定、模拟、主/子流程提交及两种设计视图已经接通。授权运行记录接口和申请详情的“服务运行”页签也已实现，范围测试、前端构建及固定包三轮强退恢复通过；真实浏览器、PostgreSQL 补测和配套备份恢复仍待完成。见[运行记录阶段证据](evidence/service-task-runtime-view-20261003.json)、[设计与公开入口证据](evidence/service-task-public-design-20261003.json)及[后台阶段证据](evidence/service-task-backend-20261003.json)。
+W01 仍未完成。可信目录、公开设计绑定、模拟、主/子流程提交及两种设计视图已经接通。授权运行记录接口和申请详情的“服务运行”页签也已实现，范围测试、前端构建、固定包三轮强退恢复及独立配套恢复通过；真实浏览器和 PostgreSQL 补测仍待完成。见[配套恢复证据](evidence/service-task-paired-restore-20261003.json)、[运行记录阶段证据](evidence/service-task-runtime-view-20261003.json)、[设计与公开入口证据](evidence/service-task-public-design-20261003.json)及[后台阶段证据](evidence/service-task-backend-20261003.json)。
 
 ## 调用链与职责
 
@@ -106,4 +106,25 @@ python3 scripts/check-service-task-restart.py \
 
 脚本不覆盖真实企业接收方、浏览器或 PostgreSQL 的验收。后续改变数据库版本或默认文件连接参数时，需要再次执行这组验收。
 
-PostgreSQL 补测遇到 Docker 镜像层 I/O 错误，尚未执行。浏览器工具因管理员策略无法核验而拒绝打开本地页面，未执行真实页面交互或生成验收截图。W01 的后续工作仍包含以上两项环境验收和配套备份恢复；这些完成前不得关闭任务。
+## 独立配套恢复验收
+
+`scripts/check-service-task-restore.py` 复用上述合成接收方和业务定义，创建全新的源实例。先完成一张申请，再让另一张申请停在“接收方效果已保存、应用尚未收到执行回执”的窗口；停止本次应用和接收方后，配套保存完整数据库逻辑备份、接收方原号账本和配置依据。
+
+工具从固定安装包提取对应 H2 客户端，在新的文件库导入备份，并在应用启动前重新导出核对。比较排除数据库部署设置及密码盐，只允许独立单行约束语句的输出顺序不同；业务行、表结构、序列和约束正文及数量都必须一致。实际用于恢复的备份保留完整导出内容。导出参数依据 [H2 SCRIPT 语法](https://h2database.github.io/html/commands.html#script)，不通过逐表重建或写 SQL 修改业务状态。
+
+恢复接收方加载复制后的原账本，沿用原回环目标身份；原进程已经停止，不将旧命令指向其他服务。恢复应用通过公开接口检查旧已批准单据不变，并等待原服务操作按原号查询成功后继续人工审批。验收同时检查恢复后没有执行调用、没有新效果或回执替换，源目录文件摘要不变。
+
+```sh
+python3 scripts/check-service-task-restore.py \
+  --java "$JAVA_HOME/bin/java" \
+  --jar agentflow-server/target/agentflow-server-0.1.0-SNAPSHOT.jar
+
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
+  -s scripts/tests -p test_service_task_restore.py -v
+```
+
+固定包实际验收已通过：恢复前后数据库内容一致，两笔合成效果保留，恢复后零次执行、一次原号查询，原流程经人工审批结束。四项比对测试确认数据变化、约束变化/缺失/重复、多行语句及数据顺序变化不会被忽略。输出保留在 `/fyoung/tmp/agentflow-service-restore-*`，脚本结束前停止自己创建的进程；不读取或覆盖已有运行实例。
+
+该脚本是默认 H2 与合成接收方的本地验收，不是生产恢复工具；本样例没有附件原件，也不证明企业接收方的灾备、断电耐久性或 RPO/RTO。生产数据库和文件仍使用[生产配套恢复方案](production-backup-recovery.md)。
+
+PostgreSQL 补测遇到 Docker 镜像层 I/O 错误，尚未执行。浏览器工具因管理员策略无法核验而拒绝打开本地页面，未执行真实页面交互或生成验收截图。这两项环境验收完成前，W01 不关闭。
