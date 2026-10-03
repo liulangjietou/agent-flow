@@ -20,10 +20,12 @@ const visibleTemplates = computed(() => {
 })
 const copyInput = computed<TemplateCopyInput>(() => ({ key: targetKey.value.trim(), name: targetName.value.trim(), templateVersion: selected.value?.templateVersion ?? 0 }))
 const copyErrors = computed(() => attempted.value ? validateTemplateCopy(copyInput.value) : {})
-const businessLabels = { FORM: '表单审批', PROCUREMENT_PAYMENT: '采购付款', BUDGET_ADJUSTMENT: '预算调整' }
+const businessLabels = { FORM: '表单审批', PROCUREMENT_PAYMENT: '采购付款', BUDGET_ADJUSTMENT: '预算调整', EXPENSE: '费用报销', EXPENSE_PLAN: '事前申请', ADVANCE_REQUEST: '借款申请' }
 const statusLabels: Record<string, string> = { DRAFT: '草稿', PUBLISHED: '已发布', ARCHIVED: '已归档' }
 const notificationLabels: Record<string, string> = { SUBMITTED: '提交后', RETURNED: '退回后', APPROVED: '批准后' }
-const roleLabels: Record<string, string> = { MANAGER: '经理审批组（示例）', ADMIN: '额外复核组（示例）', FINANCE: '财务复核（复制后绑定实际人员或岗位）', ORG_SUPERVISOR_1: '本次任职直属主管' }
+const roleLabels: Record<string, string> = { MANAGER: '经理审批组（示例）', ADMIN: '额外复核组（示例）', FINANCE: '财务复核（复制后绑定实际人员或岗位）', ORG_SUPERVISOR_1: '本次任职直属主管',
+  EXPENSE_DEPARTMENT_HEAD: '部门负责人（复制后绑定）', EXPENSE_EXECUTIVE: '分管负责人（复制后绑定）', EXPENSE_POLICY_OWNER: '费用归口负责人（复制后绑定）',
+  EXPENSE_RECEIPT: '财务收单人员（复制后绑定）', EXPENSE_FINANCE_RECHECK: '财务复核负责人（复制后绑定）' }
 const nodeName = (id: string) => selected.value?.graph.nodes.find(node => node.id === id)?.name ?? id
 const fieldName = (key: string) => selected.value?.formSchema.fields.find(field => field.key === key)?.label ?? key
 const fieldTypeName = (type: string) => fieldTypes.find(item => item.value === type)?.label ?? type

@@ -138,7 +138,7 @@ export interface DefinitionAvailabilityInput { startEnabled: boolean; expectedRe
 export interface TemplateScenario { id: string; name: string; description: string; payload: Record<string, unknown>; expectedPath: string[]; expectedFieldErrors: Record<string, string> }
 export interface TemplateCopy { definitionId: string; processKey: string; name: string; status: string; version: number; revision: number; templateVersion: number; copiedBy: string; copiedAt: string }
 export interface ProcessTemplate {
-  key: string; templateVersion: number; name: string; category: string; description: string; scope: string; businessType: 'FORM' | 'PROCUREMENT_PAYMENT' | 'BUDGET_ADJUSTMENT'
+  key: string; templateVersion: number; name: string; category: string; description: string; scope: string; businessType: 'FORM' | 'PROCUREMENT_PAYMENT' | 'BUDGET_ADJUSTMENT' | 'EXPENSE' | 'EXPENSE_PLAN' | 'ADVANCE_REQUEST'
   dependencies: string[]; defaultRoles: string[]; fieldDescriptions: Record<string, string>; risks: string[]; upgradePolicy: string
   notificationTexts: Record<string, string>; notificationsAvailable: boolean; graph: Graph; formSchema: FormSchema
   scenarios: TemplateScenario[]; copies: TemplateCopy[]

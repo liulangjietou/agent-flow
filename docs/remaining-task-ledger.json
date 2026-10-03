@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T05:37:50.342009+00:00",
+  "recordedAt": "2026-10-03T06:01:32.236408+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1440,7 +1440,7 @@
           ]
         }
       ],
-      "observed": "运行入口已有三类专用业务，但 ClasspathProcessTemplateCatalog 仅有请假、用印、合同、采购付款、预算调整 5 个模板；没有这 3 个可复制模板及配套样例。",
+      "observed": "新增报销、事前申请和借款 3 份独立模板，目录共 8 个模板、43 个路径样例。77 条范围测试通过；实际 HTTP 完成复制、模拟、阈值调整与绑定现有组织后的发布，浏览器三类复制及 390 像素布局通过。配套财务配置、业务样例及专用入口完整办理仍未完成。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/template/ClasspathProcessTemplateCatalog.java",
@@ -1449,13 +1449,18 @@
         {
           "path": "docs/process-templates.md",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/financial-templates-catalog-20261003.json",
+          "line": 1
         }
       ],
       "acceptance": "3 个模板可复制、验证、模拟、发布并从专用入口提交；附类别、制度、映射、签收开关和超标/核减/冲销/重复票样例；金额矩阵及财务复核阈值可配置。",
       "dependsOn": [
         "F01",
         "F02"
-      ]
+      ],
+      "progressEvidence": "docs/evidence/financial-templates-catalog-20261003.json"
     },
     {
       "id": "F14",
@@ -3339,8 +3344,15 @@
   },
   "latestInProgress": {
     "taskId": "F13",
-    "phase": "NEXT_TASK_SELECTED",
+    "phase": "CATALOG_COPY_SIMULATION_PUBLICATION_AND_BROWSER_VERIFIED",
     "taskCompleted": false,
-    "scope": "报销、事前申请和借款模板包"
+    "scope": "三类员工财务模板资源、模板契约、独立复制、金额矩阵、财务复核阈值与已有模板中心展示。",
+    "evidence": "docs/evidence/financial-templates-catalog-20261003.json",
+    "remaining": [
+      "补齐附带的类别、制度、科目映射和签收开关配置样例。",
+      "补超标、核减、借款冲销和重复票的可执行业务样例。",
+      "从三个模板发布版本的专用入口完成实际填报、预检、提交与办理，验证金额和复核分支。",
+      "配套包完成后执行匹配的最终固定安装包验收；本记录不关闭 F13。"
+    ]
   }
 }

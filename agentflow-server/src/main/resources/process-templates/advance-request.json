@@ -1,0 +1,327 @@
+{
+  "key": "advance-request",
+  "templateVersion": 1,
+  "name": "员工借款申请",
+  "category": "财务",
+  "description": "员工本币借款申请，批准挂账后另行授权放款，实际到账后形成借款余额。",
+  "scope": "员工本币借款申请，批准挂账后另行授权放款，实际到账后形成借款余额。",
+  "businessType": "ADVANCE_REQUEST",
+  "dependencies": [
+    "维护申请人本次任职及直属主管；本次任职随提交轮次固定。",
+    "复制后把部门负责人、分管负责人及财务占位角色绑定到本租户实际人员或岗位；按企业制度调整金额条件后校验、模拟和发布。",
+    "配置申请人可用的法人、币种及财务目录；正式提交必须通过该业务专用预检。",
+    "办理凭证和付款前，配置有效的法人币种科目映射及财务连接，ERP 和资金服务分别确认过账与到账。"
+  ],
+  "defaultRoles": [
+    "EXPENSE_DEPARTMENT_HEAD",
+    "EXPENSE_EXECUTIVE",
+    "FINANCE"
+  ],
+  "fieldDescriptions": {
+    "advanceRequestDetails": "专用业务页面维护完整单据，所有模板人工节点可原样读取此敏感组；管理员没有额外读取权限。",
+    "amount": "路由金额由服务端冻结单据派生；5,000 和 50,000 为可在设计器调整的示例阈值。",
+    "currency": "来自本次任职对应法人的本位币，借款金额不做隐式币种转换。"
+  },
+  "risks": [
+    "5,000、50,000 元均为本币示例阈值，复制后由租户按制度配置。",
+    "场景仅验证派生字段与审批路径；正式单据必须从专用入口创建、预检和提交，不能使用通用表单绕过业务依据。",
+    "本版本未包含按项目分摊自动会签、柔性预算超支分支、自审批自动上溯或相邻同人自动通过。需要这些规则的业务应待相应能力验收后启用。",
+    "借款批准不等于到账；申请人、财务授权人和出纳执行人分离，实际到账后才形成可冲销借款。"
+  ],
+  "upgradePolicy": "复制后成为租户独立草稿；目录升级不覆盖既有定义、已发布版本、任职快照或单据轮次。",
+  "notificationTexts": {
+    "SUBMITTED": "员工借款申请已提交，请等待审批。",
+    "RETURNED": "员工借款申请已退回，请按审批意见补正并重新预检。",
+    "APPROVED": "员工借款申请已批准，实际凭证和付款结果请查看后续财务办理记录。"
+  },
+  "notificationsAvailable": true,
+  "graph": {
+    "nodes": [
+      {
+        "id": "start",
+        "name": "开始",
+        "type": "START",
+        "properties": {
+          "x": "40",
+          "y": "150"
+        }
+      },
+      {
+        "id": "supervisor",
+        "name": "本次任职直属主管",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "260",
+          "y": "150",
+          "assigneeRule": "role:ORG_SUPERVISOR_1"
+        }
+      },
+      {
+        "id": "amountGate",
+        "name": "金额矩阵：5,000 元",
+        "type": "EXCLUSIVE_GATEWAY",
+        "properties": {
+          "x": "500",
+          "y": "150"
+        }
+      },
+      {
+        "id": "department",
+        "name": "部门负责人",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "740",
+          "y": "330",
+          "assigneeRule": "role:EXPENSE_DEPARTMENT_HEAD"
+        }
+      },
+      {
+        "id": "executiveGate",
+        "name": "金额矩阵：50,000 元",
+        "type": "EXCLUSIVE_GATEWAY",
+        "properties": {
+          "x": "980",
+          "y": "330"
+        }
+      },
+      {
+        "id": "executive",
+        "name": "分管负责人",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "1220",
+          "y": "490",
+          "assigneeRule": "role:EXPENSE_EXECUTIVE"
+        }
+      },
+      {
+        "id": "finance",
+        "name": "财务复核",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "1460",
+          "y": "150",
+          "assigneeRule": "role:FINANCE"
+        }
+      },
+      {
+        "id": "end",
+        "name": "结束",
+        "type": "END",
+        "properties": {
+          "x": "1700",
+          "y": "150"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "start_supervisor",
+        "source": "start",
+        "target": "supervisor",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "supervisor_amountGate",
+        "source": "supervisor",
+        "target": "amountGate",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "amountGate_department",
+        "source": "amountGate",
+        "target": "department",
+        "condition": "amount > 5000",
+        "defaultBranch": false
+      },
+      {
+        "id": "amountGate_finance",
+        "source": "amountGate",
+        "target": "finance",
+        "condition": "",
+        "defaultBranch": true
+      },
+      {
+        "id": "department_executiveGate",
+        "source": "department",
+        "target": "executiveGate",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "executiveGate_executive",
+        "source": "executiveGate",
+        "target": "executive",
+        "condition": "amount > 50000",
+        "defaultBranch": false
+      },
+      {
+        "id": "executiveGate_finance",
+        "source": "executiveGate",
+        "target": "finance",
+        "condition": "",
+        "defaultBranch": true
+      },
+      {
+        "id": "executive_finance",
+        "source": "executive",
+        "target": "finance",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "finance_end",
+        "source": "finance",
+        "target": "end",
+        "condition": "",
+        "defaultBranch": false
+      }
+    ]
+  },
+  "formSchema": {
+    "schemaVersion": 2,
+    "fields": [
+      {
+        "key": "advanceRequestDetails",
+        "label": "员工借款申请明细",
+        "type": "TEXT",
+        "required": true,
+        "sensitive": true,
+        "nodeAccess": {
+          "supervisor": "READ_ONLY",
+          "department": "READ_ONLY",
+          "executive": "READ_ONLY",
+          "finance": "READ_ONLY"
+        }
+      },
+      {
+        "key": "amount",
+        "label": "申请本币总额",
+        "type": "NUMBER",
+        "required": true,
+        "minimum": "0.01"
+      },
+      {
+        "key": "currency",
+        "label": "本位币",
+        "type": "TEXT",
+        "required": true
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "small",
+      "name": "普通金额",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "advanceRequestDetails": "员工借款申请依据见专用业务明细",
+        "amount": "80.00",
+        "currency": "CNY"
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "finance",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "first-boundary",
+      "name": "第一档上界",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "advanceRequestDetails": "员工借款申请依据见专用业务明细",
+        "amount": "5000.00",
+        "currency": "CNY"
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "finance",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "department",
+      "name": "进入部门审批",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "advanceRequestDetails": "员工借款申请依据见专用业务明细",
+        "amount": "5000.01",
+        "currency": "CNY"
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "department",
+        "executiveGate",
+        "finance",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "upper-boundary",
+      "name": "第二档上界",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "advanceRequestDetails": "员工借款申请依据见专用业务明细",
+        "amount": "50000.00",
+        "currency": "CNY"
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "department",
+        "executiveGate",
+        "finance",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "executive",
+      "name": "进入分管审批",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "advanceRequestDetails": "员工借款申请依据见专用业务明细",
+        "amount": "50000.01",
+        "currency": "CNY"
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "department",
+        "executiveGate",
+        "executive",
+        "finance",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "zero",
+      "name": "拒绝零申请金额",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "advanceRequestDetails": "员工借款申请依据见专用业务明细",
+        "amount": "0.00",
+        "currency": "CNY"
+      },
+      "expectedPath": [],
+      "expectedFieldErrors": {
+        "amount": "BELOW_MINIMUM"
+      }
+    }
+  ]
+}

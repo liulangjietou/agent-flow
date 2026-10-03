@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import io.agentflow.form.FormSchemaJsonDeserializer;
 import org.junit.jupiter.api.Test;
@@ -34,15 +35,19 @@ class ClasspathProcessTemplateCatalogTest {
     @Test
     void loadsDeliveredTemplatesAndVerifiesEveryScenario() {
         var catalog = new ClasspathProcessTemplateCatalog(resources, json);
-        assertThat(catalog.list()).extracting(ProcessTemplate::key).containsExactly("leave-request", "seal-application", "contract-review", "procurement-payment", "budget-adjustment");
-        assertThat(catalog.list().stream().mapToInt(template -> template.scenarios().size()).sum()).isEqualTo(21);
+        assertThat(catalog.list()).extracting(ProcessTemplate::key).containsExactly("leave-request", "seal-application", "contract-review", "procurement-payment", "budget-adjustment",
+                "expense-report", "expense-plan", "advance-request");
+        assertThat(catalog.list().stream().mapToInt(template -> template.scenarios().size()).sum()).isEqualTo(43);
         catalog.list().forEach(ProcessTemplate::verifyScenarios);
         assertThatThrownBy(catalog.list()::clear).isInstanceOf(UnsupportedOperationException.class);
     }
 
     @ParameterizedTest
     @CsvSource({"procurement-payment,business-type", "procurement-payment,masked", "procurement-payment,missing-sensitive",
-            "budget-adjustment,business-type", "budget-adjustment,masked", "budget-adjustment,missing-sensitive"})
+            "budget-adjustment,business-type", "budget-adjustment,masked", "budget-adjustment,missing-sensitive",
+            "expense-report,business-type", "expense-report,masked", "expense-report,missing-sensitive",
+            "expense-plan,business-type", "expense-plan,masked", "expense-plan,missing-sensitive",
+            "advance-request,business-type", "advance-request,masked", "advance-request,missing-sensitive"})
     void structuredTemplateCannotMislabelItsBusinessOrHideEvidenceFromApprovers(String templateKey, String corruption) throws Exception {
         String location = "classpath:process-templates/" + templateKey + ".json";
         ObjectNode template;
@@ -57,6 +62,26 @@ class ClasspathProcessTemplateCatalogTest {
         when(replaced.getResource(anyString())).thenAnswer(call -> location.equals(call.getArgument(0))
                 ? new ByteArrayResource(json.write(template).getBytes(StandardCharsets.UTF_8)) : resources.getResource(call.getArgument(0)));
         assertThatThrownBy(() -> new ClasspathProcessTemplateCatalog(replaced, json)).isInstanceOf(IllegalStateException.class).hasMessageContaining(location);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"receipt,EXPENSE_RECEIPT_PATH_REQUIRED", "finance,EXPENSE_FINANCE_PATH_REQUIRED"})
+    void expenseTemplateRequiresReceiptAndFinanceOnEveryCompletionPath(String nodeId, String expectedCode) throws Exception {
+        String location = "classpath:process-templates/expense-report.json";
+        ObjectNode template;
+        try (var input = resources.getResource(location).getInputStream()) {
+            template = json.read(new String(input.readAllBytes(), StandardCharsets.UTF_8), ObjectNode.class);
+        }
+        for (var node : template.path("graph").path("nodes")) {
+            if (nodeId.equals(node.path("id").asText())) ((ObjectNode) node.path("properties")).put("expenseStage", "BUSINESS");
+        }
+        ResourceLoader replaced = mock(ResourceLoader.class);
+        when(replaced.getResource(anyString())).thenAnswer(call -> location.equals(call.getArgument(0))
+                ? new ByteArrayResource(json.write(template).getBytes(StandardCharsets.UTF_8)) : resources.getResource(call.getArgument(0)));
+        assertThatThrownBy(() -> new ClasspathProcessTemplateCatalog(replaced, json))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining(location)
+                .hasCauseInstanceOf(DomainException.class)
+                .satisfies(error -> assertThat(((DomainException) error.getCause()).code()).isEqualTo(expectedCode));
     }
 
     @Test

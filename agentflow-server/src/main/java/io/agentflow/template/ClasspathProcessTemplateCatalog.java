@@ -18,7 +18,8 @@ import java.util.Set;
  */
 @Component
 public class ClasspathProcessTemplateCatalog {
-    private static final List<String> KEYS = List.of("leave-request", "seal-application", "contract-review", "procurement-payment", "budget-adjustment");
+    private static final List<String> KEYS = List.of("leave-request", "seal-application", "contract-review", "procurement-payment", "budget-adjustment",
+            "expense-report", "expense-plan", "advance-request");
     private static final Set<String> FIELDS = Set.of("key", "templateVersion", "name", "category", "description", "scope",
             "businessType", "dependencies", "defaultRoles", "fieldDescriptions", "risks", "upgradePolicy",
             "notificationTexts", "notificationsAvailable", "graph", "formSchema", "scenarios");

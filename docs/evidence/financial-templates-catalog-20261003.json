@@ -1,0 +1,556 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T06:01:32.236408+00:00",
+  "taskId": "F13",
+  "status": "CATALOG_COPY_SIMULATION_PUBLICATION_AND_BROWSER_VERIFIED",
+  "taskCompleted": false,
+  "baseCommit": "3377e73f3a853636527b976323d5243ce3a31ef3",
+  "scope": "三类员工财务模板资源、模板契约、独立复制、金额矩阵、财务复核阈值与已有模板中心展示。",
+  "callChain": {
+    "callers": [
+      "TemplateCenter.vue",
+      "ProcessTemplateController"
+    ],
+    "downstream": [
+      "ClasspathProcessTemplateCatalog",
+      "ProcessTemplateApplicationService.copy",
+      "DefinitionApplicationService",
+      "三类结构化业务入口"
+    ],
+    "responsibility": "目录资源与业务类型校验属于模板层；复制、校验、模拟和发布沿用流程定义层；类别、制度、映射、预检、收单与资金事实仍由各业务用例生成。"
+  },
+  "changes": {
+    "catalogTemplates": 8,
+    "catalogScenarios": 43,
+    "newFinancialTemplates": [
+      {
+        "key": "expense-report",
+        "path": "agentflow-server/src/main/resources/process-templates/expense-report.json",
+        "sha256": "4581bd646a0a4eafefd59a8b80072f2448cb0c5ec1dc763cbe3d942bfee266da",
+        "businessType": "EXPENSE",
+        "templateVersion": 1,
+        "scenarioCount": 10
+      },
+      {
+        "key": "expense-plan",
+        "path": "agentflow-server/src/main/resources/process-templates/expense-plan.json",
+        "sha256": "ccef83bf9cf0ab7d6b2b36b77c7d924ce8ad582ee23e8de7a83bd5cd67f7e58b",
+        "businessType": "EXPENSE_PLAN",
+        "templateVersion": 1,
+        "scenarioCount": 6
+      },
+      {
+        "key": "advance-request",
+        "path": "agentflow-server/src/main/resources/process-templates/advance-request.json",
+        "sha256": "65ffb231e3f3543afa3f59799acc32e2a0e7aefc7b479cd0872fe00c343661f3",
+        "businessType": "ADVANCE_REQUEST",
+        "templateVersion": 1,
+        "scenarioCount": 6
+      }
+    ],
+    "sensitiveDetails": "全部人工节点原样只读业务敏感组；管理员不获字段旁路。",
+    "expenseControls": [
+      "费用例外审批",
+      "必经原件签收",
+      "必经财务审核",
+      "核定金额触发财务复核"
+    ],
+    "thresholds": [
+      "5000",
+      "50000",
+      "10000"
+    ]
+  },
+  "bugFix": {
+    "coverageGap": "旧模板用例未包含 expenseStage，旧路径模拟丢失 FormSchema 未触发财务职责检查。",
+    "semanticRed": "financial-template-form-red2-20261003.log",
+    "errorBeforeFix": "EXPENSE_STAGE_REQUIRES_EXPENSE_FORM",
+    "rootCause": "ProcessTemplate.verifyScenarios 调用了不携带表单的 simulate(graph, context)。",
+    "fix": "模板层改用既有 simulateDetailed(graph, formSchema, context).path()；没有改动模拟器引擎。",
+    "setupFailureExcluded": "financial-template-form-red-20261003.log 是最小测试搭建时构造器参数错误，不能当作语义失败复现。"
+  },
+  "verification": {
+    "java": [
+      {
+        "class": "io.agentflow.template.ProcessTemplateTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.template.ClasspathProcessTemplateCatalogTest",
+        "tests": 29,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.template.ProcessTemplateIntegrationTest",
+        "tests": 32,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.api.OpenApiContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "javaUniqueTests": 72,
+    "frontendUniqueTests": 5,
+    "uniqueScopedTests": 77,
+    "frontendTypecheckAndBuild": "PASS",
+    "openapi": {
+      "status": "PASS",
+      "operations": 332,
+      "schemas": 662,
+      "examples": 123
+    },
+    "authors": {
+      "javaFiles": 1441,
+      "namedTypes": 2776,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "package": "PASS, skipped duplicate test execution after scoped gate",
+    "runtimeHttp": {
+      "successfulCatalogRunRequests": 53,
+      "publicationRequests": 18,
+      "catalogChecks": {
+        "eightTemplatesAnd43Scenarios": true,
+        "nonAdminDenied": true,
+        "copyReplayReturnsSameDraft": true,
+        "all22FinancialScenariosMatch": true,
+        "amountMatrixConfigurable": true,
+        "financeRecheckThresholdConfigurable": true,
+        "independentDraftsPreserveCatalog": true,
+        "copyingDoesNotDeploy": true,
+        "sourceDatabaseUnchanged": true
+      },
+      "publicationChecks": {
+        "threeDefinitionsValidateWithExistingOrganizationBindings": true,
+        "threeIndependentVersionOnePublications": true,
+        "publicationEvidenceRecorded": true,
+        "publicationDoesNotStartBusinessOrCallFinance": true
+      },
+      "publishedDefinitions": [
+        {
+          "templateKey": "expense-report",
+          "definitionId": "2ebf8133-d9e9-4cba-b606-17aa03f98149",
+          "processKey": "f13-expense-report-814c9e25",
+          "version": 1,
+          "status": "PUBLISHED",
+          "initiatorRequirements": {
+            "processKey": "f13-expense-report-814c9e25",
+            "definitionVersion": 1,
+            "appointmentRequired": true
+          }
+        },
+        {
+          "templateKey": "expense-plan",
+          "definitionId": "8bac6149-3827-49ee-accb-fa040973051a",
+          "processKey": "f13-expense-plan-c63135e4",
+          "version": 1,
+          "status": "PUBLISHED",
+          "initiatorRequirements": {
+            "processKey": "f13-expense-plan-c63135e4",
+            "definitionVersion": 1,
+            "appointmentRequired": true
+          }
+        },
+        {
+          "templateKey": "advance-request",
+          "definitionId": "2d3c59f1-ebdb-48b3-b6be-fad1bcff2716",
+          "processKey": "f13-advance-request-b8f2d621",
+          "version": 1,
+          "status": "PUBLISHED",
+          "initiatorRequirements": {
+            "processKey": "f13-advance-request-b8f2d621",
+            "definitionVersion": 1,
+            "appointmentRequired": true
+          }
+        }
+      ],
+      "fixtureCorrection": "初次扩展阈值样例误用 JSON 数值，真实接口按十进制字符串契约拒绝 INVALID_TYPE；改为字符串后重跑通过，失败记录保留，未修改产品校验。"
+    },
+    "browser": {
+      "status": "PASS",
+      "checks": {
+        "catalogShowsEightTemplates": true,
+        "threeFinancialBusinessLabels": true,
+        "readOnlyScenarios": true,
+        "threeIndependentCopiesOpenDesigner": true,
+        "allThreeMobileNoHorizontalOverflow": true,
+        "noPageErrors": true
+      },
+      "copies": [
+        {
+          "templateKey": "expense-report",
+          "definitionId": "14c21bb6-6a0d-4417-8e6b-8385337a76c2",
+          "processKey": "f13-ui-expense-report-7f745d3d",
+          "status": "DRAFT"
+        },
+        {
+          "templateKey": "expense-plan",
+          "definitionId": "2fe9d3d9-5a24-494b-8b89-b9ca6e65a0a2",
+          "processKey": "f13-ui-expense-plan-7ec4602c",
+          "status": "DRAFT"
+        },
+        {
+          "templateKey": "advance-request",
+          "definitionId": "41613e2b-48ee-4301-b4fa-ad99b610b835",
+          "processKey": "f13-ui-advance-request-f6c89db6",
+          "status": "DRAFT"
+        }
+      ],
+      "layout": {
+        "status": "PASS",
+        "checks": [
+          {
+            "templateKey": "expense-report",
+            "desktop": true,
+            "mobile390": true,
+            "noHorizontalOverflow": true
+          },
+          {
+            "templateKey": "expense-plan",
+            "desktop": true,
+            "mobile390": true,
+            "noHorizontalOverflow": true
+          },
+          {
+            "templateKey": "advance-request",
+            "desktop": true,
+            "mobile390": true,
+            "noHorizontalOverflow": true
+          }
+        ],
+        "pageErrors": []
+      },
+      "visualInspection": "已查看三类模板的 390 像素布局及报销桌面字段/路径；另补截图去除上一复制操作的临时提示。"
+    }
+  },
+  "packagedRuntime": {
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-server.jar",
+    "sha256": "d6ba3a488631cecf722f0cf514538b5d39327c10f556185d03004950a622c23b",
+    "backendPort": 18281,
+    "frontendPort": 15360,
+    "financePort": 18280,
+    "database": "financial_templates_7dc21ee25a",
+    "sourceDatabase": "mapping_complete_86705730e8",
+    "schemaVersion": 104,
+    "firstBootPreserved": {
+      "tables": 245,
+      "rows": 6285,
+      "files": 9
+    },
+    "sourceStoppedBeforeClone": true,
+    "sourceDatabaseUnchanged": true,
+    "workersDisabled": true,
+    "financeCallsDuringThisAcceptance": 0
+  },
+  "remaining": [
+    "补齐附带的类别、制度、科目映射和签收开关配置样例。",
+    "补超标、核减、借款冲销和重复票的可执行业务样例。",
+    "从三个模板发布版本的专用入口完成实际填报、预检、提交与办理，验证金额和复核分支。",
+    "配套包完成后执行匹配的最终固定安装包验收；本记录不关闭 F13。"
+  ],
+  "counting": {
+    "knownOpenTaskCount": 37,
+    "completeInventory": false,
+    "localDevelopment": 19,
+    "localVerification": 3,
+    "externalAcceptance": 15
+  },
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-template-form-red-20261003.log",
+      "sha256": "239e39abaacd27f1d187e7f6f000f63bf31fb97be1e7292cbb4b2caa5e242872",
+      "bytes": 6890
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-template-form-red2-20261003.log",
+      "sha256": "6e4d1b5970fcbae7106f26f166affb46c42644bd7499abc0f1c4784d274b7159",
+      "bytes": 8329
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-ClasspathProcessTemplateCatalogTest-20261003.xml",
+      "sha256": "0bc9934e2dc5a639c6d50b80d8ed0aa9756833d2c5a8f3cd728c6ef9290f9363",
+      "bytes": 47539
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-OpenApiContractTest-20261003.xml",
+      "sha256": "f00d989e6109a83af2dbde2b6ebb2d25aecae8b0a2954922c2ab2425ed42823c",
+      "bytes": 73011
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-ProcessTemplateIntegrationTest-20261003.xml",
+      "sha256": "1e646ecfb34f18cacbb4b2f45988d03ca5559a2375d193f7cb0be95f328d4ac5",
+      "bytes": 77178
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-ProcessTemplateTest-20261003.xml",
+      "sha256": "25e3e53bdf9316d6d40f59bdfb9036a02216a7fc29ddcbd773bf6dff498dd28e",
+      "bytes": 10486
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-advance-request-copied.png",
+      "sha256": "c0cf4c96f03ae90dcb8f27e25d0d2f7e1f5c18093d788a045e9fb7e61ecd592b",
+      "bytes": 162000
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-advance-request-desktop-v2.png",
+      "sha256": "bbdfcda053f69f47c7ffe16810e7901b025a9ca33f1828f9013ce79944464532",
+      "bytes": 163162
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-advance-request-desktop.png",
+      "sha256": "fe7ed211c45de87a800e1428202200d87aab78b53b1b5c7c5571e404daa053d3",
+      "bytes": 175099
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-advance-request-mobile-v2.png",
+      "sha256": "8b0b2b243fc9c65c0d888394bba0ee67340bec85fd6f5a1a494c32a049985ab5",
+      "bytes": 70494
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-advance-request-mobile.png",
+      "sha256": "15fdbf331f93f547a56181d6e0245b5ed6d86713cd56cfceea17f2bbd20cf049",
+      "bytes": 73150
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-authors-20261003.log",
+      "sha256": "fbdebdfca0fcaa0fa8351173ab42abc21f89d571575d51f412e6804de054d56a",
+      "bytes": 73
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-browser-http.json",
+      "sha256": "7f92fa1cacf25795b3c431be21add57fe08327673710c2f954517fd3b1bc4709",
+      "bytes": 107772
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-browser-result.json",
+      "sha256": "85666e9892937cd5947a2a10d611452342ade6ce874cef0fff925b472706fb74",
+      "bytes": 1949
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-browser.log",
+      "sha256": "0b506ccaa7e67ee60826a0dd1d7562ecc4d4e38bc776d3a20e655a812b75f39e",
+      "bytes": 242
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-browser.py",
+      "sha256": "2af40c115d7ee59dc2c9402f80567de1464e764119834378cde1be0da6991735",
+      "bytes": 6469
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-build-20261003.log",
+      "sha256": "81e909030b5acba97b2eec2050488cf1f119792dbe30c74cad19566e29e4c885",
+      "bytes": 781
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-catalog-desktop.png",
+      "sha256": "3a481d35b9c5e41e45b93f875496f49ceeb0a1901c779e7bdd572d41241de222",
+      "bytes": 140706
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-catalog-green-20261003.log",
+      "sha256": "9571a2d77609aad223b227a3ab0e6f76024ce6f3f8e225bbd59c4912dfef4078",
+      "bytes": 1793568
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-catalog-green2-20261003.log",
+      "sha256": "e85476ff872b81b43e74b69270e2e3599c9331df30b8fb31f257ac1a71a1a3aa",
+      "bytes": 72573
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-catalog-http-records.json",
+      "sha256": "bacd93e89d4759b2a54bae540ef049de3b367321c14a200f4a8451f089abf4c8",
+      "bytes": 142233
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-catalog-http-result.json",
+      "sha256": "9dab17e3585b66ef5f1f5c9a26839b297e477871e7fd2a2a2e3d954e9239514d",
+      "bytes": 3032
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-catalog-http-v2-records.json",
+      "sha256": "3513a76618005fa34a6d0b5939c0681680d3d78c9ed3ae2d294135e3384fc8ef",
+      "bytes": 470481
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-catalog-http-v2-result.json",
+      "sha256": "d42bd9e193c29075d38b22162557405d7fb82e2fe04bd5be8d10c4fbd8179e74",
+      "bytes": 3791
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-catalog-http-v2.log",
+      "sha256": "12225055cafcb379924f9289aa9ce2a2895a1e99acfe6585840da83f110c6157",
+      "bytes": 367
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-catalog-http-v2.py",
+      "sha256": "a0f4dc279744b85a79957f254190ad3f9ca4782be9667d81402197b158b24ae3",
+      "bytes": 5968
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-catalog-http.log",
+      "sha256": "84806e75a61e4534dbab6d309b844576f3f55c7b6693b0ae98cbe4515816a1c0",
+      "bytes": 839
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-catalog-http.py",
+      "sha256": "4b9aa15a23ba69c603df3bcea0e82dac7821ae2b565f79c26a0854c81026f88f",
+      "bytes": 5955
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-catalog-red-20261003.log",
+      "sha256": "76b424820544b0b2c8e6e8623d24fbffbe512b058539461dbc49b9aa7a1f1dc8",
+      "bytes": 15260
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-clone.log",
+      "sha256": "43264b09ba194cc5a70e234284f4b6712351bdd24944b490fc6c279938539d49",
+      "bytes": 18601
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-expense-plan-copied.png",
+      "sha256": "c0cf4c96f03ae90dcb8f27e25d0d2f7e1f5c18093d788a045e9fb7e61ecd592b",
+      "bytes": 162000
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-expense-plan-desktop-v2.png",
+      "sha256": "079377bbda676e2c0eef8e7ef700e606b4f0008bd98a1679ac13a10c27073be2",
+      "bytes": 161642
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-expense-plan-desktop.png",
+      "sha256": "d1ccfc6c3796dbd79241f165aeccb8fb8ed4930b96b41779dae3d6f2fec3acf5",
+      "bytes": 173129
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-expense-plan-mobile-v2.png",
+      "sha256": "edfe5293958437d852268555880c4b9f7e921e678cb4c3fec31d4941dc10edcf",
+      "bytes": 70600
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-expense-plan-mobile.png",
+      "sha256": "7ec1b46eb491136883fd0f2c8474c84719918aadec0e3dbec483693ff462b8ba",
+      "bytes": 72759
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-expense-report-copied.png",
+      "sha256": "22a9142814db998d2df5fe0f68146cc9b93af710187b5754dd495f4aea6bf9b6",
+      "bytes": 162091
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-expense-report-desktop-v2.png",
+      "sha256": "0e1587c4513726fc08ccbb38d408c277c51893c5f97c48ed1115b0abfdafd750",
+      "bytes": 163699
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-expense-report-desktop.png",
+      "sha256": "3b9aa0b7869c5350cf6c016a813b0e823d157d57a10e810e6c201814d6412957",
+      "bytes": 180602
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-expense-report-mobile-v2.png",
+      "sha256": "d66a15ffaac17bc96fe332a3552b1db5309aa47c8a7c819ac3122332ef36ee8c",
+      "bytes": 72791
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-expense-report-mobile.png",
+      "sha256": "6a9b9f36680f1dfbe13b899f74934b83930c976f3500aafbc1573539877602e1",
+      "bytes": 65573
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-finance.py",
+      "sha256": "b041aec1994c4d99270bff4dd8da3ed0455182f0e1deab6ae224e165813b3efe",
+      "bytes": 15643
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-layout-result.json",
+      "sha256": "6b9fbeb129ddc830faed096e838988d2d25cc6930735ba2f11deb3a57b679366",
+      "bytes": 465
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-layout.log",
+      "sha256": "53a2b5915ed2f443a0d204130e0fd32639e56a617247d75cf445e6f760cebe7c",
+      "bytes": 351
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-layout.py",
+      "sha256": "d5cf5bd5cf5310f545c6a43732fce9866138615907443c755ebcf82078e28bf0",
+      "bytes": 2113
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-openapi-20261003.log",
+      "sha256": "007cb336f4ad7de39c2fe15640722a6a991e606370a5e1f44e7d370d1b44371b",
+      "bytes": 71
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-package-20261003.log",
+      "sha256": "3a602f38429b82333ec46d346f5ddb885f9c224e6eb222701da953451da3b661",
+      "bytes": 13931
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-prepare-runtime.log",
+      "sha256": "ad1d9e95ba9c07022163ec6ecf4f5595c9fee5509dede47c2017ef2d94da9a1f",
+      "bytes": 230
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-preview.mjs",
+      "sha256": "6acd63bf25f81539d4e4941350bc929bc96deb1a149780f6529fa466bdb8903d",
+      "bytes": 537
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-publication-http-records.json",
+      "sha256": "bf783fcde235ae07e6dcd0f52ec6cd09697fa64ffd55362497b10d76cd0043ba",
+      "bytes": 105245
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-publication-http-result.json",
+      "sha256": "2539bf51a86d0b19e89edfb84db995b2427d48cbaaf0f060f18a160b257834a5",
+      "bytes": 1710
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-publication-http.log",
+      "sha256": "97abdc437195fd252d536ad65f3370a2737fdd97ab63528041c818b0706061c1",
+      "bytes": 252
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-publication-http.py",
+      "sha256": "f2b00c07aef42a0a23a72a914a57ed0325cf9c5461f5de8ec19fbb2cf48178f6",
+      "bytes": 3959
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-runtime-boot1.log",
+      "sha256": "3ece900feaed91244b897bc74331c8a9994f8df5942b8b1bbdf8b7cfc78b10a1",
+      "bytes": 7358
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-runtime.json",
+      "sha256": "14144e3d07c551ca26e64c35338557e28d921c5b42981552df2b88bee2b9dafc",
+      "bytes": 30324
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-startup-snapshot.json",
+      "sha256": "feaef835dfccb52c5b1cf7112c5c99901157b722f8646a2f8ac8a60eec58494f",
+      "bytes": 27209
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-test-summary-20261003.json",
+      "sha256": "cbc967aaf73f2c49d0d20d4ead3203023e0898fd7f4626fa96c41d3bccbf17fa",
+      "bytes": 571
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-templates-catalog-evidence-snapshot/financial-templates-web-20261003.log",
+      "sha256": "aca85abad6635694d4b53c8ee6aa03e0a91263f3e4cb8be7ea27e9363409350f",
+      "bytes": 634
+    }
+  ]
+}

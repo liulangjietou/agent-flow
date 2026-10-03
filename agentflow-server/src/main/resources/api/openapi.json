@@ -49342,7 +49342,10 @@
             "enum": [
               "FORM",
               "PROCUREMENT_PAYMENT",
-              "BUDGET_ADJUSTMENT"
+              "BUDGET_ADJUSTMENT",
+              "EXPENSE",
+              "EXPENSE_PLAN",
+              "ADVANCE_REQUEST"
             ]
           },
           "dependencies": {
@@ -49401,7 +49404,7 @@
             }
           }
         },
-        "description": "notificationsAvailable 表示模板自定义文案可用性，当前为 false；平台实际审批站内消息已接入，两者不是同一开关。",
+        "description": "内置模板复制后成为租户独立草稿。notificationsAvailable 表示复制时是否携带三类站内通知文案；结构化财务模板必须从各自业务入口填报和预检。",
         "required": [
           "key",
           "templateVersion",
