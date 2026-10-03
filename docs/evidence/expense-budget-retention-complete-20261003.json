@@ -1,0 +1,585 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F10",
+  "status": "LOCAL_ACCEPTANCE_COMPLETE",
+  "recordedAt": "2026-10-03T08:47:12.167998+00:00",
+  "implementationCommit": "e987dcf705ab4f9d9fbbdd14072c53593bec6dcd",
+  "verifiedSourceCommit": "43e95e55dcd0a5f389dafee59c2f92338d17bdf0",
+  "branch": "codex/governance-identifier-integration",
+  "taskRemainsOpen": false,
+  "knownOpenTaskCountAfterClosure": 34,
+  "implementationEvidence": {
+    "path": "docs/evidence/expense-budget-retention-local-20261003.json",
+    "sha256": "4ece681dcb7f5cdcda73b49fe0e8114725499d42977d0ae1b705563c0c64d6d0",
+    "unchangedImplementationFilesVerified": 35,
+    "priorArtifactsVerified": 14
+  },
+  "fixedPackage": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-server.jar",
+    "sha256": "92b0a5310fff430ba63f0f0b402cecc4925cf6992dbfc6c4285166e9cb996ed9",
+    "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-package.log",
+    "java": 17
+  },
+  "scopeTests": {
+    "domainAndH2UniqueCases": 328,
+    "postgresCases": 12,
+    "frontendCases": 1112,
+    "openApiOperations": 333,
+    "openApiSchemas": 671,
+    "requestExamples": 123,
+    "unchangedCodeResultsFromPriorEvidence": true
+  },
+  "runtime": {
+    "database": "expense_retention_restore_069801c345",
+    "sourceDatabase": "expense_retention_701f11460f",
+    "backendPort": 18288,
+    "frontendPort": 15365,
+    "financePort": 18289,
+    "boot": 6,
+    "strictSyntheticBudgetProvider": true,
+    "externalCommands": 12,
+    "acceptedEffects": 11,
+    "reportCases": 6,
+    "checks": {
+      "actualWithdrawalAndReturnCaptureFixedThreeDays": true,
+      "editingDoesNotMoveDeadline": true,
+      "adminAndUnrelatedEmployeeCannotReadSensitiveRetention": {
+        "admin": "NOT_FOUND",
+        "other": "NOT_FOUND"
+      },
+      "queuedReleaseBlocksPublicResubmitWithoutVersionChanges": true,
+      "restartQueriesOriginalReleaseWithExactlyOneExternalEffect": true,
+      "newRoundSupersedesUnsentExpiryWithoutRelease": true,
+      "configurationChangeFromThreeToFiveDoesNotMoveExistingDeadline": true,
+      "explicitReleaseRejectionPreservesFrozenBudget": true,
+      "stalePrecheckCannotResubmitAfterRelease": "PRECHECK_SUPERSEDED",
+      "freshPublicPrecheckRefreezesNewRoundWithOriginalReleaseReceipt": true,
+      "refreezeKeepsHistoricalRetentionUnchanged": true,
+      "pairedRestorePreserves247Tables1926RowsTwoOriginalsAndExternalReceipts": true,
+      "restoredQueuedInvoiceContinuesAgainstOriginalBytes": true,
+      "pendingOriginalFreezeReconciledBeforeRelease": true,
+      "budgetExpiryPreservesInvoicePriorAndAdvanceReservations": true,
+      "newStopsUseChangedFiveDayPolicy": true,
+      "restoredOriginalApprovalContinuesAndOldDeadlineStaysFixed": true,
+      "rejectedReleaseDoesNotCreateInfiniteNewCommands": true,
+      "restoredInvoiceDownloadMatchesOriginalSha256": "edc07ec45193b64c5885d84cfc50c637fa07d912c34fc97ed69b5c356e05328d",
+      "elevenImportedExpenseSnapshotsUnchanged": true,
+      "actualPublishedSubprocessReturnCapturesParentRetentionAndScheduledRelease": true
+    },
+    "runtimeErrorCount": 0
+  },
+  "httpContract": {
+    "responses": 246,
+    "requests": 45,
+    "status": "PASS",
+    "includesExpectedRejectionsAndReadPolling": true,
+    "binaryUploadAndDownloadProvenSeparatelyByOriginalDigest": true
+  },
+  "browser": {
+    "status": "PASS",
+    "viewports": [
+      [
+        1400,
+        1000
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "screenshots": 12,
+    "pageErrors": [],
+    "checks": [
+      {
+        "native-controlDesktopAnd390Mobile": true,
+        "expiry-releaseDesktopAnd390Mobile": true,
+        "rejected-releaseDesktopAnd390Mobile": true,
+        "historicalRoundKeepsOriginalDeadlineAndSupersededStatus": true
+      },
+      {
+        "fiveDayResourceCaseAfterRestore": true,
+        "originalReleaseHistoryAfterRefreezeAndRestore": true
+      }
+    ],
+    "manuallyInspectedScreenshots": [
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-native-control-mobile.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-expiry-release-mobile.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-superseded-history-mobile.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-restored-resources-mobile.png",
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-rejected-release-desktop.png"
+    ]
+  },
+  "upgrade": {
+    "status": "PASS",
+    "database": "expense_retention_701f11460f",
+    "jarSha256": "92b0a5310fff430ba63f0f0b402cecc4925cf6992dbfc6c4285166e9cb996ed9",
+    "unchangedTablesExcludingFlyway": 244,
+    "unchangedRowsExcludingFlyway": 1470,
+    "migration": "V104_TO_V105",
+    "emptyNewTables": [
+      {
+        "name": "expense_budget_retention",
+        "rows": 0
+      },
+      {
+        "name": "expense_budget_retention_revision",
+        "rows": 0
+      }
+    ],
+    "unchangedFiles": 1
+  },
+  "pairedRestore": {
+    "status": "PASS",
+    "sourceDatabase": "expense_retention_701f11460f",
+    "restoredDatabase": "expense_retention_restore_069801c345",
+    "backup": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-paired-backup.dump",
+    "backupSha256": "4ed86efb48dd5dd455cd4b9470852f9bc4cd417534f7323452e37105a3a351b9",
+    "jarSha256": "92b0a5310fff430ba63f0f0b402cecc4925cf6992dbfc6c4285166e9cb996ed9",
+    "tables": 247,
+    "rows": 1926,
+    "files": {
+      "d2158f3d-686f-45ac-85d3-93da1baace3b.bin": "9a9796de80c40c5be89d7d6d08a835926a41892f158bbad605fee7e05f7fc2aa",
+      "bc16d7c7-3163-4481-9206-04c040d0c8e4.bin": "edc07ec45193b64c5885d84cfc50c637fa07d912c34fc97ed69b5c356e05328d"
+    },
+    "allDatabaseAndFilesPreserved": true
+  },
+  "timeFixtureBoundary": {
+    "nativeControlUntouched": true,
+    "captureActuallyUsedPublicWithdrawAndReturn": true,
+    "configuredSyntheticDays": [
+      3,
+      5
+    ],
+    "elapsedDaysWereNotWaited": true,
+    "fixtureFiles": [
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-time-fixture-resubmitted.json",
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-time-fixture-rejected-release.json",
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-time-fixture-expiry-release.json",
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-time-fixture-resource-retention.json",
+      "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-time-fixture-subprocess-return.json"
+    ],
+    "description": "到期调度使用独立副本的合成时间输入，同步移动期限快照及对应提交/结束时间；没有修改主机时钟。其他历史审计时间和外部回执保持，因此这些夹具不能证明真实历史会计时间线。未改时间的对照单单独证明真实截止捕获、编辑及配置变化后保持。"
+  },
+  "coverageBoundary": {
+    "actualPublishedChildReturn": true,
+    "realEnterpriseBudgetReconciliation": "E05 remains OPEN",
+    "productionDeploymentAndRecovery": "E12 remains OPEN",
+    "finalProjectGate": "V02 remains OPEN",
+    "notRealEnterprisePolicyOrBalances": true,
+    "priorImplementationOnlyStatusSupersededByThisEvidence": true
+  },
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/age-expense-budget-retention-fixture.py",
+      "sha256": "835399e1e706ceba41e62ccec8b40040f307178322a5344ab9f6e6c59025be09"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/crash-expense-budget-retention-after-release.py",
+      "sha256": "8cdc75912a7785c69d9a021a564de6412d5c70976acc97fbf0734dc425777aed"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-authorization.log",
+      "sha256": "f42ab264ea0674b243196f8df0cda49c2f5e0a1f12dcf300f5798722a86c3cec"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-backend-first.log",
+      "sha256": "fbe30d3a09eea2ef3628a50f659502494b222dc2ee1c95545f65654348ec2b6e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-backend-regression.log",
+      "sha256": "6e0e82ba174d5a70594e82eb6db4c3cdbed605d45302b4faee1e84dab98e2994"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-backup-finance-receipts.json",
+      "sha256": "016b393bd38607c1fa058011e91cf5c6810e7e3e30ce67e708c473397f9e97d3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-backup-journey.json",
+      "sha256": "fce1e678d12744dd60a1b1d7a5b099557e2db151d903c19ae929d36423381a11"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-before-restore-runtime.json",
+      "sha256": "dabc904671bd8ca46c20a9e249b6a6737006f5e35fa554d4a3db521a132c0b12"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-browser-attempt1.json",
+      "sha256": "d36ff73c4a2f6a1e4962b0fcf09e32a99771ac36e7c29809bcd7d6dae6ea7336"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-browser-failure.png",
+      "sha256": "bc676d374d2a9bc3d672dc23b63c6a34ad40611f42b4e922391f1b115d79774f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-browser-run.log",
+      "sha256": "6ee24d571e2d18c0495920d1b41f766caac7a43e3f7ab8667decb4c0849536ad"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-browser.json",
+      "sha256": "53b9b0e75e9d04c3135d8e0e66a26d140f715bfd70b717a2900bd462c5008ba1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-browser.py",
+      "sha256": "2c42fdfcbbea6a4eb3c17e85f004f5966ff6541f00186165d4f7bb2957ec5fbf"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-contracts.json",
+      "sha256": "78f159f8f8e5b3ebdb3f9fec53ecf3d327889fb42b32495384f8a74d3cbb336a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-contracts.log",
+      "sha256": "3e48feacb459588295716a32913b17a24724ae02930b0de32b2359da1c4e7b76"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-expiry-release-desktop.png",
+      "sha256": "7c0a7554a65597089f258ac283b417fce00a9c887a006a05adeec4dc26f22225"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-expiry-release-mobile.png",
+      "sha256": "bd4d2dcb2c5c8cd4de01c1285f4a8d1521dbb13f4c36e805902858ebbdfab7dc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-finance-calls.jsonl",
+      "sha256": "1adfdc8d0d95d9d4c31d4a6c07f254242d08ac783614b94a2a866dd48e68c7b3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-finance-receipts.json",
+      "sha256": "3bca4ad3d84756a07bb1c8b51a184dce129d685a02faae83b5149a05ab09ad72"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-finance.py",
+      "sha256": "cc7526b95a018e212feed116d5979a2b9bd56eb9732071561e3054b0595c7efb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-before-crash.json",
+      "sha256": "20b6fa8b34249c9b35bc17e11de52f2dac702613f2b506011ac43ffabe7d0ac4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-browser-attempt1.json",
+      "sha256": "6ea0b7adb061d3ad8e6f60fbd30b72d5fb68bbdb08ecb760513ef20bcbc3c0ee"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-browser.json",
+      "sha256": "5ffcc49e91fbdf493d8ecb10a7c75ae2f4e46a47f5f6c80ef4e8a2f741543eca"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-capture.json",
+      "sha256": "9d8f84a7c0a049b42fae4ca5028538bffc0f1730509f8c7cf70052d1f2918a29"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-crash-recovery.json",
+      "sha256": "5c4253719db4cd427ac005bc3e8133e59993bb9b104746d7363f59aa07f2e0a1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-invoice-before-backup.json",
+      "sha256": "dcd5cd778937a27dc39b58ce4d26cd1a467a566a8fa776137a798d72ca642cbd"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-invoice-upload-before-backup.json",
+      "sha256": "ce61d80b6c967f701de69cb0b39083c70a1e8fd2bcba58ec25c68cd8b176476d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-native-authorization.json",
+      "sha256": "a5514f1f8e58d0f7a467736213679ce3b98c3a366e475d762521dd60a535fa25"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-refreeze-confirmed-contract.json",
+      "sha256": "38d8d2d0dc96c143bf0863fda316176c6b4787708ef4f1ff156d6a6bd537aaf1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-refreeze.json",
+      "sha256": "8078f69cb7ce2148dfad6cc792147b9d3b0525df74ba4fc18484257d97249e5a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-release-rejected.json",
+      "sha256": "4ba4bafa0ef75569f22095fae2f30954876a9bbab53075013e86deba693a6c61"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-resources-after-restore.json",
+      "sha256": "d53e2daad6a97dd879fd76bcae7dc92b8ec56588f5bf424adc5df4f58d686f54"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-restored-boot.json",
+      "sha256": "b44116cb063aa8c6d8b6065e115a793d2e32b8ff84c071461fe64d8eda5137e5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-restored-browser.json",
+      "sha256": "36069c83d9394efb68ad8db35e89d3fb8bd5efb66cf95c3b5fa64331fd70bec0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-restored-original-approval.json",
+      "sha256": "49b108a71e54eb68326a94714b94a39ac6acb9aab2d1080195b6a0b82e13cc6c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-http-subprocess-return.json",
+      "sha256": "fe6663576f3ac917f89d6fe08d726036c01392a3d87d1a9fc636dc6a2e6777df"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-implementation-files.json",
+      "sha256": "c8a2e83b0209d89c63e0305476c3b99a456301b7a3b994159b631ad0470d6715"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-invoice.xml",
+      "sha256": "edc07ec45193b64c5885d84cfc50c637fa07d912c34fc97ed69b5c356e05328d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-java-suites.json",
+      "sha256": "42d9b21a3b86ead263e592bd6538286faa1b679c18bf9488c336ea8358d64bb9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-journey.json",
+      "sha256": "fcedee6a5b0359e11514fefe6863063b5f539be8a00ff5ab90196e75fafdb3f5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-native-control-desktop.png",
+      "sha256": "0e9aecc429eb988a9a05334be554c43550b38adc35905c623b8269bd130210d1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-native-control-mobile.png",
+      "sha256": "af12d5a6f07e99555bc7bb3c9c5d934a88b70d907dee62678ed1a387a8ff1131"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-package.log",
+      "sha256": "45315097323841e2339ebace6af737f0676b893f4b750f6131890207ad5071db"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-paired-restore.json",
+      "sha256": "b99ba9806d5f66599cea9cb8bac89e3a07309e406c71bb8853fc0ed1c178276c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-postgres-before-transaction.json",
+      "sha256": "4bd503389a7522e1b4d188fb287e0e1d9c8be04285b9f0644b2f0ad9c154fc0d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-postgres-before-transaction.log",
+      "sha256": "a4f906fc79547d25881e2f2f012a9adb76f1e88830223f66f3ef287c56719db1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-postgres.json",
+      "sha256": "a1de3e201fd5515b7744fd298f920f7e693c6fd63d1223872486f1035290efef"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-postgres.log",
+      "sha256": "11602acad5e87b5c7f63726815e53775df2b9066b4a732f17654f873b512c38e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-preview.mjs",
+      "sha256": "ebd778a1b86d7b9530d1634fbb8a541ecf265f62554a15fbe2c0255485e42835"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-provider-context.json",
+      "sha256": "5594bfc853f13dc1d35838b78fd5f2e9eaa73aa8083e1d787b48f0e2c5565204"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-rejected-release-desktop.png",
+      "sha256": "1674b5506a2723a75b3e683e31f960815532c6190e3a9199efb1075282ebd92c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-rejected-release-mobile.png",
+      "sha256": "38305ffe459b36f36dd10fa54f906779b5816d4fc3307d66ebebe6659937efcc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-resources.log",
+      "sha256": "295a6f70b5a80eb450c415fe4c8c604401837c0420c7d54689471faaa76f9d52"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-restoration-snapshot.sql",
+      "sha256": "458b52e87a832ffc8c90ba871af5d92277c386968041b54f20b53cd59853d774"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-restored-browser-run.log",
+      "sha256": "d381468b690247cf32e4fbc1a5c5842a8be9ae12739bc511940afb95b59a1efd"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-restored-browser.json",
+      "sha256": "ff597deb8d04766c74d4858cb5b0235138cae467e841f09bcfd25857d0f3a02d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-restored-browser.py",
+      "sha256": "2bf5b7acabcfeb0cd6c12a73edc29f98f9e98fe48bf6f618d763f77e164cf0bf"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-restored-original-release-history-desktop.png",
+      "sha256": "e90ce3d42d7b03fb72748f84f9b51514bd8b474e1eee7b855d9d39398d9edbab"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-restored-original-release-history-mobile.png",
+      "sha256": "c1b14f866296eb114ac4545b95fbd853996c5e12a5a65d9fff8a1a8f796d1246"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-restored-resources-desktop.png",
+      "sha256": "575df925fe26962cc04964271fd89153e39a3ff8137e7af800b9c3e484ce1a57"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-restored-resources-mobile.png",
+      "sha256": "77dca0339ca46393b0512115ef90c2efe74d9b03aafcdb801c142499b3274601"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-runtime-boot1.log",
+      "sha256": "706e855c0f06dfd1f255d443ab259bb17d71abeebda450ae1196b9022a1980a8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-runtime-boot2.log",
+      "sha256": "89eedcd1cf2c54fdd96d05f0a627aa0885593747992549b59c09e70ff7a92cd5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-runtime-boot3.log",
+      "sha256": "6611f5842027887d0d49c48f0eec78270026de7eff6db84b241c006bf776f73c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-runtime-boot4.log",
+      "sha256": "c00c2e2ed9d7900569376228ffc8918b42acfa1f7a584632c52e51d9e5b520c2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-runtime-boot5.log",
+      "sha256": "9574f4974772a01ab1ac7543a74be329bdd2063bd5f2d69ea875489f3320b8a7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-runtime-boot6.log",
+      "sha256": "b9f8ef11f1152c2192fdc1fcda2fcc73845d27f51d4dcefd54288cede326cf9f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-runtime.json",
+      "sha256": "a09016df842ecc824f957cb9000a1295c39f21798264ae468b8077cbf51f00ce"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-snapshot.sql",
+      "sha256": "4302a2e433f1251878420b94f673f1bcf44d9bb3fc2562fe593c9e5a15256fd5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-subprocess.log",
+      "sha256": "73911fc44c13a9de34c2e37307b27aa1289c37e9da69386b237f331d0e667ae2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-superseded-history-desktop.png",
+      "sha256": "9f1062b6a06a0ee57b935a00bacb80a830700411c2619f777a2be46d1e402db6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-superseded-history-mobile.png",
+      "sha256": "aec996ef9a3e3d8e65a0e84883d78eed25860119f7bb4e10f7bbe6cb67216c2d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-time-fixture-expiry-release.json",
+      "sha256": "0682685a662081f3a39adf447d49350dbe87f06dced73be2a6b376f4ee83f754"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-time-fixture-rejected-release.json",
+      "sha256": "050b568e67ad296b67f41d9240b091f735bda69657d3b2ed00c65fa19ec2dec4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-time-fixture-resource-retention.json",
+      "sha256": "0542a16b6e959ed12bbf836368bfdb01eedffe8289840f679df9cc789cb9f2ff"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-time-fixture-resubmitted.json",
+      "sha256": "f7ae9195a76b9956aa812925c1385d97d25e73c8e7cf2fa327c1f3e7532e8408"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-time-fixture-subprocess-return.json",
+      "sha256": "7075f0643d98320bf03907a78210546acca7639279a34663d487502afca90a59"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-transaction-green.log",
+      "sha256": "fb381783279eec67224fe3ea818a2c9c128cd1f757b3972b893e32ba65975d60"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-transaction-red.log",
+      "sha256": "c4053bcb0ac3500b812c8dfb4546e6782669d23026c1ae5ed4524e1c2ccb8d6b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-transaction-red.xml",
+      "sha256": "cf3cdc98a1de22eb4e3405dd6cb127206e40dae3e07d61ae2c21d71086258cba"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-upgrade-baseline.json",
+      "sha256": "937bd1e3aef0f7a51bbf076a07959e69cb94c25aab147ac1f9fd56995d8da7a4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-upgrade-verified.json",
+      "sha256": "b2306e9bcbbe01fb22954f784c8ea5b692c6aa0b71803fbeaee58b6215c4a9d5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-web-build.log",
+      "sha256": "e153c9acd8ff7bc24c4820c7cd86181b5551070324d175a6f9ffb86a32088035"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-web-tests.log",
+      "sha256": "1f6710193579b5cdfcae87042bf3bab201e9400313729a27155fe1a15cc52819"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense_budget_retention_runtime.py",
+      "sha256": "f3fa1df89e37bbd36c6fb4189e51837758afcbee57aeb223b81afd7c439f6ff5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/prepare-expense-budget-retention-runtime.py",
+      "sha256": "1b111f39c9074a758a10ce17093912f6999094b21fbcf67272b3693bac7aec10"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/queue-expense-budget-retention-invoice.py",
+      "sha256": "1c9f9ca0e7e4138238b3a29158df5e71f3637450ab38275216218110cdc567da"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/record-expense-budget-retention-complete.py",
+      "sha256": "f628ec1bfd0fde72eb5c0f88349ed92c342fe2bca7901d7d1199e966ee4beff2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/restore-expense-budget-retention-runtime.py",
+      "sha256": "5186ca4e75faa89eccff24e2f2d7bfcbc5f54f6288a48946315c3d8cfbf1707b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/resume-expense-budget-retention-clone.py",
+      "sha256": "295ca1488cb1cffd57d148fc9bc68850fd20356a7a5800dc1cdcbb9ded7319a7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/resume-expense-budget-retention-invoice.py",
+      "sha256": "fd80bc37734c6e2175bbc5c002477a75addde654d06c5b563a6fa2e607bc2de0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/run-expense-budget-retention-runtime.py",
+      "sha256": "d85130150d43f139251979fcd371e384f854de03f944376d84a9d300f7fa737b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/strengthen-expense-budget-retention-provider.py",
+      "sha256": "f5553875e98f5335e36a51b81447206945b9a3e9d2558295bbd0c5f71435d9ea"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/verify-expense-budget-retention-contracts.mjs",
+      "sha256": "1f729afa1c07139240e7da2fc1699c25dc15238fa685b3135765a13176c87300"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/verify-expense-budget-retention-crash-recovery.py",
+      "sha256": "35e2962badc3e0329ceeea0831279087dbc907fa7151eb213ae26eeed9de550d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/verify-expense-budget-retention-final-state.py",
+      "sha256": "4182b2d1bc03a3fadb0e988ad5933f6369910d91e85e308f350b502ce230c4ac"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/verify-expense-budget-retention-refreeze.py",
+      "sha256": "fa2abb0a928b221b0e8bd6abf6b87b989387841bbf0ff2c0251f1134f55519f9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/verify-expense-budget-retention-resources.py",
+      "sha256": "575f810e9eb0d6b7a326fc449d67b5a6ef23ee077ecda1b036a613e801b6f6ce"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/verify-expense-budget-retention-restored-boot.py",
+      "sha256": "a5d19009df481a8b004390dd46ec4f3422375bde2508f33fa8e68358226fe96f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/verify-expense-budget-retention-subprocess.py",
+      "sha256": "f274f585adbd889b700eab8c0c3122879814174ed616b15415dd8ad646d9fc0a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/verify-expense-budget-retention-upgrade.py",
+      "sha256": "556097982406b83fbf174c439bef0a279b6b371f054137a44da43f6cf5cee67d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense_managed_client.py",
+      "sha256": "16595362cdf5de994c9a0f3def976dff70bb84d0a53096928393c4d4fb2fb067"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-complete-evidence-snapshot/expense-budget-retention-local-20261003.json",
+      "sha256": "4ece681dcb7f5cdcda73b49fe0e8114725499d42977d0ae1b705563c0c64d6d0"
+    }
+  ]
+}

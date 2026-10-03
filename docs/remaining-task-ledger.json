@@ -1,22 +1,22 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T08:20:36.619220+00:00",
+  "recordedAt": "2026-10-03T08:47:57.339607+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 35,
+    "knownOpenTaskCount": 34,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 17,
+      "LOCAL_DEVELOPMENT": 16,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 35,
+    "projectRemainingLowerBound": 34,
     "completionPercentage": null,
     "notes": [
-      "35 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "34 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
@@ -1338,7 +1338,7 @@
       "id": "F10",
       "kind": "LOCAL_DEVELOPMENT",
       "group": "费用与财务产品",
-      "status": "OPEN",
+      "status": "COMPLETED",
       "title": "退回/撤回保留预算的到期释放",
       "sourceRefs": [
         {
@@ -1350,27 +1350,26 @@
           ]
         }
       ],
-      "observed": "已实现显式租户期限、V105 持久队列、到期释放及携原凭据重提，当前和历史页面区分处理结果；范围测试通过，安装包、实际浏览器及重启恢复尚待验收。",
+      "observed": "固定期限与到期队列已完成安装包、HTTP、桌面/390 像素页面及执行中中断恢复。外部释放成功但响应未返时原号查询恢复；重提携释放凭据将预算版本从 1、2 递增至 3；真实子流程退回、明确拒绝及其他资源预留保持通过。配套恢复保留 247 张表、1,926 条记录和 2 份原件，原待办可接续。",
       "references": [
-        {
-          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetRetentionService.java",
-          "line": 1
-        },
         {
           "path": "docs/expense-submission.md",
           "line": 1
         },
         {
-          "path": "docs/evidence/expense-budget-retention-local-20261003.json",
+          "path": "docs/evidence/expense-budget-retention-complete-20261003.json",
           "line": 1
         }
       ],
       "acceptance": "显式保留期、可追溯释放队列；重提与过期释放并发不误释放新轮次；未知外部结果对账，重新提交重新预检。",
       "dependsOn": [],
-      "progress": {
-        "status": "LOCAL_IMPLEMENTATION_VERIFIED_PENDING_RUNTIME_ACCEPTANCE",
+      "completion": {
         "implementationCommit": "e987dcf705ab4f9d9fbbdd14072c53593bec6dcd",
-        "evidence": "docs/evidence/expense-budget-retention-local-20261003.json"
+        "verifiedCommit": "43e95e55dcd0a5f389dafee59c2f92338d17bdf0",
+        "verifiedAt": "2026-10-03T08:47:12.167998+00:00",
+        "evidence": "docs/evidence/expense-budget-retention-complete-20261003.json",
+        "scope": "LOCAL_ACCEPTANCE_COMPLETE",
+        "authority": "3/5 天及预算回执均为显式本地合成配置；到期使用标记时间夹具，未等候真实天数；真实企业预算及目标环境验收仍为 E05/E12。"
       }
     },
     {
@@ -3352,9 +3351,8 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F10",
-    "F05",
-    "F04"
+    "F04",
+    "F05"
   ],
   "externalDelivery": {
     "remoteConfigured": true,
@@ -3380,8 +3378,9 @@
   },
   "latestProgress": {
     "taskId": "F10",
-    "status": "LOCAL_IMPLEMENTATION_VERIFIED_PENDING_RUNTIME_ACCEPTANCE",
+    "status": "LOCAL_ACCEPTANCE_COMPLETE",
     "implementationCommit": "e987dcf705ab4f9d9fbbdd14072c53593bec6dcd",
-    "evidence": "docs/evidence/expense-budget-retention-local-20261003.json"
+    "verifiedCommit": "43e95e55dcd0a5f389dafee59c2f92338d17bdf0",
+    "evidence": "docs/evidence/expense-budget-retention-complete-20261003.json"
   }
 }
