@@ -1,0 +1,460 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F02",
+  "status": "PREPARATION_SELECTION_PHASE_VERIFIED_TASK_OPEN",
+  "recordedAt": "2026-10-03T04:40:31.821280+00:00",
+  "implementationCommit": "941a846e9bd7d8880d8f4ba60de37922603c7a47",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "已发布科目映射接入凭证准备领取及登记；不改变已登记命令、冲销或原操作查询。",
+  "callChain": [
+    "最终批准或成功付款登记准备",
+    "VoucherPreparationService.claim 派生真实来源并固定选择",
+    "VoucherPreparationWorker 在事务外读取 ERP 期间和科目",
+    "VoucherPreparationService.finish 在同一发布锁下复核并登记原命令"
+  ],
+  "tests": {
+    "scoped": {
+      "total": 168,
+      "classes": [
+        {
+          "class": "io.agentflow.api.OpenApiContractTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.finance.AccountMappingConfigurationApiTest",
+          "tests": 28,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.finance.AccountMappingConfigurationTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.finance.GatewayAccountingTest",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.finance.PaymentOperationIntegrationTest",
+          "tests": 44,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.finance.VoucherCommandTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.finance.VoucherOperationIntegrationTest",
+          "tests": 27,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.finance.VoucherOperationTest",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.finance.VoucherPreparationTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.finance.VoucherSourceTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "postgres": {
+      "total": 33,
+      "classes": [
+        {
+          "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.finance.PaymentOperationIntegrationTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.finance.VoucherOperationIntegrationTest",
+          "tests": 27,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "subsetOfScoped": true,
+      "server": {
+        "serverVersion": "17.11 (Debian 17.11-1.pgdg13+2)",
+        "AGENTFLOW_VOUCHER_TEST": {
+          "database": "mapping_preparation_896d36c109",
+          "container": "agentflow-attachments-postgres-20260928"
+        },
+        "AGENTFLOW_PAYMENT_OPERATION_TEST": {
+          "database": "mapping_preparation_acf6e8bd6d",
+          "container": "agentflow-attachments-postgres-20260928"
+        },
+        "AGENTFLOW_SUBMISSION_TEST": {
+          "database": "mapping_preparation_22c6639234",
+          "container": "agentflow-attachments-postgres-20260928"
+        }
+      }
+    },
+    "newCases": 16,
+    "frontendTypecheck": "PASS",
+    "openapi": {
+      "result": "PASS",
+      "operations": 332,
+      "schemas": 661,
+      "requestExamples": 123,
+      "schemaChanges": false
+    },
+    "authors": {
+      "javaFiles": 1441,
+      "namedTypes": 2774,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "reproductions": [
+    {
+      "case": "管理发布未被准备任务使用；首次发布期间旧读取仍能登记",
+      "redTests": 2,
+      "failures": 2,
+      "errors": 0,
+      "result": "新增用例先失败，接入持久选择及同发布锁复核后通过"
+    },
+    {
+      "case": "等待配置锁耗尽租约后仍错误登记 READY",
+      "redTests": 1,
+      "failures": 1,
+      "errors": 0,
+      "expected": "UNAVAILABLE",
+      "actual": "READY",
+      "result": "取得配置锁后重新计时；过期写入 LEASE_EXPIRED，零凭证登记"
+    },
+    {
+      "case": "旧成功付款恢复夹具删除余额时遗漏 FIFO 顺序外键",
+      "redTests": 1,
+      "failures": 0,
+      "errors": 1,
+      "coverageGap": "F07 的 318 条范围验证未包含 PaymentOperationIntegrationTest；本次扩展运行发现旧夹具失效。",
+      "result": "先删除依赖顺序记录来模拟有效缺失状态，恢复后同时断言余额和顺序重建；未修改 FIFO 生产逻辑"
+    },
+    {
+      "case": "租约复现第一次被 H2 默认两秒数据库锁等待超时截断",
+      "result": "仅将该集成测试的 H2 锁等待配置改为十秒，再确认期望 UNAVAILABLE 而实际 READY 的断言失败；完整记录保留"
+    }
+  ],
+  "verified": [
+    "借款、实际报销挂账、成功付款凭证均使用已发布的必要科目子集",
+    "费用原成本分摊及金额不变；付款银行键来自原授权，成功回单不变",
+    "领取选择及第二、三版准备修订可重载；input_json 保持原内容",
+    "首次发布和换版先提交时阻断旧准备，明确重试才选择新配置",
+    "配置发布可在 ERP 等待期间完成；最终登记等待数据库发布锁并读到提交后的指针",
+    "锁等待耗尽租约时不登记命令",
+    "缺科目不回退 ERP 默认映射；发布目标变化时零外部读取",
+    "旧排队 JSON 可绑定，旧执行中无选择不能登记，显式重试可恢复",
+    "后续类别修订不改写已发布选择；登记先完成时后续发布不改写原过账或查询命令",
+    "保留原未管理映射、命令摘要、查询恢复、API 权限及协议回归"
+  ],
+  "limitations": [
+    "管理页面与选择证据展示仍未完成，F02 保持 OPEN。",
+    "未执行本阶段固定安装包的真实进程重启、旧包升级或备份恢复；不得与 JDBC 状态重载测试等同。",
+    "全部 ERP/银行交互是本地合成服务，真实企业 E06/E07 未验收。",
+    "本阶段无新增 SQL 迁移，V104 升级证据继续引用管理后端阶段。",
+    "本阶段未进行整个项目的最终全量测试、远端推送、PR 或 CI；V02/E15 保持 OPEN。"
+  ],
+  "previousEvidence": [
+    "docs/evidence/account-mapping-foundation-20261003.json",
+    "docs/evidence/account-mapping-management-backend-20261003.json"
+  ],
+  "sourceFiles": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/finance/VoucherPreparation.java",
+      "sha256": "03a8375932139a4d4ebf9364f5413af3fa7e6cc5ec7b3ae962fadbb098e6ba08",
+      "bytes": 8655
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/finance/VoucherPreparationTest.java",
+      "sha256": "fea2b4e325839649348531225e67bfd7fd7dc21cdd1c779c7d37116fb99282eb",
+      "bytes": 7657
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/AccountMappingPreparation.java",
+      "sha256": "5e8336ca1a9b889d10fe23e174651c63c676e86d4aab3a94a65e06d54481a317",
+      "bytes": 2755
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherPreparationService.java",
+      "sha256": "1814d9a30f0cb8f3099a69416965fecd25ee0b2e0ffda65925b5b88e0622567c",
+      "bytes": 10918
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherPreparationWorker.java",
+      "sha256": "ad50bb969412c2c6222d50b19ff20d8af8d815bbe662a2061f71c4aad3105cf3",
+      "bytes": 4419
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+      "sha256": "43cd93fcc0b163fd8ec22fd9637da8a065585f3f36a6376475690ce60bb054b5",
+      "bytes": 528342
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/finance/PaymentOperationIntegrationTest.java",
+      "sha256": "73eb1c062825626d65dcca0a819772a28ef3303c4068de17cdc3d1b545a92d0d",
+      "bytes": 90528
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/finance/VoucherOperationIntegrationTest.java",
+      "sha256": "ded1a51da2f851d5dbdeea8b82d58d7f43d7831cd3da962f5c96f7d04b6608a6",
+      "bytes": 48687
+    },
+    {
+      "path": "agentflow-web/src/vouchers.ts",
+      "sha256": "7c90c13c43fc15d47ed79cbabda10d8bf08260ed626a0d62d51159e530191968",
+      "bytes": 14373
+    },
+    {
+      "path": "docs/account-mapping-configuration.md",
+      "sha256": "53d8aa39bc6a39da21ecd6257fe14a1c33c80af1612a16b8be83b3dccf542185",
+      "bytes": 9854
+    },
+    {
+      "path": "docs/voucher-preparation.md",
+      "sha256": "12f55ffe7f14d3a0847946f4fe01a232c68e84c99f9607bbb2afafbd09f0fa28",
+      "bytes": 4959
+    }
+  ],
+  "artifactFiles": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-authors.log",
+      "sha256": "463e04a25300da3719f5d39e2630d6fae2d47ca614532359931719db3b3f8d69",
+      "bytes": 73
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-before-lease.log",
+      "sha256": "42f1a4d053df64c5bf3acccd4a568f3575321e58f9eb807b4e80c1e6595d86a7",
+      "bytes": 160563
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-first-green.log",
+      "sha256": "17ba7a7eed173bcee361e132722f0437daff798bfde4ebdec16b8aeb893003a8",
+      "bytes": 42710
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green-reports/TEST-io.agentflow.api.OpenApiContractTest.xml",
+      "sha256": "5d4566360013a0445fe46ab4bcd53ebbe0872bc2170d0061d9e09541e91158af",
+      "bytes": 73429
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green-reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "sha256": "8d8f706379eab4cf78d75ce8e23d9936376ab918f85d0a93dc2e92c97e8eaaaf",
+      "bytes": 73014
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green-reports/TEST-io.agentflow.finance.AccountMappingConfigurationApiTest.xml",
+      "sha256": "34dedb6169bfa7a576bbda463ea90602a238d0e514e7d8674d1776cb80553725",
+      "bytes": 77105
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green-reports/TEST-io.agentflow.finance.AccountMappingConfigurationTest.xml",
+      "sha256": "b8f54c2eaaf78f8ee73abe996fa0a5c1bf2b6a67b8af750c4ec2d126c75a7006",
+      "bytes": 11577
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green-reports/TEST-io.agentflow.finance.GatewayAccountingTest.xml",
+      "sha256": "1e2f59efbe33b1cfd4b8f5b14a7971f4647becb06d4ef8b3538274444a915b68",
+      "bytes": 45579
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green-reports/TEST-io.agentflow.finance.PaymentOperationIntegrationTest.xml",
+      "sha256": "f3af20a0e1fb12cacd5e5caf81ad6f5271b4d3979da32a2f3c4963b220a40bb3",
+      "bytes": 80115
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green-reports/TEST-io.agentflow.finance.VoucherCommandTest.xml",
+      "sha256": "5f0d61efaaabc069987e0c6decdf10b410ee6cb629fd4d2f60454e92bac17438",
+      "bytes": 11547
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green-reports/TEST-io.agentflow.finance.VoucherOperationIntegrationTest.xml",
+      "sha256": "da09ec4c9865b116f18f851da68b6d1ba1b20b05fcf447bfbc86155e7bed45fd",
+      "bytes": 76727
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green-reports/TEST-io.agentflow.finance.VoucherOperationTest.xml",
+      "sha256": "304d367ec8d9f254b2eab54debf5d89cbab36486bfb2ff0b491b23acbcad23e4",
+      "bytes": 12626
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green-reports/TEST-io.agentflow.finance.VoucherPreparationTest.xml",
+      "sha256": "4707b66170c8ca474a6bc39d9ea8baddb8158a420abc123ea6744c5f805ea042",
+      "bytes": 11647
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green-reports/TEST-io.agentflow.finance.VoucherSourceTest.xml",
+      "sha256": "6db45c9e47eb33b54219ee27593fcd57fed1f1562ee7ee09fb4dc9bab6fcd1ab",
+      "bytes": 11046
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green-reports/summary.json",
+      "sha256": "b88f40f6e167d69aff539960b51518eb485d6b34f6303ac91fae5fdba3a5dc0d",
+      "bytes": 22315
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-green.log",
+      "sha256": "54e37f0056916e40fcfa174488ad9f63f84a4004ab3016c608125b067161215d",
+      "bytes": 160992
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-lease-fixture.log",
+      "sha256": "894acb45734c14ce12c033023f26ea07d306b92fb5229a05a7b33e13ab0578cf",
+      "bytes": 50385
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-lease-fixture.xml",
+      "sha256": "84b8838f9a78b26d705c4fd3d75773b9f6092c3c1298bff6f426691fe7b52ad4",
+      "bytes": 79581
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-lease-red-snapshot/TEST-io.agentflow.finance.VoucherOperationIntegrationTest.xml",
+      "sha256": "e52496dfcf8417f863360663aabf337b2894c498dd06cb1f51dfaa4dfafc5b95",
+      "bytes": 71932
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-lease-red-snapshot/account-mapping-preparation-lease-red.log",
+      "sha256": "e95cf7964c31f7ba2fd370c8ebde6994eebfc23fa576da459008908fb7bee90f",
+      "bytes": 42749
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-openapi.log",
+      "sha256": "a1fa2a0fbdd82e44a5fc9acff21a48ce71d9406da25077858918c2c15e431246",
+      "bytes": 71
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-postgres-databases.json",
+      "sha256": "2693655f57371b74708d06103051b9a48444a6135454f06c9a375e75a9360fb8",
+      "bytes": 502
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-postgres-reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "sha256": "b65f7b6069386d04bbe5ff4c9677b0b31109cf2a026484998e7bc966cecfd4d5",
+      "bytes": 72813
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-postgres-reports/TEST-io.agentflow.finance.PaymentOperationIntegrationTest.xml",
+      "sha256": "cf814ebe46e1671742ac4b1e5d03709bf14b7cb32667e943008a28cc4bb9c57f",
+      "bytes": 72449
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-postgres-reports/TEST-io.agentflow.finance.VoucherOperationIntegrationTest.xml",
+      "sha256": "f25dfd311f9a8c8a09c7d7fbf8a60ff19b5218cb70a03e270e5c83a308a54e1d",
+      "bytes": 76526
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-postgres-reports/summary.json",
+      "sha256": "bf755dd2c73605d69b71ec388d3c0fd2b1f29bff533bf670392c2e511e2c52e0",
+      "bytes": 4798
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-postgres.log",
+      "sha256": "144f57069f4a40b430e906992beb99afc1dc6f9436f01c9e9a5d7b78c6246fb5",
+      "bytes": 92059
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-recovery-red-snapshot/TEST-io.agentflow.finance.PaymentOperationIntegrationTest.xml",
+      "sha256": "27b297c5023839e42ea11532188f628ad2a4538d39fedeaf15a8d536f152cc1c",
+      "bytes": 76090
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-recovery-red-snapshot/account-mapping-preparation-recovery-fixture-red.log",
+      "sha256": "cfa3968a236b3486471058a915f86fd9ce85561fa03157b713265aeb50e80da0",
+      "bytes": 41944
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-red-snapshot/TEST-io.agentflow.finance.VoucherOperationIntegrationTest.xml",
+      "sha256": "4e2088f03a2cd2d67bb53319a26660a095ec2d26df6ad9b9920ddaa4320ba31e",
+      "bytes": 73608
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-red-snapshot/VoucherOperationIntegrationTest.java",
+      "sha256": "c1b93ce65c069a94a42e061ee7fc408ee5702f3b885d9f3573de9d9393f27551",
+      "bytes": 36695
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-red-snapshot/account-mapping-preparation-red.log",
+      "sha256": "b34ab598715d1654d3da853996b226eefe9d754b872667f45c05a03b4b6dd30d",
+      "bytes": 44432
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-scope-first.log",
+      "sha256": "6c12efc0de833e2562ae193fa7bbb31a06035bfb47c350e4387a8ca6352eee1e",
+      "bytes": 166187
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/account-mapping-preparation-typescript.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/capture-account-mapping-preparation-reports.py",
+      "sha256": "c318d269e4297ba5726b931c68fd573729d74a226c748c8ac440c6694585fc62",
+      "bytes": 1458
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/record-account-mapping-preparation.py",
+      "sha256": "ad517535128e7b67644b95dbeeb3d7fa4fd880e4140d17aa167651980e25ce05",
+      "bytes": 6501
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/account-mapping-preparation-evidence-snapshot/run-account-mapping-preparation-postgres.py",
+      "sha256": "9a63d2572f27c92c726860b72e66ce8176b19437bf50f59e917d716ef86f8417",
+      "bytes": 2526
+    }
+  ],
+  "remainingTaskCount": {
+    "knownOpen": 38,
+    "localDevelopment": 20,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  }
+}

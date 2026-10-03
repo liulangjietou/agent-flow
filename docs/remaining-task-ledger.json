@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T04:14:38.448896+00:00",
+  "recordedAt": "2026-10-03T04:41:01.264464+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1013,10 +1013,14 @@
           ]
         }
       ],
-      "observed": "科目版本领域与网关契约已有阶段证据；V104 管理存储和 9 个认证接口已完成。草稿、历史、三版本发布、范围外键、幂等回放及失败回滚通过 86 条范围测试，其中 29 条在 PostgreSQL 17.11 同时通过。自动凭证准备选择绑定、管理页面和完整安装包验收仍未完成。",
+      "observed": "领域、网关、V104 管理存储和 9 个认证接口已完成，凭证准备现已固定发布选择并在登记前同锁复核。168 条范围测试通过，其中 33 条在 PostgreSQL 17.11 复测通过，覆盖首次发布、并发换版、等待耗尽租约、旧任务恢复及借款／报销／付款凭证。管理页面、选择证据展示和完整安装包验收仍未完成。",
       "references": [
         {
           "path": "docs/account-mapping-configuration.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/account-mapping-preparation-20261003.json",
           "line": 1
         },
         {
@@ -3322,13 +3326,14 @@
   },
   "latestInProgress": {
     "taskId": "F02",
-    "phase": "MANAGEMENT_BACKEND_PHASE_VERIFIED_TASK_OPEN",
-    "implementationCommit": "ef0869a4c43bc0b3bcef3baf26f75e3ed38f58da",
-    "evidence": "docs/evidence/account-mapping-management-backend-20261003.json",
-    "scopedTests": 86,
-    "postgresSubset": 29,
+    "phase": "PREPARATION_SELECTION_PHASE_VERIFIED_TASK_OPEN",
+    "implementationCommit": "941a846e9bd7d8880d8f4ba60de37922603c7a47",
+    "evidence": "docs/evidence/account-mapping-preparation-20261003.json",
+    "scopedTests": 168,
+    "postgresSubset": 33,
     "managementApiImplemented": true,
-    "preparationSelectionIntegrated": false,
-    "taskCompleted": false
+    "preparationSelectionIntegrated": true,
+    "taskCompleted": false,
+    "nextPhase": "MANAGEMENT_UI_AND_SELECTION_EVIDENCE"
   }
 }

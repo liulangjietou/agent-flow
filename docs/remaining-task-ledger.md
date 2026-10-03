@@ -2,7 +2,7 @@
 
 更新：2026-10-03 UTC，F01 本地完整验收完成；已确认未完成降至 38 项。初次核对基线 `f5fd8d53c3d6bbafef456d96c462320bd186d8fc`，分支 `codex/governance-identifier-integration`。
 
-F02 已完成领域、网关及管理后端阶段，86 条相关测试与 29 条 PostgreSQL 子集通过；准备任务绑定、管理页面和完整安装包验收仍待完成，计数保持 38。
+F02 已完成领域、网关、管理后端及准备选择绑定阶段，168 条相关测试与 33 条 PostgreSQL 子集通过；管理页面、选择证据展示和完整安装包验收仍待完成，计数保持 38。
 
 **当前已确认 38 项未完成：20 项本地开发、3 项本地验收与核对、15 项需要真实企业环境或远端的联调/交付。全项目至少剩余 38 项。** V03 尚未完成，所以不能声称这是全量精确总数，也不能给完成百分比。
 
@@ -35,7 +35,7 @@ F02 已完成领域、网关及管理后端阶段，86 条相关测试与 29 条
 | A04 | 费用异常的 Agent 风险提示 | 当前 ApprovalRiskPolicy 只评估本次表单白名单条件。没有费用领域同日多笔、节假日消费、连号等事实的专用模型提示与复核链路。 [ApprovalRiskPolicy.java:48](../agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java#L48)、[agent-execution.md:1](agent-execution.md#L1) | 可解释地引用经授权的费用事实，保留提示和人工处置；不能凭模型标签自动驳回、核减或改变金额矩阵。确定性拆单路由由 F04 独立处理。 原依据：05 §16。 |
 | I01 | 外部组织同步的本地完整用例 | 现有组织目录为可信管理员维护单位、人员、任职和关系；已实现 OIDC，但没有同步批次、来源映射、冲突处置及恢复入口。 [OrganizationController.java:1](../agentflow-server/src/main/java/io/agentflow/organization/OrganizationController.java#L1)、[OrganizationService.java:1](../agentflow-server/src/main/java/io/agentflow/organization/OrganizationService.java#L1) | 以单一可信源映射组织事实，预检和具名应用变更、停用及重试均有审计；不隐式创建认证身份或授予系统角色；旧审批轮次依据保持。 原依据：04 §3.A、§3.G；04 §3.G。 |
 | I02 | 电子签业务端口、状态与操作页面 | 现有事件和支付 HMAC 验签解决消息完整性；未有文件签署业务用例。OFD 签章渲染也不等于电子签服务。 [product-goal-gap-audit.md:1](product-goal-gap-audit.md#L1)、[expense-archives.md:1](expense-archives.md#L1) | 固定文件与签署版本、显式授权、异步状态、可验证回执、重复回调和未知结果恢复；保留原件、授权及签署结果，完成本地受控协议验收。 原依据：04 §3.G；00 §6。 |
-| F02 | 科目映射版本的管理配置 | 科目版本领域与网关契约已有阶段证据；V104 管理存储和 9 个认证接口已完成。草稿、历史、三版本发布、范围外键、幂等回放及失败回滚通过 86 条范围测试，其中 29 条在 PostgreSQL 17.11 同时通过。自动凭证准备选择绑定、管理页面和完整安装包验收仍未完成。 [阶段说明](account-mapping-configuration.md)、[管理后端证据](evidence/account-mapping-management-backend-20261003.json) | 提供类别与法人维度的版本管理或明确的权威系统管理接入；旧凭证保留原映射证据；无有效映射仍阻断；本地演示可配置样例并完成凭证链路。 原依据：05 §10.1；05 §12.6。 |
+| F02 | 科目映射版本的管理配置 | 领域、网关、V104 管理存储和 9 个认证接口已完成，凭证准备现已固定发布选择并在登记前同锁复核。168 条范围测试通过，其中 33 条在 PostgreSQL 17.11 复测通过，覆盖首次发布、并发换版、等待耗尽租约、旧任务恢复及借款／报销／付款凭证。管理页面、选择证据展示和完整安装包验收仍未完成。 [阶段说明](account-mapping-configuration.md)、[准备接入证据](evidence/account-mapping-preparation-20261003.json)、[管理后端证据](evidence/account-mapping-management-backend-20261003.json) | 提供类别与法人维度的版本管理或明确的权威系统管理接入；旧凭证保留原映射证据；无有效映射仍阻断；本地演示可配置样例并完成凭证链路。 原依据：05 §10.1；05 §12.6。 |
 | F03 | 按行程自动计算定额补贴 | ExpenseLine 接收 quantity、日期和手填 claimedGross；DAY 单位不等于补贴规则，尚无系统计算的只读补贴行。 [ExpenseLine.java:17](../agentflow-domain/src/main/java/io/agentflow/expense/ExpenseLine.java#L17)、[ExpenseEditor.vue:1](../agentflow-web/src/components/ExpenseEditor.vue#L1) | 基于固定制度与行程计算天数和金额，页面显示依据且不能手改；服务端拒绝篡改；人工调整行程后重新计算并留存版本。 原依据：05 §5.1、§18；01 费用报销页面。 |
 | F04 | 跨单拆单风险与合计金额路由 | 现有风险规则只读当前提交字段，没有同申请人、类别、时间窗口内跨单聚合及审批层级提升。 [ApprovalRiskPolicy.java:48](../agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java#L48)、[ExpenseFormContract.java:1](../agentflow-domain/src/main/java/io/agentflow/expense/ExpenseFormContract.java#L1) | 窗口、阈值和启用状态显式配置；并发提交也按确定口径聚合；冻结风险及路由依据；不伪称未启用规则已经保护业务。 原依据：05 §5.3。 |
 | F05 | 事前额度 STRICT/TOLERANCE/NONE 控制 | ExpenseRequest.ApprovedLine 能表达容差上限，但 ExpensePlan.approve 固定使用 BigDecimal.ZERO；没有按类别的模式、容差说明与额外审批配置。 [ExpensePlan.java:74](../agentflow-domain/src/main/java/io/agentflow/expense/ExpensePlan.java#L74)、[ExpenseRequest.java:134](../agentflow-domain/src/main/java/io/agentflow/expense/ExpenseRequest.java#L134) | 按已发布类别策略冻结控制模式和容差；超额说明与审批同步验证；并发占用、释放和关闭保持额度不变量。 原依据：05 §6.1。 |
