@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T20:23:57.967779+00:00",
+  "recordedAt": "2026-10-03T20:44:30.331334+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1630,7 +1630,7 @@
           ]
         }
       ],
-      "observed": "员工及供应商付款、凭证、费用预算、独立冲销、外部冲销核对、报销及供应商结算、供应商回款通知已接通。本阶段补齐供应商应付调整准备、执行、裁决、安全结束和实际本地完成通知，207 项 Java、147 项前端用例通过；ERP 成功和后续本地完成分别通知，旧编号保留自身凭据，已完成后的查询不补发过时中间提示。其他独立财务恢复来源覆盖核对、固定包和环境验收仍待完成。",
+      "observed": "员工及供应商付款、凭证、费用预算、冲销、结算、供应商回款及应付调整通知已接通。本阶段补齐报销付款退回查询、明确登记及原消息详情，按用例去重后的 186 项 Java、134 项前端用例通过；历史登记重放原查询、账本与结算修订，通知失败回滚资金登记，任职撤销阻断读取与投递。借款等其他独立财务恢复来源覆盖核对、固定包和环境验收仍待完成。",
       "references": [
         {
           "path": "docs/payment-notifications.md",
@@ -1718,6 +1718,14 @@
         },
         {
           "path": "docs/evidence/supplier-adjustment-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-return-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-return-notifications-20261003.json",
           "line": 1
         }
       ],
@@ -3518,9 +3526,9 @@
   },
   "latestProgress": {
     "taskId": "F17",
-    "status": "SUPPLIER_ADJUSTMENT_NOTIFICATIONS_BACKEND_UI_SCOPE_VERIFIED",
-    "implementationCommit": "e3c7a698dffaead7f51ad990f3d194afa79539e8",
-    "evidence": "docs/evidence/supplier-adjustment-notifications-20261003.json",
-    "recordedAt": "2026-10-03T20:23:57.967779+00:00"
+    "status": "EXPENSE_RETURN_NOTIFICATIONS_BACKEND_UI_SCOPE_VERIFIED",
+    "implementationCommit": "73d7a13b5be99685261431c9860b148f569b38cf",
+    "evidence": "docs/evidence/expense-return-notifications-20261003.json",
+    "recordedAt": "2026-10-03T20:44:30.331334+00:00"
   }
 }

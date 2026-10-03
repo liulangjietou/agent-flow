@@ -1,0 +1,414 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F17",
+  "taskStatus": "OPEN",
+  "stage": "EXPENSE_RETURN_NOTIFICATIONS_BACKEND_UI_SCOPE_VERIFIED",
+  "recordedAt": "2026-10-03T20:44:30.331334+00:00",
+  "implementationCommit": "73d7a13b5be99685261431c9860b148f569b38cf",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "原报销付款退回查询失败、来源失效、未核清、退回疑点和明确登记通知",
+    "原查询实际消费的前后账本、查询及结算修订证明",
+    "消息详情当前角色、人员、原法人及字段权限，外发复核与事务回滚",
+    "真实 Vue 消息入口、只读详情及原申请轮次导航"
+  ],
+  "validation": {
+    "java": {
+      "distinctTests": 186,
+      "byClass": {
+        "io.agentflow.expense.ExpensePaymentReturnTest": 11,
+        "io.agentflow.api.OpenApiContractTest": 7,
+        "io.agentflow.expense.ExpenseSubmissionIntegrationTest": 133,
+        "io.agentflow.finance.GatewayExpensePaymentReturnTest": 5,
+        "io.agentflow.notification.InboxIntegrationTest": 9,
+        "io.agentflow.notification.NotificationDeliveryApiIntegrationTest": 8,
+        "io.agentflow.notification.NotificationDeliveryIntegrationTest": 13
+      },
+      "byModule": {
+        "agentflow-domain": 11,
+        "agentflow-server": 175
+      },
+      "rawRuns": [
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.expense.ExpensePaymentReturnTest.xml",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.api.OpenApiContractTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+          "tests": 133,
+          "failures": 0,
+          "errors": 1,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.finance.GatewayExpensePaymentReturnTest.xml",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/notice-rerun/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "note": "Final outcome per (classname,name); initial scope had one fixture unique-key collision. The corrected six notification tests were rerun without further production changes. Repeated tests are not counted twice.",
+      "result": "PASS_EFFECTIVE_DISTINCT_CASES",
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports",
+      "newNotificationIntegrationTests": 6,
+      "newDomainNoticeTests": 3,
+      "aggregation": "范围执行 186 项，其中 185 项通过；一项新测试的版本篡改夹具撞到已有唯一键，修正后重跑 6 个通知用例全部通过。按 classname/name 使用最后结果去重为 186，保留原始失败报告；修正期间业务源码未变化。"
+    },
+    "web": {
+      "result": "PASS",
+      "tests": 134,
+      "files": 15,
+      "newNotificationTests": 10,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-web.log"
+    },
+    "typecheck": {
+      "result": "PASS",
+      "session": "37246",
+      "command": "node node_modules/vue-tsc/bin/vue-tsc.js --noEmit"
+    },
+    "build": {
+      "result": "PASS",
+      "session": "37246",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-build.log",
+      "note": "Vite 仍提示部分压缩块超过 500 kB，构建退出码 0。"
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 353,
+      "schemas": 716,
+      "requestExamples": 125
+    },
+    "authors": {
+      "javaFiles": 1587,
+      "namedTypes": 3061,
+      "missing": 0,
+      "parseErrors": 0,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-authors.log"
+    },
+    "testSelectionGuard": {
+      "result": "PASS",
+      "expectedRejectedFile": "notification-inbox.test.mjs",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-test-selection-guard.log"
+    },
+    "diffCheck": "PASS"
+  },
+  "reproductions": {
+    "backendInitial": {
+      "session": "96953",
+      "tests": 3,
+      "actualMissingNotificationFailures": 2,
+      "fixtureMismatch": "登记接口实际返回 202，初始测试误写为 201。",
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-red-reports"
+    },
+    "registrationAfterFixtureCorrection": {
+      "session": "67599",
+      "tests": 1,
+      "actualMissingNotificationFailures": 1,
+      "result": "RED: expected alice/finance, actual empty"
+    },
+    "actualInbox": {
+      "session": "46941",
+      "tests": 1,
+      "result": "RED: missing 查看报销退回 button"
+    }
+  },
+  "corrections": [
+    "查询持久状态和实际登记后发布同事务事件，通知规则只依据已保存事实。",
+    "登记详情按原编号重放历史修订，不以当前累计账本代替。",
+    "通知失败回滚登记、入款凭据、审计与外发意向；查询失败与明确登记语义独立。",
+    "新测试修正了接口状态码、复制的组件测试入口、通知偏好方法名及与唯一键冲突的篡改夹具；保留原报告，不把夹具错误计为业务 RED。",
+    "补齐前端消息类别标签；测试入口拒绝不存在的指定文件并将新通知测试加入默认范围。"
+  ],
+  "sourceEvidence": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/ExpenseReturnNotice.java",
+      "sha256": "a8d36eea4500b144019ea23e193f92e32b72662e08332962dc9690134fa21a60",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-domain/src/main/java/io/agentflow/notification/ExpenseReturnNotice.java"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java",
+      "sha256": "04ccaad6f37d640400061f98926dfae29f281ed2327653d72081df2909cc0e1d",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/expense/ExpensePaymentReturnTest.java",
+      "sha256": "8ff58a98fc73f8719064421d3e382cc5e74dde7497b9d80a2706c215f8eebfbb",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-domain/src/test/java/io/agentflow/expense/ExpensePaymentReturnTest.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePaymentReturnChanged.java",
+      "sha256": "ba56a90a23477f25ddaede67765fd5bcaf2be1562a2ee634a28a17d563dce600",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/expense/ExpensePaymentReturnChanged.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePaymentReturnService.java",
+      "sha256": "26773a637d131fd6b2f00a01bb4b6299ba55075c297b96975e4e8963f6542cad",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/expense/ExpensePaymentReturnService.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpensePaymentReturnRepository.java",
+      "sha256": "19645d3f65111aad03ed87e5f5498bd3fa1b54930fd552b7c33af8014d0c00d9",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/expense/JdbcExpensePaymentReturnRepository.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpenseReturnNotificationAccess.java",
+      "sha256": "0e78cc25d59f65b0b98488c01c740f5e6168804a991f7798f8c84e24553c3656",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/notification/ExpenseReturnNotificationAccess.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpenseReturnNotificationController.java",
+      "sha256": "9ab60e2e736d2a929aabb7fae6baa755c8c042de561c35ee9f720fa52f2f7809",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/notification/ExpenseReturnNotificationController.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpenseReturnNotificationService.java",
+      "sha256": "a5b494d0aabd793416776d739ff90146368c2a8db74ff6f7c053780db525713a",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/notification/ExpenseReturnNotificationService.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java",
+      "sha256": "fe2038a5180ed35b0b9c35fe7a07c1de5c14109584690c508e996416445752ae",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "db5c17570259593ca419fe6e68e8850ee42236ca55628cea395e6981135f6bec",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-server/src/main/resources/api/openapi.json"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java",
+      "sha256": "8549ae6b5639cdcec1a18fe461a7b8e3c090da0c3a9c9b0afb31dbb576ac05e2",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+      "sha256": "36de8a3c3949c51db9ada0f06bfcbaa4ae00577477b75b6d76b3572fd66fa846",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "e50e023c72e7778acffc2c2545f794682924d438bad870019d7c5d4f5db1a841",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-web/scripts/test-requests.mjs"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "sha256": "908b2d9294b9c60b4fe97e4c414b7b93a1c796a701087d8ccf238b823d95cfb8",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-web/src/App.vue"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "6d7275eccd323ea7c370190b61827585ed3e0da04a8171d461e45acd4d1a77b5",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-web/src/api.ts"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseReturnNotificationDetail.vue",
+      "sha256": "4e95801d108b702767522e403befbc5a41d6886fc1e160982aa14ceef91bb387",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-web/src/components/ExpenseReturnNotificationDetail.vue"
+    },
+    {
+      "path": "agentflow-web/src/components/NotificationInbox.vue",
+      "sha256": "8880fd877b1b6f98922f240215d3b9071f1243b3a66d3459b5902b5aa03e8541",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-web/src/components/NotificationInbox.vue"
+    },
+    {
+      "path": "agentflow-web/src/expenseReturnNotification.ts",
+      "sha256": "1fe8287460ae3637eac0ca4806bf89b67f3f3b8705aa7b286b59c7506ac4a263",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-web/src/expenseReturnNotification.ts"
+    },
+    {
+      "path": "agentflow-web/src/notificationInbox.ts",
+      "sha256": "9251a3e30f55b668823efccc199fbef1a300e4b0df6bbc4da6ae40b28bcd6198",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-web/src/notificationInbox.ts"
+    },
+    {
+      "path": "agentflow-web/tests/expense-return-notifications.test.mjs",
+      "sha256": "47ea250613c54e8098bbe5fec3bfa841254e3f62b8174c4b623b2c72e71eea40",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/source/agentflow-web/tests/expense-return-notifications.test.mjs"
+    }
+  ],
+  "artifactEvidence": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.expense.ExpensePaymentReturnTest.xml",
+      "sha256": "54d2af6a036c18d8762a363a36e211f49b60f8abcdb7b10b3bf74f8f64e5b997",
+      "bytes": 12049
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.api.OpenApiContractTest.xml",
+      "sha256": "7b49c49d75585344251242f3b0fe92bf663c3efa529ff106aa432c61e9c457cd",
+      "bytes": 73991
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "sha256": "11e62cfa2c2271b6a6fb5a633bc94520468ee28a776a7f3ba40b97dc3c21ad34",
+      "bytes": 101070
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.finance.GatewayExpensePaymentReturnTest.xml",
+      "sha256": "ef757a0012e3e7f9f8e3956ec5483d199a2e61d19594bd097c61b9a66501b73e",
+      "bytes": 44205
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+      "sha256": "38830419e0205bc2de888687b5927d29efa6c620de9ccfd1f47a89adf724739a",
+      "bytes": 74481
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+      "sha256": "07c37d21019c483614e5cce2f603e0aa0da968a19a7aacc5a941b7e1815610e6",
+      "bytes": 74607
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+      "sha256": "482d81d5a90670b79f0473dfd6027a3e2ccde16ecf1e4ccd015a766ad7a054bb",
+      "bytes": 74872
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/notice-rerun/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "sha256": "bba07742b5ac4060eae07e44fccd5d9747e9867c9040e654bbfd8fde9b55f709",
+      "bytes": 73824
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-final-reports/effective-tests.json",
+      "sha256": "2afe3c20e2ed560eb0fbcdb14e084b96d2821574f27548c27f923b4106b7cba4",
+      "bytes": 75830
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-red-reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "sha256": "2ca42b9af54299a59b04e964f52d70d1e77c051038c15b052e84c4965a5ca9b5",
+      "bytes": 76281
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-red-reports/registration-RED.xml",
+      "sha256": "d8afac586d6ac2ea278b9455586b345a12b0bd85bb4a9dfec15039a2660ef1d2",
+      "bytes": 73830
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/artifacts/expense-return-notifications-red.log",
+      "sha256": "7035440c7b50c9d07bfe10ade9d4e221feaf2255fd767d0bfd89b458366b8ced",
+      "bytes": 46747
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/artifacts/expense-return-notifications-registration-red.log",
+      "sha256": "662a10af3e91dd42e8aed91f58816c108a01e09258256d20009d203a403fbe77",
+      "bytes": 44327
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/artifacts/expense-return-notifications-inbox-red.log",
+      "sha256": "69643300dcdd2b72f1d07f5e5ff5c12f5d3ebf512f48ae782fe0760d0e173ef2",
+      "bytes": 906
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/artifacts/expense-return-notifications-web.log",
+      "sha256": "b7fb23d859a451abca5e719f821e25a1c453713b9bd5344bb242acab3b6541c9",
+      "bytes": 12753
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/artifacts/expense-return-notifications-notice-final.log",
+      "sha256": "11f73e574e8a70929d226b8290122b7bda918fe14b3f64a1dc70654152d356f0",
+      "bytes": 42022
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/artifacts/expense-return-notifications-scope-fixture-error.log",
+      "sha256": "36cbaa46ecb8931f2c6b31d071c1f41035e2bc5c37e6b069e23d841105046386",
+      "bytes": 168285
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/artifacts/expense-return-notifications-compile-error.log",
+      "sha256": "b172ae9c5071fd630e0a0a7e28d87307905b2eef5dad1375789402f040c048d2",
+      "bytes": 15787
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/artifacts/expense-return-notifications-build.log",
+      "sha256": "9e34d81c01be0897cf801d6205bb04cdf169a037c25c09c74c3f6f90954d118e",
+      "bytes": 718
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/artifacts/expense-return-notifications-openapi.log",
+      "sha256": "c95eecaf40e926fe3c93ebc53b78a4bfddbd057d7c2949d73fd1dbf5fff767e2",
+      "bytes": 71
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/artifacts/expense-return-notifications-authors.log",
+      "sha256": "e00ee6a408e54b7285b7437f6ba1832638d5fee4de00da995d82d49085db613d",
+      "bytes": 73
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-return-notifications-evidence-snapshot/artifacts/expense-return-notifications-test-selection-guard.log",
+      "sha256": "778bbf8fbe40d5204f45795b08a9fdd8c9b9681b5080f365d1a6c7de7505861a",
+      "bytes": 7137
+    }
+  ],
+  "boundaries": [
+    "F17 整体仍为 OPEN；员工借款放款退回、还款与复核等独立来源仍须继续追链和覆盖核对。",
+    "本阶段为 H2 集成及真实 Vue 组件范围验证；固定安装包、真实浏览器、PostgreSQL 与企业真实回执均未冒充已验收。",
+    "浏览器管理员策略限制与 PostgreSQL 镜像层 I/O 阻碍保持，不绕过或修复受限环境。",
+    "当前分支仅本地提交；V02 最终本地门禁前不推送或创建 PR。"
+  ],
+  "goalCounting": {
+    "knownOpen": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "sessions": {
+    "96953": "EXIT_1 initial RED plus fixture mismatch",
+    "46941": "EXIT_1 actual inbox RED",
+    "29456": "EXIT_1 repeated inbox RED after wrong initial edit cwd; no source edits applied",
+    "67599": "EXIT_1 registration real RED",
+    "39429": "EXIT_1 copied Panel test import corrected",
+    "22160": "EXIT_0 new web 10",
+    "96121": "EXIT_2 new labels missing; corrected",
+    "37246": "EXIT_0 typecheck/build",
+    "69211": "EXIT_1 test preference method compile error; corrected",
+    "65653": "EXIT_0 OpenAPI and initial web 111; corrected selection later",
+    "23445": "EXIT_0 authors",
+    "85884": "EXIT_0 final web 134",
+    "29341": "EXIT_0 guard verified expected missing-file rejection",
+    "13491": "EXIT_1 scope 185 pass and one fixture error",
+    "93073": "EXIT_0 final six notice tests"
+  }
+}

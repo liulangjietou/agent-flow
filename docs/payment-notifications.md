@@ -1,6 +1,6 @@
 # 付款结果与财务异常通知
 
-这是 F17 的员工付款阶段记录。员工借款和费用报销的付款操作，以及付款操作创建前的出纳请求检查异常，现在可以产生最小站内消息及外发意向，并从消息读取对应的原授权。供应商付款已完成独立的后台、页面及范围验证，见[供应商付款通知](supplier-payment-notifications.md)。凭证准备与原过账通知另见[凭证通知](voucher-notifications.md)。费用预算及冲销通知已在后续阶段接通；供应商结算、回款及应付调整通知也已接通，见[供应商结算通知](supplier-settlement-notifications.md)、[供应商回款通知](supplier-return-notifications.md)及[供应商应付调整通知](supplier-adjustment-notifications.md)。F17 仍为 OPEN，其他独立资金核对及恢复来源的覆盖核对、固定安装包与环境验收尚未完成。
+这是 F17 的员工付款阶段记录。员工借款和费用报销的付款操作，以及付款操作创建前的出纳请求检查异常，现在可以产生最小站内消息及外发意向，并从消息读取对应的原授权。供应商付款已完成独立的后台、页面及范围验证，见[供应商付款通知](supplier-payment-notifications.md)。凭证准备与原过账通知另见[凭证通知](voucher-notifications.md)。费用预算及冲销通知已在后续阶段接通；供应商结算、回款及应付调整通知也已接通，见[供应商结算通知](supplier-settlement-notifications.md)、[供应商回款通知](supplier-return-notifications.md)及[供应商应付调整通知](supplier-adjustment-notifications.md)。报销付款退回查询与明确登记通知见[报销付款退回通知](expense-return-notifications.md)。F17 仍为 OPEN，其他独立资金核对及恢复来源的覆盖核对、固定安装包与环境验收尚未完成。
 
 ## 调用链与职责
 
