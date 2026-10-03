@@ -49924,7 +49924,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "原样保留的 XML NCName 标识，支持合法中文及 Unicode 字符；不能以数字开头，也不能包含空白、冒号、斜杠等非法字符。预检返回 INVALID_NODE_ID 或 INVALID_EDGE_ID，保存及发布返回 422 INVALID_DEFINITION。旧草稿仍可读取后修正，不自动重命名。"
           },
           "name": {
             "type": "string",
@@ -49963,7 +49964,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "description": "原样保留的 XML NCName 标识，支持合法中文及 Unicode 字符；不能以数字开头，也不能包含空白、冒号、斜杠等非法字符。预检返回 INVALID_NODE_ID 或 INVALID_EDGE_ID，保存及发布返回 422 INVALID_DEFINITION。旧草稿仍可读取后修正，不自动重命名。"
           },
           "source": {
             "type": "string"
@@ -50037,7 +50039,8 @@
             "type": "string"
           },
           "key": {
-            "type": "string"
+            "type": "string",
+            "description": "流程标识须为原样保留的 XML NCName；新建、设计预检和发布检查 INVALID_PROCESS_KEY。合法中文可用，草稿已有流程标识不可修改。"
           },
           "name": {
             "type": "string"
@@ -50096,7 +50099,8 @@
         "properties": {
           "key": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "流程标识须为原样保留的 XML NCName；新建、设计预检和发布检查 INVALID_PROCESS_KEY。合法中文可用，草稿已有流程标识不可修改。"
           },
           "name": {
             "type": "string",
@@ -50480,7 +50484,8 @@
         "properties": {
           "key": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "流程标识须为原样保留的 XML NCName；新建、设计预检和发布检查 INVALID_PROCESS_KEY。合法中文可用，草稿已有流程标识不可修改。"
           },
           "name": {
             "type": "string",
@@ -50687,7 +50692,8 @@
         "type": "object",
         "properties": {
           "key": {
-            "type": "string"
+            "type": "string",
+            "description": "流程标识须为原样保留的 XML NCName；新建、设计预检和发布检查 INVALID_PROCESS_KEY。合法中文可用，草稿已有流程标识不可修改。"
           },
           "templateVersion": {
             "type": "integer",

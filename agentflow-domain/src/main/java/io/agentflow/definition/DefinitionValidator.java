@@ -31,9 +31,11 @@ public final class DefinitionValidator {
     /** 图元素共享标识空间；已知流程标识时一并检查，避免部署时才发生冲突。 */
     public List<String> validate(Graph graph, FormSchema formSchema, String processKey) {
         List<String> errors = new ArrayList<>();
+        if (processKey != null && !DefinitionIdentifiers.valid(processKey)) errors.add("INVALID_PROCESS_KEY:" + processKey);
         if (graph.riskPolicy() != null) errors.addAll(graph.riskPolicy().validate(formSchema, graph.conditionLanguageVersion()));
         Map<String, Node> nodes = new HashMap<>();
         for (Node n : graph.nodes()) {
+            if (!DefinitionIdentifiers.valid(n.id())) errors.add("INVALID_NODE_ID:" + n.id());
             if (n.type() == NodeType.SUB_PROCESS) {
                 if (n.id().length() > FormSchema.MAX_NODE_ID_LENGTH || n.name().length() > MAX_SUBPROCESS_NODE_NAME_LENGTH) errors.add("SUBPROCESS_NODE_LIMIT_EXCEEDED:" + n.id());
                 try { SubprocessPolicy.fromProperties(n.properties()); }
@@ -127,6 +129,7 @@ public final class DefinitionValidator {
         Map<String, Integer> defaultBranches = new HashMap<>();
         ConditionParser parser = new ConditionParser();
         for (Edge e : graph.edges()) {
+            if (!DefinitionIdentifiers.valid(e.id())) errors.add("INVALID_EDGE_ID:" + e.id());
             if (!edgeIds.add(e.id())) errors.add("DUPLICATE_EDGE:" + e.id());
             if (nodes.containsKey(e.id())) errors.add("NODE_EDGE_ID_CONFLICT:" + e.id());
             if (e.id().equals(processKey)) errors.add("PROCESS_KEY_CONFLICT:" + e.id());

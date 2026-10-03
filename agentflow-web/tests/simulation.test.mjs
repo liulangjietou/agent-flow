@@ -82,6 +82,12 @@ test('标识冲突提示说明冲突类型，保留定位标识', () => {
   assert.deepEqual(simulationIssue('PROCESS_KEY_CONFLICT:edge:part'), { label: '流程标识与节点或连线标识重复，请更换流程标识', target: 'edge:part' })
 })
 
+test('非法标识提示区分节点、连线和流程，保留含冒号的原定位值', () => {
+  assert.deepEqual(simulationIssue('INVALID_NODE_ID:0'), { label: '节点标识不合法，请使用如 review_1 的编号，不能以数字开头或包含空白、冒号、斜杠', target: '0' })
+  assert.deepEqual(simulationIssue('INVALID_EDGE_ID:edge:part'), { label: '连线标识不合法，请使用如 route_1 的编号，不能以数字开头或包含空白、冒号、斜杠', target: 'edge:part' })
+  assert.deepEqual(simulationIssue('INVALID_PROCESS_KEY:0'), { label: '流程标识不合法，请使用如 expense_1 的编号，不能以数字开头或包含空白、冒号、斜杠', target: '0' })
+})
+
 test('条件升级只读请求携带原图与取消信号，不创建幂等写入', async () => {
   const {api,writeRequests}=await import(process.env.AGENTFLOW_TEST_API)
   const controller=new AbortController(), graph={nodes:[],edges:[],conditionLanguageVersion:1}
