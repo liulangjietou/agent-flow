@@ -907,7 +907,7 @@
           ]
         }
       ],
-      "observed": "已完成同步协议、V109 仓储，以及 V110 完整核对计划、显式采用／本地漂移预检和具名原子应用服务。152 个唯一范围用例通过，含整批停用的 RED→修复回归、并发应用、四处失败回滚和非空升级。来源 HTTP、工作器、管理 API、系统检查、页面及固定包完整验收尚待完成，继续 OPEN。",
+      "observed": "已完成 V109/V110 基础、预检与原子应用，并接通可信来源 HTTP、持久工作器及 11 个管理接口。最新范围 145 个唯一用例通过，112 个实际接口响应通过契约验证。系统检查、页面及固定包完整验收尚待完成，继续 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationController.java",
@@ -932,6 +932,10 @@
         {
           "path": "docs/evidence/organization-sync-application-20261004.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/organization-sync-backend-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "以单一可信源映射组织事实，预检和具名应用变更、停用及重试均有审计；不隐式创建认证身份或授予系统角色；旧审批轮次依据保持。",
@@ -945,6 +949,11 @@
         "status": "VERIFIED_NO_PUBLIC_ENTRYPOINT",
         "implementationCommit": "1a1b1fcaf1f742be34a30393707b7b3a0d29611e",
         "evidence": "docs/evidence/organization-sync-application-20261004.json"
+      },
+      "backendStage": {
+        "status": "HTTP_WORKER_ADMIN_API_VERIFIED_LOCAL_BACKEND",
+        "implementationCommit": "f1fad53377354b12463fe8c0f4357db0a82c3f8a",
+        "evidence": "docs/evidence/organization-sync-backend-20261004.json"
       }
     },
     {
@@ -3684,10 +3693,10 @@
   },
   "latestProgress": {
     "taskId": "I01",
-    "status": "PREFLIGHT_APPLICATION_VERIFIED_NO_PUBLIC_ENTRYPOINT",
-    "recordedAt": "2026-10-04T03:42:18.484318+00:00",
-    "sourceCommit": "1a1b1fcaf1f742be34a30393707b7b3a0d29611e",
-    "evidence": "docs/evidence/organization-sync-application-20261004.json",
+    "status": "HTTP_WORKER_ADMIN_API_VERIFIED_LOCAL_BACKEND",
+    "recordedAt": "2026-10-04T04:08:48.550852+00:00",
+    "sourceCommit": "f1fad53377354b12463fe8c0f4357db0a82c3f8a",
+    "evidence": "docs/evidence/organization-sync-backend-20261004.json",
     "knownOpenTaskCount": 34
   }
 }

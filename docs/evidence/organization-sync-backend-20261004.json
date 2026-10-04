@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 1,
+  "taskId": "I01",
+  "status": "HTTP_WORKER_ADMIN_API_VERIFIED_LOCAL_BACKEND",
+  "recordedAt": "2026-10-04T04:08:48.550852+00:00",
+  "sourceCommit": "f1fad53377354b12463fe8c0f4357db0a82c3f8a",
+  "baselineCommit": "280411e195b7a1166b450f768b02ef650c897745",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "可信单租户来源配置、有界只读 HTTP、持久批次工作器、管理员排队/重试/取消/核对/应用/历史接口及 OpenAPI；系统检查、页面及固定包完整验收尚待完成。",
+  "validation": {
+    "final": {
+      "recordedAt": "2026-10-04T04:07:39.705896+00:00",
+      "executed": 145,
+      "unique": 145,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "classes": {
+        "OrganizationSyncSourceTest": 24,
+        "OrganizationSyncApiIntegrationTest": 37,
+        "OrganizationSyncApplicationTest": 35,
+        "OrganizationSyncPersistenceTest": 23,
+        "OpenApiContractTest": 7,
+        "OrganizationIntegrationTest": 7,
+        "OrganizationApprovalIntegrationTest": 11,
+        "OidcOrganizationJourneyIntegrationTest": 1
+      }
+    },
+    "initialSelectedGate": {
+      "status": "PASS",
+      "unique": 118
+    },
+    "deduplication": "最终 145 来自八个明确执行测试类的实际 (classname,name)，不累计首轮 118 或前一阶段 152。",
+    "apiCapture": {
+      "recordedAt": "2026-10-04T04:07:40.198Z",
+      "source": "/fyoung/tmp/agentflow-remaining-20260928/i01-backend-http-final.json",
+      "responses": 112,
+      "successfulRequests": 37,
+      "replayed": 5,
+      "operations": [
+        "GET /api/v1/organization/synchronization",
+        "GET /api/v1/organization/synchronization/batches",
+        "GET /api/v1/organization/synchronization/batches/{id}",
+        "GET /api/v1/organization/synchronization/batches/{id}/plans",
+        "GET /api/v1/organization/synchronization/batches/{id}/transitions",
+        "GET /api/v1/organization/synchronization/plans/{planId}",
+        "POST /api/v1/organization/synchronization/batches",
+        "POST /api/v1/organization/synchronization/batches/{id}/apply",
+        "POST /api/v1/organization/synchronization/batches/{id}/cancel",
+        "POST /api/v1/organization/synchronization/batches/{id}/preflight",
+        "POST /api/v1/organization/synchronization/batches/{id}/retry"
+      ],
+      "statuses": [
+        200,
+        201,
+        202,
+        400,
+        403,
+        404,
+        409,
+        503
+      ],
+      "transport": "MockMvc 管理入口、真实回环 HTTP 来源，同一 JDBC 持久状态与工作器"
+    },
+    "staticContract": {
+      "status": "PASS",
+      "operations": 377,
+      "schemas": 800,
+      "requestExamples": 129,
+      "newOperations": 11,
+      "newSchemas": 33
+    },
+    "authors": {
+      "javaFiles": 1679,
+      "namedTypes": 3303,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "gitDiffCheck": "PASS"
+  },
+  "verified": [
+    "来源固定 GET、无本地组织正文、精确租户/来源/游标、拒绝重定向、超量响应流及完整响应超时。",
+    "读取网络在组织事务之外；读取中取消可立即提交，迟到结果不覆盖决定。",
+    "多工作器不重复发送已领取批次；发送前复核取消、目标与原租约，过期不自动重发。",
+    "读取中来源停用或目标变化只记录稳定失败，不接收旧事实；预检与应用前同样复核目标。",
+    "完整排队、接收、具名预检与明确应用，收到事实不改变组织或推进来源游标。",
+    "鉴权先于幂等回放、账号及租户隔离、严格 JSON 与参数范围、回执不缓存完整组织正文。",
+    "来源注册和排队失败原子回滚、版本冲突、单活动批次、追加重试及历史前缀一致性。",
+    "原组织管理、审批及 OIDC 组织旅程范围回归。"
+  ],
+  "limitations": [
+    "管理 API 使用 MockMvc，尚未用最终可执行包覆盖全部真实网络管理请求。",
+    "新阶段尚未接入系统检查和管理页面，也未进行固定包非空升级、进程重启、配套恢复及旧审批接续验收。",
+    "仓储重建验证原租约保持，不等同于真实进程重启。",
+    "浏览器受管理员策略限制，未重试或绕过；PostgreSQL 镜像层 I/O 限制仍未解除。",
+    "真实企业组织源归 E09，本地合成回环来源不代表企业联调通过。"
+  ],
+  "preservation": {
+    "mainCommit": "fec4a87c6c785ddabf40ad2584060e264abddd2f",
+    "mainClean": true,
+    "originalRuntimePid": 87821,
+    "originalRuntimeAlive": true,
+    "originalRuntimeModified": false,
+    "seedFilesModified": false,
+    "remoteDelivery": "仍按本地优先；V02 之后进入 E15。"
+  },
+  "sourceFiles": [
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java",
+      "sha256": "fd5fe80a201331c17bff18cad4e0eeefc0ac54f7cd0f7a4d95252d9dd9f8fcf2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/HttpOrganizationSyncSource.java",
+      "sha256": "4763854f17535e59df7ac11fb987fbb1dcbc28a417021033a1b7c66b88ac5a59"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/JdbcOrganizationSyncPlanRepository.java",
+      "sha256": "f2922a7285ddb158008cd786c606c2824e846817c7454818de07fa081372cf09"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/JdbcOrganizationSyncRepository.java",
+      "sha256": "97ca9be425f3d582b61d1aecb1a737ed3c4022b37ef32f39aba304eb990b3d6f"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationSyncApplicationService.java",
+      "sha256": "b100c827b1dc2006cc7dd643b9067c2c0fd813cbeae062791dda3d50d6f1dd1e"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationSyncConfiguration.java",
+      "sha256": "04b1ecb426944036db8de2664a816de449f5bc4a92a6aba1367910d0d0709b58"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationSyncController.java",
+      "sha256": "56240e966be4af1b533afc95f38a5c3112bd2965efb0b3fc5fedbb9c602d7c75"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationSyncJsonConfiguration.java",
+      "sha256": "cb163e6a8a20d88e59bd357c377d3813f5e2186d3afe6ffb6de47d7ee478c053"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationSyncScheduling.java",
+      "sha256": "494803f72d5aaf871b0bfb4696709bd140b0d6481cc8492ecfe5836b4fdd4237"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationSyncService.java",
+      "sha256": "064832860fa7d44d001a327c95d1c98a0cca92d71d16eda795a4cd494b92c68c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationSyncWorker.java",
+      "sha256": "e14b14d1f937071daaeefb3ceb1308477e45c7560383fac668bb1f57d1784427"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "cbf201bab602c668cbe038beac92232510f867acecb95b881093e1618270b479"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java",
+      "sha256": "94e61464d3e63dfd07233d83d57ef1daafa2ac01c11c651f49abe76c70a3d9d0"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/organization/OrganizationSyncApiIntegrationTest.java",
+      "sha256": "a9b2f4778f7f344796c2a24a963018e36f4e9649212b789af9ab02d22511f126"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/organization/OrganizationSyncApplicationTest.java",
+      "sha256": "3c202e2561f0cadeff8767639f32c70c939716aa67d45ada69cce8f464df0b2f"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/organization/OrganizationSyncSourceTest.java",
+      "sha256": "020da5e1457fcf2c3d8ef61ad6457e0d58c07c7e207d980f4004a7495ea1515a"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/organization/OrganizationSyncTestSource.java",
+      "sha256": "586061e46d9f54fccb86f9c0641294e08995c5127b46bb0dd01621c704de2749"
+    }
+  ],
+  "artifacts": {
+    "root": "/fyoung/tmp/agentflow-remaining-20260928/i01-backend-evidence-20261004",
+    "manifest": "manifest.json",
+    "fileCount": 43,
+    "totalBytes": 9391574
+  },
+  "remaining": {
+    "taskStatus": "OPEN",
+    "knownOpen": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  }
+}
