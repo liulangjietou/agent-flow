@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T02:56:46.930270+00:00",
+  "recordedAt": "2026-10-04T03:24:16.527085+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -907,7 +907,7 @@
           ]
         }
       ],
-      "observed": "现有组织目录为可信管理员维护单位、人员、任职和关系；已实现 OIDC，但没有同步批次、来源映射、冲突处置及恢复入口。",
+      "observed": "已完成来源增量协议、同步批次和稳定映射领域、严格 JSON、V109 五表及 JDBC 持久化基础；102 个唯一范围用例通过，覆盖并发、事务回滚、租户隔离和非空迁移。尚无来源 HTTP、预检与人工应用服务、管理 API、工作器及页面；完整本地用例仍未完成。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationController.java",
@@ -920,10 +920,23 @@
         {
           "path": "docs/local-organization.md",
           "line": 1
+        },
+        {
+          "path": "docs/organization-sync.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/organization-sync-foundation-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "以单一可信源映射组织事实，预检和具名应用变更、停用及重试均有审计；不隐式创建认证身份或授予系统角色；旧审批轮次依据保持。",
-      "dependsOn": []
+      "dependsOn": [],
+      "foundationStage": {
+        "status": "VERIFIED_NO_USER_ENTRYPOINT",
+        "implementationCommit": "7cbb27278549cc7073afe4c6a2fce68c2389817b",
+        "evidence": "docs/evidence/organization-sync-foundation-20261004.json"
+      }
     },
     {
       "id": "I02",
@@ -3635,8 +3648,8 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "A03",
-    "I01"
+    "I01",
+    "I02"
   ],
   "externalDelivery": {
     "remoteConfigured": true,
@@ -3661,11 +3674,11 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "A03",
-    "status": "FRONTEND_VERIFIED_FIXED_PACKAGE_RUNTIME_PENDING",
-    "recordedAt": "2026-10-04T02:39:53.936045+00:00",
-    "sourceCommit": "4800ba67ae15aff6ebcef34846999002d5a25637",
-    "evidence": "docs/evidence/expense-draft-assist-ui-20261004.json",
+    "taskId": "I01",
+    "status": "FOUNDATION_VERIFIED_PREFLIGHT_AND_APPLICATION_PENDING",
+    "recordedAt": "2026-10-04T03:24:16.527085+00:00",
+    "sourceCommit": "7cbb27278549cc7073afe4c6a2fce68c2389817b",
+    "evidence": "docs/evidence/organization-sync-foundation-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
