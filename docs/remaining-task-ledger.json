@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T01:53:33.883655+00:00",
+  "recordedAt": "2026-10-04T02:19:59.754802+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -814,7 +814,7 @@
           ]
         }
       ],
-      "observed": "本地实现 49a706c：已完成报销行程、类别和分摊建议协议、精确来源及目录约束、逐项确认领域状态、真实回环模型适配和 V108 运行/轨迹仓储。两阶段分别 76、68 条测试通过，去重 95 条；非空 V107→V108、并发领取、事务回滚及租约恢复验证通过。尚未接通应用服务、工作器、HTTP 和费用页面，也未完成固定包运行恢复、浏览器或 PostgreSQL 验收，继续 OPEN。",
+      "observed": "本地实现 49a706c、8bc8608：报销行程/类别/分摊协议、V108 仓储、本人来源预览、应用服务、工作器及六个 HTTP 操作完成。本轮 98 条范围测试、107 份应用响应和 61 份成功请求契约通过；原有效期、来源重读、幂等权限、并发和回滚均有证据。费用页面与客户端、固定包运行恢复、浏览器和 PostgreSQL 验收待完成，继续 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/agent/DraftAssistInputs.java",
@@ -830,6 +830,10 @@
         },
         {
           "path": "docs/evidence/expense-draft-assist-foundation-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-draft-assist-backend-20261004.json",
           "line": 1
         }
       ],
@@ -3645,10 +3649,10 @@
   },
   "latestProgress": {
     "taskId": "A03",
-    "status": "PARTIAL_FOUNDATION_VERIFIED_NO_USER_ENTRYPOINT",
-    "recordedAt": "2026-10-04T01:53:33.883655+00:00",
-    "sourceCommit": "49a706c492f77bea02f40daa4bf0b667a79e1efc",
-    "evidence": "docs/evidence/expense-draft-assist-foundation-20261004.json",
+    "status": "BACKEND_VERIFIED_UI_AND_RUNTIME_PENDING",
+    "recordedAt": "2026-10-04T02:19:59.754802+00:00",
+    "sourceCommit": "8bc8608b81b1256043e91fb65f8cd4f2498312ac",
+    "evidence": "docs/evidence/expense-draft-assist-backend-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
