@@ -1,0 +1,111 @@
+{
+  "taskId": "I02",
+  "status": "DOMAIN_AND_SERIALIZATION_VERIFIED_NO_ENTRYPOINT",
+  "recordedAt": "2026-10-04T05:12:00.326399+00:00",
+  "implementationCommit": "ec0eff523b17745b71d039cf51221f7335947fdf",
+  "baseCommit": "676ee6195e6cf9d5cb29cb88760e4b9d6e76b51f",
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/i02-domain-evidence-20261004",
+  "manifestSha256": "fb1d7a403a7cd56b1406df4e07c75e589b4f13d2a4ff3788c42f9297c1f081d2",
+  "sourceFiles": [
+    {
+      "path": "implementation/agentflow-domain/src/main/java/io/agentflow/signature/SignatureOperation.java",
+      "size": 14283,
+      "sha256": "847ee0cfbb5ac4c16467cb3bc91c1f93d5d7867521255414fc9b2c18063015b8"
+    },
+    {
+      "path": "implementation/agentflow-domain/src/main/java/io/agentflow/signature/SignatureReceipt.java",
+      "size": 6500,
+      "sha256": "0c34c10c0a1e50bda9e78bb396853183a95c34a42247e6286b1644a4890bf617"
+    },
+    {
+      "path": "implementation/agentflow-domain/src/main/java/io/agentflow/signature/SignatureRequest.java",
+      "size": 7981,
+      "sha256": "1fc2d7d3b1e253302ffeae65d4774887f36b5ae7a495c0cc7984027fb7b9edf6"
+    },
+    {
+      "path": "implementation/agentflow-domain/src/test/java/io/agentflow/signature/SignatureOperationTest.java",
+      "size": 17525,
+      "sha256": "413f179212b50ffba16e7a438915be223d4f6637390746b6a562a99f0c183cfe"
+    },
+    {
+      "path": "implementation/agentflow-domain/src/test/java/io/agentflow/signature/SignatureReceiptTest.java",
+      "size": 8454,
+      "sha256": "5f4838835d898ca75f96371144c55d233c6fe3d7f8abb10fa5415fcbccdb5c28"
+    },
+    {
+      "path": "implementation/agentflow-domain/src/test/java/io/agentflow/signature/SignatureRequestTest.java",
+      "size": 9934,
+      "sha256": "36cc65c3a0b79eb9aefd8fe6feb56e4fe2442c35e63ec349d8b56b766aa49cd6"
+    },
+    {
+      "path": "implementation/agentflow-domain/src/test/java/io/agentflow/signature/SignatureTestFixtures.java",
+      "size": 2637,
+      "sha256": "3c6c8651d672a35bf2e048e9958503ff9587ebcd68cccd775d60411d2af645ab"
+    },
+    {
+      "path": "implementation/agentflow-server/src/test/java/io/agentflow/signature/SignatureSerializationTest.java",
+      "size": 5763,
+      "sha256": "bd348133d2d72ce4c17cd5d744ec1cf9356bbe451d0d84dc0c594affac47640e"
+    }
+  ],
+  "tests": {
+    "unique": 38,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "classes": {
+      "SignatureRequestTest": 9,
+      "SignatureReceiptTest": 9,
+      "SignatureOperationTest": 17,
+      "SignatureSerializationTest": 3
+    }
+  },
+  "testCounting": "Unique (classname,name) in the four selected final Surefire reports; earlier runs are not added.",
+  "regression": {
+    "test": "SignatureOperationTest.restorationCannotClaimThatTheFirstSendStartedAfterAuthorizationExpired",
+    "red": {
+      "unique": 1,
+      "failures": 1,
+      "errors": 0,
+      "summary": "/fyoung/tmp/agentflow-remaining-20260928/i02-expired-send-red-summary.json"
+    },
+    "cause": "The first-send claim checked authorization expiry, but persisted SENDING restoration did not.",
+    "fix": "The entity restoration invariant also requires first-send claim time to precede authorization expiry.",
+    "green": "Included in the final 38 passing cases."
+  },
+  "harnessAdjustment": {
+    "firstRun": {
+      "unique": 35,
+      "failures": 0,
+      "errors": 1
+    },
+    "cause": "The domain test classpath did not contain the Java time serialization module.",
+    "resolution": "Move serialization coverage to the server test module with JsonUtil and the existing JavaTimeModule; no dependency was added.",
+    "productRed": false
+  },
+  "authorGate": {
+    "javaFiles": 1687,
+    "namedTypes": 3323,
+    "missingAuthorTags": 0,
+    "parseErrors": 0
+  },
+  "verifiedScope": [
+    "Immutable declared source-round, document, authorization and signer snapshots with canonical request digest; actual application authorization is not yet connected.",
+    "One first send; timeout and NOT_FOUND only allow querying the original operation.",
+    "Revision and request-bound receipts, duplicate callback idempotence and terminal conflict protection.",
+    "Independent reserved content identifiers, complete result-file confirmation and download-only recovery.",
+    "JSON round-trip of all 11 operation phases and rejection of malformed stored state and duplicate or trailing receipt JSON."
+  ],
+  "remainingScope": [
+    "Durable repository, tenant and frozen-round references, optimistic concurrency and audit history.",
+    "Trusted signer profiles, actual receipt authenticity verification and bounded fixed-target transmission.",
+    "Current application and field authorization, worker, public API, diagnostics and UI.",
+    "Fixed-package upgrade, crash and paired database/file recovery acceptance.",
+    "Browser, PostgreSQL and E10 real enterprise signature acceptance."
+  ],
+  "ledger": {
+    "status": "OPEN",
+    "knownOpenTaskCount": 34,
+    "completeInventory": false
+  }
+}

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T04:49:29.886156+00:00",
+  "recordedAt": "2026-10-04T05:12:37.502899+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -20,7 +20,37 @@
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
-    ]
+    ],
+    "localDeliveryBreakdown": {
+      "recordedAt": "2026-10-04T05:12:37.502899+00:00",
+      "implementationRemaining": {
+        "count": 9,
+        "taskIds": [
+          "A01",
+          "A04",
+          "I02",
+          "F04",
+          "F05",
+          "F09",
+          "F14",
+          "F15",
+          "F16"
+        ]
+      },
+      "implementedAwaitingBrowserAndPostgresVerification": {
+        "count": 7,
+        "taskIds": [
+          "A02",
+          "A03",
+          "I01",
+          "F11",
+          "F12",
+          "F17",
+          "W01"
+        ]
+      },
+      "note": "This is a breakdown of the 16 OPEN local delivery tasks, not additional tasks or new completion claims."
+    }
   },
   "requirements": [
     {
@@ -998,7 +1028,7 @@
           ]
         }
       ],
-      "observed": "现有事件和支付 HMAC 验签解决消息完整性；未有文件签署业务用例。OFD 签章渲染也不等于电子签服务。",
+      "observed": "固定来源、授权、原件及签署人模型，单次发送与查询恢复状态机、回执修订冲突和独立结果文件约束已实现；38 个领域及服务端序列化范围用例通过。恢复首次发送状态的授权截止遗漏已先复现再修复。持久仓储、可信签署及验真适配器、当前权限编排、后台执行、接口与页面尚未接通，继续 OPEN。",
       "references": [
         {
           "path": "docs/product-goal-gap-audit.md",
@@ -1007,10 +1037,23 @@
         {
           "path": "docs/expense-archives.md",
           "line": 1
+        },
+        {
+          "path": "docs/electronic-signatures.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/electronic-signature-domain-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "固定文件与签署版本、显式授权、异步状态、可验证回执、重复回调和未知结果恢复；保留原件、授权及签署结果，完成本地受控协议验收。",
-      "dependsOn": []
+      "dependsOn": [],
+      "foundationStage": {
+        "status": "DOMAIN_AND_SERIALIZATION_VERIFIED_NO_ENTRYPOINT",
+        "implementationCommit": "ec0eff523b17745b71d039cf51221f7335947fdf",
+        "evidence": "docs/evidence/electronic-signature-domain-20261004.json"
+      }
     },
     {
       "id": "F01",
@@ -3684,7 +3727,6 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "I01",
     "I02"
   ],
   "externalDelivery": {
@@ -3710,11 +3752,11 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "I01",
-    "status": "FIXED_PACKAGE_LOCAL_H2_RUNTIME_VERIFIED_BROWSER_AND_POSTGRES_PENDING",
-    "recordedAt": "2026-10-04T04:49:29.886156+00:00",
-    "sourceCommit": "0cbe62bdcff0a00553bc13d5619b127a201e4ffc",
-    "evidence": "docs/evidence/organization-sync-runtime-20261004.json",
+    "taskId": "I02",
+    "status": "DOMAIN_AND_SERIALIZATION_VERIFIED_NO_ENTRYPOINT",
+    "recordedAt": "2026-10-04T05:12:37.502899+00:00",
+    "sourceCommit": "ec0eff523b17745b71d039cf51221f7335947fdf",
+    "evidence": "docs/evidence/electronic-signature-domain-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
