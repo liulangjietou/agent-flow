@@ -51,6 +51,27 @@ public class SignatureAccess {
         return new SignatureOperation.Input(request, declaration.targetDigest());
     }
 
+    /** 成功请求重放前仍检查当前原件权限，但不重新要求旧批准版本或资料仍可用于新授权。 */
+    public List<SignatureRequest.Document> requireSelection(Actor actor, UUID applicationId, int roundNo, List<UUID> documentIds) {
+        requireRound(actor, applicationId, roundNo);
+        return documentIds.stream().map(id -> document(actor, applicationId, roundNo, id)).toList();
+    }
+
+    /** 列表首先复用申请与轮次授权，具体操作再分别检查原件字段权限。 */
+    public void requireRound(Actor actor, UUID applicationId, int roundNo) {
+        active(actor); applications.getForActor(actor, applicationId);
+        rounds.findByRound(actor.tenantId(), applicationId, roundNo)
+                .orElseThrow(() -> new DomainException("NOT_FOUND", "Submission round not found"));
+    }
+
+    /** 可选资料只来自当前具名授权，组织目录不补授签署身份。 */
+    public List<SignatureProfile> profiles(Actor actor) {
+        active(actor);
+        return configuration.declarations().stream().filter(SignatureGatewayConfiguration.Declaration::enabled)
+                .map(SignatureGatewayConfiguration.Declaration::profile)
+                .filter(value -> value.tenantId().equals(actor.tenantId()) && value.actors().contains(actor.userId())).toList();
+    }
+
     /** 状态与自由文本只向能读取全部原件的当前主体开放；不沿用创建时缓存的权限。 */
     public void requireReadable(Actor actor, SignatureOperation operation) {
         active(actor);

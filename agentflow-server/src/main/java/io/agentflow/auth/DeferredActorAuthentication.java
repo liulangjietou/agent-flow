@@ -33,6 +33,9 @@ public class DeferredActorAuthentication {
         this.demo = demo; this.oidc = oidc; this.jdbc = jdbc; this.sessions = sessions; this.logouts = logouts;
     }
 
+    /** 展示入口只说明当前部署是否支持延迟认证，不返回会话标识或认证配置。 */
+    public boolean available() { return !oidc.enabled() || sessions.getIfAvailable() != null; }
+
     /** 捕获当前认证请求对应的原登录；企业引用不是浏览器使用的 SESSION_ID。 */
     public LoginReference capture(HttpServletRequest request, Actor actor, Instant now) {
         LoginReference reference;

@@ -120,6 +120,18 @@ public class SignatureOperationService {
                 failure == null ? SignatureAudit.Action.SIGNATURE_SAVED : SignatureAudit.Action.SIGNATURE_RETRY);
     }
 
+    /** 回调与工作器沿用相同锁序和固定输入；状态、预留、证据及审计必须同时提交。 */
+    @Transactional
+    public void receiveCallback(SignatureCallbackVerifier.Callback callback, Instant now) {
+        var request = callback.input().request();
+        var initial = operations.find(request.tenantId(), request.id()).orElseThrow(SignatureOperationService::notFound); lockApplication(initial);
+        var current = operations.lock(request.tenantId(), request.id()).orElseThrow(SignatureOperationService::notFound);
+        if (!current.input().equals(callback.input())) throw new DomainException("SIGNATURE_RECEIPT_CONFLICT", "Signature callback original input changed");
+        var accepted = current.receiveCallback(callback.verified().receipt(), now);
+        if (!accepted.equals(current)) save(accepted, SignatureAudit.Action.SIGNATURE_CALLBACK);
+        if (accepted(accepted, callback.verified().receipt())) evidence.append(accepted, callback.verified().evidence());
+    }
+
     private boolean authorized(SignatureOperation operation, Instant now) {
         var request = operation.input().request();
         var actor = logins.find(operation).flatMap(login -> authentication.resolve(login, request.tenantId(), request.authorization().actor(), now));

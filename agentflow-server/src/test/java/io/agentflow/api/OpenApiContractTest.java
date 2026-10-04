@@ -87,6 +87,16 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("SignatureOptions", io.agentflow.signature.SignaturePublicService.Options.class),
+                java.util.Map.entry("SignatureProfileOption", io.agentflow.signature.SignaturePublicService.ProfileOption.class),
+                java.util.Map.entry("SignatureReceipt", io.agentflow.signature.SignaturePublicService.Receipt.class),
+                java.util.Map.entry("SignaturePage", io.agentflow.signature.SignaturePublicService.Page.class),
+                java.util.Map.entry("SignatureView", io.agentflow.signature.SignaturePublicService.View.class),
+                java.util.Map.entry("SignatureDocumentView", io.agentflow.signature.SignaturePublicService.DocumentView.class),
+                java.util.Map.entry("SignatureCallbackEnvelope", io.agentflow.signature.SignatureReceiptVerifier.Envelope.class),
+                java.util.Map.entry("SignatureProviderReceipt", io.agentflow.signature.SignatureReceipt.class),
+                java.util.Map.entry("SignatureArtifact", io.agentflow.signature.SignatureReceipt.Artifact.class),
+                java.util.Map.entry("SignatureProof", io.agentflow.signature.SignatureReceipt.Proof.class),
                 java.util.Map.entry("OrganizationSyncOverview", io.agentflow.organization.OrganizationSyncService.Overview.class),
                 java.util.Map.entry("OrganizationSyncReceipt", io.agentflow.organization.OrganizationSyncService.Receipt.class),
                 java.util.Map.entry("OrganizationSyncRequest", io.agentflow.organization.OrganizationSyncService.Request.class),

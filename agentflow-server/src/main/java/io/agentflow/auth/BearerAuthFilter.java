@@ -1,5 +1,7 @@
 package io.agentflow.auth;
 
+import io.agentflow.signature.SignatureCallbackVerifier;
+
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.Actor;
 import java.net.URLDecoder;
@@ -143,7 +145,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
 
     private boolean isPublic(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return PaymentCallbackVerifier.matches(request) || EventIngressVerifier.matches(request) || (HttpMethod.POST.matches(request.getMethod()) && path.equals("/api/v1/auth/login"))
+        return PaymentCallbackVerifier.matches(request) || EventIngressVerifier.matches(request) || SignatureCallbackVerifier.matches(request) || (HttpMethod.POST.matches(request.getMethod()) && path.equals("/api/v1/auth/login"))
                 || (HttpMethod.GET.matches(request.getMethod()) && path.equals("/api/v1/auth/options"))
                 || ((HttpMethod.GET.matches(request.getMethod()) || HttpMethod.HEAD.matches(request.getMethod()))
                 && PUBLIC_HEALTH_PATHS.contains(path)) || path.equals("/error");

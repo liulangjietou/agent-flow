@@ -86,6 +86,10 @@
     {
       "name": "科目配置",
       "description": "法人及币种范围内的科目草稿、不可变发布和生效历史；专用 FINANCE_CONFIG_ADMIN 权限。"
+    },
+    {
+      "name": "电子签",
+      "description": "固定轮次、原件与具名授权的持久签署操作，验真回调及独立结果下载。"
     }
   ],
   "paths": {
@@ -50364,6 +50368,1038 @@
           }
         ]
       }
+    },
+    "/api/v1/signatures/options": {
+      "get": {
+        "operationId": "signatureOptions",
+        "tags": [
+          "电子签"
+        ],
+        "summary": "读取当前电子签资料和可用性",
+        "description": "只返回已启用且允许当前主体的资料名称与版本，以及固定文件限制。enabled 同时要求延后身份恢复与文档存储可用。无签署账户、端点、凭据、公钥或其他授权人。",
+        "x-access": "当前登录用户；已初始化组织中须为有效人员。",
+        "x-idempotency": false,
+        "parameters": [],
+        "responses": {
+          "400": {
+            "description": "请求、字段或查询格式无效。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "认证无效；回调使用原操作绑定的回执签名。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前权限不足，或企业写操作 CSRF/页面身份不匹配。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "申请、轮次、操作或文件不存在或不可见。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源、状态、版本、回执或幂等冲突；结果尚未完成也返回此状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域约束不满足。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "共享认证、文件存储或已保存证据不可用或不完整。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的请求或基础设施故障；写入结果未知时保留原请求及幂等键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "敏感业务响应禁止缓存。",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignatureOptions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{applicationId}/signatures": {
+      "get": {
+        "operationId": "listSignatures",
+        "tags": [
+          "电子签"
+        ],
+        "summary": "按固定审批轮次分页读取电子签操作",
+        "description": "查询不能领取执行、续租或发送网络请求。未知或重复查询参数拒绝。当前不可读项被过滤，空页仍可能有下一游标。",
+        "x-access": "当前租户可读该申请、该轮次及操作全部原件字段的具名用户；管理员无敏感字段绕过。",
+        "x-idempotency": false,
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "afterId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "请求、字段或查询格式无效。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "认证无效；回调使用原操作绑定的回执签名。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前权限不足，或企业写操作 CSRF/页面身份不匹配。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "申请、轮次、操作或文件不存在或不可见。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源、状态、版本、回执或幂等冲突；结果尚未完成也返回此状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域约束不满足。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "共享认证、文件存储或已保存证据不可用或不完整。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的请求或基础设施故障；写入结果未知时保留原请求及幂等键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "敏感业务响应禁止缓存。",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignaturePage"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createSignature",
+        "tags": [
+          "电子签"
+        ],
+        "summary": "明确授权已批准原件的本次签署",
+        "description": "成功重放先重查当前原件权限，然后返回原最小回执；来源版本更新或存储暂不可用不重新执行历史成功。新请求在事务外核对原件字节，在事务内固定当前轮次、原件、具名登录、资料版本和目标。工作器首次外发前再次核对当前登录及权限。批准申请不自动授权签名。",
+        "x-access": "当前租户可读该申请、该轮次及操作全部原件字段的具名用户；管理员无敏感字段绕过。",
+        "x-idempotency": true,
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "请求、字段或查询格式无效。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "认证无效；回调使用原操作绑定的回执签名。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前权限不足，或企业写操作 CSRF/页面身份不匹配。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "申请、轮次、操作或文件不存在或不可见。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源、状态、版本、回执或幂等冲突；结果尚未完成也返回此状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域约束不满足。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "共享认证、文件存储或已保存证据不可用或不完整。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的请求或基础设施故障；写入结果未知时保留原请求及幂等键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "敏感业务响应禁止缓存。",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；不会再次创建或取消。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignatureReceipt"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignatureCreateInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{applicationId}/signatures/{id}": {
+      "get": {
+        "operationId": "getSignature",
+        "tags": [
+          "电子签"
+        ],
+        "summary": "读取电子签详情",
+        "description": "每次重查当前原件字段权限。仅展示公开操作状态、授权说明和原文件引用；不返回内部内容身份、登录引用、供应方记录或签名原文。",
+        "x-access": "当前租户可读该申请、该轮次及操作全部原件字段的具名用户；管理员无敏感字段绕过。",
+        "x-idempotency": false,
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "请求、字段或查询格式无效。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "认证无效；回调使用原操作绑定的回执签名。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前权限不足，或企业写操作 CSRF/页面身份不匹配。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "申请、轮次、操作或文件不存在或不可见。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源、状态、版本、回执或幂等冲突；结果尚未完成也返回此状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域约束不满足。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "共享认证、文件存储或已保存证据不可用或不完整。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的请求或基础设施故障；写入结果未知时保留原请求及幂等键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "敏感业务响应禁止缓存。",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignatureView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{applicationId}/signatures/{id}/cancel": {
+      "post": {
+        "operationId": "cancelSignature",
+        "tags": [
+          "电子签"
+        ],
+        "summary": "取消尚未发送的电子签授权",
+        "description": "取消不等于远程撤销。工作器已经领取或结果未知时不能取消。预期版本精确匹配；成功幂等重放仍复核当前字段权限，不重复追加审计。",
+        "x-access": "原具名授权人且当前全部原件可读；仅 QUEUED 状态。",
+        "x-idempotency": true,
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "请求、字段或查询格式无效。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "认证无效；回调使用原操作绑定的回执签名。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前权限不足，或企业写操作 CSRF/页面身份不匹配。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "申请、轮次、操作或文件不存在或不可见。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源、状态、版本、回执或幂等冲突；结果尚未完成也返回此状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域约束不满足。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "共享认证、文件存储或已保存证据不可用或不完整。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的请求或基础设施故障；写入结果未知时保留原请求及幂等键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "敏感业务响应禁止缓存。",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；不会再次创建或取消。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignatureReceipt"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignatureCancelInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/applications/{applicationId}/signatures/{id}/documents/{documentId}/content": {
+      "get": {
+        "operationId": "downloadSignedDocument",
+        "tags": [
+          "电子签"
+        ],
+        "summary": "下载本地完整电子签结果",
+        "description": "documentId 是原附件引用，结果采用独立存储身份。仅本地 SIGNED 可下载，且每次读取检查实际大小和 SHA-256；原件不覆盖。",
+        "x-access": "当前租户可读该申请、该轮次及操作全部原件字段的具名用户；管理员无敏感字段绕过。",
+        "x-idempotency": false,
+        "parameters": [
+          {
+            "name": "applicationId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "documentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "请求、字段或查询格式无效。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "认证无效；回调使用原操作绑定的回执签名。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "当前权限不足，或企业写操作 CSRF/页面身份不匹配。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "申请、轮次、操作或文件不存在或不可见。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源、状态、版本、回执或幂等冲突；结果尚未完成也返回此状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域约束不满足。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "共享认证、文件存储或已保存证据不可用或不完整。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的请求或基础设施故障；写入结果未知时保留原请求及幂等键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "全部结果已 READY 且此文件字节校验通过。",
+            "headers": {
+              "Cache-Control": {
+                "description": "敏感业务响应禁止缓存。",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Content-Disposition": {
+                "description": "UTF-8 附件下载文件名。",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "type": "string",
+                  "const": "nosniff"
+                }
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/integrations/signatures/callbacks": {
+      "post": {
+        "operationId": "receiveSignatureCallback",
+        "tags": [
+          "电子签"
+        ],
+        "summary": "接收已签名的原电子签回执",
+        "description": "仅精确 POST 路径免除用户认证及 CSRF。租户与操作头只定位原请求，不能替代签名正文绑定。Content-Type 必须为 application/json 且 UTF-8；不得有查询串、Content-Encoding 或重复认证头，原文最多 65536 字节。Ed25519 覆盖 UTF-8 的 agentflow-signature-receipt-1 加一个 LF，再连接原始正文。使用原资料公钥；资料停用不拒绝既有事实，移除或更换资料时可从已保存且重新验真的证据恢复原公钥。先验签后解析，当前输入、服务目标、原件和签署方必须完全绑定。首次发送之前、NOT_FOUND 回调、同修订不同事实或替换终态均拒绝；重复与旧修订不回滚现有事实。204 仅确认接收，不代表文件已经下载、归档或真实证书/时间戳验收通过。",
+        "x-access": "原操作固定资料公钥的 Ed25519 原始回执签名；用户会话和 Bearer 不能代替。",
+        "x-idempotency": false,
+        "security": [
+          {
+            "signatureReceiptAuthentication": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Agentflow-Signature-Tenant",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "X-Agentflow-Signature-Operation",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-Agentflow-Receipt-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 88,
+              "maxLength": 88
+            },
+            "description": "标准规范 Base64 编码的 64 字节 Ed25519 签名；不能重复此请求头。"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignatureCallbackEnvelope"
+              }
+            }
+          },
+          "description": "完整稳定的原始签名正文，重投不得重生成同一修订的时间或文件指纹。"
+        },
+        "responses": {
+          "400": {
+            "description": "请求、字段或查询格式无效。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "认证无效；回调使用原操作绑定的回执签名。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源、状态、版本、回执或幂等冲突；结果尚未完成也返回此状态。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "原始回调正文超过 65536 字节。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "共享认证、文件存储或已保存证据不可用或不完整。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的请求或基础设施故障；写入结果未知时保留原请求及幂等键。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "已验真并原子接收；重复或旧事实可安全确认。",
+            "headers": {
+              "Cache-Control": {
+                "description": "敏感业务响应禁止缓存。",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -50390,6 +51426,12 @@
         "in": "header",
         "name": "webhook-signature",
         "description": "已配置租户及独立来源的 v1 HMAC-SHA256 签名。另要求 webhook-tenant、webhook-source、webhook-id 和 webhook-timestamp；不使用用户会话或 Bearer 令牌。"
+      },
+      "signatureReceiptAuthentication": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Agentflow-Receipt-Signature",
+        "description": "原操作资料绑定的 Ed25519 回执签名；另须租户和操作头，正文、目标与原授权完全绑定。"
       }
     },
     "schemas": {
@@ -89774,6 +90816,527 @@
           "planId"
         ],
         "additionalProperties": false
+      },
+      "SignatureCreateInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "roundNo",
+          "expectedVersion",
+          "profileKey",
+          "profileVersion",
+          "documentIds",
+          "purpose",
+          "validUntil"
+        ],
+        "properties": {
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "expectedVersion": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "规范十进制文本，取值 1..9223372036854775807；不得转为 JavaScript Number。"
+          },
+          "profileKey": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$"
+          },
+          "profileVersion": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "规范十进制文本，取值 1..9223372036854775807；不得转为 JavaScript Number。"
+          },
+          "documentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "minItems": 1,
+            "maxItems": 10,
+            "uniqueItems": true
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "仅已批准的当前轮次及其当前版本可创建新授权。全部文件须为该轮次冻结的 READY 原件且当前字段可读；资料必须允许当前账号。validUntil 在服务端授权时刻之后且不超过 24 小时。签署人、账户、公钥和服务地址由精确资料版本确定。"
+      },
+      "SignatureCancelInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "规范十进制文本，取值 1..9223372036854775807；不得转为 JavaScript Number。"
+          }
+        }
+      },
+      "SignatureReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "version",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "规范十进制文本，取值 1..9223372036854775807；不得转为 JavaScript Number。"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "SENDING",
+              "UNKNOWN",
+              "QUERYING",
+              "PENDING",
+              "COLLECTING",
+              "FETCHING_FILES",
+              "SIGNED",
+              "DECLINED",
+              "CANCELLED",
+              "EXPIRED"
+            ]
+          }
+        }
+      },
+      "SignaturePage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignatureReceipt"
+            }
+          },
+          "nextAfterId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "description": "每页最多扫描 limit 个操作，只返回全部原件当前可读的项。过滤后 items 可为空但仍有 nextAfterId；只有游标缺省或 null 才表示结束。游标不得跨申请或轮次。"
+      },
+      "SignatureProfileOption": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "version",
+          "name"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "规范十进制文本，取值 1..9223372036854775807；不得转为 JavaScript Number。"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "SignatureOptions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "profiles",
+          "maxDocuments",
+          "maxDocumentBytes",
+          "maxTotalBytes",
+          "maxAuthorizationSeconds"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignatureProfileOption"
+            }
+          },
+          "maxDocuments": {
+            "type": "integer",
+            "const": 10
+          },
+          "maxDocumentBytes": {
+            "type": "integer",
+            "const": 16777216
+          },
+          "maxTotalBytes": {
+            "type": "integer",
+            "const": 33554432
+          },
+          "maxAuthorizationSeconds": {
+            "type": "integer",
+            "const": 86400
+          }
+        }
+      },
+      "SignatureDocumentView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "filename",
+          "originalBytes",
+          "downloadable"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "originalBytes": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "signedBytes": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "downloadable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SignatureView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation",
+          "roundNo",
+          "profileKey",
+          "profileVersion",
+          "authorizedBy",
+          "purpose",
+          "authorizedAt",
+          "validUntil",
+          "updatedAt",
+          "canCancel",
+          "documents"
+        ],
+        "properties": {
+          "operation": {
+            "$ref": "#/components/schemas/SignatureReceipt"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "profileKey": {
+            "type": "string"
+          },
+          "profileVersion": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]{0,18}$",
+            "description": "规范十进制文本，取值 1..9223372036854775807；不得转为 JavaScript Number。"
+          },
+          "authorizedBy": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "authorizedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "nextAttemptAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "NOT_CONFIGURED",
+                  "TARGET_CHANGED",
+                  "OPERATION_DISABLED",
+                  "TIMEOUT",
+                  "CONNECTION",
+                  "AUTHENTICATION",
+                  "REMOTE_FAILURE",
+                  "INVALID_RESPONSE",
+                  "RESPONSE_TOO_LARGE",
+                  "STALE_RESPONSE",
+                  "CONFLICTING_RECEIPT",
+                  "NOT_FOUND",
+                  "ARTIFACT_MISMATCH",
+                  "LEASE_EXPIRED",
+                  "AUTHORIZATION_EXPIRED",
+                  "SOURCE_UNAVAILABLE",
+                  "STORAGE_UNAVAILABLE",
+                  "INTERNAL_ERROR"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canCancel": {
+            "type": "boolean"
+          },
+          "documents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignatureDocumentView"
+            },
+            "minItems": 1,
+            "maxItems": 10
+          }
+        },
+        "description": "SIGNED 仅在全部结果已保存、逐份校验并确认为 READY 后出现；COLLECTING/FETCHING_FILES 不能下载。管理员同样受当前敏感字段约束。"
+      },
+      "SignatureProof": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "signerKey",
+          "certificateSha256",
+          "signedAt",
+          "timestampReference"
+        ],
+        "properties": {
+          "signerKey": {
+            "type": "string"
+          },
+          "certificateSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "signedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timestampReference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SignatureArtifact": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "documentId",
+          "size",
+          "sha256",
+          "mediaType",
+          "signatures"
+        ],
+        "properties": {
+          "documentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 33554432
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "mediaType": {
+            "type": "string"
+          },
+          "signatures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignatureProof"
+            },
+            "minItems": 1,
+            "maxItems": 10
+          }
+        }
+      },
+      "SignatureProviderReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operationId",
+          "requestDigest",
+          "revision",
+          "status",
+          "recordedAt",
+          "providerReference",
+          "completedAt",
+          "artifacts"
+        ],
+        "properties": {
+          "operationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_FOUND",
+              "PENDING",
+              "SIGNED",
+              "DECLINED",
+              "CANCELLED"
+            ]
+          },
+          "recordedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "providerReference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignatureArtifact"
+            },
+            "maxItems": 10
+          }
+        },
+        "description": "协议字段全部必须出现，空值显式为 null。NOT_FOUND 仅供查询，回调拒绝；同一 revision 的正文事实必须稳定。SIGNED 包含全部原文件及全部固定签署方，每份不超过 32 MiB，总计不超过 64 MiB。"
+      },
+      "SignatureCallbackEnvelope": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "protocol",
+          "tenantId",
+          "profileKey",
+          "profileVersion",
+          "profileDigest",
+          "targetDigest",
+          "receipt"
+        ],
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "const": "agentflow-signature-receipt-1"
+          },
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "profileKey": {
+            "type": "string"
+          },
+          "profileVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "profileDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "targetDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/SignatureProviderReceipt"
+          }
+        },
+        "description": "服务间原始 JSON 字节信封。严禁缺失字段、未知字段、重复键、尾随 JSON、数值枚举或标量强制转换；不得自行改用页面 DTO 的版本字符串。"
       }
     }
   }

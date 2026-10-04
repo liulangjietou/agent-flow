@@ -215,6 +215,38 @@ class SignatureWorkerIntegrationTest {
         assertThat(stored().status()).isEqualTo(SignatureOperation.Status.UNKNOWN);
     }
 
+    @Test void callbackProofFailureRollsBackStateReservedFilesHistoryAndAudit() {
+        queue(); var claim = service.claim("tenant-a", provider.input.request().id(), provider.clock.now);
+        var proof = provider.proof(); var original = proof.evidence();
+        var forged = new SignatureReceiptVerifier.Evidence(original.profile(), original.targetDigest(), original.payloadBase64(),
+                java.util.Base64.getEncoder().encodeToString(new byte[64]), original.verifiedAt());
+        long auditCount = jdbc.queryForObject("SELECT COUNT(*) FROM audit_event", Long.class);
+        assertThatThrownBy(() -> service.receiveCallback(new SignatureCallbackVerifier.Callback(provider.input,
+                new SignatureReceiptVerifier.Verified(proof.receipt(), forged)), provider.clock.now)).isInstanceOf(DomainException.class);
+        assertThat(stored()).isEqualTo(claim); assertThat(operations.history(stored(), 0, 10)).hasSize(2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event", Long.class)).isEqualTo(auditCount);
+        for (String table : List.of("signature_receipt_evidence", "signature_result_file"))
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class)).as(table).isZero();
+    }
+
+    @Test void concurrentDuplicateCallbacksKeepOneRevisionOneEvidenceAndOneSetOfReservedFiles() throws Exception {
+        queue(); var claim = service.claim("tenant-a", provider.input.request().id(), provider.clock.now);
+        var callback = new SignatureCallbackVerifier.Callback(provider.input, provider.proof());
+        var executor = Executors.newFixedThreadPool(2); var gate = new java.util.concurrent.CountDownLatch(1);
+        try {
+            Callable<Void> delivery = () -> { gate.await(); service.receiveCallback(callback, provider.clock.now); return null; };
+            var first = executor.submit(delivery); var second = executor.submit(delivery); gate.countDown();
+            first.get(10, TimeUnit.SECONDS); second.get(10, TimeUnit.SECONDS);
+            var accepted = stored(); assertThat(accepted.status()).isEqualTo(SignatureOperation.Status.COLLECTING);
+            assertThat(accepted.version()).isEqualTo(claim.version() + 1);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM signature_receipt_evidence", Integer.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM signature_result_file", Integer.class)).isEqualTo(provider.input.request().documents().size());
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE action='SIGNATURE_CALLBACK'", Integer.class)).isEqualTo(1);
+            service.finish(claim, new SignatureGateway.Unavailable(SignatureOperation.Failure.TIMEOUT), provider.clock.now);
+            assertThat(stored()).isEqualTo(accepted);
+        } finally { executor.shutdownNow(); }
+    }
+
     private void queue() {
         var queued = SignatureOperation.queue(provider.input, NOW);
         tx.executeWithoutResult(ignored -> { operations.create(queued); logins.insert(queued, reference); });

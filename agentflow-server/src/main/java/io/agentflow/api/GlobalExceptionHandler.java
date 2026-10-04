@@ -96,6 +96,11 @@ public class GlobalExceptionHandler {
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
                                                                                        HttpServletRequest request) {
         HttpStatus status = switch (exception.code()) {
+            case "INVALID_SIGNATURE_REQUEST", "INVALID_SIGNATURE_QUERY", "INVALID_SIGNATURE_CALLBACK" -> HttpStatus.BAD_REQUEST;
+            case "SIGNATURE_CALLBACK_UNAUTHENTICATED" -> HttpStatus.UNAUTHORIZED;
+            case "SIGNATURE_CALLBACK_TOO_LARGE" -> HttpStatus.PAYLOAD_TOO_LARGE;
+            case "SIGNATURE_SOURCE_CHANGED", "SIGNATURE_OPERATION_ACTIVE", "SIGNATURE_OPERATION_CONFLICT", "SIGNATURE_RECEIPT_CONFLICT", "SIGNATURE_RESULT_NOT_READY" -> HttpStatus.CONFLICT;
+            case "DEFERRED_AUTHENTICATION_UNAVAILABLE", "SIGNATURE_EVIDENCE_CORRUPT" -> HttpStatus.SERVICE_UNAVAILABLE;
             case "INVALID_ACCOUNT_MAPPING_QUERY", "INVALID_ACCOUNT_MAPPING_DEFINITION", "INVALID_ACCOUNT_MAPPING" -> HttpStatus.BAD_REQUEST;
             case "ACCOUNT_MAPPING_UNCHANGED", "ACCOUNT_MAPPING_SCOPE_IMMUTABLE", "ACCOUNT_MAPPING_NOT_PUBLISHABLE", "ACCOUNT_MAPPING_SCOPE_MISMATCH" -> HttpStatus.CONFLICT;
             case "ACCOUNT_MAPPING_CONFIGURATION_INCONSISTENT" -> HttpStatus.SERVICE_UNAVAILABLE;
