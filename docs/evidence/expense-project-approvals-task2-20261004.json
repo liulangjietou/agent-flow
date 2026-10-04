@@ -1,0 +1,66 @@
+{
+  "task": "F14 Task 2",
+  "base": "f94cc0824bda66a5f6a89b38c8d1c8fd0b8993e8",
+  "tests": 47,
+  "classes": {
+    "io.agentflow.expense.ExpensePrecheckJobTest": 5,
+    "io.agentflow.expense.ExpenseProjectOwnersTest": 6,
+    "io.agentflow.expense.ExpensePrecheckMigrationTest": 1,
+    "io.agentflow.expense.ExpenseProjectOwnersJsonTest": 1,
+    "io.agentflow.expense.ExpenseProjectApprovalPersistenceTest": 19,
+    "io.agentflow.expense.ExpenseSplitRoutingPersistenceTest": 13,
+    "io.agentflow.expense.ExpenseProjectApprovalMigrationTest": 1,
+    "io.agentflow.expense.ExpenseBudgetReviewMigrationTest": 1
+  },
+  "redXml": "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/f14-project-storage-red.xml",
+  "greenXml": [
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpensePrecheckJobTest.xml",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpenseProjectOwnersTest.xml",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpensePrecheckMigrationTest.xml",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpenseProjectOwnersJsonTest.xml",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpenseProjectApprovalPersistenceTest.xml",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpenseSplitRoutingPersistenceTest.xml",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpenseProjectApprovalMigrationTest.xml",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpenseBudgetReviewMigrationTest.xml"
+  ],
+  "greenLog": "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/f14-project-storage-green.log",
+  "checks": [
+    "Nonempty V119 additive migration retains every column in 8 legacy tables",
+    "Original READY precheck and full financial revision cross-check",
+    "Published definition, tenant, employee and round binding",
+    "Concurrent preparations create exactly one row",
+    "Mandatory transaction and downstream rollback",
+    "Fresh JDBC connections retain source after reduction and later precheck",
+    "Tampered original source and denormalized columns rejected"
+  ],
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseProjectApprovalSnapshot.java": "bf7ba858eb6b8b6efd2e71c5d1328b8cfa5431b48c47042c110afa832d559a80",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseProjectApprovalRepository.java": "c07c3f7d486d98ef8d38a40f92402644b0c51ad34dda6fc20a707b25c9b665f3",
+    "agentflow-server/src/main/resources/db/migration/V120__expense_project_approval.sql": "12acdc217ed6de6209d5ff8f3db78d4165463d878a3350cb16b9ca46bba59fe2",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseProjectApprovalPersistenceTest.java": "909323bcdc7048527e394c8c27e105542e05f7a429c109ce2aa6b63f7d6b0f23",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseProjectApprovalMigrationTest.java": "7e1cf765a8647d23a1c0f9b785e94b5a68f257e6f797d417abf13ea7559f1a2a"
+  },
+  "archiveSha256": {
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpenseBudgetReviewMigrationTest.xml": "501aa81c4fc7f4c4bed4b6aacfb768df46c36fdbc2db78c2b439df97ac2c51bf",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpensePrecheckJobTest.xml": "f9ed8682fa2015d5f99c1f47d26bf238017e406cc7eec94719b03986c040ee6f",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpensePrecheckMigrationTest.xml": "b706953c823a5e40613a2bcd1f3ca678016f0c420bd7726ec6fd4ea4e0230aa3",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpenseProjectApprovalMigrationTest.xml": "e1528e35ed7c1457d6798d63a6d6923d0f30370bae67804956c76102ac2b789d",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpenseProjectApprovalPersistenceTest.xml": "eba0500e2c53cdc47741b5277b1e6f59eedbc7c2745cdf6d026fd98236fad899",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpenseProjectOwnersJsonTest.xml": "ab595245c76297253872d4b57ff2004da8b8a7f1f44388356717bd109b0b0a75",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpenseProjectOwnersTest.xml": "0f6d03a1aa0965fc1d9b46ca27ffdac807e9f3b0e2d83ecfa02b3498f641de9e",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/TEST-io.agentflow.expense.ExpenseSplitRoutingPersistenceTest.xml": "f774b7bd4b1c73b903ca758e33f1c8dce3fada59ea984459b16873bdf57512ec",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/f14-project-storage-green.log": "71e3d37615a653503f7e82a656ae1315d1511d66be9d833602d75971ee797e3f",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/f14-project-storage-red.log": "029bdce6b418b7be0770b43e231556ff57af7e16b9d3615eb8ee99ece41148de",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/f14-project-storage-red.xml": "7b813cd2e3f84409e07896840aea991c21d24aec4ee7ee2afc3dd5259ff69fbe",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/source/agentflow-domain/src/main/java/io/agentflow/expense/ExpenseProjectApprovalSnapshot.java": "bf7ba858eb6b8b6efd2e71c5d1328b8cfa5431b48c47042c110afa832d559a80",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/source/agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseProjectApprovalRepository.java": "c07c3f7d486d98ef8d38a40f92402644b0c51ad34dda6fc20a707b25c9b665f3",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/source/agentflow-server/src/main/resources/db/migration/V120__expense_project_approval.sql": "12acdc217ed6de6209d5ff8f3db78d4165463d878a3350cb16b9ca46bba59fe2",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/source/agentflow-server/src/test/java/io/agentflow/expense/ExpenseProjectApprovalMigrationTest.java": "7e1cf765a8647d23a1c0f9b785e94b5a68f257e6f797d417abf13ea7559f1a2a",
+    "/fyoung/tmp/agentflow-remaining-20260928/f14-task2-verified/source/agentflow-server/src/test/java/io/agentflow/expense/ExpenseProjectApprovalPersistenceTest.java": "909323bcdc7048527e394c8c27e105542e05f7a429c109ce2aa6b63f7d6b0f23"
+  },
+  "limits": [
+    "SQL fixture and H2 verification; native Flowable submission wiring remains Task 3",
+    "Fresh JDBC connections are not a process crash/restore claim; fixed-package runtime remains Task 5",
+    "No browser or PostgreSQL claim"
+  ]
+}

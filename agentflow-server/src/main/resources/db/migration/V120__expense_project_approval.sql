@@ -1,0 +1,27 @@
+-- 只保存新提交的原项目责任，不补造旧轮次来源或审批结果。
+CREATE TABLE expense_project_approval (
+    tenant_id VARCHAR(64) NOT NULL,
+    report_id VARCHAR(36) NOT NULL,
+    round_no INTEGER NOT NULL CHECK (round_no > 0),
+    application_id VARCHAR(36) NOT NULL,
+    application_version BIGINT NOT NULL CHECK (application_version > 1),
+    financial_version BIGINT NOT NULL CHECK (financial_version > 1),
+    definition_id VARCHAR(36) NOT NULL,
+    process_key VARCHAR(128) NOT NULL,
+    definition_version BIGINT NOT NULL CHECK (definition_version > 0),
+    rule_version INTEGER NOT NULL CHECK (rule_version = 1),
+    node_id VARCHAR(128),
+    precheck_id VARCHAR(36) NOT NULL,
+    precheck_version BIGINT NOT NULL CHECK (precheck_version = 3),
+    catalog_version VARCHAR(128) NOT NULL,
+    has_projects BOOLEAN NOT NULL,
+    submitted_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    PRIMARY KEY (tenant_id,report_id,round_no),
+    CONSTRAINT uq_expense_project_application UNIQUE (tenant_id,application_id,round_no),
+    CONSTRAINT ck_expense_project_node CHECK (NOT has_projects OR node_id IS NOT NULL),
+    CONSTRAINT fk_expense_project_report FOREIGN KEY (tenant_id,report_id,application_id) REFERENCES expense_report(tenant_id,id,application_id),
+    CONSTRAINT fk_expense_project_financial FOREIGN KEY (tenant_id,report_id,financial_version) REFERENCES expense_report_revision(tenant_id,report_id,financial_version),
+    CONSTRAINT fk_expense_project_definition FOREIGN KEY (tenant_id,definition_id) REFERENCES approval_definition(tenant_id,id),
+    CONSTRAINT fk_expense_project_precheck FOREIGN KEY (tenant_id,precheck_id,precheck_version) REFERENCES expense_precheck_revision(tenant_id,job_id,version)
+);
