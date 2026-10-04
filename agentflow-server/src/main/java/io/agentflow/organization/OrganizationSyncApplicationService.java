@@ -22,11 +22,12 @@ public class OrganizationSyncApplicationService {
     private final JdbcOrganizationSyncRepository sync;
     private final JdbcOrganizationSyncPlanRepository plans;
     private final OrganizationSyncPlanner planner;
+    private final OrganizationSyncConfiguration configuration;
 
     /** 不注入网络客户端，预检与应用均不在持锁事务中读取外部服务。 */
     public OrganizationSyncApplicationService(OrganizationRepository organization, JdbcOrganizationSyncRepository sync,
-                                              JdbcOrganizationSyncPlanRepository plans, OrganizationSyncPlanner planner) {
-        this.organization = organization; this.sync = sync; this.plans = plans; this.planner = planner;
+                                              JdbcOrganizationSyncPlanRepository plans, OrganizationSyncPlanner planner, OrganizationSyncConfiguration configuration) {
+        this.organization = organization; this.sync = sync; this.plans = plans; this.planner = planner; this.configuration = configuration;
     }
 
     /** 保存完整核对结果，即使存在冲突也保留该次具名预检，不改变组织事实。 */
@@ -34,6 +35,7 @@ public class OrganizationSyncApplicationService {
     public JdbcOrganizationSyncPlanRepository.Saved preflight(Actor actor, UUID batchId, long expectedVersion, List<Selection> selections) {
         actor.requireRole("ADMIN"); long directoryRevision = organization.lock(actor.tenantId());
         var source = source(actor); var batch = batch(actor, batchId, expectedVersion);
+        configuration.requireCurrent(batch.context());
         return plans.create(planner.prepare(actor, batch, source.version(), directoryRevision, selections, now()));
     }
 
@@ -48,6 +50,7 @@ public class OrganizationSyncApplicationService {
     public OrganizationSyncBatch.State apply(Actor actor, UUID batchId, long expectedVersion, UUID planId, String comment) {
         actor.requireRole("ADMIN"); long directoryRevision = organization.lock(actor.tenantId());
         var source = source(actor); var batch = batch(actor, batchId, expectedVersion);
+        configuration.requireCurrent(batch.context());
         var saved = plans.find(actor.tenantId(), planId).orElseThrow(OrganizationSyncApplicationService::notFound); var plan = saved.plan();
         if (!plan.batchId().equals(batchId) || plan.batchVersion() != expectedVersion || plan.directoryRevision() != directoryRevision
                 || plan.sourceVersion() != source.version() || batch.context().afterRevision() != source.appliedRevision()) throw stale();

@@ -45,6 +45,7 @@ class OrganizationSyncApplicationTest {
     private JdbcOrganizationSyncPlanRepository plans;
     private OrganizationService local;
     private OrganizationSyncApplicationService service;
+    private OrganizationSyncConfiguration configuration;
 
     @BeforeEach void setup() {
         var data = new DriverManagerDataSource("jdbc:h2:mem:sync-application-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", "");
@@ -52,7 +53,10 @@ class OrganizationSyncApplicationTest {
         var manager = new DataSourceTransactionManager(data); tx = new TransactionTemplate(manager);
         organization = new JdbcOrganizationRepository(jdbc, json); local = new OrganizationService(organization);
         sync = new JdbcOrganizationSyncRepository(jdbc, json); plans = new JdbcOrganizationSyncPlanRepository(jdbc, json);
-        var proxy = new ProxyFactory(new OrganizationSyncApplicationService(organization, sync, plans, new OrganizationSyncPlanner(organization, sync)));
+        configuration = new OrganizationSyncConfiguration(); configuration.setEnabled(true);
+        var target = new OrganizationSyncConfiguration.Target(); target.setSourceKey("hr"); target.setEndpoint("https://organization.invalid/"); target.setToken("synthetic-token");
+        configuration.setTenants(java.util.Map.of("tenant", target)); configuration.validate();
+        var proxy = new ProxyFactory(new OrganizationSyncApplicationService(organization, sync, plans, new OrganizationSyncPlanner(organization, sync), configuration));
         proxy.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource())); service = (OrganizationSyncApplicationService) proxy.getProxy();
         tx.executeWithoutResult(ignored -> { local.initialize(ADMIN); sync.register(new OrganizationSyncSource("tenant", "hr", 0, 1, null, "admin", now())); });
     }
@@ -294,7 +298,7 @@ class OrganizationSyncApplicationTest {
     private void apply(OrganizationSyncBatch batch) { var saved = preview(batch); assertThat(saved.plan().conflicts()).isEmpty(); service.apply(ADMIN, batch.context().id(), 3, saved.plan().id(), "已核对"); }
     private OrganizationSyncBatch received(OrganizationSyncDelta delta) {
         Instant at = now().minusSeconds(3);
-        var batch = new OrganizationSyncBatch(new OrganizationSyncBatch.Context(UUID.randomUUID(), "tenant", "hr", delta.afterRevision(), "1".repeat(64), "admin", at, null));
+        var batch = new OrganizationSyncBatch(new OrganizationSyncBatch.Context(UUID.randomUUID(), "tenant", "hr", delta.afterRevision(), configuration.require("tenant").digest("tenant"), "admin", at, null));
         tx.executeWithoutResult(ignored -> { sync.create(batch); batch.start(1, at.plusSeconds(1), at.plusSeconds(30)); sync.update(batch, 1); batch.receive(2, delta, at.plusSeconds(2)); sync.update(batch, 2); }); return batch;
     }
     private UUID mapped(OrganizationSyncKey.Kind kind, String id) { return sync.binding("tenant", key(kind, id)).orElseThrow().localId(); }

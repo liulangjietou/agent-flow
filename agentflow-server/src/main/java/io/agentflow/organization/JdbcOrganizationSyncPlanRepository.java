@@ -8,6 +8,7 @@ import java.security.NoSuchAlgorithmException;
 import java.sql.Timestamp;
 import java.util.HexFormat;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -84,6 +85,17 @@ public class JdbcOrganizationSyncPlanRepository {
         }, tenant, batchId.toString()).stream().findFirst();
     }
 
+    /** 有界列出本批所有具名预检，不批量返回人员前后值。 */
+    public Page page(String tenant, UUID batchId, int page, int size) {
+        var items = jdbc.query("""
+                SELECT id,directory_revision,prepared_by,prepared_at,ready FROM organization_sync_plan
+                WHERE tenant_id=? AND batch_id=? ORDER BY prepared_at DESC,id DESC LIMIT ? OFFSET ?
+                """, (row, index) -> new Summary(UUID.fromString(row.getString("id")), row.getLong("directory_revision"), row.getString("prepared_by"),
+                row.getTimestamp("prepared_at").toInstant(), row.getBoolean("ready")), tenant, batchId.toString(), size, (long) page * size);
+        long total = jdbc.queryForObject("SELECT COUNT(*) FROM organization_sync_plan WHERE tenant_id=? AND batch_id=?", Long.class, tenant, batchId.toString());
+        return new Page(items, total, page, size);
+    }
+
     private static String digest(String value) {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 unavailable", impossible); }
@@ -97,4 +109,14 @@ public class JdbcOrganizationSyncPlanRepository {
      * @author owlzhangfq@gmail.com
      */
     public record Saved(OrganizationSyncPlan plan, String digest) { }
+    /**
+     * 历史核对摘要不泄露整批来源正文。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Summary(UUID id, long directoryRevision, String preparedBy, java.time.Instant preparedAt, boolean ready) { }
+    /**
+     * 管理入口统一限制分页大小。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Page(List<Summary> items, long total, int page, int pageSize) { }
 }

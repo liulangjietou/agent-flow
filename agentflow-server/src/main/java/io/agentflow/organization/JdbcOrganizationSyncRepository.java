@@ -141,6 +141,27 @@ public class JdbcOrganizationSyncRepository {
                 """, (row, index) -> new Candidate(row.getString("tenant_id"), uuid(row.getString("id"))), Timestamp.from(now), SCAN_LIMIT);
     }
 
+    /** 状态检查只读取活动批次标识，不加载完整来源正文。 */
+    public Optional<UUID> pendingId(String tenant) {
+        return jdbc.queryForList("SELECT id FROM organization_sync_batch WHERE tenant_id=? AND pending_tenant_id=?", String.class, tenant, tenant)
+                .stream().findFirst().map(UUID::fromString);
+    }
+
+    /** 按已读取版本返回完整轨迹前缀，不把并发追加误判为历史不一致。 */
+    public List<Transition> transitions(OrganizationSyncBatch batch) {
+        var states = jdbc.query("SELECT batch_version,status,state_json FROM organization_sync_transition WHERE tenant_id=? AND batch_id=? AND batch_version<=? ORDER BY batch_version",
+                (row, index) -> {
+                    var state = json.read(row.getString("state_json"), OrganizationSyncBatch.State.class);
+                    OrganizationSyncBatch.restore(batch.context(), state);
+                    if (state.version() != row.getLong("batch_version") || !state.status().name().equals(row.getString("status"))) throw inconsistent();
+                    return state;
+                }, batch.context().tenantId(), id(batch.context().id()), batch.state().version());
+        if (states.size() != batch.state().version() || !states.get(states.size() - 1).equals(batch.state())) throw inconsistent();
+        for (int index = 0; index < states.size(); index++) if (states.get(index).version() != index + 1) throw inconsistent();
+        return states.stream().map(state -> new Transition(state.version(), state.status(), state.finishedAt() != null ? state.finishedAt()
+                : state.receivedAt() != null ? state.receivedAt() : state.startedAt() != null ? state.startedAt() : batch.context().createdAt(), state.failure(), state.decision())).toList();
+    }
+
     /** 有界历史索引不包含人员主体或完整来源正文。 */
     public Page page(String tenant, int page, int size) {
         var items = jdbc.query("""
@@ -253,4 +274,11 @@ public class JdbcOrganizationSyncRepository {
      * @author owlzhangfq@gmail.com
      */
     public record Page(List<Summary> items, long total, int page, int pageSize) { }
+    /**
+     * 管理轨迹省略重复来源正文，原始事实仍保留在批次中。
+     * @author owlzhangfq@gmail.com
+     */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
+    public record Transition(long version, OrganizationSyncBatch.Status status, Instant occurredAt,
+                             OrganizationSyncBatch.Failure failure, OrganizationSyncBatch.Decision decision) { }
 }

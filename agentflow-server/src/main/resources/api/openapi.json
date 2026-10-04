@@ -48831,6 +48831,1539 @@
           }
         }
       }
+    },
+    "/api/v1/organization/synchronization": {
+      "get": {
+        "operationId": "organizationSyncStatus",
+        "tags": [
+          "本地组织"
+        ],
+        "summary": "读取组织同步配置与持久状态",
+        "description": "仅当前租户 ADMIN；当前鉴权在幂等回放之前。读取 no-store。来源地址、凭据及标识只由部署配置提供，请求不能指定任意来源。批次、预检与人工决定保留审计，组织同步不创建认证身份或授予系统角色。读取不隐式初始化目录、不注册来源，也不探测远端。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源目标、来源版本、批次状态、预检或映射冲突；已有待处理批次；幂等键意图不一致。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "当前租户未启用或没有配置可信来源；历史记录仍可读取，原批次仍可取消。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "读取组织同步配置与持久状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSyncOverview"
+                }
+              }
+            }
+          }
+        },
+        "parameters": []
+      }
+    },
+    "/api/v1/organization/synchronization/batches": {
+      "get": {
+        "operationId": "organizationSyncBatchPage",
+        "tags": [
+          "本地组织"
+        ],
+        "summary": "分页读取组织同步批次",
+        "description": "仅当前租户 ADMIN；当前鉴权在幂等回放之前。读取 no-store。来源地址、凭据及标识只由部署配置提供，请求不能指定任意来源。批次、预检与人工决定保留审计，组织同步不创建认证身份或授予系统角色。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源目标、来源版本、批次状态、预检或映射冲突；已有待处理批次；幂等键意图不一致。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "当前租户未启用或没有配置可信来源；历史记录仍可读取，原批次仍可取消。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "分页读取组织同步批次",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSyncPage"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "queueOrganizationSync",
+        "tags": [
+          "本地组织"
+        ],
+        "summary": "排队读取可信组织来源",
+        "description": "仅当前租户 ADMIN；当前鉴权在幂等回放之前。读取 no-store。来源地址、凭据及标识只由部署配置提供，请求不能指定任意来源。批次、预检与人工决定保留审计，组织同步不创建认证身份或授予系统角色。首次注册来源时 expectedSourceVersion 为 0；后续确认当前来源版本。202 仅表示排队，不表示来源已收到或组织已应用。",
+        "x-access": "ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源目标、来源版本、批次状态、预检或映射冲突；已有待处理批次；幂等键意图不一致。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "当前租户未启用或没有配置可信来源；历史记录仍可读取，原批次仍可取消。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "排队读取可信组织来源",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSyncReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "是否回放原响应",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationSyncQueueRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/synchronization/batches/{id}": {
+      "get": {
+        "operationId": "organizationSyncBatch",
+        "tags": [
+          "本地组织"
+        ],
+        "summary": "读取组织同步事实与当前状态",
+        "description": "仅当前租户 ADMIN；当前鉴权在幂等回放之前。读取 no-store。来源地址、凭据及标识只由部署配置提供，请求不能指定任意来源。批次、预检与人工决定保留审计，组织同步不创建认证身份或授予系统角色。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源目标、来源版本、批次状态、预检或映射冲突；已有待处理批次；幂等键意图不一致。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "当前租户未启用或没有配置可信来源；历史记录仍可读取，原批次仍可取消。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "读取组织同步事实与当前状态",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSyncDetail"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/organization/synchronization/batches/{id}/retry": {
+      "post": {
+        "operationId": "retryOrganizationSync",
+        "tags": [
+          "本地组织"
+        ],
+        "summary": "为失败或取消批次创建新读取",
+        "description": "仅当前租户 ADMIN；当前鉴权在幂等回放之前。读取 no-store。来源地址、凭据及标识只由部署配置提供，请求不能指定任意来源。批次、预检与人工决定保留审计，组织同步不创建认证身份或授予系统角色。原批次必须为 FAILED 或 CANCELLED。新批次保留 retryOf，确认当前部署目标和来源版本；旧批次及原租约不会覆盖或续期。",
+        "x-access": "ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源目标、来源版本、批次状态、预检或映射冲突；已有待处理批次；幂等键意图不一致。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "当前租户未启用或没有配置可信来源；历史记录仍可读取，原批次仍可取消。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "为失败或取消批次创建新读取",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSyncReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "是否回放原响应",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationSyncRetryRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/synchronization/batches/{id}/cancel": {
+      "post": {
+        "operationId": "cancelOrganizationSync",
+        "tags": [
+          "本地组织"
+        ],
+        "summary": "具名取消待处理批次",
+        "description": "仅当前租户 ADMIN；当前鉴权在幂等回放之前。读取 no-store。来源地址、凭据及标识只由部署配置提供，请求不能指定任意来源。批次、预检与人工决定保留审计，组织同步不创建认证身份或授予系统角色。来源配置停用或变化后仍可取消。取消后迟到响应不能覆盖决定。",
+        "x-access": "ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源目标、来源版本、批次状态、预检或映射冲突；已有待处理批次；幂等键意图不一致。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "当前租户未启用或没有配置可信来源；历史记录仍可读取，原批次仍可取消。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "具名取消待处理批次",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSyncReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "是否回放原响应",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationSyncCancelRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/synchronization/batches/{id}/preflight": {
+      "post": {
+        "operationId": "preflightOrganizationSync",
+        "tags": [
+          "本地组织"
+        ],
+        "summary": "保存组织同步核对计划",
+        "description": "仅当前租户 ADMIN；当前鉴权在幂等回放之前。读取 no-store。来源地址、凭据及标识只由部署配置提供，请求不能指定任意来源。批次、预检与人工决定保留审计，组织同步不创建认证身份或授予系统角色。仅 RECEIVED 且目标未变化的批次可预检。显式选择承认本地对象身份及当前修订。冲突计划可保存但不能应用；回执不含来源正文。",
+        "x-access": "ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源目标、来源版本、批次状态、预检或映射冲突；已有待处理批次；幂等键意图不一致。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "当前租户未启用或没有配置可信来源；历史记录仍可读取，原批次仍可取消。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "保存组织同步核对计划",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSyncPlanReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "是否回放原响应",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationSyncPreflightRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/synchronization/batches/{id}/apply": {
+      "post": {
+        "operationId": "applyOrganizationSync",
+        "tags": [
+          "本地组织"
+        ],
+        "summary": "原子应用人工核对的组织同步计划",
+        "description": "仅当前租户 ADMIN；当前鉴权在幂等回放之前。读取 no-store。来源地址、凭据及标识只由部署配置提供，请求不能指定任意来源。批次、预检与人工决定保留审计，组织同步不创建认证身份或授予系统角色。引用服务端已保存且无冲突的计划；来源、批次、目录和绑定版本必须仍匹配。所有组织事实、审计、映射、游标和应用回执原子提交。",
+        "x-access": "ADMIN",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源目标、来源版本、批次状态、预检或映射冲突；已有待处理批次；幂等键意图不一致。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "当前租户未启用或没有配置可信来源；历史记录仍可读取，原批次仍可取消。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "原子应用人工核对的组织同步计划",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSyncReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "是否回放原响应",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationSyncApplyRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organization/synchronization/plans/{planId}": {
+      "get": {
+        "operationId": "organizationSyncPlan",
+        "tags": [
+          "本地组织"
+        ],
+        "summary": "读取原组织同步核对计划",
+        "description": "仅当前租户 ADMIN；当前鉴权在幂等回放之前。读取 no-store。来源地址、凭据及标识只由部署配置提供，请求不能指定任意来源。批次、预检与人工决定保留审计，组织同步不创建认证身份或授予系统角色。来源当前不可用不影响当前管理员读取本租户历史计划。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源目标、来源版本、批次状态、预检或映射冲突；已有待处理批次；幂等键意图不一致。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "当前租户未启用或没有配置可信来源；历史记录仍可读取，原批次仍可取消。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "读取原组织同步核对计划",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSyncSavedPlan"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "planId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/organization/synchronization/batches/{id}/transitions": {
+      "get": {
+        "operationId": "organizationSyncTransitions",
+        "tags": [
+          "本地组织"
+        ],
+        "summary": "读取组织同步状态和人工决定轨迹",
+        "description": "仅当前租户 ADMIN；当前鉴权在幂等回放之前。读取 no-store。来源地址、凭据及标识只由部署配置提供，请求不能指定任意来源。批次、预检与人工决定保留审计，组织同步不创建认证身份或授予系统角色。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源目标、来源版本、批次状态、预检或映射冲突；已有待处理批次；幂等键意图不一致。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "当前租户未启用或没有配置可信来源；历史记录仍可读取，原批次仍可取消。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "读取组织同步状态和人工决定轨迹",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrganizationSyncTransition"
+                  },
+                  "maxItems": 4
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/organization/synchronization/batches/{id}/plans": {
+      "get": {
+        "operationId": "organizationSyncPlanPage",
+        "tags": [
+          "本地组织"
+        ],
+        "summary": "分页读取组织同步预检历史",
+        "description": "仅当前租户 ADMIN；当前鉴权在幂等回放之前。读取 no-store。来源地址、凭据及标识只由部署配置提供，请求不能指定任意来源。批次、预检与人工决定保留审计，组织同步不创建认证身份或授予系统角色。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "来源目标、来源版本、批次状态、预检或映射冲突；已有待处理批次；幂等键意图不一致。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "当前租户未启用或没有配置可信来源；历史记录仍可读取，原批次仍可取消。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "分页读取组织同步预检历史",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationSyncPlanPage"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -87072,6 +88605,1173 @@
           "review",
           "canConfirm",
           "unavailableCode"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncStatus": {
+        "type": "string",
+        "enum": [
+          "QUEUED",
+          "FETCHING",
+          "RECEIVED",
+          "FAILED",
+          "APPLIED",
+          "CANCELLED"
+        ]
+      },
+      "OrganizationSyncFailure": {
+        "type": "string",
+        "enum": [
+          "SOURCE_UNAVAILABLE",
+          "SOURCE_TIMEOUT",
+          "INVALID_SOURCE_DATA",
+          "SOURCE_CHANGED"
+        ]
+      },
+      "OrganizationSyncKey": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "LEGAL_ENTITY",
+              "DEPARTMENT",
+              "POSITION",
+              "PERSON",
+              "APPOINTMENT"
+            ]
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "kind",
+          "externalId"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncOverview": {
+        "type": "object",
+        "properties": {
+          "initialized": {
+            "type": "boolean"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "workerEnabled": {
+            "type": "boolean"
+          },
+          "sourceKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "registeredSourceKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sourceVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "appliedRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "targetDigest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "activeBatchId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "initialized",
+          "configured",
+          "workerEnabled",
+          "sourceKey",
+          "registeredSourceKey",
+          "sourceVersion",
+          "appliedRevision",
+          "targetDigest",
+          "activeBatchId"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncReceipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrganizationSyncStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceKey": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$"
+          },
+          "afterRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "requestedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "retryOf": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "sourceKey",
+          "afterRevision",
+          "requestedBy",
+          "createdAt",
+          "retryOf"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncDeltaUnit": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "legalEntity": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "parentDepartment": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "headAppointment": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "active"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncDeltaPerson": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "approvalEligible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "subject",
+          "displayName",
+          "active",
+          "approvalEligible"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncDeltaAppointment": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "person": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "department": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "position": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "supervisorAppointment": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          }
+        },
+        "required": [
+          "key",
+          "person",
+          "department",
+          "position",
+          "active"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncDelta": {
+        "type": "object",
+        "properties": {
+          "sourceKey": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$"
+          },
+          "afterRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationSyncDeltaUnit"
+            },
+            "maxItems": 5000
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationSyncDeltaPerson"
+            },
+            "maxItems": 5000
+          },
+          "appointments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationSyncDeltaAppointment"
+            },
+            "maxItems": 5000
+          }
+        },
+        "required": [
+          "sourceKey",
+          "afterRevision",
+          "revision",
+          "units",
+          "people",
+          "appointments"
+        ],
+        "additionalProperties": false,
+        "description": "服务端保存的来源事实。三类记录合计不超过 5000；遗漏表示未变，停用必须显式提供。此管理响应结构不同于外部来源 HTTP 协议。"
+      },
+      "OrganizationSyncApplied": {
+        "type": "object",
+        "properties": {
+          "planDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "directoryRevisionBefore": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "directoryRevisionAfter": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "planDigest",
+          "directoryRevisionBefore",
+          "directoryRevisionAfter"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncDecision": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "applied": {
+            "$ref": "#/components/schemas/OrganizationSyncApplied"
+          }
+        },
+        "required": [
+          "actor",
+          "at"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncState": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/OrganizationSyncStatus"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "leaseUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "delta": {
+            "$ref": "#/components/schemas/OrganizationSyncDelta"
+          },
+          "failure": {
+            "$ref": "#/components/schemas/OrganizationSyncFailure"
+          },
+          "finishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/OrganizationSyncDecision"
+          }
+        },
+        "required": [
+          "status",
+          "version"
+        ],
+        "additionalProperties": false,
+        "description": "空字段省略。RECEIVED 仅表示读取成功；必须通过人工预检和明确应用才改变组织事实。",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "FETCHING"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "startedAt",
+                "leaseUntil"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "RECEIVED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "startedAt",
+                "leaseUntil",
+                "receivedAt",
+                "delta"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "FAILED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "startedAt",
+                "leaseUntil",
+                "failure",
+                "finishedAt"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "APPLIED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "startedAt",
+                "leaseUntil",
+                "receivedAt",
+                "delta",
+                "finishedAt",
+                "decision"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "CANCELLED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "finishedAt",
+                "decision"
+              ]
+            }
+          }
+        ]
+      },
+      "OrganizationSyncDetail": {
+        "type": "object",
+        "properties": {
+          "request": {
+            "$ref": "#/components/schemas/OrganizationSyncRequest"
+          },
+          "state": {
+            "$ref": "#/components/schemas/OrganizationSyncState"
+          },
+          "appliedPlanId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reviewable": {
+            "type": "boolean"
+          },
+          "unavailableReason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "request",
+          "state",
+          "appliedPlanId",
+          "reviewable",
+          "unavailableReason"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceKey": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$"
+          },
+          "afterRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "receivedRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrganizationSyncStatus"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "requestedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "sourceKey",
+          "afterRevision",
+          "status",
+          "version",
+          "requestedBy",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationSyncSummary"
+            },
+            "maxItems": 50
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncTransition": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrganizationSyncStatus"
+          },
+          "occurredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizationSyncFailure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizationSyncDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "version",
+          "status",
+          "occurredAt",
+          "failure",
+          "decision"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncSelection": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "localId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "key",
+          "localId",
+          "expectedRevision"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncUnitChange": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "bindingVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "before": {
+            "$ref": "#/components/schemas/OrganizationUnit"
+          },
+          "after": {
+            "$ref": "#/components/schemas/OrganizationUnit"
+          },
+          "explicitlySelected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "bindingVersion",
+          "after",
+          "explicitlySelected"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncPersonChange": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "bindingVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "before": {
+            "$ref": "#/components/schemas/OrganizationPerson"
+          },
+          "after": {
+            "$ref": "#/components/schemas/OrganizationPerson"
+          },
+          "explicitlySelected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "bindingVersion",
+          "after",
+          "explicitlySelected"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncAppointmentChange": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "bindingVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "before": {
+            "$ref": "#/components/schemas/OrganizationAppointment"
+          },
+          "after": {
+            "$ref": "#/components/schemas/OrganizationAppointment"
+          },
+          "explicitlySelected": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "bindingVersion",
+          "after",
+          "explicitlySelected"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncConflict": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/OrganizationSyncKey"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "localId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "key",
+          "code"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncPlan": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "batchId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "batchVersion": {
+            "type": "integer",
+            "const": 3
+          },
+          "sourceVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "directoryRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "preparedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "preparedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "selections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationSyncSelection"
+            },
+            "maxItems": 5000
+          },
+          "units": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationSyncUnitChange"
+            },
+            "maxItems": 5000
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationSyncPersonChange"
+            },
+            "maxItems": 5000
+          },
+          "appointments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationSyncAppointmentChange"
+            },
+            "maxItems": 5000
+          },
+          "conflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationSyncConflict"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "tenantId",
+          "batchId",
+          "batchVersion",
+          "sourceVersion",
+          "directoryRevision",
+          "preparedBy",
+          "preparedAt",
+          "selections",
+          "units",
+          "people",
+          "appointments",
+          "conflicts"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncSavedPlan": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/OrganizationSyncPlan"
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "plan",
+          "digest"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncPlanSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "directoryRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "preparedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "preparedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ready": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "directoryRevision",
+          "preparedBy",
+          "preparedAt",
+          "ready"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncPlanPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationSyncPlanSummary"
+            },
+            "maxItems": 50
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncPlanReceipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "ready": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "ready"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncQueueRequest": {
+        "type": "object",
+        "properties": {
+          "expectedSourceVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "targetDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "expectedSourceVersion",
+          "targetDigest"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncRetryRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "expectedSourceVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "targetDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "expectedSourceVersion",
+          "targetDigest"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncCancelRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "expectedVersion"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncSelectionRequest": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "LEGAL_ENTITY",
+              "DEPARTMENT",
+              "POSITION",
+              "PERSON",
+              "APPOINTMENT"
+            ]
+          },
+          "externalId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "localId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "kind",
+          "externalId",
+          "localId",
+          "expectedRevision"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncPreflightRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "selections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationSyncSelectionRequest"
+            },
+            "maxItems": 5000
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "selections"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationSyncApplyRequest": {
+        "type": "object",
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "planId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "comment": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "expectedVersion",
+          "planId"
         ],
         "additionalProperties": false
       }
