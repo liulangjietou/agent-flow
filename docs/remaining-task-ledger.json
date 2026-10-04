@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T02:39:53.936045+00:00",
+  "recordedAt": "2026-10-04T02:56:46.930270+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -814,7 +814,7 @@
           ]
         }
       ],
-      "observed": "本地实现 49a706c、8bc8608、4800ba6：报销建议协议、V108 仓储、本人来源预览、服务/工作器、六个 HTTP 操作和费用页面均已接通。后端 98 条范围测试通过；页面阶段 90 条前端、30 条后端集成、类型检查与构建通过。108 份应用响应、61 份成功请求及客户端对 72 份成功响应的解析通过；真实固定包单据保存、重启/配套恢复、浏览器和 PostgreSQL 验收仍待完成，继续 OPEN。",
+      "observed": "本地协议、V108 仓储、本人来源预览、六个接口及费用页面已接通。90 条前端、30 条后端集成和构建通过；固定包完成 V107→V108 非空升级、人工确认后原领域保存、排队/完成/执行中强退及独立恢复。255 表、329 行、1,997 条结构语句一致；308 份响应、53 份成功请求及 204 份助手成功响应的客户端解析通过。浏览器和 PostgreSQL 补验仍待完成，继续 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/agent/DraftAssistInputs.java",
@@ -839,10 +839,19 @@
         {
           "path": "docs/evidence/expense-draft-assist-ui-20261004.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-draft-assist-runtime-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "结构化业务建议走各自领域保存服务；报销行程、类别和分摊逐项人工确认；不由模型生成补贴标准、真实余额或批准事实；适用业务边界明确。",
-      "dependsOn": []
+      "dependsOn": [],
+      "runtimeStage": {
+        "status": "VERIFIED_BROWSER_POSTGRES_PENDING",
+        "artifactSourceCommit": "a12ea9b50be66a721c514cc848f92f9d803c8b36",
+        "evidence": "docs/evidence/expense-draft-assist-runtime-20261004.json"
+      }
     },
     {
       "id": "A04",

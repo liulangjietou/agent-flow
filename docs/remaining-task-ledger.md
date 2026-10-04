@@ -1,6 +1,6 @@
 # 当前未完成任务台账
 
-更新：2026-10-04 UTC，A03 后端与费用页面已接通并通过范围验证；固定包单据保存、重启/配套恢复及环境相关验收待完成，已确认未完成仍为 34 项。初次核对基线 `f5fd8d53c3d6bbafef456d96c462320bd186d8fc`，分支 `codex/governance-identifier-integration`。
+更新：2026-10-04 UTC，A03 后端、费用页面及固定包单据保存、强退和独立配套恢复已通过范围验证；浏览器与 PostgreSQL 补验待完成，已确认未完成仍为 34 项。初次核对基线 `f5fd8d53c3d6bbafef456d96c462320bd186d8fc`，分支 `codex/governance-identifier-integration`。
 
 F02 固定安装包完成报销挂账、借款挂账、付款凭证及原科目依据页面验收。缺项、错误回显、发布竞争、处理中重启、回执丢失原查询恢复通过；独立配套恢复保留 245 张表、6,276 行和 9 个附件。详见[完整本地证据](evidence/account-mapping-complete-20261003.json)。F13 三类模板与十个配套样例现已完成实际办理；核减路由、超标、借款冲销、事前消费、重复票阻断及免纸件模式通过。配套恢复后可接续在审单，见[完整模板证据](evidence/financial-template-journey-complete-20261003.json)。
 
@@ -19,6 +19,8 @@ A02 后端与本人费用页面已接通，前阶段分别有 132 项 Java、118
 F17 新增供应商应付来源已完成固定包运行与独立恢复：三张采购单非空升级、两次强退后原授权查询恢复、安全结束与新授权分开保持；4 条合成 IM 受理、5 条失权抑制。253 张表、460 条记录配套恢复通过；206 份实际响应及 47 份请求通过契约。浏览器与 PostgreSQL 补验仍待完成，F17 保持 OPEN，总数仍为 34。见[固定包运行记录](supplier-payable-notifications-runtime.md)及[机器证据](evidence/supplier-payable-notifications-runtime-20261003.json)。
 
 F11 已接入费用模板 v2，模板阶段 89 项 Java、48 项前端范围测试通过；固定包验证旧草稿与在审升级、两次强退、纸件先签收职责及独立恢复（253 表、662 行）。225 份实际响应、60 份成功请求契约通过。浏览器与 PostgreSQL 补验待完成，F11 保持 OPEN。见[固定包运行与恢复](expense-self-approval-runtime.md)及[机器证据](evidence/expense-self-approval-runtime-20261004.json)。
+
+A03 已完成固定包的真实保存、强退与独立配套恢复，9 条助手运行和原人工待办保持；浏览器与 PostgreSQL 补验仍待完成，保持 OPEN，总数仍为 34。见[运行阶段证据](evidence/expense-draft-assist-runtime-20261004.json)。
 
 机器可读原表：[remaining-task-ledger.json](remaining-task-ledger.json)。原始规范为相邻 `doc/00` 至 `doc/05`，路径、SHA-256、规范行范围保存在原表；后附历史进度不再重复计为新需求。
 
@@ -41,7 +43,7 @@ F11 已接入费用模板 v2，模板阶段 89 项 Java、48 项前端范围测�
 | --- | --- | --- | --- |
 | A01 | OFD 完整票据渲染与应用抽取入口 | 基础图元、模板、字体、静态批注、复合图元和隔离进程已有范围证据；公开抽取仍未支持 OFD。缺其余绘制能力、数字签章与嵌套内容、应用字体配置及全页模型输入。 [invoice-extraction.md:78](invoice-extraction.md#L78)、[InvoiceExtractionSources.java:1](../agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionSources.java#L1) | 完整原件逐页对照；签章不能被静默丢弃；受控字体和资源限制经实际安装包验证；公开入口及完整页输入接通。签章图像呈现与签名有效性分别声明。 原依据：05 §4.1、§16；05 §16。 |
 | A02 | 模型预检解释与补正建议 | 后端、本人费用页面及固定包 HTTP／升级／重启验收通过；浏览器和 PostgreSQL 新范围补验仍待完成。 [ExpensePrecheckEvaluator.java:1](../agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java#L1)、[draft-assist.md:3](draft-assist.md#L3) | 输入绑定当前预检及选定可读事实；解释带来源；过期结果不可采纳；建议不修改规则结论、金额或审批结果。 原依据：05 §16；04 §5。 |
-| A03 | 结构化财务业务填报助手 | 实现 `49a706c`、`8bc8608`、`4800ba6`：协议、仓储、本人接口和费用页面接通。90 条前端、30 条后端集成、构建与实际响应契约通过；金额由原编辑与保存链路处理。固定包保存接续、重启/恢复、浏览器和 PostgreSQL 待完成。 [阶段说明](expense-draft-assist.md)、[页面证据](evidence/expense-draft-assist-ui-20261004.json) | 结构化业务建议走各自领域保存服务；报销行程、类别和分摊逐项人工确认；不由模型生成补贴标准、真实余额或批准事实；适用业务边界明确。 原依据：05 §16；04 §5。 |
+| A03 | 结构化财务业务填报助手 | 协议、仓储、本人接口和费用页面接通；固定包保存、三种强退及独立恢复通过。255 表、329 行、1,997 条结构语句及 308 份响应契约核对一致；浏览器和 PostgreSQL 补验待完成。 [阶段说明](expense-draft-assist.md)、[运行证据](evidence/expense-draft-assist-runtime-20261004.json) | 结构化业务建议走各自领域保存服务；报销行程、类别和分摊逐项人工确认；不由模型生成补贴标准、真实余额或批准事实；适用业务边界明确。 原依据：05 §16；04 §5。 |
 | A04 | 费用异常的 Agent 风险提示 | 当前 ApprovalRiskPolicy 只评估本次表单白名单条件。没有费用领域同日多笔、节假日消费、连号等事实的专用模型提示与复核链路。 [ApprovalRiskPolicy.java:48](../agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java#L48)、[agent-execution.md:1](agent-execution.md#L1) | 可解释地引用经授权的费用事实，保留提示和人工处置；不能凭模型标签自动驳回、核减或改变金额矩阵。确定性拆单路由由 F04 独立处理。 原依据：05 §16。 |
 | I01 | 外部组织同步的本地完整用例 | 现有组织目录为可信管理员维护单位、人员、任职和关系；已实现 OIDC，但没有同步批次、来源映射、冲突处置及恢复入口。 [OrganizationController.java:1](../agentflow-server/src/main/java/io/agentflow/organization/OrganizationController.java#L1)、[OrganizationService.java:1](../agentflow-server/src/main/java/io/agentflow/organization/OrganizationService.java#L1) | 以单一可信源映射组织事实，预检和具名应用变更、停用及重试均有审计；不隐式创建认证身份或授予系统角色；旧审批轮次依据保持。 原依据：04 §3.A、§3.G；04 §3.G。 |
 | I02 | 电子签业务端口、状态与操作页面 | 现有事件和支付 HMAC 验签解决消息完整性；未有文件签署业务用例。OFD 签章渲染也不等于电子签服务。 [product-goal-gap-audit.md:1](product-goal-gap-audit.md#L1)、[expense-archives.md:1](expense-archives.md#L1) | 固定文件与签署版本、显式授权、异步状态、可验证回执、重复回调和未知结果恢复；保留原件、授权及签署结果，完成本地受控协议验收。 原依据：04 §3.G；00 §6。 |
@@ -122,4 +124,4 @@ F11 已接入费用模板 v2，模板阶段 89 项 Java、48 项前端范围测�
 
 ## 接续顺序
 
-按本地优先的授权，F01、F02、F03、F06、F07、F08、F10、F13 已完成，W01 运行状态接口、页面范围验证和独立配套恢复已完成，剩余浏览器与 PostgreSQL 验收受环境条件影响；F11 模板与运行恢复已通过，浏览器及 PostgreSQL 待补验；F12 设计器、模板、异步接续及固定包运行恢复已通过，浏览器及 PostgreSQL 待补验；继续 A03 结构化财务填报助手和 I01 组织同步等独立待办；F04 的聚合时间窗口和有效单据口径、F05 的超容差规则仍等待业务答复。Agent、组织同步和电子签仍保留在总目标中。每关闭一项必须补具体提交和匹配的验收证据，更新 JSON 状态后重新汇总，不再依赖历史“工作包数”。
+按本地优先的授权，F01、F02、F03、F06、F07、F08、F10、F13 已完成，W01 运行状态接口、页面范围验证和独立配套恢复已完成，剩余浏览器与 PostgreSQL 验收受环境条件影响；F11 模板与运行恢复已通过，浏览器及 PostgreSQL 待补验；F12 设计器、模板、异步接续及固定包运行恢复已通过，浏览器及 PostgreSQL 待补验；A03 填报助手前后端、固定包人工保存、强退与独立恢复已通过，浏览器及 PostgreSQL 待补验。继续 I01 组织同步等独立待办；F04 的聚合时间窗口和有效单据口径、F05 的超容差规则仍等待业务答复。Agent、组织同步和电子签仍保留在总目标中。每关闭一项必须补具体提交和匹配的验收证据，更新 JSON 状态后重新汇总，不再依赖历史“工作包数”。

@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "taskId": "A03",
+  "status": "FIXED_PACKAGE_RUNTIME_VERIFIED_BROWSER_POSTGRES_PENDING",
+  "recordedAt": "2026-10-04T02:56:46.930270+00:00",
+  "sourceCommit": "a12ea9b50be66a721c514cc848f92f9d803c8b36",
+  "implementationCommits": {
+    "foundation": "49a706c492f77bea02f40daa4bf0b667a79e1efc",
+    "backend": "8bc8608b81b1256043e91fb65f8cd4f2498312ac",
+    "frontend": "4800ba67ae15aff6ebcef34846999002d5a25637"
+  },
+  "branch": "codex/governance-identifier-integration",
+  "scope": "ExpenseReport only. Actual fixed-package HTTP, selected-source model transport, explicit human confirmation, production TypeScript fill and original domain save, process crash recovery and independent paired H2 restore with synthetic finance/model peers.",
+  "artifacts": {
+    "sourceCommit": "a12ea9b50be66a721c514cc848f92f9d803c8b36",
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/expense-draft-assist-server-a12ea9b.jar",
+    "jarSha256": "6389533593d0431ee6e80fb49a0e03c3b8e046bbcd1681422949dd210ddea28c",
+    "jarBytes": 79772803,
+    "entries": [
+      "BOOT-INF/classes/io/agentflow/agent/JdbcExpenseDraftAssistRepository$Candidate.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistInputs$CatalogSelection.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistPreparation$Request.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistController.class",
+      "BOOT-INF/classes/io/agentflow/agent/JdbcExpenseDraftAssistRepository$Summary.class",
+      "BOOT-INF/classes/io/agentflow/agent/JdbcExpenseDraftAssistRepository.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistPreparation$Preview.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistService$Receipt.class",
+      "BOOT-INF/classes/io/agentflow/agent/JdbcExpenseDraftAssistRepository$Page.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistController$GenerateRequest.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistController$LegRequest.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistPreparation$Consent.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistService$Detail.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistInputs$CatalogSource.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistPreparation$Prepared.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistPreparation.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistController$DismissRequest.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistWorker.class",
+      "BOOT-INF/classes/io/agentflow/agent/JdbcExpenseDraftAssistRepository$1.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistController$ConfirmRequest.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistController$SelectionRequest.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistInputs.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistService.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistController$InputRequest.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistService$Snapshot.class",
+      "BOOT-INF/classes/io/agentflow/agent/ExpenseDraftAssistController$CatalogRequest.class",
+      "BOOT-INF/classes/db/migration/V108__expense_draft_assist_runs.sql",
+      "BOOT-INF/lib/h2-2.5.250.jar"
+    ],
+    "webDist": "/fyoung/tmp/agentflow-remaining-20260928/expense-draft-assist-ui-evidence-snapshot/web-dist",
+    "webFiles": {
+      "index.html": "03d748c138c8d16adaf2aa2d5cf111d0f46dca4a13e4698e948de763fc88d215",
+      "assets/index-BxidcA2J.css": "4bcd97d5b722d251d4f38785404a4cda38c6f2e74e700862e8c9e4e6bde323b4",
+      "assets/index-BACWrUtE.js": "b049e879897d2bfae225192c59c10157dddb06448c37a5b6b3e0b52cfd05ab77"
+    },
+    "deployment": "separate backend JAR and static web dist",
+    "packageLog": "/fyoung/tmp/agentflow-remaining-20260928/a03-runtime-package.log"
+  },
+  "runtime": {
+    "directory": "/fyoung/tmp/agentflow-expense-draft-assist-vy2anzr7",
+    "restoreDirectory": "/fyoung/tmp/agentflow-expense-draft-restored-z8pfejco",
+    "boots": 15,
+    "baselineBoots": 1,
+    "ownedRuntimeStopped": true,
+    "preservedRuntime": 87821,
+    "stages": [
+      "migration",
+      "queue_restart",
+      "success_errors",
+      "source_change",
+      "running_crash",
+      "restore_pair"
+    ],
+    "checks": {
+      "clientProductionSources": {
+        "expenses": "2c2bb4abfd86c3a11cd1ce925059e4c5aedb664c0a86c257e88a358a0f26d9ec",
+        "expenseDraft": "7e6e196b6727bf417425db6f1949606e3be8d360112a335af7355d74735a2133",
+        "invoiceExtraction": "e9b83643071e9f4905dc5b6656d03f184835198133c972f5b984a396fe081542",
+        "expenseDraftAssist": "79d69fb722c99b1e6b411472845b0f02e669ac67c22b3acb4fe6297429cbf878"
+      },
+      "nonEmptyV107ToV108": {
+        "oldTables": 253,
+        "oldRows": 175,
+        "newTables": 255,
+        "changedExistingTables": [
+          "flyway_schema_history"
+        ],
+        "preservedOldTables": 252
+      },
+      "queuedRestartAndReplayNoExternalCall": true,
+      "confirmedSuggestThenExplicitDomainSave": {
+        "reportId": "e0b61f98-7494-45c6-b00a-e0013eca1050",
+        "modelRequests": 1,
+        "emptyAmountsBeforeManualEdit": true,
+        "savedApplicationVersion": 2,
+        "savedFinancialVersion": 2
+      },
+      "modelCannotSubmitOrApprove": {
+        "applicationId": "4348a47d-f7f2-429f-a159-55fd2a0568a6",
+        "taskId": "494d3358-bf9e-11f1-97b3-f6f0e4108e2d",
+        "taskCount": 1,
+        "submissionResponseIsReceipt": true
+      },
+      "outcome-empty": {
+        "status": "COMPLETED",
+        "failure": null,
+        "modelRequests": 1
+      },
+      "outcome-invalid": {
+        "status": "FAILED",
+        "failure": "INVALID_MODEL_OUTPUT",
+        "modelRequests": 1
+      },
+      "outcome-unavailable": {
+        "status": "FAILED",
+        "failure": "MODEL_UNAVAILABLE",
+        "modelRequests": 1
+      },
+      "actualExpiryBlocksConfirmationAllowsDismiss": true,
+      "exactAuthorizedModelSources": {
+        "requests": 8,
+        "sourceIds": [
+          "expense:brief",
+          "expense:catalog",
+          "expense:itinerary[1]"
+        ],
+        "foreignAndUnselectedAndFullReportExcluded": true
+      },
+      "completedResultPreservedAcrossCrash": true,
+      "changedCatalogBlocksSendingAndConfirmation": {
+        "modelRequests": 0,
+        "error": "AGENT_INPUT_CHANGED"
+      },
+      "runningCrashUsesOriginalLeaseWithoutResend": {
+        "runId": "72380ec8-1699-4343-9313-57df4f14b71a",
+        "leaseSeconds": 35,
+        "leaseUntil": "2026-10-04T02:53:10.512Z",
+        "startedAt": "2026-10-04T02:52:35.512Z",
+        "failedAt": "2026-10-04T02:53:10.587Z",
+        "modelRequests": 1,
+        "transitions": 3
+      },
+      "pairedRestoreReadSnapshotPreserved": {
+        "exactExceptUnorderedParts": true,
+        "unorderedPartsContract": "ExpenseDraftAssistRun.Selection.parts is a Set; only this unique array is sorted for comparison."
+      },
+      "independentPairedRestore": {
+        "directory": "/fyoung/tmp/agentflow-expense-draft-restored-z8pfejco",
+        "tables": 255,
+        "rows": 329,
+        "schemaStatements": 1997,
+        "runs": 9,
+        "transitionRows": 28,
+        "peerReceiptsPreserved": 1,
+        "queuedFirstSendAfterRestore": 1,
+        "originalDatabasePeerAndAttachmentsUnchangedDuringContinuation": true,
+        "confirmedAndSavedAfterRestore": "ca96135c-4e42-4a62-8bca-4d34fd62fd36",
+        "humanTaskPreserved": "494d3358-bf9e-11f1-97b3-f6f0e4108e2d",
+        "schemaUsesNativeNoPasswords": true,
+        "actualJar": "/fyoung/tmp/agentflow-expense-draft-restored-z8pfejco/server.jar"
+      },
+      "fixedWebArtifactsServedOverHttp": {
+        "index.html": "03d748c138c8d16adaf2aa2d5cf111d0f46dca4a13e4698e948de763fc88d215",
+        "assets/index-BxidcA2J.css": "4bcd97d5b722d251d4f38785404a4cda38c6f2e74e700862e8c9e4e6bde323b4",
+        "assets/index-BACWrUtE.js": "b049e879897d2bfae225192c59c10157dddb06448c37a5b6b3e0b52cfd05ab77"
+      }
+    }
+  },
+  "contracts": {
+    "status": "PASS",
+    "counts": {
+      "responses": 308,
+      "successfulRequests": 53,
+      "assistResponses": 212,
+      "assistSuccessfulRequests": 24,
+      "clientResponses": 204,
+      "noStoreAssistResponses": 212
+    },
+    "modelRequests": 8,
+    "distinctRuns": 9,
+    "operations": [
+      "confirmExpenseDraftAssist",
+      "copyTemplate",
+      "createExpenseReport",
+      "createOrganizationAppointment",
+      "createOrganizationPerson",
+      "createOrganizationUnit",
+      "dismissExpenseDraftAssist",
+      "expenseDraftAssistRun",
+      "expenseDraftAssistRuns",
+      "generateExpenseDraftAssist",
+      "getExpensePrecheck",
+      "getExpensePrecheckOptions",
+      "getExpenseReport",
+      "getFinanceCatalog",
+      "initializeOrganization",
+      "listTasks",
+      "previewExpenseDraftAssist",
+      "publishDefinition",
+      "queueExpensePrecheck",
+      "reviseExpenseReport",
+      "setOrganizationDepartmentHead",
+      "setOrganizationSupervisor",
+      "submitExpenseReport",
+      "updateDefinition"
+    ],
+    "assistOperations": [
+      "confirmExpenseDraftAssist",
+      "dismissExpenseDraftAssist",
+      "expenseDraftAssistRun",
+      "expenseDraftAssistRuns",
+      "generateExpenseDraftAssist",
+      "previewExpenseDraftAssist"
+    ],
+    "observedRunStatuses": [
+      "COMPLETED",
+      "CONFIRMED",
+      "DISMISSED",
+      "FAILED",
+      "QUEUED",
+      "RUNNING"
+    ],
+    "openapiSha256": "c0f12bd2b5ff121dae160fae909e015cc2bc55966b23348e745cf96f3213a4f9",
+    "evidence": "/fyoung/tmp/agentflow-remaining-20260928/expense-draft-assist-runtime-contract.json",
+    "counting": "Counts include repeated real observations; they are not additional Java tests, distinct business cases or browser interactions."
+  },
+  "fixtureCorrections": {
+    "failedHarnessAttempts": 3,
+    "items": [
+      "Submission returns a receipt; approval state is read from the report detail.",
+      "Application approval state is the existing IN_APPROVAL enum.",
+      "Selection.parts is an unordered unique set; only its element order is normalized in the API comparison."
+    ],
+    "productCodeChanges": false,
+    "allAttemptLogsPreserved": true,
+    "scope": "These are acceptance harness assumptions corrected against existing contracts, not product regressions or product RED tests."
+  },
+  "evidenceSnapshot": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-draft-assist-runtime-evidence-snapshot",
+    "manifestSha256": "673690fadd43732875085aa71e973cdda4253cdc95efe4d2760db8f723437432",
+    "verifiedFiles": 138,
+    "bytes": 13719628,
+    "externalArtifacts": 7,
+    "sourceCommit": "a12ea9b50be66a721c514cc848f92f9d803c8b36"
+  },
+  "limits": [
+    "Real browser execution is still pending; asset HTTP hashes, production parser/fill execution and prior Vue setup/SSR checks do not replace it.",
+    "PostgreSQL acceptance of this new scope remains pending.",
+    "Finance and model services are synthetic local peers; enterprise model quality and real finance integrations remain external tasks.",
+    "The attachment directory is empty in this scenario; this is not new evidence for restoration of attachment contents.",
+    "Expense plans, advances and other financial aggregates are outside this ExpenseReport assistant implementation."
+  ],
+  "remaining": {
+    "taskStatus": "OPEN",
+    "knownOpenTasks": 34,
+    "completeInventory": false,
+    "nextIndependentTask": "I01"
+  }
+}
