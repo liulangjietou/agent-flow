@@ -82,6 +82,9 @@ class ExpenseSubmissionIntegrationTest {
     private boolean reductionRoute;
     private boolean hideBusinessDetails;
     private boolean selfApprovalEscalation;
+    private Graph expenseTemplateGraph;
+    private FormSchema expenseTemplateSchema;
+    private String lineGross = "100";
     private String selfApprovalBusinessRule;
     private String selfApprovalBusinessMode;
     private boolean parallelExpenseReviews;
@@ -257,8 +260,119 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired io.agentflow.organization.ApprovalProxyService approvalProxies;
     @Autowired io.agentflow.definition.DefinitionDraftRepository definitionRecords;
     @Autowired io.agentflow.organization.OrganizationRepository organizationRecords;
+    @MockitoSpyBean io.agentflow.approval.process.JdbcTaskAuditAdapter taskAudit;
 
     private final List<EmployeeAdvance> fifoFixtures = new ArrayList<>();
+
+    @Test
+    void adjacentExpenseApprovalPassesAcrossActualTemplateAmountGateWithAuditedSource() throws Exception {
+        duplicateExpenseTemplate(true);
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        var source = task(report); long before = app(report).version();
+        assertThat(source.getTaskDefinitionKey()).isEqualTo("supervisor");
+
+        ok(act(report, "manager", "APPROVE"), 200);
+
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+        assertThat(app(report).version()).isEqualTo(before + 2);
+        var events = jdbc.queryForList("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE'",
+                String.class, report.applicationId().toString());
+        assertThat(events).hasSize(1);
+        var event = json.read(events.get(0), JsonNode.class);
+        assertThat(event.path("actor").asText()).isEqualTo("system:expense-duplicate-approval");
+        assertThat(event.path("nodeId").asText()).isEqualTo("department");
+        assertThat(event.at("/duplicateApproval/sourceTaskIds").toString()).contains(source.getId());
+        assertThat(event.at("/duplicateApproval/subject").asText()).isEqualTo("manager");
+        assertThat(event.at("/duplicateApproval/ruleVersion").asInt()).isEqualTo(1);
+        assertThat(ok(read("/api/v1/applications/" + report.applicationId() + "/audit?action=AUTO_PASSED_DUPLICATE", "alice"), 200).path("items")).hasSize(1);
+        long advanced = app(report).version();
+        assertThat(send("/api/v1/tasks/" + source.getId() + "/actions", "manager",
+                Map.of("action", "APPROVE", "expectedVersion", before)).getStatus()).isNotEqualTo(200);
+        assertThat(app(report).version()).isEqualTo(advanced);
+        ok(send(path(report) + "/tasks/" + task(report).getId() + "/receive", "finance", receiveInput(report)), 200);
+        ok(act(report, "finance", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("finance");
+    }
+
+    @Test
+    void adjacentExpenseApprovalKeepsPublishedTemplateWithoutExplicitPolicyManual() throws Exception {
+        duplicateExpenseTemplate(false);
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("department");
+    }
+
+    @Test
+    void adjacentExpenseApprovalUsesActualTransferredActorInsteadOfOriginalCandidate() throws Exception {
+        duplicateExpenseTemplate(true); person("bob", true);
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        ok(send("/api/v1/tasks/" + task(report).getId() + "/actions", "manager",
+                Map.of("action", "TRANSFER", "targetUser", "bob", "expectedVersion", app(report).version())), 200);
+        ok(act(report, "bob", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("department");
+    }
+
+    @Test
+    void adjacentExpenseApprovalSupportsDeduplicatedSingleMemberCountersign() throws Exception {
+        duplicateExpenseTemplate(true);
+        configureTemplateDepartment(Map.of("approvalMode", "ALL"));
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+    }
+
+    @Test
+    void adjacentExpenseApprovalLeavesMultipleEffectiveCandidatesManual() throws Exception {
+        duplicateExpenseTemplate(true);
+        var selected = organizationRecords.appointment("demo", appointment).orElseThrow();
+        organization.createAppointment(admin, person("bob", true), selected.departmentId(), selected.positionId(), true);
+        configureTemplateDepartment(Map.of("assigneeRule", "role:ORG_UNIT_" + selected.departmentId()));
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("department");
+    }
+
+    @Test
+    void adjacentExpenseApprovalAuditFailureRollsBackHumanAndAutomaticTaskTogether() throws Exception {
+        duplicateExpenseTemplate(true);
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        var source = task(report); long version = app(report).version();
+        doThrow(new IllegalStateException("Synthetic automatic approval audit failure")).when(taskAudit)
+                .record(argThat(operation -> operation.action().equals("AUTO_PASSED_DUPLICATE")));
+        assertThatThrownBy(() -> act(report, "manager", "APPROVE"))
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasStackTraceContaining("Synthetic automatic approval audit failure");
+        assertThat(app(report).version()).isEqualTo(version);
+        assertThat(task(report).getId()).isEqualTo(source.getId());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action IN ('APPROVE','AUTO_PASSED_DUPLICATE')",
+                Integer.class, report.applicationId().toString())).isZero();
+    }
+
+    private void configureTemplateDepartment(Map<String, String> changes) {
+        expenseTemplateGraph = new Graph(expenseTemplateGraph.nodes().stream().map(node -> {
+            if (!node.id().equals("department")) return node;
+            var properties = new HashMap<>(node.properties()); properties.putAll(changes);
+            return new Node(node.id(), node.name(), node.type(), properties);
+        }).toList(), expenseTemplateGraph.edges(), expenseTemplateGraph.conditionLanguageVersion(), expenseTemplateGraph.riskPolicy());
+    }
+
+    private void duplicateExpenseTemplate(boolean enabled) throws Exception {
+        selfApprovingAppointment(true); lineGross = "6000";
+        try (var stream = getClass().getResourceAsStream("/process-templates/expense-report.json")) {
+            var template = json.read(new String(stream.readAllBytes(), StandardCharsets.UTF_8), JsonNode.class);
+            var graph = json.read(template.path("graph").toString(), Graph.class);
+            expenseTemplateSchema = json.read(template.path("formSchema").toString(), FormSchema.class);
+            expenseTemplateGraph = new Graph(graph.nodes().stream().map(node -> {
+                var properties = new HashMap<>(node.properties());
+                if (node.type() == NodeType.START && enabled) properties.put("expenseDuplicateApproval", "AUTO_PASS_ADJACENT");
+                if (node.type() == NodeType.USER_TASK && !node.id().equals("supervisor")) {
+                    properties.put("assigneeRule", properties.containsKey("expenseStage") ? "role:ORG_PERSON_" + finance
+                            : io.agentflow.organization.LocalOrganizationDirectory.DEPARTMENT_HEAD_RULE);
+                }
+                return new Node(node.id(), node.name(), node.type(), properties);
+            }).toList(), graph.edges(), graph.conditionLanguageVersion(), graph.riskPolicy());
+        }
+    }
 
     @Test
     void expenseSelfApprovalUsesSupervisorOfSelectedAppointment() throws Exception {
@@ -6038,6 +6152,11 @@ class ExpenseSubmissionIntegrationTest {
         return new Fixture(reports.find("demo", id).orElseThrow(), invoice, priorId, advanceId);
     }
     private DefinitionDraft definition() {
+        if (expenseTemplateGraph != null) {
+            var draft = definitions.create("demo", "expense-template-" + UUID.randomUUID(), "费用模板重复审批验收",
+                    expenseTemplateGraph, expenseTemplateSchema, null);
+            return definitions.publish(admin, draft.id(), draft.revision(), "合成验收");
+        }
         var nodes = new ArrayList<>(List.of(new Node("start", "开始", NodeType.START,
                 selfApprovalEscalation ? Map.of("expenseSelfApproval", "ESCALATE_SUPERVISOR") : Map.of()),
                 new Node("business", "业务审批", NodeType.USER_TASK, selfApprovalEscalation
@@ -6091,9 +6210,9 @@ class ExpenseSubmissionIntegrationTest {
         return found.isEmpty() ? organization.createPerson(admin, user, "测试" + user, true, approver).id() : UUID.fromString(found.get(0));
     }
     private ExpenseLine line(UUID invoice, UUID prior) {
-        return new ExpenseLine(1, "OFFICE", LocalDate.now(), null, "SH", BigDecimal.ONE, ExpenseLine.Unit.ITEM, money("100"), money("6"),
+        return new ExpenseLine(1, "OFFICE", LocalDate.now(), null, "SH", BigDecimal.ONE, ExpenseLine.Unit.ITEM, money(lineGross), money("6"),
                 invoice == null ? List.of() : List.of(invoice), prior == null ? null : new ExpenseLine.PriorRequestLine(prior, 1),
-                List.of(new CostAllocation("IT", null, money("100"))), "合成办公费", null);
+                List.of(new CostAllocation("IT", null, money(lineGross))), "合成办公费", null);
     }
     private UUID original() throws Exception {
         byte[] bytes = invoiceOriginalFormat == InvoiceOriginal.Format.XML ? syntheticXmlOriginal()
@@ -6259,7 +6378,7 @@ class ExpenseSubmissionIntegrationTest {
             }
             case "exchange-rate" -> new ExpenseExchangeRate("CNY", "CNY", BigDecimal.ONE, "synthetic", LocalDate.parse(data.path("rateDate").asText()));
             case "invoice-verification" -> verificationUnavailable ? Map.of("unavailableFixture", true) : new Invoice.VerifiedFacts(new InvoiceKey(InvoiceKey.Type.DIGITAL, null, invoiceNumber), entity, money("100"), money("6"), LocalDate.now(), data.path("originalDigest").asText(), "synthetic-verification", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
-            case "expense-policy" -> new ExpensePolicyPort.Assessment(new ExpensePolicySnapshot(UUID.randomUUID(), 1, money("100"), money("100"), ExpensePolicySnapshot.Decision.WITHIN_LIMIT, "synthetic-tax", "synthetic-policy"), money("6"), false, Instant.now().plusSeconds(600));
+            case "expense-policy" -> new ExpensePolicyPort.Assessment(new ExpensePolicySnapshot(UUID.randomUUID(), 1, money(lineGross), money(lineGross), ExpensePolicySnapshot.Decision.WITHIN_LIMIT, "synthetic-tax", "synthetic-policy"), money("6"), false, Instant.now().plusSeconds(600));
             case "budget-precheck" -> new BudgetPrecheckPort.Assessment(json.read(data.toString(), BudgetPrecheckPort.Request.class), "synthetic-precheck", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
             case "accounting-period" -> {
                 var request = json.read(data.toString(), AccountingPeriodPort.Request.class); var date = request.accountingDate(); var at = Instant.now();

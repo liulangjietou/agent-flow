@@ -6566,7 +6566,8 @@
                 "SERVICE_TASK_COMPLETED",
                 "SUBPROCESS_COMPLETED",
                 "SUBPROCESS_STOPPED",
-                "SELF_APPROVAL_ESCALATED"
+                "SELF_APPROVAL_ESCALATED",
+                "AUTO_PASSED_DUPLICATE"
               ]
             }
           },
@@ -9976,7 +9977,8 @@
                 "INVOICE_EXTRACTION_CONFIRM",
                 "INVOICE_EXTRACTION_DISMISS",
                 "EXPENSE_REQUEST_CLOSED",
-                "SELF_APPROVAL_ESCALATED"
+                "SELF_APPROVAL_ESCALATED",
+                "AUTO_PASSED_DUPLICATE"
               ]
             }
           },
@@ -11516,7 +11518,8 @@
                 "INVOICE_EXTRACTION_CONFIRM",
                 "INVOICE_EXTRACTION_DISMISS",
                 "EXPENSE_REQUEST_CLOSED",
-                "SELF_APPROVAL_ESCALATED"
+                "SELF_APPROVAL_ESCALATED",
+                "AUTO_PASSED_DUPLICATE"
               ]
             }
           },
