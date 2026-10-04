@@ -1361,7 +1361,7 @@
           ]
         }
       ],
-      "observed": "规则、V116 依据、提交事务与 Flowable 路由、原轮次查询及逐来源字段授权已接通。356 项路由范围通过，原轮次查询和相邻范围 47 项通过；40 份 MVC 响应及 17 份错误变体完成契约检查。设计器、页面、固定包及浏览器/PostgreSQL 仍待验收；F04 保持 OPEN，阶段测试数不累加。",
+      "observed": "规则、V116 依据、提交事务与 Flowable 路由、原轮次权限查询及只读详情面板已接通。356 项路由、47 项查询、53 项前端范围分别通过，阶段数不累加；21 份后端成功响应通过页面解析。两种设计器、模板和模拟、固定包及浏览器/PostgreSQL 验收仍待完成；F04 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
@@ -1377,7 +1377,8 @@
       "domainFoundationEvidence": "docs/evidence/expense-split-domain-20261004.json",
       "persistenceEvidence": "docs/evidence/expense-split-persistence-20261004.json",
       "routingIntegrationEvidence": "docs/evidence/expense-split-routing-integration-20261004.json",
-      "readEvidence": "docs/evidence/expense-split-read-20261004.json"
+      "readEvidence": "docs/evidence/expense-split-read-20261004.json",
+      "readUiEvidence": "docs/evidence/expense-split-read-ui-20261004.json"
     },
     {
       "id": "F05",
@@ -3896,9 +3897,9 @@
   },
   "latestProgress": {
     "taskId": "F04",
-    "status": "READ_API_VERIFIED_DESIGNER_AND_RUNTIME_PENDING",
-    "recordedAt": "2026-10-04T12:28:08.367428+00:00",
-    "evidence": "docs/evidence/expense-split-read-20261004.json",
+    "status": "READ_UI_VERIFIED_DESIGNER_AND_RUNTIME_PENDING",
+    "recordedAt": "2026-10-04T12:41:22.883950+00:00",
+    "evidence": "docs/evidence/expense-split-read-ui-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
