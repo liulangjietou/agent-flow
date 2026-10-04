@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import ts from 'typescript'
@@ -13,8 +13,11 @@ for (const name of ['expenses', 'expensePriorControl']) {
 }
 const model = await import(pathToFileURL(resolve(output, 'expensePriorControl.js')).href)
 let originalRounds = 0, prechecks = 0, selectorPages = 0
-for (const directory of process.argv.slice(2)) for (const filename of readdirSync(directory).filter(name => name.endsWith('.json'))) {
-  const record = JSON.parse(readFileSync(resolve(directory, filename), 'utf8'))
+const records = process.argv.slice(2).flatMap(input => {
+  const files = statSync(input).isDirectory() ? readdirSync(input).filter(name => name.endsWith('.json')).map(name => resolve(input, name)) : [input]
+  return files.flatMap(file => { const value = JSON.parse(readFileSync(file, 'utf8')); return Array.isArray(value) ? value : [value] })
+})
+for (const record of records) {
   if (record.status !== 200 || record.method !== 'GET') continue
   const url = new URL(record.path, 'http://127.0.0.1'), value = record.response
   const match = url.pathname.match(/\/expense-reports\/([^/]+)\/prior-control$/)
