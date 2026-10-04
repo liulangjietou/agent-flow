@@ -1,6 +1,6 @@
 {
   "recordedAt": "2026-10-04T14:44:51.859554+00:00",
-  "status": "LOCAL_RUNTIME_VERIFIED_FINAL_REVIEW_PENDING",
+  "status": "LOCAL_RUNTIME_VERIFIED_FINAL_REVIEW_PASSED",
   "sourceCommit": "beefd17c2f1adaa862edb17349241e9cc9419bc1",
   "artifactDirectory": "/fyoung/tmp/agentflow-remaining-20260928/f16-due-date-runtime-evidence-20261004",
   "runtimeDirectory": "/fyoung/tmp/agentflow-due-runtime-d8gkfiek",
@@ -430,5 +430,6 @@
     "enterpriseFinanceVerified": false,
     "enterpriseSsoVerified": false
   },
-  "transportNotes": "Third fresh run passed with persistent HTTP/1.1. ConnectionResetError printed while deliberately killing the app reflects the intended crash, not an unhandled financial command failure."
+  "transportNotes": "Third fresh run passed with persistent HTTP/1.1. ConnectionResetError printed while deliberately killing the app reflects the intended crash, not an unhandled financial command failure.",
+  "finalReview": "docs/evidence/payment-due-dates-final-review-20261004.json"
 }

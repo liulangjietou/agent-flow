@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T13:04:17.891681+00:00",
+  "recordedAt": "2026-10-04T14:47:56.128406+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -22,20 +22,19 @@
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
     ],
     "localDeliveryBreakdown": {
-      "recordedAt": "2026-10-04T14:02:08.691010+00:00",
+      "recordedAt": "2026-10-04T14:47:56.128406+00:00",
       "implementationRemaining": {
-        "count": 6,
+        "count": 5,
         "taskIds": [
           "A01",
           "F05",
           "F09",
           "F14",
-          "F15",
-          "F16"
+          "F15"
         ]
       },
       "implementedAwaitingBrowserAndPostgresVerification": {
-        "count": 10,
+        "count": 11,
         "taskIds": [
           "A02",
           "A03",
@@ -46,7 +45,8 @@
           "W01",
           "I02",
           "A04",
-          "F04"
+          "F04",
+          "F16"
         ]
       },
       "note": "This is a breakdown of the 16 OPEN local delivery tasks, not additional tasks or new completion claims."
@@ -1871,7 +1871,7 @@
           ]
         }
       ],
-      "observed": "法人、固定出款账户与显式付款到期日的后端、日期筛选排序和页面已完成；184 条 Java、62 条前端范围测试以及类型检查、构建、OpenAPI 通过。旧法人/账户固定包运行验收已完成，新增日期的 V116→V117 升级、旧键接续、付款中断与独立恢复正在验证；浏览器与 PostgreSQL 仍待环境，F16 保持 OPEN。",
+      "observed": "法人、固定出款账户、显式付款到期日及范围/排序/分页页面已完成本地实现和一次最终审查。184 条 Java、62 条前端范围测试通过；V116→V117 保留 272 张旧表的 819 行，665 次 HTTP 和 238 次真实页面解析、两次付款强退及独立配套恢复通过。浏览器与 PostgreSQL 待补验，F16 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java",
@@ -1908,21 +1908,30 @@
         {
           "path": "docs/evidence/payment-due-dates-task2-20261004.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/payment-due-dates-runtime-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/payment-due-dates-final-review-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "定义可信付款到期事实并接入筛选/排序；法人和实际支付账户筛选与总数、分页一致；保持逐笔复核及当前权限；不能把借款归还日当付款到期日。",
       "dependsOn": [],
       "progress": {
-        "recordedAt": "2026-10-04T14:40:38.234090+00:00",
-        "status": "DUE_DATE_IMPLEMENTED_SCOPED_CHECKS_PASSED_RUNTIME_IN_PROGRESS",
-        "implementationCommit": "beefd17c2f1adaa862edb17349241e9cc9419bc1",
-        "evidence": "docs/evidence/cashier-payment-filters-runtime-20261004.json",
+        "recordedAt": "2026-10-04T14:47:56.128406+00:00",
+        "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
+        "implementationCommit": "3848c22fc89d036758af4c001204daa380a22e0a",
+        "evidence": "docs/evidence/payment-due-dates-final-review-20261004.json",
         "dateQuestionPending": false,
-        "packagedRuntimePending": true,
+        "packagedRuntimePending": false,
         "browserAndPostgresPending": true,
         "dateRuleAuthorized": true,
         "dateImplementationPending": false,
-        "dateRuntimePending": true
+        "dateRuntimePending": false,
+        "finalReviewPassed": true
       }
     },
     {
@@ -3912,10 +3921,10 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "F04",
+    "taskId": "F16",
     "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
-    "recordedAt": "2026-10-04T14:02:08.691010+00:00",
-    "evidence": "docs/evidence/expense-split-final-review-20261004.json",
+    "recordedAt": "2026-10-04T14:47:56.128406+00:00",
+    "evidence": "docs/evidence/payment-due-dates-final-review-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
