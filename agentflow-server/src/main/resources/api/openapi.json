@@ -52423,6 +52423,112 @@
           }
         ]
       }
+    },
+    "/api/v1/expense-reports/{id}/split-routing": {
+      "get": {
+        "operationId": "expenseSplitRouting",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "读取原报销轮次的跨单路由依据",
+        "description": "本单及每份来源均按当前主体和原审批轮次校验完整敏感明细。任一来源不可读则统一返回 RESTRICTED，不披露是否命中、来源编号、数量或金额；管理员不豁免。NOT_RECORDED 表示旧轮次没有记录，不代表检查通过。只接受一个规范正整数 roundNo，拒绝重复及其他查询参数。查询不修改业务状态。",
+        "x-access": "同租户本单原轮次完整费用明细权限；跨单正文另须所有来源原轮次完整明细权限",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseSplitRoutingView"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "包含审批关联信息，禁止缓存。"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": true,
+            "description": "主单原提交轮次",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -93213,6 +93319,557 @@
           "nextAfterKey"
         ],
         "additionalProperties": false
+      },
+      "ExpenseSplitRule": {
+        "type": "object",
+        "properties": {
+          "windowDays": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
+          },
+          "threshold": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "properties": {
+                  "value": {
+                    "not": {
+                      "enum": [
+                        "0",
+                        "0.0",
+                        "0.00"
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "required": [
+          "windowDays",
+          "threshold"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseSplitConfiguration": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "UNCONFIGURED",
+              "DISABLED",
+              "ENABLED"
+            ]
+          },
+          "rule": {
+            "$ref": "#/components/schemas/ExpenseSplitRule"
+          },
+          "gatewayIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "mode",
+          "gatewayIds"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "ENABLED"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "rule"
+              ],
+              "properties": {
+                "gatewayIds": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "UNCONFIGURED"
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "rule"
+                ]
+              },
+              "properties": {
+                "gatewayIds": {
+                  "maxItems": 0
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ExpenseSplitScope": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "employeeId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "legalEntityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          }
+        },
+        "required": [
+          "tenantId",
+          "employeeId",
+          "legalEntityId",
+          "currency"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseSplitLine": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "categoryCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "approvedGross": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "lineNo",
+          "categoryCode",
+          "approvedGross"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseSplitDocument": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ExpenseSplitScope"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "IN_APPROVAL",
+              "RETURNED",
+              "WITHDRAWN",
+              "REJECTED",
+              "APPROVED",
+              "REVOKED",
+              "CANCELLED"
+            ],
+            "description": "冻结依据时的来源状态。主单在引擎启动前准备，可能为 DRAFT/RETURNED/WITHDRAWN；不是单据的当前状态。"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseSplitLine"
+            },
+            "minItems": 1,
+            "maxItems": 200
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "applicationVersion",
+          "financialVersion",
+          "roundNo",
+          "scope",
+          "submittedAt",
+          "status",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseSplitCategory": {
+        "type": "object",
+        "properties": {
+          "categoryCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "reportCount": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "triggered": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "categoryCode",
+          "total",
+          "reportCount",
+          "triggered"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseSplitAssessment": {
+        "type": "object",
+        "properties": {
+          "windowFrom": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "assessedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ownAmount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "routingAmount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseSplitCategory"
+            },
+            "minItems": 0,
+            "maxItems": 200
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseSplitDocument"
+            },
+            "minItems": 1,
+            "maxItems": 1000
+          }
+        },
+        "required": [
+          "windowFrom",
+          "assessedAt",
+          "ownAmount",
+          "routingAmount",
+          "categories",
+          "sources"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseSplitSnapshot": {
+        "type": "object",
+        "properties": {
+          "ruleVersion": {
+            "type": "integer",
+            "const": 1
+          },
+          "definitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "processKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "configuration": {
+            "$ref": "#/components/schemas/ExpenseSplitConfiguration"
+          },
+          "primary": {
+            "$ref": "#/components/schemas/ExpenseSplitDocument"
+          },
+          "assessment": {
+            "$ref": "#/components/schemas/ExpenseSplitAssessment"
+          }
+        },
+        "required": [
+          "ruleVersion",
+          "definitionId",
+          "processKey",
+          "definitionVersion",
+          "configuration",
+          "primary"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "configuration": {
+                  "properties": {
+                    "mode": {
+                      "const": "ENABLED"
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "assessment"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "assessment"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "ExpenseSplitRoutingView": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_RECORDED",
+              "UNCONFIGURED",
+              "DISABLED",
+              "CLEAR",
+              "SPLIT_SUSPECTED",
+              "RESTRICTED"
+            ]
+          },
+          "sourcesReadable": {
+            "type": "boolean"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseSplitSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "roundNo",
+          "status",
+          "sourcesReadable",
+          "details"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "NOT_RECORDED",
+                    "RESTRICTED"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "sourcesReadable": {
+                  "const": false
+                },
+                "details": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "sourcesReadable": {
+                  "const": true
+                },
+                "details": {
+                  "$ref": "#/components/schemas/ExpenseSplitSnapshot"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "UNCONFIGURED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "details": {
+                  "properties": {
+                    "configuration": {
+                      "properties": {
+                        "mode": {
+                          "const": "UNCONFIGURED"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "DISABLED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "details": {
+                  "properties": {
+                    "configuration": {
+                      "properties": {
+                        "mode": {
+                          "const": "DISABLED"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "CLEAR"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "details": {
+                  "properties": {
+                    "configuration": {
+                      "properties": {
+                        "mode": {
+                          "const": "ENABLED"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "SPLIT_SUSPECTED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "details": {
+                  "properties": {
+                    "configuration": {
+                      "properties": {
+                        "mode": {
+                          "const": "ENABLED"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }

@@ -87,6 +87,15 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("ExpenseSplitRoutingView", io.agentflow.expense.ExpenseSplitRoutingQueries.View.class),
+                java.util.Map.entry("ExpenseSplitSnapshot", io.agentflow.expense.ExpenseSplitRoutingSnapshot.class),
+                java.util.Map.entry("ExpenseSplitConfiguration", io.agentflow.expense.ExpenseSplitRiskPolicy.Configuration.class),
+                java.util.Map.entry("ExpenseSplitRule", io.agentflow.expense.ExpenseSplitRiskPolicy.Rule.class),
+                java.util.Map.entry("ExpenseSplitScope", io.agentflow.expense.ExpenseSplitRiskEvidence.Scope.class),
+                java.util.Map.entry("ExpenseSplitLine", io.agentflow.expense.ExpenseSplitRiskEvidence.Line.class),
+                java.util.Map.entry("ExpenseSplitDocument", io.agentflow.expense.ExpenseSplitRiskEvidence.Document.class),
+                java.util.Map.entry("ExpenseSplitCategory", io.agentflow.expense.ExpenseSplitRiskEvidence.CategoryTotal.class),
+                java.util.Map.entry("ExpenseSplitAssessment", io.agentflow.expense.ExpenseSplitRiskEvidence.Assessment.class),
                 java.util.Map.entry("ExpenseRiskDocumentRequest", io.agentflow.agent.ExpenseRiskController.DocumentRequest.class),
                 java.util.Map.entry("ExpenseRiskCalendar", io.agentflow.agent.ExpenseRiskAccess.CalendarOption.class),
                 java.util.Map.entry("ExpenseRiskCalendars", io.agentflow.agent.ExpenseRiskAccess.CalendarOptions.class),
