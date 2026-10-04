@@ -147,6 +147,32 @@ class GatewayBudgetSystemTest {
     }
 
     @Test
+    void explicitFlexibleRejectionIsAcceptedOnlyWithOriginalCommandAndCompleteOffer() {
+        responder.set(request -> {
+            var body = success(request, new BudgetObservation(command.id(), command.digest(), BudgetObservation.Status.REJECTED,
+                    null, null, null, BudgetObservation.Rejection.BUDGET_INSUFFICIENT));
+            var value = (ObjectNode) body.path("data"); value.put("rejection", "BUDGET_EXCEPTION_REQUIRED");
+            value.putObject("exceptionOffer").put("policyReference", "policy-flex-1").put("reference", "offer-1");
+            return json.write(body);
+        });
+        var result = budgets.execute(target, command);
+        assertThat(result).isInstanceOf(FinanceResult.Success.class);
+        assertThat(result.requireValue().status()).isEqualTo(BudgetObservation.Status.REJECTED);
+        assertThat(json.read(json.write(result.requireValue()), JsonNode.class).at("/exceptionOffer/reference").asText()).isEqualTo("offer-1");
+        assertThat(requests.get()).isEqualTo(1);
+        var valid = responder.get();
+        List<Consumer<ObjectNode>> corruptions = List.of(value -> value.remove("exceptionOffer"), value -> value.put("rejection", "BUDGET_INSUFFICIENT"),
+                value -> value.put("operationId", UUID.randomUUID().toString()), value -> value.put("commandDigest", "f".repeat(64)),
+                value -> ((ObjectNode) value.path("exceptionOffer")).remove("policyReference"),
+                value -> ((ObjectNode) value.path("exceptionOffer")).put("reference", " "),
+                value -> ((ObjectNode) value.path("exceptionOffer")).put("unknown", true));
+        for (var corrupt : corruptions) {
+            responder.set(request -> { var body = json.read(valid.apply(request), ObjectNode.class); corrupt.accept((ObjectNode) body.path("data")); return json.write(body); });
+            assertThat(budgets.execute(target, command)).isEqualTo(unavailable(FinanceResult.Failure.INVALID_RESPONSE));
+        }
+    }
+
+    @Test
     void timedOutWriteIsSentOnceAndRecoveredThroughOriginalOperationQuery() throws Exception {
         var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
         responder.set(request -> {

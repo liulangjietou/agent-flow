@@ -34,9 +34,9 @@
 - Modify: `agentflow-server/src/main/java/io/agentflow/finance/GatewayBudgetPrecheck.java`, `GatewayBudgetSystem.java`
 - Test: 已有预算领域/适配器测试及新增柔性凭据边界测试（先用 `rg --files` 确定现有测试名）
 
-- [ ] 固定旧命令 JSON/摘要及旧拒绝；先复现柔性政策、原命令凭据和授权绑定缺失。
-- [ ] 新字段成组校验，旧构造/缺字段保持；预算事实仍由实际 APPLIED 确定。
-- [ ] 覆盖错命令/错政策、无授权、摘要变化、重复恢复和普通预算回归后本地提交。
+- [x] 固定旧命令 JSON/摘要及旧拒绝；先复现柔性政策、原命令凭据和授权绑定缺失。
+- [x] 新字段成组校验，旧构造/缺字段保持；预算事实仍由实际 APPLIED 确定。
+- [x] 覆盖错命令/错政策、无授权、摘要变化、重复恢复和普通预算回归后本地提交。
 
 ### Task 2: 原轮次预算例外聚合与持久化
 

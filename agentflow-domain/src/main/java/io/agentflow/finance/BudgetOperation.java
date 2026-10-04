@@ -28,7 +28,8 @@ public record BudgetOperation(Input input, long version, Status status, int atte
                 || status == Status.UNKNOWN && observation != null && observation.status() != BudgetObservation.Status.PENDING
                 || status == Status.QUEUED && (failure != null || attempts == 0 && observation != null
                         || attempts > 0 && (observation == null || observation.status() != BudgetObservation.Status.NOT_FOUND))
-                || observation != null && !observation.matches(input.command(), true, updatedAt)) throw invalid();
+                || observation != null && !observation.matches(input.command(), true, updatedAt)
+                || input.command().exceptionApproval() != null && input.command().exceptionApproval().approvedAt().isAfter(createdAt)) throw invalid();
     }
 
     /** 本地事务只排队，未提交的事务没有任何外部预算效果。 */
@@ -96,6 +97,7 @@ public record BudgetOperation(Input input, long version, Status status, int atte
         /** 目标摘要来自服务端租户配置。 */
         public Input {
             if (command == null || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}")) throw invalid();
+            if (command.exceptionApproval() != null && !targetDigest.equals(command.exceptionApproval().targetDigest())) throw invalid();
         }
     }
     /**

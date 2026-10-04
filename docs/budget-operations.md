@@ -34,6 +34,18 @@
 
 跨语言测试向量见 `BudgetCommandTest`：中文成本中心 `研发:中心`、空项目、CNY 100.00 的固定样本摘要为 `240aecd51a8aaa95bc378695ec620ceea69c4b7e8a7def36bd8d4b4a738fd82a`，由 Python 独立计算并由 Java 验证。
 
+## 柔性预算协议（F09）
+
+预检 `Assessment.exceptionPolicy` 为可选 `{reference}`，缺失保持刚性。该来源绑定预检的完整请求，仅允许后续申请例外；它既不是预算冻结凭据，也不是人工批准。
+
+实际 `FREEZE` / `ADJUST` 可以返回 `REJECTED`、`BUDGET_EXCEPTION_REQUIRED` 和 `exceptionOffer: {policyReference, reference}`。两个来源必须完整且非空；其他状态或拒绝分类不能携带此字段。该结果仍然没有台账版本、冻结凭据或生效时间。费用轮次另核对原预检政策，不能仅凭外部新给的政策批准。
+
+人工审批产生可选的 `command.exceptionApproval`：原操作编号、原命令摘要、原目标摘要、政策来源、例外凭据、真实任务、实际操作者、审计事件号和批准时刻。它仅能用于新编号的冻结/调整；以原编号和新命令的租户、动作、完整位置及前置台账重新计算 v1 摘要，必须等于原摘要。目标在持久操作输入处再次绑定，排队时刻不得早于批准。原拒绝保持终态，再次拒绝不能继续生成例外授权。
+
+无此字段时 JSON 省略新字段，摘要沿用上述 v1。携带此字段时首项改为 `agentflow-budget-command-2`，其余原字段顺序不变，然后追加：`originalOperationId`、`originalCommandDigest`、`targetDigest`、`policyReference`、`offerReference`、`taskId`、`actorId`、`auditEventId`、`approvedAt`（Java `Instant` 的规范 UTC ISO 文本）。各值仍使用 UTF-8 字节长度编码。独立跨语言向量及完整字段见 `BudgetExceptionProtocolTest`。
+
+本阶段仅完成端口、领域与兼容测试，原流程节点、持久轮次及页面按 [F09 计划](superpowers/plans/2026-10-04-expense-budget-exceptions.md) 继续。新命令排队和人工批准均不替代实际 `APPLIED`。
+
 ## 结果与恢复约束
 
 响应外层 `outcome=SUCCESS` 仅表示取得了有效操作事实。`data` 必须包含原 `operationId`、相同 `commandDigest`、`status`，其他字段按状态互斥：

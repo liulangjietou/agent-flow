@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.CostAllocation;
 import io.agentflow.expense.ExpenseContent;
@@ -85,7 +86,12 @@ public interface BudgetPrecheckPort {
      * 返回完整核对请求及短期证据；后续冻结仍须幂等外部操作，不能把此结果当作冻结凭证。
      * @author owlzhangfq@gmail.com
      */
-    record Assessment(Request request, String reference, Instant checkedAt, Instant validUntil) {
+    record Assessment(Request request, String reference, Instant checkedAt, Instant validUntil,
+                      @JsonInclude(JsonInclude.Include.NON_NULL) BudgetExceptionPolicy exceptionPolicy) {
+        /** 历史结果没有柔性来源，保持原 JSON 和刚性预算语义。 */
+        public Assessment(Request request, String reference, Instant checkedAt, Instant validUntil) {
+            this(request, reference, checkedAt, validUntil, null);
+        }
         /** 没有来源或有效期不能成为提交预检事实。 */
         public Assessment {
             if (request == null || StringUtils.isBlank(reference) || reference.length() > 128 || checkedAt == null

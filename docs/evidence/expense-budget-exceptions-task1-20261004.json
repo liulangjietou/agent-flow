@@ -1,0 +1,49 @@
+{
+  "status": "PROTOCOL_VERIFIED_ROUND_WORKFLOW_UI_RUNTIME_PENDING",
+  "tests": 64,
+  "red": {
+    "assertionFailures": 2,
+    "runtimeDeserializationErrors": 3,
+    "compileErrors": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/f09-task1-red.log"
+  },
+  "greenLog": "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/f09-task1-green.log",
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/finance/BudgetCommand.java": "e0ef3e517dc5e87604e92ca2c8fd62f44ec7ecd56f224b94c432c5ea726a18d3",
+    "agentflow-domain/src/main/java/io/agentflow/finance/BudgetExceptionApproval.java": "04218d0ae8fb7b8af127765503f803ce586e544788bb593b6959b4972a75d340",
+    "agentflow-domain/src/main/java/io/agentflow/finance/BudgetExceptionOffer.java": "4588e745b118f9350f032438f78e1eb54588caa84c52696134eefde61e82b43d",
+    "agentflow-domain/src/main/java/io/agentflow/finance/BudgetExceptionPolicy.java": "e07488ade2bc35a76d1c2569558717d885ddc17bab53f27761e6fe5bd5a91183",
+    "agentflow-domain/src/main/java/io/agentflow/finance/BudgetObservation.java": "d48972155d49e329a22f316656762eff86bb16c94bc73e3490bb2584f2635f7f",
+    "agentflow-domain/src/main/java/io/agentflow/finance/BudgetOperation.java": "e2c018aa7f6a504ba727e331a595ff823e8a015cc2e864081857e44d5e7bbe52",
+    "agentflow-domain/src/main/java/io/agentflow/finance/BudgetPrecheckPort.java": "5f0a12ea9c4fe0d43aceb3e276b639742811863081c356a88bbf961e7a709583",
+    "agentflow-domain/src/test/java/io/agentflow/finance/BudgetExceptionApprovalTest.java": "88716d662684b5da3e8de4e83721bfda4abe6e1967870498aea755ede18c92ef",
+    "agentflow-server/src/test/java/io/agentflow/finance/BudgetExceptionProtocolTest.java": "2ed4d2dd47a09c3e50afc3a4e2a7908f59dc0c5f46c2affa4e74be0b32cf5aa9",
+    "agentflow-server/src/test/java/io/agentflow/finance/FinanceGatewayClientTest.java": "76f0d1ef2a89a089aa490fcbec6939498b3da1c48d60fd9db463881868cf39f6",
+    "agentflow-server/src/test/java/io/agentflow/finance/GatewayBudgetSystemTest.java": "4caf9640ae8b5f89ce4a90283e7b3f29632cc7a17772996b4d14a0c644faca9d"
+  },
+  "archiveSha256": {
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/TEST-io.agentflow.finance.BudgetCommandTest.xml": "390cee55e2def501f9752913651bedc0ace99bd6613fd79c1c4b6acbd59915dd",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/TEST-io.agentflow.finance.BudgetExceptionApprovalTest.xml": "7a17c5c3974244d9c4670e4af20c0dcbe8b773181eb24681572c23bfee682137",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/TEST-io.agentflow.finance.BudgetExceptionProtocolTest.xml": "78a180c8fa025ae432fcbc6fce2f9d3d9f42c214b4bd6e78ba279c35000db5b6",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/TEST-io.agentflow.finance.BudgetOperationIntegrationTest.xml": "d50aac9c2e425b1d52b491ef6ec5dcc22a3286d17bb83927ec3ff0e20b81779c",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/TEST-io.agentflow.finance.BudgetOperationMigrationTest.xml": "99c0b0a0e2ea449ae7a6e544c545470d7dd5cdbb83a1bf5ffe32e7ceea0eb605",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/TEST-io.agentflow.finance.BudgetOperationTest.xml": "f5eed4756285c08ad2e2c3df5de3cdc052efce6cea489bb865908200f657a385",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/TEST-io.agentflow.finance.BudgetPrecheckPortTest.xml": "b7d182613bc175b55b4d742e4a5e39570bc0f9abb5863ac8ec2f1e6f965806f5",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/TEST-io.agentflow.finance.BudgetRefreezeTest.xml": "05f45efcf248e617ab68f842b3d4c0ea03a67906014ce288fb7379dc854b8ab7",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/TEST-io.agentflow.finance.FinanceGatewayClientTest.xml": "676d4e61d18f2f93839683533c49445a471bf60b22c78397f16862d103afe882",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/TEST-io.agentflow.finance.GatewayBudgetSystemTest.xml": "596d3d30ebf19c5ce4ba3d99f0f49fe5af5847d2a346faf3ccd616feae9a61bb",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/f09-task1-green.log": "ce4a515ef10d198840dbd52c194be2ab7e962a6c2c93f5b1d6d024b8cd26a5a1",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/f09-task1-red.log": "28e42fe8c2eb7d995c76277184f63e691cb82201a70ff37806f781dee76a703b",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/sources/agentflow-domain/src/main/java/io/agentflow/finance/BudgetCommand.java": "e0ef3e517dc5e87604e92ca2c8fd62f44ec7ecd56f224b94c432c5ea726a18d3",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/sources/agentflow-domain/src/main/java/io/agentflow/finance/BudgetExceptionApproval.java": "04218d0ae8fb7b8af127765503f803ce586e544788bb593b6959b4972a75d340",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/sources/agentflow-domain/src/main/java/io/agentflow/finance/BudgetExceptionOffer.java": "4588e745b118f9350f032438f78e1eb54588caa84c52696134eefde61e82b43d",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/sources/agentflow-domain/src/main/java/io/agentflow/finance/BudgetExceptionPolicy.java": "e07488ade2bc35a76d1c2569558717d885ddc17bab53f27761e6fe5bd5a91183",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/sources/agentflow-domain/src/main/java/io/agentflow/finance/BudgetObservation.java": "d48972155d49e329a22f316656762eff86bb16c94bc73e3490bb2584f2635f7f",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/sources/agentflow-domain/src/main/java/io/agentflow/finance/BudgetOperation.java": "e2c018aa7f6a504ba727e331a595ff823e8a015cc2e864081857e44d5e7bbe52",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/sources/agentflow-domain/src/main/java/io/agentflow/finance/BudgetPrecheckPort.java": "5f0a12ea9c4fe0d43aceb3e276b639742811863081c356a88bbf961e7a709583",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/sources/agentflow-domain/src/test/java/io/agentflow/finance/BudgetExceptionApprovalTest.java": "88716d662684b5da3e8de4e83721bfda4abe6e1967870498aea755ede18c92ef",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/sources/agentflow-server/src/test/java/io/agentflow/finance/BudgetExceptionProtocolTest.java": "2ed4d2dd47a09c3e50afc3a4e2a7908f59dc0c5f46c2affa4e74be0b32cf5aa9",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/sources/agentflow-server/src/test/java/io/agentflow/finance/FinanceGatewayClientTest.java": "76f0d1ef2a89a089aa490fcbec6939498b3da1c48d60fd9db463881868cf39f6",
+    "/fyoung/tmp/agentflow-remaining-20260928/f09-task1-verified/sources/agentflow-server/src/test/java/io/agentflow/finance/GatewayBudgetSystemTest.java": "4caf9640ae8b5f89ce4a90283e7b3f29632cc7a17772996b4d14a0c644faca9d"
+  }
+}
