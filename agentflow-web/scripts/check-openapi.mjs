@@ -4,12 +4,25 @@ import { randomUUID } from 'node:crypto'
 import SwaggerParser from '@apidevtools/swagger-parser'
 import Ajv2020 from 'ajv/dist/2020.js'
 import addFormats from 'ajv-formats'
+import { report as financialReportFixture } from '../tests/fixtures/expense-financial-reporting.mjs'
 const spec = JSON.parse(readFileSync(new URL('../../agentflow-server/src/main/resources/api/openapi.json', import.meta.url), 'utf8'))
 await SwaggerParser.validate(structuredClone(spec))
 const ajv = new Ajv2020({ strict: false, allErrors: true })
 addFormats(ajv)
 ajv.addFormat('binary', true)
 ajv.addSchema({ $id: 'agentflow', components: spec.components })
+// 报表保留显式空样本与未知历史，汇总金额不受单笔上限约束。
+const financialReportSchema = { $ref: '#/components/schemas/ExpenseFinancialReport' }
+validate(financialReportSchema, financialReportFixture())
+const largeFinancialReport = financialReportFixture()
+largeFinancialReport.totals.amounts = [{ currency: 'CNY', claimed: '9999999999999999999999.99', approved: '0.00', reduced: '0.00' }]
+validate(financialReportSchema, largeFinancialReport)
+for (const mutate of [x => { x.scope = 'TENANT' }, x => { delete x.totals.approval.p50Seconds },
+  x => { x.totals.returnRate = 2 }, x => { x.backlog.payments.SUCCEEDED = 0 },
+  x => { x.activity.unreadableReports = 2 }, x => { x.totals.amounts[0].claimed = 12 }]) {
+  const value = structuredClone(largeFinancialReport); mutate(value)
+  assert.equal(validator(financialReportSchema)(value), false)
+}
 // 事前控制由类别配置明确选择；旧类别保持缺字段，容差不能缺失或伪装成文本。
 const priorControlSchema = { $ref: '#/components/schemas/ExpensePriorControl' }
 for (const control of [{ mode: 'STRICT' }, { mode: 'NONE' }, { mode: 'TOLERANCE', toleranceFraction: 0 },

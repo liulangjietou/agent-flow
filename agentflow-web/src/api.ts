@@ -53,6 +53,7 @@ import type { FirstWorkflowReport } from './firstWorkflow'
 import type { ApplicationComment, CommentDraft, CommentPage, CommentQuery } from './applicationComments'
 import { readCommentMentionPage, validateCommentReceipt, type CommentMentionFilter, type CommentMentionPage } from './commentMentions.js'
 import type { OperationsFilter, OperationsReport } from './approvalOperations'
+import type { FinancialFilter } from './expenseFinancialReporting'
 import type { AssigneeOption } from './definitionAssignees'
 import type { FormAssigneeOption } from './formAssignees'
 import type { ApiDocument } from './apiReference'
@@ -931,6 +932,7 @@ export const api = {
   compareDefinition: (baselineId: string, body: ComparisonInput, signal: AbortSignal) => request<ComparisonResult>('/process-definitions/' + encodeURIComponent(baselineId) + '/compare', { method: 'POST', body: JSON.stringify(body), signal }),
   simulateDesign: (body: SimulationInput, signal: AbortSignal) => request<SimulationResult>('/process-definitions/simulate', { method: 'POST', body: JSON.stringify(body), signal }),
   previewFields: (body: FieldPreviewInput, signal: AbortSignal) => request<FieldPreviewResult>('/process-definitions/field-preview', { method: 'POST', body: JSON.stringify(body), signal }),
+  expenseFinancialReport: (filter: FinancialFilter, signal: AbortSignal) => request<unknown>('/reports/expense-finance' + historyQuery(filter), { signal }),
   approvalOperations: (filter: OperationsFilter, signal: AbortSignal) => request<OperationsReport>('/operations/approvals' + historyQuery(filter), { signal }),
   firstWorkflow: (id: string, signal: AbortSignal) => request<FirstWorkflowReport>('/system/first-workflow' + (id ? '?definitionId=' + encodeURIComponent(id) : ''), { signal }),
   tenantInitialization: (signal: AbortSignal) => {

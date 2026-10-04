@@ -1,0 +1,72 @@
+{
+  "status": "LOCAL_BACKEND_AND_WEB_VERIFIED_FIXED_RUNTIME_PENDING",
+  "baseCommit": "32946cd70e80452c17e71d357c6a3066cbb71479",
+  "web": {
+    "tests": 112,
+    "failures": 0,
+    "newReportCases": 15,
+    "typecheck": true,
+    "productionBuild": true,
+    "browserVisualVerified": false
+  },
+  "java": {
+    "ExpenseFinancialReportingIntegrationTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "OpenApiContractTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "nativeResponses": {
+    "result": "PASS",
+    "reports": 15,
+    "denied": 2,
+    "invalid": 6,
+    "submittedAcrossSnapshots": 8,
+    "sourceSha256": "5482d849625e7788d0a7fe3064e1f171f1f79b54fd3b85f32ba14d270e2e3664",
+    "contractSha256": "c870f3758eabceeae16b7f90cd49ad7f2fab23eca2a08e030d6141aebac896ae",
+    "output": "/fyoung/tmp/agentflow-financial-parser-0gfPXw"
+  },
+  "contract": {
+    "result": "PASS",
+    "operations": 396,
+    "schemas": 867,
+    "requestExamples": 129
+  },
+  "sourceSha256": {
+    "agentflow-server/src/main/resources/api/openapi.json": "c870f3758eabceeae16b7f90cd49ad7f2fab23eca2a08e030d6141aebac896ae",
+    "agentflow-server/src/test/java/io/agentflow/approval/ExpenseFinancialReportingIntegrationTest.java": "b28768b2d488384ce08e7a4606e3091c3ded0d1857c049b280ae5527e2955321",
+    "agentflow-web/scripts/check-expense-financial-responses.mjs": "66438e684286b0231414e9edae86b3f464074522230492f122ba81cc0ff25e45",
+    "agentflow-web/scripts/check-openapi.mjs": "1418125ee93292dd8a8a3e14714ba9e471424ab9fa9ec8a38a5c570be787abe6",
+    "agentflow-web/scripts/test-requests.mjs": "be02db3aeae71b1460c3af3727108883e1b63ac8e4a35c801c1e72d0f608fd4a",
+    "agentflow-web/src/App.vue": "7aad2f8ec9e13e1e67299f7c08b978e066f729f63a68f6c43d6e67dad44ccc94",
+    "agentflow-web/src/api.ts": "a9f14cac5e27f565bbdc847516294686cacd6c797afdf30699f3d749cefaa1ff",
+    "agentflow-web/src/components/ExpenseFinancialReporting.vue": "84fa556d7fd686208deff748e860e066fd37c88e74b2603a2862148ab11f27ed",
+    "agentflow-web/src/components/WorkspaceNavigation.vue": "90b4ee7badc3f18d4e115eb692111e1d35ea1f464786ba8f338bb3e3f224df53",
+    "agentflow-web/src/expenseFinancialReporting.ts": "5482d849625e7788d0a7fe3064e1f171f1f79b54fd3b85f32ba14d270e2e3664",
+    "agentflow-web/src/workspaceNavigation.ts": "3cb5a95299494a5994db82c6beec68d6116b91fb4bc2b075a40efcb73fdba21e",
+    "agentflow-web/tests/expense-financial-reporting.test.mjs": "37a2d3c0cf0b6a8461c2b9f5ba2ff584193f8e583b48fff42ce988f495964bca",
+    "agentflow-web/tests/fixtures/expense-financial-reporting.mjs": "6596e2129b7fd81367834527cd1b8a7273624733fa24e8abaf902ef73f585f92",
+    "docs/openapi-reference.md": "8a58989e41c2e60ae5e052b95b3afc2e7a9c540524dfdaabab19fa531b4b92be"
+  },
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/f15-task3-verified/manifest.json",
+    "sha256": "c98042e593c0ff124c36c8b0c5837374987631ae09c7551e2202cccf1c0f10f9",
+    "files": 51
+  },
+  "fixedJar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-reporting-server-task3.jar",
+    "sha256": "3cc9e82e2d32a774516431b1c01482e3e53629d5b93b55ccba15908ffccb598a"
+  },
+  "boundaries": {
+    "fixedUpgradeAndRecoveryVerified": false,
+    "postgresqlVerified": false,
+    "remoteDelivered": false
+  }
+}

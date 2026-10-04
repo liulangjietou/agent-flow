@@ -1,8 +1,8 @@
 /** 工作空间已有页面标识；导航展示不授予业务权限。@author owlzhangfq@gmail.com */
-export type WorkspacePage = 'account-mappings' | 'expense-configuration' | 'organization' | 'proxies' | 'webhooks' | 'audit' | 'transfer' | 'calendars' | 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'assist' | 'expense' | 'cashier' | 'system'
+export type WorkspacePage = 'expense-reports' | 'account-mappings' | 'expense-configuration' | 'organization' | 'proxies' | 'webhooks' | 'audit' | 'transfer' | 'calendars' | 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'assist' | 'expense' | 'cashier' | 'system'
 
 /** 同一份菜单供桌面侧栏与窄屏抽屉使用。@author owlzhangfq@gmail.com */
-export interface WorkspaceMenuItem { label: string; icon: string; page?: WorkspacePage; access?: 'manage' | 'inspect' | 'cashier' | 'finance-config' }
+export interface WorkspaceMenuItem { label: string; icon: string; page?: WorkspacePage; access?: 'manage' | 'inspect' | 'cashier' | 'finance-config' | 'finance' }
 
 export const workspaceMenu: { label: string; items: WorkspaceMenuItem[] }[] = [
   { label: '个人工作', items: [
@@ -19,6 +19,7 @@ export const workspaceMenu: { label: string; items: WorkspaceMenuItem[] }[] = [
     { page: 'templates', label: '模板中心', icon: '▤', access: 'manage' },
     { page: 'assist', label: 'Agent 助理', icon: '✦' },
     { page: 'expense', label: '财务申请', icon: '▣' },
+    { page: 'expense-reports', label: '费用财务报表', icon: '▥', access: 'finance' },
     { page: 'cashier', label: '出纳付款', icon: '↗', access: 'cashier' }
   ] },
   { label: '管理与集成', items: [

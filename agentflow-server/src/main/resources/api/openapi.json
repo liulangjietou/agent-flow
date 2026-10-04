@@ -52906,6 +52906,143 @@
           }
         ]
       }
+    },
+    "/api/v1/reports/expense-finance": {
+      "get": {
+        "operationId": "expenseFinancialReport",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "费用财务报表",
+        "description": "FINANCE 只读报告，逐来源复用原轮次完整财务字段权限。日期按 UTC 提交轮次统计，默认近 30 天，含首尾最多 366 天，结束不得晚于今天；法人、部门和类别为原值。余额、额度执行和操作积压属于生成时点，不受提交日期窗口限制。尝试指标仅取所选可读轮次，查验按原件最近可读提交时点截断，拒绝记录启用前历史未知。无外部网关调用。只接收下列参数，每个最多出现一次。",
+        "x-access": "FINANCE + original round full financial field visibility",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseFinancialReport"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "不缓存财务与权限快照",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_EXPENSE_REPORT_QUERY：日期、组织编号、原类别或未知/重复查询参数无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原财务来源缺失或不一致，整次报告失败，不返回部分金额。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "提交开始 UTC 日期，默认 to 减 29 天",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "提交结束 UTC 日期，包含该日，默认今天",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "legalEntityId",
+            "in": "query",
+            "required": false,
+            "description": "原提交法人编号",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "departmentId",
+            "in": "query",
+            "required": false,
+            "description": "原提交部门编号",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "categoryCode",
+            "in": "query",
+            "required": false,
+            "description": "原费用行类别编码，逐字匹配",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "description": "原明细类别编码，保留原字符，不从当前目录替换。"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -95673,6 +95810,783 @@
             }
           }
         ]
+      },
+      "ExpenseFinancialCycle": {
+        "type": "object",
+        "properties": {
+          "samples": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "unknown": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "pending": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "notApplicable": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "p50Seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "p90Seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "samples",
+          "unknown",
+          "pending",
+          "notApplicable",
+          "p50Seconds",
+          "p90Seconds"
+        ],
+        "additionalProperties": false,
+        "description": "nearest-rank 分位数。无有效样本时 P50/P90 为 null；未知、待完成、不适用分别保留。"
+      },
+      "ExpenseFinancialAmounts": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "claimed": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d*)\\.\\d{2}$",
+            "description": "同币种精确汇总金额，不受单笔 Money 上限限制。"
+          },
+          "approved": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d*)\\.\\d{2}$",
+            "description": "同币种精确汇总金额，不受单笔 Money 上限限制。"
+          },
+          "reduced": {
+            "type": "string",
+            "pattern": "^(0|[1-9]\\d*)\\.\\d{2}$",
+            "description": "同币种精确汇总金额，不受单笔 Money 上限限制。"
+          }
+        },
+        "required": [
+          "currency",
+          "claimed",
+          "approved",
+          "reduced"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseFinancialMetrics": {
+        "type": "object",
+        "properties": {
+          "submitted": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "approved": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "returned": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "rejected": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "withdrawn": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "cancelled": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "inApproval": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "overLimit": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "reduced": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "overLimitRate": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reductionRate": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "returnRate": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approval": {
+            "$ref": "#/components/schemas/ExpenseFinancialCycle"
+          },
+          "payment": {
+            "$ref": "#/components/schemas/ExpenseFinancialCycle"
+          },
+          "endToEnd": {
+            "$ref": "#/components/schemas/ExpenseFinancialCycle"
+          },
+          "amounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseFinancialAmounts"
+            }
+          },
+          "returnReasons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "count": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "reason",
+                "count"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "submitted",
+          "approved",
+          "returned",
+          "rejected",
+          "withdrawn",
+          "cancelled",
+          "inApproval",
+          "overLimit",
+          "reduced",
+          "overLimitRate",
+          "reductionRate",
+          "returnRate",
+          "approval",
+          "payment",
+          "endToEnd",
+          "amounts",
+          "returnReasons"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseFinancialGroup": {
+        "type": "object",
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "enum": [
+              "LEGAL_ENTITY",
+              "DEPARTMENT",
+              "CATEGORY"
+            ]
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/ExpenseFinancialMetrics"
+          }
+        },
+        "required": [
+          "dimension",
+          "code",
+          "name",
+          "metrics"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseFinancialFilters": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "legalEntityId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "departmentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "categoryCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "description": "原明细类别编码，保留原字符，不从当前目录替换。"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "legalEntityId",
+          "departmentId",
+          "categoryCode"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseFinancialActivity": {
+        "type": "object",
+        "properties": {
+          "verification": {
+            "type": "object",
+            "properties": {
+              "succeeded": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "rejected": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "unavailable": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "pending": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "failureRate": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "succeeded",
+              "rejected",
+              "unavailable",
+              "pending",
+              "failureRate"
+            ],
+            "additionalProperties": false
+          },
+          "duplicatePrechecks": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "duplicateSubmissions": {
+            "type": "object",
+            "properties": {
+              "recorded": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "recordingStartedAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "containsUnrecordedHistory": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "recorded",
+              "recordingStartedAt",
+              "containsUnrecordedHistory"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "verification",
+          "duplicatePrechecks",
+          "duplicateSubmissions"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseFinancialResources": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "advanceCategoryApplicable": {
+            "type": "boolean"
+          },
+          "advances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "accounts": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "outstanding": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9]\\d*)\\.\\d{2}$",
+                  "description": "同币种精确汇总金额，不受单笔 Money 上限限制。"
+                },
+                "underReview": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9]\\d*)\\.\\d{2}$",
+                  "description": "同币种精确汇总金额，不受单笔 Money 上限限制。"
+                },
+                "ages": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "band": {
+                        "type": "string",
+                        "enum": [
+                          "NOT_DUE",
+                          "DAYS_1_30",
+                          "DAYS_31_60",
+                          "DAYS_61_90",
+                          "OVER_90",
+                          "UNKNOWN"
+                        ]
+                      },
+                      "accounts": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                      },
+                      "outstanding": {
+                        "type": "string",
+                        "pattern": "^(0|[1-9]\\d*)\\.\\d{2}$",
+                        "description": "同币种精确汇总金额，不受单笔 Money 上限限制。"
+                      }
+                    },
+                    "required": [
+                      "band",
+                      "accounts",
+                      "outstanding"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 6,
+                  "maxItems": 6
+                }
+              },
+              "required": [
+                "currency",
+                "accounts",
+                "outstanding",
+                "underReview",
+                "ages"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "priorRequests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "currency": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{3}$"
+                },
+                "lines": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0
+                },
+                "approved": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9]\\d*)\\.\\d{2}$",
+                  "description": "同币种精确汇总金额，不受单笔 Money 上限限制。"
+                },
+                "consumed": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9]\\d*)\\.\\d{2}$",
+                  "description": "同币种精确汇总金额，不受单笔 Money 上限限制。"
+                },
+                "reserved": {
+                  "type": "string",
+                  "pattern": "^(0|[1-9]\\d*)\\.\\d{2}$",
+                  "description": "同币种精确汇总金额，不受单笔 Money 上限限制。"
+                },
+                "executionRate": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "currency",
+                "lines",
+                "approved",
+                "consumed",
+                "reserved",
+                "executionRate"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "advanceCategoryApplicable",
+          "advances",
+          "priorRequests"
+        ],
+        "additionalProperties": false,
+        "description": "生成时可读存量，不是日期窗口期末余额。借款账龄按原法人时区；类别筛选时借款不适用且数组为空。计划执行以原批准额度为分母，允许超过一。"
+      },
+      "ExpenseFinancialBacklog": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "vouchers": {
+            "type": "object",
+            "properties": {
+              "QUEUED": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "POSTING": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "QUERYING": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "UNKNOWN": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "FAILED": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "NOT_FOUND": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "EXPIRED": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "VOIDED": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "RECONCILING": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "REVERSED": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "QUEUED",
+              "POSTING",
+              "QUERYING",
+              "UNKNOWN",
+              "FAILED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING",
+              "REVERSED"
+            ],
+            "additionalProperties": false
+          },
+          "payments": {
+            "type": "object",
+            "properties": {
+              "QUEUED": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "CHECKING": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "SENDING": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "QUERYING": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "UNKNOWN": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "FAILED": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "NOT_FOUND": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "EXPIRED": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "VOIDED": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "RECONCILING": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              "REVERSED": {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "QUEUED",
+              "CHECKING",
+              "SENDING",
+              "QUERYING",
+              "UNKNOWN",
+              "FAILED",
+              "NOT_FOUND",
+              "EXPIRED",
+              "VOIDED",
+              "RECONCILING",
+              "REVERSED"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "asOf",
+          "vouchers",
+          "payments"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseFinancialReport": {
+        "type": "object",
+        "properties": {
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "timeZone": {
+            "type": "string",
+            "const": "UTC"
+          },
+          "scope": {
+            "type": "string",
+            "const": "CURRENT_ACTOR_READABLE"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/ExpenseFinancialFilters"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/ExpenseFinancialMetrics"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseFinancialGroup"
+            }
+          },
+          "activity": {
+            "$ref": "#/components/schemas/ExpenseFinancialActivity"
+          },
+          "resources": {
+            "$ref": "#/components/schemas/ExpenseFinancialResources"
+          },
+          "backlog": {
+            "$ref": "#/components/schemas/ExpenseFinancialBacklog"
+          }
+        },
+        "required": [
+          "generatedAt",
+          "timeZone",
+          "scope",
+          "filters",
+          "totals",
+          "groups",
+          "activity",
+          "resources",
+          "backlog"
+        ],
+        "additionalProperties": false,
+        "description": "FINANCE 当前身份完整可读原轮次范围。不可读来源不返回存在性计数；管理员没有敏感字段豁免。金额逐币种汇总，类别间轮次数不可相加。"
       }
     }
   }

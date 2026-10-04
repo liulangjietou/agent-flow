@@ -230,7 +230,17 @@ class ExpenseFinancialReportingIntegrationTest {
         var response = mvc.perform(get(path).header("Authorization", token(user))).andReturn().getResponse();
         assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(expected);
         if (expected == 200) assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
-        return json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class);
+        var body = json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class);
+        // 契约验收可显式保存真实控制器响应，常规测试不生成额外文件。
+        String archive = System.getProperty("agentflow.test.financial-report-responses");
+        if (archive != null) {
+            var directory = java.nio.file.Path.of(archive).toAbsolutePath().normalize();
+            assertThat(directory.startsWith(java.nio.file.Path.of("/fyoung/tmp"))).isTrue();
+            java.nio.file.Files.createDirectories(directory);
+            java.nio.file.Files.writeString(directory.resolve(UUID.randomUUID()+".json"),
+                    json.write(List.of(Map.of("method", "GET", "path", path, "actor", user, "status", expected, "response", body))));
+        }
+        return body;
     }
     private String token(String user) { return "Bearer "+auth.login("demo", user, "demo").token(); }
     private static Money money(String amount) { return new Money(new BigDecimal(amount), "CNY"); }
