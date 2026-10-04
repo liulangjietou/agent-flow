@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T01:24:46.042572+00:00",
+  "recordedAt": "2026-10-04T01:53:33.883655+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -814,7 +814,7 @@
           ]
         }
       ],
-      "observed": "普通草稿入口对 businessReference 非空明确返回 AGENT_DRAFT_UNSUPPORTED。票面金额辅助填报已完成，但没有按行程生成费用行、类别和分摊建议的专用入口。",
+      "observed": "本地实现 49a706c：已完成报销行程、类别和分摊建议协议、精确来源及目录约束、逐项确认领域状态、真实回环模型适配和 V108 运行/轨迹仓储。两阶段分别 76、68 条测试通过，去重 95 条；非空 V107→V108、并发领取、事务回滚及租约恢复验证通过。尚未接通应用服务、工作器、HTTP 和费用页面，也未完成固定包运行恢复、浏览器或 PostgreSQL 验收，继续 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/agent/DraftAssistInputs.java",
@@ -822,6 +822,14 @@
         },
         {
           "path": "docs/evidence/expense-invoice-fill-20261002.json",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-draft-assist.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-draft-assist-foundation-20261004.json",
           "line": 1
         }
       ],
@@ -3636,11 +3644,11 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "F12",
-    "status": "FIXED_PACKAGE_RUNTIME_VERIFIED_BROWSER_POSTGRES_PENDING",
-    "recordedAt": "2026-10-04T01:24:46.042572+00:00",
-    "sourceCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
-    "evidence": "docs/evidence/expense-duplicate-approval-runtime-20261004.json",
+    "taskId": "A03",
+    "status": "PARTIAL_FOUNDATION_VERIFIED_NO_USER_ENTRYPOINT",
+    "recordedAt": "2026-10-04T01:53:33.883655+00:00",
+    "sourceCommit": "49a706c492f77bea02f40daa4bf0b667a79e1efc",
+    "evidence": "docs/evidence/expense-draft-assist-foundation-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
