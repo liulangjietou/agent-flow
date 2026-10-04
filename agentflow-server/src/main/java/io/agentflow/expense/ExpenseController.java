@@ -1,6 +1,9 @@
 package io.agentflow.expense;
 
 import io.agentflow.api.idempotency.IdempotencyExecutor;
+import io.agentflow.common.DomainException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -25,6 +28,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/expense-reports")
 public class ExpenseController {
+    private static final Logger LOG = LoggerFactory.getLogger(ExpenseController.class);
     private final ExpenseDraftService drafts;
     private final IdempotencyExecutor idempotency;
     private final ExpenseSubmissionService submissions;
@@ -32,12 +36,15 @@ public class ExpenseController {
     private final ExpenseLifecycleService lifecycle;
     private final ExpenseReductionService reductions;
     private final ExpenseAllowancePreparation allowances;
+    private final ExpenseSubmissionRejections rejections;
 
     /** 财务写入继续使用平台请求幂等及实际认证主体。 */
     public ExpenseController(ExpenseDraftService drafts, IdempotencyExecutor idempotency, ExpenseSubmissionService submissions,
-            ExpenseApprovalService approvals, ExpenseLifecycleService lifecycle, ExpenseReductionService reductions, ExpenseAllowancePreparation allowances) {
+            ExpenseApprovalService approvals, ExpenseLifecycleService lifecycle, ExpenseReductionService reductions, ExpenseAllowancePreparation allowances,
+            ExpenseSubmissionRejections rejections) {
         this.drafts = drafts; this.idempotency = idempotency; this.submissions = submissions; this.approvals = approvals; this.lifecycle = lifecycle; this.reductions = reductions;
         this.allowances = allowances;
+        this.rejections = rejections;
     }
 
     /** 创建草稿，只绑定可用的已发布费用流程。 */
@@ -61,7 +68,14 @@ public class ExpenseController {
     /** 正式提交与重提共用实际预检、双版本和当前审批轮次。 */
     @PostMapping("/{id}/submit")
     public ResponseEntity<String> submit(@PathVariable UUID id, @Valid @RequestBody ExpenseSubmissionService.Input request, HttpServletRequest http) {
-        return idempotency.execute(http, HttpStatus.OK, () -> submissions.submit(id, request));
+        try { return idempotency.execute(http, HttpStatus.OK, () -> submissions.submit(id, request)); }
+        catch (DomainException failure) {
+            try { rejections.record(id, request, http.getHeader("Idempotency-Key"), failure); }
+            catch (RuntimeException recordingFailure) {
+                LOG.error("Expense submission rejection recording failed, errorCode={}, reportId={}", "EXPENSE_REPORTING_RECORD_FAILED", id, recordingFailure);
+            }
+            throw failure;
+        }
     }
 
     /** 签收是明确操作，不隐含在通用审批同意中。 */

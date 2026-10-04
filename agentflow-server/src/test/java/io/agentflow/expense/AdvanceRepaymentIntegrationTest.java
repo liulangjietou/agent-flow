@@ -1163,6 +1163,21 @@ class AdvanceRepaymentIntegrationTest {
         UUID other = paidLoan(); code(read(path(other) + "/repayments?beforeId=" + cursor, "alice"), "INVALID_ADVANCE_REPAYMENT_QUERY");
     }
 
+    @Test void financialReportKeepsReservationsOutstandingAndIncludesOnlyCurrentReadableDebt() throws Exception {
+        UUID loan = paidLoan(); reserve(loan, "20"); repay(loan, "financial-report-repayment");
+        String endpoint = "/api/v1/reports/expense-finance?legalEntityId="+entity;
+        var report = ok(read(endpoint, "finance"), 200);
+        assertThat(report.at("/resources/advances/0/outstanding").asText()).isEqualTo(balance(loan).outstanding().value().toPlainString());
+        assertThat(report.at("/resources/advances/0/outstanding").asText()).isNotEqualTo(balance(loan).available().value().toPlainString());
+        assertThat(report.at("/resources/advances/0/accounts").asLong()).isOne();
+        assertThat(ok(read(endpoint, "admin"), 200).at("/resources/advances")).isEmpty();
+        var advance = balance(loan); long version = advance.version(); advance.requirePaymentReview(version);
+        balances.update(advance, version, "fixture", "PAYMENT_REVIEW");
+        assertThat(ok(read(endpoint, "finance"), 200).at("/resources/advances/0/underReview").asText()).isEqualTo(advance.outstanding().value().toPlainString());
+        var category = ok(read(endpoint+"&categoryCode=OFFICE", "finance"), 200);
+        assertThat(category.at("/resources/advanceCategoryApplicable").asBoolean()).isFalse(); assertThat(category.at("/resources/advances")).isEmpty();
+    }
+
     private ExpenseUse reserve(UUID loan, String reserved) {
         return new TransactionTemplate(transactions).execute(tx -> {
             UUID id = UUID.randomUUID(); var application = Application.draftBusiness(UUID.randomUUID(), "demo", "EXP-" + id, "fixture", 1, "alice", "合成预留", Map.of(), null, null, null, new BusinessReference(BusinessReference.Type.EXPENSE, id));

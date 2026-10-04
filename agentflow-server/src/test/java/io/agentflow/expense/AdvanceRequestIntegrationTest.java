@@ -243,6 +243,26 @@ class AdvanceRequestIntegrationTest {
         assertThat(overdueRepository.recorded(candidate)).isTrue();
     }
 
+    @Autowired io.agentflow.expense.reporting.ExpenseFinancialReportQuery financialReporting;
+
+    @Test void financialReportAgingUsesOriginalLegalTimeZoneAndTreatsCategoryAsInapplicable() throws Exception {
+        var paid = approvedBalance();
+        Instant at = paid.dueOn().plusDays(1).atStartOfDay(java.time.ZoneId.of("Pacific/Kiritimati")).toInstant();
+        var day = at.atOffset(java.time.ZoneOffset.UTC).toLocalDate();
+        var query = new io.agentflow.expense.reporting.ExpenseReportQueryParameters.Query(day, day, entity, null, null);
+        actors.set(new Actor("demo", "manager", Set.of("FINANCE", "APPROVER")));
+        try {
+            var report = financialReporting.read(query, at);
+            assertThat(report.resources().advances()).hasSize(1);
+            var result = report.resources().advances().get(0);
+            assertThat(result.outstanding()).isEqualTo("100.00");
+            assertThat(result.ages().stream().filter(age -> age.band() == io.agentflow.expense.reporting.ExpenseResourceMetrics.AgeBand.DAYS_1_30)
+                    .findFirst().orElseThrow().accounts()).isOne();
+            var categorized = financialReporting.read(new io.agentflow.expense.reporting.ExpenseReportQueryParameters.Query(day, day, entity, null, "TRAVEL"), at);
+            assertThat(categorized.resources().advanceCategoryApplicable()).isFalse(); assertThat(categorized.resources().advances()).isEmpty();
+        } finally { actors.clear(); }
+    }
+
     private EmployeeAdvance approvedBalance() throws Exception {
         UUID id = create(); submit(id); ok(act(id, "APPROVE"), 200); ok(act(id, "APPROVE"), 200);
         var paid = new EmployeeAdvance(id, "demo", entity, "alice", money("100", "CNY"), "synthetic-paid-" + id,

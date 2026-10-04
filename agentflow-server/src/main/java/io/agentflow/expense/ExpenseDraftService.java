@@ -58,7 +58,8 @@ public class ExpenseDraftService {
     }
 
     /** 每次读取复核该轮节点权限；旧审批人不会因参与过往轮次获得当前补正内容。 */
-    @Transactional(readOnly = true)
+    // 领域读取拒绝没有写入，上层只读聚合可排除不可读来源而不污染其余读取事务。
+    @Transactional(readOnly = true, noRollbackFor = DomainException.class)
     public ExpenseResponse read(UUID reportId, Integer roundNo) {
         var report = require(reportId);
         var application = applications.get(report.applicationId());

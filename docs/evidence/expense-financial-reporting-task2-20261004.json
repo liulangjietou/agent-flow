@@ -1,0 +1,117 @@
+{
+  "status": "BACKEND_SCOPE_VERIFIED_UI_RUNTIME_PENDING",
+  "baseCommit": "864bece1c0e553ed28e18e81452d61731e5619b3",
+  "tests": {
+    "io.agentflow.expense.reporting.ExpenseFinancialMetricsTest": {
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.expense.reporting.ExpenseResourceMetricsTest": {
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.expense.reporting.ExpenseReportQueryParametersTest": {
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.approval.ExpenseFinancialReportingIntegrationTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.expense.ExpenseFinancialReportingMigrationTest": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.expense.ExpensePlanIntegrationTest": {
+      "tests": 24,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.expense.AdvanceRequestIntegrationTest": {
+      "tests": 28,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.expense.ExpensePrecheckIntegrationTest": {
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.expense.AdvanceRepaymentIntegrationTest": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.expense.ExpenseSubmissionIntegrationTest": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "redEvidence": [
+    "Missing report endpoint returned 404 before implementation.",
+    "Same uploaded invoice rejection count was 0 instead of 1 before preserving the original occupancy cause.",
+    "Caught readonly permission rejection marked the aggregate transaction rollback-only before noRollbackFor on the three pure read services.",
+    "Original legal time-zone aging boundary and exact legacy category code failed before fixing UTC-day and stripping assumptions."
+  ],
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/reporting/ExpenseFinancialMetrics.java": "40f7bcfadc2aec484129f37ec52397979c4ce4bf9a12eeec7ca46d10c3df3ef2",
+    "agentflow-domain/src/main/java/io/agentflow/expense/reporting/ExpenseResourceMetrics.java": "aba133393e5ceb2e6701fa3b6a3a03be5f1a629ed86210077210fe3a3bb86980",
+    "agentflow-domain/src/test/java/io/agentflow/expense/reporting/ExpenseFinancialMetricsTest.java": "e87d0c01133e97ca1791e9ec0cca56b96610021b29275721bdb46a7dd7199b80",
+    "agentflow-domain/src/test/java/io/agentflow/expense/reporting/ExpenseResourceMetricsTest.java": "891c9814f2671d719871b44bf424ba1d2dbe1d818132fd0b9ba0328dc4c3de82",
+    "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java": "9075992aec9df51b9b4f58b181257089d07bac8acfea81424b28abcae0e1ec1c",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRequestService.java": "25644a5f421a08b70dc3ab3631c98423dcf22b7d985aa8b0a74734d7378c8179",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseController.java": "e25f720e32cc1a20e163987ec3f18d41d11c741df0176500771f4fe04902123d",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseDraftService.java": "0b2a773796bf3b61c705c06fc38a1ad402e1d5a817eb643bcfa9db38cc055262",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanService.java": "2c9a6f5cf86d924bc8b0a2eba0707ac3322b4a13391ec9482478bb6a8bab8c16",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckResources.java": "cdcfceb0b729efcdd66580527a68fdb16e6ff3e270825021506ba083d03b75e4",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckService.java": "cf6cb399d29fa71ae61d4bf41693ed30082a7af051f6712a08855f73c72832cf",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSubmissionRejections.java": "b52184259afeba59da9fb98cf3b442eb9380da8c2d4423a8d9327fc38d36cc48",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSubmissionService.java": "46f90d06501b768a3655b096b7baace4e6659d03effbd4fd32b097eef54510e1",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseFinancialReport.java": "fc293ab2206b50c064a753338503b736df9a777949cb1c6d6e40cd8670ca6616",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseFinancialReportController.java": "07190df168590ab3921e1e2e64dd7e6f995f268a697978b37f318a393d017597",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseFinancialReportQuery.java": "2f51ecc3ef8516502c28bdba773bc5697a07e8e62960bf1e01cecff995348ff9",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseReportQueryParameters.java": "43023c8a5ccd58af374e23bce2f843eb3db059cf74a86d30facfed002aac306e",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseReportScope.java": "bd4015c1bc8c439fa0dcede6c7fb47e0327609e818ee8a6e82ce755c0256aaca",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseReportingActivity.java": "dd8522169ab4d8e4a4a3cebb37447aeef136da248f1d4d40d0f22df8cbbac5f8",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseReportingOperations.java": "ddde5eb29e5c76547d9cd926929f6d4350165502af160d267b354376841b8b8a",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseReportingResources.java": "5b7653572c9dca6fd3452baa2c92413c97a8dacaa81e811b3c07bdf283a109b6",
+    "agentflow-server/src/main/resources/db/migration/V121__expense_reporting_rejections.sql": "7eab30c66bc0a87fc4c49c7e79896ec4905d6f5c30729723ef15a6cfaba27ba8",
+    "agentflow-server/src/test/java/io/agentflow/approval/ExpenseFinancialReportingIntegrationTest.java": "d11086ce3dc6b203a831725872e6f3732f4a1efbbeb07cd0fafcf5a71ae018a5",
+    "agentflow-server/src/test/java/io/agentflow/expense/AdvanceRepaymentIntegrationTest.java": "7c0e2a77670afe639e3a9e252abb4075a99e67515ffbe65ff2cb8773eb843f0b",
+    "agentflow-server/src/test/java/io/agentflow/expense/AdvanceRequestIntegrationTest.java": "14c3bdbec92d87254eccc1a401e1bd80364848f3df2c8dc41b17d968e4be8ef7",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseFinancialReportingMigrationTest.java": "740e29b508d5aed3ae4e230b8e4071a1b0dcb82d01dd1d95ae43378cd380466e",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpensePlanIntegrationTest.java": "d5a8dfc412cd22eea6019cd9e39b16ca5ef6318ed9539611302bbf241fde57bd",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java": "4cdfee376689b42bf74ba141018e85ea2adfd62aa3d69d529f2ffe5d31a770fc",
+    "agentflow-server/src/test/java/io/agentflow/expense/reporting/ExpenseReportQueryParametersTest.java": "d2c3d1d3aeed8195ccc6725798bb3b9dd4d17785a7f09b57c45626d58d1ba413",
+    "docs/expense-financial-reporting.md": "0a59e81cde64228ddfc668a75002a465b8bee74ce6887839007ce6a7387bd8d4"
+  },
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/f15-task2-verified/manifest.json",
+    "sha256": "cfb8746c39827e7845a6f7d030f450992e6daf3448d515f31a7be6776079f0bb",
+    "files": 54
+  },
+  "boundaries": {
+    "apiVerified": true,
+    "h2NonEmptyV120MigrationVerified": true,
+    "uiVerified": false,
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "fixedPackageRuntimeVerified": false
+  }
+}

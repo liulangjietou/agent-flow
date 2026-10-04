@@ -48,7 +48,8 @@ public class AdvanceRequestService {
     }
 
     /** 旧审批人只能读取其有权查看的冻结轮次，不能读取退回后的补正草稿。 */
-    @Transactional(readOnly = true)
+    // 领域读取拒绝没有写入，上层只读聚合可排除不可读来源而不污染其余读取事务。
+    @Transactional(readOnly = true, noRollbackFor = DomainException.class)
     public View read(UUID id, Integer roundNo) {
         var advance = requests.find(actors.actor().tenantId(), id).orElseThrow(AdvanceRequestService::notFound);
         var application = applications.get(advance.applicationId()); boolean owner = advance.employeeId().equals(actors.actor().userId());

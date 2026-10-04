@@ -21,10 +21,10 @@ public final class ExpenseResourceMetrics {
     private static final long THIRD_AGE_BOUNDARY = 90;
     private ExpenseResourceMetrics() { }
 
-    /** 账龄是生成日的当前余额；到期日当天不逾期，已结清账户不进入账龄账户数。 */
-    public static List<AdvanceTotals> advances(List<Advance> values, LocalDate asOf) {
+    /** 每笔余额按原法人的本地日期计算账龄；到期日当天不逾期，已结清账户不进入账龄账户数。 */
+    public static List<AdvanceTotals> advances(List<Advance> values) {
         Map<String, AdvanceAccumulator> totals = new TreeMap<>();
-        for (var value : values) totals.computeIfAbsent(value.outstanding().currency(), ignored -> new AdvanceAccumulator()).add(value, asOf);
+        for (var value : values) totals.computeIfAbsent(value.outstanding().currency(), ignored -> new AdvanceAccumulator()).add(value);
         return totals.entrySet().stream().map(entry -> entry.getValue().result(entry.getKey())).toList();
     }
 
@@ -45,10 +45,10 @@ public final class ExpenseResourceMetrics {
         return AgeBand.OVER_90;
     }
     /**
-     * 余额来自原聚合 outstanding，争议中的资金仍保留余额并单独提示。
+     * 余额来自原聚合 outstanding，本地日期由原法人时区确定，争议资金仍保留余额。
      * @author owlzhangfq@gmail.com
      */
-    public record Advance(Money outstanding, LocalDate dueOn, boolean reviewRequired) { }
+    public record Advance(Money outstanding, LocalDate dueOn, boolean reviewRequired, LocalDate localDate) { }
     /**
      * 单条原批准额度与当前实际消费、预留；查询层负责原资源权限和去重。
      * @author owlzhangfq@gmail.com
@@ -85,11 +85,11 @@ public final class ExpenseResourceMetrics {
         private BigDecimal outstanding = BigDecimal.ZERO, underReview = BigDecimal.ZERO;
         private final Map<AgeBand, Long> counts = new EnumMap<>(AgeBand.class);
         private final Map<AgeBand, BigDecimal> amounts = new EnumMap<>(AgeBand.class);
-        private void add(Advance value, LocalDate asOf) {
+        private void add(Advance value) {
             accounts++; var amount = value.outstanding().value(); outstanding = outstanding.add(amount);
             if (value.reviewRequired()) underReview = underReview.add(amount);
             if (amount.signum() > 0) {
-                var band = age(value.dueOn(), asOf);
+                var band = age(value.dueOn(), value.localDate());
                 counts.merge(band, 1L, Long::sum); amounts.merge(band, amount, BigDecimal::add);
             }
         }

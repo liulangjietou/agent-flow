@@ -6420,6 +6420,7 @@ class ExpenseSubmissionIntegrationTest {
         checked = precheck(current(report)); advance.requirePaymentReview(1); advances.update(advance, 1, "fixture", "PAYMENT_REVIEW");
         assertCode(read(path(report) + "/prechecks/" + checked + "/advance-offset-suggestion", "alice"), "RESOURCES_CHANGED");
         assertCode(send(path(report) + "/submit", "alice", submitInput(current(report), checked)), "RESOURCES_CHANGED");
+        assertThat(rejectionCount(report)).isZero();
         assertThat(app(report).status()).isEqualTo(ApplicationStatus.DRAFT);
     }
 
@@ -6435,6 +6436,131 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(advances.find("demo", fixture.advance()).orElseThrow().balance().reservedFor(new ExpenseUse(report.id(), 1, 0))).isEqualTo(money("50"));
         submit(current(report));
         assertThat(current(report).currentRound().offsetTotal()).isEqualTo(money("50"));
+    }
+
+    @Test
+    void duplicateSubmissionAttemptsAreRecordedAfterRollbackOncePerRequest() throws Exception {
+        var winner = fixture(true); var rejected = fixture(true); var report = rejected.report();
+        UUID checked = precheck(report); var input = submitInput(report, checked);
+        submit(winner.report());
+        var before = current(report).state(); var invoiceBefore = invoices.find("demo", rejected.invoice()).orElseThrow().state();
+        String key = UUID.randomUUID().toString();
+        assertCode(send(path(report) + "/submit", "alice", key, input), "RESOURCES_CHANGED");
+        assertThat(current(report).state()).isEqualTo(before);
+        assertThat(invoices.find("demo", rejected.invoice()).orElseThrow().state()).isEqualTo(invoiceBefore);
+        assertThat(tasks(report)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_submission_rejection WHERE tenant_id='demo' AND report_id=?", Integer.class, report.id().toString())).isOne();
+        assertCode(send(path(report) + "/submit", "alice", key, input), "RESOURCES_CHANGED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_submission_rejection WHERE tenant_id='demo' AND report_id=?", Integer.class, report.id().toString())).isOne();
+        assertCode(send(path(report) + "/submit", "alice", UUID.randomUUID().toString(), input), "RESOURCES_CHANGED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_submission_rejection WHERE tenant_id='demo' AND report_id=?", Integer.class, report.id().toString())).isEqualTo(2);
+        assertThat(jdbc.queryForList("SELECT DISTINCT reason_code FROM expense_submission_rejection WHERE tenant_id='demo' AND report_id=?", String.class, report.id().toString())).containsExactly("INVOICE_OCCUPIED");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM budget_occupation WHERE tenant_id='demo' AND report_id=?", Integer.class, report.id().toString())).isZero();
+    }
+
+    @Test
+    void duplicateOfSameUploadedInvoiceIsRecordedDespiteItsChangedVersionAndConcurrentReplay() throws Exception {
+        var winner = fixture(true); var draft = fixture(false).report();
+        var content = new ExpenseContent(entity, ExpenseContent.Type.DAILY, "同原件重复提交",
+                List.of(line(winner.invoice(), null)), List.of());
+        ok(send(path(draft) + "/revise", "alice", Map.of("applicationVersion", app(draft).version(),
+                "financialVersion", draft.version(), "content", content)), 200);
+        var report = current(draft); var input = submitInput(report, precheck(report));
+        submit(winner.report());
+        var before = current(report).state(); String key = UUID.randomUUID().toString();
+        assertCode(send(path(report) + "/submit", "bob", key, input), "NOT_FOUND");
+        assertThat(rejectionCount(report)).isZero();
+        assertCode(send(path(report) + "/submit", "alice", key, input), "RESOURCES_CHANGED");
+        assertThat(rejectionCount(report)).isOne();
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var replay = new java.util.concurrent.Callable<MockHttpServletResponse>() {
+                public MockHttpServletResponse call() throws Exception { return send(path(report) + "/submit", "alice", key, input); }
+            };
+            var first = pool.submit(replay); var second = pool.submit(replay);
+            assertCode(first.get(30, java.util.concurrent.TimeUnit.SECONDS), "RESOURCES_CHANGED");
+            assertCode(second.get(30, java.util.concurrent.TimeUnit.SECONDS), "RESOURCES_CHANGED");
+        } finally { pool.shutdownNow(); }
+        assertThat(rejectionCount(report)).isOne();
+        assertThat(current(report).state()).isEqualTo(before);
+        assertThat(tasks(report)).isEmpty();
+        assertThat(invoices.find("demo", winner.invoice()).orElseThrow().use().reportId()).isEqualTo(winner.report().id());
+    }
+
+    @Test
+    void financialReportCountsOnlyReadableRoundAttemptsAndExcludesLaterPrivateVerification() throws Exception {
+        var winner = fixture(true); var rejected = fixture(true); var report = rejected.report();
+        UUID checked = precheck(report); var input = submitInput(report, checked);
+        submit(winner.report()); budgetWorker.poll();
+        assertCode(send(path(report)+"/submit", "alice", input), "RESOURCES_CHANGED");
+        var blocked = ok(send(path(report)+"/precheck", "alice", Map.of("applicationVersion", app(report).version(), "financialVersion", report.version(),
+                "initiatorAppointmentId", appointment, "accountingDate", LocalDate.now(), "targetDigest", target())), 202);
+        precheckWorker.poll();
+        assertThat(prechecks.find("demo", UUID.fromString(blocked.path("id").asText())).orElseThrow().result().findings())
+                .extracting(ExpensePrecheckJob.Finding::code).contains("INVOICE_OCCUPIED");
+        assertThat(financialReport().at("/activity/duplicateSubmissions/recorded").asLong()).isZero();
+        ok(send(path(winner.report())+"/withdraw", "alice", lifecycleInput(winner.report())), 200);
+        ok(send(path(winner.report())+"/cancel", "alice", lifecycleInput(winner.report())), 200); budgetWorker.poll();
+        enterFinance(report);
+        var readable = financialReport();
+        assertThat(readable.at("/totals/submitted").asLong()).isOne();
+        assertThat(readable.at("/activity/duplicateSubmissions/recorded").asLong()).isOne();
+        assertThat(readable.at("/activity/duplicatePrechecks").asLong()).isOne();
+        assertThat(readable.at("/activity/verification/succeeded").asLong()).isOne();
+        assertThat(readable.at("/resources/advances")).isEmpty();
+        assertThat(readable.at("/resources/priorRequests")).isEmpty();
+        verify(rejected.invoice());
+        assertThat(financialReport().path("activity")).isEqualTo(readable.path("activity"));
+    }
+
+    @Test
+    void financialReportSeparatesUnknownBacklogAndRetainsFirstArrivalAfterReversal() throws Exception {
+        var report = paymentReport(); UUID id = authorizePayment(report);
+        assertThat(financialReport().at("/totals/payment/pending").asLong()).isOne();
+        ok(send("/api/v1/cashier/payments/"+id+"/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202);
+        paymentRequestWorker.poll();
+        assertThat(financialReport().at("/backlog/payments/QUEUED").asLong()).isOne();
+        paymentMode = "INVALID"; paymentWorker.poll();
+        var unknown = paymentOperations.find("demo", id).orElseThrow();
+        assertThat(unknown.status()).isEqualTo(PaymentOperation.Status.UNKNOWN);
+        var unresolved = financialReport();
+        assertThat(unresolved.at("/totals/payment/unknown").asLong()).isOne();
+        assertThat(unresolved.at("/backlog/payments/UNKNOWN").asLong()).isOne();
+        assertThat(unresolved.at("/backlog/payments/FAILED").asLong()).isZero();
+        tx().executeWithoutResult(status -> paymentExecution.query("demo", id, unknown.version(), Instant.now()));
+        paymentMode = "SUCCEEDED"; paymentWorker.poll();
+        var paid = paymentOperations.find("demo", id).orElseThrow(); assertThat(paid.settleable()).isTrue();
+        var arrived = financialReport();
+        assertThat(arrived.at("/totals/payment/samples").asLong()).isOne();
+        assertThat(arrived.at("/totals/endToEnd/samples").asLong()).isOne();
+        tx().executeWithoutResult(status -> paymentExecution.query("demo", id, paid.version(), Instant.now()));
+        paymentMode = "REVERSED"; paymentWorker.poll();
+        var reversed = financialReport();
+        assertThat(reversed.at("/backlog/payments/REVERSED").asLong()).isOne();
+        assertThat(reversed.at("/totals/payment")).isEqualTo(arrived.at("/totals/payment"));
+        assertThat(reversed.at("/totals/endToEnd")).isEqualTo(arrived.at("/totals/endToEnd"));
+        assertThat(paymentWrites).isOne();
+    }
+
+    @Test
+    void rejectionRecordingFailurePreservesTheOriginalBusinessErrorAndRollback() throws Exception {
+        var winner = fixture(true); var rejected = fixture(true); var report = rejected.report();
+        UUID checked = precheck(report); var input = submitInput(report, checked); submit(winner.report());
+        var before = current(report).state();
+        jdbc.execute("ALTER TABLE expense_submission_rejection ADD CONSTRAINT reporting_storage_failure CHECK(report_id<>'"+report.id()+"')");
+        try {
+            assertCode(send(path(report)+"/submit", "alice", input), "RESOURCES_CHANGED");
+            assertThat(rejectionCount(report)).isZero(); assertThat(current(report).state()).isEqualTo(before);
+            assertThat(tasks(report)).isEmpty();
+        } finally { jdbc.execute("ALTER TABLE expense_submission_rejection DROP CONSTRAINT reporting_storage_failure"); }
+    }
+
+    private JsonNode financialReport() throws Exception {
+        return ok(read("/api/v1/reports/expense-finance?legalEntityId="+entity, "finance"), 200);
+    }
+
+    private int rejectionCount(ExpenseReport report) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM expense_submission_rejection WHERE tenant_id='demo' AND report_id=?", Integer.class, report.id().toString());
     }
 
     private EmployeeAdvance fifoAdvance(UUID id, String tenant, String employee, UUID legalEntity, String amount, String currency, LocalDate paidOn) {

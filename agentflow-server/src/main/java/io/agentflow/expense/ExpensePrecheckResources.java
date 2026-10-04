@@ -109,21 +109,35 @@ public class ExpensePrecheckResources {
 
     /** 再次验票即使失败且未改变发票版本，也使先前成功凭据失效。 */
     public boolean current(ExpenseReport report, ExpensePrecheckEvidence evidence) {
+        return currentProblem(report, evidence) == null;
+    }
+
+    /** 提交保留原资源拒绝原因，公开错误码仍为原有的资源变化。 */
+    public void requireCurrentForSubmission(ExpenseReport report, ExpensePrecheckEvidence evidence) {
+        var problem = currentProblem(report, evidence);
+        if (problem != null) {
+            var failure = changed(); failure.initCause(problem); throw failure;
+        }
+    }
+
+    private DomainException currentProblem(ExpenseReport report, ExpensePrecheckEvidence evidence) {
         try {
             var loaded = load(report);
-            if (!versions(loaded).equals(evidence.resources())) return false;
-            var receipts = verifications.currentReceipts(report.tenantId(), evidence.invoices().stream().map(ExpensePrecheckEvidence.InvoiceReceipt::invoiceId).toList());
-            if (!evidence.invoices().stream().allMatch(value -> receipts.containsKey(value.invoiceId())
-                    && receipts.get(value.invoiceId()).input().id().equals(value.verificationId())
-                    && receipts.get(value.invoiceId()).resultingInvoiceVersion() == value.invoiceVersion())) return false;
-            // 其他文件占用同票号不会增加本单引用资源的版本，因此必须重查规范票号互斥键。
+            // 先在副本上复核原领域占用规则，保留同原件和同票号竞争的明确原因；此处不保存计划。
             var prepared = ExpenseReport.restore(report.state()); var preview = evidence.preview();
             var assessments = preview.originalLines().stream().collect(Collectors.toMap(value -> value.original().lineNo(), ExpenseRound.FrozenLine::assessment));
             prepared.freeze(report.version(), preview.roundNo(), preview.baseCurrency(), preview.account(), assessments, report.employeeId(), java.time.Instant.now());
             requireClaimsAvailable(report.tenantId(), new ExpenseSubmissionResources().plan(prepared, loaded, java.time.Instant.now()));
-            return true;
-        } catch (DomainException changed) { return false; }
+            if (!versions(loaded).equals(evidence.resources())) return changed();
+            var receipts = verifications.currentReceipts(report.tenantId(), evidence.invoices().stream().map(ExpensePrecheckEvidence.InvoiceReceipt::invoiceId).toList());
+            if (!evidence.invoices().stream().allMatch(value -> receipts.containsKey(value.invoiceId())
+                    && receipts.get(value.invoiceId()).input().id().equals(value.verificationId())
+                    && receipts.get(value.invoiceId()).resultingInvoiceVersion() == value.invoiceVersion())) return changed();
+            return null;
+        } catch (DomainException changed) { return changed; }
     }
+
+    private static DomainException changed() { return new DomainException("RESOURCES_CHANGED", "Expense precheck must be refreshed before submission"); }
 
     private static void collect(ExpenseContent content, Set<UUID> invoices, Set<UUID> requests) {
         for (var line : content.lines()) {

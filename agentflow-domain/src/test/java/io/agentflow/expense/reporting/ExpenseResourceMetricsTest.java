@@ -16,8 +16,8 @@ class ExpenseResourceMetricsTest {
 
     @Test void dueDateItselfIsNotOverdueAndEveryBoundaryHasOneBand() {
         var days = List.of(0, 1, 30, 31, 60, 61, 90, 91);
-        var values = days.stream().map(day -> new ExpenseResourceMetrics.Advance(money("10", "CNY"), TODAY.minusDays(day), false)).toList();
-        var result = ExpenseResourceMetrics.advances(values, TODAY).get(0);
+        var values = days.stream().map(day -> new ExpenseResourceMetrics.Advance(money("10", "CNY"), TODAY.minusDays(day), false, TODAY)).toList();
+        var result = ExpenseResourceMetrics.advances(values).get(0);
         assertThat(result.accounts()).isEqualTo(8);
         assertThat(result.outstanding()).isEqualTo("80.00");
         assertThat(result.ages()).extracting(ExpenseResourceMetrics.Age::accounts).containsExactly(1L, 2L, 2L, 2L, 1L, 0L);
@@ -25,8 +25,8 @@ class ExpenseResourceMetricsTest {
     }
 
     @Test void futureAndUnknownDatesAreNotInventedOverdueBalances() {
-        var result = ExpenseResourceMetrics.advances(List.of(new ExpenseResourceMetrics.Advance(money("10", "CNY"), TODAY.plusDays(1), false),
-                new ExpenseResourceMetrics.Advance(money("20", "CNY"), null, true)), TODAY).get(0);
+        var result = ExpenseResourceMetrics.advances(List.of(new ExpenseResourceMetrics.Advance(money("10", "CNY"), TODAY.plusDays(1), false, TODAY),
+                new ExpenseResourceMetrics.Advance(money("20", "CNY"), null, true, TODAY))).get(0);
         assertThat(result.underReview()).isEqualTo("20.00");
         assertThat(result.ages().get(0).outstanding()).isEqualTo("10.00");
         assertThat(result.ages().get(5).band()).isEqualTo(ExpenseResourceMetrics.AgeBand.UNKNOWN);
@@ -34,15 +34,15 @@ class ExpenseResourceMetricsTest {
     }
 
     @Test void settledAccountsDoNotIncreaseOutstandingAgeCounts() {
-        var result = ExpenseResourceMetrics.advances(List.of(new ExpenseResourceMetrics.Advance(money("0", "CNY"), TODAY.minusDays(100), false)), TODAY).get(0);
+        var result = ExpenseResourceMetrics.advances(List.of(new ExpenseResourceMetrics.Advance(money("0", "CNY"), TODAY.minusDays(100), false, TODAY))).get(0);
         assertThat(result.accounts()).isOne();
         assertThat(result.ages()).allSatisfy(age -> assertThat(age.accounts()).isZero());
     }
 
     @Test void currenciesStaySeparateAndLargeTotalsStayExact() {
         var max = new Money(Money.MAX_VALUE, "CNY");
-        var result = ExpenseResourceMetrics.advances(List.of(new ExpenseResourceMetrics.Advance(max, TODAY, false),
-                new ExpenseResourceMetrics.Advance(max, TODAY, true), new ExpenseResourceMetrics.Advance(money("5", "USD"), TODAY, false)), TODAY);
+        var result = ExpenseResourceMetrics.advances(List.of(new ExpenseResourceMetrics.Advance(max, TODAY, false, TODAY),
+                new ExpenseResourceMetrics.Advance(max, TODAY, true, TODAY), new ExpenseResourceMetrics.Advance(money("5", "USD"), TODAY, false, TODAY)));
         assertThat(result).extracting(ExpenseResourceMetrics.AdvanceTotals::currency).containsExactly("CNY", "USD");
         assertThat(result.get(0).outstanding()).isEqualTo("1999999999999999.98");
         assertThat(result.get(1).outstanding()).isEqualTo("5.00");
@@ -64,8 +64,16 @@ class ExpenseResourceMetricsTest {
     }
 
     @Test void emptyResourcesDoNotInventCurrencyRows() {
-        assertThat(ExpenseResourceMetrics.advances(List.of(), TODAY)).isEmpty();
+        assertThat(ExpenseResourceMetrics.advances(List.of())).isEmpty();
         assertThat(ExpenseResourceMetrics.priorRequests(List.of())).isEmpty();
+    }
+
+    @Test void sameCurrencyLoansKeepTheirOwnLocalDatesAtTheSameInstant() {
+        var result = ExpenseResourceMetrics.advances(List.of(
+                new ExpenseResourceMetrics.Advance(money("10", "CNY"), TODAY, false, TODAY),
+                new ExpenseResourceMetrics.Advance(money("20", "CNY"), TODAY, false, TODAY.plusDays(1)))).get(0);
+        assertThat(result.ages().get(0).outstanding()).isEqualTo("10.00");
+        assertThat(result.ages().get(1).outstanding()).isEqualTo("20.00");
     }
 
     private static ExpenseResourceMetrics.Prior prior(String approved, String consumed, String reserved, String currency) {

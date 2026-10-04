@@ -152,12 +152,23 @@ public class ExpensePrecheckService {
 
     /** 正式提交和页面提示共用有效性判断；不从历史 READY 回退到旧事实。 */
     public String readyFailure(ExpensePrecheckJob job, ExpenseReport report, Instant now) {
+        String failure = readyContextFailure(job, now);
+        return failure != null ? failure : resources.current(report, job.result().evidence()) ? null : "RESOURCES_CHANGED";
+    }
+
+    /** 原提交事务只校验一次资源，异常链保留真实拒绝依据供回滚后的记录使用。 */
+    public void requireReady(ExpensePrecheckJob job, ExpenseReport report, Instant now) {
+        String failure = readyContextFailure(job, now);
+        if (failure != null) throw new DomainException(failure, "Expense precheck must be refreshed before submission");
+        resources.requireCurrentForSubmission(report, job.result().evidence());
+    }
+
+    private String readyContextFailure(ExpensePrecheckJob job, Instant now) {
         if (job.status() != Status.READY) return "PRECHECK_NOT_READY";
         if (jobs.latestAttempt(job.input().tenantId(), job.input().reportId()) != job.input().attempt()) return "PRECHECK_SUPERSEDED";
         if (!job.result().evidence().validUntil().isAfter(now)) return "FACTS_EXPIRED";
         if (!policyConfiguration.current(job.input().tenantId(), job.result().evidence().policySelection())) return "POLICY_CONFIGURATION_CHANGED";
-        String failure = contextFailure(job); if (failure != null) return failure;
-        return resources.current(report, job.result().evidence()) ? null : "RESOURCES_CHANGED";
+        return contextFailure(job);
     }
 
     /** 解释只能绑定当前检查；业务失败可解释，但不能借此取得正式提交资格。 */

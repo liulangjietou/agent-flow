@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
+import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
@@ -459,6 +460,47 @@ class ExpensePlanIntegrationTest {
         jdbc.update("UPDATE expense_configuration SET active_revision=0,active_policy_id=NULL,active_policy_version=NULL WHERE tenant_id='demo'");
         for (String table : List.of("expense_policy_activation", "expense_policy_version", "expense_policy_draft_revision",
                 "expense_policy_draft", "expense_category_revision", "expense_configuration")) jdbc.update("DELETE FROM " + table + " WHERE tenant_id='demo'");
+    }
+
+    @Autowired io.agentflow.expense.reporting.ExpenseFinancialReportQuery financialReporting;
+    @Autowired ExpenseReportRepository reportRecords;
+
+    @Test void financialReportUsesOriginalApprovedAmountWithSeparateConsumedAndReservedBalances() throws Exception {
+        configureCategories(true);
+        var categories = json.read("""
+                [{"code":"TRAVEL","name":"容差差旅","units":["ITEM"],"active":true,
+                  "priorControl":{"mode":"TOLERANCE","toleranceFraction":0.1}},
+                 {"code":"OTHER","name":"其他","units":["ITEM"],"active":true}]
+                """, new com.fasterxml.jackson.core.type.TypeReference<List<ExpenseCategoryCatalog.Category>>() { });
+        expenseConfiguration.saveCategories(admin, 1, categories, "报表批准额度口径");
+        UUID id = create(); submit(id); ok(act(id, "APPROVE"), 200); ok(act(id, "APPROVE"), 200);
+        new org.springframework.transaction.support.TransactionTemplate(transactions).executeWithoutResult(status -> {
+            UUID report = UUID.randomUUID();
+            var application = Application.draftBusiness(UUID.randomUUID(), "demo", "REPORT-USAGE-"+report, "fixture", 1, "alice", "合成计划用量", Map.of(), null, null, null,
+                    new BusinessReference(BusinessReference.Type.EXPENSE, report));
+            applications.save(application);
+            reportRecords.create(ExpenseReport.draft(report, "demo", application.id(), "alice", new ExpenseContent(entity, ExpenseContent.Type.DAILY, "合成用量", List.of(), List.of())), "fixture");
+            var credit = requests.find("demo", id).orElseThrow(); var consumed = new ExpenseUse(report, 1, 1); var reserved = new ExpenseUse(report, 1, 2);
+            long version = credit.version(); credit.reserve(version, 7, consumed, money("142", "CNY")); requests.update(credit, version, "fixture", "RESERVE");
+            version = credit.version(); credit.consume(version, 7, consumed); requests.update(credit, version, "fixture", "CONSUME");
+            version = credit.version(); credit.reserve(version, 7, reserved, money("71", "CNY")); requests.update(credit, version, "fixture", "RESERVE");
+            version = credit.version(); credit.close(version); requests.update(credit, version, "fixture", "CLOSE");
+        });
+        var day = LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1);
+        var query = new io.agentflow.expense.reporting.ExpenseReportQueryParameters.Query(day, day, entity, null, "TRAVEL");
+        actors.set(new Actor("demo", "manager", Set.of("FINANCE", "APPROVER")));
+        try {
+            var report = financialReporting.read(query, Instant.now());
+            assertThat(report.totals().submitted()).isZero(); assertThat(report.resources().priorRequests()).hasSize(1);
+            var result = report.resources().priorRequests().get(0);
+            assertThat(result.approved()).isEqualTo("710.00"); assertThat(result.consumed()).isEqualTo("142.00");
+            assertThat(result.reserved()).isEqualTo("71.00"); assertThat(result.executionRate()).isEqualByComparingTo("0.2");
+            assertThat(financialReporting.read(new io.agentflow.expense.reporting.ExpenseReportQueryParameters.Query(day, day, entity, null, "OTHER"), Instant.now())
+                    .resources().priorRequests()).isEmpty();
+        } finally { actors.clear(); }
+        actors.set(new Actor("demo", "admin", Set.of("ADMIN", "FINANCE", "APPROVER")));
+        try { assertThat(financialReporting.read(query, Instant.now()).resources().priorRequests()).isEmpty(); }
+        finally { actors.clear(); }
     }
 
     private UUID create() throws Exception { return id(ok(send("/api/v1/expense-plans", "alice", createBody(published(false, false), content("100"))), 201)); }

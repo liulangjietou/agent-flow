@@ -66,8 +66,7 @@ public class ExpenseSubmissionService {
         if (checked.status() != ExpensePrecheckJob.Status.READY) throw new DomainException("PRECHECK_NOT_READY", "Expense precheck is not ready");
         var evidence = checked.result().evidence(); resources.lockReferences(actor.tenantId(), evidence.resources());
         policyConfiguration.lockForSubmission(actor.tenantId());
-        String failure = validation.readyFailure(checked, report, Instant.now());
-        if (failure != null) throw new DomainException(failure, "Expense precheck must be refreshed before submission");
+        validation.requireReady(checked, report, Instant.now());
         var definition = definitions.lockPublished(actor.tenantId(), application.processKey(), application.definitionVersion())
                 .orElseThrow(() -> new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published expense process not found"));
         definition.requireStartEnabled();
