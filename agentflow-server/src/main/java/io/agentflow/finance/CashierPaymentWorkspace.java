@@ -28,20 +28,38 @@ public class CashierPaymentWorkspace {
     private final JdbcPaymentExecutionRequestRepository requests;
     private final JdbcPaymentOperationRepository operations;
     private final PaymentAccountsPort accounts;
+    private final PaymentPersonnel personnel;
     /** 资金目录只接受持久授权的法人、币种、目标以及当前认证出纳。 */
     public CashierPaymentWorkspace(CurrentActor actors, PaymentAccess access, ApprovedPaymentSources sources, JdbcPaymentAuthorizationRepository authorizations,
-                                    JdbcPaymentExecutionRequestRepository requests, JdbcPaymentOperationRepository operations, PaymentAccountsPort accounts) {
+                                    JdbcPaymentExecutionRequestRepository requests, JdbcPaymentOperationRepository operations, PaymentAccountsPort accounts, PaymentPersonnel personnel) {
         this.actors = actors; this.access = access; this.sources = sources; this.authorizations = authorizations;
-        this.requests = requests; this.operations = operations; this.accounts = accounts;
+        this.requests = requests; this.operations = operations; this.accounts = accounts; this.personnel = personnel;
     }
     /** 分页边界也必须属于当前法人范围，不能借任意授权号观察其他法人的目录。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Page list(Map<String, String> parameters) {
         access.requireCashierRole(); var query = page(parameters); var actor = actors.actor();
         var before = query.beforeId() == null ? null : access.requireCashier(query.beforeId());
-        var rows = authorizations.cashierPage(actor.tenantId(), actor.userId(), before == null ? null : before.decision().authorizedAt(), query.beforeId(), query.limit());
+        if (before != null && !authorizations.cashierMatches(actor.tenantId(), actor.userId(), query.filter(), query.beforeId())) throw invalid();
+        long count = authorizations.cashierCount(actor.tenantId(), actor.userId(), query.filter());
+        var rows = authorizations.cashierPage(actor.tenantId(), actor.userId(), query.filter(), before == null ? null : before.decision().authorizedAt(), query.beforeId(), query.limit());
         var items = rows.stream().limit(query.limit()).map(this::view).toList();
-        return new Page(items, rows.size() > query.limit() ? items.get(items.size() - 1).payment().id() : null);
+        return new Page(items, rows.size() > query.limit() ? items.get(items.size() - 1).payment().id() : null, count);
+    }
+
+    /** 历史实际出款账户按同一法人权限分页，未固定账户不猜测当前目录或默认账户。 */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public FilterOptions filterOptions(Map<String, String> parameters) {
+        access.requireCashierRole();
+        if (!Set.of("limit", "legalEntityId", "afterAccountKey").containsAll(parameters.keySet())) throw invalid();
+        int limit = limit(parameters); UUID legal = identifier(parameters, "legalEntityId"); String after = parameters.get("afterAccountKey");
+        if (after != null && !accountKey(after)) throw invalid();
+        var actor = actors.actor();
+        if (after != null && authorizations.cashierCount(actor.tenantId(), actor.userId(), new JdbcPaymentAuthorizationRepository.CashierFilter(legal, after)) == 0) throw invalid();
+        var rows = authorizations.cashierAccounts(actor.tenantId(), actor.userId(), legal, after, limit);
+        var options = rows.stream().limit(limit).map(CashierPaymentWorkspace::accountOption).toList();
+        return new FilterOptions(personnel.legalEntityOptions(actor.tenantId(), actor.userId()), options,
+                rows.size() > limit ? options.get(options.size() - 1).key() : null);
     }
     /** 状态与操作提示共同读取，不接受客户端传入租户或操作人。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -75,34 +93,63 @@ public class CashierPaymentWorkspace {
         boolean execute = separated && window && value.status() == PaymentAuthorization.Status.AUTHORIZED && request == null;
         boolean resend = separated && window && value.status() == PaymentAuthorization.Status.EXECUTION_REGISTERED && actor.userId().equals(value.execution().command().authorization().executedBy())
                 && operation != null && operation.status() == PaymentOperation.Status.NOT_FOUND && operation.highestRevision() == 0 && operation.conflictingObservation() == null;
-        return new View(PaymentView.of(value, request, operation), new Actions(execute, PaymentView.queryable(value, operation), resend));
+        return new View(PaymentView.of(value, request, operation), new Actions(execute, PaymentView.queryable(value, operation), resend), accountOption(value));
+    }
+    private static AccountOption accountOption(PaymentAuthorization value) {
+        if (value.execution() == null) return null;
+        var debit = value.execution().debitAccount();
+        return new AccountOption(CashierPaymentAccountKey.of(value), value.terms().payee().legalEntityId(), debit.currency(), debit.displayName(), debit.maskedAccount());
     }
     private static Query page(Map<String, String> parameters) {
-        if (!Set.of("limit", "beforeId").containsAll(parameters.keySet())) throw invalid();
+        if (!Set.of("limit", "beforeId", "legalEntityId", "debitAccount").containsAll(parameters.keySet())) throw invalid();
+        String account = parameters.get("debitAccount");
+        if (account != null && !JdbcPaymentAuthorizationRepository.CashierFilter.UNASSIGNED.equals(account) && !accountKey(account)) throw invalid();
+        return new Query(limit(parameters), identifier(parameters, "beforeId"),
+                new JdbcPaymentAuthorizationRepository.CashierFilter(identifier(parameters, "legalEntityId"), account));
+    }
+    private static int limit(Map<String, String> parameters) {
         try {
             var raw = parameters.getOrDefault("limit", Integer.toString(DEFAULT_LIMIT));
             if (!raw.matches("[1-9][0-9]{0,2}")) throw invalid(); int limit = Integer.parseInt(raw); if (limit > MAX_LIMIT) throw invalid();
-            UUID before = parameters.containsKey("beforeId") ? UUID.fromString(parameters.get("beforeId")) : null;
-            if (before != null && !before.toString().equals(parameters.get("beforeId"))) throw invalid(); return new Query(limit, before);
+            return limit;
         } catch (IllegalArgumentException failure) { throw invalid(); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_QUERY", "Cashier pagination accepts only a bounded limit and canonical beforeId"); }
+    private static UUID identifier(Map<String, String> parameters, String key) {
+        if (!parameters.containsKey(key)) return null;
+        try {
+            UUID value = UUID.fromString(parameters.get(key)); if (!value.toString().equals(parameters.get(key))) throw invalid(); return value;
+        } catch (IllegalArgumentException failure) { throw invalid(); }
+    }
+    private static boolean accountKey(String value) { return value.matches("[a-f0-9]{64}"); }
+    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_QUERY", "Cashier filters and pagination must use bounded limits and canonical identifiers in the same scope"); }
     /**
      * 私有分页值不接受外部排序片段。
      * @author owlzhangfq@gmail.com
      */
-    private record Query(int limit, UUID beforeId) { }
+    private record Query(int limit, UUID beforeId, JdbcPaymentAuthorizationRepository.CashierFilter filter) { }
     /**
      * 目录条目与详情共用最小投影。
      * @author owlzhangfq@gmail.com
      */
-    public record View(PaymentView payment, Actions actions) { }
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record View(PaymentView payment, Actions actions, AccountOption debitAccount) { }
     /**
      * 分页不会扩大读取范围。
      * @author owlzhangfq@gmail.com
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Page(List<View> items, UUID nextBeforeId) { }
+    public record Page(List<View> items, UUID nextBeforeId, long totalCount) { }
+    /**
+     * 账户键固定资金目标、法人、币种和账户引用，只公开历史脱敏展示。
+     * @author owlzhangfq@gmail.com
+     */
+    public record AccountOption(String key, UUID legalEntityId, String currency, String displayName, String maskedAccount) { }
+    /**
+     * 账户选项独立分页，不因截断选项而宣称目录完整。
+     * @author owlzhangfq@gmail.com
+     */
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record FilterOptions(List<PaymentPersonnel.LegalEntity> legalEntities, List<AccountOption> accounts, String nextAfterAccountKey) { }
     /**
      * 提示只影响按钮，实际资金动作仍复核来源与人员。
      * @author owlzhangfq@gmail.com

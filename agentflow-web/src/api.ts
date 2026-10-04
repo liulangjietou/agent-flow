@@ -69,7 +69,7 @@ import type { BudgetAdjustmentItem, BudgetAdjustmentDetail, BudgetAdjustmentCrea
 import type { RepaymentView, RepaymentQueryInput, RepaymentRecordInput, RepaymentActionReceipt } from './advanceRepayment'
 import type { DisbursementReturnView, DisbursementReturnQueryInput, DisbursementResolutionInput, DisbursementReturnActionReceipt } from './disbursementReturn'
 import type { RepaymentReviewView, RepaymentReviewQueryInput, RepaymentResolutionInput, RepaymentReviewActionReceipt } from './repaymentReview'
-import type { PaymentView, FinancePaymentView, CashierPaymentView, CashierPaymentPage, PaymentAccounts, PaymentAuthorizationInput, FinancePaymentActionInput, CashierPaymentActionInput, FinancePaymentReceipt, CashierPaymentReceipt, PayeeReviewInput, PayeeReviewReceipt, PaymentDisputeInput, PaymentDisputeReceipt } from './payments'
+import type { PaymentView, FinancePaymentView, CashierPaymentView, CashierPaymentPage, CashierPaymentFilter, CashierFilterOptions, PaymentAccounts, PaymentAuthorizationInput, FinancePaymentActionInput, CashierPaymentActionInput, FinancePaymentReceipt, CashierPaymentReceipt, PayeeReviewInput, PayeeReviewReceipt, PaymentDisputeInput, PaymentDisputeReceipt } from './payments'
 import type { VoucherActionInput, VoucherReceipt, VoucherView, VoucherDisputeInput, VoucherDisputeReceipt } from './vouchers'
 import type { VoucherReversalView, ReversalQueryInput, ReversalRecordInput, ReversalActionReceipt } from './voucherReversal'
 import type { VoucherReversalExecutionView, ReversalPrepareInput, ReversalAuthorizeInput, ReversalOperationInput, ReversalExecutionReceipt, ReversalRetirementInput, ReversalRetirementReceipt } from './voucherReversalExecution'
@@ -712,7 +712,8 @@ export const api = {
   paymentBatches: (beforeId: string | undefined, signal: AbortSignal) => request<PaymentBatchPage>('/payment-batches' + historyQuery({ limit: 25, beforeId }), { signal, cache: 'no-store' }),
   paymentBatch: (id: string, signal: AbortSignal) => request<PaymentBatchDetail>(`/payment-batches/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
   submitPaymentBatch: (input: PaymentBatchInput) => write<PaymentBatchReceipt>('/payment-batches', 'POST', '登记批量付款', input),
-  cashierPayments: (beforeId: string | undefined, signal: AbortSignal) => request<CashierPaymentPage>('/cashier/payments' + historyQuery({ limit: 25, beforeId }), { signal, cache: 'no-store' }),
+  cashierPayments: (beforeId: string | undefined, signal: AbortSignal, filter: CashierPaymentFilter = {}) => request<CashierPaymentPage>('/cashier/payments' + historyQuery({ limit: 25, beforeId, legalEntityId: filter.legalEntityId, debitAccount: filter.debitAccount }), { signal, cache: 'no-store' }),
+  cashierPaymentFilterOptions: (legalEntityId: string | undefined, afterAccountKey: string | undefined, signal: AbortSignal) => request<CashierFilterOptions>('/cashier/payments/filter-options' + historyQuery({ limit: 25, legalEntityId, afterAccountKey }), { signal, cache: 'no-store' }),
   cashierPayment: (id: string, signal: AbortSignal) => request<CashierPaymentView>(`/cashier/payments/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
   paymentAccounts: (id: string, signal: AbortSignal) => request<PaymentAccounts>(`/cashier/payments/${encodeURIComponent(id)}/accounts`, { signal, cache: 'no-store' }),
   cashierPaymentAction: (id: string, input: CashierPaymentActionInput) => write<CashierPaymentReceipt>(`/cashier/payments/${encodeURIComponent(id)}/actions`, 'POST', '出纳办理原付款', input),

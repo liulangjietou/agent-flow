@@ -54,11 +54,12 @@ public class JdbcPaymentAuthorizationRepository {
             if (!Objects.equals(current, value.retirement().operationVersion())) throw conflict();
         }
         int changed = jdbc.update("""
-                UPDATE payment_authorization SET state_json=?,version=?,status=?,active_business_id=?,updated_at=?
+                UPDATE payment_authorization SET state_json=?,version=?,status=?,active_business_id=?,updated_at=?,debit_account_key=?
                 WHERE tenant_id=? AND id=? AND version=? AND status=? AND terms_json=? AND decision_json=?
-                """, json.write(value), value.version(), value.status().name(), activeBusiness(value), Timestamp.from(value.updatedAt()), value.terms().tenantId(), value.terms().id().toString(),
+                AND ((version=1 AND debit_account_key IS NULL) OR debit_account_key=?)
+                """, json.write(value), value.version(), value.status().name(), activeBusiness(value), Timestamp.from(value.updatedAt()), CashierPaymentAccountKey.of(value), value.terms().tenantId(), value.terms().id().toString(),
                 value.version() - 1, value.version() == 2 ? "AUTHORIZED" : "EXECUTION_REGISTERED",
-                json.write(value.terms()), json.write(value.decision()));
+                json.write(value.terms()), json.write(value.decision()), CashierPaymentAccountKey.of(value));
         if (changed != 1) throw conflict(); append(value);
         if (value.retirement() != null) {
             var retirement = value.retirement();
@@ -84,15 +85,49 @@ public class JdbcPaymentAuthorizationRepository {
                 row(), tenant, applicationId.toString(), round).stream().findFirst();
     }
     /** 出纳列表先在数据库按当前法人任职过滤，再读取原授权；不扫描全租户付款后交给页面筛选。 */
-    public List<PaymentAuthorization> cashierPage(String tenant, String cashier, Instant beforeTime, UUID beforeId, int limit) {
-        var args = new ArrayList<Object>(List.of(tenant, tenant, cashier)); var filter = "";
+    public List<PaymentAuthorization> cashierPage(String tenant, String cashier, CashierFilter selection, Instant beforeTime, UUID beforeId, int limit) {
+        var where = cashierWhere(tenant, cashier, selection); var filter = "";
         if (beforeTime != null) {
-            filter = " AND (authorized_at<? OR (authorized_at=? AND id<?))";
-            args.add(Timestamp.from(beforeTime)); args.add(Timestamp.from(beforeTime)); args.add(beforeId.toString());
+            filter = " AND (p.authorized_at<? OR (p.authorized_at=? AND p.id<?))";
+            where.arguments().add(Timestamp.from(beforeTime)); where.arguments().add(Timestamp.from(beforeTime)); where.arguments().add(beforeId.toString());
         }
-        args.add(limit + 1);
-        return jdbc.query("SELECT * FROM payment_authorization WHERE tenant_id=? AND legal_entity_id IN (" + PaymentPersonnel.ELIGIBLE_ENTITIES + ")"
-                + filter + " ORDER BY authorized_at DESC,id DESC LIMIT ?", row(), args.toArray());
+        where.arguments().add(limit + 1);
+        return jdbc.query("SELECT p.*" + where.sql() + filter + " ORDER BY p.authorized_at DESC,p.id DESC LIMIT ?", row(), where.arguments().toArray());
+    }
+
+    /** 总数与分页共用法人权限及筛选条件，不把上一页游标计入总数。 */
+    public long cashierCount(String tenant, String cashier, CashierFilter selection) {
+        var where = cashierWhere(tenant, cashier, selection);
+        return jdbc.queryForObject("SELECT COUNT(*)" + where.sql(), Long.class, where.arguments().toArray());
+    }
+
+    /** 游标必须仍在同一组筛选结果内，不能借换条件复用旧分页边界。 */
+    public boolean cashierMatches(String tenant, String cashier, CashierFilter selection, UUID id) {
+        var where = cashierWhere(tenant, cashier, selection); where.arguments().add(id.toString());
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1" + where.sql() + " AND p.id=?)", Boolean.class, where.arguments().toArray()));
+    }
+
+    /** 账户选项按稳定内部标识分页，同账户不同资料版本只采用最新已固定命令的脱敏名称。 */
+    public List<PaymentAuthorization> cashierAccounts(String tenant, String cashier, UUID legalEntity, String afterKey, int limit) {
+        var where = cashierWhere(tenant, cashier, new CashierFilter(legalEntity, null)); var after = "";
+        if (afterKey != null) { after = " AND p.debit_account_key>?"; where.arguments().add(afterKey); }
+        where.arguments().add(limit + 1);
+        return jdbc.query("SELECT p.*" + where.sql() + " AND p.debit_account_key IS NOT NULL" + after + " " + """
+                AND NOT EXISTS (SELECT 1 FROM payment_authorization newer
+                    WHERE newer.tenant_id=p.tenant_id AND newer.debit_account_key=p.debit_account_key
+                    AND (newer.authorized_at>p.authorized_at OR (newer.authorized_at=p.authorized_at AND newer.id>p.id)))
+                ORDER BY p.debit_account_key LIMIT ?
+                """, row(), where.arguments().toArray());
+    }
+
+    private static CashierWhere cashierWhere(String tenant, String cashier, CashierFilter selection) {
+        var arguments = new ArrayList<Object>(List.of(tenant, tenant, cashier));
+        var sql = new StringBuilder(" FROM payment_authorization p WHERE p.tenant_id=? AND p.legal_entity_id IN (")
+                .append(PaymentPersonnel.ELIGIBLE_ENTITIES).append(")");
+        if (selection.legalEntityId() != null) { sql.append(" AND p.legal_entity_id=?"); arguments.add(selection.legalEntityId().toString()); }
+        if (CashierFilter.UNASSIGNED.equals(selection.debitAccount())) sql.append(" AND p.debit_account_key IS NULL");
+        else if (selection.debitAccount() != null) { sql.append(" AND p.debit_account_key=?"); arguments.add(selection.debitAccount()); }
+        return new CashierWhere(sql.toString(), arguments);
     }
     /** 业务种类固定取原用途，不接受客户端单独声明。 */
     public static BusinessReference.Type businessType(PaymentCommand.Purpose purpose) { return purpose == PaymentCommand.Purpose.EMPLOYEE_ADVANCE ? BusinessReference.Type.ADVANCE_REQUEST : BusinessReference.Type.EXPENSE; }
@@ -110,6 +145,7 @@ public class JdbcPaymentAuthorizationRepository {
                     || !terms.purpose().name().equals(row.getString("purpose")) || !terms.voucherOperationId().toString().equals(row.getString("voucher_operation_id"))
                     || !kind(terms.purpose()).name().equals(row.getString("voucher_kind")) || !Objects.equals(activeBusiness(value), row.getString("active_business_id"))
                     || !terms.payee().legalEntityId().toString().equals(row.getString("legal_entity_id"))
+                    || !Objects.equals(CashierPaymentAccountKey.of(value), row.getString("debit_account_key"))
                     || value.version() != row.getLong("version") || !value.status().name().equals(row.getString("status"))
                     || !value.decision().authorizedAt().equals(row.getTimestamp("authorized_at").toInstant()) || !value.decision().expiresAt().equals(row.getTimestamp("expires_at").toInstant())
                     || !value.updatedAt().equals(row.getTimestamp("updated_at").toInstant())) throw new IllegalStateException("Persisted payment authorization identity is inconsistent");
@@ -131,4 +167,19 @@ public class JdbcPaymentAuthorizationRepository {
     private static String activeBusiness(PaymentAuthorization value) { return value.status() == PaymentAuthorization.Status.AUTHORIZED || value.status() == PaymentAuthorization.Status.EXECUTION_REGISTERED ? value.terms().binding().businessId().toString() : null; }
     private void append(PaymentAuthorization value) { jdbc.update("INSERT INTO payment_authorization_revision(tenant_id,authorization_id,version,state_json) VALUES(?,?,?,?)", value.terms().tenantId(), value.terms().id().toString(), value.version(), json.write(value)); }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Payment authorization terms or version changed"); }
+
+    /**
+     * 已由工作区入口解析的筛选值，不携带客户端 SQL 或当前账户目录。
+     * @author owlzhangfq@gmail.com
+     */
+    public record CashierFilter(UUID legalEntityId, String debitAccount) {
+        public static final String UNASSIGNED = "UNASSIGNED";
+        public static final CashierFilter ALL = new CashierFilter(null, null);
+    }
+
+    /**
+     * 列表、总数及游标共享同一参数化范围。
+     * @author owlzhangfq@gmail.com
+     */
+    private record CashierWhere(String sql, List<Object> arguments) { }
 }

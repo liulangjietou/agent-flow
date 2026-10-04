@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-04T08:24:30.761343+00:00",
+  "taskId": "F16",
+  "status": "LEGAL_ENTITY_AND_ACCOUNT_SCOPE_GATES_PASSED_PACKAGED_RUNTIME_AND_DATE_RULE_PENDING",
+  "baseCommit": "d0b3121c70b3e754198532318e2d94956152e739",
+  "branch": "codex/governance-identifier-integration",
+  "remainingTaskCount": 34,
+  "scope": [
+    "Employee advance and expense cashier legal-entity and registered debit-account filters, current personnel scope, shared count and cursor conditions.",
+    "V114 derives account keys from persisted commands without rewriting historical snapshots; nonempty V113 upgrade verified in isolated H2 tests.",
+    "Actual compiled Vue template tested with a custom renderer: filter controls, timeouts, late-response isolation, identity changes, pagination and disabled state."
+  ],
+  "java": {
+    "exitCode": 0,
+    "uniqueCases": 85,
+    "newCases": 7,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "summary": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-filters-test-summary.json",
+    "countingNote": "PaymentOperationIntegrationTest XML declares tests=0 but includes 63 successful testcase elements. Distinct classname/name pairs and Maven aggregate both confirm 85 cases."
+  },
+  "frontend": {
+    "exitCode": 0,
+    "uniqueCases": 80,
+    "newCases": 10,
+    "failures": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-ui-focused-runner.log",
+    "typesExitCode": 0,
+    "buildExitCode": 0,
+    "buildWarning": "Bundle exceeds the 500 kB warning threshold; build completed successfully."
+  },
+  "openapi": {
+    "exitCode": 0,
+    "operations": 385,
+    "schemas": 814,
+    "requestExamples": 129
+  },
+  "priorRuns": [
+    {
+      "result": "UI fixture failure",
+      "finding": "Root component props mutation did not propagate. An independent Vue probe confirmed the reactive-parent fixture required; no product behavior changed for that failure.",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-ui-first.log"
+    },
+    {
+      "result": "Type check failure",
+      "finding": "Object.hasOwn and Array.at were not supported by the configured library target; replaced with equivalent compatible operations.",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-ui-types.log"
+    }
+  ],
+  "sourceManifest": [
+    {
+      "path": "agentflow-server/src/main/java/db/migration/V114__Index_cashier_payment_account.java",
+      "sha256": "7d1d2bfb3027a2864d70826420ff318b2258d3884c708287120a615a01f35401"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentAccountKey.java",
+      "sha256": "9ec317e47320a0077a98fef6cf2d12777f5b0661a79003fdb8db8496812acbf3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentController.java",
+      "sha256": "55dd076b01fb081fc9bfbc3f11a05e06449f2614fded626d2d9fe78f209ff635"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java",
+      "sha256": "03a8d13a0f47f276841e8a85316b590fc912dad2b40ae07ee6c4bf1dfe14644d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/JdbcPaymentAuthorizationRepository.java",
+      "sha256": "383eb09e50f40ae1f290c0f17b5abc3e8b0ee799ba6edad6ce18d5be9932ebc9"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentPersonnel.java",
+      "sha256": "c9c40497b98ee8f9617b39d8e41a5219f0c32ce575fea5973012906ebebfe002"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "54f23b819b96abb8643543930473abc0a4150d48cf498e0462100575c6baa3c8"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/finance/CashierPaymentFiltersTest.java",
+      "sha256": "22dca5dde0e3cee4bb8943be571a04ae8cca686b01d703601efaa897a3f99ae0"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/finance/PaymentPersistenceTest.java",
+      "sha256": "d585caf373b509f9b618c484a5ec662511b9434a0c845d39b08d9261a93e46d5"
+    },
+    {
+      "path": "agentflow-web/scripts/check-openapi.mjs",
+      "sha256": "1efb774b59860a4704e2adbbcf5cecf4f7623df4717919e53d34967fd3ec85d4"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "71dc5ee2f0cd4f3dd805d21c3978e6fcb58bcb295479ec46230e43c8487d0b8e"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "55ea853e81b496eeab795519b898a05a8ae9734605f0ec4a3d9eb2bff275e61d"
+    },
+    {
+      "path": "agentflow-web/src/cashierFilters.ts",
+      "sha256": "ab5edace7f4cd1269a98ed19a5763546dafc4318980dbc9310d9b6b2127f7db5"
+    },
+    {
+      "path": "agentflow-web/src/components/CashierWorkspace.vue",
+      "sha256": "5cd4ccf3fd48785246966f6148fe2a8a7a9882235639200187e85d96362e5c22"
+    },
+    {
+      "path": "agentflow-web/src/payments.ts",
+      "sha256": "7e70af8b2a580b5ae4688d14a9b7e6962fd38315eee595566450384da977eaaa"
+    },
+    {
+      "path": "agentflow-web/tests/cashier-filters.test.mjs",
+      "sha256": "20c5400dacff7248343bfbf7014854a7d0f9ab275abca79720aa9717211d5871"
+    },
+    {
+      "path": "agentflow-web/tests/payments.test.mjs",
+      "sha256": "b3411ce9c1121cd930b84020bf4ce9b01338b67f84dea6ba3e11c6b9d50bcd0f"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-filters-first.log",
+      "sha256": "48ede8f2f5cc53c633d6b17c731624067930b6977b9f49dedb1450c9bbf7bad9"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-filters-test-summary.json",
+      "sha256": "fd15f42c9e2e1d811cf05b81d77b1873015ed80ad713ddabedba741294772b63"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-ui-first.log",
+      "sha256": "f31d0a33bc08092a8aaf1906be3f440f00552439e23bcf0e7bbf309593d49bea"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-ui-fixture-probe.log",
+      "sha256": "237293eadfa72a3c3d7ea345cc8df4825738e570515546f0c9347b2c2b040926"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-ui-types.log",
+      "sha256": "f05ca389020fa63643958c79350856fd01889a52cdbf5a3ab768d2985eca8ab7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-ui-final.log",
+      "sha256": "fb1f71a7d0cc6649edd64a4dd077d6e0373cdfb416743057141f95f412a8ce1f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-ui-focused-runner.log",
+      "sha256": "43f0c47085f54752fbb8b6f7c5035b7df1503f0cda412e6f6fe4a11679ef905b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-ui-types-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-ui-build.log",
+      "sha256": "4caab22651afc72c6a8582bc3905268c0e6f136720e7b9dae9ce20f8efe63ad0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f16-cashier-openapi-final.log",
+      "sha256": "5468aa3b00694e82bde9284178590984bd3818b0acb25088aa6e9f3798cd7f94"
+    }
+  ],
+  "limits": [
+    "F16 remains OPEN. Due-date source, owner and historical behavior have a pending business question; no due-date fields or authorization expiry rules were changed.",
+    "No packaged financial HTTP journey, fixed-package upgrade/restart or independent restore acceptance has been performed for F16.",
+    "Custom Vue renderer and H2 tests do not provide browser or PostgreSQL acceptance. Existing environment restrictions were not retried or bypassed.",
+    "No push, pull request, CI or enterprise integration acceptance is claimed."
+  ]
+}

@@ -22784,8 +22784,8 @@
         "tags": [
           "凭证与结算"
         ],
-        "summary": "按当前法人列出付款",
-        "description": "数据库先按当前有效任职筛选，再按授权时间和编号分页；beforeId 也必须在当前范围内。",
+        "summary": "按当前法人及已固定出款账户筛选付款",
+        "description": "数据库先按当前有效任职和筛选条件过滤，再按授权时间和编号分页；总数不含游标限制，beforeId 必须属于同一筛选。账户以已固定付款命令为准，不包含尚未完成复查的选择。",
         "x-access": "明确 CASHIER 角色 + 当前法人有效任职；ADMIN 或 FINANCE 不隐含出纳角色",
         "x-idempotency": false,
         "responses": {
@@ -22890,6 +22890,35 @@
               "type": "string",
               "format": "uuid"
             }
+          },
+          {
+            "name": "legalEntityId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "debitAccount",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "UNASSIGNED"
+                  ]
+                }
+              ]
+            },
+            "description": "省略为全部；UNASSIGNED 为未固定出款账户；否则使用受控选项返回的内部筛选键。"
           }
         ]
       }
@@ -51400,6 +51429,131 @@
           }
         }
       }
+    },
+    "/api/v1/cashier/payments/filter-options": {
+      "get": {
+        "operationId": "cashierPaymentFilterOptions",
+        "tags": [
+          "凭证与结算"
+        ],
+        "summary": "读取当前法人及历史已固定出款账户筛选项",
+        "description": "当前任职法人及历史脱敏账户；账户独立分页。同一账户的资料版本合并，资金目标、法人或币种不同则分别显示。不读取外部资金目录，不返回原账户引用。",
+        "x-access": "明确 CASHIER 角色 + 当前法人有效任职；ADMIN 或 FINANCE 不隐含出纳角色",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "当前权限范围内的最小付款视图",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CashierPaymentFilterOptions"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "原批准、账户、凭证、职责分离或状态不再符合付款规则",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "账户目录或资金系统不可用；不得使用默认账户或把读取失败视为付款失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "legalEntityId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "afterAccountKey",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -66951,7 +67105,8 @@
         "additionalProperties": false,
         "required": [
           "payment",
-          "actions"
+          "actions",
+          "debitAccount"
         ],
         "properties": {
           "payment": {
@@ -66959,6 +67114,16 @@
           },
           "actions": {
             "$ref": "#/components/schemas/CashierPaymentActions"
+          },
+          "debitAccount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CashierPaymentAccountOption"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -66967,7 +67132,8 @@
         "additionalProperties": false,
         "required": [
           "items",
-          "nextBeforeId"
+          "nextBeforeId",
+          "totalCount"
         ],
         "properties": {
           "items": {
@@ -66987,6 +67153,12 @@
                 "type": "null"
               }
             ]
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "当前法人权限及同一筛选条件下的总数，不含分页游标限制。"
           }
         }
       },
@@ -91337,6 +91509,93 @@
           }
         },
         "description": "服务间原始 JSON 字节信封。严禁缺失字段、未知字段、重复键、尾随 JSON、数值枚举或标量强制转换；不得自行改用页面 DTO 的版本字符串。"
+      },
+      "CashierPaymentAccountOption": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "legalEntityId",
+          "currency",
+          "displayName",
+          "maskedAccount"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "legalEntityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maskedAccount": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^(?=.*(?:\\*{2,}|•{2,}|[xX]{2,}))(?!.*[0-9]{5})(?=(?:[^0-9]*[0-9]){0,8}[^0-9]*$)[0-9*•xX -]+$"
+          }
+        }
+      },
+      "CashierPaymentFilterOptions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "legalEntities",
+          "accounts",
+          "nextAfterAccountKey"
+        ],
+        "properties": {
+          "legalEntities": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "name"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "accounts": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/CashierPaymentAccountOption"
+            }
+          },
+          "nextAfterAccountKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       }
     }
   }

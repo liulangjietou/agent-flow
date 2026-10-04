@@ -35,6 +35,11 @@ public class CashierPaymentController {
     public ResponseEntity<CashierPaymentWorkspace.Page> list(@RequestParam Map<String, String> parameters) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(workspace.list(parameters));
     }
+    /** 当前任职法人及历史已固定账户均从受控事实读取，响应不含原始账户引用。 */
+    @GetMapping("/filter-options")
+    public ResponseEntity<CashierPaymentWorkspace.FilterOptions> filterOptions(@RequestParam Map<String, String> parameters) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(workspace.filterOptions(parameters));
+    }
     /** 不返回付款命令、完整账号或完整申请。 */
     @GetMapping("/{id}")
     public ResponseEntity<CashierPaymentWorkspace.View> get(@PathVariable UUID id) {

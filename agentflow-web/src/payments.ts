@@ -29,8 +29,11 @@ export interface PaymentDisputeView {
 export interface PaymentDisputeInput { authorizationVersion: number; operationVersion: number; outcome: 'SUCCEEDED' | 'FAILED' | 'REVERSED'; evidenceReference: string; comment: string }
 export interface PaymentDisputeReceipt { applicationId: string; authorizationId: string; resolutionId: string; operationVersion: number; outcome: PaymentDisputeInput['outcome']; auditEventId: string }
 export interface FinancePaymentView extends PaymentBinding { voucherOperationId: string | null; voucherVersion: number | null; payable: Money | null; payment: PaymentView | null; payeeReview: PayeeReview | null; dispute: PaymentDisputeView | null; actions: { authorize: boolean; voidAuthorization: boolean; query: boolean; retire: boolean; reviewAccount: boolean; authorizeReviewed: boolean } }
-export interface CashierPaymentView { payment: PaymentView; actions: { execute: boolean; query: boolean; resendOriginal: boolean } }
-export interface CashierPaymentPage { items: CashierPaymentView[]; nextBeforeId: string | null }
+export interface CashierAccountOption { key: string; legalEntityId: string; currency: string; displayName: string; maskedAccount: string }
+export interface CashierPaymentFilter { legalEntityId?: string; debitAccount?: string }
+export interface CashierFilterOptions { legalEntities: { id: string; name: string }[]; accounts: CashierAccountOption[]; nextAfterAccountKey: string | null }
+export interface CashierPaymentView { payment: PaymentView; actions: { execute: boolean; query: boolean; resendOriginal: boolean }; debitAccount: CashierAccountOption | null }
+export interface CashierPaymentPage { items: CashierPaymentView[]; nextBeforeId: string | null; totalCount: number }
 export interface DebitAccount { reference: string; displayName: string; maskedAccount: string; currency: string; sourceVersion: string }
 export interface PaymentAccounts { authorizationId: string; authorizationVersion: number; validUntil: string; items: DebitAccount[] }
 export interface PaymentAuthorizationInput { roundNo: number; applicationVersion: number; businessVersion: number; voucherOperationId: string; voucherVersion: number; validitySeconds: number; comment: string; payeeReviewId?: string; payeeReviewVersion?: number }

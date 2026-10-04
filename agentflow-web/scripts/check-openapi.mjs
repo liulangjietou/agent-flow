@@ -34,6 +34,16 @@ assert.equal(validator({ $ref: '#/components/schemas/SignatureReceipt' })({ ...s
 assert.equal(validator({ $ref: '#/components/schemas/SignatureReceipt' })({ ...signatureReceipt, providerAccount: 'private' }), false)
 validate({ $ref: '#/components/schemas/SignatureCancelInput' }, { expectedVersion: '1' })
 assert.equal(validator({ $ref: '#/components/schemas/SignatureCancelInput' })({ expectedVersion: 1 }), false)
+// 出纳总数属于同条件结果；账户选项只公开内部筛选键及历史脱敏展示。
+validate({ $ref: '#/components/schemas/CashierPaymentPage' }, { items: [], nextBeforeId: null, totalCount: 0 })
+assert.equal(validator({ $ref: '#/components/schemas/CashierPaymentPage' })({ items: [], nextBeforeId: null }), false)
+assert.equal(validator({ $ref: '#/components/schemas/CashierPaymentPage' })({ items: [], nextBeforeId: null, totalCount: -1 }), false)
+const cashierAccount = { key: 'a'.repeat(64), legalEntityId: signatureReceipt.id, currency: 'CNY', displayName: '基本户', maskedAccount: '****5678' }
+validate({ $ref: '#/components/schemas/CashierPaymentAccountOption' }, cashierAccount)
+assert.equal(validator({ $ref: '#/components/schemas/CashierPaymentAccountOption' })({ ...cashierAccount, reference: 'private-account' }), false)
+assert.equal(validator({ $ref: '#/components/schemas/CashierPaymentAccountOption' })({ ...cashierAccount, maskedAccount: '1234567890123456' }), false)
+validate({ $ref: '#/components/schemas/CashierPaymentFilterOptions' }, { legalEntities: [], accounts: [], nextAfterAccountKey: null })
+assert.deepEqual(spec.paths['/api/v1/cashier/payments'].get.parameters.map(parameter => parameter.name), ['limit', 'beforeId', 'legalEntityId', 'debitAccount'])
 // 组织启用后动态规则尚未解析本轮任职；静态目录仍须具有实际可用成员。
 const assigneeSchema = { $ref: '#/components/schemas/AssigneeOption' }
 validate(assigneeSchema, { rule: 'role:ORG_SUPERVISOR_1', label: '本次任职一级主管', memberCount: 0, contextual: true })

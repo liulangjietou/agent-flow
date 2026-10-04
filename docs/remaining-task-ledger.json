@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T07:58:38.044538+00:00",
+  "recordedAt": "2026-10-04T08:24:30.761343+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1828,7 +1828,7 @@
           ]
         }
       ],
-      "observed": "CashierPaymentWorkspace.list 只接受 limit、beforeId，支付条款也没有付款到期日；选支付账户和批次逐笔检查已经存在。",
+      "observed": "法人和已固定出款账户筛选、同条件总数、分页游标权限及 V114 派生索引已实现，85 条 Java 与 80 条前端用例、类型、构建和契约检查通过；固定包财务运行及升级恢复尚未验收，付款到期日来源规则待答复，F16 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java",
@@ -1841,10 +1841,26 @@
         {
           "path": "docs/payment-workspace.md",
           "line": 1
+        },
+        {
+          "path": "docs/cashier-payment-filters.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/cashier-payment-filters-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "定义可信付款到期事实并接入筛选/排序；法人和实际支付账户筛选与总数、分页一致；保持逐笔复核及当前权限；不能把借款归还日当付款到期日。",
-      "dependsOn": []
+      "dependsOn": [],
+      "progress": {
+        "recordedAt": "2026-10-04T08:24:30.761343+00:00",
+        "status": "LEGAL_ENTITY_AND_ACCOUNT_SCOPE_GATES_PASSED_PACKAGED_RUNTIME_AND_DATE_RULE_PENDING",
+        "baseCommit": "d0b3121c70b3e754198532318e2d94956152e739",
+        "evidence": "docs/evidence/cashier-payment-filters-20261004.json",
+        "dateQuestionPending": true,
+        "packagedRuntimePending": true
+      }
     },
     {
       "id": "F17",
@@ -3827,12 +3843,11 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "I02",
-    "status": "FIXED_PACKAGE_LOCAL_H2_AND_SHARED_OIDC_RUNTIME_VERIFIED_BROWSER_AND_POSTGRES_PENDING",
-    "recordedAt": "2026-10-04T07:58:38.044538+00:00",
-    "sourceCommit": "f44e21cf71daeea93ab9a1baac958c49e3c247d7",
-    "implementationCommit": "f44e21cf71daeea93ab9a1baac958c49e3c247d7",
-    "evidence": "docs/evidence/electronic-signature-runtime-20261004.json",
+    "taskId": "F16",
+    "status": "LEGAL_ENTITY_AND_ACCOUNT_SCOPE_GATES_PASSED_PACKAGED_RUNTIME_AND_DATE_RULE_PENDING",
+    "recordedAt": "2026-10-04T08:24:30.761343+00:00",
+    "baseCommit": "d0b3121c70b3e754198532318e2d94956152e739",
+    "evidence": "docs/evidence/cashier-payment-filters-20261004.json",
     "knownOpenTaskCount": 34
   }
 }

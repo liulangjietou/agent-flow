@@ -33,8 +33,18 @@ public class PaymentPersonnel {
     public List<UUID> legalEntities(String tenant, String user) {
         return jdbc.query("SELECT DISTINCT id FROM (" + ELIGIBLE_ENTITIES + ") eligible_entities", (row, index) -> UUID.fromString(row.getString("id")), tenant, user);
     }
+    /** 筛选只展示当前有效任职法人名称，不向出纳公开完整组织目录。 */
+    public List<LegalEntity> legalEntityOptions(String tenant, String user) {
+        return jdbc.query("SELECT id,name FROM organization_unit WHERE tenant_id=? AND id IN (" + ELIGIBLE_ENTITIES + ") ORDER BY name,id",
+                (row, index) -> new LegalEntity(UUID.fromString(row.getString("id")), row.getString("name")), tenant, tenant, user);
+    }
     /** 后台在领取和发送登记时重读当前组织，停用或结束任职后阻止新发送。 */
     public void requireEligible(String tenant, String user, UUID legalEntityId) {
         if (!eligible(tenant, user, legalEntityId)) throw new DomainException("PAYMENT_ACTOR_UNAVAILABLE", "Payment actor must have an active appointment in the original legal entity");
     }
+    /**
+     * 当前出纳可用的法人筛选项。
+     * @author owlzhangfq@gmail.com
+     */
+    public record LegalEntity(UUID id, String name) { }
 }

@@ -13,7 +13,7 @@ const clone = value => JSON.parse(JSON.stringify(value)), settle = () => new Pro
 const binding = () => ({ applicationId: 'app', businessId: 'report', roundNo: 1, applicationVersion: 9, businessVersion: 3 })
 const payment = () => ({ ...binding(), id: 'authorization', version: 1, status: 'AUTHORIZED', purpose: 'EXPENSE_REIMBURSEMENT', legalEntityId: 'entity', employeeId: 'alice', amount: { value: '100.00', currency: 'CNY' }, maskedPayeeAccount: '****1234', authorizedBy: 'finance', authorizedAt: new Date(Date.now() - 60000).toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString(), executedBy: null, request: null, operation: null, retirement: null })
 const finance = () => ({ ...binding(), voucherOperationId: 'voucher', voucherVersion: 3, payable: { value: '100.00', currency: 'CNY' }, payment: null, payeeReview: null, dispute: null, actions: { authorize: true, voidAuthorization: false, query: false, retire: false, reviewAccount: false, authorizeReviewed: false } })
-const cashier = () => ({ payment: payment(), actions: { execute: true, query: false, resendOriginal: false } })
+const cashier = () => ({ payment: payment(), actions: { execute: true, query: false, resendOriginal: false }, debitAccount: null })
 const accounts = () => ({ authorizationId: 'authorization', authorizationVersion: 1, validUntil: new Date(Date.now() + 60000).toISOString(), items: [{ reference: 'debit-1', displayName: '基本户', maskedAccount: '****4567', currency: 'CNY', sourceVersion: 'v1' }] })
 const operation = () => ({ version: 4, status: 'UNKNOWN', updatedAt: new Date().toISOString(), observedStatus: null, paymentReference: null, receiptReference: null, completedAt: null, disputed: false, issue: 'CONNECTION' })
 const disputedFinance = () => {
@@ -172,13 +172,14 @@ test('旧身份的付款详情和写入回执都不能改写新身份面板', as
 })
 
 test('目录分页受当前身份和响应序列约束，重复条目不能无限追加', async () => {
+  api.cashierPaymentFilterOptions = async () => ({ legalEntities: [], accounts: [], nextAfterAccountKey: null })
   const calls = []; api.cashierPayments = (before, signal) => new Promise(resolve => calls.push({ before, signal, resolve }))
   const p = mount(Workspace, { refreshVersion: 1 })
   try {
-    p.props.scopeKey = 'new-cashier'; calls[0].resolve({ items: [cashier()], nextBeforeId: null }); await settle(); assert.equal(p.state.items.length, 0)
-    calls[1].resolve({ items: [cashier()], nextBeforeId: 'authorization' }); await settle(); assert.equal(p.state.items.length, 1)
-    const more = p.state.load(true); calls[2].resolve({ items: [cashier()], nextBeforeId: null }); await more
-    assert.match(p.state.error, /列表发生变化/); assert.equal(p.state.items.length, 1)
+    p.props.scopeKey = 'new-cashier'; calls[0].resolve({ items: [cashier()], nextBeforeId: null, totalCount: 2 }); await settle(); assert.equal(p.state.items.length, 0)
+    calls[1].resolve({ items: [cashier()], nextBeforeId: 'authorization', totalCount: 2 }); await settle(); assert.equal(p.state.items.length, 1)
+    const more = p.state.load(true); calls[2].resolve({ items: [cashier()], nextBeforeId: null, totalCount: 2 }); await more
+    assert.match(p.state.error, /列表发生变化/); assert.equal(p.state.items.length, 0)
   } finally { p.close() }
 })
 
