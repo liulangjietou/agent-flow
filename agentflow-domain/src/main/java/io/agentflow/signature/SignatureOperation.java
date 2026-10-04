@@ -214,7 +214,7 @@ public record SignatureOperation(Input input, long version, Status status, int a
      */
     public enum Failure { NOT_CONFIGURED, TARGET_CHANGED, OPERATION_DISABLED, TIMEOUT, CONNECTION, AUTHENTICATION,
         REMOTE_FAILURE, INVALID_RESPONSE, RESPONSE_TOO_LARGE, STALE_RESPONSE, CONFLICTING_RECEIPT, NOT_FOUND,
-        ARTIFACT_MISMATCH, LEASE_EXPIRED, INTERNAL_ERROR }
+        ARTIFACT_MISMATCH, LEASE_EXPIRED, AUTHORIZATION_EXPIRED, SOURCE_UNAVAILABLE, STORAGE_UNAVAILABLE, INTERNAL_ERROR }
 
     private static DomainException invalid() { return new DomainException("INVALID_SIGNATURE_OPERATION", "Signature operation state, authorization and artifacts must be consistent"); }
     private static DomainException conflict() { return new DomainException("SIGNATURE_OPERATION_CONFLICT", "Signature operation is no longer executable with this claim"); }
