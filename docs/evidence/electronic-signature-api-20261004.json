@@ -1,0 +1,700 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-04T07:06:24.019426+00:00",
+  "taskId": "I02",
+  "status": "PUBLIC_API_AND_VERIFIED_CALLBACK_SCOPE_PASSED_UI_AND_PACKAGED_ACCEPTANCE_REMAIN",
+  "implementationCommit": "ad96a6e6acfcc61415e1dca2e13d1c57809d899d",
+  "branch": "codex/governance-identifier-integration",
+  "remainingTaskCount": 34,
+  "implementation": [
+    "Six user operations cover profile choices, round-scoped pages, explicit authorization, current detail, unsent cancellation and integrity-checked independent result downloads.",
+    "Minimal successful idempotent receipts recheck current original-file permissions before cache access; a prior success survives later source-version change or unavailable physical storage.",
+    "Browser versions require JSON text and rounds require JSON integers; no implicit scalar coercion can select a different source.",
+    "One exact POST callback bypasses user-session authentication and CSRF but requires bounded raw Ed25519 receipt verification bound to the original tenant, operation, profile and target.",
+    "Callback state, reserved files, evidence and audit share the worker lock order and transaction; concurrent duplicates are stable and old worker claims cannot overwrite accepted facts.",
+    "Disabled exact profiles remain usable for existing receipts; removed or replaced profiles require previously stored, reverified evidence to recover the original key.",
+    "Public responses omit provider accounts, tokens, targets, raw receipts, authentication references and internal content identities; current sensitive-file restrictions apply to administrators."
+  ],
+  "tests": {
+    "uniqueJavaCases": 314,
+    "newRiskFocusedCases": 20,
+    "regressionCases": 294,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "classes": {
+      "SignatureReceiptTest": 9,
+      "SignatureRequestTest": 9,
+      "SignatureOperationTest": 17,
+      "SignatureDatabaseRecoveryTest": 1,
+      "SignatureReceiptVerifierTest": 31,
+      "SignatureLoginMigrationTest": 1,
+      "SignaturePersistenceTest": 32,
+      "SignatureMigrationTest": 1,
+      "SignatureWorkerIntegrationTest": 15,
+      "SignatureApiIntegrationTest": 9,
+      "SignatureEvidencePersistenceTest": 15,
+      "SignatureAccessTest": 6,
+      "HttpSignatureGatewayTest": 39,
+      "SignatureHttpRecoveryTest": 1,
+      "SignatureSerializationTest": 3,
+      "SignatureProfileTest": 11,
+      "SignatureCallbackVerifierTest": 8,
+      "SignatureGatewayConfigurationTest": 15,
+      "OidcLogoutScopesTest": 2,
+      "DeferredActorAuthenticationTest": 7,
+      "OidcIdentityPolicyTest": 11,
+      "OidcAuthenticationIntegrationTest": 18,
+      "LocalAttachmentStoreTest": 4,
+      "AttachmentIntegrationTest": 9,
+      "OpenApiContractTest": 7,
+      "IdempotencyIntegrationTest": 30,
+      "FieldPermissionsIntegrationTest": 3
+    },
+    "counting": "Only the complete final run is counted. Earlier failed runs and historical results are not added.",
+    "firstExecutableRun": {
+      "log": "i02-api-test.log",
+      "exitCode": 1,
+      "unique": 312,
+      "failures": 1,
+      "errors": 0,
+      "cause": "Fixture error: MockHttpServletRequest replaces Content-Type instead of preserving a second header. The standalone probe confirms 1 value; the test now supplies a two-value Servlet enumeration. Not a product defect."
+    },
+    "productRed": {
+      "log": "i02-api-input-red.log",
+      "exitCode": 1,
+      "unique": 10,
+      "failures": 2,
+      "errors": 0,
+      "previousGap": "Existing invalid-version cases covered strings, not Jackson scalar coercion.",
+      "reproductions": [
+        "Numeric expectedVersion returned 201 instead of 400.",
+        "Fractional roundNo returned 201 instead of 400."
+      ],
+      "rootCause": "Default JSON binding coerced numeric tokens into text versions and truncated a fractional round into an integer before domain validation.",
+      "fix": "Signature HTTP DTOs use local token-checked text and integer deserializers; global JSON behavior and domain models remain unchanged."
+    },
+    "finalRun": {
+      "log": "i02-api-final.log",
+      "exitCode": 0
+    }
+  },
+  "authorGate": {
+    "javaFiles": 1723,
+    "namedTypes": 3400,
+    "missingAuthorTags": 0,
+    "parseErrors": 0
+  },
+  "openApi": {
+    "paths": 342,
+    "operations": 384,
+    "newOperations": 7,
+    "exactSpringRouteAndRequestFieldContractPassed": true
+  },
+  "validatedScenarios": [
+    "MockMvc through the actual authentication chain, real definition publication, original upload, approval, explicit signing authorization, signed callback, separate stored result and byte-identical original.",
+    "Permission revocation blocks idempotent replays; administrator cannot inspect or download sensitive originals/results; hidden pages retain a usable cursor without returning hidden file metadata.",
+    "Queued callback rejected; duplicate and older revisions acknowledged without overwriting facts; conflicting revision rejected; invalid signature leaves state unchanged.",
+    "Two concurrent identical callbacks commit one operation revision, one evidence entry and exactly one reservation per original; invalid proof rolls all state, files, history and audit back.",
+    "OIDC exact callback requires receipt authentication; adjacent paths and ordinary writes retain CSRF. The full positive OIDC signing journey is not claimed.",
+    "Callback duplicate headers, unknown-length size limit, UTF-8/media type, original key retention and storage-error classification are tested."
+  ],
+  "limits": [
+    "No signing UI has been implemented or accepted yet.",
+    "MockMvc user journeys are not browser or packaged live-HTTP acceptance.",
+    "Positive signing under actual JDBC-shared OIDC sessions, packaged process crash/restart and paired backup/restore remain to be exercised as a complete journey.",
+    "Browser administrator-policy and PostgreSQL image-I/O blockers remain; no bypass attempted.",
+    "Actual supplier identity, embedded PDF/OFD signatures, certificate chain and trusted timestamp acceptance remain E10.",
+    "No main runtime replacement, remote push, PR or CI; delivery remains behind V02."
+  ],
+  "evidenceArchive": "/fyoung/tmp/agentflow-remaining-20260928/i02-api-evidence-20261004",
+  "archiveManifest": {
+    "files": [
+      {
+        "path": "SignatureHeaderProbe.java",
+        "bytes": 592,
+        "sha256": "e82a2ec2672777a35b3a34e60193364f7611fb8397c97d9942b05bfd265d57bd"
+      },
+      {
+        "path": "i02-api-authors.log",
+        "bytes": 73,
+        "sha256": "332fd2d5cfc91b3ea3181987a7e8e555c4c7dad8b3f1d71379de059fd4fec36c"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.api.OpenApiContractTest.xml",
+        "bytes": 75101,
+        "sha256": "7f6020f7bcc67304d6ea04831edd8623326cff0d4d4f7fd5267601e53188c106"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.approval.FieldPermissionsIntegrationTest.xml",
+        "bytes": 74738,
+        "sha256": "9916584f539f2f34a9c7a4b8d7a2b2276538c5f27300fbd94944d8b6b354c1dc"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.approval.IdempotencyIntegrationTest.xml",
+        "bytes": 78856,
+        "sha256": "bd765d932a703e3e1f39443e216d93ddc5441b1d148c3f6e04fba938b70dbecf"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.attachment.AttachmentIntegrationTest.xml",
+        "bytes": 75605,
+        "sha256": "6e01d0e9be90f25f3a38d0bede609879fdf766883942694dbc1acb277f063f85"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.attachment.LocalAttachmentStoreTest.xml",
+        "bytes": 56972,
+        "sha256": "e0833cad58d5f10468a5571eae7db67f1f724d00883fa84110dd6e275109efd2"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.auth.DeferredActorAuthenticationTest.xml",
+        "bytes": 86052,
+        "sha256": "db72108bec636d3cb212068acdaf2391ed8d35d06ca86f150815fefbc0b98853"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.auth.OidcAuthenticationIntegrationTest.xml",
+        "bytes": 77019,
+        "sha256": "890ed0a839ae996f1d9a3cbb8d4ed6137f829ca0b1d3030d3f28334dc4e529e9"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.auth.OidcIdentityPolicyTest.xml",
+        "bytes": 44749,
+        "sha256": "0f070cff6139b7d789a26606d226d0a10efeeb077961b91978bcd636fce93af6"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.auth.OidcLogoutScopesTest.xml",
+        "bytes": 68247,
+        "sha256": "595e500fd74ca445a51e1e166a83f7747d8dbdad14329260d2a5599cbd54fed0"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.HttpSignatureGatewayTest.xml",
+        "bytes": 49691,
+        "sha256": "64f1a1aeedb4dd23691d7566db7e33b28a2aba51606bf92fdc8059f21c4294b2"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureAccessTest.xml",
+        "bytes": 44253,
+        "sha256": "2310d17a2a7bc0d4b8889d2248519ab0492ecc7adf7727f53118eafb3e9db572"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureApiIntegrationTest.xml",
+        "bytes": 75676,
+        "sha256": "a0507a21664d00e1bf40b2a3a5413714d8497e5b2483253434e0e746e2729a13"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureCallbackVerifierTest.xml",
+        "bytes": 44628,
+        "sha256": "eaf72ea32e7a7bb683546006c19ec2b6f8a744894933341a10880da0b69ce6bb"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureDatabaseRecoveryTest.xml",
+        "bytes": 60987,
+        "sha256": "3224fd2e5701e6998ccf4701d370175e2747959184db9b69052a891024242e2b"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureEvidencePersistenceTest.xml",
+        "bytes": 423134,
+        "sha256": "e34849cc8ef307dae039d4cd773c8c7d0c2aeae9968c628913274231dcabc8ab"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureGatewayConfigurationTest.xml",
+        "bytes": 45727,
+        "sha256": "d4bb988334a0d251bf0cc4afcb99f06d176599ff2dc1906cb47b42c2a817b9f5"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureHttpRecoveryTest.xml",
+        "bytes": 67644,
+        "sha256": "c50ad7c444c603c1375ec8b01339e49b028d54bfc91f26f645fd1897dc79a51a"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureLoginMigrationTest.xml",
+        "bytes": 62342,
+        "sha256": "16bff4241e5fbaaa88c7af63a678182668145b0080b80d50f9f44154e1d7da25"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureMigrationTest.xml",
+        "bytes": 61828,
+        "sha256": "afe318504e0687c92235b28f11d3fba6b48efa2a7491b41831f6e918c98e4394"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureOperationTest.xml",
+        "bytes": 12999,
+        "sha256": "5da09dffc4768c03481e29b751d0831a24159f6e907500fb170ce768ef349c8e"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignaturePersistenceTest.xml",
+        "bytes": 590673,
+        "sha256": "c64bb8b983e561eeb555c98ae4f83383824076a2e1b5082708373e09559cd71d"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureProfileTest.xml",
+        "bytes": 44826,
+        "sha256": "573a17434e25d6d1943c9518c8bab97cf63d7f3aa249d7b573251f9156ccd89a"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureReceiptTest.xml",
+        "bytes": 11592,
+        "sha256": "f6359bc84464ffa821700e918e307c4ad4d47711467004fc66608dad14b47022"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureReceiptVerifierTest.xml",
+        "bytes": 48167,
+        "sha256": "7fb4d8445cbb1108dd9f8b5a398c320725cfb52de39bb7a77a8c26a5db16db8f"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureRequestTest.xml",
+        "bytes": 11560,
+        "sha256": "3f7dad5b24ed85b820e5886c86790ea9263a769847d07661a5a657f9498bc6de"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureSerializationTest.xml",
+        "bytes": 43787,
+        "sha256": "de889983334cf0c1ca5fdbba9b7d9b7441086e125f8627c0963dd454f72472b0"
+      },
+      {
+        "path": "i02-api-final-reports/TEST-io.agentflow.signature.SignatureWorkerIntegrationTest.xml",
+        "bytes": 304285,
+        "sha256": "133ef472bda643b93225ae74a54489afd2f6dd24570972a7d51b1bfcf8adb612"
+      },
+      {
+        "path": "i02-api-final-summary.json",
+        "bytes": 67268,
+        "sha256": "b0dd225c6033e5295173122953b4b8857f21dc7855e866121b1f41c483242f05"
+      },
+      {
+        "path": "i02-api-final.log",
+        "bytes": 1539430,
+        "sha256": "c29312e545b00afff686367a374784238108a74fdde18438317a06930c504c72"
+      },
+      {
+        "path": "i02-api-header-probe.log",
+        "bytes": 136,
+        "sha256": "bd23bab293f71ae4be579a739750220364dd6dd594e4b76ccfbff965c74bea1f"
+      },
+      {
+        "path": "i02-api-input-red-reports/TEST-io.agentflow.signature.SignatureApiIntegrationTest.xml",
+        "bytes": 104595,
+        "sha256": "d402d86efe52b1348116f505fea16f832ccb66afe384773a4feeddf230111a64"
+      },
+      {
+        "path": "i02-api-input-red-reports/TEST-io.agentflow.signature.SignatureCallbackVerifierTest.xml",
+        "bytes": 44541,
+        "sha256": "b89e703f78fafa93c941f1e7006f8aac27caa198d544cea5b8d04b7ee5e3ba95"
+      },
+      {
+        "path": "i02-api-input-red-summary.json",
+        "bytes": 2854,
+        "sha256": "913b90b147ba980d8e43b2c0f2b6dc2b7c4f05e089fc0a414bda2343815d5f4f"
+      },
+      {
+        "path": "i02-api-input-red.log",
+        "bytes": 75672,
+        "sha256": "63f085159c727bea874762fc055c0946084a988097dbdddb0d4fbb3d00ee6c0c"
+      },
+      {
+        "path": "i02-api-openapi.py",
+        "bytes": 12869,
+        "sha256": "d19ae337f4406fff969b0c5b7b2c295c228eaf81d5ef939aa773a91a6196882d"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.api.OpenApiContractTest.xml",
+        "bytes": 75101,
+        "sha256": "b11942376954a28ff48c8aa35b8e24482bf3058bb228a1ace54fd24a0b021873"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.approval.FieldPermissionsIntegrationTest.xml",
+        "bytes": 74737,
+        "sha256": "4423dde271208bc0f2c02af019b959a21411d175ec344c602c9b06e0216afa20"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.approval.IdempotencyIntegrationTest.xml",
+        "bytes": 78860,
+        "sha256": "615e03e0936c2d3cdd96638a7a0fedddc6204a73a8b150797cc3722ed6e28006"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.attachment.AttachmentIntegrationTest.xml",
+        "bytes": 75605,
+        "sha256": "57c65da785787ef6b90d0e671b99b2496959a839d0554f5dd7c6d242589badc8"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.attachment.LocalAttachmentStoreTest.xml",
+        "bytes": 56974,
+        "sha256": "5062640bc02b2cb179e3ce7a9838c29a28bf12591fade9b7c7a0d6ed9f622696"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.auth.DeferredActorAuthenticationTest.xml",
+        "bytes": 86051,
+        "sha256": "92669bd3e1a804ba2f67c37d8243113240a5e959875511c125b0a5fcb098e08d"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.auth.OidcAuthenticationIntegrationTest.xml",
+        "bytes": 77018,
+        "sha256": "916a431b8082c59ef21f903ceec71692fb079829675c518197b6aa14205671b9"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.auth.OidcIdentityPolicyTest.xml",
+        "bytes": 44749,
+        "sha256": "4b42dc7ece215bf4fc60c11e989728d7f3389a3d1485580797adbc047c206ed0"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.auth.OidcLogoutScopesTest.xml",
+        "bytes": 68245,
+        "sha256": "24d0e788ea30cc134b1d316174d694d703200fe9fcec90f57192c8c5caf4224c"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.HttpSignatureGatewayTest.xml",
+        "bytes": 49692,
+        "sha256": "231dcb09e2156875c66666acc041b5b2a43275b3062640fb303a0251f6a93e0e"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureAccessTest.xml",
+        "bytes": 44253,
+        "sha256": "976a8b21d02dd346eded14a58b5f952ff61dc34e20ee611f2a9def0e8ced3d88"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureApiIntegrationTest.xml",
+        "bytes": 75347,
+        "sha256": "35245a8ac43c5668416ea5f0cebb9e22fcdcf8e82961f4c541008bec0645450c"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureCallbackVerifierTest.xml",
+        "bytes": 45292,
+        "sha256": "d8df9de2a261db1ebea8815fd95311aa7d3e166cc8ce4967c0ad6691a38f87e1"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureDatabaseRecoveryTest.xml",
+        "bytes": 60990,
+        "sha256": "520525f44a50f91206f7817f957e323ae34a122b94d69f3028a5923896079264"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureEvidencePersistenceTest.xml",
+        "bytes": 423132,
+        "sha256": "a294383576221342f02f3fedb572abbc74681cc071127130cbe0ccd81064fbaf"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureGatewayConfigurationTest.xml",
+        "bytes": 45723,
+        "sha256": "cdb1e333e8b916c783e49a00147b43acf08d3b16f6f073547ee949e77fefef61"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureHttpRecoveryTest.xml",
+        "bytes": 67644,
+        "sha256": "da0fff992904472c8d41ae5c3a11b1b79296408eb7f74f818932c8704a98505b"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureLoginMigrationTest.xml",
+        "bytes": 62344,
+        "sha256": "90c9aaf804b5b6ccaf152a381409202f4ea351d8fd8522c62f2b35dd668438f1"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureMigrationTest.xml",
+        "bytes": 61828,
+        "sha256": "54df9d22c00ff7af8155a42f0de8df3f7b5cb9cf03b3bde3f72b0a8f1fb2899c"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureOperationTest.xml",
+        "bytes": 12997,
+        "sha256": "f72bde51daafa0f413f8bca78b447ca53baf6b0545b056fffbc07094a56ee29d"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignaturePersistenceTest.xml",
+        "bytes": 590676,
+        "sha256": "6762eb4a63066437ad6b5fe6c0228ab566150995532136cba6582ef93c89d930"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureProfileTest.xml",
+        "bytes": 44828,
+        "sha256": "fda68def8ad5c3fba75ac7429498fa239659b190b3fc9208636a64e64eb4dcab"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureReceiptTest.xml",
+        "bytes": 11592,
+        "sha256": "6c6446aa8a38df08350c3051e0b4e4b3f938ba6690f04d68f55efb8391020882"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureReceiptVerifierTest.xml",
+        "bytes": 48165,
+        "sha256": "4ddcf52f3955239126097f7a22add4d61da72bf2c0a5fb8b8d3ef70acf617366"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureRequestTest.xml",
+        "bytes": 11563,
+        "sha256": "f9d15bf966c2782fbfe6b637853c75daa6b8e0ecbfc6b1e12fbbb6e20064f6f3"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureSerializationTest.xml",
+        "bytes": 43787,
+        "sha256": "a0f9d7fe94931915282e9dc2ff2711919f43599f101db660c0cc9887bb2a4f45"
+      },
+      {
+        "path": "i02-api-test-reports/TEST-io.agentflow.signature.SignatureWorkerIntegrationTest.xml",
+        "bytes": 304287,
+        "sha256": "90362dea570a51f525b9682d21406324215e6b8ee40296310b1229f79c2330a8"
+      },
+      {
+        "path": "i02-api-test-summary.json",
+        "bytes": 66933,
+        "sha256": "fd4126ae7009691225ea0e4d0ea67cb8d50e1422973e4217efb7d025839fd842"
+      },
+      {
+        "path": "i02-api-test.log",
+        "bytes": 1541614,
+        "sha256": "2c63668e3c4790bb6a6ffd9cff1bb095c816de4f15717123af6fbcce23981087"
+      }
+    ],
+    "totalBytes": 8739195
+  },
+  "sources": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/signature/SignatureOperation.java",
+      "sha256": "45728ae27ea1d854dcc7a899e544d026d16d850fe4c5fe43bd1df0c34fe88941"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/signature/SignatureReceipt.java",
+      "sha256": "0c34c10c0a1e50bda9e78bb396853183a95c34a42247e6286b1644a4890bf617"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/signature/SignatureRequest.java",
+      "sha256": "1fc2d7d3b1e253302ffeae65d4774887f36b5ae7a495c0cc7984027fb7b9edf6"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/signature/SignatureOperationTest.java",
+      "sha256": "413f179212b50ffba16e7a438915be223d4f6637390746b6a562a99f0c183cfe"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/signature/SignatureReceiptTest.java",
+      "sha256": "5f4838835d898ca75f96371144c55d233c6fe3d7f8abb10fa5415fcbccdb5c28"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/signature/SignatureRequestTest.java",
+      "sha256": "36cc65c3a0b79eb9aefd8fe6feb56e4fe2442c35e63ec349d8b56b766aa49cd6"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/signature/SignatureTestFixtures.java",
+      "sha256": "3c6c8651d672a35bf2e048e9958503ff9587ebcd68cccd775d60411d2af645ab"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java",
+      "sha256": "41f98d5c5695083cb108a908a7674c34e829f55ea3fb3f41526a8fa11d2c482c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/ApplicationFieldViews.java",
+      "sha256": "5a162d8c6663606ab745414e93acf8cf3aef57580d3c2678bf1b53a16c72acf4"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java",
+      "sha256": "811fe085b1a71382d5ccc3c6c495aae8596059bb0cb8f9e877fb4afac6b59a7c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/attachment/AttachmentService.java",
+      "sha256": "1fb94fbd19a54268ab766f9a1d139214df6eae96bb28d04b96367e6f2e81da96"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/auth/AuthService.java",
+      "sha256": "781a40c6f7edb187c77673c688ae6bc7cad4678c8f9c6fadaf6146f83a5b5a6f"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/auth/AuthenticationConfiguration.java",
+      "sha256": "77f00df344fe57f4ddc06a604223cded26ca6402836661bf0680bc6ece984627"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/auth/BearerAuthFilter.java",
+      "sha256": "0a37774682517e16c29aab9d028bdd1b924a42e39fb8ac03f6b5bd621a7e1185"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/auth/DeferredActorAuthentication.java",
+      "sha256": "1b01ecb773ebb634d1665499a1bd4c236e569729b984240b115cdb0e4866d795"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/auth/OidcActorMapper.java",
+      "sha256": "dad4359584354e9bd41c8c2453a3202b2dc6c512c1bd6f007e9e3b2bc3485c7f"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/auth/OidcLogoutScopes.java",
+      "sha256": "8c0b85ec4aa82206f293bdfbb71b05399e1fbfbbb74b86f36cd8a445f63ba9e9"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/HttpSignatureGateway.java",
+      "sha256": "844560116be2b7df5820cecf4dc3e3f1aaaf0033cf1df88e85fc9ccf23a47321"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/JdbcSignatureEvidenceRepository.java",
+      "sha256": "6bbfee58f8856a492ca087095f6d391f9ab7da247cd0a5c598cbc4a29d339958"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/JdbcSignatureLoginRepository.java",
+      "sha256": "9f652ffee214a5335b30352c635f0daac4d87b6b3172ef0bbfe34cf86c236138"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/JdbcSignatureOperationRepository.java",
+      "sha256": "3423d91c24f07050068c0eb65b430412d4ae00426bb419bb8d563bf389582a00"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureAccess.java",
+      "sha256": "2f6b587cc9be27ad3ab837294005c548859888f56c78d82a8443667f4cde7bfb"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureAudit.java",
+      "sha256": "8a7172bbb93e7f62b83006dbdaf94688b46e2fe02e63ff1dbdadd5e4ab230527"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureCallbackController.java",
+      "sha256": "8731e01ad7d4d15c6c03138528b6d69e2f8960f3a2ebfa55a9a5697ad4635582"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureCallbackVerifier.java",
+      "sha256": "212963fecdc8f6a6fa9245a41ac86a1af6e40cc03cf87ab67de2e4d5526d2050"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureController.java",
+      "sha256": "e8d65fa375681270ed1f93fbc30635072f25216250a1abccca49b4c334941ee3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureGateway.java",
+      "sha256": "39404360954c58bc032a22271c0f094402b5cce9200976881c226caa1207889f"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureGatewayConfiguration.java",
+      "sha256": "b9922945a9b046bc84703bafecd30a87452a1414271c9cc453aeb7544dbe1783"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureOperationService.java",
+      "sha256": "2f465048da65de5193c379c3ca18ba8e7926f9ed7d1b955a693ac0275ac4bf16"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureProfile.java",
+      "sha256": "1ada04a0469b6273e1b8a26d39df27cdd0ac5f384695ba1ceff7173668ed2292"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignaturePublicService.java",
+      "sha256": "5ec4947cd6219e528049778470423adbfc8ace412130c15201d3d8308622d99b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureReceiptVerifier.java",
+      "sha256": "cd9191b2a5bfce4c1281f49813657d4fdfb1dc70518144f3c05375c40cd18238"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureScheduling.java",
+      "sha256": "ff1d50ca57a74ef7a2a9796bef9c02f7de978bc0405d0a7c05769ac863995b22"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureWorker.java",
+      "sha256": "d6407b354ac15693eaab7154447d80d0f898599375edce27335b2239d0430bd2"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "31b7d0f492b91e49ad3d11b255ef998e91c966a7f8f2f6173d1336b1c81c06b6"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/db/migration/V113__signature_login_authorization.sql",
+      "sha256": "ae8b5901984af88cf3de8abe710e99bb482f1cab0777e9a27bd13b6a4398f421"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java",
+      "sha256": "5dccb18774435842bfb21625695f259fc69fc8bdbed3397e2bd4d170a63aa664"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/approval/FieldPermissionsIntegrationTest.java",
+      "sha256": "c62d7784e01d035d0a520d55c6fba27e5d5ec0659c77dc839672637f12c336ed"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/attachment/AttachmentIntegrationTest.java",
+      "sha256": "bb4cd6e9dc389014e89286cf4aea3cb7d02e1506d24a42930944ff0dcc0e2c27"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/attachment/LocalAttachmentStoreTest.java",
+      "sha256": "9d19863e74fac3e7927cb479347a01fba665a9ae7154eb708b6d059ff0e55e34"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/auth/DeferredActorAuthenticationTest.java",
+      "sha256": "e18fbf8137ab13e795bc30de92017dff1b1152b57bebdbfec800c2604c8883f1"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/auth/OidcAuthenticationIntegrationTest.java",
+      "sha256": "7629b834680aedfc91777ede0c213dced8e2c4702a55dab36e9a2a641e5259a4"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/auth/OidcIdentityPolicyTest.java",
+      "sha256": "76c1eb76df9743270de572af929a7c9f5a6085a625b8adab317b3f4398977111"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/auth/OidcLogoutScopesTest.java",
+      "sha256": "7f9b96214417d60f5aef6917555223c505e74409b1c6bc9188f156dea5300bc9"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/HttpSignatureGatewayTest.java",
+      "sha256": "0a76d4b00413b1fd5dfa2428976aa8d2fc90189bfdc0c98203ce14fb8ccef9c3"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureAccessTest.java",
+      "sha256": "ae72c7b100519200a516d1fddf57e60101795d99ed3977f41bcc4309e818834a"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureApiIntegrationTest.java",
+      "sha256": "83359696f6b872f5cfcb883384ae0b0f37c46a47c01cd40d96ef207ab731dbc8"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureCallbackVerifierTest.java",
+      "sha256": "fe20144cfbb886f4ffc6bbcd89c60fea9552e532be67424812ba1aefdc85e590"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureDatabaseRecoveryTest.java",
+      "sha256": "6ccd209c23e10d6a0c57a27190c30a183c601bfb338270fbd1f405e430e805db"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureEvidencePersistenceTest.java",
+      "sha256": "1174e5ee8645c1ddfc941e0f114303c5d6103c5d50733398079d5789543e2755"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureGatewayConfigurationTest.java",
+      "sha256": "07de19db837b882604a13e612940c93e9dcc83d430f8c3e1c84f8aa1d60fa242"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureHttpFixture.java",
+      "sha256": "276255491134953db9eced10f033b3cda4fb3b4f652b33bb4b00eee796b2c258"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureHttpRecoveryTest.java",
+      "sha256": "721c4590732abeb1007b4bc6b80d19b0b613867e6a0ba81ec539203a665a501d"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureLoginMigrationTest.java",
+      "sha256": "9da9729969ae234a1a3e4c4d6bf8213bb40b056dca02ed59db7131f2d7c4a709"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureMigrationTest.java",
+      "sha256": "52e0cc3bf477b65c7ec4ff16e3671c760b0ddf883c51205f88a133a4013e2353"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignaturePersistenceFixtures.java",
+      "sha256": "1f966a2838a4d52eac046058e3ba7c0174bfd01edc1e309d8df0cbc495059a2c"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignaturePersistenceTest.java",
+      "sha256": "3748cb6b1f19589facd5fe91aae1daa28a81a3b202055f9d3c998cb1329817ad"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureProfileTest.java",
+      "sha256": "51ba2cfe18c2f99effc270f8a21f331765362845e3e4aebf4b20f1d0cf8a9aef"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureReceiptVerifierTest.java",
+      "sha256": "25a42133a8154ef95b0e49df040438dffe610d19e1e99d74d5b79321caf2a69b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureSerializationTest.java",
+      "sha256": "bd348133d2d72ce4c17cd5d744ec1cf9356bbe451d0d84dc0c594affac47640e"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureVerificationFixtures.java",
+      "sha256": "2dc8d4dd307c7382c3ec4296736dab45b7878ace9e2c98d25f140aa202a8d1f2"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureWorkerIntegrationTest.java",
+      "sha256": "778b34b49ed7f0955985c01e43cf0462bbef2649bc17a71edc28564c0311440f"
+    },
+    {
+      "path": "docs/electronic-signatures.md",
+      "sha256": "9f348a00e47ec0bd0b35c7243e48ff7c24b40e051e38743c212f783781d4e64c"
+    }
+  ]
+}
