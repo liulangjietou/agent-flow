@@ -37,7 +37,7 @@ public class FlowableTaskAuthorization {
     /** 每次操作重新读取任务，锁等待后也必须重新授权。 */
     public Task require(String taskId, Actor actor) {
         Task task = requireActive(taskId, actor);
-        if (!canAct(actor, task) || !responsibilities.allows(task, actor.userId())) {
+        if (!canAct(actor, task)) {
             throw new DomainException("FORBIDDEN", "The task is not assigned to or available for the current user");
         }
         return task;
@@ -46,7 +46,7 @@ public class FlowableTaskAuthorization {
     /** 读取可使用当前直接代理；决策写入必须通过 requireAction 在锁内重新授权。 */
     public Task requireReadable(String taskId, Actor actor) {
         Task task = requireActive(taskId, actor);
-        if (!(canAct(actor, task) && responsibilities.allows(task, actor.userId()))
+        if (!canAct(actor, task)
                 && !proxies.forActor(actor, java.time.Instant.now()).canRead(task)) {
             throw new DomainException("FORBIDDEN", "The task is not available for the current user");
         }
@@ -57,7 +57,7 @@ public class FlowableTaskAuthorization {
     @Transactional(propagation = Propagation.MANDATORY)
     public AuthorizedTask requireAction(String taskId, Actor actor, TaskAction action, UUID proxyId) {
         Task task = requireActive(taskId, actor);
-        if (proxyId == null && canAct(actor, task) && responsibilities.allows(task, actor.userId())) {
+        if (proxyId == null && canAct(actor, task)) {
             return new AuthorizedTask(task, null);
         }
         if (!FlowableApprovalProxyAccess.DECISIONS.contains(action)) {
@@ -97,13 +97,21 @@ public class FlowableTaskAuthorization {
         } catch (IllegalArgumentException invalid) { throw new DomainException("NOT_FOUND", "Application not found"); }
     }
 
-    /** 列表复用已受职责约束的原生候选，不逐条查引擎变量；实际办理由 require 再复核。 */
+    /** 列表和办理共用当前职责约束；并行候选创建后发生的实际决策也可能使原候选失权。 */
     public boolean canAct(Actor actor, Task task) {
         if (!actor.hasRole("APPROVER") || !actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) return false;
-        if (actor.userId().equals(task.getAssignee())) return true;
+        if (actor.userId().equals(task.getAssignee())) return responsibilities.allows(task, actor.userId());
         if (task.getAssignee() != null) return false;
         return task.getIdentityLinks().stream().anyMatch(link -> actor.userId().equals(link.getUserId())
-                || link.getGroupId() != null && actor.hasRole(link.getGroupId()));
+                || link.getGroupId() != null && actor.hasRole(link.getGroupId())) && responsibilities.allows(task, actor.userId());
+    }
+
+    /** 费用策略已展开为人员候选；分页查询在计数前排除失权原候选，不改写历史名单。 */
+    public List<String> conflictingExpenseTaskIds(Actor actor) {
+        return tasks.createTaskQuery().active().processVariableValueEquals("tenantId", actor.tenantId())
+                .taskCandidateOrAssigned(actor.userId()).includeProcessVariables().includeIdentityLinks().list().stream()
+                .filter(task -> task.getProcessVariables().containsKey(io.agentflow.expense.ExpenseSelfApprovalBindings.VARIABLE))
+                .filter(task -> !canAct(actor, task)).map(Task::getId).toList();
     }
 
     /** 展示和执行共用原节点职责约束，不以组织资格代替职责分离。 */

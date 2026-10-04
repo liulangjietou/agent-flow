@@ -41,17 +41,23 @@ public class FlowableCountersignMembers {
 
     /** 任一及比例方式同时冻结人数门槛，后续目录变化不能改变当前节点的分母。 */
     public List<String> resolve(DelegateExecution execution, String encodedRule, String mode, Integer percentage) {
-        return resolveMembers(execution, encodedRule, mode, percentage, false, null);
+        return resolveMembers(execution, encodedRule, mode, percentage, false, null, false);
     }
 
     /** 新规则在冻结名单和分母之前执行，旧发布表达式不受新增规则影响。 */
     public List<String> resolveWithResponsibilities(DelegateExecution execution, String encodedRule, String mode,
                                                    Integer percentage, boolean excludeApplicant, String encodedReferences) {
-        return resolveMembers(execution, encodedRule, mode, percentage, excludeApplicant, encodedReferences);
+        return resolveMembers(execution, encodedRule, mode, percentage, excludeApplicant, encodedReferences, false);
+    }
+
+    /** 费用原候选在提交轮次中冻结，上溯和职责排除完成后再固定会签分母。 */
+    public List<String> resolveExpense(DelegateExecution execution, String encodedRule, String mode,
+            Integer percentage, boolean excludeApplicant, String encodedReferences) {
+        return resolveMembers(execution, encodedRule, mode, percentage, excludeApplicant, encodedReferences, true);
     }
 
     private List<String> resolveMembers(DelegateExecution execution, String encodedRule, String mode, Integer percentage,
-                                        boolean excludeApplicant, String encodedReferences) {
+                                        boolean excludeApplicant, String encodedReferences, boolean expensePolicy) {
         DelegateExecution root = execution;
         while (!root.isMultiInstanceRoot() && root.getParent() != null) root = root.getParent();
         String tenant = root.getTenantId();
@@ -62,7 +68,9 @@ public class FlowableCountersignMembers {
         String rule = new String(Base64.getDecoder().decode(encodedRule), StandardCharsets.UTF_8);
         Set<String> users = rule.startsWith("user:") ? Set.of(rule.substring("user:".length())) : Set.of();
         Set<String> roles = rule.startsWith("role:") ? Set.of(rule.substring("role:".length())) : Set.of();
-        List<String> selected = encodedReferences != null
+        List<String> selected = expensePolicy
+                ? responsibilities.resolveExpense(root, encodedRule, excludeApplicant, encodedReferences)
+                : encodedReferences != null
                 ? responsibilities.resolve(root, encodedRule, excludeApplicant, encodedReferences)
                 : io.agentflow.definition.FormAssigneePolicy.isFieldRule(rule) || io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)
                     ? organization.resolve(root, encodedRule) : directory.members(tenant, users, roles);

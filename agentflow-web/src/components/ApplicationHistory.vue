@@ -23,6 +23,7 @@ const actionOptions = [
   ['INSTANCE_PAUSE', '暂停审批'], ['INSTANCE_RESUME', '恢复审批'], ['INSTANCE_TERMINATE', '终止审批'],
   ['TIMER_ELAPSED', '定时等待已到期'], ['TIMER_FAILED', '定时推进失败'], ['TIMER_RETRY', '重试原定时等待'],
   ['EVENT_RECEIVED', '事件已推进等待'],
+  ['SELF_APPROVAL_ESCALATED', '自审批已上溯直属主管'],
   ['SERVICE_TASK_COMPLETED', '服务任务已完成'],
   ['SUBPROCESS_COMPLETED', '子审批完成并接续'],
   ['SUBPROCESS_STOPPED', '父子审批停止联动'],

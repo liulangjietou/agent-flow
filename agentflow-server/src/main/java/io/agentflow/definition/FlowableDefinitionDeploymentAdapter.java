@@ -66,6 +66,7 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
 
         static String write(DefinitionDraft draft, Map<String, String> subprocesses) {
             Graph graph = draft.graph();
+            boolean expenseSelfApproval = io.agentflow.expense.ExpenseSelfApprovalPolicy.enabled(graph);
             var decisionSources = graph.nodes().stream().filter(node -> node.type() == NodeType.USER_TASK)
                     .flatMap(node -> ApprovalResponsibilityPolicy.fromProperties(node.properties()).differentApproverFrom().stream())
                     .collect(java.util.stream.Collectors.toSet());
@@ -83,7 +84,7 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                             .append(escape(node.name())).append("\"/>");
                     case END -> xml.append("<endEvent id=\"").append(escape(node.id())).append("\" name=\"")
                             .append(escape(node.name())).append("\"/>");
-                    case USER_TASK -> appendUserTask(xml, node, decisionSources.contains(node.id()));
+                    case USER_TASK -> appendUserTask(xml, node, expenseSelfApproval || decisionSources.contains(node.id()), expenseSelfApproval);
                     case SUB_PROCESS -> xml.append("<callActivity id=\"").append(escape(node.id()))
                             .append("\" name=\"").append(escape(node.name())).append("\" calledElement=\"")
                             .append(escape(Objects.requireNonNull(subprocesses.get(node.id()), "Bound subprocess definition is required")))
@@ -155,12 +156,14 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
             xml.append("/>");
         }
 
-        private static void appendUserTask(StringBuilder xml, Node node, boolean recordDecision) {
+        private static void appendUserTask(StringBuilder xml, Node node, boolean recordDecision, boolean expenseSelfApproval) {
             String rule = Objects.requireNonNull(node.properties().get("assigneeRule"), "assigneeRule");
             xml.append("<userTask id=\"").append(escape(node.id())).append("\" name=\"")
                     .append(escape(node.name())).append("\"");
             ApprovalPolicy policy = node.approvalPolicy();
-            var responsibilities = ApprovalResponsibilityPolicy.fromProperties(node.properties());
+            var configured = ApprovalResponsibilityPolicy.fromProperties(node.properties());
+            var responsibilities = expenseSelfApproval
+                    ? new ApprovalResponsibilityPolicy(true, configured.differentApproverFrom()) : configured;
             String encodedRule = Base64.getEncoder().encodeToString(rule.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             String encodedReferences = Base64.getEncoder().encodeToString(String.join(",", responsibilities.differentApproverFrom())
                     .getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -170,7 +173,7 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                 if (recordDecision) appendDecisionListener(xml);
                 xml.append("<multiInstanceLoopCharacteristics isSequential=\"false\" ")
                         .append("flowable:collection=\"${flowableCountersignMembers.")
-                        .append(responsibilities.enabled() ? "resolveWithResponsibilities" : "resolve")
+                        .append(expenseSelfApproval ? "resolveExpense" : responsibilities.enabled() ? "resolveWithResponsibilities" : "resolve")
                         .append("(execution, '").append(encodedRule).append("'");
                 if (policy.mode() != ApprovalMode.ALL || responsibilities.enabled()) xml.append(", '").append(policy.mode().name()).append("', ").append(policy.percentage());
                 if (responsibilities.enabled()) xml.append(", ").append(responsibilities.excludeApplicant()).append(", '").append(encodedReferences).append("'");
@@ -183,7 +186,8 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
             }
             if (responsibilities.enabled()) {
                 // 角色必须先展开成真实人员再排除，不能保留候选组使冲突账号仍能领取。
-                xml.append(" flowable:candidateUsers=\"${flowableApprovalResponsibilities.resolve(execution, '")
+                xml.append(" flowable:candidateUsers=\"${flowableApprovalResponsibilities.")
+                        .append(expenseSelfApproval ? "resolveExpense" : "resolve").append("(execution, '")
                         .append(encodedRule).append("', ").append(responsibilities.excludeApplicant()).append(", '")
                         .append(encodedReferences).append("')}\"");
             } else if (FormAssigneePolicy.isFieldRule(rule) || io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)) {

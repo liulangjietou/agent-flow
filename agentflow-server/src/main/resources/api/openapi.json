@@ -6565,7 +6565,8 @@
                 "EVENT_RECEIVED",
                 "SERVICE_TASK_COMPLETED",
                 "SUBPROCESS_COMPLETED",
-                "SUBPROCESS_STOPPED"
+                "SUBPROCESS_STOPPED",
+                "SELF_APPROVAL_ESCALATED"
               ]
             }
           },
@@ -9974,7 +9975,8 @@
                 "INVOICE_EXTRACTION_QUEUE",
                 "INVOICE_EXTRACTION_CONFIRM",
                 "INVOICE_EXTRACTION_DISMISS",
-                "EXPENSE_REQUEST_CLOSED"
+                "EXPENSE_REQUEST_CLOSED",
+                "SELF_APPROVAL_ESCALATED"
               ]
             }
           },
@@ -11513,7 +11515,8 @@
                 "INVOICE_EXTRACTION_QUEUE",
                 "INVOICE_EXTRACTION_CONFIRM",
                 "INVOICE_EXTRACTION_DISMISS",
-                "EXPENSE_REQUEST_CLOSED"
+                "EXPENSE_REQUEST_CLOSED",
+                "SELF_APPROVAL_ESCALATED"
               ]
             }
           },

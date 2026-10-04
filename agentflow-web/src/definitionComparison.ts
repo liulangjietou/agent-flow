@@ -65,6 +65,8 @@ const labels: Record<string, string> = {
   recipientRule: '抄送收件规则', 'properties.recipientRule': '抄送收件规则',
   approvalMode: '审批方式', 'properties.approvalMode': '审批方式',
   approvalPercentage: '通过比例（%）', 'properties.approvalPercentage': '通过比例（%）',
+  expenseSelfApproval: '费用自审批处理', 'properties.expenseSelfApproval': '费用自审批处理',
+  expenseStage: '费用审批职责', 'properties.expenseStage': '费用审批职责',
   excludeApplicant: '禁止申请人办理', 'properties.excludeApplicant': '禁止申请人办理',
   differentApproverFrom: '排除前序步骤批准人', 'properties.differentApproverFrom': '排除前序步骤批准人',
   serviceOperationKey: '服务操作', 'properties.serviceOperationKey': '服务操作', serviceOperationVersion: '服务版本', 'properties.serviceOperationVersion': '服务版本', serviceContractDigest: '服务契约', 'properties.serviceContractDigest': '服务契约',
@@ -88,6 +90,7 @@ export function comparisonValue(value: unknown, property = ''): string {
   if (value === '') return '空值'
   if (typeof value === 'boolean') return value ? '是' : '否'
   if (typeof value === 'string') {
+    if (property.endsWith('expenseSelfApproval')) return value === 'ESCALATE_SUPERVISOR' ? '申请人转本次任职的直属主管' : '待修正：' + value
     if (property.endsWith('excludeApplicant')) return value === 'true' ? '启用' : value === 'false' ? '关闭' : '待修正：' + value
     if (property.endsWith('differentApproverFrom')) return value.split(',').join('、')
     if (property.endsWith('approvalMode')) return approvalPolicyLabel(value)

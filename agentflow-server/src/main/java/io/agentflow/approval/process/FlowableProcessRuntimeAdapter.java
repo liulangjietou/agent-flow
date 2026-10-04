@@ -8,6 +8,8 @@ import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionDraftRepository;
 import io.agentflow.definition.DefinitionInitiatorRequirements;
 import io.agentflow.organization.FormAssigneeBindings;
+import io.agentflow.expense.ExpenseSelfApprovalBindings;
+import io.agentflow.expense.ExpenseSelfApprovalSnapshot;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
@@ -42,6 +44,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     private final DefinitionInitiatorRequirements initiatorRequirements;
     private final FormAssigneeBindings formAssignees;
     private final ServiceTaskBindings serviceTasks;
+    private final ExpenseSelfApprovalBindings expenseSelfApproval;
     public static final String INITIATOR_CONTEXT = "agentflowInitiatorContext";
     public static final String FORM_ASSIGNEES = "agentflowFormAssignees";
 
@@ -49,7 +52,8 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     public FlowableProcessRuntimeAdapter(RepositoryService repositoryService, RuntimeService runtimeService,
                                          TaskService taskService, HistoryService historyService, DefinitionDraftRepository platformDefinitions,
                                          JsonUtil json, EventContractBindings eventContracts, DefinitionInitiatorRequirements initiatorRequirements,
-                                         FormAssigneeBindings formAssignees, ServiceTaskBindings serviceTasks) {
+                                         FormAssigneeBindings formAssignees, ServiceTaskBindings serviceTasks,
+                                         ExpenseSelfApprovalBindings expenseSelfApproval) {
         this.repositoryService = repositoryService;
         this.runtimeService = runtimeService;
         this.taskService = taskService;
@@ -60,6 +64,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         this.initiatorRequirements = initiatorRequirements;
         this.formAssignees = formAssignees;
         this.serviceTasks = serviceTasks;
+        this.expenseSelfApproval = expenseSelfApproval;
     }
 
     /** 创建申请时严格解析指定来源，返回不透明定义标识。 */
@@ -76,6 +81,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         ProcessDefinition definition = boundDefinition(command.definitionBinding());
         var risk = SubmissionRisk.unassessed();
         var selected = FormAssigneeBindings.Snapshot.EMPTY;
+        ExpenseSelfApprovalSnapshot expenseSelection = null;
         // 首提和重提均检查已绑定版本；先确认引擎来源，避免误停同名内置流程。
         if (command.tenantId().equals(definition.getTenantId())) {
             var published = platformDefinitions.lockPublished(command.tenantId(), command.processKey(), command.definitionVersion()).orElse(null);
@@ -92,6 +98,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
                             published.graph().conditionLanguageVersion(), command.payload());
                 }
                 selected = formAssignees.freeze(command.tenantId(), published.graph(), command.payload());
+                expenseSelection = expenseSelfApproval.freeze(command, published, definition.getId(), selected);
             }
         }
         Map<String, Object> variables = new HashMap<>();
@@ -101,6 +108,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         variables.put("roundNo", command.roundNo());
         if (command.initiatorContext() != null) variables.put(INITIATOR_CONTEXT, json.write(command.initiatorContext()));
         if (!selected.nodes().isEmpty()) variables.put(FORM_ASSIGNEES, json.write(selected));
+        if (expenseSelection != null) variables.put(ExpenseSelfApprovalBindings.VARIABLE, json.write(expenseSelection));
         // 表单的显式 null 需要原样交给引擎，不能因不可变拷贝丢失清空语义。
         variables.put("formData", command.payload() == null ? Map.of()
                 : Collections.unmodifiableMap(new HashMap<>(command.payload())));

@@ -81,6 +81,11 @@ class ExpenseSubmissionIntegrationTest {
     private boolean afterFinanceTask;
     private boolean reductionRoute;
     private boolean hideBusinessDetails;
+    private boolean selfApprovalEscalation;
+    private String selfApprovalBusinessRule;
+    private String selfApprovalBusinessMode;
+    private boolean parallelExpenseReviews;
+    private String expenseReceiptRule;
     private BudgetObservation.Status budgetStatus = BudgetObservation.Status.APPLIED;
     private BudgetObservation.Rejection budgetRejection = BudgetObservation.Rejection.BUDGET_INSUFFICIENT;
     private int writes;
@@ -251,8 +256,200 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired ExpenseResourceAdjustmentWorker resourceWorker;
     @Autowired io.agentflow.organization.ApprovalProxyService approvalProxies;
     @Autowired io.agentflow.definition.DefinitionDraftRepository definitionRecords;
+    @Autowired io.agentflow.organization.OrganizationRepository organizationRecords;
 
     private final List<EmployeeAdvance> fifoFixtures = new ArrayList<>();
+
+    @Test
+    void expenseSelfApprovalUsesSupervisorOfSelectedAppointment() throws Exception {
+        var selected = selfApprovingAppointment(true);
+        var otherDepartment = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "另一兼任部门", entity, null, true);
+        var other = organization.createAppointment(admin, selected.personId(), otherDepartment.id(), selected.positionId(), true);
+        var otherSuperior = organization.createAppointment(admin, finance, otherDepartment.id(), selected.positionId(), true);
+        organization.setSupervisor(admin, other.id(), otherSuperior.id(), other.revision());
+        var report = fixture(false).report();
+
+        submit(report);
+
+        assertThat(tasks.getIdentityLinksForTask(task(report).getId())).extracting(link -> link.getUserId())
+                .contains("manager").doesNotContain("alice");
+        assertThat(act(report, "alice", "APPROVE").getStatus()).isEqualTo(403);
+        for (String action : List.of("TRANSFER", "DELEGATE")) {
+            assertCode(send("/api/v1/tasks/" + task(report).getId() + "/actions", "manager",
+                    Map.of("action", action, "targetUser", "alice", "expectedVersion", app(report).version())), "APPROVAL_RESPONSIBILITY_CONFLICT");
+        }
+        var audit = selfApprovalAudit(report);
+        assertThat(audit.path("initiator").path("appointmentId").asText()).isEqualTo(appointment.toString());
+        assertThat(audit.path("definitionVersion").asLong()).isEqualTo(app(report).definitionVersion());
+        assertThat(audit.path("ruleVersion").asInt()).isEqualTo(1);
+        assertThat(audit.at("/selection/originalSubjects").toString()).isEqualTo("[\"alice\"]");
+        assertThat(audit.at("/selection/escalation/replacementSubject").asText()).isEqualTo("manager");
+        var history = ok(read("/api/v1/applications/" + report.applicationId() + "/audit?action=SELF_APPROVAL_ESCALATED", "alice"), 200);
+        assertThat(history.path("items")).hasSize(1);
+        assertThat(history.path("items").get(0).path("nodeId").asText()).isEqualTo("business");
+        assertThat(history.path("items").get(0).path("definitionVersion").asLong()).isEqualTo(app(report).definitionVersion());
+        var search = ok(read("/api/v1/operations/audit?action=SELF_APPROVAL_ESCALATED&applicationId=" + report.applicationId(), "admin"), 200);
+        assertThat(search.path("items")).hasSize(1);
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+        assertThat(selfApprovalAudit(report)).isEqualTo(audit);
+    }
+
+    @Test
+    void expenseSelfApprovalWithoutSuperiorRollsBackSubmissionAndFinancialState() throws Exception {
+        selfApprovingAppointment(false); var report = fixture(false).report();
+        UUID checked = precheck(report); var application = app(report); var financial = current(report).state();
+        assertCode(send(path(report) + "/submit", "alice", submitInput(report, checked)), "APPROVER_NOT_FOUND");
+        assertThat(app(report).version()).isEqualTo(application.version());
+        assertThat(app(report).status()).isEqualTo(ApplicationStatus.DRAFT);
+        assertThat(current(report).state()).isEqualTo(financial);
+        assertThat(tasks(report)).isEmpty(); assertThat(controls.find("demo", report.id(), 1)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='SELF_APPROVAL_ESCALATED'",
+                Integer.class, report.applicationId().toString())).isZero();
+        assertThat(writes).isZero();
+    }
+
+    @Test
+    void expenseSelfApprovalRejectsCyclicOrInactiveSelectedSuperior() throws Exception {
+        var selected = selfApprovingAppointment(true); var report = fixture(false).report(); UUID checked = precheck(report);
+        var superior = organizationRecords.appointment("demo", selected.supervisorAppointmentId()).orElseThrow();
+        // 模拟已损坏的历史关系；正常组织写入口本身已禁止环路。
+        jdbc.update("UPDATE organization_appointment SET supervisor_appointment_id=? WHERE tenant_id='demo' AND id=?",
+                appointment.toString(), appointment.toString());
+        assertCode(send(path(report) + "/submit", "alice", submitInput(report, checked)), "APPROVER_NOT_FOUND");
+        jdbc.update("UPDATE organization_appointment SET supervisor_appointment_id=? WHERE tenant_id='demo' AND id=?",
+                superior.id().toString(), appointment.toString());
+        organization.updateAppointment(admin, superior.id(), false, superior.revision());
+        // 组织变化要求重新预检，失效上级仍必须在正式提交中阻断。
+        checked = precheck(report);
+        assertCode(send(path(report) + "/submit", "alice", submitInput(report, checked)), "APPROVER_NOT_FOUND");
+        assertThat(tasks(report)).isEmpty();
+    }
+
+    @Test
+    void expenseSelfApprovalDeduplicatesSupervisorBeforeCountersignDenominator() throws Exception {
+        var selected = selfApprovingAppointment(true);
+        selfApprovalBusinessRule = "role:ORG_UNIT_" + selected.departmentId(); selfApprovalBusinessMode = "ALL";
+        var report = fixture(false).report(); submit(report);
+        assertThat(tasks(report)).hasSize(1); assertThat(task(report).getAssignee()).isEqualTo("manager");
+        assertThat(tasks.getVariable(task(report).getId(), "nrOfInstances")).isEqualTo(1);
+        assertThat(selfApprovalAudit(report).at("/selection/originalSubjects").toString()).isEqualTo("[\"alice\",\"manager\"]");
+        assertThat(selfApprovalAudit(report).path("effectiveCandidates").toString()).isEqualTo("[\"manager\"]");
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+    }
+
+    @Test
+    void expenseSelfApprovalNeverEscalatesOrSkipsFinancialConflict() throws Exception {
+        var selected = selfApprovingAppointment(true); finance = selected.personId();
+        var selfFinance = fixture(false).report(); UUID checked = precheck(selfFinance);
+        assertCode(send(path(selfFinance) + "/submit", "alice", submitInput(selfFinance, checked)), "APPROVAL_RESPONSIBILITY_NO_MEMBERS");
+        assertThat(tasks(selfFinance)).isEmpty();
+        finance = manager; var conflict = fixture(false).report(); submit(conflict);
+        var originalTask = task(conflict).getId(); long version = app(conflict).version();
+        assertCode(act(conflict, "manager", "APPROVE"), "APPROVAL_RESPONSIBILITY_NO_MEMBERS");
+        assertThat(task(conflict).getId()).isEqualTo(originalTask); assertThat(app(conflict).version()).isEqualTo(version);
+        assertThat(controls.find("demo", conflict.id(), 1).orElseThrow().receipt()).isNull();
+    }
+
+    @Test
+    void expenseSelfApprovalKeepsFutureNodeAndHistoryAfterOrganizationChanges() throws Exception {
+        var selected = selfApprovingAppointment(true); afterFinanceTask = true;
+        var report = fixture(false).report(); submit(report); var firstAudit = selfApprovalAudit(report);
+        var nextPerson = organization.createPerson(admin, "future-superior-" + UUID.randomUUID(), "新主管", true, true);
+        var next = organization.createAppointment(admin, nextPerson.id(), selected.departmentId(), selected.positionId(), true);
+        organization.setSupervisor(admin, selected.id(), next.id(), selected.revision());
+        budgetWorker.poll(); ok(act(report, "manager", "APPROVE"), 200);
+        ok(send(path(report) + "/tasks/" + task(report).getId() + "/receive", "finance", receiveInput(report)), 200);
+        ok(act(report, "finance", "APPROVE"), 200); ok(act(report, "finance", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("afterFinance");
+        assertThat(tasks.getIdentityLinksForTask(task(report).getId())).extracting(link -> link.getUserId()).containsExactly("manager");
+        var firstRound = selfApprovalAudits(report); assertThat(firstRound).hasSize(2).contains(firstAudit);
+        assertThat(firstRound).allSatisfy(audit -> {
+            assertThat(audit.path("roundNo").asInt()).isEqualTo(1);
+            assertThat(audit.at("/selection/escalation/replacementSubject").asText()).isEqualTo("manager");
+        });
+    }
+
+    @Test
+    void expenseSelfApprovalReevaluatesOnlyNewRoundAndRetainsOriginalEvidence() throws Exception {
+        var selected = selfApprovingAppointment(true); var report = fixture(false).report(); submit(report);
+        var firstAudit = selfApprovalAudit(report); budgetWorker.poll();
+        ok(send(path(report) + "/withdraw", "alice", lifecycleInput(report)), 200);
+        var nextPerson = organization.createPerson(admin, "next-round-superior-" + UUID.randomUUID(), "重提主管", true, true);
+        var next = organization.createAppointment(admin, nextPerson.id(), selected.departmentId(), selected.positionId(), true);
+        organization.setSupervisor(admin, selected.id(), next.id(), selected.revision());
+        submit(current(report));
+        assertThat(tasks.getIdentityLinksForTask(task(report).getId())).extracting(link -> link.getUserId()).containsExactly(nextPerson.subject());
+        assertThat(selfApprovalAudits(report)).hasSize(2).contains(firstAudit);
+        var newAudit = selfApprovalAudits(report).stream().filter(audit -> audit.path("roundNo").asInt() == 2).findFirst().orElseThrow();
+        assertThat(newAudit.at("/selection/escalation/replacementSubject").asText()).isEqualTo(nextPerson.subject());
+    }
+
+    @Test
+    void expenseSelfApprovalRechecksFinancialDutiesAfterParallelCandidateActivation() throws Exception {
+        var selected = selfApprovingAppointment(true); parallelExpenseReviews = true; paperRequired = false;
+        organization.createAppointment(admin, finance, selected.departmentId(), selected.positionId(), true);
+        expenseReceiptRule = "role:ORG_UNIT_" + selected.departmentId();
+        var report = fixture(false).report(); submit(report);
+        var business = tasks(report).stream().filter(task -> task.getTaskDefinitionKey().equals("business")).findFirst().orElseThrow();
+        var receipt = tasks(report).stream().filter(task -> task.getTaskDefinitionKey().equals("receipt")).findFirst().orElseThrow();
+        assertThat(tasks.getIdentityLinksForTask(receipt.getId())).extracting(link -> link.getUserId()).contains("manager", "finance");
+        ok(send("/api/v1/tasks/" + business.getId() + "/actions", "manager", Map.of("action", "APPROVE", "expectedVersion", app(report).version())), 200);
+        var queue = ok(read("/api/v1/workspace/tasks?processKey=" + app(report).processKey(), "manager"), 200);
+        assertThat(queue.path("items")).isEmpty(); assertThat(queue.path("total").asLong()).isZero();
+        assertThat(ok(read("/api/v1/tasks", "manager"), 200).findValuesAsText("taskId")).doesNotContain(receipt.getId());
+        var nextDraft = ok(send("/api/v1/expense-reports", "alice", Map.of("businessNo", "SYNTHETIC-" + UUID.randomUUID(),
+                "processKey", app(report).processKey(), "definitionVersion", app(report).definitionVersion(), "content", report.content())), 201);
+        UUID nextId = UUID.fromString(nextDraft.path("id").asText()); created.add(nextId);
+        var nextReport = reports.find("demo", nextId).orElseThrow(); submit(nextReport);
+        var firstPage = ok(read("/api/v1/workspace/tasks?processKey=" + app(report).processKey() + "&limit=1", "manager"), 200);
+        assertThat(firstPage.path("items")).hasSize(1); assertThat(firstPage.path("total").asLong()).isEqualTo(2);
+        assertThat(firstPage.path("items").findValuesAsText("taskId")).doesNotContain(receipt.getId());
+        assertThat(firstPage.path("nextCursor").asText()).isNotBlank();
+        var secondPage = ok(read("/api/v1/workspace/tasks?processKey=" + app(report).processKey()
+                + "&limit=1&cursor=" + firstPage.path("nextCursor").asText(), "manager"), 200);
+        assertThat(secondPage.path("items")).hasSize(1); assertThat(secondPage.path("total").asLong()).isEqualTo(2);
+        assertThat(secondPage.path("items").findValuesAsText("taskId"))
+                .doesNotContain(receipt.getId()).doesNotContainAnyElementsOf(firstPage.path("items").findValuesAsText("taskId"));
+        assertThat(secondPage.path("nextCursor").isTextual()).isFalse();
+        assertThat(send("/api/v1/tasks/" + receipt.getId() + "/actions", "manager",
+                Map.of("action", "APPROVE", "expectedVersion", app(report).version())).getStatus()).isEqualTo(403);
+        ok(send("/api/v1/tasks/" + receipt.getId() + "/actions", "finance",
+                Map.of("action", "APPROVE", "expectedVersion", app(report).version())), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("finance");
+    }
+
+    private io.agentflow.organization.OrganizationAppointment selfApprovingAppointment(boolean withSuperior) {
+        selfApprovalEscalation = true;
+        var selected = organizationRecords.appointment("demo", appointment).orElseThrow();
+        var applicant = organizationRecords.person("demo", selected.personId()).orElseThrow();
+        organization.updatePerson(admin, applicant.id(), applicant.displayName(), true, true, applicant.revision());
+        if (withSuperior) {
+            var superior = organization.createAppointment(admin, manager, selected.departmentId(), selected.positionId(), true);
+            organization.setSupervisor(admin, appointment, superior.id(), selected.revision());
+        }
+        var department = organizationRecords.unit("demo", selected.departmentId()).orElseThrow();
+        organization.setDepartmentHead(admin, department.id(), appointment, department.revision());
+        return organizationRecords.appointment("demo", appointment).orElseThrow();
+    }
+
+    private JsonNode selfApprovalAudit(ExpenseReport report) {
+        var stored = selfApprovalAudits(report); assertThat(stored).hasSize(1); return stored.get(0);
+    }
+
+    private List<JsonNode> selfApprovalAudits(ExpenseReport report) {
+        return jdbc.queryForList("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='SELF_APPROVAL_ESCALATED'",
+                String.class, report.applicationId().toString()).stream().map(value -> json.read(value, JsonNode.class)).toList();
+    }
+
+    private Map<String, String> selfApprovalBusinessProperties() {
+        var values = new HashMap<String, String>(); values.put("excludeApplicant", "true");
+        values.put("assigneeRule", selfApprovalBusinessRule == null
+                ? io.agentflow.organization.LocalOrganizationDirectory.DEPARTMENT_HEAD_RULE : selfApprovalBusinessRule);
+        if (selfApprovalBusinessMode != null) values.put("approvalMode", selfApprovalBusinessMode);
+        return Map.copyOf(values);
+    }
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true);
@@ -265,6 +462,10 @@ class ExpenseSubmissionIntegrationTest {
     }
     @AfterEach void clear() {
         actors.clear(); budgetStatus = BudgetObservation.Status.APPLIED;
+        if (selfApprovalEscalation) {
+            var applicant = organizationRecords.personBySubject("demo", "alice").orElseThrow();
+            organization.updatePerson(admin, applicant.id(), applicant.displayName(), true, false, applicant.revision());
+        }
         for (var advance : fifoFixtures) {
             jdbc.update("DELETE FROM finance_amount_use WHERE tenant_id=? AND resource_type='ADVANCE' AND resource_id=?", advance.tenantId(), advance.id().toString());
             jdbc.update("DELETE FROM employee_advance_order WHERE tenant_id=? AND advance_id=?", advance.tenantId(), advance.id().toString());
@@ -5816,21 +6017,34 @@ class ExpenseSubmissionIntegrationTest {
         return new Fixture(reports.find("demo", id).orElseThrow(), invoice, priorId, advanceId);
     }
     private DefinitionDraft definition() {
-        var nodes = new ArrayList<>(List.of(new Node("start", "开始", NodeType.START, Map.of()),
-                new Node("business", "业务审批", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager)),
-                new Node("receipt", "原件签收", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + finance, "expenseStage", "RECEIPT")),
+        var nodes = new ArrayList<>(List.of(new Node("start", "开始", NodeType.START,
+                selfApprovalEscalation ? Map.of("expenseSelfApproval", "ESCALATE_SUPERVISOR") : Map.of()),
+                new Node("business", "业务审批", NodeType.USER_TASK, selfApprovalEscalation
+                        ? selfApprovalBusinessProperties()
+                        : Map.of("assigneeRule", "role:ORG_PERSON_" + manager)),
+                new Node("receipt", "原件签收", NodeType.USER_TASK, Map.of("assigneeRule", expenseReceiptRule == null ? "role:ORG_PERSON_" + finance : expenseReceiptRule, "expenseStage", "RECEIPT")),
                 new Node("finance", "财务审核", NodeType.USER_TASK, financeStage ? Map.of("assigneeRule", "role:ORG_PERSON_" + finance, "expenseStage", "FINANCE_REVIEW") : Map.of("assigneeRule", "role:ORG_PERSON_" + finance)),
                 new Node("end", "结束", NodeType.END, Map.of())));
         var edges = new ArrayList<>(List.of(new Edge("a", "start", "business", "", false), new Edge("b", "business", "receipt", "", false),
                 new Edge("c", "receipt", "finance", "", false), new Edge("d", "finance", reductionRoute ? "amountGate" : afterFinanceTask ? "afterFinance" : "end", "", false)));
         if (afterFinanceTask || reductionRoute) {
-            nodes.add(new Node("afterFinance", "财务后续业务", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager)));
+            nodes.add(new Node("afterFinance", "财务后续业务", NodeType.USER_TASK,
+                    selfApprovalEscalation ? selfApprovalBusinessProperties() : Map.of("assigneeRule", "role:ORG_PERSON_" + manager)));
             edges.add(new Edge("e", "afterFinance", "end", "", false));
         }
         if (reductionRoute) {
             nodes.add(new Node("amountGate", "核定金额判断", NodeType.EXCLUSIVE_GATEWAY, Map.of()));
             edges.add(new Edge("low", "amountGate", "end", "amount <= 50", false));
             edges.add(new Edge("high", "amountGate", "afterFinance", "amount > 50", false));
+        }
+        if (parallelExpenseReviews) {
+            nodes.add(new Node("fork", "并行复核", NodeType.PARALLEL_GATEWAY, Map.of()));
+            nodes.add(new Node("join", "复核汇合", NodeType.PARALLEL_GATEWAY, Map.of()));
+            edges.clear();
+            edges.addAll(List.of(new Edge("a", "start", "fork", "", false), new Edge("b", "fork", "business", "", false),
+                    new Edge("c", "fork", "receipt", "", false), new Edge("d", "business", "join", "", false),
+                    new Edge("e", "receipt", "join", "", false), new Edge("f", "join", "finance", "", false),
+                    new Edge("g", "finance", "end", "", false)));
         }
         var graph = new Graph(nodes, edges);
         var schema = new FormSchema(2, List.of(new FormSchema.Field("expenseDetails", "费用明细", FormSchema.FieldType.TEXT, true, null,

@@ -53,6 +53,14 @@ class DefinitionInitiatorRequirementsTest {
         verifyNoInteractions(definitions);
     }
 
+    @Test
+    void expenseSelfApprovalRequiresAppointmentEvenWithOnlyStaticAssigneeRules() {
+        var graph = graph(new Node("start", "开始", NodeType.START, Map.of("expenseSelfApproval", "ESCALATE_SUPERVISOR")),
+                new Node("review", "固定候选", NodeType.USER_TASK, Map.of("assigneeRule", "user:applicant")));
+        assertThat(requirements.required("demo", graph)).isTrue();
+        verifyNoInteractions(definitions);
+    }
+
     private DefinitionDraft definition(String key, long version, Graph graph) {
         var draft = DefinitionDraft.create(UUID.randomUUID(), "demo", key, "子审批", graph); draft.publish(0, version); return draft;
     }
