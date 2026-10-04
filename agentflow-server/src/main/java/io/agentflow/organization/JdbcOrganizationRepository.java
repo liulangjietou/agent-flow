@@ -103,6 +103,12 @@ public class JdbcOrganizationRepository implements OrganizationRepository {
     }
 
     @Override
+    public Optional<OrganizationAppointment> appointmentByIdentity(String tenantId, UUID personId, UUID departmentId, UUID positionId) {
+        return jdbc.query("SELECT * FROM organization_appointment WHERE tenant_id=? AND person_id=? AND department_id=? AND position_id=?",
+                appointmentMapper(), tenantId, personId.toString(), departmentId.toString(), positionId.toString()).stream().findFirst();
+    }
+
+    @Override
     public List<OrganizationAppointment> appointments(String tenantId, UUID personId, String afterId, int limit) {
         if (personId == null) return jdbc.query("SELECT * FROM organization_appointment WHERE tenant_id=? AND id>? ORDER BY id LIMIT ?", appointmentMapper(), tenantId, afterId, limit + 1);
         return jdbc.query("SELECT * FROM organization_appointment WHERE tenant_id=? AND person_id=? AND id>? ORDER BY id LIMIT ?", appointmentMapper(), tenantId, personId.toString(), afterId, limit + 1);

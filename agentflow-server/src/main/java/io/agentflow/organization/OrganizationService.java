@@ -5,7 +5,6 @@ import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.UUID;
 
 /**
@@ -95,19 +94,7 @@ public class OrganizationService {
     public OrganizationAppointment setSupervisor(Actor actor, UUID id, UUID supervisorId, long expectedRevision) {
         long revision = repository.lock(actor.tenantId());
         var value = appointment(actor.tenantId(), id).withSupervisor(supervisorId, expectedRevision);
-        var legalId = unit(actor.tenantId(), value.departmentId()).legalEntityId();
-        var seen = new HashSet<UUID>();
-        var people = new HashSet<UUID>();
-        seen.add(id); people.add(value.personId());
-        UUID current = supervisorId;
-        while (current != null) {
-            if (!seen.add(current)) throw supervisorCycle();
-            var supervisor = appointment(actor.tenantId(), current);
-            if (!people.add(supervisor.personId())) throw supervisorCycle();
-            if (!legalId.equals(unit(actor.tenantId(), supervisor.departmentId()).legalEntityId())) throw relation();
-            requireEffectiveAppointment(actor.tenantId(), supervisor);
-            current = supervisor.supervisorAppointmentId();
-        }
+        relations(actor.tenantId()).supervisor(value);
         repository.save(actor.tenantId(), value, expectedRevision);
         record(actor, revision, APPOINTMENT, id, value);
         return value;
@@ -118,46 +105,17 @@ public class OrganizationService {
     public OrganizationUnit setDepartmentHead(Actor actor, UUID id, UUID appointmentId, long expectedRevision) {
         long revision = repository.lock(actor.tenantId());
         var value = requireKind(actor.tenantId(), id, OrganizationUnit.Kind.DEPARTMENT).withHead(appointmentId, expectedRevision);
-        if (appointmentId != null) {
-            var head = appointment(actor.tenantId(), appointmentId);
-            if (!id.equals(head.departmentId())) throw relation();
-            requireEffectiveAppointment(actor.tenantId(), head);
-        }
+        relations(actor.tenantId()).head(value);
         repository.save(actor.tenantId(), value, expectedRevision);
         record(actor, revision, value.kind().name(), id, value);
         return value;
     }
 
-    private void requireEffectiveAppointment(String tenant, OrganizationAppointment value) {
-        if (!value.active() || !person(tenant, value.personId()).canApprove()) throw inactive();
-        checkAppointment(tenant, value);
+    private OrganizationRelations relations(String tenant) {
+        return new OrganizationRelations(id -> unit(tenant, id), id -> person(tenant, id), id -> appointment(tenant, id));
     }
-    private static DomainException supervisorCycle() { return new DomainException("ORGANIZATION_SUPERVISOR_CYCLE", "Supervisor chain cannot repeat an appointment or person"); }
-
-    private void checkUnit(String tenant, OrganizationUnit value) {
-        if (value.kind() == OrganizationUnit.Kind.LEGAL_ENTITY) return;
-        var legal = requireKind(tenant, value.legalEntityId(), OrganizationUnit.Kind.LEGAL_ENTITY);
-        if (value.active() && !legal.active()) throw inactive();
-        UUID parent = value.parentDepartmentId();
-        var seen = new HashSet<UUID>();
-        seen.add(value.id());
-        while (parent != null) {
-            if (!seen.add(parent)) throw new DomainException("ORGANIZATION_DEPARTMENT_CYCLE", "Department hierarchy cannot contain a cycle");
-            var department = requireKind(tenant, parent, OrganizationUnit.Kind.DEPARTMENT);
-            if (!value.legalEntityId().equals(department.legalEntityId())) throw relation();
-            if (value.active() && !department.active()) throw inactive();
-            parent = department.parentDepartmentId();
-        }
-    }
-
-    private void checkAppointment(String tenant, OrganizationAppointment value) {
-        var person = person(tenant, value.personId());
-        var department = requireKind(tenant, value.departmentId(), OrganizationUnit.Kind.DEPARTMENT);
-        var position = requireKind(tenant, value.positionId(), OrganizationUnit.Kind.POSITION);
-        if (!department.legalEntityId().equals(position.legalEntityId())) throw relation();
-        var legal = requireKind(tenant, department.legalEntityId(), OrganizationUnit.Kind.LEGAL_ENTITY);
-        if (value.active() && (!person.active() || !department.active() || !position.active() || !legal.active())) throw inactive();
-    }
+    private void checkUnit(String tenant, OrganizationUnit value) { relations(tenant).unit(value); }
+    private void checkAppointment(String tenant, OrganizationAppointment value) { relations(tenant).appointment(value); }
 
     private OrganizationUnit requireKind(String tenant, UUID id, OrganizationUnit.Kind kind) {
         var value = unit(tenant, id);
@@ -172,5 +130,4 @@ public class OrganizationService {
     }
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Organization record not found"); }
     private static DomainException relation() { return new DomainException("ORGANIZATION_RELATION_INVALID", "Organization relation type or legal entity does not match"); }
-    private static DomainException inactive() { return new DomainException("ORGANIZATION_RELATION_INACTIVE", "An active relation requires active referenced records"); }
 }

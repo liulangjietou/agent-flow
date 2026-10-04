@@ -34,6 +34,8 @@ public interface OrganizationRepository {
     void save(String tenantId, OrganizationPerson value, long expectedRevision);
     /** 读取任职。 */
     Optional<OrganizationAppointment> appointment(String tenantId, UUID id);
+    /** 精确读取任职身份，供同步预检要求显式采用已有任职，不按名称猜测。 */
+    Optional<OrganizationAppointment> appointmentByIdentity(String tenantId, UUID personId, UUID departmentId, UUID positionId);
     /** 分页读取任职，可限定人员。 */
     List<OrganizationAppointment> appointments(String tenantId, UUID personId, String afterId, int limit);
     /** 保存任职，结束任职保留关系。 */

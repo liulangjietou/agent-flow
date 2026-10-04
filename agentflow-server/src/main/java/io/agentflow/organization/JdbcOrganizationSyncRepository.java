@@ -169,6 +169,13 @@ public class JdbcOrganizationSyncRepository {
         }, tenant, key.kind().name(), key.externalId()).stream().findFirst();
     }
 
+    /** 显式采用已有对象前检查它是否已经归属另一来源标识。 */
+    public Optional<OrganizationSyncBinding> bindingByLocal(String tenant, OrganizationSyncKey.Kind kind, UUID localId) {
+        return jdbc.queryForList("SELECT external_id FROM organization_sync_binding WHERE tenant_id=? AND kind=? AND local_id=?",
+                String.class, tenant, kind.name(), id(localId)).stream().findFirst()
+                .flatMap(external -> binding(tenant, new OrganizationSyncKey(kind, external)));
+    }
+
     /** 保存当前实体修订与来源批次的对应关系；不允许改绑已有来源标识。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void save(OrganizationSyncBinding value, long expectedVersion) {
