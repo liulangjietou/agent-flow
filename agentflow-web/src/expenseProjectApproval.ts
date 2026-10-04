@@ -19,7 +19,8 @@ export interface ProjectApprovalView {
 const MAX_PROJECTS = 2000
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 const positive = (value: unknown): value is number => Number.isSafeInteger(value) && (value as number) > 0
-const text = (value: unknown, limit = 128): value is string => typeof value === 'string' && !!value.trim() && value.length <= limit
+const nonBlankText = (value: unknown): value is string => typeof value === 'string' && !!value.trim()
+const text = (value: unknown, limit = 128): value is string => nonBlankText(value) && value.length <= limit
 const object = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value)
 const own = (value: object, key: string) => Object.prototype.hasOwnProperty.call(value, key)
 function keys(value: unknown, required: string[], optional: string[] = []): value is Record<string, unknown> {
@@ -64,7 +65,7 @@ export function readProjectApprovalView(value: unknown, reportId: string, applic
       const responsibility = details.responsibility
       requireValue(source.projects.length > 0 && text(details.nodeId) && keys(responsibility,
         ['nodeName', 'stage', 'rule', 'directoryRevision', 'originalSubjects', 'candidateSubjects'], ['escalation'])
-        && text(responsibility.nodeName) && responsibility.stage === 'PROJECT_REVIEW' && responsibility.rule === 'expense:projectOwners'
+        && nonBlankText(responsibility.nodeName) && responsibility.stage === 'PROJECT_REVIEW' && responsibility.rule === 'expense:projectOwners'
         && positive(responsibility.directoryRevision) && subjects(responsibility.originalSubjects) && subjects(responsibility.candidateSubjects)
         && sameSubjects([...new Set(source.projects.map(project => project.ownerSubject))], responsibility.originalSubjects))
       const self = responsibility.originalSubjects.includes(initiator.subject), escalation = responsibility.escalation

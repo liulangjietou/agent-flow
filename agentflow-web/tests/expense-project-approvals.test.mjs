@@ -42,6 +42,16 @@ test('原责任记录、无项目和未知历史保持三种不同状态', () =>
   assert.deepEqual(read(legacy), legacy)
   assert.throws(() => read({ ...legacy, details: {} })); assert.throws(() => read({ ...empty, status: 'RECORDED' }))
 })
+test('合法长节点名称保留原轮次依据，空名称和目录字段越界仍拒绝', () => {
+  const recorded = view(); recorded.details.responsibility.nodeName = '项目'.repeat(65)
+  assert.equal(read(recorded).details.responsibility.nodeName, recorded.details.responsibility.nodeName)
+  for (const invalid of ['', '   ', null, 130]) {
+    const broken = view(); broken.details.responsibility.nodeName = invalid
+    assert.throws(() => read(broken))
+  }
+  const invalidProject = view(); invalidProject.details.source.projects[0].name = '项'.repeat(129)
+  assert.throws(() => read(invalidProject))
+})
 test('跨单、错轮、错法人、未知版本和不完整项目或责任集合均拒绝', () => {
   for (const mutate of [v => { v.reportId = id(99) }, v => { v.applicationId = id(99) }, v => { v.roundNo++ },
     v => { v.details.ruleVersion = 2 }, v => { v.details.precheckVersion = 2 }, v => { v.details.applicationVersion = 1.5 },

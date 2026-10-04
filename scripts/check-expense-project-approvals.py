@@ -17,6 +17,7 @@ split, risk = prior.split, prior.risk
 save, digest, instant, wait_for = risk.save, risk.digest, risk.instant, risk.wait_for
 BASELINE_SHA256 = "e5978f9fe03dd8ff37416e42f9baf61a9103853703920860038adc6d3f21629e"
 NEW_TABLES = {"EXPENSE_PROJECT_APPROVAL"}
+PROJECT_NODE_NAME = "项目" * 65
 
 
 def sources_for(directory):
@@ -47,6 +48,9 @@ def template(runtime, fixture, hidden=False):
         "name": "合成项目会签", "templateVersion": item["templateVersion"]}, "admin")
     graph, schema = copy.deepcopy(draft["graph"]), copy.deepcopy(draft["formSchema"])
     for node in graph["nodes"]:
+        # 定义入口允许此长度，原轮次读取不能单方面截断或拒绝。
+        if node["id"] == "projectReview":
+            node["name"] = PROJECT_NODE_NAME
         if node["type"] == "USER_TASK" and node["id"] != "projectReview":
             actor = "finance" if node["id"] in ("receipt", "finance", "recheck") else "manager"
             node["properties"]["assigneeRule"] = "role:ORG_PERSON_" + fixture["people"][actor]
@@ -83,7 +87,10 @@ def draft(runtime, fixture, definition, allocated=True):
 
 
 def view(runtime, report, round_no=1, actor="alice", expected=200):
-    return runtime.call("GET", "/expense-reports/" + report["id"] + "/project-approval?roundNo=" + str(round_no), user=actor, expected=expected)
+    value = runtime.call("GET", "/expense-reports/" + report["id"] + "/project-approval?roundNo=" + str(round_no), user=actor, expected=expected)
+    if expected == 200 and value["status"] == "RECORDED":
+        assert value["details"]["responsibility"]["nodeName"] == PROJECT_NODE_NAME
+    return value
 
 
 def submit(runtime, fixture, report):
