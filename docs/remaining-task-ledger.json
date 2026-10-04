@@ -1361,7 +1361,7 @@
           ]
         }
       ],
-      "observed": "显式配置、业务网关发布校验、领域聚合、V116 当前轮次投影和不可变依据仓储已实现。358 项相关回归通过，补充实际入库的未配置/关闭断言后 13 项存储范围通过，数量不相加。原提交事务、实际网关路由、权限接口和页面仍待接通；F04 保持 OPEN。",
+      "observed": "显式规则、V116 不可变依据、原提交事务与 Flowable 业务网关已接通。356 项相关回归通过，含 14 项实际跨单路由用例；并发、核减隔离、错配阻断、回滚、重提及换版已验证。权限查询、设计器、页面和固定包验收仍待完成；F04 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
@@ -1375,7 +1375,8 @@
       "acceptance": "窗口、阈值和启用状态显式配置；并发提交也按确定口径聚合；冻结风险及路由依据；不伪称未启用规则已经保护业务。",
       "dependsOn": [],
       "domainFoundationEvidence": "docs/evidence/expense-split-domain-20261004.json",
-      "persistenceEvidence": "docs/evidence/expense-split-persistence-20261004.json"
+      "persistenceEvidence": "docs/evidence/expense-split-persistence-20261004.json",
+      "routingIntegrationEvidence": "docs/evidence/expense-split-routing-integration-20261004.json"
     },
     {
       "id": "F05",

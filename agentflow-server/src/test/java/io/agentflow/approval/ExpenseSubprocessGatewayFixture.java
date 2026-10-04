@@ -71,7 +71,11 @@ final class ExpenseSubprocessGatewayFixture implements AutoCloseable {
     }
 
     void use(JsonUtil json, UUID entity, String invoiceNumber) {
-        context = new Context(json, entity, invoiceNumber);
+        use(json, entity, invoiceNumber, money("100"));
+    }
+    /** 跨单路由用例显式选择合成金额，既有子流程和风险提示夹具保留原值。 */
+    void use(JsonUtil json, UUID entity, String invoiceNumber, Money expenseGross) {
+        context = new Context(json, entity, invoiceNumber, expenseGross);
         commands.clear(); writes.clear(); queries.clear(); appliedAt.clear(); failure = null;
         budgetStatus = BudgetObservation.Status.APPLIED;
     }
@@ -95,7 +99,7 @@ final class ExpenseSubprocessGatewayFixture implements AutoCloseable {
             case "exchange-rate" -> new ExpenseExchangeRate("CNY", "CNY", BigDecimal.ONE, "synthetic-rate", LocalDate.parse(data.path("rateDate").asText()));
             case "invoice-verification" -> new Invoice.VerifiedFacts(new InvoiceKey(InvoiceKey.Type.DIGITAL, null, current.invoiceNumber()), current.entity(),
                     money("100"), money("6"), LocalDate.now(), data.path("originalDigest").asText(), "synthetic-invoice", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
-            case "expense-policy" -> new ExpensePolicyPort.Assessment(new ExpensePolicySnapshot(UUID.randomUUID(), 1, money("100"), money("100"),
+            case "expense-policy" -> new ExpensePolicyPort.Assessment(new ExpensePolicySnapshot(UUID.randomUUID(), 1, current.expenseGross(), current.expenseGross(),
                     ExpensePolicySnapshot.Decision.WITHIN_LIMIT, "synthetic-tax", "synthetic-policy"), money("6"), false, Instant.now().plusSeconds(600));
             case "budget-precheck" -> new BudgetPrecheckPort.Assessment(current.json().read(data.toString(), BudgetPrecheckPort.Request.class),
                     "synthetic-precheck", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
@@ -131,5 +135,5 @@ final class ExpenseSubprocessGatewayFixture implements AutoCloseable {
     /**
      * @author owlzhangfq@gmail.com
      */
-    private record Context(JsonUtil json, UUID entity, String invoiceNumber) { }
+    private record Context(JsonUtil json, UUID entity, String invoiceNumber, Money expenseGross) { }
 }

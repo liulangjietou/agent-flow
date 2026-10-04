@@ -49,4 +49,16 @@ public class FlowableConditionEvaluator {
         }
         return parser.parse(condition, languageVersion).evaluate(new EvaluationContext(variables));
     }
+
+    /** 仅被显式发布的业务网关调用，局部替换求值金额，不写回原表单或财务变量。 */
+    public boolean matchesExpenseSplit(DelegateExecution execution, String encodedCondition, int languageVersion) {
+        var amount = io.agentflow.expense.ExpenseSplitRoutingBindings.routingAmount(execution);
+        var values = new HashMap<String, Object>();
+        ((Map<?, ?>) execution.getVariable("formData")).forEach((key, value) -> values.put((String) key, value));
+        values.put(io.agentflow.expense.ExpenseFormContract.AMOUNT, amount);
+        var types = new HashMap<String, String>();
+        ((Map<?, ?>) execution.getVariable("formFieldTypes")).forEach((key, value) -> types.put((String) key, (String) value));
+        String condition = new String(Base64.getDecoder().decode(encodedCondition), StandardCharsets.UTF_8);
+        return parser.parse(condition, languageVersion).evaluate(new EvaluationContext(values, types));
+    }
 }

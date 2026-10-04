@@ -68,6 +68,7 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
             Graph graph = draft.graph();
             boolean expenseSelfApproval = io.agentflow.expense.ExpenseSelfApprovalPolicy.enabled(graph);
             boolean expenseDuplicateApproval = io.agentflow.expense.ExpenseDuplicateApprovalPolicy.enabled(graph);
+            var expenseSplit = io.agentflow.expense.ExpenseSplitRiskPolicy.from(graph);
             var decisionSources = graph.nodes().stream().filter(node -> node.type() == NodeType.USER_TASK)
                     .flatMap(node -> ApprovalResponsibilityPolicy.fromProperties(node.properties()).differentApproverFrom().stream())
                     .collect(java.util.stream.Collectors.toSet());
@@ -120,7 +121,10 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                 if (expenseDuplicateApproval) xml.append("<extensionElements><flowable:executionListener event=\"take\" delegateExpression=\"${flowableExpenseDuplicateTrace}\"/></extensionElements>");
                 if (!edge.condition().isBlank()) {
                     String encodedCondition = Base64.getEncoder().encodeToString(edge.condition().getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                    xml.append("<conditionExpression xsi:type=\"tFormalExpression\">${flowableConditionEvaluator.matches(execution, '")
+                    boolean aggregateAmount = expenseSplit.mode() == io.agentflow.expense.ExpenseSplitRiskPolicy.Mode.ENABLED
+                            && expenseSplit.gatewayIds().contains(edge.source());
+                    xml.append("<conditionExpression xsi:type=\"tFormalExpression\">${flowableConditionEvaluator.")
+                            .append(aggregateAmount ? "matchesExpenseSplit" : "matches").append("(execution, '")
                             .append(encodedCondition).append("', ").append(graph.conditionLanguageVersion()).append(")}</conditionExpression>");
                 }
                 xml.append("</sequenceFlow>");

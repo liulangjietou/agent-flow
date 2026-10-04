@@ -10,6 +10,8 @@ import io.agentflow.definition.DefinitionInitiatorRequirements;
 import io.agentflow.organization.FormAssigneeBindings;
 import io.agentflow.expense.ExpenseSelfApprovalBindings;
 import io.agentflow.expense.ExpenseSelfApprovalSnapshot;
+import io.agentflow.expense.ExpenseSplitRoutingBindings;
+import io.agentflow.expense.ExpenseSplitRoutingSnapshot;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
@@ -45,6 +47,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     private final FormAssigneeBindings formAssignees;
     private final ServiceTaskBindings serviceTasks;
     private final ExpenseSelfApprovalBindings expenseSelfApproval;
+    private final ExpenseSplitRoutingBindings expenseSplitRouting;
     public static final String INITIATOR_CONTEXT = "agentflowInitiatorContext";
     public static final String FORM_ASSIGNEES = "agentflowFormAssignees";
 
@@ -53,7 +56,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
                                          TaskService taskService, HistoryService historyService, DefinitionDraftRepository platformDefinitions,
                                          JsonUtil json, EventContractBindings eventContracts, DefinitionInitiatorRequirements initiatorRequirements,
                                          FormAssigneeBindings formAssignees, ServiceTaskBindings serviceTasks,
-                                         ExpenseSelfApprovalBindings expenseSelfApproval) {
+                                         ExpenseSelfApprovalBindings expenseSelfApproval, ExpenseSplitRoutingBindings expenseSplitRouting) {
         this.repositoryService = repositoryService;
         this.runtimeService = runtimeService;
         this.taskService = taskService;
@@ -65,6 +68,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         this.formAssignees = formAssignees;
         this.serviceTasks = serviceTasks;
         this.expenseSelfApproval = expenseSelfApproval;
+        this.expenseSplitRouting = expenseSplitRouting;
     }
 
     /** 创建申请时严格解析指定来源，返回不透明定义标识。 */
@@ -82,6 +86,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         var risk = SubmissionRisk.unassessed();
         var selected = FormAssigneeBindings.Snapshot.EMPTY;
         ExpenseSelfApprovalSnapshot expenseSelection = null;
+        ExpenseSplitRoutingSnapshot splitRouting = null;
         // 首提和重提均检查已绑定版本；先确认引擎来源，避免误停同名内置流程。
         if (command.tenantId().equals(definition.getTenantId())) {
             var published = platformDefinitions.lockPublished(command.tenantId(), command.processKey(), command.definitionVersion()).orElse(null);
@@ -99,6 +104,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
                 }
                 selected = formAssignees.freeze(command.tenantId(), published.graph(), command.payload());
                 expenseSelection = expenseSelfApproval.freeze(command, published, definition.getId(), selected);
+                splitRouting = expenseSplitRouting.require(command, published);
             }
         }
         Map<String, Object> variables = new HashMap<>();
@@ -109,6 +115,8 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         if (command.initiatorContext() != null) variables.put(INITIATOR_CONTEXT, json.write(command.initiatorContext()));
         if (!selected.nodes().isEmpty()) variables.put(FORM_ASSIGNEES, json.write(selected));
         if (expenseSelection != null) variables.put(ExpenseSelfApprovalBindings.VARIABLE, json.write(expenseSelection));
+        var splitVariables = ExpenseSplitRoutingBindings.variables(splitRouting, definition.getId());
+        if (!splitVariables.isEmpty()) variables.put(ExpenseSplitRoutingBindings.VARIABLE, splitVariables);
         // 表单的显式 null 需要原样交给引擎，不能因不可变拷贝丢失清空语义。
         variables.put("formData", command.payload() == null ? Map.of()
                 : Collections.unmodifiableMap(new HashMap<>(command.payload())));

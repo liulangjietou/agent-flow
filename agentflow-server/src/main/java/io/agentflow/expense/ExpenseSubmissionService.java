@@ -31,16 +31,18 @@ public class ExpenseSubmissionService {
     private final JdbcExpenseSubmissionControlRepository controls;
     private final BudgetOperationService budgets;
     private final ExpensePolicyConfiguration policyConfiguration;
+    private final ExpenseSplitRoutingService splitRouting;
 
     /** 外部调用由持久执行器承担，提交事务只使用仍然有效的已确认事实。 */
     public ExpenseSubmissionService(CurrentActor actors, ExpenseReportRepository reports, ApprovalApplicationFacade applications,
             DefinitionDraftRepository definitions, JdbcExpensePrecheckRepository prechecks, ExpensePrecheckService validation,
             ExpensePrecheckResources resources, ExpenseResourceChanges changes, JdbcExpenseSubmissionControlRepository controls,
-            BudgetOperationService budgets, ExpensePolicyConfiguration policyConfiguration) {
+            BudgetOperationService budgets, ExpensePolicyConfiguration policyConfiguration, ExpenseSplitRoutingService splitRouting) {
         this.actors = actors; this.reports = reports; this.applications = applications; this.definitions = definitions;
         this.prechecks = prechecks; this.validation = validation; this.resources = resources; this.changes = changes;
         this.controls = controls; this.budgets = budgets;
         this.policyConfiguration = policyConfiguration;
+        this.splitRouting = splitRouting;
     }
 
     /** 申请人只提交双版本与预检编号；金额、任职、纸件要求和预算输入全部从服务端事实派生。 */
@@ -72,6 +74,7 @@ public class ExpenseSubmissionService {
         reports.update(report, input.financialVersion(), actor.userId(), "SUBMIT");
         application = applications.reviseBusiness(application.id(), application.version(), report.content().title(),
                 ExpenseFormContract.submittedPayload(report.currentRound()), application.businessReference());
+        splitRouting.prepare(report, application, definition, now);
         application = applications.submitBusiness(application.id(), application.version(), checked.input().initiator().appointmentId(), application.businessReference());
         var control = ExpenseSubmissionControl.submitted(new ExpenseSubmissionControl.Input(actor.tenantId(), id, application.id(), actor.userId(),
                 application.roundNo(), report.version(), input.precheckId(), checked.input().accountingDate(), evidence.legalEntity().paperReceiptRequired(), stages), now);
