@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T00:28:06.734182+00:00",
+  "recordedAt": "2026-10-04T00:50:11.126820+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1441,19 +1441,28 @@
           ]
         }
       ],
-      "observed": "现有职责分离记录真实批准人以排除冲突，不实现相邻相同审批人自动通过；未有该类审计动作。",
+      "observed": "后端显式发布策略、实际路径与决策持久化、统一事务自动推进、来源审计及动作筛选已接入。真实费用模板网关、转交实际人、单人会签、多候选保留人工和审计失败整体回滚通过；本阶段 36 项 Java、14 项前端测试及类型和契约检查通过。设计器、模板、专项运行并发/重启恢复、浏览器和 PostgreSQL 验收仍待完成。",
       "references": [
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java",
+          "path": "docs/expense-duplicate-approval.md",
           "line": 1
         },
         {
-          "path": "docs/approval-responsibilities.md",
+          "path": "docs/evidence/expense-duplicate-approval-backend-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/approval/process/ExpenseDuplicateApprovalProgress.java",
           "line": 1
         }
       ],
       "acceptance": "按发布版本识别相邻业务节点，记录自动动作和来源；非相邻默认不跳过；财务签收、审核、复核永不自动跳过；并发和重启不重复推进。",
-      "dependsOn": []
+      "dependsOn": [],
+      "backendStage": {
+        "status": "VERIFIED_TASK_OPEN",
+        "implementationCommit": "084b18e01811473313e6e1c2a875f7a9f89e4508",
+        "evidence": "docs/evidence/expense-duplicate-approval-backend-20261004.json"
+      }
     },
     {
       "id": "F13",
@@ -3601,11 +3610,11 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "F11",
-    "status": "TEMPLATE_FIXED_PACKAGE_RUNTIME_AND_RESTORE_VERIFIED_TASK_OPEN",
-    "recordedAt": "2026-10-04T00:28:06.734182+00:00",
-    "sourceCommit": "1a62061b9e44a4d3b818fce6d81a80b89827f909",
-    "evidence": "docs/evidence/expense-self-approval-runtime-20261004.json",
+    "taskId": "F12",
+    "status": "BACKEND_STAGE_VERIFIED_TASK_OPEN",
+    "recordedAt": "2026-10-04T00:50:11.126820+00:00",
+    "sourceCommit": "084b18e01811473313e6e1c2a875f7a9f89e4508",
+    "evidence": "docs/evidence/expense-duplicate-approval-backend-20261004.json",
     "knownOpenTaskCount": 34
   }
 }

@@ -1,0 +1,97 @@
+{
+  "taskId": "F12",
+  "status": "BACKEND_STAGE_VERIFIED_TASK_OPEN",
+  "recordedAt": "2026-10-04T00:50:11.126820+00:00",
+  "baseCommit": "2ce28868f0cab26ffc0225d5aa38684c95db9119",
+  "sourceCommit": "084b18e01811473313e6e1c2a875f7a9f89e4508",
+  "ruleVersion": 1,
+  "red": {
+    "sessionId": 65297,
+    "exitCode": 1,
+    "newPolicy": "Expected receipt, actual department after supervisor approval through the real expense template amount gateway",
+    "legacyPolicy": "PASS",
+    "excludedFixtureRuns": [
+      68692,
+      10492
+    ],
+    "reports": "/fyoung/tmp/agentflow-remaining-20260928/f12-red-confirmed-reports"
+  },
+  "verification": {
+    "java": {
+      "status": "PASS",
+      "sessionId": 22729,
+      "exitCode": 0,
+      "uniqueCases": 36,
+      "classes": {
+        "io.agentflow.expense.ExpenseDuplicateApprovalPolicyTest": 7,
+        "io.agentflow.expense.ExpenseSelfApprovalPolicyTest": 4,
+        "io.agentflow.expense.ExpenseSubmissionIntegrationTest": 16,
+        "io.agentflow.definition.DefinitionDeploymentIntegrationTest": 5,
+        "io.agentflow.definition.DefinitionApplicationServiceTest": 4
+      }
+    },
+    "frontend": {
+      "sessionId": 57408,
+      "exitCode": 0,
+      "tests": 14,
+      "files": [
+        "audit-search.test.mjs",
+        "audit-export.test.mjs",
+        "expense-self-approval.test.mjs"
+      ]
+    },
+    "typescript": {
+      "sessionId": 97458,
+      "exitCode": 0
+    },
+    "openapi": {
+      "status": "PASS",
+      "operations": 360,
+      "schemas": 748,
+      "requestExamples": 125
+    },
+    "authors": {
+      "sessionId": 76193,
+      "exitCode": 0,
+      "javaFiles": 1634,
+      "namedTypes": 3184,
+      "missingAuthorTags": 0,
+      "parseErrors": 0
+    },
+    "diffCheck": "PASS"
+  },
+  "validatedScenarios": [
+    "Actual expense template amount gateway automatically advances supervisor to receipt with one explicit department automatic action",
+    "Unconfigured published graph retains the department manual task",
+    "Source proof contains actual task IDs, actual subject and rule version; public audit action filter returns the event",
+    "Current receipt and finance tasks remain separately manual even for the same finance actor",
+    "Transferred source uses the actual actor rather than original candidate",
+    "A deduplicated one-person countersign can pass; multiple effective candidates remain manual",
+    "Repeated request for the completed source does not increment the version again",
+    "Audit failure rolls back both human and automatic native progress, aggregate version and audit facts",
+    "Domain path tests cover actual branch selection, financial boundaries, nonadjacent predecessors, ambiguous predecessors and wait/subprocess boundaries"
+  ],
+  "remaining": [
+    "Designer control, portable template property, definition comparison and new catalog/companion version",
+    "Native proxy, parallel join, longer automatic chains and asynchronous wait resumption integration cases",
+    "Actual concurrent replay, fixed package legacy upgrade, forced restart and independent restore",
+    "Browser and PostgreSQL scope acceptance"
+  ],
+  "inventory": {
+    "knownOpenTaskCount": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "delivery": {
+    "localOnly": true,
+    "pushed": false,
+    "pullRequestCreated": false
+  },
+  "evidenceSnapshot": {
+    "directory": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-backend-evidence",
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-backend-evidence/manifest.json",
+    "fileCount": 28
+  }
+}
