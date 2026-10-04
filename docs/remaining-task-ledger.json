@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T05:34:27.871296+00:00",
+  "recordedAt": "2026-10-04T05:52:00.763020+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1028,7 +1028,7 @@
           ]
         }
       ],
-      "observed": "固定请求、单次发送状态机及 V111 持久仓储已实现；72 个领域、序列化、JDBC、非空升级与数据库恢复用例和 6 个备份工具用例通过。216 张旧表、8 条旧记录与 2 份原件元数据保持；并发领取、迟到回执、部分文件保存及独立 H2 恢复通过。可信签署及验真适配器、当前权限编排、实际文件传输、后台、接口和页面仍待接通，继续 OPEN。",
+      "observed": "固定请求、单次发送状态机、持久仓储及可信签署配置已实现；原始回执验签、V112 证据留存与独立 H2 恢复通过。144 个唯一 Java 范围用例通过，含既有 72 个及新增 72 个；非空 V111→V112 保留 220 张旧表和 10 条旧记录。固定目标 HTTP 文件传输、当前权限编排、后台、接口和页面仍待接通，继续 OPEN。",
       "references": [
         {
           "path": "docs/product-goal-gap-audit.md",
@@ -1049,6 +1049,10 @@
         {
           "path": "docs/evidence/electronic-signature-persistence-20261004.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/electronic-signature-receipt-evidence-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "固定文件与签署版本、显式授权、异步状态、可验证回执、重复回调和未知结果恢复；保留原件、授权及签署结果，完成本地受控协议验收。",
@@ -1062,6 +1066,11 @@
         "status": "PERSISTENCE_AND_LOCAL_DATABASE_RECOVERY_VERIFIED_NO_PUBLIC_ENTRYPOINT",
         "implementationCommit": "956dc61b45a1811443f83cba94fd4faf976ff0b3",
         "evidence": "docs/evidence/electronic-signature-persistence-20261004.json"
+      },
+      "receiptEvidenceStage": {
+        "status": "TRUSTED_PROFILE_AND_PERSISTED_RAW_RECEIPT_VERIFIED_NO_HTTP_OR_PUBLIC_ENTRYPOINT",
+        "implementationCommit": "caff66d5d7b5928078b12b53ee0dc141f7cc1331",
+        "evidence": "docs/evidence/electronic-signature-receipt-evidence-20261004.json"
       }
     },
     {
@@ -3762,10 +3771,11 @@
   },
   "latestProgress": {
     "taskId": "I02",
-    "status": "PERSISTENCE_AND_LOCAL_DATABASE_RECOVERY_VERIFIED_NO_PUBLIC_ENTRYPOINT",
-    "recordedAt": "2026-10-04T05:34:27.871296+00:00",
-    "sourceCommit": "956dc61b45a1811443f83cba94fd4faf976ff0b3",
-    "evidence": "docs/evidence/electronic-signature-persistence-20261004.json",
-    "knownOpenTaskCount": 34
+    "status": "TRUSTED_PROFILE_AND_PERSISTED_RAW_RECEIPT_VERIFIED_NO_HTTP_OR_PUBLIC_ENTRYPOINT",
+    "recordedAt": "2026-10-04T05:52:00.763020+00:00",
+    "sourceCommit": "caff66d5d7b5928078b12b53ee0dc141f7cc1331",
+    "evidence": "docs/evidence/electronic-signature-receipt-evidence-20261004.json",
+    "knownOpenTaskCount": 34,
+    "implementationCommit": "caff66d5d7b5928078b12b53ee0dc141f7cc1331"
   }
 }
