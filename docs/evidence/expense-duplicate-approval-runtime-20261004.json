@@ -1,0 +1,180 @@
+{
+  "taskId": "F12",
+  "status": "FIXED_PACKAGE_RUNTIME_VERIFIED_BROWSER_POSTGRES_PENDING",
+  "recordedAt": "2026-10-04T01:24:46.042572+00:00",
+  "sourceCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
+  "verifiedRepositoryHead": "3292fb56aced35e7d24dacc46abe2cfd0ee7d5c7",
+  "priorEvidence": [
+    "docs/evidence/expense-duplicate-approval-backend-20261004.json",
+    "docs/evidence/expense-duplicate-approval-ui-template-20261004.json",
+    "docs/evidence/expense-duplicate-approval-event-service-20261004.json"
+  ],
+  "artifacts": {
+    "baseline": {
+      "sourceCommit": "1a62061",
+      "templateVersion": 2,
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-template-server-1a62061.jar",
+      "sha256": "4eacdc4a6e63017a99e9fdc34d8c9eb40b0c26ef0a62ae3b036bb86897a0002b"
+    },
+    "current": {
+      "sourceCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
+      "templateVersion": 3,
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-server-25fc140.jar",
+      "sha256": "197f9d738440a1d197e57c79c95d2ef19fe8da6ab9903624b082729c5ab0d0b1"
+    }
+  },
+  "runtime": {
+    "sessionId": 72726,
+    "exitCode": 0,
+    "status": "PASS",
+    "syntheticOnly": true,
+    "directory": "/fyoung/tmp/agentflow-expense-duplicate-approval-reospdta",
+    "restoreDirectory": "/fyoung/tmp/agentflow-expense-duplicate-approval-restore-p2n83d6f",
+    "boots": [
+      {
+        "boot": 1,
+        "tag": "v2-baseline",
+        "pid": 22724,
+        "baseline": true,
+        "directory": "/fyoung/tmp/agentflow-expense-duplicate-approval-reospdta",
+        "readySeconds": 9.14
+      },
+      {
+        "boot": 2,
+        "tag": "v3-upgrade",
+        "pid": 22800,
+        "baseline": false,
+        "directory": "/fyoung/tmp/agentflow-expense-duplicate-approval-reospdta",
+        "readySeconds": 8.98
+      },
+      {
+        "boot": 3,
+        "tag": "before-approval-forced-restart",
+        "pid": 22836,
+        "baseline": false,
+        "directory": "/fyoung/tmp/agentflow-expense-duplicate-approval-reospdta",
+        "readySeconds": 7.65
+      },
+      {
+        "boot": 4,
+        "tag": "round-rebinding",
+        "pid": 22851,
+        "baseline": false,
+        "directory": "/fyoung/tmp/agentflow-expense-duplicate-approval-reospdta",
+        "readySeconds": 8.41
+      },
+      {
+        "boot": 5,
+        "tag": "after-automatic-approval-forced-restart",
+        "pid": 22880,
+        "baseline": false,
+        "directory": "/fyoung/tmp/agentflow-expense-duplicate-approval-reospdta",
+        "readySeconds": 7.66
+      },
+      {
+        "boot": 6,
+        "tag": "independent-restore",
+        "pid": 22951,
+        "baseline": false,
+        "directory": "/fyoung/tmp/agentflow-expense-duplicate-approval-restore-p2n83d6f/restored",
+        "readySeconds": 8.44
+      }
+    ],
+    "ownedRuntimeStopped": true,
+    "checks": {
+      "legacyDefinitionsBusinessDraftAndInApprovalStatePreserved": true,
+      "legacyV2SameApproverDepartmentRemainsManualAndCompletes": true,
+      "frozenOriginalManagerAndAutomaticSourceSurviveOrganizationChangeAndCrash": true,
+      "financialReceiptRemainsManualAfterAutomaticBusinessApproval": true,
+      "concurrentRequestsCompleteExactlyOneHumanAndTwoAutomaticNodes": [
+        200,
+        409
+      ],
+      "newRoundRequiresHumanSourceAndKeepsDistinctPriorRoundAutomaticAudit": true,
+      "automaticAuditsVersionsAndPendingFinancialTasksSurviveSecondCrashWithoutReplay": true,
+      "restoredAllTableContentsAndStructuredAutomaticProofs": {
+        "tables": 253,
+        "rows": 789,
+        "automaticProofs": 5
+      },
+      "attachmentFileCount": 0,
+      "restoredPendingRoundResumesFromFrozenBobAndAutomaticallyPassesOnlyDepartment": true,
+      "restoredStructuredAutomaticProofCount": 6,
+      "originalDatabaseAndSyntheticReceiptsUnchangedByRestore": true
+    },
+    "forcedRestartStages": [
+      "UPGRADE",
+      "SEPARATION"
+    ],
+    "forcedRestartMethod": "Popen.kill followed by wait on the owned baseline/current artifact process, then a new PID and exact application/history comparison"
+  },
+  "httpContract": {
+    "status": "PASS",
+    "counts": {
+      "responses": 257,
+      "successfulRequests": 53,
+      "automaticEventSamples": 9,
+      "templateCopies": 3,
+      "duplicateDenials": 2
+    },
+    "distinctAutomaticEvents": 6,
+    "operationCount": 24,
+    "openapiSha256": "9806bed5114b31116afa31637d352a86c99e4b14a027bcd45b187d6cda8e7fdb",
+    "scope": "Actual HTTP against fixed baseline/new/restored packages; counts include repeat observations, not distinct business cases or browser interactions."
+  },
+  "restoreSchema": {
+    "status": "PASS",
+    "schemaStatements": 1981,
+    "canonicalStatementsSha256": "de4b5789edb2a1d7db3346210d09e20c473dbbdc891e55c5a6a4ed21b28f8292",
+    "sourceSchemaSha256": "0f6e783aaeb50b794443d2754ec3d3c34bdaa164b187882ae91d2c75a0c0aad5",
+    "restoredSchemaSha256": "b3bff757faeb86b2268ba60c2fb1081fd2a0f89d8d3503582cdd8f53de5b3273",
+    "source": "/fyoung/tmp/agentflow-f12-schema-check-1g8wj4zy/source.sql",
+    "restored": "/fyoung/tmp/agentflow-f12-schema-check-1g8wj4zy/restored.sql",
+    "originalSourceUnchanged": true,
+    "credentials": "Both schema exports authenticated as the explicitly configured synthetic sa user with empty password; NOPASSWORDS retains the user and ADMIN declarations while omitting random salt and password hashes.",
+    "scope": "All complete statements compared with native NODATA NOPASSWORDS output; equivalent original source and pre-resume restore snapshots also verified, retaining account identity/privileges and every table/column/constraint/sequence."
+  },
+  "schemaVerificationCorrection": {
+    "initialResult": "FAILED",
+    "cause": "Default H2 SCRIPT output includes a different generated salt/hash for the synthetic local SA account in a fresh database. Exactly one CREATE USER statement differed on each side.",
+    "resolution": "Authenticated closed source copy and fresh backup restore with explicit empty synthetic SA credentials, exported native NODATA NOPASSWORDS statements, and verified equivalence with both originally captured schemas while retaining account identity and ADMIN privilege. No database structure/constraint was excluded.",
+    "sourceDatabaseChanged": false
+  },
+  "structuredProofs": {
+    "sourceAndPreResumeRestoreCount": 5,
+    "afterRestoredContinuationCount": 6,
+    "checkedFields": [
+      "applicationId",
+      "roundNo",
+      "automatic taskId",
+      "nodeId",
+      "actor",
+      "action",
+      "ruleVersion",
+      "definitionId",
+      "definitionVersion",
+      "sourceNodeId",
+      "sourceTaskIds",
+      "subject"
+    ]
+  },
+  "evidenceSnapshot": {
+    "directory": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-runtime-evidence-snapshot",
+    "fileCount": 58,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-runtime-evidence-snapshot/manifest.json"
+  },
+  "remaining": [
+    "Browser scope acceptance remains blocked by administrator policy; no alternate browser used.",
+    "PostgreSQL scope acceptance remains blocked by the existing image-layer I/O issue; no restart/delete/install workaround performed."
+  ],
+  "inventory": {
+    "knownOpenTaskCount": 34,
+    "completeInventory": false
+  },
+  "delivery": {
+    "localOnly": true,
+    "pushed": false,
+    "pullRequestCreated": false,
+    "dependsOn": "V02 before E15"
+  }
+}

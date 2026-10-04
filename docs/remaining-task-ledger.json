@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T01:14:35.401126+00:00",
+  "recordedAt": "2026-10-04T01:24:46.042572+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1441,7 +1441,7 @@
           ]
         }
       ],
-      "observed": "后端、两种设计器、便携配置、差异展示及费用模板/配套包 v3 已接入。设计器与模板阶段 102 项 Java、67 项前端、类型/契约/构建检查通过；原生代理、定时接续、并行汇合和并发连续自动审批通过。事件/服务接续新增 2 项组合场景，65 项范围回归通过，审计回滚与服务效果不重复已验证。固定包已保存，实际升级与强退恢复、浏览器及 PostgreSQL 验收仍待完成。",
+      "observed": "后端、两种设计器及模板/配套包 v3 已接入；设计器阶段 102 项 Java、67 项前端及异步接续 65 项范围回归通过。固定包完成 v2→v3 非空升级、旧版人工语义、并发自动审批、撤回重提、两次强退及独立恢复；253 表 789 行、1,981 条结构语句、257 份响应与 53 份请求契约通过。剩余浏览器和 PostgreSQL 补验。",
       "references": [
         {
           "path": "docs/expense-duplicate-approval.md",
@@ -1457,6 +1457,14 @@
         },
         {
           "path": "docs/evidence/expense-duplicate-approval-event-service-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-duplicate-approval-runtime.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-duplicate-approval-runtime-20261004.json",
           "line": 1
         }
       ],
@@ -1476,6 +1484,11 @@
         "status": "VERIFIED_TASK_OPEN",
         "sourceCommit": "8422723383998aa5521b6e64bbea9016322d7ed2",
         "evidence": "docs/evidence/expense-duplicate-approval-event-service-20261004.json"
+      },
+      "runtimeStage": {
+        "status": "VERIFIED_BROWSER_POSTGRES_PENDING",
+        "artifactSourceCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
+        "evidence": "docs/evidence/expense-duplicate-approval-runtime-20261004.json"
       }
     },
     {
@@ -3597,7 +3610,6 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F12",
     "A03",
     "I01"
   ],
@@ -3625,10 +3637,10 @@
   },
   "latestProgress": {
     "taskId": "F12",
-    "status": "EVENT_SERVICE_WAIT_RESUMPTION_VERIFIED_TASK_OPEN",
-    "recordedAt": "2026-10-04T01:14:35.401126+00:00",
-    "sourceCommit": "8422723383998aa5521b6e64bbea9016322d7ed2",
-    "evidence": "docs/evidence/expense-duplicate-approval-event-service-20261004.json",
+    "status": "FIXED_PACKAGE_RUNTIME_VERIFIED_BROWSER_POSTGRES_PENDING",
+    "recordedAt": "2026-10-04T01:24:46.042572+00:00",
+    "sourceCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
+    "evidence": "docs/evidence/expense-duplicate-approval-runtime-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
