@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T23:38:39.983155+00:00",
+  "recordedAt": "2026-10-04T00:12:55.673523+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1407,15 +1407,23 @@
           ]
         }
       ],
-      "observed": "通用职责分离已过滤申请人并在无人时阻断；多级主管可显式选择，但遇到费用自审批时不会自动沿任职关系上溯并审计。",
+      "observed": "已实现显式发布费用策略、提交轮次候选与任职冻结、自审批上溯一级、版本审计及设计器配置；并行职责变化同步作用于办理、待办和分页总数。87 项 Java、82 项前端范围测试及构建通过；模板接入、固定包运行与恢复、浏览器和 PostgreSQL 仍待验收。",
       "references": [
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java",
-          "line": 85
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSelfApprovalBindings.java",
+          "line": 45
         },
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationAssigneeResolver.java",
-          "line": 107
+          "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskAuthorization.java",
+          "line": 110
+        },
+        {
+          "path": "docs/expense-self-approval.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-self-approval-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "仅已发布费用策略启用；固定任职依据、检测环路与空上级，记录原候选和替代人及规则版本；财务职责分离仍强制。",
@@ -3598,11 +3606,11 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "F17",
-    "status": "FIXED_PACKAGE_RUNTIME_AND_RESTORE_VERIFIED_TASK_OPEN",
-    "recordedAt": "2026-10-03T23:38:39.983155+00:00",
-    "sourceCommit": "24b0096108349599c3feec7c1347376249821288",
-    "evidence": "docs/evidence/supplier-payable-notifications-runtime-20261003.json",
+    "taskId": "F11",
+    "status": "CORE_DESIGNER_AND_RANGE_TESTS_VERIFIED_TASK_OPEN",
+    "recordedAt": "2026-10-04T00:12:55.673523+00:00",
+    "sourceCommit": "a113e072ee4a496a2bd102790524bd94ecb3186d",
+    "evidence": "docs/evidence/expense-self-approval-20261004.json",
     "knownOpenTaskCount": 34
   }
 }

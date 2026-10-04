@@ -1,0 +1,581 @@
+{
+  "task": "F11",
+  "status": "CORE_DESIGNER_AND_RANGE_TESTS_VERIFIED_TASK_OPEN",
+  "recordedAt": "2026-10-04T00:12:55.673523+00:00",
+  "sourceCommit": "a113e072ee4a496a2bd102790524bd94ecb3186d",
+  "baseCommit": "169cbfba7f8cd47d4150d432e8f03fd30e643fa8",
+  "branch": "codex/governance-identifier-integration",
+  "requirement": {
+    "path": "/Volumes/fyoung/code/AI/flow/doc/05-费用报销领域设计.md",
+    "lines": [
+      341,
+      350
+    ]
+  },
+  "trace": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-source-trace-a113e07.json",
+    "bytes": 6326,
+    "sha256": "106d4a673feb018c1c1f688c6a3456db667d049765af75a7a84e38832930c420"
+  },
+  "realRed": [
+    {
+      "cause": "Existing generic exclusion left no candidate instead of escalating a self-approving expense applicant.",
+      "tests": 1,
+      "assertionFailures": 1,
+      "errors": 0,
+      "summary": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-red-summary.json",
+        "bytes": 550,
+        "sha256": "fa79f04a4697a800439e55a0fcee97217661f5b8a1b999f910dc83c048a27712"
+      },
+      "log": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-red.log",
+        "bytes": 44612,
+        "sha256": "dfbc52c0b130be61de1683275c25c08bb770ff1e8626ee21fd3f172da6cc8064"
+      }
+    },
+    {
+      "cause": "Pending and legacy task lists retained a now-conflicting financial candidate after parallel business approval.",
+      "tests": 1,
+      "assertionFailures": 1,
+      "errors": 0,
+      "summary": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-queue-red-summary.json",
+        "bytes": 973,
+        "sha256": "1805666e3151fc2c7d50a1b00df091b67768758234da909498d92a45b822ac92"
+      },
+      "log": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-queue-red.log",
+        "bytes": 45261,
+        "sha256": "b2da1dcdf23675cecf9374715498fc8c1e12141e25fad8612b126c5f339bc6d6"
+      }
+    },
+    {
+      "cause": "Public audit filter rejected persisted SELF_APPROVAL_ESCALATED action with 400.",
+      "tests": 1,
+      "assertionFailures": 1,
+      "errors": 0,
+      "summary": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-audit-red-summary.json",
+        "bytes": 504,
+        "sha256": "840f4f0810682edd8eecbb9196dc77d3733f1bb56d70c7a0700eeda5d2a76da9"
+      },
+      "log": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-audit-red.log",
+        "bytes": 44543,
+        "sha256": "fe6e370b03b718c2ebb4b3fc998a343e4c6102cc7d7dfe12fd624297f3609663"
+      }
+    }
+  ],
+  "java": {
+    "distinctCases": 87,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "summary": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java-summary.json",
+      "bytes": 11551,
+      "sha256": "65678a54d3e87f11e30a844b30fbcb4a5112343303f539538c13e867144b9f01"
+    },
+    "log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java.log",
+      "bytes": 224972,
+      "sha256": "94d2cc943f6184b4759798832d45021593960590ffbfce43a4864e32e1c9ff2a"
+    },
+    "reports": [
+      {
+        "class": "io.agentflow.expense.ExpenseProcessPolicyTest",
+        "module": "agentflow-domain",
+        "distinctCases": 4,
+        "sha256": "e4d873db46a7c2c69ae8b9089e8bf80c8d0a8786d56bc8ef88e874b46619a20d",
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java-reports/TEST-io.agentflow.expense.ExpenseProcessPolicyTest.xml",
+        "caseNames": [
+          "legalEntityPaperRequirementNeedsReceiptBeforeEveryFinancialTask",
+          "maskedDetailsAndUnknownStageCannotBeUsedForFinancialReview",
+          "paperReceiptIsAnExplicitOnceOnlyFactForTheCurrentFrozenRound",
+          "taskNameCannotGrantFinanceRoleAndAllCompletionPathsMustCrossFinance"
+        ]
+      },
+      {
+        "class": "io.agentflow.expense.ExpenseSelfApprovalPolicyTest",
+        "module": "agentflow-domain",
+        "distinctCases": 4,
+        "sha256": "d8cd22e27d443d1bb407c6c2051392c6930dc5d64e01caf6b063a0aa76cc5839",
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java-reports/TEST-io.agentflow.expense.ExpenseSelfApprovalPolicyTest.xml",
+        "caseNames": [
+          "absentPolicyKeepsPublishedLegacySemantics",
+          "dutyConflictsAreSymmetricAndIncludeReceiptWithoutForbiddingTwoFinanceSteps",
+          "explicitPolicyRequiresExpenseSchemaAndStartNode",
+          "nonCanonicalOrUnknownRulesFailAtPublication"
+        ]
+      },
+      {
+        "class": "io.agentflow.definition.ApprovalResponsibilityPolicyTest",
+        "module": "agentflow-domain",
+        "distinctCases": 4,
+        "sha256": "c82a68840d69639dcc369423d225fd72da68fd4004a1e3f4042277befff4660f",
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java-reports/TEST-io.agentflow.definition.ApprovalResponsibilityPolicyTest.xml",
+        "caseNames": [
+          "futureAndParallelReferencesCannotCreateChangingResponsibility",
+          "invalidValuesAndRepeatedOrUnknownReferencesAreRejected",
+          "nonApprovalNodeCannotHideAnIgnoredPolicy",
+          "validSequentialReferenceAndLegacyGraphRemainPublishable"
+        ]
+      },
+      {
+        "class": "io.agentflow.organization.ApprovalProxyDecisionIntegrationTest",
+        "module": "agentflow-server",
+        "distinctCases": 11,
+        "sha256": "2be41b1902f2895cca67985b742428f31c80376738b3fbdc139ac1e1520af3b5",
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java-reports/TEST-io.agentflow.organization.ApprovalProxyDecisionIntegrationTest.xml",
+        "caseNames": [
+          "approvalKeepsActualNativeAssigneeAndOriginalProxyEvidenceAndHistoricalAccess",
+          "auditAndNativeHistoryRollbackTogetherAndTheOriginalRequestRecoversOnce",
+          "committedRevocationWinsAgainstADecisionWaitingForTheSameProxyRow",
+          "completedProxyAndPrincipalRetainOnlyTheOriginalNodeFieldProjectionAfterRevocation",
+          "countersignKeepsOneVoteAndCannotAddTheRepresentedPrincipalOrActualApproverAgain",
+          "downstreamResponsibilityExcludesTheActualProxyApproverInsteadOfTheOriginalPrincipal",
+          "expirationWhileWaitingForTheProxyLockRejectsTheDecision",
+          "multipleOriginalPrincipalsRequireSelectionAndOnlyTheSelectedPrincipalGainsHistory",
+          "nativeAuthorityTakesPrecedenceButInvalidExplicitProxyNeverFallsBack",
+          "returnAndRejectKeepTheReasonActualActorAndOriginalResponsibility",
+          "simultaneousProxyDecisionsAtOneApplicationVersionHaveOnlyOneWinner"
+        ]
+      },
+      {
+        "class": "io.agentflow.organization.ApprovalResponsibilitiesIntegrationTest",
+        "module": "agentflow-server",
+        "distinctCases": 8,
+        "sha256": "8083d1e8ee01e4f0a26a1d4015bdd1fe8bd55d1d79fb362b7acf209cc9fbb7cd",
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java-reports/TEST-io.agentflow.organization.ApprovalResponsibilitiesIntegrationTest.xml",
+        "caseNames": [
+          "cancelledAnyMembersAreNotMistakenForActualApprovers",
+          "countersignFiltersBeforeCountingAndDoesNotAllowAddingExcludedPerson",
+          "downstreamExcludesActualDecisionMakerRatherThanOriginalAssignee",
+          "emptyDownstreamRosterRollsBackDecisionVersionAndNativeCompletion",
+          "emptyFilteredRosterRollsBackAndLegacyVersionKeepsItsSemantics",
+          "historicalCandidateEvidenceUsesEffectiveRosterAndNewRoundHasItsOwnSnapshot",
+          "percentageUsesFilteredDenominatorAndAllPreviousApproversAreExcluded",
+          "selfApprovalIsExcludedFromCandidatesQueuesAndResponsibilityChanges"
+        ]
+      },
+      {
+        "class": "io.agentflow.organization.ApprovalProxyTaskReadIntegrationTest",
+        "module": "agentflow-server",
+        "distinctCases": 11,
+        "sha256": "d958dee6c28e081cff4fdba3b7cef7f09b1bfaf5c2bebb1af474e63bb6715d4a",
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java-reports/TEST-io.agentflow.organization.ApprovalProxyTaskReadIntegrationTest.xml",
+        "caseNames": [
+          "actualRoleAndBothPeopleRemainRequiredAndNoOtherTenantCanBorrowTheGrant",
+          "countersignProxyCannotBorrowAnotherVoteWhileResponsibleOrAfterApproving",
+          "directProxyDoesNotChainOrTakeOverPendingNativeDelegation",
+          "effectiveProxyReadsTheNativeTaskAndApplicationWithoutClaimingIt",
+          "explicitFinanceNodeRequiresTheSubstitutesOwnFinanceRole",
+          "fieldProjectionAndOriginalAttachmentsUseTheSameRevocableNodePermission",
+          "multiplePrincipalsDoNotDuplicateRowsAndAuthorizationPrecedesPaginationAndFiltering",
+          "originalNativeRoleMembershipIsNotInferredFromLocalApprovalEligibility",
+          "roundBindingSuspensionAndUnrecordedInstancesCannotBecomeProxyTasks",
+          "scheduledAndExactVersionScopesUseInclusiveStartExclusiveEndWithoutAJob",
+          "selfApprovalAndPreviousActualApproverExclusionsApplyToTheSubstitute"
+        ]
+      },
+      {
+        "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+        "module": "agentflow-server",
+        "distinctCases": 12,
+        "sha256": "a789ce1fcb173d638628a0ddc55c59daacbc2ceef2456acad1ba42d43554d584",
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java-reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+        "caseNames": [
+          "expenseSelfApprovalDeduplicatesSupervisorBeforeCountersignDenominator",
+          "expenseSelfApprovalKeepsFutureNodeAndHistoryAfterOrganizationChanges",
+          "expenseSelfApprovalNeverEscalatesOrSkipsFinancialConflict",
+          "expenseSelfApprovalRechecksFinancialDutiesAfterParallelCandidateActivation",
+          "expenseSelfApprovalReevaluatesOnlyNewRoundAndRetainsOriginalEvidence",
+          "expenseSelfApprovalRejectsCyclicOrInactiveSelectedSuperior",
+          "expenseSelfApprovalUsesSupervisorOfSelectedAppointment",
+          "expenseSelfApprovalWithoutSuperiorRollsBackSubmissionAndFinancialState",
+          "formalSubmissionReplaysOnceAndRequiresExplicitReceiptThenActualBudgetFreeze",
+          "resubmissionMovesReservationsAndRequiresANewReceiptAndAnAdjustedBudget",
+          "timedProxyReceiptKeepsOriginalResponsibilityAndRecordsActualSigner",
+          "timedProxyReductionUsesOwnFinanceRoleAndRetainsActualOperatorAndOriginalAuthority"
+        ]
+      },
+      {
+        "class": "io.agentflow.definition.DefinitionDeploymentIntegrationTest",
+        "module": "agentflow-server",
+        "distinctCases": 5,
+        "sha256": "97096a980ac76bea20191360e6d9071ed547800a48c0d40fe91fbb71cec3260a",
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java-reports/TEST-io.agentflow.definition.DefinitionDeploymentIntegrationTest.xml",
+        "caseNames": [
+          "allocatesNextVersionForAnotherDraftWithSameKey",
+          "keepsBundledAndTenantVersionsIndependentForTheSameKey",
+          "publishesConditionalDefinitionToFlowable",
+          "rejectsAnUnrelatedExistingEngineVersionWithoutPublishingTheNewGraph",
+          "rollsBackBothPlatformAndEngineWhenTheirVersionSequencesDiverge"
+        ]
+      },
+      {
+        "class": "io.agentflow.definition.DefinitionInitiatorRequirementsTest",
+        "module": "agentflow-server",
+        "distinctCases": 6,
+        "sha256": "2f0f77d07078faa63d012f77c027b15280e650db7f61e148a458a35f7b902648",
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java-reports/TEST-io.agentflow.definition.DefinitionInitiatorRequirementsTest.xml",
+        "caseNames": [
+          "cyclesAndMissingTenantVersionsFailInsteadOfGuessingAnAppointment",
+          "directContextualCopyDoesNotRequireLoadingUnrelatedDefinitions",
+          "expenseSelfApprovalRequiresAppointmentEvenWithOnlyStaticAssigneeRules",
+          "findsContextualRulesAcrossSeveralFixedVersions",
+          "sharedStaticVersionsAreReadOnlyOnce",
+          "supervisorEscalationInAFixedChildRequiresTheRootAppointment"
+        ]
+      },
+      {
+        "class": "io.agentflow.api.OpenApiContractTest",
+        "module": "agentflow-server",
+        "distinctCases": 7,
+        "sha256": "e76b19df0bcde9139bf46c46b52bcaa35841e6885fe0bc2ac5955ae1d9264205",
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java-reports/TEST-io.agentflow.api.OpenApiContractTest.xml",
+        "caseNames": [
+          "availabilityIsOptionalOnlyOnLegacyDefinitionWriteReplays",
+          "callbackContractAllowsAbsentOptionalFieldsFromTheRealSerializer",
+          "cancellationIsReadableForApplicationsAndSystemStoppedSubprocessRounds",
+          "contractRequiresAuthenticationAndContainsNoSessionData",
+          "operationsExactlyMatchActualApiRoutesAndRequestFields",
+          "responseSchemasMatchPublishedRecordFields",
+          "riskRequiredFieldsMatchActualSerializationIncludingUnassessedLegacyRounds"
+        ]
+      },
+      {
+        "class": "io.agentflow.approval.PendingTaskQueueIntegrationTest",
+        "module": "agentflow-server",
+        "distinctCases": 15,
+        "sha256": "1368786b6263d2ff0d2f6f64c1c91f20453ed72d9042192e2d0a12ed025a6123",
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-java-reports/TEST-io.agentflow.approval.PendingTaskQueueIntegrationTest.xml",
+        "caseNames": [
+          "claimedTransferredAndDelegatedTasksOnlyFollowTheCurrentHandler",
+          "countersignPagesCountOnlyTheCurrentUsersRemainingTasks",
+          "deadlineBoundaryUsesOneServerInstantAndStillChecksTenantAndCurrentEligibility",
+          "deadlineFilterUsesRealDueDatesAndTheSameAuthorizedSetForRowsAndTotal",
+          "deadlineFilteredCursorBindsTheFilterAndKeepsTotalBeforePagination",
+          "declaredTextAmountNeverBecomesANumericQueueProjection",
+          "excludesSuspendedTasksWrongRuntimeBindingAndNonCurrentRound",
+          "filtersActualTaskAndApplicationSummariesWithoutReturningPayload",
+          "pageAndTotalReadTheAuthorizedTaskSetOnceBeforeCursorAndLimit",
+          "rejectsUnknownOrMalformedFiltersAndDoesNotExposeAnUnrelatedQueue",
+          "resubmissionFreezesNewAssessmentWhileHistoryAndOriginalVersionRemain",
+          "riskCursorBindsFilterAndKeepsTotalWhenLastPageDisappears",
+          "riskFiltersOnlyCurrentAuthorizedSnapshotsAndDistinguishesMissingEvidence",
+          "sameTimestampCursorSurvivesCompletedRowsAndBindsFiltersActorAndTenant",
+          "unknownAmountsAreNotZeroAndRevisedAmountsBecomeSearchableOnResubmission"
+        ]
+      }
+    ]
+  },
+  "frontend": {
+    "tests": 82,
+    "passed": 82,
+    "failures": 0,
+    "scope": [
+      "expense-self-approval.test.mjs",
+      "approval-responsibilities.test.mjs",
+      "comparison.test.mjs",
+      "portable-template.test.mjs",
+      "quick-designer.test.mjs",
+      "designer-graph.test.mjs",
+      "audit-search.test.mjs"
+    ],
+    "log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-web.log",
+      "bytes": 8456,
+      "sha256": "b1f146b4b1539da35979bac6712a681a8b47b9a37afd93c7f66a0d4235ba8001"
+    },
+    "initialFailure": {
+      "cause": "Test expected an omitted optional differentApproverFrom key as explicit undefined; corrected only assertion.",
+      "log": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-web-initial.log",
+        "bytes": 9405,
+        "sha256": "41ef82746026bed4f83b72d21a493ef71e15b9ccc447dca83f35bd8570e01bee"
+      }
+    },
+    "typecheck": {
+      "status": "PASS",
+      "session": 26438,
+      "exitCode": 0,
+      "log": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-typecheck.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "build": {
+      "status": "PASS",
+      "session": 38212,
+      "exitCode": 0,
+      "log": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-vite.log",
+        "bytes": 1113,
+        "sha256": "2829c74aed33c3edf0a7459febba7fbb98f2bff6adfde615e76d48c9d2e2143e"
+      },
+      "existingWarning": "Main minified chunk exceeds 500 kB; no real-browser acceptance in this stage."
+    }
+  },
+  "openapi": {
+    "status": "PASS",
+    "operations": 360,
+    "schemas": 748,
+    "requestExamples": 125,
+    "log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-openapi.log",
+      "bytes": 71,
+      "sha256": "d7f578b26e02a3954b9a05a40ba1e8b9088d50c0e7f5bbafb028cb97d79a775b"
+    }
+  },
+  "authors": {
+    "status": "PASS",
+    "javaFiles": 1630,
+    "namedTypes": 3177,
+    "missingAuthors": 0,
+    "parseErrors": 0,
+    "log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/f11-self-approval-final-authors.log",
+      "bytes": 73,
+      "sha256": "c39ab5e36177f74f7a5d465a14b09c1ddf9a985732e4d8d7093fb95fd05ad864"
+    }
+  },
+  "artifacts": {
+    "server": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-server-a113e07.jar",
+      "bytes": 79660076,
+      "sha256": "66d3824e0f672295c389067e04e805e9387935fccee16f8b828035331f0f1941"
+    },
+    "webRoot": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-web-a113e07",
+    "webFiles": [
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-web-a113e07/assets/index-Ds-ROVwg.js",
+        "bytes": 1881921,
+        "sha256": "9876fc07945227245041a7aac9bbaff2a9411d334047dbbbcbee2eca2845feb5"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-web-a113e07/assets/index-fAmZmAev.css",
+        "bytes": 407073,
+        "sha256": "118d787462a503e3fbb79748d66bb255ee53d17e1876bdfa9e961ffdca05fdc9"
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-web-a113e07/index.html",
+        "bytes": 420,
+        "sha256": "08ae5796c3301d8b6e9e510600593c4d97bce8bbf03d02b4173d8b30b3a18cc3"
+      }
+    ]
+  },
+  "sourceFiles": [
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java",
+      "bytes": 18707,
+      "sha256": "3b7172ad319e03c03675b7d02cdbe6133d4f1fd0ab7aeb076c411c91dca8bf72",
+      "repositoryPath": "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-domain/src/main/java/io/agentflow/expense/ExpenseSelfApprovalPolicy.java",
+      "bytes": 1715,
+      "sha256": "29d6dd5bfcd92eb3df8842f27868edb059984f01dcbad8877533703310c6e09f",
+      "repositoryPath": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseSelfApprovalPolicy.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-domain/src/main/java/io/agentflow/expense/ExpenseSelfApprovalSnapshot.java",
+      "bytes": 2330,
+      "sha256": "13c504b6cb2ca0ad192d50bf9ba9446c4d235a19a35e0b9dda01c58556c0ec83",
+      "repositoryPath": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseSelfApprovalSnapshot.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-domain/src/test/java/io/agentflow/expense/ExpenseSelfApprovalPolicyTest.java",
+      "bytes": 4033,
+      "sha256": "5b41e04e15edf1ef54f87930536f888f3798a0099958e6ee80386775bc56a7c5",
+      "repositoryPath": "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseSelfApprovalPolicyTest.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/approval/history/HistoryQueryParameters.java",
+      "bytes": 5911,
+      "sha256": "509d75f2cfb8521f9c4deafbb23567c8a9eaac3310fd905137994918f3454cc3",
+      "repositoryPath": "agentflow-server/src/main/java/io/agentflow/approval/history/HistoryQueryParameters.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/approval/operations/AuditSearchParameters.java",
+      "bytes": 6064,
+      "sha256": "4ec20206a653702efc74ba47b67815333068ab9f4c2a5ccec8216dace1e235ec",
+      "repositoryPath": "agentflow-server/src/main/java/io/agentflow/approval/operations/AuditSearchParameters.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java",
+      "bytes": 12666,
+      "sha256": "29fc5c8b1cc2705c0dddf6b5f55221fb2379167c1c0a488f3a9746c1166af887",
+      "repositoryPath": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/approval/process/FlowableCountersignMembers.java",
+      "bytes": 5546,
+      "sha256": "e09a9d249362d96b4d8e9c0fa79f6937b954948e6d7127322d221b1fb6b4ff6c",
+      "repositoryPath": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableCountersignMembers.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/approval/process/FlowableProcessRuntimeAdapter.java",
+      "bytes": 15555,
+      "sha256": "786300409c0a42c0b992ff1ea68f4798fe8c0d49bd68a6ed83f8c0b16df6958c",
+      "repositoryPath": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableProcessRuntimeAdapter.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskAuthorization.java",
+      "bytes": 6966,
+      "sha256": "f8e1f5c8fc9ec5425544f9ad1d702adb1b55b9677f8fb1661385b9a08441a6b9",
+      "repositoryPath": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskAuthorization.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/approval/workspace/FlowablePendingTaskReadAdapter.java",
+      "bytes": 8745,
+      "sha256": "d78d8229e24bdd527f7e698c287841fd73a367556e3d7d5413e89537f0aa1bdf",
+      "repositoryPath": "agentflow-server/src/main/java/io/agentflow/approval/workspace/FlowablePendingTaskReadAdapter.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/definition/DefinitionInitiatorRequirements.java",
+      "bytes": 4112,
+      "sha256": "bd4bc50897f734d33184f3f577b4ecc72c310ba29a7c5790f07959e576347274",
+      "repositoryPath": "agentflow-server/src/main/java/io/agentflow/definition/DefinitionInitiatorRequirements.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java",
+      "bytes": 14890,
+      "sha256": "b7d3f0f45243ff9f03aeae292ef8030d4c8f0703f2b2ed03461e4db89e804460",
+      "repositoryPath": "agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/expense/ExpenseApprovalService.java",
+      "bytes": 11610,
+      "sha256": "d52719ff3827e14fff7774b78a2b7eaa283e0724925864c39b45f4ba00498891",
+      "repositoryPath": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseApprovalService.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/expense/ExpenseSelfApprovalAudit.java",
+      "bytes": 3104,
+      "sha256": "fa16ec2986a7fb8064f1d2fc59efcff9a069afa685a8e929fca2fbb969b06d08",
+      "repositoryPath": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSelfApprovalAudit.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/java/io/agentflow/expense/ExpenseSelfApprovalBindings.java",
+      "bytes": 7046,
+      "sha256": "69e1120dc1fe65e6bd3f68f0913f306f350e8db18cf7ff953435a50a2dafe3af",
+      "repositoryPath": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSelfApprovalBindings.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/main/resources/api/openapi.json",
+      "bytes": 2514357,
+      "sha256": "5890c16894633936c33111844200a311315931e400ade376aaf1ead88065b0b8",
+      "repositoryPath": "agentflow-server/src/main/resources/api/openapi.json"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/approval/PendingTaskQueueIntegrationTest.java",
+      "bytes": 34392,
+      "sha256": "2540dbe8f3d82f08a71868642110dbe77d4c27013e7ae4100b5f9c77e3e0548a",
+      "repositoryPath": "agentflow-server/src/test/java/io/agentflow/approval/PendingTaskQueueIntegrationTest.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/definition/DefinitionInitiatorRequirementsTest.java",
+      "bytes": 4559,
+      "sha256": "1522993ddb64ccad8b81eff7ac354260143c16ddde44cd714ee760fbaeaa9901",
+      "repositoryPath": "agentflow-server/src/test/java/io/agentflow/definition/DefinitionInitiatorRequirementsTest.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+      "bytes": 646555,
+      "sha256": "44bb2ae28d8d4a3049e50fe60198e84e744ab66d329999da01c5b54eef4195ab",
+      "repositoryPath": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-web/scripts/test-requests.mjs",
+      "bytes": 91900,
+      "sha256": "8c8f433938b3d91e141a62be157f012c909367763f81c2efb1111858d3064cb9",
+      "repositoryPath": "agentflow-web/scripts/test-requests.mjs"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-web/src/App.vue",
+      "bytes": 143931,
+      "sha256": "77cabebb77e56e61f25f11896242fec6407a8d44e3e05c307be8d17f5b49925a",
+      "repositoryPath": "agentflow-web/src/App.vue"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-web/src/components/ApplicationHistory.vue",
+      "bytes": 13859,
+      "sha256": "5ffecd41a08239f829a7ba46aeef8d2a9cc672809746f1af606503a7b430a9d4",
+      "repositoryPath": "agentflow-web/src/components/ApplicationHistory.vue"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-web/src/components/AuditSearch.vue",
+      "bytes": 13621,
+      "sha256": "486c81b1e9290adada1b583c60dd8cc1cfc782135b1e4bdc19b8475eec0a1757",
+      "repositoryPath": "agentflow-web/src/components/AuditSearch.vue"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-web/src/components/DefinitionExpenseSelfApproval.vue",
+      "bytes": 2364,
+      "sha256": "96e0fc67ed69900270beeb6e3296e0cb7553e20665725ae306a5ee8c5421f11d",
+      "repositoryPath": "agentflow-web/src/components/DefinitionExpenseSelfApproval.vue"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-web/src/components/DefinitionResponsibilities.vue",
+      "bytes": 7337,
+      "sha256": "0bb855294ee31b6676ecaecd371968544a2d5fe4d0b67faf95f16dc69d7eb114",
+      "repositoryPath": "agentflow-web/src/components/DefinitionResponsibilities.vue"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-web/src/components/QuickDesigner.vue",
+      "bytes": 18106,
+      "sha256": "428894ef1e2885675067daca83fafc40b204945cee24a6eea17cbc6669449a74",
+      "repositoryPath": "agentflow-web/src/components/QuickDesigner.vue"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-web/src/definitionComparison.ts",
+      "bytes": 7575,
+      "sha256": "be0fef8be0366bb5b8dff37a7b422b7f3b7fc9aec94c39b202c204d9b080b775",
+      "repositoryPath": "agentflow-web/src/definitionComparison.ts"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-web/src/portableTemplate.ts",
+      "bytes": 13022,
+      "sha256": "b61cd987aa0c34ef5b66b92d09722df85713d8b7e3ea517262d957cd7d04d93f",
+      "repositoryPath": "agentflow-web/src/portableTemplate.ts"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-governance-identifier-integration/agentflow-web/tests/expense-self-approval.test.mjs",
+      "bytes": 6384,
+      "sha256": "c7123640d31ae90e6430088d74bf87a6376cfaf1dca6229dbb93c61d4552ada5",
+      "repositoryPath": "agentflow-web/tests/expense-self-approval.test.mjs"
+    }
+  ],
+  "manualReview": [
+    "New policy is explicit on the published expense START node; existing definitions without it keep prior expressions.",
+    "Domain records contain no engine types; submission freezes the selected appointment and candidates; organization authority remains in the existing resolver.",
+    "Candidate replacement is one superior only, deduplicated before countersign denominator freezing. Missing superior blocks the complete submission transaction.",
+    "Actual business and financial participation is checked for actions and lists; pending SQL excludes conflicting tasks before window count and cursor pagination.",
+    "Audit filters and all three OpenAPI action enums include the escalation event.",
+    "Sensitive form visibility remains governed by existing field rules; no administrator bypass added."
+  ],
+  "pending": [
+    "Versioned expense template integration and sample expectations.",
+    "Fixed-package public HTTP acceptance, nonempty upgrade, restart, and independent paired restore.",
+    "Exercise paper receipt participation before completion against a parallel business task in fixed-package acceptance.",
+    "Real browser and PostgreSQL validation; existing environment restrictions remain."
+  ],
+  "counting": {
+    "knownOpen": 34,
+    "byKind": {
+      "LOCAL_DEVELOPMENT": 16,
+      "LOCAL_VERIFICATION": 3,
+      "EXTERNAL_ACCEPTANCE": 15
+    },
+    "completeInventory": false,
+    "completionPercentage": null
+  },
+  "preservation": {
+    "mainCommit": "fec4a87c6c785ddabf40ad2584060e264abddd2f",
+    "originalRuntimePid": 87821,
+    "remoteDelivery": "Not attempted; V02 precedes E15."
+  }
+}
