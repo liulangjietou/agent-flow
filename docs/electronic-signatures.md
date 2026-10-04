@@ -1,6 +1,6 @@
 # 电子签实施记录
 
-I02 当前已实现固定签署请求、服务方回执、操作状态机、持久仓储，以及可信签署配置、原始回执验真、证据持久化和固定目标 HTTP 文件传输。申请权限编排和后台执行已通过相应范围验证；已补齐[用户接口、结果下载及验真回调](electronic-signature-api.md)和[操作页面](electronic-signature-ui.md)，固定安装包运行验收仍待完成。领域基础见 [领域阶段证据](evidence/electronic-signature-domain-20261004.json)，仓储和数据库恢复见 [持久化阶段证据](evidence/electronic-signature-persistence-20261004.json)。
+I02 当前已实现固定签署请求、服务方回执、操作状态机、持久仓储，以及可信签署配置、原始回执验真、证据持久化和固定目标 HTTP 文件传输。申请权限编排和后台执行已通过相应范围验证；已补齐[用户接口、结果下载及验真回调](electronic-signature-api.md)和[操作页面](electronic-signature-ui.md)，[固定安装包运行](electronic-signature-runtime.md)已完成演示及合成共享 OIDC 场景，浏览器与 PostgreSQL 待补验。领域基础见 [领域阶段证据](evidence/electronic-signature-domain-20261004.json)，仓储和数据库恢复见 [持久化阶段证据](evidence/electronic-signature-persistence-20261004.json)。
 
 2026-10-04 范围验证通过 38 个唯一 Java 用例，其中请求 9、回执 9、操作状态 17、服务端序列化 3。恢复首次发送状态时遗漏授权截止校验的问题已先复现再修正；正常入口已有截止校验，新增用例覆盖绕过入口直接恢复的风险。首轮序列化检查因放在不含 Java 时间模块的领域测试环境而报错，随后移至服务端；这属于测试归属调整，不计为业务缺陷修复。
 
@@ -17,6 +17,8 @@ I02 当前已实现固定签署请求、服务方回执、操作状态机、持�
 同日公开接口与回调阶段通过 314 个唯一 Java 用例，按最终完整运行计数，前序重复运行不相加。实际上传、审批、创建、回调、独立结果下载、当前失权、管理员敏感附件限制、并发重复和证据失败整体回滚均通过。首次重复 Content-Type 测试因模拟请求覆盖头值而失败，独立探针确认后修正夹具；另有两条真实失败先复现了数字版本与小数轮次的隐式转换，再由入口类型检查修复。公开 OpenAPI 的路由、请求和响应字段匹配，全部 1723 个 Java 文件的 3400 个具名类型署名检查通过。详见[接口说明](electronic-signature-api.md)及[范围证据](evidence/electronic-signature-api-20261004.json)。
 
 同日页面阶段通过 161 个唯一前端用例，其中新增签署 27 项、相关回归 134 项；类型、构建和静态接口契约通过。真实模板与 API 序列化覆盖明确授权、原键恢复、取消、身份切换、文件边界和独立下载，标题关闭状态遗漏已先复现再修正。自定义渲染器不代表浏览器验收，详见[页面说明](electronic-signature-ui.md)及[范围证据](evidence/electronic-signature-ui-20261004.json)。
+
+同日固定包运行完成演示模式 144 次及共享 OIDC 模式 68 次业务 HTTP 交互，非空升级、两次执行中强退、独立配套恢复和原登录授权均通过。实际并发回调发现锁等待引起的时间顺序问题，先补失败用例再在事务编排层修正，165 个 Java 范围回归通过。详见[运行说明](electronic-signature-runtime.md)及[证据](evidence/electronic-signature-runtime-20261004.json)；各阶段和重复运行不相加，I02 仍等待浏览器及 PostgreSQL 验收。
 
 ## 调用链与职责
 

@@ -1,0 +1,446 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-04T07:58:03.560257+00:00",
+  "taskId": "I02",
+  "status": "FIXED_PACKAGE_LOCAL_H2_AND_SHARED_OIDC_RUNTIME_VERIFIED_BROWSER_AND_POSTGRES_PENDING",
+  "sourceCommit": "f44e21cf71daeea93ab9a1baac958c49e3c247d7",
+  "branch": "codex/governance-identifier-integration",
+  "remainingTaskCount": 34,
+  "artifacts": {
+    "sourceCommit": "f44e21cf71daeea93ab9a1baac958c49e3c247d7",
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/signature-server-f44e21c.jar",
+    "jarSha256": "6ac23beffa6b9b4137ff7cf43ce029efddd57fd8ec81f823d5766ebd8dd1e560",
+    "baselineJar": "/fyoung/tmp/agentflow-remaining-20260928/organization-sync-server-0cbe62b.jar",
+    "baselineSha256": "734ee4320d1832c9c3928cf78923c45f6e52ad7a71335fcd3201862aa3e0a15c",
+    "baselineVersion": 110,
+    "targetVersion": 113,
+    "webDist": "/fyoung/tmp/agentflow-remaining-20260928/i02-ui-evidence-20261004/build",
+    "webFiles": {
+      "index.html": "f37441733cb489eca2a55927f426631867ffa989b0f965cf2964e54f0696a76d",
+      "assets/index-CMXqvSsG.css": "65d047054347300d052a68beedf57a8b924fb7523bb80aeb4f955970ad56610d",
+      "assets/index-Dh3oCuNb.js": "1896abca8a455a47347a54ac9ce4d43e07a6eda5e84e0ec2f1b8975221953453"
+    }
+  },
+  "demoRuntime": {
+    "directory": "/fyoung/tmp/agentflow-signature-runtime-ez33pw1z",
+    "status": "PASS",
+    "syntheticOnly": true,
+    "browserAcceptance": false,
+    "postgresAcceptance": false,
+    "oidcAcceptance": false,
+    "checks": {
+      "nonemptyV110ToV113": {
+        "preservedTables": 261,
+        "oldRows": 105,
+        "newTables": [
+          "SIGNATURE_LOGIN_AUTHORIZATION",
+          "SIGNATURE_OPERATION",
+          "SIGNATURE_OPERATION_REVISION",
+          "SIGNATURE_RECEIPT_EVIDENCE",
+          "SIGNATURE_RESULT_FILE",
+          "SIGNATURE_SOURCE_DOCUMENT"
+        ],
+        "originalFiles": 4
+      },
+      "explicitQueuedCancelExpirationAndRevokedDemoLogin": {
+        "cancelled": "872e543f-9aba-465d-918a-d29dc310987e",
+        "expired": "1dd7bba4-398d-4b8f-854c-bf161856cacf",
+        "revoked": "a955c412-7162-4dfb-aa98-8c161395ff0a",
+        "providerCalls": 0,
+        "longProfileVersion": "9007199254740993"
+      },
+      "actualSignedCallbackAndIndependentDownloads": {
+        "operation": "3034e703-973e-48a3-a89f-e95acbd16b5c",
+        "files": 2,
+        "concurrentDuplicateCallbacks": 2,
+        "invalidSignatureRejected": true,
+        "olderReceiptPreservesSigned": true,
+        "conflictingReceiptRejected": true
+      },
+      "processCrashAfterRemoteAcceptanceUsesOriginalQuery": {
+        "operation": "d1c00ce3-ac07-4910-b86f-922117c99efe",
+        "submitCalls": 1,
+        "queryCalls": 1,
+        "resultDownloads": 2,
+        "demoLoginExpiredAfterRestart": true
+      },
+      "partialResultCrashAndIndependentPairedRestore": {
+        "operation": "b485cbe0-df10-4f0b-b20a-2235a4c1f6fd",
+        "tables": 268,
+        "rows": 346,
+        "schemaStatements": 2099,
+        "storedFiles": 11,
+        "readyBeforeCrash": 1,
+        "firstResultRemoteDownloads": 1,
+        "oldTaskCompleted": "ca05f12f-bfc7-11f1-8381-debdc7977caa",
+        "sourceDatabaseAndFilesUnchanged": true,
+        "restoreDirectory": "/fyoung/tmp/agentflow-signature-restored-p3ogqe3y"
+      }
+    },
+    "boots": [
+      {
+        "boot": 1,
+        "tag": "baseline-v110",
+        "baseline": true,
+        "workers": false,
+        "pid": 68203,
+        "directory": "/fyoung/tmp/agentflow-signature-runtime-ez33pw1z",
+        "readySeconds": 6.95
+      },
+      {
+        "boot": 2,
+        "tag": "upgraded-v113",
+        "baseline": false,
+        "workers": false,
+        "pid": 68213,
+        "directory": "/fyoung/tmp/agentflow-signature-runtime-ez33pw1z",
+        "readySeconds": 6.69
+      },
+      {
+        "boot": 3,
+        "tag": "queued-controls",
+        "baseline": false,
+        "workers": false,
+        "pid": 68226,
+        "directory": "/fyoung/tmp/agentflow-signature-runtime-ez33pw1z",
+        "readySeconds": 6.05
+      },
+      {
+        "boot": 4,
+        "tag": "queued-after-demo-login-restart",
+        "baseline": false,
+        "workers": true,
+        "pid": 68234,
+        "directory": "/fyoung/tmp/agentflow-signature-runtime-ez33pw1z",
+        "readySeconds": 6.16
+      },
+      {
+        "boot": 5,
+        "tag": "send-crash-query-only",
+        "baseline": false,
+        "workers": true,
+        "pid": 68249,
+        "directory": "/fyoung/tmp/agentflow-signature-runtime-ez33pw1z",
+        "readySeconds": 6.07
+      },
+      {
+        "boot": 6,
+        "tag": "restore-worker-off",
+        "baseline": false,
+        "workers": false,
+        "pid": 68303,
+        "directory": "/fyoung/tmp/agentflow-signature-restored-p3ogqe3y",
+        "readySeconds": 6.56
+      },
+      {
+        "boot": 7,
+        "tag": "restore-worker-on",
+        "baseline": false,
+        "workers": true,
+        "pid": 68312,
+        "directory": "/fyoung/tmp/agentflow-signature-restored-p3ogqe3y",
+        "readySeconds": 6.64
+      }
+    ],
+    "httpExchanges": 144,
+    "providerCalls": 11,
+    "temporaryServicesStopped": true,
+    "contracts": {
+      "result": "PASS",
+      "httpExchanges": 144,
+      "responseContracts": 125,
+      "requestContracts": 32,
+      "binaryContracts": 16,
+      "emptyCallbacks": 3,
+      "realFrontendReads": 60,
+      "realFrontendWriteReceipts": 9
+    }
+  },
+  "sharedOidcRuntime": {
+    "directory": "/fyoung/tmp/agentflow-signature-oidc-gzdjv3k7",
+    "status": "PASS",
+    "syntheticOnly": true,
+    "browserAcceptance": false,
+    "postgresAcceptance": false,
+    "oidcAcceptance": false,
+    "syntheticSharedOidcProtocolAcceptance": true,
+    "checks": {
+      "sharedOriginalLoginSurvivesBeforeFirstSend": {
+        "operation": "4f67a342-a5b5-4fa4-8da3-01bc48caa2e7",
+        "submitCalls": 1,
+        "identityPreserved": true,
+        "internalPrimaryIdOnly": true,
+        "callbackWithoutSessionOrCsrf": true,
+        "ordinaryWriteWithoutCsrfRejected": true,
+        "independentResultFiles": 2
+      },
+      "logoutAndNewLoginCannotReplaceOriginalGrant": {
+        "operation": "e7ae48f2-fe3a-4ee3-9f9b-ea50641decaf",
+        "providerCalls": 0,
+        "originalSessionDeleted": true,
+        "authorizationHistoryPreserved": true,
+        "newLoginDoesNotAuthorizeOldOperation": true
+      },
+      "disabledPersonCannotFirstSend": {
+        "operation": "006e831e-2c3c-4444-9093-5352e031d84a",
+        "providerCalls": 0,
+        "attempts": 0,
+        "status": "CANCELLED"
+      },
+      "enterpriseFirstSendRequiresSharedSession": {
+        "publicOptionsEnabled": false,
+        "creationStatus": 503,
+        "providerCalls": 0
+      }
+    },
+    "boots": [
+      {
+        "boot": 1,
+        "tag": "oidc-shared-queue",
+        "baseline": false,
+        "workers": false,
+        "pid": 69559,
+        "directory": "/fyoung/tmp/agentflow-signature-oidc-gzdjv3k7",
+        "readySeconds": 7.1
+      },
+      {
+        "boot": 2,
+        "tag": "oidc-shared-after-restart",
+        "baseline": false,
+        "workers": true,
+        "pid": 69580,
+        "directory": "/fyoung/tmp/agentflow-signature-oidc-gzdjv3k7",
+        "readySeconds": 6.63
+      },
+      {
+        "boot": 3,
+        "tag": "oidc-shared-logout-queue",
+        "baseline": false,
+        "workers": false,
+        "pid": 69593,
+        "directory": "/fyoung/tmp/agentflow-signature-oidc-gzdjv3k7",
+        "readySeconds": 6.64
+      },
+      {
+        "boot": 4,
+        "tag": "oidc-shared-after-original-logout",
+        "baseline": false,
+        "workers": true,
+        "pid": 69603,
+        "directory": "/fyoung/tmp/agentflow-signature-oidc-gzdjv3k7",
+        "readySeconds": 6.56
+      },
+      {
+        "boot": 5,
+        "tag": "oidc-shared-person-disable-queue",
+        "baseline": false,
+        "workers": false,
+        "pid": 69614,
+        "directory": "/fyoung/tmp/agentflow-signature-oidc-gzdjv3k7",
+        "readySeconds": 6.55
+      },
+      {
+        "boot": 6,
+        "tag": "oidc-shared-after-person-disable",
+        "baseline": false,
+        "workers": true,
+        "pid": 69619,
+        "directory": "/fyoung/tmp/agentflow-signature-oidc-gzdjv3k7",
+        "readySeconds": 6.55
+      },
+      {
+        "boot": 7,
+        "tag": "oidc-without-shared-session",
+        "baseline": false,
+        "workers": false,
+        "pid": 69628,
+        "directory": "/fyoung/tmp/agentflow-signature-oidc-gzdjv3k7",
+        "readySeconds": 6.66
+      }
+    ],
+    "httpExchanges": 68,
+    "providerCalls": 3,
+    "temporaryServicesStopped": true,
+    "contracts": {
+      "result": "PASS",
+      "httpExchanges": 68,
+      "responseContracts": 63,
+      "requestContracts": 35,
+      "binaryContracts": 4,
+      "emptyCallbacks": 1,
+      "realFrontendReads": 9,
+      "realFrontendWriteReceipts": 3
+    }
+  },
+  "callbackTimingRegression": {
+    "priorGap": "Concurrent tests used the same receive time for both calls and missed arrival order differing from transaction lock order.",
+    "red": {
+      "classCases": 17,
+      "failures": 0,
+      "errors": 2,
+      "report": "regression/red.xml"
+    },
+    "rootCause": "Controller observation time is captured before waiting for the application and operation locks; another transaction may advance updatedAt first.",
+    "fix": "Clamp the effective mutation time to the locked persisted updatedAt in the transaction service. Keep the original verified evidence time and the domain monotonic invariant unchanged.",
+    "greenUniqueJavaCases": 165,
+    "classes": [
+      {
+        "name": "io.agentflow.approval.IdempotencyIntegrationTest",
+        "tests": 30,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.signature.SignatureAccessTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.signature.SignatureApiIntegrationTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.signature.SignatureCallbackVerifierTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.signature.SignatureEvidencePersistenceTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.signature.SignatureOperationTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.signature.SignaturePersistenceTest",
+        "tests": 32,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.signature.SignatureReceiptVerifierTest",
+        "tests": 31,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.signature.SignatureWorkerIntegrationTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "counting": "Only final unique class and case names are counted; earlier 314-case stage and repeated runs are not added."
+  },
+  "priorRuns": [
+    {
+      "label": "demo-first",
+      "directory": "/fyoung/tmp/agentflow-signature-runtime-beomovzp",
+      "reason": "Concurrent callback lock ordering caused one valid duplicate to return 409 before the production fix.",
+      "productDefect": true
+    },
+    {
+      "label": "demo-schema-fixture",
+      "directory": "/fyoung/tmp/agentflow-signature-runtime-44btuwml",
+      "reason": "The fixture compared export line order; complete H2 SQL statements, including duplicate counts, are equivalent.",
+      "productDefect": false
+    },
+    {
+      "label": "oidc-launch-fixture",
+      "directory": "/fyoung/tmp/agentflow-signature-oidc-zaqdlz7n",
+      "reason": "Java source launch used a different classloader, preventing access to package-private fixture members. Compile then launch with the same application classloader.",
+      "productDefect": false
+    },
+    {
+      "label": "oidc-assignee-fixture",
+      "directory": "/fyoung/tmp/agentflow-signature-oidc-0_l_fdxw",
+      "reason": "The synthetic definition used a demo user rule. The initialized enterprise directory requires its actual ORG_PERSON identifier.",
+      "productDefect": false
+    },
+    {
+      "label": "oidc-active-admin-fixture",
+      "directory": "/fyoung/tmp/agentflow-signature-oidc-qjw1jdky",
+      "reason": "The administrator had valid IdP roles but no active local person, so its signing read correctly returned 403. Create its active person to independently verify sensitive-field restrictions.",
+      "productDefect": false
+    }
+  ],
+  "sourceManifest": [
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureOperationService.java",
+      "bytes": 10998,
+      "sha256": "14c4c16673b6016fdd927e0bec57ebbd950afbae6629495888d2e41796deff10"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureCallbackController.java",
+      "bytes": 1524,
+      "sha256": "8731e01ad7d4d15c6c03138528b6d69e2f8960f3a2ebfa55a9a5697ad4635582"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/auth/DeferredActorAuthentication.java",
+      "bytes": 6206,
+      "sha256": "1b01ecb773ebb634d1665499a1bd4c236e569729b984240b115cdb0e4866d795"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureWorkerIntegrationTest.java",
+      "bytes": 21862,
+      "sha256": "fe0d96fdd9f8093bf82dd41aed5cd8250793ec2cd3ebe0524f412535531888cf"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/auth/OidcTestProvider.java",
+      "bytes": 13410,
+      "sha256": "d0bc33ab2d51ca5622edc7bde153ea71f8cb597c9f74ab56912b8522f3b4027b"
+    },
+    {
+      "path": "agentflow-web/src/signatures.ts",
+      "bytes": 13567,
+      "sha256": "84e8e4deeed07865e861c252b3cab504194e86d9683ec94a14bd47997102c7bb"
+    },
+    {
+      "path": "agentflow-web/src/attachments.ts",
+      "bytes": 1650,
+      "sha256": "3dc0e6290ce869a9cebea0a0ec0b7f25176b9e1748de1303170d64be02931129"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "bytes": 142730,
+      "sha256": "a70bee4e1644de16a8bb3149ebd55d5d3e0abbc6241284a09c0d80b89d3d598d"
+    },
+    {
+      "path": "agentflow-web/src/components/SignaturePanel.vue",
+      "bytes": 23520,
+      "sha256": "0b31f51b9fbd371a78f9529d29b63743b2a610776aee3c4a5fb25bca22f75a42"
+    }
+  ],
+  "archive": {
+    "directory": "/fyoung/tmp/agentflow-remaining-20260928/i02-runtime-evidence-20261004",
+    "fileCount": 250,
+    "bytes": 14635516,
+    "manifestSha256": "3f594be9618c1def8fcfb46d18fb24fba826c676d5ceb8f3d4df7117553e72e4"
+  },
+  "limits": [
+    "Actual HTTP and compiled frontend DTO parser verification do not constitute browser acceptance.",
+    "Synthetic RSA/PKCE/OIDC and JDBC session restoration are verified locally; real enterprise IdP acceptance remains E11.",
+    "Synthetic signature provider and bytes do not validate embedded PDF/OFD signatures, certificate chains or timestamps; real supplier acceptance remains E10.",
+    "Browser administrator policy and PostgreSQL image I/O blockers remain without bypass, restart or alternate installation.",
+    "I02 stays OPEN awaiting browser and PostgreSQL acceptance. V03 is incomplete; 34 is the known remaining lower bound.",
+    "Main checkout and PID 87821 are preserved. Local commits only; V02 precedes E15 remote PR and CI."
+  ]
+}
