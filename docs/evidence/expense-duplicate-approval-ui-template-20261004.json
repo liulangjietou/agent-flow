@@ -1,0 +1,149 @@
+{
+  "taskId": "F12",
+  "status": "DESIGNER_TEMPLATE_AND_NATIVE_SCENARIOS_VERIFIED_TASK_OPEN",
+  "recordedAt": "2026-10-04T01:03:37.637526+00:00",
+  "sourceCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
+  "baseCommit": "7046453d3769c374fd10e6eb971a5e211b1a069a",
+  "backendCommit": "084b18e01811473313e6e1c2a875f7a9f89e4508",
+  "verification": {
+    "java": {
+      "status": "PASS",
+      "sessionId": 7505,
+      "exitCode": 0,
+      "uniqueCases": 102,
+      "classes": {
+        "io.agentflow.expense.ExpenseDuplicateApprovalPolicyTest": 7,
+        "io.agentflow.expense.ExpenseSelfApprovalPolicyTest": 4,
+        "io.agentflow.template.ClasspathProcessTemplateCatalogTest": 30,
+        "io.agentflow.template.ProcessTemplateIntegrationTest": 33,
+        "io.agentflow.template.ClasspathFinancialTemplateExamplesTest": 8,
+        "io.agentflow.expense.ExpenseSubmissionIntegrationTest": 20
+      }
+    },
+    "frontend": {
+      "sessionId": 79302,
+      "exitCode": 0,
+      "tests": 67,
+      "testFiles": [
+        "expense-duplicate-approval.test.mjs",
+        "expense-self-approval.test.mjs",
+        "portable-template.test.mjs",
+        "designer-graph.test.mjs",
+        "comparison.test.mjs",
+        "templates.test.mjs",
+        "simulation.test.mjs"
+      ]
+    },
+    "typescript": {
+      "sessionId": 42419,
+      "exitCode": 0
+    },
+    "vite": {
+      "sessionId": 23672,
+      "exitCode": 0,
+      "existingWarning": "JavaScript chunk remains larger than 500 kB"
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 360,
+      "schemas": 748,
+      "requestExamples": 125
+    },
+    "authors": {
+      "sessionId": 24140,
+      "exitCode": 0,
+      "javaFiles": 1634,
+      "namedTypes": 3184,
+      "missingAuthorTags": 0,
+      "parseErrors": 0
+    },
+    "templateInvariants": "Original graph amount edges, form schema, all scenarios and companion configuration unchanged",
+    "diffCheck": "PASS"
+  },
+  "red": {
+    "sessionId": 38320,
+    "exitCode": 1,
+    "failures": [
+      "Portable-template round trip rejects expenseDuplicateApproval as an unsupported property",
+      "Version comparison exposes the raw property instead of its name"
+    ]
+  },
+  "excludedRuns": [
+    {
+      "sessionId": 68859,
+      "reason": "Incorrect comparison test filename; no tests executed"
+    },
+    {
+      "sessionId": 29832,
+      "exitCode": 143,
+      "reason": "Stopped the owned Maven process after detecting a missing test import, before applying the correction"
+    },
+    {
+      "sessionId": 82296,
+      "reason": "101 of 102 passed; parallel fixture lacked an exclusive merge before the parallel join. Corrected the fixture without weakening the graph validator."
+    }
+  ],
+  "implemented": [
+    "Shared quick/advanced designer control, dependency guidance, explicit clearing and locked-state enforcement",
+    "Portable configuration round trip and readable version comparison",
+    "Simulation clarifies that traversed nodes do not establish actual automatic approval",
+    "Expense template v3 and employee-finance companion v3; stale v1/v2 catalog-copy source rejected"
+  ],
+  "nativeScenarios": [
+    "Proxy completion uses the actual substitute; a different next approver stays manual",
+    "Native timer advance retains the original decision trace, blocks early advancement and rejects duplicate job consumption",
+    "Both unique branch tasks can automatically pass; a following business task with distinct parallel predecessors stays manual",
+    "Two simultaneous public approval requests yield one success; a 60000 expense traverses department/executive once with two automatic actions and exact version growth"
+  ],
+  "artifacts": {
+    "sourceCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
+    "recordedAt": "2026-10-04T01:03:37.637526+00:00",
+    "server": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-server-25fc140.jar",
+      "bytes": 79676180,
+      "sha256": "197f9d738440a1d197e57c79c95d2ef19fe8da6ab9903624b082729c5ab0d0b1"
+    },
+    "web": {
+      "directory": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-web-25fc140",
+      "files": [
+        {
+          "path": "assets/index-C-XRaavZ.css",
+          "bytes": 407361,
+          "sha256": "d40e1f5724b886bb28b20a18804e5d4b1179567f5cb8ef0eb141a2162a312b28"
+        },
+        {
+          "path": "assets/index-PWB8zP6D.js",
+          "bytes": 1885957,
+          "sha256": "db254966f908161980d758d09c9dde833101f43855368af16814c3a6b32def28"
+        },
+        {
+          "path": "index.html",
+          "bytes": 420,
+          "sha256": "7bb85c0312aa6d1bc7c63eb4f9f39b09898ebea59df40f48439cfbb328804723"
+        }
+      ]
+    },
+    "templateVersion": 3,
+    "companionVersion": 3,
+    "runtimeExecuted": false
+  },
+  "remaining": [
+    "Event and service wait resumption integration coverage",
+    "Actual fixed-package nonempty legacy upgrade, concurrent replay, forced restart and independent restoration",
+    "Browser and PostgreSQL scope acceptance"
+  ],
+  "inventory": {
+    "knownOpenTaskCount": 34,
+    "completeInventory": false
+  },
+  "evidenceSnapshot": {
+    "directory": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-ui-template-evidence",
+    "fileCount": 42,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-ui-template-evidence/manifest.json"
+  },
+  "delivery": {
+    "localOnly": true,
+    "pushed": false,
+    "pullRequestCreated": false
+  }
+}
