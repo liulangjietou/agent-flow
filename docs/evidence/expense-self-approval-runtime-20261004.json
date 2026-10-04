@@ -1,0 +1,224 @@
+{
+  "task": "F11",
+  "status": "TEMPLATE_FIXED_PACKAGE_RUNTIME_AND_RESTORE_VERIFIED_TASK_OPEN",
+  "recordedAt": "2026-10-04T00:28:06.734182+00:00",
+  "sourceCommit": "1a62061b9e44a4d3b818fce6d81a80b89827f909",
+  "coreSourceCommit": "a113e072ee4a496a2bd102790524bd94ecb3186d",
+  "sourceFiles": 34,
+  "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-runtime-evidence-snapshot",
+  "manifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-runtime-evidence-snapshot/manifest.json",
+    "bytes": 23965,
+    "sha256": "425ca0301026f8b0087b20ac9b19bf5bfdf07cc9065187f8c272d35b0bdf17e4"
+  },
+  "template": {
+    "expenseReportVersion": 2,
+    "expensePlanVersion": 1,
+    "advanceRequestVersion": 1,
+    "companionVersion": 2,
+    "companionInputsAndConfigurationUnchanged": true,
+    "oldCopiesAndPublishedVersionKept": true
+  },
+  "java": {
+    "distinctCases": 89,
+    "classes": [
+      {
+        "class": "io.agentflow.expense.ExpenseProcessPolicyTest",
+        "distinctCases": 4
+      },
+      {
+        "class": "io.agentflow.expense.ExpenseSelfApprovalPolicyTest",
+        "distinctCases": 4
+      },
+      {
+        "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+        "distinctCases": 10
+      },
+      {
+        "class": "io.agentflow.template.ClasspathFinancialTemplateExamplesTest",
+        "distinctCases": 8
+      },
+      {
+        "class": "io.agentflow.template.ClasspathProcessTemplateCatalogTest",
+        "distinctCases": 30
+      },
+      {
+        "class": "io.agentflow.template.ProcessTemplateIntegrationTest",
+        "distinctCases": 33
+      }
+    ],
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "summary": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-runtime-evidence-snapshot/audit/f11-template-green-summary.json",
+      "bytes": 9257,
+      "sha256": "a56be57aae164f380a985b67ee8cc47008ba0a75d52c87252639aa023a1b66bb"
+    },
+    "initialRed": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-runtime-evidence-snapshot/audit/f11-template-red-and-receipt-summary.json",
+      "bytes": 1074,
+      "sha256": "5d49111b8b0ba0baf1c792a8db0d7c6e2acbd9fced537ef6112a8d13b389a1fb"
+    },
+    "fixtureIssue": "Required common paper-receipt path intentionally rejected branch-only fixture. Added shared receipt checkpoint only in test fixture, production validation unchanged."
+  },
+  "frontend": {
+    "scopeTests": 48,
+    "failures": 0,
+    "log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-runtime-evidence-snapshot/audit/f11-template-web.log",
+      "bytes": 5005,
+      "sha256": "de1d22a7ff0927fe9006b5463fc73a925b678b2fddafd5b103e4df0521c358f2"
+    },
+    "sourceUnchangedFromCoreCommit": true,
+    "typecheckAndBuild": "Reused passing core evidence because frontend sources are unchanged.",
+    "artifactDirectory": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-web-a113e07",
+    "realBrowser": "PENDING"
+  },
+  "server": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-template-server-1a62061.jar",
+    "bytes": 79660307,
+    "sha256": "4eacdc4a6e63017a99e9fdc34d8c9eb40b0c26ef0a62ae3b036bb86897a0002b"
+  },
+  "authors": {
+    "javaFiles": 1630,
+    "namedTypes": 3177,
+    "missingAuthors": 0,
+    "parseErrors": 0,
+    "log": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-runtime-evidence-snapshot/audit/f11-template-authors.log",
+      "bytes": 73,
+      "sha256": "c39ab5e36177f74f7a5d465a14b09c1ddf9a985732e4d8d7093fb95fd05ad864"
+    }
+  },
+  "runtime": {
+    "result": "PASS",
+    "cases": [
+      "legacy",
+      "frozen",
+      "resubmit",
+      "receipt-first",
+      "missing",
+      "restore-active"
+    ],
+    "checks": {
+      "legacyDraftPublishedApplicationAndNativeRuntimePreserved": true,
+      "frozenFutureDepartmentCandidateAndAuditSurviveOrgChangeAndCrash": true,
+      "resubmissionUsesOnlyNewRoundOrganization": true,
+      "actualReceiptBeforeDecisionExcludesParallelBusiness": true,
+      "missingSuperiorRollsBackPublicSubmission": true,
+      "receiptParticipationAndPendingCandidatesSurviveCrash": true,
+      "restoredTableContents": {
+        "tables": 253,
+        "rows": 662
+      },
+      "restoredPendingRoundResumesWithFrozenCandidateAndCurrentSeparation": true,
+      "originalDatabaseAndSyntheticReceiptsUnchangedByRestore": true
+    },
+    "boots": [
+      {
+        "boot": 1,
+        "tag": "baseline",
+        "pid": 14245,
+        "baseline": true,
+        "directory": "/fyoung/tmp/agentflow-expense-self-approval-j3xfdm6n",
+        "readySeconds": 9.1
+      },
+      {
+        "boot": 2,
+        "tag": "upgrade",
+        "pid": 14366,
+        "baseline": false,
+        "directory": "/fyoung/tmp/agentflow-expense-self-approval-j3xfdm6n",
+        "readySeconds": 8.12
+      },
+      {
+        "boot": 3,
+        "tag": "frozen-restart",
+        "pid": 14451,
+        "baseline": false,
+        "directory": "/fyoung/tmp/agentflow-expense-self-approval-j3xfdm6n",
+        "readySeconds": 6.15
+      },
+      {
+        "boot": 4,
+        "tag": "separation",
+        "pid": 14483,
+        "baseline": false,
+        "directory": "/fyoung/tmp/agentflow-expense-self-approval-j3xfdm6n",
+        "readySeconds": 6.23
+      },
+      {
+        "boot": 5,
+        "tag": "second-restart",
+        "pid": 14525,
+        "baseline": false,
+        "directory": "/fyoung/tmp/agentflow-expense-self-approval-j3xfdm6n",
+        "readySeconds": 6.41
+      },
+      {
+        "boot": 6,
+        "tag": "independent-restore",
+        "pid": 14548,
+        "baseline": false,
+        "directory": "/fyoung/tmp/agentflow-expense-self-approval-restore-03b4gepg/restored",
+        "readySeconds": 6.28
+      }
+    ],
+    "forcedTerminations": 2,
+    "allOwnedApplicationsStopped": true,
+    "originalRuntimePreserved": 87821,
+    "actualResponses": 225,
+    "actualSuccessfulRequests": 60,
+    "distinctOperations": 25,
+    "escalationEventSamples": 9,
+    "distinctEscalationEvents": 3,
+    "budgetCommands": 6,
+    "distinctBudgetCommands": 6,
+    "contractEvidence": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-runtime-evidence-snapshot/audit/expense-self-approval-runtime-contract.json",
+      "bytes": 2414,
+      "sha256": "7a36c98ea37e44caee232bedccd1a5fa171fc99b5b62fbf9b325ad72e4e0c357"
+    },
+    "index": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-runtime-evidence-snapshot/audit/expense-self-approval-runtime-state.json",
+      "bytes": 120463,
+      "sha256": "f208e11831675c22e8b203859f7384c17c6334ffffbd03248f7bb2fe37a4e4f8"
+    },
+    "resultEvidence": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-runtime-evidence-snapshot/runtime/result.json",
+      "bytes": 2038,
+      "sha256": "5c5bc6eff22b3e60110695a83499a21bfd7004345fd8259fa079110e82d795a0"
+    }
+  },
+  "restore": {
+    "tables": 253,
+    "rows": 662,
+    "attachments": 0,
+    "sourceDataUnchanged": true,
+    "schemaStatements": 1980,
+    "canonicalSchemaSha256": "99c23e04282d33f455adfe3fa0eb2ee5bbf8d03e2c6b0d8578996488eaa201fb",
+    "schemaEvidence": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-self-approval-runtime-evidence-snapshot/audit/expense-self-approval-restore-schema.json",
+      "bytes": 781,
+      "sha256": "92a0109ddabc2fa31a04bbb219414a26668fe55d3dfae27fe2e92fbd17b89466"
+    },
+    "budgetReceiptsPreserved": true,
+    "pendingApplicationResumed": true
+  },
+  "pending": [
+    "Real browser acceptance of changed expense template and self-approval designer/history.",
+    "PostgreSQL execution of new expense self-approval and template scope."
+  ],
+  "counting": {
+    "knownOpenTaskCount": 34,
+    "byKind": {
+      "LOCAL_DEVELOPMENT": 16,
+      "LOCAL_VERIFICATION": 3,
+      "EXTERNAL_ACCEPTANCE": 15
+    },
+    "completeInventory": false
+  },
+  "nextIndependentTask": "F12",
+  "remoteDelivery": "Not attempted; V02 final local acceptance precedes E15."
+}

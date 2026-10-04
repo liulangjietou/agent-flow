@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T00:12:55.673523+00:00",
+  "recordedAt": "2026-10-04T00:28:06.734182+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1407,22 +1407,18 @@
           ]
         }
       ],
-      "observed": "已实现显式发布费用策略、提交轮次候选与任职冻结、自审批上溯一级、版本审计及设计器配置；并行职责变化同步作用于办理、待办和分页总数。87 项 Java、82 项前端范围测试及构建通过；模板接入、固定包运行与恢复、浏览器和 PostgreSQL 仍待验收。",
+      "observed": "费用模板 v2、显式发布策略、轮次候选冻结、上溯审计、设计器及并行职责查询已实现。模板阶段 89 项 Java、48 项前端范围测试通过；固定包完成旧草稿和在审升级、两次强退、纸件先签收及独立恢复（253 表 662 行）。225 份响应、60 份请求契约通过；剩余浏览器与 PostgreSQL 补验。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSelfApprovalBindings.java",
           "line": 45
         },
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskAuthorization.java",
-          "line": 110
-        },
-        {
-          "path": "docs/expense-self-approval.md",
+          "path": "docs/expense-self-approval-runtime.md",
           "line": 1
         },
         {
-          "path": "docs/evidence/expense-self-approval-20261004.json",
+          "path": "docs/evidence/expense-self-approval-runtime-20261004.json",
           "line": 1
         }
       ],
@@ -3578,7 +3574,6 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F11",
     "F12",
     "A03",
     "I01"
@@ -3607,10 +3602,10 @@
   },
   "latestProgress": {
     "taskId": "F11",
-    "status": "CORE_DESIGNER_AND_RANGE_TESTS_VERIFIED_TASK_OPEN",
-    "recordedAt": "2026-10-04T00:12:55.673523+00:00",
-    "sourceCommit": "a113e072ee4a496a2bd102790524bd94ecb3186d",
-    "evidence": "docs/evidence/expense-self-approval-20261004.json",
+    "status": "TEMPLATE_FIXED_PACKAGE_RUNTIME_AND_RESTORE_VERIFIED_TASK_OPEN",
+    "recordedAt": "2026-10-04T00:28:06.734182+00:00",
+    "sourceCommit": "1a62061b9e44a4d3b818fce6d81a80b89827f909",
+    "evidence": "docs/evidence/expense-self-approval-runtime-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
