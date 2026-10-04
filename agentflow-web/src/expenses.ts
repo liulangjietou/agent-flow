@@ -1,3 +1,4 @@
+import type { PriorControlSource } from './expensePriorControl'
 import type { ApprovalProxyOption, ApprovalProxyUse } from './api'
 
 /** 所有金额以十进制字符串传输；币种来自服务端财务事实。 */
@@ -57,12 +58,12 @@ export interface ExpenseWorkflow extends ExpenseReceipt {
   roundNo: number; canWithdraw: boolean; canCancel: boolean
   paper: null | { roundNo: number; required: boolean; received: boolean; receivedBy: string | null; receivedAt: string | null; proxyUse?: ApprovalProxyUse | null }
   budget: { ledgerStatus: string | null; confirmedCurrent: boolean; operationId: string | null; operationStatus: string | null; issue: string | null }
-  task: null | { taskId: string; stage: 'BUSINESS' | 'RECEIPT' | 'FINANCE_REVIEW' | 'FINANCE_RECHECK'; canReceive: boolean; canReduce: boolean; reductionUnavailable: string | null; canActDirectly?: boolean; proxyOptions?: ApprovalProxyOption[] }
+  task: null | { taskId: string; stage: 'BUSINESS' | 'PRIOR_REQUEST_REVIEW' | 'RECEIPT' | 'FINANCE_REVIEW' | 'FINANCE_RECHECK'; canReceive: boolean; canReduce: boolean; reductionUnavailable: string | null; canActDirectly?: boolean; proxyOptions?: ApprovalProxyOption[] }
 }
 export interface ExpenseItem extends ExpenseVersions { id: string; applicationId: string; businessNo: string; title: string; status: string; roundNo: number; createdAt: string }
 export interface ExpensePage<T> { items: T[]; nextBeforeId: string | null }
 export interface ExpenseFilter { beforeId?: string; limit?: number; status?: string }
-export interface PriorRequestItem { id: string; applicationId: string; legalEntityId: string; version: number; closed: boolean; lines: Array<{ lineNo: number; approved: Money; limit: Money; available: Money; reserved: Money; consumed: Money }> }
+export interface PriorRequestItem { id: string; applicationId: string; legalEntityId: string; version: number; closed: boolean; lines: Array<{ lineNo: number; approved: Money; limit: Money; available: Money; reserved: Money; consumed: Money; control?: PriorControlSource; hardLimit?: boolean; exceeded?: Money }> }
 export interface AdvanceItem { id: string; legalEntityId: string; version: number; status: string; paidOn: string; dueOn: string; paid: Money; available: Money; reserved: Money; settled: Money; repaid: Money; outstanding: Money; receivedRepayments: Money; returnedRepayments: Money; returnedDisbursements?: Money }
 
 export const reductionReasons: Record<ReductionReason, string> = { INELIGIBLE_COST: '不符合报销范围', OVER_STANDARD_NOT_ACCEPTED: '超标部分不予报销', INVALID_INVOICE: '票据不符合要求', TAX_CORRECTION: '调整可抵扣税额', OTHER: '其他原因' }

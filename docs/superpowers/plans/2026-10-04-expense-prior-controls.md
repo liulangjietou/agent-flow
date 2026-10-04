@@ -89,10 +89,10 @@
 - Test: `agentflow-web/tests/expense-configuration.test.mjs`, `expense-plan.test.mjs`，新增 `expense-prior-controls.test.mjs`
 - Modify: `agentflow-server/src/main/resources/api/openapi.json` 与对应契约检查
 
-- [ ] 先复现配置模式、阈值/无上限展示、原轮次依据和新审批职责未接通。
-- [ ] 管理页明确比例；选择器区分硬上限与参考余额；超容差逐行说明、金额依据和新增节点可配置且受控读取。
-- [ ] 升级模板但保留旧版本、下载/导入及模拟路径；身份/轮次切换和原键恢复保持。
-- [ ] 范围组件测试、类型检查、构建和 OpenAPI 通过，本地提交。
+- [x] 先复现配置模式、阈值/无上限展示、原轮次依据和新审批职责未接通。
+- [x] 管理页明确比例；选择器区分硬上限与参考余额；超容差逐行说明、金额依据和新增节点可配置且受控读取。
+- [x] 升级模板但保留旧版本、下载/导入及模拟路径；身份/轮次切换和原键恢复保持。
+- [x] 范围组件测试、类型检查、构建和 OpenAPI 通过，本地提交。
 
 ### Task 5: 固定安装包与恢复验收
 

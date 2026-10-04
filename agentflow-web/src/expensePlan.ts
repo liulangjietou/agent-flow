@@ -1,3 +1,4 @@
+import type { PriorControlSource } from './expensePriorControl'
 import type { Definition } from './api'
 import type { FinanceCatalog } from './expenseDraft'
 import type { InitiatorContext } from './initiatorContext'
@@ -9,7 +10,7 @@ export interface PlanVersions { applicationVersion: number; planVersion: number 
 export interface PlanRound {
   roundNo: number; submittedPlanVersion: number; submittedBy: string; submittedAt: string; content: PlanContent
   legalEntity: FinanceCatalog['legalEntities'][number]; catalogVersion: string; managedCategoryRevision?: number | null
-  lines: Array<{ original: PlanLine; rate: FrozenExpenseLine['assessment']['exchangeRate']; amount: Money; allocations: CostAllocation[] }>
+  lines: Array<{ original: PlanLine; rate: FrozenExpenseLine['assessment']['exchangeRate']; amount: Money; allocations: CostAllocation[]; priorControl?: PriorControlSource }>
 }
 export interface PlanDetail extends PlanVersions { id: string; applicationId: string; businessNo: string; status: string; roundNo: number; editable: boolean; content: PlanContent; financialRound?: PlanRound | null }
 export interface PlanReceipt extends PlanVersions { id: string; applicationId: string; roundNo: number; status: string }

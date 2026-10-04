@@ -65249,6 +65249,15 @@
           },
           "consumed": {
             "$ref": "#/components/schemas/Money"
+          },
+          "control": {
+            "$ref": "#/components/schemas/ExpensePriorControlSnapshot"
+          },
+          "hardLimit": {
+            "type": "boolean"
+          },
+          "exceeded": {
+            "$ref": "#/components/schemas/Money"
           }
         },
         "required": [
@@ -65257,7 +65266,9 @@
           "limit",
           "available",
           "reserved",
-          "consumed"
+          "consumed",
+          "hardLimit",
+          "exceeded"
         ],
         "additionalProperties": false
       },

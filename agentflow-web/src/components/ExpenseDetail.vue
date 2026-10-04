@@ -12,6 +12,7 @@ import ExpenseBudgetRetentionStatus from './ExpenseBudgetRetentionStatus.vue'
 import PrecheckExplanationPanel from './PrecheckExplanationPanel.vue'
 import ExpenseRiskPanel from './ExpenseRiskPanel.vue'
 import ExpenseSplitRoutingPanel from './ExpenseSplitRoutingPanel.vue'
+import ExpensePriorControlPanel from './ExpensePriorControlPanel.vue'
 const props = defineProps<{ reportId: string; applicationId: string; scopeKey: string; version?: number; taskId?: string; roundNo?: number; locked?: boolean; applicant?: boolean }>()
 const emit = defineEmits<{ changed: []; busy: [value: boolean] }>()
 const query = reactive(new ExpenseDetailQuery(api.expenseReport, api.expenseWorkflow))
@@ -29,7 +30,7 @@ onUnmounted(() => { query.clear(); emit('busy', false) })
 async function changed() { notice.value = '操作已记录，正在核对最新费用状态。'; emit('changed'); await load() }
 const financial = computed(() => query.detail?.financialRound)
 const budgetLabels: Record<string, string> = { QUEUED: '等待预算处理', EXECUTING: '预算请求处理中', UNKNOWN: '预算结果待确认', QUERYING: '正在核对预算结果', APPLIED: '预算操作已确认', REJECTED: '预算操作未通过', FAILED: '预算操作失败' }
-const taskLabels: Record<string, string> = { BUSINESS: '业务审批', RECEIPT: '原件收单', FINANCE_REVIEW: '财务审核', FINANCE_RECHECK: '财务复核' }
+const taskLabels: Record<string, string> = { BUSINESS: '业务审批', PRIOR_REQUEST_REVIEW: '事前额度例外审批', RECEIPT: '原件收单', FINANCE_REVIEW: '财务审核', FINANCE_RECHECK: '财务复核' }
 const budgetLabel = computed(() => {
   const budget = query.workflow?.budget
   if (budget?.confirmedCurrent) return '当前金额预算已确认'
@@ -94,6 +95,7 @@ const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
       <section v-if="financial?.adjustments.length" class="adjustment-history" aria-label="财务核减记录"><h4>核减记录</h4><article v-for="adjustment in financial.adjustments" :key="adjustment.id"><p><strong>{{ reductionReasons[adjustment.reasonCode] ?? adjustment.reasonCode }}</strong> · {{ adjustment.adjustedBy }} · {{ timeLabel(adjustment.adjustedAt) }}</p><p class="preserved-text">{{ adjustment.comment }}</p><ul><li v-for="line in adjustment.lineChanges" :key="line.lineNo">第 {{ line.lineNo }} 行：{{ moneyLabel(line.previousGross) }} → {{ moneyLabel(line.approvedGross) }}；税额 {{ moneyLabel(line.previousTax) }} → {{ moneyLabel(line.approvedTax) }}</li><li v-for="offset in adjustment.offsetChanges" :key="offset.advanceId">借款 {{ offset.advanceId }}：{{ moneyLabel(offset.previousAmount) }} → {{ moneyLabel(offset.amount) }}</li></ul></article></section>
       <PrecheckExplanationPanel v-if="applicant && !taskId && roundNo === undefined" :report-id="query.detail.id" :scope-key="scopeKey" :application-version="query.detail.applicationVersion" :financial-version="query.detail.financialVersion" :editable="query.detail.editable" :application-dirty="false" :locked="!!locked || businessBusy || query.loading || riskLocked" @busy="explanationBusy = $event" @dirty="explanationDirty = $event" />
       <ExpenseSplitRoutingPanel v-if="query.detail.financialRound && query.detail.roundNo > 0" :report-id="query.detail.id" :application-id="query.detail.applicationId" :round-no="query.detail.roundNo" :scope-key="scopeKey" :version="query.detail.applicationVersion" :locked="!!locked || businessBusy || query.loading" />
+      <ExpensePriorControlPanel v-if="query.detail.financialRound && query.detail.roundNo > 0" :report-id="query.detail.id" :application-id="query.detail.applicationId" :round-no="query.detail.roundNo" :scope-key="scopeKey" :version="query.detail.applicationVersion" :locked="!!locked || businessBusy || query.loading" />
       <ExpenseRiskPanel v-if="query.detail.financialRound && query.detail.roundNo > 0" :report="query.detail" :task-id="roundNo === undefined ? (taskId ?? query.workflow?.task?.taskId) : undefined" :scope-key="scopeKey" :locked="!!locked || businessBusy || query.loading || explanationLocked" @busy="riskBusy = $event" @dirty="riskDirty = $event" />
       <ExpenseActions v-if="query.workflow && roundNo === undefined" :detail="query.detail" :workflow="query.workflow" :scope-key="scopeKey" :locked="actionsLocked" @changed="changed" @busy="businessBusy = $event" @refresh="load" />
       <VoucherStatus v-if="financial && ['APPROVED', 'REVOKED'].includes(query.detail.applicationStatus)" :application-id="query.detail.applicationId" :business-id="query.detail.id" business-type="EXPENSE" :round-no="query.detail.roundNo" :application-version="query.detail.applicationVersion" :business-version="query.detail.financialVersion" :scope-key="scopeKey" :locked="actionsLocked" @busy="businessBusy = $event" @changed="load" />

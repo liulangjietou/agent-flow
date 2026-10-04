@@ -38,7 +38,7 @@ class ClasspathProcessTemplateCatalogTest {
         var catalog = new ClasspathProcessTemplateCatalog(resources, json);
         assertThat(catalog.list()).extracting(ProcessTemplate::key).containsExactly("leave-request", "seal-application", "contract-review", "procurement-payment", "budget-adjustment",
                 "expense-report", "expense-plan", "advance-request");
-        assertThat(catalog.list().stream().mapToInt(template -> template.scenarios().size()).sum()).isEqualTo(43);
+        assertThat(catalog.list().stream().mapToInt(template -> template.scenarios().size()).sum()).isEqualTo(44);
         catalog.list().forEach(ProcessTemplate::verifyScenarios);
         assertThatThrownBy(catalog.list()::clear).isInstanceOf(UnsupportedOperationException.class);
     }
@@ -47,7 +47,9 @@ class ClasspathProcessTemplateCatalogTest {
     void expenseTemplateRequiresExplicitNewSourceVersionWithSplitRiskDisabledAndNoInventedParameters() {
         var catalog = new ClasspathProcessTemplateCatalog(resources, json);
         var expense = catalog.get("expense-report");
-        assertThat(expense.templateVersion()).isEqualTo(4);
+        assertThat(expense.templateVersion()).isEqualTo(5);
+        assertThat(io.agentflow.expense.ExpenseFormContract.hasPriorControl(expense.formSchema())).isTrue();
+        assertThat(io.agentflow.expense.ExpenseProcessPolicy.stage(expense.graph().node("priorReview"))).isEqualTo(io.agentflow.expense.ExpenseProcessPolicy.Stage.PRIOR_REQUEST_REVIEW);
         assertThat(io.agentflow.expense.ExpenseSelfApprovalPolicy.enabled(expense.graph())).isTrue();
         assertThat(io.agentflow.expense.ExpenseDuplicateApprovalPolicy.enabled(expense.graph())).isTrue();
         var split = io.agentflow.expense.ExpenseSplitRiskPolicy.from(expense.graph());
@@ -55,11 +57,11 @@ class ClasspathProcessTemplateCatalogTest {
         assertThat(split.rule()).isNull();
         assertThat(split.gatewayIds()).containsExactlyInAnyOrder("amountGate", "executiveGate");
         assertThat(expense.graph().node("recheckGate").properties()).doesNotContainKey("expenseSplitRouting");
-        for (long oldVersion : List.of(1L, 2L, 3L)) {
+        for (long oldVersion : List.of(1L, 2L, 3L, 4L)) {
             assertThatThrownBy(() -> catalog.requireVersion("expense-report", oldVersion)).isInstanceOf(DomainException.class)
                     .satisfies(error -> assertThat(((DomainException) error).code()).isEqualTo("TEMPLATE_VERSION_CONFLICT"));
         }
-        assertThat(catalog.requireVersion("expense-report", 4)).isSameAs(expense);
+        assertThat(catalog.requireVersion("expense-report", 5)).isSameAs(expense);
         assertThat(catalog.get("expense-plan").templateVersion()).isEqualTo(1);
         assertThat(catalog.get("advance-request").templateVersion()).isEqualTo(1);
     }

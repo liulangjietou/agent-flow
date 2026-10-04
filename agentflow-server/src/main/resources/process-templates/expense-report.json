@@ -1,15 +1,16 @@
 {
   "key": "expense-report",
-  "templateVersion": 4,
+  "templateVersion": 5,
   "name": "员工费用报销",
   "category": "财务",
-  "description": "员工本币费用报销，包含自审批上溯、相邻同人业务审批自动通过、可配置跨单拆分风险、制度例外、原件签收、逐行核减和独立财务复核。",
+  "description": "员工本币费用报销，包含自审批上溯、相邻同人业务审批自动通过、可配置跨单拆分风险、制度例外、原件签收、逐行核减和独立财务复核。 超出事前累计容差时，增加独立额度例外审批。",
   "scope": "员工本币费用报销，包含自审批上溯、相邻同人业务审批自动通过、可配置跨单拆分风险、制度例外、原件签收、逐行核减和独立财务复核。",
   "businessType": "EXPENSE",
   "dependencies": [
     "维护申请人本次任职及直属主管；本次任职和各节点候选随提交轮次固定。业务候选包含申请人时上溯一级，无有效主管则阻断提交。",
     "启用相邻同人业务审批自动通过；核对候选和实际办理人。非相邻重复、多人候选、多人会签及多个不同审批前驱的汇合保留人工办理。",
     "跨单拆分风险在本模板中明确关闭。启用前须按企业制度明确滚动天数、同类费用阈值及本位币，并逐个确认业务金额网关；模拟时单独填写合成路由金额。",
+    "事前额度控制来自批准计划冻结的类别修订；累计超过容差时逐行说明，由独立额度例外节点审批，不能由制度超标节点或相邻同人自动通过替代。",
     "复制后把部门负责人、分管负责人及财务占位角色绑定到本租户实际人员或岗位；按企业制度调整金额条件后校验、模拟和发布。",
     "配置申请人可用的法人、币种及财务目录；正式提交必须通过该业务专用预检。",
     "先发布适用的费用类别；使用费用制度的报销还需发布匹配的制度版本，示例标准不能替代企业制度。",
@@ -23,13 +24,15 @@
     "EXPENSE_POLICY_OWNER",
     "EXPENSE_RECEIPT",
     "FINANCE",
-    "EXPENSE_FINANCE_RECHECK"
+    "EXPENSE_FINANCE_RECHECK",
+    "EXPENSE_PRIOR_REVIEW"
   ],
   "fieldDescriptions": {
     "expenseDetails": "专用业务页面维护完整单据，所有模板人工节点可原样读取此敏感组；管理员没有额外读取权限。",
     "amount": "本单金额由服务端冻结费用派生；5,000 和 50,000 为可调整的业务示例阈值。明确启用跨单规则后，指定业务网关改用本轮冻结路由金额，表单金额保持本单口径。财务核减后 10,000 元复核条件读取最新本单核定金额。",
     "currency": "由本次任职法人、费用目录及权威汇率共同确认，不由普通表单填写。",
-    "overPolicy": "由本轮原费用制度判定派生，核减不会删除原超标事实，也不能由申请人改成 false。"
+    "overPolicy": "由本轮原费用制度判定派生，核减不会删除原超标事实，也不能由申请人改成 false。",
+    "priorRequestOverTolerance": "服务端根据同一批准行的净核销与全部占用派生，超容差走独立额度例外审批；财务核减不删除原判断。"
   },
   "risks": [
     "5,000、50,000 与财务复核 10,000 元均为本币示例阈值，复制后由租户按制度配置。",
@@ -39,7 +42,8 @@
     "相邻同人业务审批按实际路径自动通过，并记录来源任务、实际人员及规则版本；财务签收、审核和复核始终人工办理。",
     "本版本未包含按项目分摊自动会签或柔性预算超支分支。需要这些规则的业务应待相应能力验收后启用。",
     "签收、审核与复核保留独立人工任务；节点可核减不等于可以扩大原申请金额或修改原制度事实。",
-    "审批通过不等于实际付款或归档；完整凭证、付款、预算核销及发票占用按各自受控链路继续办理。"
+    "审批通过不等于实际付款或归档；完整凭证、付款、预算核销及发票占用按各自受控链路继续办理。",
+    "原发布流程和在审轮次保持原定义；使用容差模式且超阈值时，必须选用有独立额度例外节点的流程版本。"
   ],
   "upgradePolicy": "复制后成为租户独立草稿；目录升级不覆盖既有定义、已发布版本、任职快照或单据轮次。",
   "notificationTexts": {
@@ -136,7 +140,7 @@
         "name": "单据检查与原件签收",
         "type": "USER_TASK",
         "properties": {
-          "x": "1700",
+          "x": "2180",
           "y": "150",
           "assigneeRule": "role:EXPENSE_RECEIPT",
           "expenseStage": "RECEIPT"
@@ -147,7 +151,7 @@
         "name": "财务审核与核减",
         "type": "USER_TASK",
         "properties": {
-          "x": "1940",
+          "x": "2420",
           "y": "150",
           "assigneeRule": "role:FINANCE",
           "expenseStage": "FINANCE_REVIEW"
@@ -158,7 +162,7 @@
         "name": "财务复核：10,000 元",
         "type": "EXCLUSIVE_GATEWAY",
         "properties": {
-          "x": "2180",
+          "x": "2660",
           "y": "150"
         }
       },
@@ -167,7 +171,7 @@
         "name": "财务负责人复核",
         "type": "USER_TASK",
         "properties": {
-          "x": "2420",
+          "x": "2900",
           "y": "330",
           "assigneeRule": "role:EXPENSE_FINANCE_RECHECK",
           "expenseStage": "FINANCE_RECHECK"
@@ -178,8 +182,28 @@
         "name": "结束",
         "type": "END",
         "properties": {
-          "x": "2660",
+          "x": "3140",
           "y": "150"
+        }
+      },
+      {
+        "id": "priorGate",
+        "name": "事前累计容差",
+        "type": "EXCLUSIVE_GATEWAY",
+        "properties": {
+          "x": "1700",
+          "y": "150"
+        }
+      },
+      {
+        "id": "priorReview",
+        "name": "事前额度例外审批",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "1940",
+          "y": "330",
+          "assigneeRule": "role:EXPENSE_PRIOR_REVIEW",
+          "expenseStage": "PRIOR_REQUEST_REVIEW"
         }
       }
     ],
@@ -248,16 +272,16 @@
         "defaultBranch": false
       },
       {
-        "id": "policyGate_receipt",
+        "id": "policyGate_priorGate",
         "source": "policyGate",
-        "target": "receipt",
+        "target": "priorGate",
         "condition": "",
         "defaultBranch": true
       },
       {
-        "id": "policy_receipt",
+        "id": "policy_priorGate",
         "source": "policy",
-        "target": "receipt",
+        "target": "priorGate",
         "condition": "",
         "defaultBranch": false
       },
@@ -295,6 +319,27 @@
         "target": "end",
         "condition": "",
         "defaultBranch": false
+      },
+      {
+        "id": "priorGate_priorReview",
+        "source": "priorGate",
+        "target": "priorReview",
+        "condition": "priorRequestOverTolerance == true",
+        "defaultBranch": false
+      },
+      {
+        "id": "priorGate_receipt",
+        "source": "priorGate",
+        "target": "receipt",
+        "condition": "",
+        "defaultBranch": true
+      },
+      {
+        "id": "priorReview_receipt",
+        "source": "priorReview",
+        "target": "receipt",
+        "condition": "",
+        "defaultBranch": false
       }
     ]
   },
@@ -314,7 +359,8 @@
           "policy": "READ_ONLY",
           "receipt": "READ_ONLY",
           "finance": "READ_ONLY",
-          "recheck": "READ_ONLY"
+          "recheck": "READ_ONLY",
+          "priorReview": "READ_ONLY"
         }
       },
       {
@@ -335,6 +381,12 @@
         "label": "费用制度要求例外审批",
         "type": "BOOLEAN",
         "required": true
+      },
+      {
+        "key": "priorRequestOverTolerance",
+        "label": "事前累计超过容差",
+        "type": "BOOLEAN",
+        "required": true
       }
     ]
   },
@@ -347,13 +399,15 @@
         "expenseDetails": "员工费用报销依据见专用业务明细",
         "amount": "80.00",
         "currency": "CNY",
-        "overPolicy": false
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
       },
       "expectedPath": [
         "start",
         "supervisor",
         "amountGate",
         "policyGate",
+        "priorGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -369,13 +423,15 @@
         "expenseDetails": "员工费用报销依据见专用业务明细",
         "amount": "5000.00",
         "currency": "CNY",
-        "overPolicy": false
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
       },
       "expectedPath": [
         "start",
         "supervisor",
         "amountGate",
         "policyGate",
+        "priorGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -391,7 +447,8 @@
         "expenseDetails": "员工费用报销依据见专用业务明细",
         "amount": "5000.01",
         "currency": "CNY",
-        "overPolicy": false
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
       },
       "expectedPath": [
         "start",
@@ -400,6 +457,7 @@
         "department",
         "executiveGate",
         "policyGate",
+        "priorGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -415,7 +473,8 @@
         "expenseDetails": "员工费用报销依据见专用业务明细",
         "amount": "50000.00",
         "currency": "CNY",
-        "overPolicy": false
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
       },
       "expectedPath": [
         "start",
@@ -424,6 +483,7 @@
         "department",
         "executiveGate",
         "policyGate",
+        "priorGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -440,7 +500,8 @@
         "expenseDetails": "员工费用报销依据见专用业务明细",
         "amount": "50000.01",
         "currency": "CNY",
-        "overPolicy": false
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
       },
       "expectedPath": [
         "start",
@@ -450,6 +511,7 @@
         "executiveGate",
         "executive",
         "policyGate",
+        "priorGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -466,7 +528,8 @@
         "expenseDetails": "员工费用报销依据见专用业务明细",
         "amount": "10000.00",
         "currency": "CNY",
-        "overPolicy": false
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
       },
       "expectedPath": [
         "start",
@@ -475,6 +538,7 @@
         "department",
         "executiveGate",
         "policyGate",
+        "priorGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -490,7 +554,8 @@
         "expenseDetails": "员工费用报销依据见专用业务明细",
         "amount": "10000.01",
         "currency": "CNY",
-        "overPolicy": false
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
       },
       "expectedPath": [
         "start",
@@ -499,6 +564,7 @@
         "department",
         "executiveGate",
         "policyGate",
+        "priorGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -515,7 +581,8 @@
         "expenseDetails": "员工费用报销依据见专用业务明细",
         "amount": "80.00",
         "currency": "CNY",
-        "overPolicy": true
+        "overPolicy": true,
+        "priorRequestOverTolerance": false
       },
       "expectedPath": [
         "start",
@@ -523,6 +590,7 @@
         "amountGate",
         "policyGate",
         "policy",
+        "priorGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -538,13 +606,15 @@
         "expenseDetails": "员工费用报销依据见专用业务明细",
         "amount": "0.00",
         "currency": "CNY",
-        "overPolicy": false
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
       },
       "expectedPath": [
         "start",
         "supervisor",
         "amountGate",
         "policyGate",
+        "priorGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -560,12 +630,38 @@
         "expenseDetails": "员工费用报销依据见专用业务明细",
         "amount": "-0.01",
         "currency": "CNY",
-        "overPolicy": false
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
       },
       "expectedPath": [],
       "expectedFieldErrors": {
         "amount": "BELOW_MINIMUM"
       }
+    },
+    {
+      "id": "prior-over-tolerance",
+      "name": "事前累计超过容差",
+      "description": "同一批准行的累计用量超过原阈值，必须独立额度例外审批；不能由普通制度例外替代。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "80.00",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": true
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "policyGate",
+        "priorGate",
+        "priorReview",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "end"
+      ],
+      "expectedFieldErrors": {}
     }
   ]
 }

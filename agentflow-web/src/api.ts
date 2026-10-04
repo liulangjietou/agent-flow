@@ -1,3 +1,4 @@
+import { readPriorRequestPage, readPriorAssessments } from './expensePriorControl.js'
 import type { ExpensePartialAdjustmentNotificationTarget } from './expensePartialAdjustmentNotification'
 export type { ExpensePartialAdjustmentNotificationTarget } from './expensePartialAdjustmentNotification'
 import type { ExpenseAdjustmentNotificationTarget } from './expenseAdjustmentNotification'
@@ -801,8 +802,9 @@ export const api = {
   reviseExpense: (id: string, input: ExpenseRevise) => write<ExpenseDetail>(`/expense-reports/${encodeURIComponent(id)}/revise`, 'POST', '保存报销修改', input),
   expensePrecheckOptions: (id: string, signal: AbortSignal) => request<PrecheckOptions>(`/expense-reports/${encodeURIComponent(id)}/precheck-options`, { signal, cache: 'no-store' }),
   queueExpensePrecheck: (id: string, input: PrecheckInput) => write<{ id: string }>(`/expense-reports/${encodeURIComponent(id)}/precheck`, 'POST', '发起费用预检', input),
-  expensePrecheck: (id: string, jobId: string, signal: AbortSignal) => request<PrecheckView>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
+  expensePrecheck: (id: string, jobId: string, signal: AbortSignal) => request<PrecheckView>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }).then(value => { if (value.priorControls != null) readPriorAssessments(value.priorControls); return value }),
   precheckExplanationInput: (id: string, precheckId: string, signal: AbortSignal) => request(explanationPath(id) + '/input?precheckId=' + encodeURIComponent(precheckId), { signal, cache: 'no-store' }).then(value => readExplanationInput(value, precheckId)),
+  expensePriorControl: (id: string, roundNo: number, signal: AbortSignal) => request<unknown>(`/expense-reports/${encodeURIComponent(id)}/prior-control` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   expenseSplitRouting: (id: string, roundNo: number, signal: AbortSignal) => request<unknown>(`/expense-reports/${encodeURIComponent(id)}/split-routing` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   expenseRiskInput: (id: string, body: RiskRequest, signal: AbortSignal) => request(riskPath(id) + '/input', { method: 'POST', body: JSON.stringify(body), signal, cache: 'no-store' }).then(value => readRiskInput(value, body.scope)),
   expenseRiskCalendars: (id: string, roundNo: number, taskId: string, afterKey: string | undefined, signal: AbortSignal) => request(riskPath(id) + '/calendars' + historyQuery({ roundNo, taskId, afterKey }), { signal, cache: 'no-store' }).then(readRiskCalendars),
@@ -838,7 +840,7 @@ export const api = {
   invoiceVerification: (id: string, jobId: string, signal: AbortSignal) => request<InvoiceVerificationJob>(`/invoices/${encodeURIComponent(id)}/verifications/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
   invoiceVerifications: (id: string, filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<InvoiceVerificationJob>>(`/invoices/${encodeURIComponent(id)}/verifications` + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseReports: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<ExpenseItem>>('/expense-reports' + historyQuery(filter), { signal, cache: 'no-store' }),
-  expenseRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<PriorRequestItem>>('/expense-requests' + historyQuery(filter), { signal, cache: 'no-store' }),
+  expenseRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<unknown>('/expense-requests' + historyQuery(filter), { signal, cache: 'no-store' }).then(readPriorRequestPage),
   closeExpenseRequest: (id: string, input: ExpenseRequestCloseInput) => write<ExpenseRequestCloseReceipt>(`/expense-requests/${encodeURIComponent(id)}/close`, 'POST', '关闭事前费用额度', input),
   employeeAdvances: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceItem>>('/employee-advances' + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseReport: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<ExpenseDetail>(`/expense-reports/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),

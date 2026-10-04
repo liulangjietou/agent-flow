@@ -8,6 +8,7 @@ const drafts = await import(process.env.AGENTFLOW_TEST_EXPENSE_CONFIGURATION_DRA
 const { ConfigurationRead } = await import(process.env.AGENTFLOW_TEST_EXPENSE_CONFIGURATION_READ)
 const { default: Manager } = await import(process.env.AGENTFLOW_TEST_EXPENSECONFIGURATIONMANAGERPANEL)
 const { default: History } = await import(process.env.AGENTFLOW_TEST_EXPENSECONFIGURATIONHISTORYPANEL)
+const { default: HistoryRendered } = await import(process.env.AGENTFLOW_TEST_EXPENSECONFIGURATIONHISTORYRENDERED)
 const { default: Rules } = await import(process.env.AGENTFLOW_TEST_EXPENSEPOLICYRULESPANEL)
 const { default: Summary } = await import(process.env.AGENTFLOW_TEST_EXPENSEPOLICYSUMMARYRENDERED)
 const { workspaceMenu } = await import(process.env.AGENTFLOW_TEST_WORKSPACE_NAVIGATION)
@@ -254,4 +255,33 @@ test('只读历史正文转义输入，管理导航使用独立的财务配置�
   assert.ok(html.includes('&lt;img')); assert.ok(html.includes('&lt;script')); assert.ok(!html.includes('<script>'))
   const item = workspaceMenu.flatMap(group => group.items).find(item => item.page === 'expense-configuration')
   assert.equal(item.access, 'finance-config')
+})
+
+test('真实类别编辑器不预设容差，并精确保留输入百分比与原恢复正文', async () => {
+  stubReads(); const panel = await mount()
+  try {
+    panel.state.changePriorMode(0, { target: { value: 'TOLERANCE' } })
+    const row = panel.state.categories.categories[0]; assert.equal(row.priorControl.toleranceFraction, null)
+    panel.state.changeTolerance(0, { target: { value: '12.3456' } }); assert.equal(row.priorControl.toleranceFraction, 0.123456)
+    assert.equal(drafts.categoryInput(panel.state.categories).categories[0].priorControl.toleranceFraction, 0.123456)
+    panel.state.changeTolerance(0, { target: { value: '12.345678' } }); panel.state.categories.comment = '合成比例'
+    await panel.state.saveCategories(); assert.match(panel.state.error, /最多四位小数/)
+    panel.state.changePriorMode(0, { target: { value: 'NONE' } }); assert.deepEqual(row.priorControl, { mode: 'NONE' })
+    panel.state.changePriorMode(0, { target: { value: 'LEGACY' } }); assert.equal(Object.hasOwn(row, 'priorControl'), false)
+  } finally { panel.close() }
+})
+
+
+test('历史类别正文展示原修订的控制模式及容差，缺失控制保持历史语义', async () => {
+  api.expenseCategoryVersions = async () => ({ items: [], nextBeforeVersion: null })
+  api.expenseCategoryVersion = async () => ({ catalog: { ...categories(2), categories: [
+    ...categories().categories, { code: 'TRAVEL', name: '差旅', units: ['DAY'], active: true, priorControl: { mode: 'TOLERANCE', toleranceFraction: 0.123456 } },
+    { code: 'OTHER', name: '其他', units: ['ITEM'], active: true, priorControl: { mode: 'NONE' } }
+  ] }, updatedBy: actor.userId, updatedAt: at, comment: '保存原控制' })
+  const panel = await mount(History, { mode: 'categories' })
+  try {
+    await panel.state.open({ version: 2 })
+    const html = await renderToString(createSSRApp({ ...HistoryRendered, setup: () => panel.state }, panel.props))
+    assert.match(html, /历史硬上限/); assert.match(html, /容差 12.3456%/); assert.match(html, /事前额度：不限制额度/)
+  } finally { panel.close() }
 })

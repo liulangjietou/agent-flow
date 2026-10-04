@@ -52,7 +52,7 @@ function addAllocation() {
     <p v-else-if="isAllowance" class="entry-help" role="status">请填写完整行程并等待计算；补贴金额、天数和税额由系统确定。</p>
     <ExpensePolicyGuidance :context="guidanceContext" :line="line" :scope-key="scopeKey" :disabled="locked" @resolved="acceptGuidance" />
     <label>费用说明<textarea v-model="line.description" rows="2" maxlength="2000" required /></label>
-    <label>超标说明（适用时填写）<textarea v-model="line.exceptionReason" rows="2" maxlength="2000" /></label>
+    <label>制度或事前额度超额说明（适用时填写）<textarea v-model="line.exceptionReason" rows="2" maxlength="2000" /></label>
     <div class="allocation-heading"><h4>成本分摊 · {{ line.claimedGross.currency }}</h4><button type="button" class="quiet" :disabled="line.allocations.length >= 50" @click="addAllocation">＋ 添加分摊</button></div>
     <p class="entry-help">每笔金额须大于零，合计须等于本行含税金额。</p>
     <div v-for="(allocation, index) in line.allocations" :key="index" class="allocation-row">

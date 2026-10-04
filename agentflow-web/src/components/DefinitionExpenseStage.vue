@@ -5,6 +5,7 @@ const props = defineProps<{ modelValue?: string; formSchema: FormSchema | null; 
 const emit = defineEmits<{ 'update:modelValue': [value: string | undefined]; beforeChange: [] }>()
 const stages = [
   { value: 'BUSINESS', name: '普通业务审批' },
+  { value: 'PRIOR_REQUEST_REVIEW', name: '事前额度例外审批' },
   { value: 'RECEIPT', name: '纸质原件签收' },
   { value: 'FINANCE_REVIEW', name: '财务审核' },
   { value: 'FINANCE_RECHECK', name: '财务复核' },
@@ -27,6 +28,7 @@ function choose(event: Event) {
         <option v-for="stage in stages" :key="stage.value" :value="stage.value">{{ stage.name }}</option>
       </select>
     </label>
+    <p v-if="selected === 'PRIOR_REQUEST_REVIEW'">服务端累计超容差时必须经过本节点，位于财务审核之前；不能通过相邻同人规则自动跳过。流程表单需有布尔字段 priorRequestOverTolerance，值由提交时的额度依据产生。</p>
     <p v-if="selected === 'RECEIPT'">办理人需明确确认本轮纸件后才能同意；退回或撤回后重提，需要重新签收。</p>
     <p v-else-if="selected === 'FINANCE_REVIEW' || selected === 'FINANCE_RECHECK'">同意前检查本轮纸件要求及当前核定金额的预算冻结结果。</p>
     <p v-if="selected !== 'BUSINESS'">请在字段权限中将此节点的“费用明细”设为只读。每条结束路径都须经过财务审核；需纸件时先安排签收。</p>

@@ -1,8 +1,9 @@
+import { readPriorControl, type PriorControl } from './expensePriorControl.js'
 import { amountMinor, type Money, type ExpenseAllowanceRule } from './expenses.js'
 
 export type ExpenseUnit = 'ITEM' | 'DAY' | 'NIGHT' | 'KILOMETER' | 'PERSON'
 export const expenseUnits: Record<ExpenseUnit, string> = { ITEM: '项', DAY: '天', NIGHT: '晚', KILOMETER: '公里', PERSON: '人' }
-export interface ExpenseCategory { code: string; name: string; units: ExpenseUnit[]; active: boolean }
+export interface ExpenseCategory { code: string; name: string; units: ExpenseUnit[]; active: boolean; priorControl?: PriorControl | null }
 export interface ExpenseCategories { tenantId: string; version: number; categories: ExpenseCategory[] }
 export interface PolicyMatch {
   legalEntityIds: string[]; categoryCodes: string[]; cityTiers: string[]; employeeGrades: string[]
@@ -57,7 +58,8 @@ function selectors(value: unknown, identities = false): string[] {
 function readCategory(value: ExpenseCategory): ExpenseCategory {
   requireValue(object(value) && text(value.code, 64) && text(value.name, 128) && typeof value.active === 'boolean'
     && Array.isArray(value.units) && value.units.length > 0 && value.units.every(unit) && new Set(value.units).size === value.units.length)
-  return { code: value.code, name: value.name, units: [...value.units], active: value.active }
+  return { code: value.code, name: value.name, units: [...value.units], active: value.active,
+    ...(value.priorControl == null ? {} : { priorControl: readPriorControl(value.priorControl) }) }
 }
 
 /** 同时核对租户和精确历史版本，畸形响应不能成为可编辑的零版。 */

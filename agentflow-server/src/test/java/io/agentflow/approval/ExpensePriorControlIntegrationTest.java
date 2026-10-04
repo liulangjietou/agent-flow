@@ -266,6 +266,18 @@ class ExpensePriorControlIntegrationTest {
         assertThatThrownBy(() -> controls.find("demo", report.id(), 1)).isInstanceOf(IllegalStateException.class);
     }
 
+    @Test void selectorDistinguishesReferenceCeilingAndFrozenCategorySource() throws Exception {
+        var credit = credit(ExpensePriorControl.Mode.NONE, "50");
+        var response = request("/api/v1/expense-requests", "alice", 200);
+        var items = response.path("items");
+        var selected = java.util.stream.StreamSupport.stream(items.spliterator(), false).filter(item -> item.path("id").asText().equals(credit.id().toString())).findFirst().orElseThrow();
+        var line = selected.path("lines").get(0);
+        assertThat(line.path("hardLimit").isBoolean()).isTrue(); assertThat(line.path("hardLimit").asBoolean()).isFalse();
+        assertThat(line.at("/control/control/mode").asText()).isEqualTo("NONE");
+        assertThat(line.at("/control/categoryCode").asText()).isEqualTo("OFFICE");
+        assertThat(line.at("/exceeded/value").asText()).isEqualTo("0.00");
+    }
+
     private ExpenseRequest credit(ExpensePriorControl.Mode mode, String amount) {
         var source = Application.restore(UUID.randomUUID(), "demo", "PRIOR-" + UUID.randomUUID(), "prior", 1, "alice", "合成批准事实", Map.of(), ApplicationStatus.APPROVED, 1, 1);
         applications.save(source);
