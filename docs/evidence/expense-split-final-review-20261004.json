@@ -1,0 +1,116 @@
+{
+  "taskId": "F04",
+  "status": "LOCAL_IMPLEMENTATION_AND_RUNTIME_VERIFIED_BROWSER_POSTGRES_PENDING",
+  "recordedAt": "2026-10-04T14:02:08.691010+00:00",
+  "reviewBase": "322861302e1c42e4456d9892d5e9ffe7cf440575",
+  "reviewHead": "1d6b1db012f254ece8c2eb3ebee478dbf7966b08",
+  "independentReviews": 1,
+  "findings": {
+    "critical": 0,
+    "important": 1,
+    "minor": 0,
+    "importantFixed": 1
+  },
+  "fix": {
+    "issue": "关闭规则保留异币种合法参数时，页面将其误判为响应损坏。",
+    "cause": "readConfiguration 对关闭及启用规则都要求阈值币种与本单相同；后端只在启用时执行该绑定。",
+    "whyTestsMissed": "既有关闭用例只有同币种或无参数，固定包关闭场景也没有保留规则参数。",
+    "change": "币种绑定仅在 ENABLED 检查；关闭参数仍校验窗口、金额及币种格式。",
+    "red": {
+      "tests": 13,
+      "failed": 1,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/f04-review-fix-red.log"
+    },
+    "green": {
+      "tests": 147,
+      "failed": 0,
+      "typecheck": true,
+      "productionBuild": true,
+      "runtimeResponseReplay": {
+        "status": "PASSED",
+        "counts": {
+          "responses": 706,
+          "successfulRequests": 78,
+          "splitResponses": 28,
+          "parsedViews": 23,
+          "repeatedFrozenViews": 11,
+          "deniedReads": 5
+        },
+        "operations": [
+          "expenseSplitRouting"
+        ],
+        "states": [
+          "CLEAR",
+          "DISABLED",
+          "NOT_RECORDED",
+          "RESTRICTED",
+          "SPLIT_SUSPECTED",
+          "UNCONFIGURED"
+        ],
+        "statuses": [
+          200,
+          400,
+          403,
+          404
+        ],
+        "openApiSha256": "415b5ec2bbe02f7825103e89001cf790e29ffe2558092d9ad291176b4ee06fa7",
+        "compiledSources": [
+          {
+            "path": "agentflow-web/src/expenseSplitRouting.ts",
+            "sha256": "aafa4d017193f1d416a2c4a8b72604808d6e4d9b4b250e12062925496eb35470"
+          },
+          {
+            "path": "agentflow-web/src/expenses.ts",
+            "sha256": "2c2bb4abfd86c3a11cd1ce925059e4c5aedb664c0a86c257e88a358a0f26d9ec"
+          }
+        ],
+        "compiledDirectory": "/fyoung/tmp/agentflow-split-contract-W94I34",
+        "recordFiles": [
+          {
+            "path": "original/http-records.json",
+            "sha256": "6d7e4f551ca2df79deefd9f9b209584b2f75d117c3278efe81d9b9ac28c0bcf7"
+          },
+          {
+            "path": "restored/http-records.json",
+            "sha256": "3d57edf93990dd9c4e7ba02baf005f38432919a4a9c336c4740b8c479716f23a"
+          }
+        ],
+        "scope": "Actual fixed-package HTTP contracts and frontend parsers; no interactive browser or PostgreSQL verification."
+      }
+    }
+  },
+  "declinedToJudgeRulings": [
+    {
+      "topic": "浏览器最终布局与操作",
+      "decision": "继续保留未验收，不以组件渲染替代。",
+      "costIfWrong": "仍可能存在真实浏览器交互或布局问题。"
+    },
+    {
+      "topic": "PostgreSQL 迁移、并发和恢复",
+      "decision": "继续保留未验收，不以 H2 替代。",
+      "costIfWrong": "仍可能存在特定数据库兼容问题。"
+    },
+    {
+      "topic": "企业 N、阈值及启用选择",
+      "decision": "管理员明确配置；不填写默认企业参数。",
+      "costIfWrong": "企业上线前需完成配置和业务验收。"
+    },
+    {
+      "topic": "V02/E15及远端交付",
+      "decision": "保留最终版本整体门禁，继续本地开发。",
+      "costIfWrong": "当前版本仍只在本地保存。"
+    }
+  ],
+  "sourceSha256": {
+    "agentflow-web/src/expenseSplitRouting.ts": "aafa4d017193f1d416a2c4a8b72604808d6e4d9b4b250e12062925496eb35470",
+    "agentflow-web/tests/expense-split-routing.test.mjs": "7b4d96defe613f798ce13256303c2b2c236750ad1f222dbdaa24702c73a54280",
+    "agentflow-web/tests/expense-split-panel.test.mjs": "425eac05af138f597df1bd9a5cbad853040630a764b90d017dfe8519149a4c90"
+  },
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-final-review-verified",
+  "runtimeEvidence": "docs/evidence/expense-split-runtime-20261004.json",
+  "browserVerified": false,
+  "postgresqlVerified": false,
+  "openTaskCount": 34,
+  "buildWarning": "Existing application chunk exceeds 500 kB.",
+  "manifestSha256": "9a730c800146723b4168cb10dcf0b352c175b3d5c65f723bdcb4d39ab10c0d32"
+}

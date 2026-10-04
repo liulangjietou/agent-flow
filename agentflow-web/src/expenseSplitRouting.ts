@@ -67,7 +67,8 @@ function readConfiguration(value: unknown, currency: string): SplitConfiguration
   if (!keys(value, ['mode', 'gatewayIds'], ['rule']) || !['UNCONFIGURED', 'DISABLED', 'ENABLED'].includes(String(value.mode))
       || !Array.isArray(value.gatewayIds) || !value.gatewayIds.every(id => text(id, 128)) || !unique(value.gatewayIds)) throw unreadable()
   if (own(value, 'rule') && (!keys(value.rule, ['windowDays', 'threshold']) || !positive(value.rule.windowDays)
-      || value.rule.windowDays > MAX_WINDOW_DAYS || !monetary(value.rule.threshold, currency) || amountMinor(value.rule.threshold.value) === 0n)) throw unreadable()
+      || value.rule.windowDays > MAX_WINDOW_DAYS || !monetary(value.rule.threshold, value.mode === 'ENABLED' ? currency : undefined)
+      || amountMinor(value.rule.threshold.value) === 0n)) throw unreadable()
   if (value.mode === 'ENABLED' && (!own(value, 'rule') || !value.gatewayIds.length)
       || value.mode === 'UNCONFIGURED' && (own(value, 'rule') || value.gatewayIds.length)) throw unreadable()
   return value as unknown as SplitConfiguration

@@ -1,7 +1,7 @@
 {
   "taskId": "F04",
   "recordedAt": "2026-10-04T13:54:30.180529+00:00",
-  "status": "LOCAL_RUNTIME_VERIFIED_FINAL_REVIEW_PENDING",
+  "status": "LOCAL_RUNTIME_VERIFIED_BROWSER_POSTGRES_PENDING",
   "runtimeSourceCommit": "5daf2838a942676c70e67fa57b718b875a4109bf",
   "runtime": {
     "status": "PASSED",
@@ -222,7 +222,10 @@
     "f04-runtime-fourth/restored/restored-before-start-tables.tsv": "22c9fb82a2244de3cbc17812fe5e2eace5dc216ab87d259d9170b4fbc876529e",
     "f04-runtime-fourth/restored/restored-before-start.json": "c33639522d27086011ba9e8ec109f7e0b775acf04a48ff94bc341ebd145219a9"
   },
-  "finalReview": "PENDING",
+  "finalReview": {
+    "status": "ONE_IMPORTANT_FIXED_SCOPED_REGRESSION_PASSED",
+    "evidence": "docs/evidence/expense-split-final-review-20261004.json"
+  },
   "browserVerified": false,
   "postgresqlVerified": false,
   "openTaskCount": 34,

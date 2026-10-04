@@ -1,12 +1,12 @@
 # 当前未完成任务台账
 
-更新：2026-10-04 UTC，A04 风险解释固定包已完成 V114→V115 非空升级、原 OIDC 会话恢复、执行中强退不重发、原键恢复和独立配套恢复（271 表、379 行、3 原件），风险六个操作的 167 份实际响应通过契约及页面解析。A04 转为等待浏览器与 PostgreSQL 补验，保持 OPEN。已确认未完成仍为 34 项，见[本轮证据](evidence/expense-risk-runtime-20261004.json)。初次核对基线 `f5fd8d53c3d6bbafef456d96c462320bd186d8fc`，分支 `codex/governance-identifier-integration`。
+更新：2026-10-04 UTC，F04 跨单路由本地开发、固定包升级/并发/强退/配套恢复及最终审查修复已完成，转为等待浏览器与 PostgreSQL 补验，保持 OPEN。总待办仍为 34 项，本地需补功能或运行验收降为 6 项。见[最终审查与修复证据](evidence/expense-split-final-review-20261004.json)。初次核对基线 `f5fd8d53c3d6bbafef456d96c462320bd186d8fc`，分支 `codex/governance-identifier-integration`。
 
 F02 固定安装包完成报销挂账、借款挂账、付款凭证及原科目依据页面验收。缺项、错误回显、发布竞争、处理中重启、回执丢失原查询恢复通过；独立配套恢复保留 245 张表、6,276 行和 9 个附件。详见[完整本地证据](evidence/account-mapping-complete-20261003.json)。F13 三类模板与十个配套样例现已完成实际办理；核减路由、超标、借款冲销、事前消费、重复票阻断及免纸件模式通过。配套恢复后可接续在审单，见[完整模板证据](evidence/financial-template-journey-complete-20261003.json)。
 
 **当前已确认 34 项未完成：16 项本地开发、3 项本地验收与核对、15 项需要真实企业环境或远端的联调/交付。全项目至少剩余 34 项。** V03 尚未完成，所以不能声称这是全量精确总数，也不能给完成百分比。
 
-按实际进度拆开这 16 项本地交付：**7 项仍需补功能或运行验收**（A01、F04、F05、F09、F14、F15、F16）；**9 项已实现、等待浏览器与 PostgreSQL 补验**（A02、A03、A04、I01、I02、F11、F12、F17、W01）。两组仍计入原来的 16 项，不另加数量，也不提前改为完成。
+按实际进度拆开这 16 项本地交付：**6 项仍需补功能或运行验收**（A01、F05、F09、F14、F15、F16）；**10 项已实现、等待浏览器与 PostgreSQL 补验**（A02、A03、A04、I01、I02、F04、F11、F12、F17、W01）。两组仍计入原来的 16 项，不另加数量，也不提前改为完成。
 
 此前“6 项”是六个工作类别，不能当成六个小任务。本次发现原费用方案里的管理入口、补贴、跨单风险、额度控制、项目审批和报表仍有缺口，已单独编号；这些来自既定方案，没有新增产品需求。
 
@@ -49,7 +49,7 @@ A03 已完成固定包的真实保存、强退与独立配套恢复，9 条助�
 | A04 | 费用异常的 Agent 风险提示 | 已实现四类证据、六个公开操作和审批页面；固定包完成非空升级、强退恢复、原键恢复与独立恢复后的原审批接续。271 表、379 行、3 原件保留，167 份风险响应契约通过。剩余浏览器和 PostgreSQL 补验。[实施说明](expense-risk-hints.md)、[运行证据](evidence/expense-risk-runtime-20261004.json) | 可解释地引用经授权的费用事实，保留提示和人工处置；不能凭模型标签自动驳回、核减或改变金额矩阵。确定性拆单路由由 F04 独立处理。 原依据：05 §16。 |
 | I01 | 外部组织同步的本地完整用例 | 后台、管理页面与只读诊断接通，69 项后端及 134 项前端范围用例通过。固定包 14 次启动验证非空升级、强退、人工采用、冲突及原审批接续，独立恢复保留 262 表、366 行、1 附件。浏览器和 PostgreSQL 待补验。 [实施说明](organization-sync.md)、[运行证据](evidence/organization-sync-runtime-20261004.json) | 以单一可信源映射组织事实，预检和具名应用变更、停用及重试均有审计；不隐式创建认证身份或授予系统角色；旧审批轮次依据保持。 原依据：04 §3.A、§3.G；04 §3.G。 |
 | I02 | 电子签业务端口、状态与操作页面 | 固定请求、状态、仓储、可信配置、回执证据、原登录授权及持久后台已接通；本轮补齐六个用户操作及精确验签回调。314 个唯一 Java 用例通过，包含实际上传审批、幂等失权复查、受限管理员下载、并发回调与原子回滚；先复现再修复 JSON 类型隐式转换。页面、固定安装包完整运行、浏览器/PostgreSQL 和真实供应商验收仍待完成，继续 OPEN。 [实施记录](electronic-signatures.md)、[接口与回调证据](evidence/electronic-signature-api-20261004.json) | 固定请求、回执证据、原登录授权、持久后台、公开 API 与操作页面均已接通。固定安装包通过演示模式 144 次 HTTP、两次进程强退和独立数据库/原件/结果配套恢复；共享 OIDC 模式另通过 68 次 HTTP，验证重启续发、原登录注销、人员停用和共享会话必需。实际契约与页面解析通过，回调锁等待缺陷先复现后修复，165 个 Java 范围用例通过。浏览器/PostgreSQL 待补验，真实供应商另归 E10；I02 保持 OPEN。 [运行证据](evidence/electronic-signature-runtime-20261004.json)。
-| F04 | 跨单拆单风险与合计金额路由 | 规则、V116、提交/Flowable、权限查询、详情页、设计器、模板与模拟已实现。固定包 H2 并发、升级、核减、强退和配套恢复通过（273 张表、1,140 行、3 份原件）；706 份响应和 78 份请求契约、23 次页面解析通过。最终审查、浏览器和 PostgreSQL 待验收。[固定包证据](evidence/expense-split-runtime-20261004.json)。 | 窗口、阈值和启用状态显式配置；并发聚合、冻结路由依据及财务金额隔离，不将未启用视为受保护。原依据：05 §5.3。 |
+| F04 | 跨单拆单风险与合计金额路由 | 规则、V116、提交/Flowable、权限查询、详情页、设计器、模板与模拟已实现。固定包 H2 并发、升级、核减、强退和配套恢复通过（273 张表、1,140 行、3 份原件）；706 份响应和 78 份请求契约、23 次页面解析通过。最终独立审查的一项页面缺陷已修复，147 项前端范围通过；浏览器和 PostgreSQL 待验收。[固定包证据](evidence/expense-split-runtime-20261004.json)。 | 窗口、阈值和启用状态显式配置；并发聚合、冻结路由依据及财务金额隔离，不将未启用视为受保护。原依据：05 §5.3。 |
 | F05 | 事前额度 STRICT/TOLERANCE/NONE 控制 | ExpenseRequest.ApprovedLine 能表达容差上限，但 ExpensePlan.approvedRequest 固定使用 BigDecimal.ZERO；没有按类别的模式、容差说明与额外审批配置。 [ExpensePlan.java:74](../agentflow-domain/src/main/java/io/agentflow/expense/ExpensePlan.java#L74)、[ExpenseRequest.java:134](../agentflow-domain/src/main/java/io/agentflow/expense/ExpenseRequest.java#L134) | 按已发布类别策略冻结控制模式和容差；超额说明与审批同步验证；并发占用、释放和关闭保持额度不变量。 原依据：05 §6.1。 |
 | F09 | 柔性预算超支审批 | ExpenseBudgetOutcomeHandler 对 BUDGET_INSUFFICIENT 已实现自动退回；不存在区分柔性预算及预算负责人审批的路径，刚性不足不是缺失项。 [ExpenseBudgetOutcomeHandler.java:50](../agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetOutcomeHandler.java#L50)、[ExpensePrecheckEvaluator.java:114](../agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java#L114) | 外部预算明确允许柔性策略才进入指定审批；例外不得伪造冻结成功；审批后重新确认预算，未知和拒绝状态保持阻断。 原依据：05 §8.1、§9；05 §9。 |
 | F11 | 费用自审批场景自动上溯 | 模板 v2、轮次上溯、审计、设计器和职责查询已接通，旧单升级、重启及 253 表／662 行独立恢复通过。剩余浏览器与 PostgreSQL 补验。 [运行记录](expense-self-approval-runtime.md)、[证据](evidence/expense-self-approval-runtime-20261004.json) | 仅已发布费用策略启用；固定任职依据、检测环路与空上级，记录原候选和替代人及规则版本；财务职责分离仍强制。 原依据：05 §9.1。 |

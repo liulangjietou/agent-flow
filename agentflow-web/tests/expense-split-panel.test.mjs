@@ -52,7 +52,8 @@ test('受限、历史未记录和明确关闭分别展示，受限状态不包�
   assert.match(restricted, /跨单依据受限/); assert.doesNotMatch(restricted, /8,000|4,000|来源单据|未命中拆单风险|已经检查通过/)
   assert.match(await rendered(view('NOT_RECORDED')), /本轮未记录跨单检查/)
   assert.match(await rendered(view('UNCONFIGURED')), /本轮未配置跨单规则/)
-  assert.match(await rendered(view('DISABLED')), /本轮已关闭跨单规则/)
+  const disabled = view('DISABLED'); disabled.details.configuration.rule.threshold.currency = 'USD'
+  assert.match(await rendered(disabled), /本轮已关闭跨单规则/)
 })
 test('已授权正文展示冻结规则、本单和路由金额，原状态不冒充当前审批状态', async () => {
   const html = await rendered(view())

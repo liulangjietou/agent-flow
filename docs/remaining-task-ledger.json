@@ -22,12 +22,11 @@
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
     ],
     "localDeliveryBreakdown": {
-      "recordedAt": "2026-10-04T11:04:34.056090+00:00",
+      "recordedAt": "2026-10-04T14:02:08.691010+00:00",
       "implementationRemaining": {
-        "count": 7,
+        "count": 6,
         "taskIds": [
           "A01",
-          "F04",
           "F05",
           "F09",
           "F14",
@@ -36,7 +35,7 @@
         ]
       },
       "implementedAwaitingBrowserAndPostgresVerification": {
-        "count": 9,
+        "count": 10,
         "taskIds": [
           "A02",
           "A03",
@@ -46,7 +45,8 @@
           "F17",
           "W01",
           "I02",
-          "A04"
+          "A04",
+          "F04"
         ]
       },
       "note": "This is a breakdown of the 16 OPEN local delivery tasks, not additional tasks or new completion claims."
@@ -1361,7 +1361,7 @@
           ]
         }
       ],
-      "observed": "规则、V116、提交/Flowable、权限查询、详情页、两种设计器、便携模板和合成金额模拟已实现。固定包 H2 并发、升级、核减、强退与配套恢复通过；273 张表、1140 行、3 份原件保持，706 份响应和 78 份请求契约、23 次实际页面解析通过。最终独立审查、浏览器及 PostgreSQL 仍待完成，F04 保持 OPEN。",
+      "observed": "规则、V116、提交/Flowable、原轮次授权、详情页、设计器、模板和模拟均已实现。固定包 H2 并发/升级/核减/强退/配套恢复及实际契约通过。最终独立审查的一项关闭规则异币种显示缺陷已复现修复，147 项前端范围、类型/构建和实际响应重放通过。仅浏览器及 PostgreSQL 待验收，F04 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
@@ -1379,7 +1379,9 @@
       "routingIntegrationEvidence": "docs/evidence/expense-split-routing-integration-20261004.json",
       "readEvidence": "docs/evidence/expense-split-read-20261004.json",
       "readUiEvidence": "docs/evidence/expense-split-read-ui-20261004.json",
-      "designSimulationEvidence": "docs/evidence/expense-split-design-simulation-20261004.json"
+      "designSimulationEvidence": "docs/evidence/expense-split-design-simulation-20261004.json",
+      "runtimeEvidence": "docs/evidence/expense-split-runtime-20261004.json",
+      "finalReviewEvidence": "docs/evidence/expense-split-final-review-20261004.json"
     },
     {
       "id": "F05",
@@ -3898,9 +3900,9 @@
   },
   "latestProgress": {
     "taskId": "F04",
-    "status": "FIXED_PACKAGE_RUNTIME_VERIFIED_FINAL_REVIEW_PENDING",
-    "recordedAt": "2026-10-04T13:52:33.235103+00:00",
-    "evidence": "docs/evidence/expense-split-runtime-20261004.json",
+    "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
+    "recordedAt": "2026-10-04T14:02:08.691010+00:00",
+    "evidence": "docs/evidence/expense-split-final-review-20261004.json",
     "knownOpenTaskCount": 34
   }
 }

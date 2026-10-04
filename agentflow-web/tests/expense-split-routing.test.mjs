@@ -9,6 +9,16 @@ test('六种状态保持独立语义，完整依据接受十进制金额和原�
   for (const status of ['NOT_RECORDED', 'UNCONFIGURED', 'DISABLED', 'CLEAR', 'SPLIT_SUSPECTED', 'RESTRICTED']) assert.deepEqual(read(view(status)), view(status))
   const disabled = view('DISABLED'); delete disabled.details.configuration.rule; assert.deepEqual(read(disabled), disabled)
 })
+test('关闭规则可保留其他币种参数，启用规则仍必须与本单币种一致', () => {
+  const disabled = view('DISABLED'); disabled.details.configuration.rule.threshold.currency = 'USD'
+  assert.deepEqual(read(disabled), disabled)
+  const enabled = view(); enabled.details.configuration.rule.threshold.currency = 'USD'
+  assert.throws(() => read(enabled), unreadable)
+  for (const threshold of [{ value: '0.00', currency: 'USD' }, { value: '5000.00', currency: 'usd' }, { value: '1e3', currency: 'USD' }]) {
+    const invalid = structuredClone(disabled); invalid.details.configuration.rule.threshold = threshold
+    assert.throws(() => read(invalid), unreadable)
+  }
+})
 test('身份、轮次、未知状态或缺少规则及财务版本不能成为有效响应', () => {
   for (const mutate of [v => { v.reportId = uuid(99) }, v => { v.applicationId = uuid(99) }, v => { v.roundNo = 2 }, v => { v.roundNo = 0 },
     v => { v.status = '__proto__' }, v => { v.status = 'constructor' }, v => { v.status = 'NEW' }, v => { delete v.details.ruleVersion }, v => { v.details.ruleVersion = 2 },
