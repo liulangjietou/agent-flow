@@ -1,0 +1,289 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-04T07:28:23.570529+00:00",
+  "taskId": "I02",
+  "status": "SIGNING_UI_SCOPE_PASSED_PACKAGED_RUNTIME_BROWSER_POSTGRES_REMAIN",
+  "implementationCommit": "ca936ab2a8eda49da788a6257f6390e474f670fb",
+  "branch": "codex/governance-identifier-integration",
+  "remainingTaskCount": 34,
+  "implementation": [
+    "ApplicationRecord exposes a round-scoped signing panel; authorized frozen attachment metadata is read with at most four concurrent requests and no default document or profile selection.",
+    "Explicit review and acknowledgement bind documents, profile text version, application source version, purpose and first-send deadline; changed intent or expired confirmation cannot dispatch.",
+    "Unsent cancellation binds the original operation and text version; pending writes reuse the existing actor-scoped recovery queue with the original body and idempotency key.",
+    "Successful write receipts are validated before pending state is cleared; a bounded write timeout or malformed response retains the original request even if a success later arrives.",
+    "History accepts permission-filtered empty pages with a cursor; repeated cursors and inconsistent responses are rejected. Read generations and abort signals prevent late data crossing identities.",
+    "Original and signed-result downloads remain separate. Collecting states offer no result download, incomplete bodies are rejected, and object URLs are released.",
+    "The parent record keeps header, footer, history and related navigation consistent with pending signing edits and writes. Only the last original operation position is remembered in memory."
+  ],
+  "tests": {
+    "frontendUniqueCases": 161,
+    "newSignatureCases": 27,
+    "relatedRegressionCases": 134,
+    "failures": 0,
+    "skipped": 0,
+    "counting": "Only the complete final scope run is counted; prior repeated runs and earlier Java cases are not added.",
+    "scopeFiles": [
+      "signatures.test.mjs",
+      "signature-panel.test.mjs",
+      "authentication.test.mjs",
+      "requests.test.mjs",
+      "attachments.test.mjs",
+      "timer-waits.test.mjs",
+      "instance-control.test.mjs",
+      "service-task-runtime.test.mjs",
+      "copy-record.test.mjs",
+      "expense-request-close.test.mjs",
+      "subprocess-relations.test.mjs",
+      "draft-assist.test.mjs",
+      "expense-draft-assist.test.mjs"
+    ],
+    "finalRun": {
+      "log": "i02-ui-regression.log",
+      "exitCode": 0
+    },
+    "fixtureCorrections": [
+      {
+        "logs": [
+          "i02-ui-first.log",
+          "i02-ui-confirm-diagnostic.log",
+          "i02-ui-fixture-probe.log"
+        ],
+        "reason": "structuredClone cannot clone a Vue reactive proxy. The mock now serializes JSON like the actual API; an additional rendered-panel/real-API case verifies the original request. No production change was made for this fixture error."
+      },
+      {
+        "log": "i02-ui-parent-red.log",
+        "reason": "Raw stub VNodes preserve kebab-case props, and the attachment API mock must accept application ID before document ID. These fixture mistakes are not product defects."
+      }
+    ],
+    "productRed": {
+      "log": "i02-ui-parent-diagnostic.log",
+      "uniqueCases": 15,
+      "failures": 2,
+      "productFailures": 1,
+      "fixtureFailures": 1,
+      "previousGap": "The earlier close test invoked the script guard but did not inspect the real header close button binding.",
+      "reproduction": "With unsaved signature inputs, the real header close button had disabled=false while the close method rejected the action.",
+      "rootCause": "The header disabled expression omitted the new signature busy/dirty state.",
+      "fix": "Add those states to the parent header binding; the rendered-parent test checks the header, footer, history controls and signing child props."
+    },
+    "setupNote": "An initial type-check command referenced nonexistent tsconfig.app.json; the canonical no-argument vue-tsc command was subsequently used. The path error is not a product failure."
+  },
+  "build": {
+    "typeCheck": {
+      "log": "i02-ui-types-final.log",
+      "exitCode": 0
+    },
+    "vite": {
+      "log": "i02-ui-build.log",
+      "exitCode": 0,
+      "modules": 677,
+      "warning": "Existing single application chunk exceeds 500 kB; no performance or visual acceptance is claimed."
+    }
+  },
+  "openApi": {
+    "log": "i02-ui-contract.log",
+    "exitCode": 0,
+    "operations": 384,
+    "schemas": 812,
+    "requestExamples": 129,
+    "signatureAssertions": "String versions, private-field rejection, cancellation input and permission-filtered empty cursor pages."
+  },
+  "limits": [
+    "Vue custom-renderer tests execute real compiled templates and API serialization but are not browser acceptance or screenshots.",
+    "Packaged live HTTP, JDBC-shared OIDC first-send authorization, in-flight process crash recovery, and paired original/result storage restore still require the complete runtime journey.",
+    "Browser administrator-policy and PostgreSQL image-I/O blockers remain; no bypass, restart or alternate installation was attempted.",
+    "Real supplier identity, embedded PDF/OFD signatures, certificate chain and timestamp acceptance remain E10.",
+    "Main checkout and runtime PID 87821 were rechecked and preserved. No remote push, PR or CI; delivery follows V02."
+  ],
+  "sourceManifest": [
+    {
+      "path": "agentflow-web/scripts/check-openapi.mjs",
+      "bytes": 36513,
+      "sha256": "500839ecc7699c4ce161e49fc2087f2055ac8096531762ce3347629d7743e6a4"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "bytes": 93304,
+      "sha256": "e82c18638adf4ce3e79d5f324add006ae0c0aeafec3a67a45d367dea2ce23345"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "bytes": 146589,
+      "sha256": "3ea87d70651e20ce08b9561b54e494cc436c5424e235c8a820ce48305810a5aa"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "bytes": 142730,
+      "sha256": "a70bee4e1644de16a8bb3149ebd55d5d3e0abbc6241284a09c0d80b89d3d598d"
+    },
+    {
+      "path": "agentflow-web/src/components/ApplicationRecord.vue",
+      "bytes": 40835,
+      "sha256": "c744a3b3f08c11b49d0a215c1bedaa297bf89feaaab3b2c59adcf8e76a2fee58"
+    },
+    {
+      "path": "agentflow-web/src/components/SignaturePanel.vue",
+      "bytes": 23520,
+      "sha256": "0b31f51b9fbd371a78f9529d29b63743b2a610776aee3c4a5fb25bca22f75a42"
+    },
+    {
+      "path": "agentflow-web/src/signatures.ts",
+      "bytes": 13567,
+      "sha256": "84e8e4deeed07865e861c252b3cab504194e86d9683ec94a14bd47997102c7bb"
+    },
+    {
+      "path": "agentflow-web/tests/signature-fixtures.mjs",
+      "bytes": 2192,
+      "sha256": "d190e354ad8cb6696ce681b5ddbb47a98cd8e526e827d7f2c9adb9349c67e835"
+    },
+    {
+      "path": "agentflow-web/tests/signature-panel.test.mjs",
+      "bytes": 19857,
+      "sha256": "86f797ac3738be10140028122041bcd4f732649c9478fe62e086de24a6c6a816"
+    },
+    {
+      "path": "agentflow-web/tests/signatures.test.mjs",
+      "bytes": 10086,
+      "sha256": "68656cdde7ac33efce833fdd384870df38884976fdf2c35707d99847b9a192bf"
+    }
+  ],
+  "evidenceArchive": "/fyoung/tmp/agentflow-remaining-20260928/i02-ui-evidence-20261004",
+  "archiveManifest": {
+    "recordedAt": "2026-10-04T07:28:23.570529+00:00",
+    "sourceCommit": "ca936ab2a8eda49da788a6257f6390e474f670fb",
+    "files": [
+      {
+        "path": "build/assets/index-CMXqvSsG.css",
+        "bytes": 419002,
+        "sha256": "65d047054347300d052a68beedf57a8b924fb7523bb80aeb4f955970ad56610d"
+      },
+      {
+        "path": "build/assets/index-Dh3oCuNb.js",
+        "bytes": 1983229,
+        "sha256": "1896abca8a455a47347a54ac9ce4d43e07a6eda5e84e0ec2f1b8975221953453"
+      },
+      {
+        "path": "build/index.html",
+        "bytes": 420,
+        "sha256": "f37441733cb489eca2a55927f426631867ffa989b0f965cf2964e54f0696a76d"
+      },
+      {
+        "path": "i02-ui-build.log",
+        "bytes": 718,
+        "sha256": "9a4083e10cb9ff3b70b1ce694c2ea2308412c7f4f35270ad3ed7fd65fe093477"
+      },
+      {
+        "path": "i02-ui-confirm-diagnostic.log",
+        "bytes": 2867,
+        "sha256": "27026f385d7016471e7ff5278d01de3abdb39f5185c0b5a2afab868621ae6668"
+      },
+      {
+        "path": "i02-ui-confirm-red.log",
+        "bytes": 2022,
+        "sha256": "e6cc6e0ed4ac6c402e890b56cedbdcb965d2f811612db2dae10ba4d105c6816f"
+      },
+      {
+        "path": "i02-ui-contract.log",
+        "bytes": 71,
+        "sha256": "ba66a1655a95ae464fbd9564b18b230d4b9669f1232bc43eb97c8a2c8a2f8634"
+      },
+      {
+        "path": "i02-ui-first-green.log",
+        "bytes": 2629,
+        "sha256": "004489debd5d75e560319ac42065cea0a1103513d07bfa65b98b87a392ef3d26"
+      },
+      {
+        "path": "i02-ui-first.log",
+        "bytes": 3213,
+        "sha256": "1d29cc3406e1473636550a801c86603dad6d89c320b37ebe47be63add55b6561"
+      },
+      {
+        "path": "i02-ui-fixture-probe.log",
+        "bytes": 170,
+        "sha256": "ccdf8cb09a4a45cf7abd329c1e533ed5404ee7436ecd034c6aeebbc2e85a7981"
+      },
+      {
+        "path": "i02-ui-parent-diagnostic.log",
+        "bytes": 3797,
+        "sha256": "adb56b12860f2887d2f8d246c7d0fd4b3d9c6009f7e259d5e77fe68d93045c81"
+      },
+      {
+        "path": "i02-ui-parent-red.log",
+        "bytes": 3124,
+        "sha256": "d2ee6d9c52665d96c3673068a8446a1d6729538dd24de5642cf0b1a554ff61ea"
+      },
+      {
+        "path": "i02-ui-regression.log",
+        "bytes": 16530,
+        "sha256": "1b3bdc781da8ed0030e3fa1b4d80b80311ce15519bfaa135bef4368e6ee3a241"
+      },
+      {
+        "path": "i02-ui-types-final.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "i02-ui-types-initial.log",
+        "bytes": 84,
+        "sha256": "c327b3b3d8d45cd34b8104e293592a586146fc2cac3f9f4bb14b91dc041f0fdb"
+      },
+      {
+        "path": "i02-ui-types.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "path": "source/agentflow-web/scripts/check-openapi.mjs",
+        "bytes": 36513,
+        "sha256": "500839ecc7699c4ce161e49fc2087f2055ac8096531762ce3347629d7743e6a4"
+      },
+      {
+        "path": "source/agentflow-web/scripts/test-requests.mjs",
+        "bytes": 93304,
+        "sha256": "e82c18638adf4ce3e79d5f324add006ae0c0aeafec3a67a45d367dea2ce23345"
+      },
+      {
+        "path": "source/agentflow-web/src/App.vue",
+        "bytes": 146589,
+        "sha256": "3ea87d70651e20ce08b9561b54e494cc436c5424e235c8a820ce48305810a5aa"
+      },
+      {
+        "path": "source/agentflow-web/src/api.ts",
+        "bytes": 142730,
+        "sha256": "a70bee4e1644de16a8bb3149ebd55d5d3e0abbc6241284a09c0d80b89d3d598d"
+      },
+      {
+        "path": "source/agentflow-web/src/components/ApplicationRecord.vue",
+        "bytes": 40835,
+        "sha256": "c744a3b3f08c11b49d0a215c1bedaa297bf89feaaab3b2c59adcf8e76a2fee58"
+      },
+      {
+        "path": "source/agentflow-web/src/components/SignaturePanel.vue",
+        "bytes": 23520,
+        "sha256": "0b31f51b9fbd371a78f9529d29b63743b2a610776aee3c4a5fb25bca22f75a42"
+      },
+      {
+        "path": "source/agentflow-web/src/signatures.ts",
+        "bytes": 13567,
+        "sha256": "84e8e4deeed07865e861c252b3cab504194e86d9683ec94a14bd47997102c7bb"
+      },
+      {
+        "path": "source/agentflow-web/tests/signature-fixtures.mjs",
+        "bytes": 2192,
+        "sha256": "d190e354ad8cb6696ce681b5ddbb47a98cd8e526e827d7f2c9adb9349c67e835"
+      },
+      {
+        "path": "source/agentflow-web/tests/signature-panel.test.mjs",
+        "bytes": 19857,
+        "sha256": "86f797ac3738be10140028122041bcd4f732649c9478fe62e086de24a6c6a816"
+      },
+      {
+        "path": "source/agentflow-web/tests/signatures.test.mjs",
+        "bytes": 10086,
+        "sha256": "68656cdde7ac33efce833fdd384870df38884976fdf2c35707d99847b9a192bf"
+      }
+    ],
+    "fileCount": 26,
+    "totalBytes": 2967069
+  }
+}
