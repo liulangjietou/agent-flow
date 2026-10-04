@@ -420,6 +420,27 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(task(report).getTaskDefinitionKey()).isEqualTo("finance");
     }
 
+    @Test
+    void expenseSelfApprovalReceiptSignerCannotThenApproveParallelBusinessTask() throws Exception {
+        var selected = selfApprovingAppointment(true); parallelExpenseReviews = true;
+        var financeAppointment = organization.createAppointment(admin, finance, selected.departmentId(), selected.positionId(), true);
+        organization.setSupervisor(admin, selected.id(), financeAppointment.id(), selected.revision());
+        var report = fixture(false).report(); submit(report);
+        var business = tasks(report).stream().filter(task -> task.getTaskDefinitionKey().equals("business")).findFirst().orElseThrow();
+        var receipt = tasks(report).stream().filter(task -> task.getTaskDefinitionKey().equals("receipt")).findFirst().orElseThrow();
+        assertThat(tasks.getIdentityLinksForTask(business.getId())).extracting(link -> link.getUserId()).contains("finance");
+        ok(send(path(report) + "/tasks/" + receipt.getId() + "/receive", "finance", receiveInput(report)), 200);
+        var recorded = controls.find("demo", report.id(), 1).orElseThrow().receipt();
+        assertThat(recorded.receivedBy()).isEqualTo("finance");
+        assertThat(send("/api/v1/tasks/" + business.getId() + "/actions", "finance",
+                Map.of("action", "APPROVE", "expectedVersion", app(report).version())).getStatus()).isEqualTo(403);
+        var queue = ok(read("/api/v1/workspace/tasks?processKey=" + app(report).processKey(), "finance"), 200);
+        assertThat(queue.path("total").asLong()).isEqualTo(1);
+        assertThat(queue.path("items").findValuesAsText("taskId")).containsExactly(receipt.getId());
+        assertThat(tasks.createTaskQuery().taskId(business.getId()).count()).isEqualTo(1);
+        assertThat(controls.find("demo", report.id(), 1).orElseThrow().receipt()).isEqualTo(recorded);
+    }
+
     private io.agentflow.organization.OrganizationAppointment selfApprovingAppointment(boolean withSuperior) {
         selfApprovalEscalation = true;
         var selected = organizationRecords.appointment("demo", appointment).orElseThrow();
@@ -6045,10 +6066,20 @@ class ExpenseSubmissionIntegrationTest {
                     new Edge("c", "fork", "receipt", "", false), new Edge("d", "business", "join", "", false),
                     new Edge("e", "receipt", "join", "", false), new Edge("f", "join", "finance", "", false),
                     new Edge("g", "finance", "end", "", false)));
+            if (paperRequired) {
+                // 纸件制度要求共同必经签收；分支中的提前签收不能替代整单必经控制。
+                nodes.add(new Node("receiptCheck", "共同签收复核", NodeType.USER_TASK,
+                        Map.of("assigneeRule", "role:ORG_PERSON_" + finance, "expenseStage", "RECEIPT")));
+                edges.replaceAll(edge -> edge.id().equals("f") ? new Edge("f", "join", "receiptCheck", "", false) : edge);
+                edges.add(new Edge("h", "receiptCheck", "finance", "", false));
+            }
         }
         var graph = new Graph(nodes, edges);
+        var detailAccess = new HashMap<>(Map.of("business", hideBusinessDetails ? FieldVisibility.HIDDEN : FieldVisibility.READ_ONLY,
+                "receipt", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY));
+        if (parallelExpenseReviews && paperRequired) detailAccess.put("receiptCheck", FieldVisibility.READ_ONLY);
         var schema = new FormSchema(2, List.of(new FormSchema.Field("expenseDetails", "费用明细", FormSchema.FieldType.TEXT, true, null,
-                null, null, null, null, null, null, true, Map.of("business", hideBusinessDetails ? FieldVisibility.HIDDEN : FieldVisibility.READ_ONLY, "receipt", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY)),
+                null, null, null, null, null, null, true, detailAccess),
                 new FormSchema.Field("amount", "本币金额", FormSchema.FieldType.NUMBER, true, null, null, null, null, null),
                 new FormSchema.Field("currency", "本位币", FormSchema.FieldType.TEXT, true, null, null, null, null, null),
                 new FormSchema.Field("overPolicy", "超标", FormSchema.FieldType.BOOLEAN, true, null, null, null, null, null)));

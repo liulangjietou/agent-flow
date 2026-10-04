@@ -42,6 +42,19 @@ class ClasspathProcessTemplateCatalogTest {
         assertThatThrownBy(catalog.list()::clear).isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @Test
+    void expenseTemplateRequiresExplicitNewSourceVersionForSelfApprovalEscalation() {
+        var catalog = new ClasspathProcessTemplateCatalog(resources, json);
+        var expense = catalog.get("expense-report");
+        assertThat(expense.templateVersion()).isEqualTo(2);
+        assertThat(io.agentflow.expense.ExpenseSelfApprovalPolicy.enabled(expense.graph())).isTrue();
+        assertThatThrownBy(() -> catalog.requireVersion("expense-report", 1)).isInstanceOf(DomainException.class)
+                .satisfies(error -> assertThat(((DomainException) error).code()).isEqualTo("TEMPLATE_VERSION_CONFLICT"));
+        assertThat(catalog.requireVersion("expense-report", 2)).isSameAs(expense);
+        assertThat(catalog.get("expense-plan").templateVersion()).isEqualTo(1);
+        assertThat(catalog.get("advance-request").templateVersion()).isEqualTo(1);
+    }
+
     @ParameterizedTest
     @CsvSource({"procurement-payment,business-type", "procurement-payment,masked", "procurement-payment,missing-sensitive",
             "budget-adjustment,business-type", "budget-adjustment,masked", "budget-adjustment,missing-sensitive",

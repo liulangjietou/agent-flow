@@ -107,6 +107,9 @@ class ProcessTemplateIntegrationTest {
                 "key", uniqueKey(), "name", "财务模板独立副本", "templateVersion", original.templateVersion()))));
         assertThat(draft.path("status").asText()).isEqualTo("DRAFT");
         assertThat(draft.path("formSchema")).isEqualTo(json.read(json.write(original.formSchema()), JsonNode.class));
+        assertThat(draft.path("graph")).isEqualTo(json.read(json.write(original.graph()), JsonNode.class));
+        assertThat(findCopy(template(templateKey, admin), draft.path("id").asText()).path("templateVersion").asLong())
+                .isEqualTo(original.templateVersion());
         String definitionUrl = "/api/v1/process-definitions/" + draft.path("id").asText();
         for (var scenario : original.scenarios()) {
             var simulation = send(definitionUrl + "/simulate", admin, json.write(Map.of("values", scenario.payload())));
