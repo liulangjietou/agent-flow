@@ -83,9 +83,9 @@ public final class ExpenseProcessPolicy {
      * @author owlzhangfq@gmail.com
      */
     public enum Stage {
-        BUSINESS, PRIOR_REQUEST_REVIEW, BUDGET_REVIEW, RECEIPT, FINANCE_REVIEW, FINANCE_RECHECK;
-        /** 额度和预算例外属于业务审批责任，但不能被普通业务节点的重复审批策略跳过。 */
-        public boolean businessApproval() { return this == BUSINESS || this == PRIOR_REQUEST_REVIEW || this == BUDGET_REVIEW; }
+        BUSINESS, PRIOR_REQUEST_REVIEW, BUDGET_REVIEW, PROJECT_REVIEW, RECEIPT, FINANCE_REVIEW, FINANCE_RECHECK;
+        /** 额度、预算例外和项目审核属于业务责任，不能被普通业务节点重复审批策略跳过。 */
+        public boolean businessApproval() { return this == BUSINESS || this == PRIOR_REQUEST_REVIEW || this == BUDGET_REVIEW || this == PROJECT_REVIEW; }
         /** 两类财务节点都必须复核预算及纸件事实。 */
         public boolean finance() { return this == FINANCE_REVIEW || this == FINANCE_RECHECK; }
     }

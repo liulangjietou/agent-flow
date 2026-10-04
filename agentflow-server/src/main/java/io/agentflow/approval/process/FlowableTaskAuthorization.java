@@ -121,4 +121,7 @@ public class FlowableTaskAuthorization {
 
     /** 被排除人员不能借责任变更取得新的待办。 */
     public void requireTargetAllowed(Task task, String subject) { responsibilities.requireAllowed(task, subject); }
+
+    /** 会签成员读写使用同一本轮项目职责，历史或管理员身份不能改写它。 */
+    public boolean fixedProjectMembers(Task task) { return responsibilities.fixedProjectMembers(task); }
 }

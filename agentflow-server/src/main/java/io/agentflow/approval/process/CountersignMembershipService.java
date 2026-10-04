@@ -72,7 +72,8 @@ public class CountersignMembershipService {
         var scope = runtime.read(task);
         var state = scope.membership();
         var operator = state.pending().stream().filter(member -> taskId.equals(member.taskId())).findFirst().orElseThrow(CountersignMembershipService::changed);
-        boolean canChange = !operator.delegated() && operator.user().equals(actor.userId());
+        boolean projectFixed = authorization.fixedProjectMembers(task);
+        boolean canChange = !projectFixed && !operator.delegated() && operator.user().equals(actor.userId());
         var available = canChange && state.total() < CountersignMembership.MAX_MEMBERS
                 ? authorization.allowedTargets(task, recipients.approvers(actor.tenantId())).stream().filter(user -> !state.completedUsers().contains(user)
                     && !state.completedResponsibilities().contains(user)
@@ -87,7 +88,7 @@ public class CountersignMembershipService {
         return new View(taskId, application.id(), application.roundNo(), application.version(), task.getProcessInstanceId(),
                 task.getTaskDefinitionKey(), scope.executionId(), scope.originalMembers(), state.total(), state.completed(),
                 pending, state.completedUsers().stream().sorted().toList(), canChange,
-                operator.delegated() ? "TASK_DELEGATION_PENDING" : null, !available.isEmpty(), available);
+                projectFixed ? io.agentflow.expense.ExpenseProjectApprovalPolicy.MEMBERS_FIXED : operator.delegated() ? "TASK_DELEGATION_PENDING" : null, !available.isEmpty(), available);
     }
 
     /** 锁后重新授权并校验绑定；任何审计、通知或版本冲突都回滚引擎变更。 */
@@ -99,6 +100,9 @@ public class CountersignMembershipService {
         Application application = executionLocks.lock(found);
         Task task = authorization.require(taskId, actor);
         requireBinding(application, task);
+        if (authorization.fixedProjectMembers(task)) {
+            throw new DomainException(io.agentflow.expense.ExpenseProjectApprovalPolicy.MEMBERS_FIXED, "Project approval membership is fixed by the original submission evidence");
+        }
         var state = runtime.read(task).membership();
         var operator = state.pending().stream().filter(member -> taskId.equals(member.taskId())).findFirst().orElseThrow(CountersignMembershipService::changed);
         if (operator.delegated()) throw new DomainException("TASK_DELEGATION_PENDING", "Resolve delegated assistance before changing countersign responsibilities");

@@ -14,6 +14,7 @@ public final class ExpenseFormContract {
     public static final String CURRENCY = "currency";
     public static final String OVER_POLICY = "overPolicy";
     public static final String PRIOR_OVER_TOLERANCE = "priorRequestOverTolerance";
+    public static final String HAS_PROJECT_ALLOCATION = "hasProjectAllocation";
     private static final String DETAILS_LINK = "费用明细见报销单";
     private static final Map<String, FormSchema.FieldType> TYPES = Map.of(DETAILS, FormSchema.FieldType.TEXT,
             AMOUNT, FormSchema.FieldType.NUMBER, CURRENCY, FormSchema.FieldType.TEXT, OVER_POLICY, FormSchema.FieldType.BOOLEAN);
@@ -23,15 +24,18 @@ public final class ExpenseFormContract {
     /** 完整费用组必须显式受敏感字段约束，管理员身份不会因此获得明细权限。 */
     public static void requireSchema(FormSchema schema) {
         if (schema == null || !schema.fieldTypes().keySet().containsAll(TYPES.keySet())
-                || schema.fieldTypes().size() != TYPES.size() + (hasPriorControl(schema) ? 1 : 0)) throw invalid();
+                || schema.fieldTypes().size() != TYPES.size() + (hasPriorControl(schema) ? 1 : 0) + (hasProjectControl(schema) ? 1 : 0)) throw invalid();
         for (var field : schema.fields()) {
-            if (field.type() != (PRIOR_OVER_TOLERANCE.equals(field.key()) ? FormSchema.FieldType.BOOLEAN : TYPES.get(field.key())) || !field.required()
+            if (field.type() != (PRIOR_OVER_TOLERANCE.equals(field.key()) || HAS_PROJECT_ALLOCATION.equals(field.key()) ? FormSchema.FieldType.BOOLEAN : TYPES.get(field.key())) || !field.required()
                     || DETAILS.equals(field.key()) && !Boolean.TRUE.equals(field.sensitive())) throw invalid();
         }
     }
 
-    /** 只有明确采用新控制字段的定义才接收第五项服务端路由值，旧定义保持原载荷。 */
+    /** 只有明确采用额度控制字段的定义才接收该服务端路由值，旧定义保持原载荷。 */
     public static boolean hasPriorControl(FormSchema schema) { return schema != null && schema.fieldTypes().containsKey(PRIOR_OVER_TOLERANCE); }
+
+    /** 只有明确采用项目会签的定义接收该服务端布尔值。 */
+    public static boolean hasProjectControl(FormSchema schema) { return schema != null && schema.fieldTypes().containsKey(HAS_PROJECT_ALLOCATION); }
 
     /** 保留字段标识防止通用表单创建伪造的结构化申请。 */
     public static boolean structured(FormSchema schema) {
@@ -51,6 +55,13 @@ public final class ExpenseFormContract {
     public static Map<String, Object> submittedPayload(ExpenseRound round, Boolean priorOverTolerance) {
         if (priorOverTolerance == null) return submittedPayload(round);
         var values = new java.util.HashMap<>(submittedPayload(round)); values.put(PRIOR_OVER_TOLERANCE, priorOverTolerance); return Map.copyOf(values);
+    }
+
+    /** 项目标志来自原提交依据，核减不能改变本轮项目集合或清掉路由值。 */
+    public static Map<String, Object> submittedPayload(ExpenseRound round, Boolean priorOverTolerance, Boolean hasProjects) {
+        var original = submittedPayload(round, priorOverTolerance);
+        if (hasProjects == null) return original;
+        var values = new java.util.HashMap<>(original); values.put(HAS_PROJECT_ALLOCATION, hasProjects); return Map.copyOf(values);
     }
 
     /** 读取完整明细需要该敏感组原样可读，脱敏占位文本不能当作授权。 */

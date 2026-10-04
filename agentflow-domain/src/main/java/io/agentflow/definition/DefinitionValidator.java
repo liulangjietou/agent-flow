@@ -41,6 +41,8 @@ public final class DefinitionValidator {
         catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code()); }
         try { io.agentflow.expense.ExpenseBudgetApprovalPolicy.validate(graph, formSchema); }
         catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code()); }
+        try { io.agentflow.expense.ExpenseProjectApprovalPolicy.validate(graph, formSchema); }
+        catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code()); }
         if (processKey != null && !DefinitionIdentifiers.valid(processKey)) errors.add("INVALID_PROCESS_KEY:" + processKey);
         if (graph.riskPolicy() != null) errors.addAll(graph.riskPolicy().validate(formSchema, graph.conditionLanguageVersion()));
         Map<String, Node> nodes = new HashMap<>();
@@ -118,7 +120,8 @@ public final class DefinitionValidator {
                 } else if (n.type() == NodeType.USER_TASK && FormAssigneePolicy.isFieldRule(assigneeRule)) {
                     try { FormAssigneePolicy.parse(assigneeRule).field(formSchema); }
                     catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
-                } else if (!isLiteralAssigneeRule(assigneeRule)) {
+                } else if (!(n.type() == NodeType.USER_TASK && io.agentflow.expense.ExpenseProjectApprovalPolicy.isRule(assigneeRule))
+                        && !isLiteralAssigneeRule(assigneeRule)) {
                     errors.add("ASSIGNEE_RULE_INVALID:" + n.id());
                 }
             }

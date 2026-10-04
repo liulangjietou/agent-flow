@@ -37,14 +37,17 @@ public class ExpenseReductionService {
     private final ApprovalNotificationService notifications;
     private final TaskAuditPort audit;
     private final JdbcExpensePriorControlRepository priorControls;
+    private final ExpenseProjectApprovalBindings projects;
 
     /** 外部预算只登记持久命令，核减事务内不发 HTTP。 */
     public ExpenseReductionService(CurrentActor actors, ExpenseApprovalService approvals, ExpenseReportRepository reports,
             ExpensePrecheckResources resources, ExpenseResourceChanges changes, ApprovalApplicationFacade applications,
-            BudgetOperationService budgets, ApprovalNotificationService notifications, TaskAuditPort audit, JdbcExpensePriorControlRepository priorControls) {
+            BudgetOperationService budgets, ApprovalNotificationService notifications, TaskAuditPort audit, JdbcExpensePriorControlRepository priorControls,
+            ExpenseProjectApprovalBindings projects) {
         this.actors = actors; this.approvals = approvals; this.reports = reports; this.resources = resources;
         this.changes = changes; this.applications = applications; this.budgets = budgets; this.notifications = notifications; this.audit = audit;
         this.priorControls = priorControls;
+        this.projects = projects;
     }
 
     /** 只减不增由报销实体执行；最后一个环节失败时，全部本地事实与引擎变量一起回滚。 */
@@ -62,7 +65,8 @@ public class ExpenseReductionService {
         reports.update(report, input.financialVersion(), actor.userId(), "REDUCE");
         // 核减后的预算仍需实际确认，期间通用财务批准守卫会阻止放行。
         application = applications.adjustBusiness(application.id(), input.applicationVersion(), application.businessReference(),
-                ExpenseFormContract.submittedPayload(report.currentRound(), priorControls.routingFlag(report, application.formSchema())));
+                ExpenseFormContract.submittedPayload(report.currentRound(), priorControls.routingFlag(report, application.formSchema()),
+                        projects.routingFlag(report, application.formSchema())));
         var operation = budgets.reserve(actor.tenantId(), reportId, report.version(), context.control().input().accountingDate(), context.targetDigest(), now);
         audit.record(new TaskAuditPort.TaskOperation(actor.tenantId(), context.taskId(), application.id(), application.version(),
                 application.roundNo(), context.processInstanceId(), actor.userId(), AUDIT_ACTION, input.comment(), null,

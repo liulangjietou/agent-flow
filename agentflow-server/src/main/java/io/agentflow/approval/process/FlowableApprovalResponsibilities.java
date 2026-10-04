@@ -124,6 +124,10 @@ public class FlowableApprovalResponsibilities implements TaskListener {
         if (expense != null && original.stream().anyMatch(subject -> !directory.eligible(tenant, subject))) {
             throw new DomainException("EXPENSE_APPROVER_UNAVAILABLE", "A frozen expense approver is no longer eligible");
         }
+        if (expense != null && expense.node(execution.getCurrentActivityId()).stage() == ExpenseProcessPolicy.Stage.PROJECT_REVIEW
+                && original.stream().anyMatch(excluded::contains)) {
+            throw new DomainException("APPROVAL_RESPONSIBILITY_CONFLICT", "A required project owner conflicts with approval responsibilities; the complete project review cannot start");
+        }
         var members = original.stream().filter(subject -> !excluded.contains(subject)).distinct().sorted().toList();
         if (members.isEmpty()) throw new DomainException("APPROVAL_RESPONSIBILITY_NO_MEMBERS", "No approvers remain after applying responsibility constraints");
         execution.setVariableLocal(variable, json.write(new Snapshot(policy, List.copyOf(excluded), members)));
@@ -155,6 +159,12 @@ public class FlowableApprovalResponsibilities implements TaskListener {
     /** 冲突不能通过转交、委派和加签成为新的合法责任。 */
     public void requireAllowed(Task task, String subject) {
         if (!allows(task, subject)) throw new DomainException("APPROVAL_RESPONSIBILITY_CONFLICT", "The selected user conflicts with the frozen approval responsibilities");
+    }
+
+    /** 项目责任取自本轮冻结职责，不能通过通用会签成员入口删改。 */
+    public boolean fixedProjectMembers(Task task) {
+        var expense = expenseSnapshot(task);
+        return expense != null && expense.node(task.getTaskDefinitionKey()).stage() == io.agentflow.expense.ExpenseProcessPolicy.Stage.PROJECT_REVIEW;
     }
 
     private Snapshot snapshot(Task task) {

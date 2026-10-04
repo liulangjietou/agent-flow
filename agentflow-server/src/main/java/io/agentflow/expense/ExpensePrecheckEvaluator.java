@@ -122,6 +122,9 @@ public class ExpensePrecheckEvaluator {
             } catch (CheckFailure failed) { findings.add(failed.finding); }
         }
         if (!findings.isEmpty()) return new Result(null, findings);
+        ExpenseProjectOwners projectOwners;
+        try { projectOwners = ExpenseProjectOwners.from(catalog, report.content()); }
+        catch (DomainException invalid) { throw rejected(Stage.CATALOG, null, invalid.code()); }
         try { report.freeze(input.financialVersion(), input.roundNo(), entity.baseCurrency(), account.snapshot(), assessments, input.employeeId(), Instant.now()); }
         catch (DomainException invalid) { throw rejected(Stage.INPUT, null, invalid.code()); }
         ExpenseSubmissionResources.Plan resourcePlan;
@@ -133,7 +136,7 @@ public class ExpensePrecheckEvaluator {
         ensureLive(job);
         if (!capture.validUntil().isAfter(Instant.now())) throw unavailable(Stage.CONTEXT, "FACTS_EXPIRED");
         return new Result(new ExpensePrecheckEvidence(catalog.sourceVersion(), entity, rateDate, budget, report.currentRound(),
-                ExpensePrecheckResources.versions(loaded), invoiceEvidence, capture.validUntil(), selectedPolicy.selection(), resourcePlan.priorControls()), List.of());
+                ExpensePrecheckResources.versions(loaded), invoiceEvidence, capture.validUntil(), selectedPolicy.selection(), resourcePlan.priorControls(), projectOwners), List.of());
     }
 
     private List<ExpensePolicyPort.InvoiceEvidence> invoiceFacts(ExpensePrecheckJob job, ExpenseLine line,

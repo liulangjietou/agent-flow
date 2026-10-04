@@ -32,12 +32,14 @@ public class ExpenseSelfApprovalBindings {
     private final OrganizationAssigneeResolver resolver;
     private final TaskRecipientDirectory directory;
     private final FormAssigneeBindings formAssignees;
+    private final ExpenseProjectApprovalBindings projects;
 
     /** 选人仍使用既有权威目录，费用层只编排本轮冻结和自审批替换。 */
     public ExpenseSelfApprovalBindings(ApplicationRepository applications, OrganizationRepository organizations,
-            OrganizationAssigneeResolver resolver, TaskRecipientDirectory directory, FormAssigneeBindings formAssignees) {
+            OrganizationAssigneeResolver resolver, TaskRecipientDirectory directory, FormAssigneeBindings formAssignees, ExpenseProjectApprovalBindings projects) {
         this.applications = applications; this.organizations = organizations; this.resolver = resolver;
         this.directory = directory; this.formAssignees = formAssignees;
+        this.projects = projects;
     }
 
     /** 所有声明路径都预先检查，未命中的分支不能潜伏一个无法上溯的申请人。 */
@@ -54,7 +56,10 @@ public class ExpenseSelfApprovalBindings {
         for (var node : definition.graph().nodes()) {
             if (node.type() != NodeType.USER_TASK) continue;
             String rule = node.properties().get("assigneeRule");
-            var selected = original(command, fields, node.id(), rule, revision);
+            var selected = ExpenseProjectApprovalPolicy.isRule(rule) ? projects.select(command, definition, node.id(), revision)
+                    : original(command, fields, node.id(), rule, revision);
+            // 双向路径已证明无项目不可达，只有这一个专用节点可省略空责任。
+            if (ExpenseProjectApprovalPolicy.isRule(rule) && selected.subjects().isEmpty()) continue;
             var original = selected.subjects().stream().distinct().sorted().toList();
             var stage = ExpenseProcessPolicy.stage(node);
             var candidates = original;

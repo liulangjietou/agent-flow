@@ -37,6 +37,7 @@ public class DefinitionReferenceInspector {
                 .map(DefinitionAssigneeDirectory.Option::rule).collect(Collectors.toSet());
         var errors = new ArrayList<>(graph.nodes().stream().filter(node -> node.type() == NodeType.USER_TASK)
                 .filter(node -> !FormAssigneePolicy.isFieldRule(node.properties().get("assigneeRule")))
+                .filter(node -> !io.agentflow.expense.ExpenseProjectApprovalPolicy.isRule(node.properties().get("assigneeRule")))
                 .filter(node -> !available.contains(node.properties().get("assigneeRule")))
                 .map(node -> "ASSIGNEE_NOT_AVAILABLE:" + node.id()).toList());
         var fieldNodes = graph.nodes().stream().filter(node -> node.type() == NodeType.USER_TASK

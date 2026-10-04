@@ -45,6 +45,8 @@ final class ExpenseSubprocessGatewayFixture implements AutoCloseable {
     private volatile RuntimeException failure;
     private volatile BudgetObservation.Status budgetStatus = BudgetObservation.Status.APPLIED;
     private volatile BudgetExceptionPolicy exceptionPolicy;
+    private volatile List<FinanceCatalog.Project> projects = List.of();
+    private volatile String catalogVersion = "synthetic-subprocess-v1";
 
     ExpenseSubprocessGatewayFixture() {
         try {
@@ -83,12 +85,15 @@ final class ExpenseSubprocessGatewayFixture implements AutoCloseable {
         commands.clear(); writes.clear(); queries.clear(); appliedAt.clear(); failure = null;
         budgetStatus = BudgetObservation.Status.APPLIED;
         exceptionPolicy = null; exceptionTerminals.clear();
+        projects = List.of(); catalogVersion = "synthetic-subprocess-v1";
     }
     String endpoint() { return "http://127.0.0.1:" + server.getAddress().getPort() + "/finance"; }
     RuntimeException failure() { return failure; }
     void budgetStatus(BudgetObservation.Status status) { budgetStatus = status; }
     /** 柔性用例才显式返回外部政策，已确认终态按原命令保留。 */
     void exceptionPolicy(String reference) { exceptionPolicy = reference == null ? null : new BudgetExceptionPolicy(reference); }
+    /** 项目用例显式选择可信负责人，原有无项目夹具继续原目录。 */
+    void projects(String version, List<FinanceCatalog.Project> values) { catalogVersion = version; projects = List.copyOf(values); }
     int writes() { return writes.values().stream().mapToInt(AtomicInteger::get).sum(); }
     int queries() { return queries.values().stream().mapToInt(AtomicInteger::get).sum(); }
     int writes(UUID id) { return writes.getOrDefault(id, new AtomicInteger()).get(); }
@@ -97,10 +102,10 @@ final class ExpenseSubprocessGatewayFixture implements AutoCloseable {
 
     private Object data(Context current, String operation, JsonNode data) {
         return switch (operation) {
-            case "catalog" -> new FinanceCatalog("alice", "synthetic-subprocess-v1", Instant.now().plusSeconds(600),
+            case "catalog" -> new FinanceCatalog("alice", catalogVersion, Instant.now().plusSeconds(600),
                     List.of(new FinanceCatalog.LegalEntity(current.entity(), "合成报销法人", "CNY", true, "entity-v1", "UTC")),
                     List.of(new FinanceCatalog.Category("OFFICE", "办公", List.of(ExpenseLine.Unit.ITEM))),
-                    List.of(new FinanceCatalog.CostCenter(current.entity(), "IT", "研发")), List.of(), List.of(new FinanceCatalog.City("SH", "上海")));
+                    List.of(new FinanceCatalog.CostCenter(current.entity(), "IT", "研发")), projects, List.of(new FinanceCatalog.City("SH", "上海")));
             case "employee-account" -> new EmployeeAccountPort.Account(new EmployeeAccountSnapshot(current.entity(), "alice",
                     "synthetic-employee-account", "****1234", "a".repeat(64), "account-v1"), Instant.now().plusSeconds(600));
             case "exchange-rate" -> new ExpenseExchangeRate("CNY", "CNY", BigDecimal.ONE, "synthetic-rate", LocalDate.parse(data.path("rateDate").asText()));
