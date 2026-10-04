@@ -20,10 +20,15 @@ class AssistSchedulingTest {
         var ordinaryDrafts = org.mockito.Mockito.mock(DraftAssistWorker.class);
         var explanations = org.mockito.Mockito.mock(PrecheckExplanationWorker.class);
         var expenseDrafts = org.mockito.Mockito.mock(ExpenseDraftAssistWorker.class);
+        var expenseRisks = org.mockito.Mockito.mock(ExpenseRiskWorker.class);
         new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, AssistScheduling.class)
                 .withConfiguration(AutoConfigurations.of(TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
                 .withBean(AssistWorker.class, () -> summaries).withBean(DraftAssistWorker.class, () -> ordinaryDrafts)
                 .withBean(PrecheckExplanationWorker.class, () -> explanations).withBean(ExpenseDraftAssistWorker.class, () -> expenseDrafts)
+                .withBean(ExpenseRiskWorker.class, () -> expenseRisks)
+                .withBean(org.springframework.transaction.PlatformTransactionManager.class, () ->
+                        new org.springframework.jdbc.datasource.DataSourceTransactionManager(
+                                new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:h2:mem:assist-scheduling", "sa", "")))
                 .withPropertyValues("agentflow.assist.enabled=true", "agentflow.assist.poll-delay-ms=10")
                 .run(context -> {
                     assertThat(context).hasBean("assistPoller");
@@ -31,6 +36,7 @@ class AssistSchedulingTest {
                     org.mockito.Mockito.verify(summaries, org.mockito.Mockito.atLeastOnce()).poll();
                     org.mockito.Mockito.verify(ordinaryDrafts, org.mockito.Mockito.atLeastOnce()).poll();
                     org.mockito.Mockito.verify(explanations, org.mockito.Mockito.atLeastOnce()).poll();
+                    org.mockito.Mockito.verify(expenseRisks, org.mockito.Mockito.timeout(5000).atLeastOnce()).poll();
                 });
     }
 

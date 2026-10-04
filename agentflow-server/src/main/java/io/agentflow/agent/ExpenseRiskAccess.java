@@ -100,19 +100,39 @@ public class ExpenseRiskAccess {
         }
     }
 
+    /** 历史索引只要求主单原轮次可读，不因索引查询而访问对照单或票据。 */
+    @Transactional(readOnly = true)
+    public void requirePrimaryReadable(Actor actor, UUID reportId, int roundNo) {
+        readable(actor, reportId, roundNo);
+    }
+
+    /** 放弃旧解释也须拥有原主单当前决定权，不能用历史参与资格写入复核轨迹。 */
+    @Transactional(readOnly = true)
+    public void requireDecision(Actor actor, ExpenseRiskInput.Document primary, String taskId) {
+        var value = readable(actor, new SelectedDocument(primary.reportId(), primary.roundNo(), primary.lineNos()));
+        if (!value.application().id().equals(primary.applicationId())) throw notFound();
+        decisions.requireDecision(value.application(), taskId, actor);
+        if (value.application().roundNo() != primary.roundNo()) throw changed();
+    }
+
     private Readable readable(Actor actor, SelectedDocument selection) {
-        var report = reports.find(actor.tenantId(), selection.reportId()).orElseThrow(ExpenseRiskAccess::notFound);
+        var value = readable(actor, selection.reportId(), selection.roundNo());
+        var lines = value.lines().stream().filter(line -> selection.lineNos().contains(line.lineNo()))
+                .sorted(java.util.Comparator.comparingInt(ExpenseLine::lineNo)).toList();
+        if (lines.size() != selection.lineNos().size()) throw invalid();
+        return new Readable(value.report(), value.application(), value.round(), lines);
+    }
+
+    private Readable readable(Actor actor, UUID reportId, int roundNo) {
+        var report = reports.find(actor.tenantId(), reportId).orElseThrow(ExpenseRiskAccess::notFound);
         var application = applications.getForActor(actor, report.applicationId());
-        var round = report.rounds().stream().filter(value -> value.roundNo() == selection.roundNo()).findFirst().orElseThrow(ExpenseRiskAccess::notFound);
+        var round = report.rounds().stream().filter(value -> value.roundNo() == roundNo).findFirst().orElseThrow(ExpenseRiskAccess::notFound);
         var submitted = rounds.findByRound(actor.tenantId(), application.id(), round.roundNo()).orElseThrow(ExpenseRiskAccess::notFound);
         var projection = fields.attachmentViewForActor(actor, application, round.roundNo());
         if (!ExpenseFormContract.detailsReadable(submitted.formSchema(), projection.schema())) {
             throw new DomainException("FORBIDDEN", "All selected expense details must remain fully readable");
         }
-        var lines = round.content().lines().stream().filter(line -> selection.lineNos().contains(line.lineNo()))
-                .sorted(java.util.Comparator.comparingInt(ExpenseLine::lineNo)).toList();
-        if (lines.size() != selection.lineNos().size()) throw invalid();
-        return new Readable(report, application, round, lines);
+        return new Readable(report, application, round, round.content().lines());
     }
 
     private static Invoice.VerifiedFacts verifiedFacts(Invoice invoice, Readable source, Instant at) {

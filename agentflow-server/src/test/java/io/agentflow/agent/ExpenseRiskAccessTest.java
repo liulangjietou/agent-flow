@@ -184,6 +184,25 @@ class ExpenseRiskAccessTest {
         verify(invoices, never()).findAll(anyString(), anyCollection());
     }
 
+    @Test void historyIndexUsesOriginalSensitiveFieldPermissionWithoutDiscoveringInvoices() {
+        var primary = fixture("employee", LEGAL, List.of(line(1)));
+        access.requirePrimaryReadable(actor, primary.report().id(), 1);
+        verifyNoInteractions(decisions, calendars); verify(invoices, never()).findAll(anyString(), anyCollection());
+        when(fields.attachmentViewForActor(actor, primary.application(), 1)).thenReturn(new FormFieldProjection(new FormSchema(2, List.of()), Map.of(), true));
+        error("FORBIDDEN", () -> access.requirePrimaryReadable(actor, primary.report().id(), 1));
+    }
+
+    @Test void reviewDecisionRequiresMatchingApplicationAndCurrentOriginalRound() {
+        var primary = fixture("employee", LEGAL, List.of(line(1)));
+        var document = new ExpenseRiskInput.Document(1, primary.report().id(), primary.application().id(), 4, 1, 3, "a".repeat(64), List.of(1));
+        access.requireDecision(actor, document, TASK); verify(decisions).requireDecision(primary.application(), TASK, actor);
+        when(primary.application().roundNo()).thenReturn(2);
+        error("AGENT_INPUT_CHANGED", () -> access.requireDecision(actor, document, TASK));
+        var wrong = new ExpenseRiskInput.Document(1, primary.report().id(), UUID.randomUUID(), 4, 1, 3, "a".repeat(64), List.of(1));
+        error("NOT_FOUND", () -> access.requireDecision(actor, wrong, TASK));
+        verify(invoices, never()).findAll(anyString(), anyCollection());
+    }
+
     private Fixture fixture(String employee, UUID legal, List<ExpenseLine> lines) {
         var report = mock(ExpenseReport.class); var application = mock(Application.class); var submitted = mock(SubmissionRound.class);
         UUID reportId = UUID.randomUUID(), applicationId = UUID.randomUUID();

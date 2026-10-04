@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T09:46:18.675532+00:00",
+  "recordedAt": "2026-10-04T10:11:05.994537+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -907,7 +907,7 @@
           ]
         }
       ],
-      "observed": "已实现四类局部证据计算、逐单原轮次授权来源、输入版本绑定、严格模型解释及独立复核领域状态；领域、来源与模型 HTTP 范围共 154 项已通过，其中 74 项为新增风险能力测试。持久队列、公开 API、页面和完整运行验收尚未接通，A04 保持 OPEN。",
+      "observed": "已接通四类局部证据、逐单原轮次来源授权、严格模型端口、V115 持久队列、原登录发送前复核、事务外执行和人工复核服务。后端范围 129 项去重用例已通过；公开 API、页面和真实业务运行验收待完成，A04 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
@@ -925,15 +925,18 @@
       "acceptance": "可解释地引用经授权的费用事实，保留提示和人工处置；不能凭模型标签自动驳回、核减或改变金额矩阵。确定性拆单路由由 F04 独立处理。",
       "dependsOn": [],
       "progress": {
-        "recordedAt": "2026-10-04T09:46:18.675532+00:00",
-        "status": "LOCAL_DOMAIN_ACCESS_SOURCES_AND_MODEL_FOUNDATION_VERIFIED_FULL_FLOW_PENDING",
+        "recordedAt": "2026-10-04T10:11:05.994537+00:00",
+        "status": "LOCAL_PERSISTENCE_AND_EXECUTION_VERIFIED_PUBLIC_API_UI_RUNTIME_PENDING",
         "publicApiImplemented": false,
-        "persistenceImplemented": false,
+        "persistenceImplemented": true,
+        "backendExecutionImplemented": true,
         "uiImplemented": false,
         "runtimeAccepted": false,
-        "evidence": "docs/evidence/expense-risk-foundation-20261004.json",
-        "scopeTestsPassed": 154,
-        "newFeatureTestsPassed": 74
+        "evidence": "docs/evidence/expense-risk-execution-20261004.json",
+        "foundationEvidence": "docs/evidence/expense-risk-foundation-20261004.json",
+        "scopeTestsPassed": 129,
+        "persistenceCasesPassed": 25,
+        "executionCasesPassed": 31
       }
     },
     {
@@ -3874,9 +3877,9 @@
   },
   "latestProgress": {
     "taskId": "A04",
-    "status": "LOCAL_DOMAIN_ACCESS_SOURCES_AND_MODEL_FOUNDATION_VERIFIED_FULL_FLOW_PENDING",
-    "recordedAt": "2026-10-04T09:46:18.675532+00:00",
-    "evidence": "docs/evidence/expense-risk-foundation-20261004.json",
+    "status": "LOCAL_PERSISTENCE_AND_EXECUTION_VERIFIED_PUBLIC_API_UI_RUNTIME_PENDING",
+    "recordedAt": "2026-10-04T10:11:05.994537+00:00",
+    "evidence": "docs/evidence/expense-risk-execution-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
