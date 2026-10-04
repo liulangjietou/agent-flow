@@ -12,6 +12,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
+import java.util.HexFormat;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 /**
  * 演示认证及演示审批人目录；企业登录由独立 OIDC 接入层负责。
@@ -97,6 +102,24 @@ public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDi
             throw new DomainException("UNAUTHENTICATED", "Token is invalid or expired");
         }
         return actor;
+    }
+
+    /** 后台只保存登录指纹，不能将此指纹作为 Bearer 凭据使用。 */
+    public String loginReference(String token) {
+        authenticate(token);
+        return fingerprint(token);
+    }
+
+    /** 注销或进程重启后演示登录失效，不从账号目录重新授予后台权限。 */
+    public Optional<Actor> actorForLoginReference(String reference) {
+        if (!demoEnabled) return Optional.empty();
+        return tokens.entrySet().stream().filter(entry -> fingerprint(entry.getKey()).equals(reference))
+                .map(Map.Entry::getValue).findFirst();
+    }
+
+    private static String fingerprint(String token) {
+        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8))); }
+        catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 unavailable", impossible); }
     }
 
     /** 注销当前 token。 */

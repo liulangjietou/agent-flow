@@ -73,6 +73,20 @@ public class JdbcSignatureEvidenceRepository {
         }, tenant, operationId.toString(), evidenceDigest).stream().findFirst();
     }
 
+    /** 文件恢复只取当前已接受回执的原始证据，不用配置或状态 JSON 补造签名。 */
+    public SignatureReceiptVerifier.Verified forReceipt(SignatureOperation operation) {
+        if (operation.receipt() == null) throw conflict();
+        var request = operation.input().request();
+        String digest = jdbc.query("""
+                SELECT evidence_digest FROM signature_receipt_evidence WHERE tenant_id=? AND operation_id=?
+                AND receipt_digest=? AND accepted_version<=? ORDER BY accepted_version,evidence_digest LIMIT 1
+                """, (row, index) -> row.getString(1), request.tenantId(), request.id().toString(), operation.receipt().digest(), operation.version())
+                .stream().findFirst().orElseThrow(JdbcSignatureEvidenceRepository::corrupt);
+        var verified = find(request.tenantId(), request.id(), digest).orElseThrow(JdbcSignatureEvidenceRepository::corrupt);
+        if (!verified.receipt().equals(operation.receipt())) throw corrupt();
+        return verified;
+    }
+
     private static boolean accepted(SignatureOperation operation, SignatureReceipt receipt) {
         if (operation.attempts() < 1) return false;
         if (receipt.status() == SignatureReceipt.Status.NOT_FOUND) return operation.status() == SignatureOperation.Status.UNKNOWN && operation.failure() == SignatureOperation.Failure.NOT_FOUND;

@@ -3,6 +3,7 @@ package io.agentflow.attachment;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.ApplicationFieldViews;
 import io.agentflow.common.CurrentActor;
+import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import jakarta.validation.constraints.Max;
@@ -121,8 +122,13 @@ public class AttachmentService {
     }
 
     private Attachment readable(UUID applicationId, UUID id, Integer round) {
-        var application = applications.get(applicationId);
-        var view = fields.attachmentView(application, round);
+        return readableForActor(actors.actor(), applicationId, id, round);
+    }
+
+    /** 签署等后台用例复用原件读取权限；调用方提供真实认证主体，不能以目录角色代替。 */
+    public Attachment readableForActor(Actor actor, UUID applicationId, UUID id, Integer round) {
+        var application = applications.getForActor(actor, applicationId);
+        var view = fields.attachmentViewForActor(actor, application, round);
         var file = files.get(application.tenantId(), applicationId, id);
         if (!AttachmentReferences.containsField(view.schema(), file.fieldPath())) {
             throw new DomainException("FORBIDDEN", "Field permissions do not allow reading this attachment");
@@ -130,7 +136,7 @@ public class AttachmentService {
         var reference = new AttachmentReferences.Reference(file.fieldPath(), id);
         boolean referenced = AttachmentReferences.collect(view.schema(), view.payload()).contains(reference);
         if (round != null ? !referenced || !files.frozen(file, round)
-                : !referenced && !(application.createdBy().equals(actors.actor().userId()) && application.editable())) {
+                : !referenced && !(application.createdBy().equals(actor.userId()) && application.editable())) {
             throw new DomainException("NOT_FOUND", "Attachment is not referenced in this view");
         }
         return file;
