@@ -94,7 +94,8 @@ public class ExpensePrecheckService {
         return new View(summary(job), unavailable == null, unavailable, job.input().initiator(), job.input().accountingDate(),
                 evidence == null ? null : evidence.rateDate(), evidence == null ? null : evidence.validUntil(),
                 evidence == null ? null : ExpenseResponse.FinancialRound.from(evidence.preview()), job.result() == null ? List.of() : job.result().findings(),
-                evidence == null ? null : evidence.priorControls(), evidence == null ? null : evidence.budget().exceptionPolicy());
+                evidence == null ? null : evidence.priorControls(), evidence == null ? null : evidence.budget().exceptionPolicy(),
+                evidence == null ? null : evidence.projectOwners());
     }
 
     /** 历史分页只列轻量状态，不在一页内复制多份完整费用明细。 */
@@ -220,7 +221,8 @@ public class ExpensePrecheckService {
      */
     public record View(Summary job, boolean usable, String unavailableCode, InitiatorContext initiator, LocalDate accountingDate,
             LocalDate rateDate, Instant validUntil, ExpenseResponse.FinancialRound preview, List<Finding> findings,
-            List<ExpensePriorControlAssessment> priorControls, io.agentflow.finance.BudgetExceptionPolicy budgetExceptionPolicy) { }
+            List<ExpensePriorControlAssessment> priorControls, io.agentflow.finance.BudgetExceptionPolicy budgetExceptionPolicy,
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) ExpenseProjectOwners projectOwners) { }
     /**
      * 下一页游标只能用于本人当前单据。
      * @author owlzhangfq@gmail.com

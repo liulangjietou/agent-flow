@@ -38,7 +38,7 @@ class ClasspathProcessTemplateCatalogTest {
         var catalog = new ClasspathProcessTemplateCatalog(resources, json);
         assertThat(catalog.list()).extracting(ProcessTemplate::key).containsExactly("leave-request", "seal-application", "contract-review", "procurement-payment", "budget-adjustment",
                 "expense-report", "expense-plan", "advance-request");
-        assertThat(catalog.list().stream().mapToInt(template -> template.scenarios().size()).sum()).isEqualTo(44);
+        assertThat(catalog.list().stream().mapToInt(template -> template.scenarios().size()).sum()).isEqualTo(47);
         catalog.list().forEach(ProcessTemplate::verifyScenarios);
         assertThatThrownBy(catalog.list()::clear).isInstanceOf(UnsupportedOperationException.class);
     }
@@ -47,9 +47,11 @@ class ClasspathProcessTemplateCatalogTest {
     void expenseTemplateRequiresExplicitNewSourceVersionWithSplitRiskDisabledAndNoInventedParameters() {
         var catalog = new ClasspathProcessTemplateCatalog(resources, json);
         var expense = catalog.get("expense-report");
-        assertThat(expense.templateVersion()).isEqualTo(6);
+        assertThat(expense.templateVersion()).isEqualTo(7);
         assertThat(io.agentflow.expense.ExpenseBudgetApprovalPolicy.require(expense.graph(), expense.formSchema(), true)).isEqualTo("budgetReview");
         assertThat(expense.defaultRoles()).contains("EXPENSE_BUDGET_REVIEW");
+        assertThat(io.agentflow.expense.ExpenseProjectApprovalPolicy.require(expense.graph(), expense.formSchema(), true)).isEqualTo("projectReview");
+        assertThat(expense.graph().node("projectReview").approvalMode()).isEqualTo(io.agentflow.definition.DefinitionModels.ApprovalMode.ALL);
         assertThat(io.agentflow.expense.ExpenseFormContract.hasPriorControl(expense.formSchema())).isTrue();
         assertThat(io.agentflow.expense.ExpenseProcessPolicy.stage(expense.graph().node("priorReview"))).isEqualTo(io.agentflow.expense.ExpenseProcessPolicy.Stage.PRIOR_REQUEST_REVIEW);
         assertThat(io.agentflow.expense.ExpenseSelfApprovalPolicy.enabled(expense.graph())).isTrue();
@@ -59,11 +61,11 @@ class ClasspathProcessTemplateCatalogTest {
         assertThat(split.rule()).isNull();
         assertThat(split.gatewayIds()).containsExactlyInAnyOrder("amountGate", "executiveGate");
         assertThat(expense.graph().node("recheckGate").properties()).doesNotContainKey("expenseSplitRouting");
-        for (long oldVersion : List.of(1L, 2L, 3L, 4L, 5L)) {
+        for (long oldVersion : List.of(1L, 2L, 3L, 4L, 5L, 6L)) {
             assertThatThrownBy(() -> catalog.requireVersion("expense-report", oldVersion)).isInstanceOf(DomainException.class)
                     .satisfies(error -> assertThat(((DomainException) error).code()).isEqualTo("TEMPLATE_VERSION_CONFLICT"));
         }
-        assertThat(catalog.requireVersion("expense-report", 6)).isSameAs(expense);
+        assertThat(catalog.requireVersion("expense-report", 7)).isSameAs(expense);
         assertThat(catalog.get("expense-plan").templateVersion()).isEqualTo(1);
         assertThat(catalog.get("advance-request").templateVersion()).isEqualTo(1);
     }

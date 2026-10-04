@@ -1,3 +1,4 @@
+import { readProjectOwners } from './expenseProjectApproval.js'
 import { readPriorRequestPage, readPriorAssessments } from './expensePriorControl.js'
 import type { ExpensePartialAdjustmentNotificationTarget } from './expensePartialAdjustmentNotification'
 export type { ExpensePartialAdjustmentNotificationTarget } from './expensePartialAdjustmentNotification'
@@ -802,7 +803,8 @@ export const api = {
   reviseExpense: (id: string, input: ExpenseRevise) => write<ExpenseDetail>(`/expense-reports/${encodeURIComponent(id)}/revise`, 'POST', '保存报销修改', input),
   expensePrecheckOptions: (id: string, signal: AbortSignal) => request<PrecheckOptions>(`/expense-reports/${encodeURIComponent(id)}/precheck-options`, { signal, cache: 'no-store' }),
   queueExpensePrecheck: (id: string, input: PrecheckInput) => write<{ id: string }>(`/expense-reports/${encodeURIComponent(id)}/precheck`, 'POST', '发起费用预检', input),
-  expensePrecheck: (id: string, jobId: string, signal: AbortSignal) => request<PrecheckView>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }).then(value => { if (value.priorControls != null) readPriorAssessments(value.priorControls); return value }),
+  expenseProjectApproval: (id: string, roundNo: number, signal: AbortSignal) => request<unknown>(`/expense-reports/${encodeURIComponent(id)}/project-approval?roundNo=${roundNo}`, { signal, cache: 'no-store' }),
+  expensePrecheck: (id: string, jobId: string, signal: AbortSignal) => request<PrecheckView>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }).then(value => { if (value.priorControls != null) readPriorAssessments(value.priorControls); if (value.projectOwners != null) readProjectOwners(value.projectOwners, value.initiator.legalEntityId); return value }),
   precheckExplanationInput: (id: string, precheckId: string, signal: AbortSignal) => request(explanationPath(id) + '/input?precheckId=' + encodeURIComponent(precheckId), { signal, cache: 'no-store' }).then(value => readExplanationInput(value, precheckId)),
   expensePriorControl: (id: string, roundNo: number, signal: AbortSignal) => request<unknown>(`/expense-reports/${encodeURIComponent(id)}/prior-control` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   expenseSplitRouting: (id: string, roundNo: number, signal: AbortSignal) => request<unknown>(`/expense-reports/${encodeURIComponent(id)}/split-routing` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),

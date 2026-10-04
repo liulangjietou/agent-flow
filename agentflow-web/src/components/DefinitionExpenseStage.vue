@@ -7,6 +7,7 @@ const stages = [
   { value: 'BUSINESS', name: '普通业务审批' },
   { value: 'PRIOR_REQUEST_REVIEW', name: '事前额度例外审批' },
   { value: 'BUDGET_REVIEW', name: '预算负责人审批' },
+  { value: 'PROJECT_REVIEW', name: '项目负责人全员会签' },
   { value: 'RECEIPT', name: '纸质原件签收' },
   { value: 'FINANCE_REVIEW', name: '财务审核' },
   { value: 'FINANCE_RECHECK', name: '财务复核' },
@@ -23,6 +24,7 @@ function choose(event: Event) {
 
 <template>
   <section v-if="visible" class="expense-stage-config" aria-label="费用审批职责">
+    <p v-if="selected === 'PROJECT_REVIEW'">项目负责人全员会签须选择本轮项目负责人来源和 ALL，费用明细设为可见只读。表单须有必填布尔字段 hasProjectAllocation，含项目时在财务审核前必经本节点，无项目时跳过。名单按提交轮次固定，不能加减签、转交或释放。</p>
     <label>费用审批职责
       <select :value="selected" :disabled="disabled" @change="choose">
         <option v-if="!known" :value="selected">{{ selected }}（待修正）</option>

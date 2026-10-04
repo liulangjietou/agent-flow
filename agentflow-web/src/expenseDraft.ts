@@ -1,3 +1,4 @@
+import type { ExpenseProjectOwners } from './expenseProjectApproval'
 import type { PriorAssessment } from './expensePriorControl'
 import type { Definition } from './api'
 import type { InitiatorContext } from './initiatorContext'
@@ -11,7 +12,7 @@ export interface FinanceCatalog {
   legalEntities: Array<{ id: string; name: string; baseCurrency: string; paperReceiptRequired: boolean; sourceVersion: string; timeZone: string }>
   categories: Array<{ code: string; name: string; units: ExpenseLine['unit'][] }>
   costCenters: Array<{ legalEntityId: string; code: string; name: string }>
-  projects: Array<{ legalEntityId: string; code: string; name: string }>
+  projects: Array<{ legalEntityId: string; code: string; name: string; ownerSubject?: string | null }>
   cities: Array<{ code: string; name: string }>
 }
 export interface ExpenseCreate { businessNo: string; processKey: string; definitionVersion: number; content: ExpenseContent }
@@ -24,6 +25,7 @@ export interface PrecheckView {
   rateDate: string | null; validUntil: string | null; preview: FinancialRound | null
   budgetExceptionPolicy?: { reference: string } | null
   priorControls?: PriorAssessment[] | null
+  projectOwners?: ExpenseProjectOwners | null
   findings: Array<{ stage: string; lineNo: number | null; nature: 'REJECTED' | 'UNAVAILABLE'; code: string }>
 }
 
@@ -31,6 +33,10 @@ export const expenseUnits: Record<ExpenseLine['unit'], string> = { ITEM: '项', 
 export const precheckStatuses: Record<PrecheckSummary['status'], string> = { QUEUED: '等待检查', RUNNING: '正在检查', READY: '检查完成', BLOCKED: '费用检查未通过', UNAVAILABLE: '检查未完成' }
 export const precheckStages: Record<string, string> = { INPUT: '填报内容', CATALOG: '财务主数据', ACCOUNT: '收款账户', INVOICE: '发票', RATE: '汇率', POLICY: '费用标准', RESOURCES: '额度与借款', BUDGET: '预算', CONTEXT: '单据与任职', SYSTEM: '预检服务' }
 export const precheckIssues: Record<string, string> = {
+  EXPENSE_PROJECT_OWNER_UNAVAILABLE: '项目缺少有效负责人，请联系主数据管理员补全后重新检查',
+  EXPENSE_PROJECT_APPROVAL_REQUIRED: '当前流程缺少固定的项目负责人会签，请选择支持项目审批的发布版本',
+  EXPENSE_PROJECT_PRECHECK_REQUIRED: '请重新预检，取得本次项目负责人依据后再提交',
+  EXPENSE_PROJECT_SNAPSHOT_MISSING: '原轮次项目依据不完整，请联系管理员核对，不能跳过项目审批',
   PRIOR_REQUEST_CATEGORY_MISMATCH: '事前批准行与费用类别不一致，请重新选择',
   PRIOR_REQUEST_EXCEPTION_REASON_REQUIRED: '累计超过事前容差，请为每个相关费用行填写说明后重新检查',
   EXPENSE_BUDGET_APPROVAL_REQUIRED: '当前流程缺少安全的预算审批节点，请联系流程管理员选择支持预算例外的发布版本',
@@ -50,8 +56,8 @@ export const precheckIssues: Record<string, string> = {
 /** 完整费用字段契约与后端一致，选错通用流程时不创建不适用的草稿。 */
 export function expenseDefinition(definition: Pick<Definition, 'formSchema'> | null): boolean {
   const fields = definition?.formSchema?.fields
-  const types: Record<string, string> = { expenseDetails: 'TEXT', amount: 'NUMBER', currency: 'TEXT', overPolicy: 'BOOLEAN', priorRequestOverTolerance: 'BOOLEAN' }
-  return !!fields && [4, 5].includes(fields.length) && new Set(fields.map(field => field.key)).size === fields.length
+  const types: Record<string, string> = { expenseDetails: 'TEXT', amount: 'NUMBER', currency: 'TEXT', overPolicy: 'BOOLEAN', priorRequestOverTolerance: 'BOOLEAN', hasProjectAllocation: 'BOOLEAN' }
+  return !!fields && [4, 5, 6].includes(fields.length) && new Set(fields.map(field => field.key)).size === fields.length
     && ['expenseDetails', 'amount', 'currency', 'overPolicy'].every(key => fields.some(field => field.key === key))
     && fields.every(field => field.required && types[field.key] === field.type && (field.key !== 'expenseDetails' || field.sensitive === true))
 }

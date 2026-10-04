@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "key": "employee-finance",
-  "version": 6,
+  "version": 7,
   "name": "员工财务配套样例",
   "description": "三类财务模板共用的合成配置与办理数据。按步骤绑定本租户事实后，在专用业务入口执行；金额、账户和编号均为演示值。",
   "templateKeys": [
@@ -54,6 +54,16 @@
       "key": "bankAccountId",
       "exampleValue": "synthetic-f13-bank",
       "instruction": "映射中的银行选择键替换为实际付款账户标识；SYNTHETIC 科目代码全部由财务复核后替换。"
+    },
+    {
+      "key": "projectCodeA",
+      "exampleValue": "PROJECT_A",
+      "instruction": "替换为法人可信目录中的项目代码，目录同时提供 ownerSubject，不能把负责人写入申请内容。"
+    },
+    {
+      "key": "projectCodeB",
+      "exampleValue": "PROJECT_B",
+      "instruction": "替换为同法人另一项目代码；分别准备不同负责人和同一负责人的两种可信目录场景。"
     }
   ],
   "setupSteps": [
@@ -68,7 +78,8 @@
     "从专用财务入口创建 content；每次预检使用页面/API 返回的当前版本、目标摘要和本次任职，提交使用本次预检编号。",
     "先运行事前和借款前置样例，再运行有关联资源的报销；所有写操作遵循现有幂等和版本协议。",
     "第 5 版增加事前额度例外职责和服务端派生字段；复制后绑定 EXPENSE_PRIOR_REVIEW。样例保持原严格额度，容差比例须另由企业明确配置；历史批准行不随改版变更。",
-    "报销模板第 6 版增加独立 EXPENSE_BUDGET_REVIEW，复制后绑定预算负责人。可信预算源未开放例外时保持刚性；原预算明确要求例外时才在本轮真实任务中批准，之后仍须等待实际预算确认。原预算已确认则由系统记录通过，不能生成伪造人工同意。"
+    "报销模板第 6 版增加独立 EXPENSE_BUDGET_REVIEW，复制后绑定预算负责人。可信预算源未开放例外时保持刚性；原预算明确要求例外时才在本轮真实任务中批准，之后仍须等待实际预算确认。原预算已确认则由系统记录通过，不能生成伪造人工同意。",
+    "报销模板第 7 版增加固定项目全员会签。可信目录为 PROJECT_A、PROJECT_B 提供负责人；有项目必经会签，无项目跳过。项目负责人须有当前审批资格；申请人兼任时核对本次任职的直接主管。原发布副本与在审轮次不重写。"
   ],
   "configuration": {
     "categories": [
@@ -741,6 +752,134 @@
       "expected": [
         "预检或提交重新核对占用时拒绝第二单。",
         "不能新增第二份票据占用，也不能改变第一单占用。"
+      ]
+    },
+    {
+      "id": "expense-project-all",
+      "name": "两个项目由不同负责人会签",
+      "templateKey": "expense-report",
+      "content": {
+        "legalEntityId": "00000000-0000-4000-8000-000000000013",
+        "type": "DAILY",
+        "title": "两个项目由不同负责人会签",
+        "lines": [
+          {
+            "lineNo": 1,
+            "categoryCode": "DEMO_OFFICE",
+            "incurredOn": "2026-01-10",
+            "endedOn": null,
+            "cityCode": "SH",
+            "quantity": 1,
+            "unit": "ITEM",
+            "claimedGross": {
+              "value": "80.00",
+              "currency": "CNY"
+            },
+            "claimedTax": {
+              "value": "0.00",
+              "currency": "CNY"
+            },
+            "invoiceIds": [],
+            "priorRequest": null,
+            "allocations": [
+              {
+                "costCenter": "IT",
+                "projectCode": "PROJECT_A",
+                "amount": {
+                  "value": "40.00",
+                  "currency": "CNY"
+                }
+              },
+              {
+                "costCenter": "IT",
+                "projectCode": "PROJECT_B",
+                "amount": {
+                  "value": "40.00",
+                  "currency": "CNY"
+                }
+              }
+            ],
+            "description": "演示普通办公报销",
+            "exceptionReason": null
+          }
+        ],
+        "advanceOffsets": []
+      },
+      "steps": [
+        "在可信目录维护两个同法人项目及不同负责人，负责人不得从申请参数填写。",
+        "创建报销草稿并预检，选择本次任职、记账日与当前目标摘要。",
+        "提交后按模板完成主管、收单与财务审核；纸件开关为 true 时先确认实际签收，false 时不登记纸件签收但保留人工收单审批。",
+        "主管及必要的业务例外完成后核对预算节点：原预算已确认时自动通过；待结果时先等待；只有原操作明确要求例外时由预算负责人独立审批。财务审核前核对实际预算确认。",
+        "进入项目会签后核对原项目映射和责任名单，再完成全部必要审批。"
+      ],
+      "expected": [
+        "原轮次保留两个项目到可信负责人的完整映射。",
+        "一人批准后仍保留另一负责人待办；全部同意后才进入收单。",
+        "负责人变更不改写在审轮次；加减签、转交不能删改原责任。"
+      ]
+    },
+    {
+      "id": "expense-project-same-owner",
+      "name": "同一负责人承担两个项目",
+      "templateKey": "expense-report",
+      "content": {
+        "legalEntityId": "00000000-0000-4000-8000-000000000013",
+        "type": "DAILY",
+        "title": "同一负责人承担两个项目",
+        "lines": [
+          {
+            "lineNo": 1,
+            "categoryCode": "DEMO_OFFICE",
+            "incurredOn": "2026-01-10",
+            "endedOn": null,
+            "cityCode": "SH",
+            "quantity": 1,
+            "unit": "ITEM",
+            "claimedGross": {
+              "value": "80.00",
+              "currency": "CNY"
+            },
+            "claimedTax": {
+              "value": "0.00",
+              "currency": "CNY"
+            },
+            "invoiceIds": [],
+            "priorRequest": null,
+            "allocations": [
+              {
+                "costCenter": "IT",
+                "projectCode": "PROJECT_A",
+                "amount": {
+                  "value": "40.00",
+                  "currency": "CNY"
+                }
+              },
+              {
+                "costCenter": "IT",
+                "projectCode": "PROJECT_B",
+                "amount": {
+                  "value": "40.00",
+                  "currency": "CNY"
+                }
+              }
+            ],
+            "description": "演示普通办公报销",
+            "exceptionReason": null
+          }
+        ],
+        "advanceOffsets": []
+      },
+      "steps": [
+        "在可信目录维护两个同法人项目及相同负责人，负责人不得从申请参数填写。",
+        "创建报销草稿并预检，选择本次任职、记账日与当前目标摘要。",
+        "提交后按模板完成主管、收单与财务审核；纸件开关为 true 时先确认实际签收，false 时不登记纸件签收但保留人工收单审批。",
+        "主管及必要的业务例外完成后核对预算节点：原预算已确认时自动通过；待结果时先等待；只有原操作明确要求例外时由预算负责人独立审批。财务审核前核对实际预算确认。",
+        "进入项目会签后核对原项目映射和责任名单，再完成全部必要审批。"
+      ],
+      "expected": [
+        "原轮次保留两个项目到可信负责人的完整映射。",
+        "相同负责人只创建一份必要审批责任。",
+        "负责人变更不改写在审轮次；加减签、转交不能删改原责任。"
       ]
     }
   ]

@@ -13,6 +13,7 @@ const roleLabels: Record<string, string> = {
 
 /** 已保存规则始终可读，不因目录暂时不可用而变为空白。 */
 export function assigneeLabel(rule: string, directoryLabel?: string): string {
+  if (rule === 'expense:projectOwners') return '本轮项目负责人 · 固定全员会签'
   if (rule.startsWith('field:')) return formAssigneeLabel(rule)
   if (rule === 'role:ORG_DEPARTMENT_HEAD') return directoryLabel || '本次任职部门负责人'
   if (rule.startsWith('role:ORG_SUPERVISOR_')) return directoryLabel || `本次任职 · 第 ${rule.slice('role:ORG_SUPERVISOR_'.length)} 级主管`

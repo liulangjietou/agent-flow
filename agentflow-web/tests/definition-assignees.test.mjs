@@ -52,3 +52,8 @@ test('本地组织选项展示目录名称，不向配置人暴露技术角色�
   assert.equal(assigneeLabel('role:ORG_PERSON_456'), '本地指定人员')
   assert.equal(assigneeLabel('role:FINANCE', 'FINANCE'), '财务审批组')
 })
+
+
+test('项目负责人专用选人使用业务名称', () => {
+  assert.equal(assigneeLabel('expense:projectOwners'), '本轮项目负责人 · 固定全员会签')
+})

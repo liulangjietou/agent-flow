@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api'
+import ExpenseProjectOwners from './ExpenseProjectOwners.vue'
 import ExpensePriorControlFacts from './ExpensePriorControlFacts.vue'
 import { expenseError, moneyLabel, type ExpenseDetail } from '../expenses'
 import { nextExpenseRound, precheckIssues, precheckStages, precheckStatuses, usablePrecheck, type PrecheckOptions, type PrecheckView } from '../expenseDraft'
@@ -107,6 +108,7 @@ onUnmounted(() => { stop(); emit('busy', false) })
       <ul v-if="result.findings.length"><li v-for="(finding, index) in result.findings" :key="index">{{ finding.lineNo ? `第 ${finding.lineNo} 行 · ` : '' }}{{ precheckStages[finding.stage] ?? '检查结果' }}：{{ issue(finding.code) }}<small>核对码 {{ finding.code }}</small></li></ul>
       <p v-if="result.budgetExceptionPolicy" class="submission-help">预算政策 {{ result.budgetExceptionPolicy.reference }} 允许申请例外。此时预算尚未冻结；正式提交后如需例外，将由独立预算负责人审批，批准后仍须实际预算确认。</p>
       <template v-if="result.preview"><div class="preview-amounts"><div><small>核定含税额</small><strong>{{ moneyLabel(result.preview.approvedGross) }}</strong></div><div><small>借款抵扣</small><strong>{{ moneyLabel(result.preview.offsetTotal) }}</strong></div><div><small>应付余额</small><strong>{{ moneyLabel(result.preview.payable) }}</strong></div></div><p class="submission-help">收款账户 {{ result.preview.maskedAccount }} · 汇率日期 {{ result.rateDate }}<br />有效至 {{ result.validUntil ? new Date(result.validUntil).toLocaleString('zh-CN') : '待核对' }}；正式提交仍会复核有效性。</p></template>
+      <details v-if="result.projectOwners" class="policy-sources"><summary>核对本次项目负责人</summary><p>正式提交时核对当前资格并固定责任；申请人兼任负责人时按本次任职上溯直接主管。</p><ExpenseProjectOwners :source="result.projectOwners" /></details>
       <details v-if="result.priorControls" class="policy-sources"><summary>核对事前额度累计依据</summary><p>预检不占用额度，正式提交时将再次核对；同一批准行的全部报销共享累计阈值。</p><ExpensePriorControlFacts :assessments="result.priorControls" /></details>
       <details v-if="result.preview" class="policy-sources"><summary>核对各行制度版本与来源</summary><ul><li v-for="line in result.preview.originalLines" :key="line.original.lineNo">第 {{ line.original.lineNo }} 行 · 制度 {{ line.assessment.policy.policyId }} · v{{ line.assessment.policy.version }}<template v-if="line.assessment.policy.managedPolicy"><br />类别修订 {{ line.assessment.policy.managedPolicy.selection.categoryRevision }} · 生效修订 {{ line.assessment.policy.managedPolicy.selection.activeRevision }} · 规则 {{ line.assessment.policy.managedPolicy.ruleKey }}<br />匹配事实来源：{{ line.assessment.policy.managedPolicy.factSourceReference }}</template><template v-if="line.assessment.policy.evidenceReference"><br />判定证据 {{ line.assessment.policy.evidenceReference }}</template></li></ul></details>
       <p v-if="result.usable && !ready" class="submission-help">请选择与本次检查一致的任职和会计日期；修改选择后需要重新预检。</p>

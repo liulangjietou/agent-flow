@@ -639,7 +639,7 @@ class ExpenseSubmissionIntegrationTest {
                     if (enabled) properties.put("expenseDuplicateApproval", "AUTO_PASS_ADJACENT");
                     else properties.remove("expenseDuplicateApproval");
                 }
-                if (node.type() == NodeType.USER_TASK && !node.id().equals("supervisor")) {
+                if (node.type() == NodeType.USER_TASK && !node.id().equals("supervisor") && !node.id().equals("projectReview")) {
                     properties.put("assigneeRule", properties.containsKey("expenseStage") ? "role:ORG_PERSON_" + finance
                             : io.agentflow.organization.LocalOrganizationDirectory.DEPARTMENT_HEAD_RULE);
                 }

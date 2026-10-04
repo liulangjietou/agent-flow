@@ -84,10 +84,10 @@ class ProcessTemplateIntegrationTest {
         for (String key : List.of("expense-report", "expense-plan", "advance-request")) {
             mvc.perform(get("/api/v1/process-templates/" + key + "/financial-examples").header("Authorization", token("admin")))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.key").value("employee-finance"))
-                    .andExpect(jsonPath("$.scenarios.length()").value(10));
+                    .andExpect(jsonPath("$.scenarios.length()").value(12));
             mvc.perform(get("/api/v1/process-templates/" + key + "/financial-examples").header("Authorization", token("finance")))
                     .andExpect(status().isForbidden());
-            assertThat(template(key, token("admin")).path("companion").path("scenarioCount").asInt()).isEqualTo(10);
+            assertThat(template(key, token("admin")).path("companion").path("scenarioCount").asInt()).isEqualTo(12);
         }
         mvc.perform(get("/api/v1/process-templates/leave-request/financial-examples").header("Authorization", token("admin")))
                 .andExpect(status().isNotFound());

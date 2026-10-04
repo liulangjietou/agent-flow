@@ -1,9 +1,9 @@
 {
   "key": "expense-report",
-  "templateVersion": 6,
+  "templateVersion": 7,
   "name": "员工费用报销",
   "category": "财务",
-  "description": "员工本币费用报销，包含自审批上溯、相邻同人业务审批自动通过、可配置跨单拆分风险、制度例外、原件签收、逐行核减和独立财务复核。 超出事前累计容差时，增加独立额度例外审批。 本轮预算明确要求例外时，由独立预算负责人审批，并等待实际预算确认。",
+  "description": "员工本币费用报销，包含自审批上溯、相邻同人业务审批自动通过、可配置跨单拆分风险、制度例外、原件签收、逐行核减和独立财务复核。 超出事前累计容差时，增加独立额度例外审批。 本轮预算明确要求例外时，由独立预算负责人审批，并等待实际预算确认。 含项目分摊时，按可信目录冻结全部项目负责人并执行固定全员会签。",
   "scope": "员工本币费用报销，包含自审批上溯、相邻同人业务审批自动通过、可配置跨单拆分风险、制度例外、原件签收、逐行核减和独立财务复核。",
   "businessType": "EXPENSE",
   "dependencies": [
@@ -17,7 +17,8 @@
     "办理凭证和付款前，配置有效的法人币种科目映射及财务连接，ERP 和资金服务分别确认过账与到账。",
     "财务签收、审核和复核需绑定具有财务角色及当期法人任职的人员，并与申请人及本单业务审批人分离。",
     "签收要求由法人目录的 paperReceiptRequired 控制；启用纸件要求时必须在签收节点确认原件，关闭时该节点仍保留人工单据检查。",
-    "绑定 EXPENSE_BUDGET_REVIEW 为预算负责人；该单人节点位于所有财务路径之前，完整只读费用明细，不参加相邻同人自动通过。原预算已确认时由系统记录通过；只有可信预算政策和本轮原操作明确要求例外时才由人审批。"
+    "绑定 EXPENSE_BUDGET_REVIEW 为预算负责人；该单人节点位于所有财务路径之前，完整只读费用明细，不参加相邻同人自动通过。原预算已确认时由系统记录通过；只有可信预算政策和本轮原操作明确要求例外时才由人审批。",
+    "可信财务目录须为每个实际分摊项目提供本租户有效 ownerSubject。同人多项目只创建一份责任并保留全部映射；申请人是负责人时，沿本次任职上溯直接主管。无有效负责人或主管时阻断提交。"
   ],
   "defaultRoles": [
     "EXPENSE_DEPARTMENT_HEAD",
@@ -34,7 +35,8 @@
     "amount": "本单金额由服务端冻结费用派生；5,000 和 50,000 为可调整的业务示例阈值。明确启用跨单规则后，指定业务网关改用本轮冻结路由金额，表单金额保持本单口径。财务核减后 10,000 元复核条件读取最新本单核定金额。",
     "currency": "由本次任职法人、费用目录及权威汇率共同确认，不由普通表单填写。",
     "overPolicy": "由本轮原费用制度判定派生，核减不会删除原超标事实，也不能由申请人改成 false。",
-    "priorRequestOverTolerance": "服务端根据同一批准行的净核销与全部占用派生，超容差走独立额度例外审批；财务核减不删除原判断。"
+    "priorRequestOverTolerance": "服务端根据同一批准行的净核销与全部占用派生，超容差走独立额度例外审批；财务核减不删除原判断。",
+    "hasProjectAllocation": "服务端从本轮原项目分摊派生。有项目必须完成项目负责人全员会签，无项目走跳过分支；后续核减到零也不删除原项目标志。"
   },
   "risks": [
     "5,000、50,000 与财务复核 10,000 元均为本币示例阈值，复制后由租户按制度配置。",
@@ -42,7 +44,7 @@
     "场景仅验证派生字段与审批路径；正式单据必须从专用入口创建、预检和提交，不能使用通用表单绕过业务依据。",
     "业务候选包含申请人时，按本次任职上溯直属主管并保留原候选及版本审计；财务节点始终排除申请人及本单实际业务审批人。",
     "相邻同人业务审批按实际路径自动通过，并记录来源任务、实际人员及规则版本；财务签收、审核和复核始终人工办理。",
-    "本版本未包含按项目分摊自动会签。柔性预算必须由可信预算源明确提供政策与本次例外依据；人工批准后仍等待实际预算确认，不能把审批同意解释为冻结成功。",
+    "项目负责人按本轮可信来源固定全员会签，禁止加减签或转交；委派协助和有效代理保留原责任。柔性预算必须由可信预算源明确提供政策与本次例外依据；人工批准后仍等待实际预算确认，不能把审批同意解释为冻结成功。",
     "签收、审核与复核保留独立人工任务；节点可核减不等于可以扩大原申请金额或修改原制度事实。",
     "审批通过不等于实际付款或归档；完整凭证、付款、预算核销及发票占用按各自受控链路继续办理。",
     "原发布流程和在审轮次保持原定义；使用容差模式且超阈值时，必须选用有独立额度例外节点的流程版本。"
@@ -142,7 +144,7 @@
         "name": "单据检查与原件签收",
         "type": "USER_TASK",
         "properties": {
-          "x": "2420",
+          "x": "2900",
           "y": "150",
           "assigneeRule": "role:EXPENSE_RECEIPT",
           "expenseStage": "RECEIPT"
@@ -153,7 +155,7 @@
         "name": "财务审核与核减",
         "type": "USER_TASK",
         "properties": {
-          "x": "2660",
+          "x": "3140",
           "y": "150",
           "assigneeRule": "role:FINANCE",
           "expenseStage": "FINANCE_REVIEW"
@@ -164,7 +166,7 @@
         "name": "财务复核：10,000 元",
         "type": "EXCLUSIVE_GATEWAY",
         "properties": {
-          "x": "2900",
+          "x": "3380",
           "y": "150"
         }
       },
@@ -173,7 +175,7 @@
         "name": "财务负责人复核",
         "type": "USER_TASK",
         "properties": {
-          "x": "3140",
+          "x": "3620",
           "y": "330",
           "assigneeRule": "role:EXPENSE_FINANCE_RECHECK",
           "expenseStage": "FINANCE_RECHECK"
@@ -184,7 +186,7 @@
         "name": "结束",
         "type": "END",
         "properties": {
-          "x": "3380",
+          "x": "3860",
           "y": "150"
         }
       },
@@ -218,6 +220,27 @@
           "assigneeRule": "role:EXPENSE_BUDGET_REVIEW",
           "expenseStage": "BUDGET_REVIEW",
           "approvalMode": "SINGLE"
+        }
+      },
+      {
+        "id": "projectGate",
+        "name": "是否有项目分摊",
+        "type": "EXCLUSIVE_GATEWAY",
+        "properties": {
+          "x": "2420",
+          "y": "150"
+        }
+      },
+      {
+        "id": "projectReview",
+        "name": "项目负责人全员会签",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "2660",
+          "y": "330",
+          "assigneeRule": "expense:projectOwners",
+          "expenseStage": "PROJECT_REVIEW",
+          "approvalMode": "ALL"
         }
       }
     ],
@@ -356,8 +379,29 @@
         "defaultBranch": false
       },
       {
-        "id": "budgetReview_receipt",
+        "id": "budgetReview_projectGate",
         "source": "budgetReview",
+        "target": "projectGate",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "projectGate_projectReview",
+        "source": "projectGate",
+        "target": "projectReview",
+        "condition": "hasProjectAllocation == true",
+        "defaultBranch": false
+      },
+      {
+        "id": "projectGate_receipt",
+        "source": "projectGate",
+        "target": "receipt",
+        "condition": "",
+        "defaultBranch": true
+      },
+      {
+        "id": "projectReview_receipt",
+        "source": "projectReview",
         "target": "receipt",
         "condition": "",
         "defaultBranch": false
@@ -382,7 +426,8 @@
           "finance": "READ_ONLY",
           "recheck": "READ_ONLY",
           "priorReview": "READ_ONLY",
-          "budgetReview": "READ_ONLY"
+          "budgetReview": "READ_ONLY",
+          "projectReview": "READ_ONLY"
         }
       },
       {
@@ -409,6 +454,12 @@
         "label": "事前累计超过容差",
         "type": "BOOLEAN",
         "required": true
+      },
+      {
+        "key": "hasProjectAllocation",
+        "label": "本轮包含项目分摊",
+        "type": "BOOLEAN",
+        "required": true
       }
     ]
   },
@@ -422,7 +473,8 @@
         "amount": "80.00",
         "currency": "CNY",
         "overPolicy": false,
-        "priorRequestOverTolerance": false
+        "priorRequestOverTolerance": false,
+        "hasProjectAllocation": false
       },
       "expectedPath": [
         "start",
@@ -431,6 +483,7 @@
         "policyGate",
         "priorGate",
         "budgetReview",
+        "projectGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -447,7 +500,8 @@
         "amount": "5000.00",
         "currency": "CNY",
         "overPolicy": false,
-        "priorRequestOverTolerance": false
+        "priorRequestOverTolerance": false,
+        "hasProjectAllocation": false
       },
       "expectedPath": [
         "start",
@@ -456,6 +510,7 @@
         "policyGate",
         "priorGate",
         "budgetReview",
+        "projectGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -472,7 +527,8 @@
         "amount": "5000.01",
         "currency": "CNY",
         "overPolicy": false,
-        "priorRequestOverTolerance": false
+        "priorRequestOverTolerance": false,
+        "hasProjectAllocation": false
       },
       "expectedPath": [
         "start",
@@ -483,6 +539,7 @@
         "policyGate",
         "priorGate",
         "budgetReview",
+        "projectGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -499,7 +556,8 @@
         "amount": "50000.00",
         "currency": "CNY",
         "overPolicy": false,
-        "priorRequestOverTolerance": false
+        "priorRequestOverTolerance": false,
+        "hasProjectAllocation": false
       },
       "expectedPath": [
         "start",
@@ -510,6 +568,7 @@
         "policyGate",
         "priorGate",
         "budgetReview",
+        "projectGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -527,7 +586,8 @@
         "amount": "50000.01",
         "currency": "CNY",
         "overPolicy": false,
-        "priorRequestOverTolerance": false
+        "priorRequestOverTolerance": false,
+        "hasProjectAllocation": false
       },
       "expectedPath": [
         "start",
@@ -539,6 +599,7 @@
         "policyGate",
         "priorGate",
         "budgetReview",
+        "projectGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -556,7 +617,8 @@
         "amount": "10000.00",
         "currency": "CNY",
         "overPolicy": false,
-        "priorRequestOverTolerance": false
+        "priorRequestOverTolerance": false,
+        "hasProjectAllocation": false
       },
       "expectedPath": [
         "start",
@@ -567,6 +629,7 @@
         "policyGate",
         "priorGate",
         "budgetReview",
+        "projectGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -583,7 +646,8 @@
         "amount": "10000.01",
         "currency": "CNY",
         "overPolicy": false,
-        "priorRequestOverTolerance": false
+        "priorRequestOverTolerance": false,
+        "hasProjectAllocation": false
       },
       "expectedPath": [
         "start",
@@ -594,6 +658,7 @@
         "policyGate",
         "priorGate",
         "budgetReview",
+        "projectGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -611,7 +676,8 @@
         "amount": "80.00",
         "currency": "CNY",
         "overPolicy": true,
-        "priorRequestOverTolerance": false
+        "priorRequestOverTolerance": false,
+        "hasProjectAllocation": false
       },
       "expectedPath": [
         "start",
@@ -621,6 +687,7 @@
         "policy",
         "priorGate",
         "budgetReview",
+        "projectGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -637,7 +704,8 @@
         "amount": "0.00",
         "currency": "CNY",
         "overPolicy": false,
-        "priorRequestOverTolerance": false
+        "priorRequestOverTolerance": false,
+        "hasProjectAllocation": false
       },
       "expectedPath": [
         "start",
@@ -646,6 +714,7 @@
         "policyGate",
         "priorGate",
         "budgetReview",
+        "projectGate",
         "receipt",
         "finance",
         "recheckGate",
@@ -662,7 +731,8 @@
         "amount": "-0.01",
         "currency": "CNY",
         "overPolicy": false,
-        "priorRequestOverTolerance": false
+        "priorRequestOverTolerance": false,
+        "hasProjectAllocation": false
       },
       "expectedPath": [],
       "expectedFieldErrors": {
@@ -678,7 +748,8 @@
         "amount": "80.00",
         "currency": "CNY",
         "overPolicy": false,
-        "priorRequestOverTolerance": true
+        "priorRequestOverTolerance": true,
+        "hasProjectAllocation": false
       },
       "expectedPath": [
         "start",
@@ -688,6 +759,92 @@
         "priorGate",
         "priorReview",
         "budgetReview",
+        "projectGate",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "project-all",
+      "name": "项目负责人全员会签",
+      "description": "只验证有项目必经项目节点的路径；实际名单来自本轮预检与任职，不由模拟填写。同人去重和代理资格由真实审批验证。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "80.00",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": false,
+        "hasProjectAllocation": true
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "policyGate",
+        "priorGate",
+        "budgetReview",
+        "projectGate",
+        "projectReview",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "project-prior-exception",
+      "name": "项目与事前额度例外同时适用",
+      "description": "只验证有项目必经项目节点的路径；实际名单来自本轮预检与任职，不由模拟填写。同人去重和代理资格由真实审批验证。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "80.00",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": true,
+        "hasProjectAllocation": true
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "policyGate",
+        "priorGate",
+        "priorReview",
+        "budgetReview",
+        "projectGate",
+        "projectReview",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "project-zero-approved",
+      "name": "核减到零保留原项目责任",
+      "description": "只验证有项目必经项目节点的路径；实际名单来自本轮预检与任职，不由模拟填写。同人去重和代理资格由真实审批验证。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "0.00",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": false,
+        "hasProjectAllocation": true
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "policyGate",
+        "priorGate",
+        "budgetReview",
+        "projectGate",
+        "projectReview",
         "receipt",
         "finance",
         "recheckGate",

@@ -7,7 +7,7 @@ export interface CountersignBinding {
 }
 export interface CountersignView extends CountersignBinding {
   originalMembers: string[]; total: number; completed: number; pending: CountersignMember[]; completedUsers: string[]
-  canChange: boolean; issue?: 'TASK_DELEGATION_PENDING' | null; canAdd: boolean; additions: string[]
+  canChange: boolean; issue?: 'TASK_DELEGATION_PENDING' | 'EXPENSE_PROJECT_MEMBERS_FIXED' | null; canAdd: boolean; additions: string[]
 }
 export type CountersignInput = { action: 'ADD'; targetUser: string; reason: string; expectedVersion: number }
   | { action: 'REMOVE'; targetTaskId: string; reason: string; expectedVersion: number }
@@ -37,8 +37,10 @@ export function validateCountersignView(v: CountersignView, task: Task): Counter
     if (m.canRemove !== (v.canChange && v.pending.length > 1 && !m.delegated && m.taskId !== task.taskId)) return fail()
   }
   const source = v.pending.find(m => m.taskId === task.taskId)
+  const projectFixed = v.issue === 'EXPENSE_PROJECT_MEMBERS_FIXED'
   if (!source || source.assignee !== task.assignee || source.delegated !== (task.delegationState === 'PENDING')
-      || v.canChange !== !source.delegated || (source.delegated ? v.issue !== 'TASK_DELEGATION_PENDING' : v.issue != null)
+      || v.canChange !== (!projectFixed && !source.delegated)
+      || (!projectFixed && (source.delegated ? v.issue !== 'TASK_DELEGATION_PENDING' : v.issue != null))
       || v.additions.some(user => users.has(user)) || ((!v.canChange || v.total >= 100) && v.additions.length > 0)
       || v.canAdd !== (v.canChange && v.total < 100 && v.additions.length > 0)
       || task.countersign?.total !== v.total || task.countersign?.completed !== v.completed) return fail()
@@ -47,6 +49,7 @@ export function validateCountersignView(v: CountersignView, task: Task): Counter
 
 /** 表单提交保留查看名单时的版本；减签目标必须是确切的未决任务编号。 */
 export function countersignInput(v: CountersignView, action: 'ADD' | 'REMOVE', target: string, reason: string): CountersignInput {
+  if (v.issue === 'EXPENSE_PROJECT_MEMBERS_FIXED') throw new Error('项目审批责任已按本轮提交固定，不能加减会签人员。')
   if (!v.canChange) throw new Error('当前任务不能增减会签人员，请先完成委派回交。')
   const comment = reason.trim()
   if (!comment || comment.length > 2000) throw new Error('请填写 1 至 2000 字的变更原因。')

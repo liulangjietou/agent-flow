@@ -58,7 +58,7 @@ export interface ExpenseWorkflow extends ExpenseReceipt {
   roundNo: number; canWithdraw: boolean; canCancel: boolean
   paper: null | { roundNo: number; required: boolean; received: boolean; receivedBy: string | null; receivedAt: string | null; proxyUse?: ApprovalProxyUse | null }
   budget: { ledgerStatus: string | null; confirmedCurrent: boolean; operationId: string | null; operationStatus: string | null; issue: string | null }
-  task: null | { taskId: string; stage: 'BUSINESS' | 'PRIOR_REQUEST_REVIEW' | 'BUDGET_REVIEW' | 'RECEIPT' | 'FINANCE_REVIEW' | 'FINANCE_RECHECK'; canApprove?: boolean; approvalUnavailable?: string | null; canReceive: boolean; canReduce: boolean; reductionUnavailable: string | null; canActDirectly?: boolean; proxyOptions?: ApprovalProxyOption[] }
+  task: null | { taskId: string; stage: 'BUSINESS' | 'PROJECT_REVIEW' | 'PRIOR_REQUEST_REVIEW' | 'BUDGET_REVIEW' | 'RECEIPT' | 'FINANCE_REVIEW' | 'FINANCE_RECHECK'; canApprove?: boolean; approvalUnavailable?: string | null; canReceive: boolean; canReduce: boolean; reductionUnavailable: string | null; canActDirectly?: boolean; proxyOptions?: ApprovalProxyOption[] }
 }
 export interface ExpenseItem extends ExpenseVersions { id: string; applicationId: string; businessNo: string; title: string; status: string; roundNo: number; createdAt: string }
 export interface ExpensePage<T> { items: T[]; nextBeforeId: string | null }

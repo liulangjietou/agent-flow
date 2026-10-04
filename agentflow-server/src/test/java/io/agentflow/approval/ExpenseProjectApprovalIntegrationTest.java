@@ -67,6 +67,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 class ExpenseProjectApprovalIntegrationTest {
     private static final Actor ADMIN = new Actor("demo", "admin", Set.of("ADMIN", "PROCESS_ADMIN"));
     private static final ExpenseSubprocessGatewayFixture GATEWAY = new ExpenseSubprocessGatewayFixture();
+    private static final List<Map<String, Object>> PROJECT_VIEWS = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final Map<String, String> tokens = new ConcurrentHashMap<>();
     private UUID entity, appointment, manager, finance;
     @Autowired MockMvc mvc;
@@ -122,6 +123,8 @@ class ExpenseProjectApprovalIntegrationTest {
         assertThat(checked.status()).isEqualTo(ExpensePrecheckJob.Status.READY);
         assertThat(checked.result().evidence().projectOwners()).isNotNull();
         assertThat(checked.result().evidence().projectOwners().projects()).extracting(FinanceCatalog.Project::ownerSubject).containsExactly("manager", "bob");
+        var view = request(path(report)+"/prechecks/"+checked.input().id(), "alice", 200);
+        assertThat(view.path("projectOwners")).isEqualTo(json.read(json.write(checked.result().evidence().projectOwners()), JsonNode.class));
     }
 
     @Test void oldDefinitionCannotSilentlyStartNewProjectExpensesWithoutTheDedicatedReview() throws Exception {
@@ -308,6 +311,11 @@ class ExpenseProjectApprovalIntegrationTest {
         assertThat(projects.find("demo", report.id(), 1)).contains(first); assertThat(projects.find("demo", report.id(), 2)).contains(second);
         assertThat(projects.find("demo", report.id(), 3).orElseThrow().owners().subjects()).containsExactly("alice", "bob");
         assertThat(current(report).rounds()).hasSize(3);
+        for (int round = 1; round <= 3; round++) {
+            var view = projectView(report, round, "alice");
+            assertThat(view.path("roundNo").asInt()).isEqualTo(round);
+            assertThat(view.at("/details/source")).isEqualTo(json.read(json.write(projects.find("demo", report.id(), round).orElseThrow().owners()), JsonNode.class));
+        }
     }
 
     @Test void reductionToZeroPreservesOriginalProjectRoutingAndRequiresBudgetReconfirmation() throws Exception {
@@ -387,7 +395,43 @@ class ExpenseProjectApprovalIntegrationTest {
             budgets(report); approve(report, "business", "manager");
             assertThat(application(report).payload()).containsOnlyKeys("expenseDetails", "amount", "currency", "overPolicy");
             assertThat(pending(report)).extracting(Task::getTaskDefinitionKey).containsExactly("receipt");
+            var view = projectView(report, 1, "alice"); assertThat(view.path("status").asText()).isEqualTo("NOT_RECORDED");
+            assertThat(view.path("details").isNull()).isTrue();
         }
+    }
+
+    @Test void readCombinesOriginalProjectsAndFrozenEscalationBeforeAndAfterTheProjectNode() throws Exception {
+        source("alice", "bob"); var report = draft(definition(true), true); submit(report);
+        var before = projectView(report, 1, "alice");
+        assertThat(before.path("status").asText()).isEqualTo("RECORDED");
+        assertThat(before.at("/details/responsibility/originalSubjects").toString()).isEqualTo("[\"alice\",\"bob\"]");
+        assertThat(before.at("/details/responsibility/candidateSubjects").toString()).isEqualTo("[\"bob\",\"manager\"]");
+        assertThat(before.at("/details/responsibility/escalation/replacementSubject").asText()).isEqualTo("manager");
+        assertThat(before.at("/details/initiator/appointmentId").asText()).isEqualTo(appointment.toString());
+        source("finance", "finance"); approve(report, "business", "manager");
+        assertThat(projectView(report, 1, "bob")).isEqualTo(before);
+        approve(report, "projects", "manager"); approve(report, "projects", "bob");
+        assertThat(projectView(report, 1, "alice")).isEqualTo(before);
+    }
+
+    @Test void readDistinguishesNoProjectFromUnknownLegacyAndRequiresAnExplicitCanonicalRound() throws Exception {
+        var report = draft(definition(true), false); submit(report);
+        var view = projectView(report, 1, "alice");
+        assertThat(view.path("status").asText()).isEqualTo("NO_PROJECT"); assertThat(view.at("/details/source/projects")).isEmpty();
+        assertThat(view.at("/details/responsibility").isNull()).isTrue();
+        for (String query : List.of("", "?roundNo=0", "?roundNo=01", "?roundNo=-1", "?roundNo=2147483648", "?roundNo=1&roundNo=1", "?roundNo=1&owner=alice"))
+            request(path(report)+"/project-approval"+query, "alice", 400);
+        request(path(report)+"/project-approval?roundNo=2", "alice", 404);
+        request("/api/v1/expense-reports/"+UUID.randomUUID()+"/project-approval?roundNo=1", "alice", 404);
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"HIDDEN", "MASKED"})
+    void originalSensitiveFieldRulesAlsoRestrictAdministrators(String visibility) throws Exception {
+        var report = draft(definition(true, Map.of(), FieldVisibility.valueOf(visibility)), true); submit(report);
+        request(path(report)+"/project-approval?roundNo=1", "manager", 403);
+        request(path(report)+"/project-approval?roundNo=1", "admin", 403);
+        request(path(report)+"/project-approval?roundNo=1", "bob", 404);
+        assertThat(projectView(report, 1, "alice").path("status").asText()).isEqualTo("RECORDED");
     }
 
     private void source(String first, String second) {
@@ -397,6 +441,9 @@ class ExpenseProjectApprovalIntegrationTest {
         return definition(projectReview, Map.of());
     }
     private DefinitionDraft definition(boolean projectReview, Map<String, String> projectProperties) {
+        return definition(projectReview, projectProperties, FieldVisibility.READ_ONLY);
+    }
+    private DefinitionDraft definition(boolean projectReview, Map<String, String> projectProperties, FieldVisibility businessVisibility) {
         var nodes = new ArrayList<>(List.of(new Node("start", "开始", NodeType.START, Map.of(ExpenseSelfApprovalPolicy.PROPERTY, ExpenseSelfApprovalPolicy.ESCALATE_SUPERVISOR,
                 ExpenseDuplicateApprovalPolicy.PROPERTY, ExpenseDuplicateApprovalPolicy.AUTO_PASS_ADJACENT)),
                 new Node("business", "业务审批", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_"+manager)),
@@ -405,7 +452,7 @@ class ExpenseProjectApprovalIntegrationTest {
                 new Node("end", "结束", NodeType.END, Map.of())));
         var edges = new ArrayList<>(List.of(new Edge("a", "start", "business", ""), new Edge("b", "business", projectReview ? "project_gate" : "receipt", ""),
                 new Edge("c", "receipt", "finance", ""), new Edge("d", "finance", "end", "")));
-        var visibility = new HashMap<>(Map.of("business", FieldVisibility.READ_ONLY, "receipt", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY));
+        var visibility = new HashMap<>(Map.of("business", businessVisibility, "receipt", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY));
         if (projectReview) {
             nodes.add(new Node("project_gate", "项目分摊", NodeType.EXCLUSIVE_GATEWAY, Map.of()));
             var properties = new HashMap<>(Map.of("assigneeRule", "expense:projectOwners", "expenseStage", "PROJECT_REVIEW", "approvalMode", "ALL"));
@@ -472,6 +519,16 @@ class ExpenseProjectApprovalIntegrationTest {
     private JsonNode request(String path, String user, int expected) throws Exception {
         var response = mvc.perform(get(path).header("Authorization", token(user))).andReturn().getResponse();
         assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(expected); return json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class);
+    }
+    private JsonNode projectView(ExpenseReport report, int round, String user) throws Exception {
+        String path = path(report)+"/project-approval?roundNo="+round;
+        var response = mvc.perform(get(path).header("Authorization", token(user))).andReturn().getResponse();
+        assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        var view = json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class);
+        PROJECT_VIEWS.add(Map.of("path", path, "reportId", report.id(), "applicationId", report.applicationId(), "roundNo", round, "user", user, "response", view));
+        java.nio.file.Files.writeString(java.nio.file.Path.of("/fyoung/tmp/agentflow-remaining-20260928/f14-project-query-responses.json"), json.write(PROJECT_VIEWS));
+        return view;
     }
     private String token(String user) { return "Bearer " + tokens.computeIfAbsent(user, value -> auth.login("demo", value, "demo").token()); }
     private MockHttpServletResponse raw(String path, String user, Object input) throws Exception {

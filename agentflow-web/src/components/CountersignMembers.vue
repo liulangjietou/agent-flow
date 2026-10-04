@@ -22,14 +22,15 @@ onUnmounted(() => query.clear())
 
 <template>
   <section class="membership-panel" aria-label="会签人员" :aria-busy="query.loading">
-    <header><div><h4>会签人员</h4><p>新增人员也须实际审批。减签保留取消记录和已有意见。</p></div><button type="button" class="secondary" :disabled="locked" @click="emit('close')">返回审批</button></header>
+    <header><div><h4>会签人员</h4><p v-if="query.view?.issue === 'EXPENSE_PROJECT_MEMBERS_FIXED'">本轮项目负责人必须全部办理，名单随提交固定。</p><p v-else>新增人员也须实际审批。减签保留取消记录和已有意见。</p></div><button type="button" class="secondary" :disabled="locked" @click="emit('close')">返回审批</button></header>
     <p v-if="query.loading" role="status">正在核对本轮会签人员…</p>
     <div v-else-if="query.error" role="alert"><p class="membership-error">{{ query.error }}</p><button type="button" class="secondary" :disabled="locked" @click="emit('refresh')">刷新当前任务</button></div>
     <template v-else-if="query.view">
       <p class="membership-count">第 {{ query.view.roundNo }} 轮 · 已同意 {{ query.view.completed }} / {{ query.view.total }} 人</p>
       <ul class="member-list"><li v-for="member in query.view.pending" :key="member.taskId"><strong>{{ member.user }}</strong><span>{{ member.taskId === task.taskId ? '当前任务' : '待审批' }}<template v-if="member.delegated"> · {{ member.assignee }} 受托处理中</template></span></li><li v-for="user in query.view.completedUsers" :key="'completed:' + user"><strong>{{ user }}</strong><span>已同意 · 意见保留</span></li></ul>
-      <details><summary>节点开始时的名单</summary><p>{{ query.view.originalMembers.join('、') }}</p><p>后续明确增减记录保留在操作审计中。</p></details>
-      <p v-if="!query.view.canChange" class="membership-help">受托处理中不能增减人员，请先回交给原责任人。</p>
+      <details><summary>节点开始时的名单</summary><p>{{ query.view.originalMembers.join('、') }}</p><p v-if="query.view.issue !== 'EXPENSE_PROJECT_MEMBERS_FIXED'">后续明确增减记录保留在操作审计中。</p></details>
+      <p v-if="query.view.issue === 'EXPENSE_PROJECT_MEMBERS_FIXED'" class="membership-help">项目审批责任已固定，不能加减签或转交。委派协助结束后仍由原负责人决定；有效代理保留原责任。</p>
+      <p v-else-if="!query.view.canChange" class="membership-help">受托处理中不能增减人员，请先回交给原责任人。</p>
       <form v-else-if="action" @submit.prevent="execute">
         <h4>{{ action === 'ADD' ? '增加必要会签人' : '移除未决会签任务' }}</h4>
         <p class="membership-help">{{ action === 'ADD' ? '确认后为所选人员创建必要审批任务，已有意见保持。' : '确认后取消所选人员的这张未决任务；你的审批责任继续保留。' }}</p>

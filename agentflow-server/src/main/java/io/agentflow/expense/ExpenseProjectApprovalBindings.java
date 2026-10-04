@@ -41,7 +41,7 @@ public class ExpenseProjectApprovalBindings {
         return new OrganizationAssigneeResolver.Selection(revision, ExpenseProjectApprovalPolicy.ASSIGNEE_RULE, subjects);
     }
 
-    /** 核减不改变本轮项目集合；旧定义不增加额外字段。 */
+    /** 跨单路由核验和财务核减均沿用本轮项目集合；旧定义不增加额外字段。 */
     public Boolean routingFlag(ExpenseReport report, FormSchema schema) {
         if (!ExpenseFormContract.hasProjectControl(schema)) return null;
         return projects.find(report.tenantId(), report.id(), report.currentRound().roundNo()).orElseThrow(ExpenseProjectApprovalBindings::missing).hasProjects();

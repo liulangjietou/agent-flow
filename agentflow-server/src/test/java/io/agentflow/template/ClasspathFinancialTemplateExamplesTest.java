@@ -29,13 +29,13 @@ class ClasspathFinancialTemplateExamplesTest {
     @Test
     void relatedTemplatesShareAValidatedPackWithoutSharingMutableDocuments() {
         var pack = examples.get("expense-report");
-        assertThat(pack.path("version").asInt()).isEqualTo(6);
+        assertThat(pack.path("version").asInt()).isEqualTo(7);
         assertThat(pack.path("setupSteps").toString()).contains("EXPENSE_BUDGET_REVIEW", "实际预算确认");
         assertThat(pack.path("setupSteps").toString()).contains("相邻同人业务审批自动通过", "来源任务和规则版本审计");
         assertThat(pack.path("setupSteps").toString()).contains("跨单拆分风险默认关闭", "合成路由金额");
-        assertThat(pack.path("scenarios")).hasSize(10);
+        assertThat(pack.path("scenarios")).hasSize(12);
         assertThat(examples.summary("expense-plan")).isEqualTo(examples.summary("advance-request"));
-        assertThat(examples.summary("expense-plan").scenarioCount()).isEqualTo(10);
+        assertThat(examples.summary("expense-plan").scenarioCount()).isEqualTo(12);
         assertThat(examples.summary("leave-request")).isNull();
         assertThatThrownBy(() -> examples.get("leave-request")).hasMessageContaining("not found");
         assertThatThrownBy(() -> examples.get("../../employee-finance")).hasMessageContaining("not found");

@@ -143,3 +143,12 @@ test('计划冻结阈值向下取整到分，严格与无上限模式保留明�
     assert.match(html, expected)
   }
 })
+
+
+test('费用入口接受项目派生字段与事前控制组合，仍拒绝多余或非布尔字段', () => {
+  for (const prior of [false, true]) {
+    const value = form(prior); value.formSchema.fields.push({ key: 'hasProjectAllocation', type: 'BOOLEAN', required: true })
+    assert.equal(draft.expenseDefinition(value), true)
+    value.formSchema.fields.at(-1).type = 'TEXT'; assert.equal(draft.expenseDefinition(value), false)
+  }
+})

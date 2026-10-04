@@ -52790,6 +52790,122 @@
           }
         ]
       }
+    },
+    "/api/v1/expense-reports/{id}/project-approval": {
+      "get": {
+        "operationId": "expenseProjectApproval",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "读取原报销轮次的项目负责人依据",
+        "description": "按当前主体和原审批轮次校验完整敏感明细，管理员不豁免。返回原可信项目来源、原负责人及本轮固定责任与直属主管上溯。NOT_RECORDED 表示旧轮次未保存依据，NO_PROJECT 表示原轮次无项目；两者均不表示已通过审批。不使用当前目录替换历史。只接受一个规范正整数 roundNo，拒绝重复和其他查询参数。",
+        "x-access": "同租户原轮次完整费用明细权限",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "轮次参数不规范或包含不支持的查询字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseProjectApprovalView"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "包含审批关联信息，禁止缓存。"
+              }
+            }
+          },
+          "422": {
+            "description": "原项目来源与审批轮次或原生责任不一致（EXPENSE_PROJECT_SNAPSHOT_MISSING），拒绝输出不完整依据。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": true,
+            "description": "主单原提交轮次",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -63885,6 +64001,19 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128
+          },
+          "ownerSubject": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "可信财务目录的项目负责人主体；旧目录可以缺失，含项目的新报销提交必须具有完整负责人。"
           }
         },
         "required": [
@@ -64915,6 +65044,17 @@
                 "type": "null"
               }
             ]
+          },
+          "projectOwners": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseProjectOwners"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "由可信目录和实际费用分摊生成的项目全集；旧预检可以缺失，正式提交仍核对原预检和负责人资格。"
           }
         },
         "required": [
@@ -65688,6 +65828,7 @@
               "BUSINESS",
               "PRIOR_REQUEST_REVIEW",
               "BUDGET_REVIEW",
+              "PROJECT_REVIEW",
               "RECEIPT",
               "FINANCE_REVIEW",
               "FINANCE_RECHECK"
@@ -79381,6 +79522,7 @@
               "null"
             ],
             "enum": [
+              "EXPENSE_PROJECT_MEMBERS_FIXED",
               "TASK_DELEGATION_PENDING",
               null
             ]
@@ -95162,6 +95304,371 @@
               "properties": {
                 "details": {
                   "$ref": "#/components/schemas/ExpenseBudgetReviewDetails"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ExpenseProjectOwner": {
+        "type": "object",
+        "properties": {
+          "legalEntityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "ownerSubject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "legalEntityId",
+          "code",
+          "name",
+          "ownerSubject"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseProjectOwners": {
+        "type": "object",
+        "properties": {
+          "catalogVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "legalEntityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "projects": {
+            "type": "array",
+            "maxItems": 2000,
+            "items": {
+              "$ref": "#/components/schemas/ExpenseProjectOwner"
+            }
+          }
+        },
+        "required": [
+          "catalogVersion",
+          "legalEntityId",
+          "projects"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseProjectEscalation": {
+        "type": "object",
+        "properties": {
+          "supervisorAppointmentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originalSubject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "replacementSubject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "directoryRevision": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "supervisorAppointmentId",
+          "originalSubject",
+          "replacementSubject",
+          "directoryRevision"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseProjectResponsibility": {
+        "type": "object",
+        "properties": {
+          "nodeName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "stage": {
+            "type": "string",
+            "const": "PROJECT_REVIEW"
+          },
+          "rule": {
+            "type": "string",
+            "const": "expense:projectOwners"
+          },
+          "directoryRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "originalSubjects": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2000,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "candidateSubjects": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2000,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          "escalation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseProjectEscalation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "nodeName",
+          "stage",
+          "rule",
+          "directoryRevision",
+          "originalSubjects",
+          "candidateSubjects"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseProjectApprovalDetails": {
+        "type": "object",
+        "properties": {
+          "ruleVersion": {
+            "type": "integer",
+            "const": 1
+          },
+          "precheckId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "precheckVersion": {
+            "type": "integer",
+            "const": 3
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "financialVersion": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "definitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nodeId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "source": {
+            "$ref": "#/components/schemas/ExpenseProjectOwners"
+          },
+          "initiator": {
+            "$ref": "#/components/schemas/InitiatorContext"
+          },
+          "responsibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseProjectResponsibility"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "ruleVersion",
+          "precheckId",
+          "precheckVersion",
+          "applicationVersion",
+          "financialVersion",
+          "definitionId",
+          "definitionVersion",
+          "nodeId",
+          "submittedAt",
+          "source",
+          "initiator",
+          "responsibility"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseProjectApprovalView": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_RECORDED",
+              "NO_PROJECT",
+              "RECORDED"
+            ]
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseProjectApprovalDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "roundNo",
+          "status",
+          "details"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "NOT_RECORDED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "details": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "details": {
+                  "$ref": "#/components/schemas/ExpenseProjectApprovalDetails"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "NO_PROJECT"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "details": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "projects": {
+                          "type": "array",
+                          "maxItems": 0
+                        }
+                      }
+                    },
+                    "responsibility": {
+                      "type": "null"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "RECORDED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "details": {
+                  "type": "object",
+                  "properties": {
+                    "nodeId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "source": {
+                      "type": "object",
+                      "properties": {
+                        "projects": {
+                          "type": "array",
+                          "minItems": 1
+                        }
+                      }
+                    },
+                    "responsibility": {
+                      "$ref": "#/components/schemas/ExpenseProjectResponsibility"
+                    }
+                  }
                 }
               }
             }

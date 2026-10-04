@@ -144,3 +144,14 @@ test('父页面加签成功后实际重读新版本，不能被写入期间 busy
   assert.equal(env.activeTask.value.version, 3); assert.equal(env.activeTask.value.countersign.total, 3)
   assert.equal(env.activeApplication.value.version, 3); assert.equal(env.busy.value, false)
 })
+
+
+test('项目固定名单明确只读，不能把固定责任或异常能力投影解释为可加减签', () => {
+  const fixed = view(); fixed.canChange = false; fixed.canAdd = false; fixed.additions = []; fixed.issue = 'EXPENSE_PROJECT_MEMBERS_FIXED'
+  fixed.pending.forEach(member => { member.canRemove = false })
+  assert.equal(rules.validateCountersignView(fixed, task()), fixed)
+  assert.throws(() => rules.countersignInput(fixed, 'REMOVE', 'other', '减少责任'), /项目.*固定/)
+  for (const mutate of [v => { v.canChange = true }, v => { v.canAdd = true }, v => { v.pending[1].canRemove = true }, v => { v.issue = 'UNKNOWN' }]) {
+    const broken = structuredClone(fixed); mutate(broken); assert.throws(() => rules.validateCountersignView(broken, task()))
+  }
+})
