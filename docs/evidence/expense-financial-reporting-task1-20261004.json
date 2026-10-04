@@ -1,0 +1,45 @@
+{
+  "status": "DOMAIN_METRICS_VERIFIED_QUERY_UI_RUNTIME_PENDING",
+  "baseCommit": "0bbb009258150ef49faf4a9dcdfb6d893de9673f",
+  "red": "New metrics types were absent; the new feature tests failed compilation before implementation. No existing runtime bug is claimed by this RED.",
+  "tests": {
+    "io.agentflow.expense.reporting.ExpenseFinancialMetricsTest": {
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.expense.reporting.ExpenseResourceMetricsTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.expense.ExpenseReportTest": {
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/reporting/ExpenseFinancialMetrics.java": "40f7bcfadc2aec484129f37ec52397979c4ce4bf9a12eeec7ca46d10c3df3ef2",
+    "agentflow-domain/src/main/java/io/agentflow/expense/reporting/ExpenseResourceMetrics.java": "3351ceeb97951f03c9d5c47e915f8a8dd9a56878fda890060cb46115ce88a8d8",
+    "agentflow-domain/src/test/java/io/agentflow/expense/reporting/ExpenseFinancialMetricsTest.java": "e87d0c01133e97ca1791e9ec0cca56b96610021b29275721bdb46a7dd7199b80",
+    "agentflow-domain/src/test/java/io/agentflow/expense/reporting/ExpenseResourceMetricsTest.java": "ba2f8b5fe0274973f7a7cf9ceef7e44dcc2a8e54b940881919335998381fd872",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseReport.java": "a284e0ad9b3e1c7c72231bb4792dc3ca0f4716cc88db56da0d8131ebda8f51b8",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseReportTest.java": "4aa7c8ded797903622cc7ea59382a538d31c180a0730a4bc8df775d9e1430e6a"
+  },
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/f15-task1-verified/manifest.json",
+    "sha256": "83508fc9fb92f5bd7b1cde471bec71c0816858d74e32bf946b9f94912f4addc0",
+    "files": 11
+  },
+  "boundaries": {
+    "apiVerified": false,
+    "uiVerified": false,
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "runtimeVerified": false
+  }
+}
