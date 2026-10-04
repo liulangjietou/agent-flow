@@ -63,6 +63,7 @@ import ApprovalProxyManager from './components/ApprovalProxyManager.vue'
 import { approvalProxyDrafts, type ApprovalProxyReceipt } from './approvalProxies'
 import { organizationDrafts, type OrganizationRecord } from './organization'
 import { organizationSyncDrafts, syncPath, type SyncReceipt, type SyncPlanReceipt } from './organizationSync'
+import { rememberSignatureOperation } from './signatures'
 import { initializationDrafts } from './tenantInitialization'
 import BusinessCalendars from './components/BusinessCalendars.vue'
 import { calendarDrafts, type BusinessCalendar } from './businessCalendars'
@@ -1203,6 +1204,11 @@ async function recoverOperation(id: string) {
         if (request.body) calendarDrafts.acknowledge(actorScope.value, request.path, request.body, result as BusinessCalendar)
         templateRefresh.value++
         notice.value = '已确认原日历保存结果，旧版本保持不变。'
+      } else if (/^\/applications\/[^/?]+\/signatures(?:\/[^/?]+\/cancel)?$/.test(request.path)) {
+        const applicationId = decodeURIComponent(request.path.split('/')[2]!)
+        rememberSignatureOperation(actorScope.value, applicationId, (result as { id: string }).id, (JSON.parse(request.body!) as { roundNo?: number }).roundNo)
+        if (recordApplicationId.value === applicationId) recordRefresh.value++
+        notice.value = '原签署操作已确认，请打开电子签页核对原记录和文件保存进度。'
       } else if (/^\/applications\/[^/?]+\/draft-assist-runs(?:\/[^/?]+\/review)?$/.test(request.path)) {
         const applicationId = decodeURIComponent(request.path.split('/')[2]!)
         rememberDraftRun(actorScope.value, applicationId, (result as DraftAssistReceipt).id)

@@ -26,6 +26,14 @@ assert.equal(validator({ $ref: '#/components/schemas/ServiceTaskVersionPage' })(
 const serviceRuntime = { applicationId: '00000000-0000-0000-0000-000000000001', applicationVersion: 2, roundNo: 1, roundStatus: 'IN_APPROVAL', items: [] }
 validate({ $ref: '#/components/schemas/ServiceTaskRuntimeView' }, serviceRuntime)
 assert.equal(validator({ $ref: '#/components/schemas/ServiceTaskRuntimeView' })({ ...serviceRuntime, inputs: { secret: 'not-public' } }), false)
+// 签署版本在页面保持文本，权限过滤后的空页仍可能有下一游标。
+const signatureReceipt = { id: '00000000-0000-0000-0000-000000000001', version: '9007199254740993', status: 'PENDING' }
+validate({ $ref: '#/components/schemas/SignatureReceipt' }, signatureReceipt)
+validate({ $ref: '#/components/schemas/SignaturePage' }, { items: [], nextAfterId: signatureReceipt.id })
+assert.equal(validator({ $ref: '#/components/schemas/SignatureReceipt' })({ ...signatureReceipt, version: 2 }), false)
+assert.equal(validator({ $ref: '#/components/schemas/SignatureReceipt' })({ ...signatureReceipt, providerAccount: 'private' }), false)
+validate({ $ref: '#/components/schemas/SignatureCancelInput' }, { expectedVersion: '1' })
+assert.equal(validator({ $ref: '#/components/schemas/SignatureCancelInput' })({ expectedVersion: 1 }), false)
 // 组织启用后动态规则尚未解析本轮任职；静态目录仍须具有实际可用成员。
 const assigneeSchema = { $ref: '#/components/schemas/AssigneeOption' }
 validate(assigneeSchema, { rule: 'role:ORG_SUPERVISOR_1', label: '本次任职一级主管', memberCount: 0, contextual: true })

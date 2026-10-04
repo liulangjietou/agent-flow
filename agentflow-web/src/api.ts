@@ -41,6 +41,7 @@ import { validateInstanceReceipt, type InstanceControlAction, type InstanceContr
 import type { AuditSearchFilters, AuditSearchPage } from './auditSearch'
 import type { ApplicationSearchFilters, ApplicationSearchPage } from './applicationSearch'
 import { readServiceTaskRuntime, type ServiceTaskRuntimeView } from './serviceTaskRuntime.js'
+import { signaturePath, signatureWritePath, readSignatureOptions, readSignaturePage, readSignatureView, validateSignatureReceipt, type SignatureReceipt, type SignatureInput } from './signatures.js'
 import type { DefinitionCatalogFilters, DefinitionCatalogPage } from './definitionCatalog'
 import { workbookType, type ApplicationExportFilters } from './applicationExport.js'
 import type { AuditExportFilters } from './auditSearch'
@@ -577,7 +578,19 @@ function configurationRead<T>(path: string, signal: AbortSignal, read: (value: u
   return request(path, { signal, cache: 'no-store' }).then(value => read(value, actor))
 }
 
+/** 签署准备可能读取原件；结束等待不代表授权失败，原键保留供本人恢复。 */
+async function sendSignature(operation: WriteRequest, key: string): Promise<SignatureReceipt> {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const result = await Promise.race([request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key }, signal: controller.signal }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject({ status: 0, code: 'REQUEST_TIMEOUT', message: '签署操作结果尚未确认，请恢复原操作。' } satisfies ApiError) }, 12_000) })])
+    return validateSignatureReceipt(result, operation.path, operation.body!)
+  } finally { clearTimeout(timer) }
+}
+
 export const writeRequests = new PendingWrites(async (operation, key) => {
+  if (signatureWritePath.test(operation.path)) return sendSignature(operation, key)
   if (operation.path === '/admin/expense-categories' || /^\/admin\/expense-policies\/[^/?]+\/(draft|publish)$/.test(operation.path)) return sendFinanceConfiguration(operation, key)
   if (/^\/admin\/account-mappings\/[^/?]+\/(draft|publish)$/.test(operation.path)) return sendFinanceConfiguration(operation, key, validateMappingOperation)
   if (/^\/expense-requests\/[^/?]+\/close$/.test(operation.path)) return sendExpenseRequestClose(operation, key)
@@ -828,6 +841,12 @@ export const api = {
   copySnapshot: (applicationId: string, round: number, signal?: AbortSignal) => request<CopySnapshot>(`/copies/${applicationId}/rounds/${round}`, { signal }),
   copyAttachment: (applicationId: string, id: string, round: number, signal?: AbortSignal) => request<AttachmentMetadata>(`/copies/${applicationId}/rounds/${round}/attachments/${id}`, { signal }),
   downloadCopyAttachment: (applicationId: string, id: string, round: number, signal?: AbortSignal) => request<Blob>(`/copies/${applicationId}/rounds/${round}/attachments/${id}/content`, { signal }, 'binary'),
+  signatureOptions: (signal: AbortSignal) => configurationRead('/signatures/options', signal, readSignatureOptions),
+  signaturePage: (applicationId: string, roundNo: number, afterId: string | undefined, signal: AbortSignal) => configurationRead(signaturePath(applicationId) + historyQuery({ roundNo, afterId, limit: 25 }), signal, value => readSignaturePage(value, afterId)),
+  signatureDetail: (applicationId: string, id: string, roundNo: number, signal: AbortSignal) => configurationRead(signaturePath(applicationId) + '/' + encodeURIComponent(id), signal, (value, actor) => readSignatureView(value, id, roundNo, actor?.userId ?? '')),
+  createSignature: (applicationId: string, body: SignatureInput) => write<SignatureReceipt>(signaturePath(applicationId), 'POST', '授权签署所选原件', body),
+  cancelSignature: (applicationId: string, id: string, expectedVersion: string) => write<SignatureReceipt>(signaturePath(applicationId) + '/' + encodeURIComponent(id) + '/cancel', 'POST', '取消尚未发送的签署', { expectedVersion }),
+  downloadSignature: (applicationId: string, id: string, documentId: string, signal: AbortSignal) => request<Blob>(signaturePath(applicationId) + '/' + encodeURIComponent(id) + '/documents/' + encodeURIComponent(documentId) + '/content', { signal, cache: 'no-store' }, 'binary'),
   attachmentOptions: (signal?: AbortSignal) => request<AttachmentOptions>('/attachments/options', { signal }),
   reserveAttachment: (applicationId: string, input: AttachmentInput, key: string, signal?: AbortSignal) => request<AttachmentMetadata>(`/applications/${applicationId}/attachments`, { method: 'POST', body: JSON.stringify(input), headers: { 'Idempotency-Key': key }, signal }),
   uploadAttachment: (applicationId: string, id: string, expectedVersion: number, file: Blob, signal?: AbortSignal) => request<AttachmentMetadata>(`/applications/${applicationId}/attachments/${id}/content`, { method: 'PUT', body: file, headers: { 'Content-Type': 'application/octet-stream', 'X-Application-Version': String(expectedVersion) }, signal }),

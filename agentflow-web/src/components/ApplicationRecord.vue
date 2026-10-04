@@ -14,6 +14,7 @@ import BudgetAdjustmentDetail from './BudgetAdjustmentDetail.vue'
 import RoundComparison from './RoundComparison.vue'
 import ApplicationHistory from './ApplicationHistory.vue'
 import ServiceTaskRuntimePanel from './ServiceTaskRuntimePanel.vue'
+import SignaturePanel from './SignaturePanel.vue'
 import ApplicationComments from './ApplicationComments.vue'
 import AssistRunRecords from './AssistRunRecords.vue'
 import DraftAssistPanel from './DraftAssistPanel.vue'
@@ -39,7 +40,7 @@ const runtimeBlocked = computed(() => application.value?.status === 'IN_APPROVAL
   || runtimeState.value.applicationVersion !== application.value.version || runtimeState.value.state !== 'RUNNING'))
 const businessLocked = computed(() => saving.value || writesBlocked.value || runtimeBusy.value || runtimeBlocked.value)
 const rounds = ref<SubmissionRound[]>([])
-const historyTab = ref<'rounds' | 'relations' | 'compare' | 'diagram' | 'timeline' | 'audit' | 'comments' | 'assist' | 'services'>('rounds')
+const historyTab = ref<'rounds' | 'relations' | 'compare' | 'diagram' | 'timeline' | 'audit' | 'comments' | 'assist' | 'services' | 'signatures'>('rounds')
 const title = ref('')
 const initiatorAppointmentId = ref('')
 const initiatorRequirements = reactive(new InitiatorRequirements(api.definitionInitiatorRequirements, api.applicationInitiatorRequirements))
@@ -49,6 +50,7 @@ const payload = ref<Record<string, unknown>>({})
 const fieldErrors = ref<FieldErrors>({})
 const loading = ref(true)
 const expenseBusy = ref(false)
+const signatureBusy = ref(false), signatureDirty = ref(false)
 const draftAssistBusy = ref(false), draftAssistDirty = ref(false)
 const selectedExpenseRound = ref<number | null>(null)
 const advanceRequestId = computed(() => application.value?.businessReference?.type === 'ADVANCE_REQUEST' ? application.value.businessReference.id : null)
@@ -76,7 +78,7 @@ const canEdit = computed(() => !application.value?.businessReference && applicat
 const canWithdraw = computed(() => !application.value?.businessReference && application.value?.createdBy === props.userId && application.value.status === 'IN_APPROVAL' && !runtimeBlocked.value && !runtimeBusy.value)
 const conclusionLabel = computed(() => application.value?.status === 'WITHDRAWN' ? '撤回说明' : '退回原因')
 const dirty = computed(() => application.value !== null && fieldsSnapshot() !== initialFields.value)
-const relatedNavigationLocked = computed(() => loading.value || saving.value || uploading.value || expenseBusy.value || draftAssistBusy.value || draftAssistDirty.value || runtimeBusy.value || writesBlocked.value || dirty.value || withdrawalOpen.value || cancellationOpen.value)
+const relatedNavigationLocked = computed(() => loading.value || saving.value || uploading.value || expenseBusy.value || signatureBusy.value || signatureDirty.value || draftAssistBusy.value || draftAssistDirty.value || runtimeBusy.value || writesBlocked.value || dirty.value || withdrawalOpen.value || cancellationOpen.value)
 /** 关联链接不丢弃未保存内容，也不绕过未知写入恢复。 */
 function openRelated(target: RelatedRound) { if (!relatedNavigationLocked.value) emit('openRelated', target) }
 const currentRound = computed(() => rounds.value.find(round => round.roundNo === application.value?.roundNo))
@@ -200,7 +202,7 @@ async function withdraw() {
   }
 }
 function close() {
-  if (!runtimeBusy.value && !expenseBusy.value && !draftAssistBusy.value && !draftAssistDirty.value && !uploading.value && !saving.value && !dirty.value) emit('close')
+  if (!runtimeBusy.value && !signatureBusy.value && !signatureDirty.value && !expenseBusy.value && !draftAssistBusy.value && !draftAssistDirty.value && !uploading.value && !saving.value && !dirty.value) emit('close')
 }
 /** 已确认保存后重新读取申请，读取失败不继续呈现旧版本可编辑正文。 */
 async function draftAssistSaved() {
@@ -268,7 +270,7 @@ onUnmounted(() => { initiatorRequirements.clear(); returnFocus?.focus() })
     <section ref="dialog" class="modal application-record" role="dialog" aria-modal="true" aria-labelledby="record-title" tabindex="-1" @keydown="trapFocus">
       <div class="modal-heading">
         <div><p class="eyebrow">APPLICATION RECORD</p><h2 id="record-title">申请详情与轮次</h2></div>
-        <button aria-label="关闭申请详情" :disabled="runtimeBusy || expenseBusy || draftAssistBusy || draftAssistDirty || uploading || saving || dirty" @click="close">×</button>
+        <button aria-label="关闭申请详情" :disabled="runtimeBusy || signatureBusy || signatureDirty || expenseBusy || draftAssistBusy || draftAssistDirty || uploading || saving || dirty" @click="close">×</button>
       </div>
       <p v-if="error" class="record-alert" role="alert">{{ error }}</p>
       <p v-if="notice" class="record-notice" role="status">{{ notice }}</p>
@@ -325,7 +327,7 @@ onUnmounted(() => { initiatorRequirements.clear(); returnFocus?.focus() })
           </form>
         </section>
         <p v-if="initialRoundNo" class="field-help">关联入口指向第 {{ initialRoundNo }} 轮提交记录；上方显示申请当前状态。</p>
-        <div class="record-history-tabs" role="group" aria-label="选择申请历史视图"><button type="button" :aria-pressed="historyTab === 'rounds'" @click="historyTab = 'rounds'">提交轮次</button><button type="button" :aria-pressed="historyTab === 'relations'" @click="historyTab = 'relations'">父子流程</button><button type="button" :aria-pressed="historyTab === 'compare'" @click="historyTab = 'compare'">内容对比</button><button type="button" :aria-pressed="historyTab === 'diagram'" @click="historyTab = 'diagram'">流程图</button><button type="button" :aria-pressed="historyTab === 'timeline'" @click="historyTab = 'timeline'">审批轨迹</button><button type="button" :aria-pressed="historyTab === 'audit'" @click="historyTab = 'audit'">操作审计</button><button type="button" :aria-pressed="historyTab === 'comments'" @click="historyTab = 'comments'">协作评论</button><button type="button" :aria-pressed="historyTab === 'assist'" @click="historyTab = 'assist'">Agent 摘要</button><button type="button" :aria-pressed="historyTab === 'services'" @click="historyTab = 'services'">服务运行</button></div>
+        <div class="record-history-tabs" role="group" aria-label="选择申请历史视图"><button type="button" :disabled="signatureBusy || signatureDirty" :aria-pressed="historyTab === 'rounds'" @click="historyTab = 'rounds'">提交轮次</button><button type="button" :disabled="signatureBusy || signatureDirty" :aria-pressed="historyTab === 'relations'" @click="historyTab = 'relations'">父子流程</button><button type="button" :disabled="signatureBusy || signatureDirty" :aria-pressed="historyTab === 'compare'" @click="historyTab = 'compare'">内容对比</button><button type="button" :disabled="signatureBusy || signatureDirty" :aria-pressed="historyTab === 'diagram'" @click="historyTab = 'diagram'">流程图</button><button type="button" :disabled="signatureBusy || signatureDirty" :aria-pressed="historyTab === 'timeline'" @click="historyTab = 'timeline'">审批轨迹</button><button type="button" :disabled="signatureBusy || signatureDirty" :aria-pressed="historyTab === 'audit'" @click="historyTab = 'audit'">操作审计</button><button type="button" :disabled="signatureBusy || signatureDirty" :aria-pressed="historyTab === 'comments'" @click="historyTab = 'comments'">协作评论</button><button type="button" :disabled="signatureBusy || signatureDirty" :aria-pressed="historyTab === 'assist'" @click="historyTab = 'assist'">Agent 摘要</button><button type="button" :disabled="signatureBusy || signatureDirty" :aria-pressed="historyTab === 'services'" @click="historyTab = 'services'">服务运行</button><button type="button" :disabled="signatureBusy || signatureDirty" :aria-pressed="historyTab === 'signatures'" @click="historyTab = 'signatures'">电子签</button></div>
         <section v-if="historyTab === 'rounds'" class="round-history" aria-label="提交轮次记录">
           <div class="record-history-heading"><h3>提交轮次</h3><span>{{ rounds.length }} 条记录</span></div>
           <p v-if="!rounds.length" class="unavailable">{{ application.status === 'DRAFT' ? '尚未提交，保存修改不会产生审批轮次。' : application.status === 'CANCELLED' ? '此申请没有提交轮次记录。作废不会补造审批轮次。' : '此申请暂无提交快照。早期版本的历史内容不会用当前内容补写。' }}</p>
@@ -339,10 +341,11 @@ onUnmounted(() => { initiatorRequirements.clear(); returnFocus?.focus() })
         <RoundDiagram v-else-if="historyTab === 'diagram'" :application-id="application.id" :rounds="rounds" :scope-key="scopeKey" :version="application.version" :locked="writesBlocked" @changed="load(); emit('changed')" />
         <AssistRunRecords v-else-if="historyTab === 'assist'" :application-id="application.id" :scope-key="scopeKey" :version="application.version" :round-no="application.roundNo" />
         <ServiceTaskRuntimePanel v-else-if="historyTab === 'services'" :application-id="application.id" :version="application.version" :scope-key="scopeKey" :rounds="rounds" :initial-round-no="initialRoundNo" @changed="load(); emit('changed')" />
+        <SignaturePanel v-else-if="historyTab === 'signatures'" :application="application" :rounds="rounds" :scope-key="scopeKey" :user-id="userId" :initial-round-no="initialRoundNo" :locked="writesBlocked || saving || loading" @busy="signatureBusy = $event" @dirty="signatureDirty = $event" />
         <ApplicationHistory v-else-if="historyTab !== 'comments'" :application-id="application.id" :mode="historyTab" :round-no-max="application.roundNo" :version="application.version" />
         <ApplicationComments v-else :application-id="application.id" :scope-key="scopeKey" :version="application.version" :status="application.status" :round-no="application.roundNo" :locked="saving || loading || writesBlocked" :refresh-version="commentRefreshVersion" @posted="emit('commentPosted')" @refresh-application="load" />
       </template>
-      <div class="form-actions"><button v-if="dirty || draftAssistDirty" type="button" class="return" :disabled="uploading || saving || draftAssistBusy" @click="emit('close')">放弃修改并关闭</button><button type="button" class="secondary" :disabled="expenseBusy || draftAssistBusy || writesBlocked || uploading || saving || loading" @click="load">{{ dirty || draftAssistDirty ? '放弃修改并重新加载' : '重新加载' }}</button><button type="button" class="secondary" :disabled="expenseBusy || draftAssistBusy || draftAssistDirty || uploading || saving || dirty" @click="close">关闭</button></div>
+      <div class="form-actions"><button v-if="dirty || draftAssistDirty || signatureDirty" type="button" class="return" :disabled="uploading || saving || draftAssistBusy || signatureBusy" @click="emit('close')">放弃修改并关闭</button><button type="button" class="secondary" :disabled="expenseBusy || draftAssistBusy || signatureBusy || writesBlocked || uploading || saving || loading" @click="load">{{ dirty || draftAssistDirty || signatureDirty ? '放弃修改并重新加载' : '重新加载' }}</button><button type="button" class="secondary" :disabled="expenseBusy || draftAssistBusy || draftAssistDirty || signatureBusy || signatureDirty || uploading || saving || dirty" @click="close">关闭</button></div>
     </section>
   </div>
 </template>
