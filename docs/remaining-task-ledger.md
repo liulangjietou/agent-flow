@@ -14,7 +14,7 @@ F02 固定安装包完成报销挂账、借款挂账、付款凭证及原科目�
 
 W01 的可信目录、公开设计及授权运行记录接口与页面已经接通。运行记录阶段 62 项 Java、39 项前端范围测试、构建和 OpenAPI 通过；固定包三轮强退前后均保留同一操作号，恢复时只查询原号，之后由人工审批完成。独立数据库与合成接收方的配套恢复也已通过，原号只查询不重发。真实浏览器和 PostgreSQL 新范围补测仍待完成，总数保持 34。见[配套恢复证据](evidence/service-task-paired-restore-20261003.json)、[运行记录阶段证据](evidence/service-task-runtime-view-20261003.json)、[公开设计阶段证据](evidence/service-task-public-design-20261003.json)和[实现说明](service-tasks.md)。
 
-V02 的编号字符校验子问题已修复：草稿预检、保存和发布提前拦截非法流程/节点/连线编号；106 项 Java、36 项前端范围测试及固定包 42 次 HTTP 升级检查通过，旧草稿修正和原在审接续成功。见[修复说明](definition-identifier-syntax.md)。V02 整体验收仍为 OPEN，总数不变。
+V02 的编号字符校验子问题已修复：草稿预检、保存和发布提前拦截非法流程/节点/连线编号；106 项 Java、36 项前端范围测试及固定包 42 次 HTTP 升级检查通过，旧草稿修正和原在审接续成功。见[修复说明](definition-identifier-syntax.md)。V02 整体验收仍为 OPEN，总数不变。 预检解释响应版本子问题也已修复：未知状态同时缺失版本时拒绝解析，两个失败用例先行；69 项前端范围测试、构建及 274 份历史实际响应重验通过，见[子问题证据](evidence/precheck-response-version-20261004.json)。
 
 A02 后端与本人费用页面已接通，前阶段分别有 132 项 Java、118 项前端用例证据。固定包 V106→V107 保留 250 张旧表及 109 行；8 次启动完成实际断线后的原键恢复、执行中强退不重发、超时迟到与真实到期，以及排队后修改阻断。365 份实际响应中，解释接口 274 份通过契约及页面解析核对。浏览器与 PostgreSQL 补验仍待完成，A02 保持 OPEN。见[实施记录](precheck-explanation.md)、[页面阶段证据](evidence/precheck-explanation-ui-20261003.json)和[运行阶段证据](evidence/precheck-explanation-runtime-20261003.json)。
 

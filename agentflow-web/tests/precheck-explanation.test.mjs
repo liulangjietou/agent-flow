@@ -69,6 +69,21 @@ test('输入、分页及原解释契约绑定预检、运行、双版本和来�
   }
 })
 
+test('预检历史拒绝未知状态与缺失版本同时出现，不把两个 undefined 当成合法版本', () => {
+  for (const status of ['UNKNOWN', 'constructor', 'toString']) {
+    const item = { ...summary(), status }; delete item.version
+    assert.throws(() => model.readExplanationPage({ ...page(), items: [item] }, 0), unreadable)
+  }
+})
+
+test('预检详情拒绝未知状态与缺失版本，即使其余结束时间和空结果形状合法', () => {
+  for (const status of ['UNKNOWN', 'constructor', 'toString']) {
+    const value = { ...detail(), status, suggestion: null, canAdopt: false, unavailableCode: 'AGENT_RUN_NOT_REVIEWABLE' }
+    delete value.version
+    assert.throws(() => model.readExplanationDetail(value, uuid(2)), unreadable)
+  }
+})
+
 test('可用 READY、失效目录和已复核历史保留真实状态，不补造可采纳性', () => {
   const ready = { ...input(), result: 'READY', sources: [source('precheck:result')] }
   assert.deepEqual(model.readExplanationInput(ready, uuid(3)), ready)

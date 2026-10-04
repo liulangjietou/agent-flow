@@ -42,8 +42,9 @@ const terminal = (v: unknown) => ['READY', 'BLOCKED', 'UNAVAILABLE'].includes(St
 const unreadable = () => ({ status: 0, code: 'RESPONSE_UNREADABLE', message: '预检解释响应不完整，请刷新记录；写入结果未知时先恢复原操作。' })
 const finding = (id: string) => /^precheck:finding\[(?:0|[1-9][0-9]*)\]$/.test(id)
 function summary(v: unknown): v is ExplanationSummary {
+  // 未知状态查表返回 undefined，必须先确认版本有效，避免与缺失版本相等。
   return object(v) && uuid(v.id) && uuid(v.precheckId) && positive(v.applicationVersion) && positive(v.financialVersion)
-    && positive(v.attempt) && typeof v.status === 'string' && ownValue(versions, v.status) === v.version && time(v.createdAt)
+    && positive(v.attempt) && positive(v.version) && typeof v.status === 'string' && ownValue(versions, v.status) === v.version && time(v.createdAt)
 }
 function sources(v: unknown, maximum: number): v is AssistSource[] {
   return Array.isArray(v) && v.length <= maximum && v.every(s => object(s) && text(s.label) && typeof s.content === 'string'

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T11:04:34.056090+00:00",
+  "recordedAt": "2026-10-04T11:07:34.104223+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -2231,7 +2231,7 @@
           ]
         }
       ],
-      "observed": "已具备分阶段验收证据；本轮修复流程/节点/连线编号字符校验缺口，106 项 Java、36 项前端范围测试及固定包 42 次 HTTP 升级检查通过，旧草稿可修正、原在审接续成功。全部本地待办尚未完成，最终固定版本整体验收及发布资料仍待完成。",
+      "observed": "已具备分阶段验收证据；本轮修复流程/节点/连线编号字符校验缺口，106 项 Java、36 项前端范围测试及固定包 42 次 HTTP 升级检查通过，旧草稿可修正、原在审接续成功。全部本地待办尚未完成，最终固定版本整体验收及发布资料仍待完成。 另已复现并修复旧预检解释未知状态与缺失版本同时被接受的问题：两个失败用例先行，69 项前端范围测试、构建及 274 份历史实际响应重新解析通过。",
       "references": [
         {
           "path": "docs/postgres-release-gate.md",
@@ -2256,6 +2256,12 @@
         "status": "VERIFIED",
         "implementationCommit": "1a46d5d99486604bd9557587b351afb094d1344d",
         "evidence": "docs/evidence/definition-identifier-syntax-20261003.json"
+      },
+      "precheckResponseVersionSubissue": {
+        "status": "VERIFIED",
+        "evidence": "docs/evidence/precheck-response-version-20261004.json",
+        "frontendCases": 69,
+        "historicalResponsesRevalidated": 274
       }
     },
     {
@@ -3860,7 +3866,6 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "V02",
     "F04"
   ],
   "externalDelivery": {
@@ -3886,10 +3891,10 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "A04",
-    "status": "LOCAL_PACKAGED_RUNTIME_VERIFIED_BROWSER_POSTGRES_PENDING",
-    "recordedAt": "2026-10-04T11:04:34.056090+00:00",
-    "evidence": "docs/evidence/expense-risk-runtime-20261004.json",
+    "taskId": "V02",
+    "status": "RESPONSE_VERSION_SUBISSUE_VERIFIED_TASK_OPEN",
+    "recordedAt": "2026-10-04T11:07:34.104223+00:00",
+    "evidence": "docs/evidence/precheck-response-version-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
