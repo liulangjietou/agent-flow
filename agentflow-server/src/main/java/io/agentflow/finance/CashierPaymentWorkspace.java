@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,7 +44,7 @@ public class CashierPaymentWorkspace {
         var before = query.beforeId() == null ? null : access.requireCashier(query.beforeId());
         if (before != null && !authorizations.cashierMatches(actor.tenantId(), actor.userId(), query.filter(), query.beforeId())) throw invalid();
         long count = authorizations.cashierCount(actor.tenantId(), actor.userId(), query.filter());
-        var rows = authorizations.cashierPage(actor.tenantId(), actor.userId(), query.filter(), before == null ? null : before.decision().authorizedAt(), query.beforeId(), query.limit());
+        var rows = authorizations.cashierPage(actor.tenantId(), actor.userId(), query.filter(), before, query.limit());
         var items = rows.stream().limit(query.limit()).map(this::view).toList();
         return new Page(items, rows.size() > query.limit() ? items.get(items.size() - 1).payment().id() : null, count);
     }
@@ -101,11 +103,25 @@ public class CashierPaymentWorkspace {
         return new AccountOption(CashierPaymentAccountKey.of(value), value.terms().payee().legalEntityId(), debit.currency(), debit.displayName(), debit.maskedAccount());
     }
     private static Query page(Map<String, String> parameters) {
-        if (!Set.of("limit", "beforeId", "legalEntityId", "debitAccount").containsAll(parameters.keySet())) throw invalid();
+        if (!Set.of("limit", "beforeId", "legalEntityId", "debitAccount", "dueFrom", "dueTo", "undated", "sort").containsAll(parameters.keySet())) throw invalid();
         String account = parameters.get("debitAccount");
         if (account != null && !JdbcPaymentAuthorizationRepository.CashierFilter.UNASSIGNED.equals(account) && !accountKey(account)) throw invalid();
+        var from = date(parameters, "dueFrom"); var to = date(parameters, "dueTo");
+        boolean undated = parameters.containsKey("undated");
+        if (undated && (!"true".equals(parameters.get("undated")) || from != null || to != null) || from != null && to != null && from.isAfter(to)) throw invalid();
+        JdbcPaymentAuthorizationRepository.CashierSort sort;
+        try { sort = JdbcPaymentAuthorizationRepository.CashierSort.valueOf(parameters.getOrDefault("sort", "AUTHORIZED_AT_DESC")); }
+        catch (IllegalArgumentException failure) { throw invalid(); }
         return new Query(limit(parameters), identifier(parameters, "beforeId"),
-                new JdbcPaymentAuthorizationRepository.CashierFilter(identifier(parameters, "legalEntityId"), account));
+                new JdbcPaymentAuthorizationRepository.CashierFilter(identifier(parameters, "legalEntityId"), account, from, to, undated, sort));
+    }
+    private static LocalDate date(Map<String, String> parameters, String key) {
+        if (!parameters.containsKey(key)) return null;
+        String value = parameters.get(key);
+        if (!value.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) throw invalid();
+        try {
+            var date = LocalDate.parse(value); if (date.isBefore(PaymentAuthorization.MIN_DUE_DATE)) throw invalid(); return date;
+        } catch (DateTimeParseException failure) { throw invalid(); }
     }
     private static int limit(Map<String, String> parameters) {
         try {

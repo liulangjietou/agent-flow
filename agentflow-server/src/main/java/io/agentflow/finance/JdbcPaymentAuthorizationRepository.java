@@ -9,7 +9,6 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -87,14 +86,23 @@ public class JdbcPaymentAuthorizationRepository {
                 row(), tenant, applicationId.toString(), round).stream().findFirst();
     }
     /** 出纳列表先在数据库按当前法人任职过滤，再读取原授权；不扫描全租户付款后交给页面筛选。 */
-    public List<PaymentAuthorization> cashierPage(String tenant, String cashier, CashierFilter selection, Instant beforeTime, UUID beforeId, int limit) {
+    public List<PaymentAuthorization> cashierPage(String tenant, String cashier, CashierFilter selection, PaymentAuthorization before, int limit) {
         var where = cashierWhere(tenant, cashier, selection); var filter = "";
-        if (beforeTime != null) {
-            filter = " AND (p.authorized_at<? OR (p.authorized_at=? AND p.id<?))";
-            where.arguments().add(Timestamp.from(beforeTime)); where.arguments().add(Timestamp.from(beforeTime)); where.arguments().add(beforeId.toString());
+        boolean byDate = selection.sort() == CashierSort.DUE_DATE_ASC;
+        if (before != null) {
+            var remaining = "(p.authorized_at<? OR (p.authorized_at=? AND p.id<?))";
+            var date = before.decision().dueDate();
+            if (byDate && date != null) {
+                // 有日期页可进入更晚日期和历史空值段；同日仍保留原时间和编号边界。
+                filter = " AND (p.due_date>? OR p.due_date IS NULL OR (p.due_date=? AND " + remaining + "))";
+                where.arguments().add(date); where.arguments().add(date);
+            } else filter = " AND " + (byDate ? "p.due_date IS NULL AND " : "") + remaining;
+            where.arguments().add(Timestamp.from(before.decision().authorizedAt()));
+            where.arguments().add(Timestamp.from(before.decision().authorizedAt())); where.arguments().add(before.terms().id().toString());
         }
         where.arguments().add(limit + 1);
-        return jdbc.query("SELECT p.*" + where.sql() + filter + " ORDER BY p.authorized_at DESC,p.id DESC LIMIT ?", row(), where.arguments().toArray());
+        var order = byDate ? "p.due_date ASC NULLS LAST,p.authorized_at DESC,p.id DESC" : "p.authorized_at DESC,p.id DESC";
+        return jdbc.query("SELECT p.*" + where.sql() + filter + " ORDER BY " + order + " LIMIT ?", row(), where.arguments().toArray());
     }
 
     /** 总数与分页共用法人权限及筛选条件，不把上一页游标计入总数。 */
@@ -129,6 +137,9 @@ public class JdbcPaymentAuthorizationRepository {
         if (selection.legalEntityId() != null) { sql.append(" AND p.legal_entity_id=?"); arguments.add(selection.legalEntityId().toString()); }
         if (CashierFilter.UNASSIGNED.equals(selection.debitAccount())) sql.append(" AND p.debit_account_key IS NULL");
         else if (selection.debitAccount() != null) { sql.append(" AND p.debit_account_key=?"); arguments.add(selection.debitAccount()); }
+        if (selection.undated()) sql.append(" AND p.due_date IS NULL");
+        if (selection.dueFrom() != null) { sql.append(" AND p.due_date>=?"); arguments.add(selection.dueFrom()); }
+        if (selection.dueTo() != null) { sql.append(" AND p.due_date<=?"); arguments.add(selection.dueTo()); }
         return new CashierWhere(sql.toString(), arguments);
     }
     /** 业务种类固定取原用途，不接受客户端单独声明。 */
@@ -175,10 +186,18 @@ public class JdbcPaymentAuthorizationRepository {
      * 已由工作区入口解析的筛选值，不携带客户端 SQL 或当前账户目录。
      * @author owlzhangfq@gmail.com
      */
-    public record CashierFilter(UUID legalEntityId, String debitAccount) {
+    public record CashierFilter(UUID legalEntityId, String debitAccount, LocalDate dueFrom, LocalDate dueTo, boolean undated, CashierSort sort) {
         public static final String UNASSIGNED = "UNASSIGNED";
         public static final CashierFilter ALL = new CashierFilter(null, null);
+        /** 账户选项和原列表默认仍按最近授权排列，不隐式增加日期筛选。 */
+        public CashierFilter(UUID legalEntityId, String debitAccount) { this(legalEntityId, debitAccount, null, null, false, CashierSort.AUTHORIZED_AT_DESC); }
     }
+
+    /**
+     * 仅允许两种固定排序，客户端不能提供 SQL 片段。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum CashierSort { AUTHORIZED_AT_DESC, DUE_DATE_ASC }
 
     /**
      * 列表、总数及游标共享同一参数化范围。

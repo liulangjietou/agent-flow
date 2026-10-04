@@ -171,11 +171,11 @@ class PaymentPersistenceTest {
             organization.save(TENANT, new OrganizationUnit(entity, OrganizationUnit.Kind.LEGAL_ENTITY, "付款法人", null, null, true, 1), 0);
             organization.save(TENANT, department, 0); organization.save(TENANT, position, 0); organization.save(TENANT, person, 0); organization.save(TENANT, appointment, 0);
         });
-        assertThat(authorizations.cashierPage(TENANT, subject, JdbcPaymentAuthorizationRepository.CashierFilter.ALL, null, null, 1)).containsExactly(visible);
-        assertThat(authorizations.cashierPage("foreign", subject, JdbcPaymentAuthorizationRepository.CashierFilter.ALL, null, null, 1)).isEmpty();
+        assertThat(authorizations.cashierPage(TENANT, subject, JdbcPaymentAuthorizationRepository.CashierFilter.ALL, null, 1)).containsExactly(visible);
+        assertThat(authorizations.cashierPage("foreign", subject, JdbcPaymentAuthorizationRepository.CashierFilter.ALL, null, 1)).isEmpty();
         assertThat(new PaymentPersonnel(jdbc).eligible(TENANT, subject, hidden.terms().payee().legalEntityId())).isFalse();
         tx.executeWithoutResult(status -> organization.save(TENANT, appointment.revise(false, 1), 1));
-        assertThat(authorizations.cashierPage(TENANT, subject, JdbcPaymentAuthorizationRepository.CashierFilter.ALL, null, null, 1)).isEmpty();
+        assertThat(authorizations.cashierPage(TENANT, subject, JdbcPaymentAuthorizationRepository.CashierFilter.ALL, null, 1)).isEmpty();
         jdbc.update("UPDATE payment_authorization SET legal_entity_id=? WHERE tenant_id=? AND id=?", hidden.terms().payee().legalEntityId().toString(), TENANT, visible.terms().id().toString());
         assertThatThrownBy(() -> authorizations.find(TENANT, visible.terms().id())).isInstanceOf(IllegalStateException.class);
     }

@@ -1,4 +1,4 @@
-import { validateCashierPayment, type CashierAccountOption, type CashierFilterOptions, type CashierPaymentFilter, type CashierPaymentPage, type CashierPaymentView } from './payments.js'
+import { isPaymentDueDate, validateCashierPayment, type CashierAccountOption, type CashierFilterOptions, type CashierPaymentFilter, type CashierPaymentPage, type CashierPaymentView } from './payments.js'
 
 const uuid = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)
 const accountKey = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value)
@@ -14,9 +14,12 @@ function account(value: unknown): value is CashierAccountOption {
 }
 
 /** 法人、账户只接受当前页面选项中的规范标识，不拼接调用者提供的查询字符串。 */
-export function cashierFilter(legalEntityId: string, debitAccount: string): CashierPaymentFilter {
-  if (legalEntityId && !uuid(legalEntityId) || debitAccount && debitAccount !== 'UNASSIGNED' && !accountKey(debitAccount)) throw new Error('付款筛选条件无效，请重新选择。')
-  return { ...(legalEntityId ? { legalEntityId } : {}), ...(debitAccount ? { debitAccount } : {}) }
+export function cashierFilter(legalEntityId: string, debitAccount: string, dueFrom = '', dueTo = '', undated = false, sort = 'AUTHORIZED_AT_DESC'): CashierPaymentFilter {
+  if (legalEntityId && !uuid(legalEntityId) || debitAccount && debitAccount !== 'UNASSIGNED' && !accountKey(debitAccount)
+      || dueFrom && !isPaymentDueDate(dueFrom) || dueTo && !isPaymentDueDate(dueTo) || dueFrom && dueTo && dueFrom > dueTo
+      || undated && (dueFrom || dueTo) || !['AUTHORIZED_AT_DESC', 'DUE_DATE_ASC'].includes(sort)) throw new Error('付款筛选条件无效，请核对日期范围和选项。')
+  return { ...(legalEntityId ? { legalEntityId } : {}), ...(debitAccount ? { debitAccount } : {}),
+    ...(dueFrom ? { dueFrom } : {}), ...(dueTo ? { dueTo } : {}), ...(undated ? { undated: true } : {}), ...(sort === 'DUE_DATE_ASC' ? { sort } : {}) }
 }
 
 /** 账户选项可继续分页；切换法人后，旧范围的账户和游标不能混入新目录。 */
@@ -47,7 +50,10 @@ export function validateCashierPaymentPage(value: CashierPaymentPage, filter: Ca
         || (item.payment.executedBy !== null) !== (item.debitAccount !== null)
         || filter.legalEntityId && item.payment.legalEntityId !== filter.legalEntityId
         || filter.debitAccount === 'UNASSIGNED' && item.debitAccount !== null
-        || filter.debitAccount && filter.debitAccount !== 'UNASSIGNED' && item.debitAccount?.key !== filter.debitAccount) throw new Error('付款记录与当前筛选条件不一致，请刷新。')
+        || filter.debitAccount && filter.debitAccount !== 'UNASSIGNED' && item.debitAccount?.key !== filter.debitAccount
+        || filter.undated && item.payment.dueDate !== null
+        || filter.dueFrom && (item.payment.dueDate === null || item.payment.dueDate < filter.dueFrom)
+        || filter.dueTo && (item.payment.dueDate === null || item.payment.dueDate > filter.dueTo)) throw new Error('付款记录与当前筛选条件不一致，请刷新。')
   }
   return value
 }

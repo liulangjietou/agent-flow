@@ -40,6 +40,55 @@ class CashierPaymentFiltersTest {
 
     @AfterEach void clearActor() { actors.clear(); }
 
+    @Test void dueDateOrderPagesAcrossEqualDatesAndTheUndatedTailWithoutChangingTotals() {
+        var f = new Fixture(null); UUID entity = f.entity(true); var day = LocalDate.of(2026, 10, 1);
+        var last = f.payment(entity, "CNY", "a", null, "v1", null);
+        var sameOlder = f.payment(entity, "CNY", "a", null, "v1", day);
+        var later = f.payment(entity, "CNY", "a", null, "v1", day.plusDays(1));
+        f.sequence = 1; // 同一到期日和授权时刻，编号仍须稳定分页。
+        var sameNewer = f.payment(entity, "CNY", "a", null, "v1", day);
+        f.sequence = 4;
+        var firstUndated = f.payment(entity, "CNY", "a", null, "v1", null);
+        f.payment(f.entity(false), "CNY", "a", null, "v1", day.minusDays(1));
+        var workspace = f.workspace(); var found = new java.util.ArrayList<UUID>(); UUID before = null;
+        do {
+            var query = new java.util.HashMap<>(Map.of("sort", "DUE_DATE_ASC", "limit", "1"));
+            if (before != null) query.put("beforeId", before.toString());
+            var page = f.read(() -> workspace.list(query)); assertThat(page.totalCount()).isEqualTo(5);
+            assertThat(page.items()).hasSize(1); found.add(page.items().get(0).payment().id()); before = page.nextBeforeId();
+            assertThat(found).hasSizeLessThanOrEqualTo(5);
+        } while (before != null);
+        var sameIds = java.util.stream.Stream.of(sameNewer.terms().id(), sameOlder.terms().id()).sorted(java.util.Comparator.comparing(UUID::toString).reversed()).toList();
+        assertThat(found).containsExactly(sameIds.get(0), sameIds.get(1), later.terms().id(), firstUndated.terms().id(), last.terms().id());
+        var undated = workspace.list(Map.of("undated", "true", "sort", "DUE_DATE_ASC", "limit", "1"));
+        assertThat(undated.totalCount()).isEqualTo(2); assertThat(undated.nextBeforeId()).isEqualTo(firstUndated.terms().id());
+        assertThat(workspace.list(Map.of("undated", "true", "sort", "DUE_DATE_ASC", "beforeId", undated.nextBeforeId().toString())).items())
+                .extracting(item -> item.payment().id()).containsExactly(last.terms().id());
+        assertThat(workspace.list(Map.of()).items().get(0).payment().id()).isEqualTo(firstUndated.terms().id());
+    }
+
+    @Test void dateRangesUseInclusiveBoundariesWithEntityAndAccountScopeAndRejectInvalidInputs() {
+        var f = new Fixture(null); UUID entity = f.entity(true), other = f.entity(true); var date = LocalDate.of(2026, 10, 1);
+        var first = f.payment(entity, "CNY", "a", "debit", "v1", date);
+        var last = f.payment(entity, "CNY", "a", "debit", "v1", date.plusDays(1));
+        var outside = f.payment(entity, "CNY", "a", null, "v1", date.plusDays(2));
+        f.payment(other, "CNY", "a", "debit", "v1", date); f.payment(entity, "CNY", "a", null, "v1", null);
+        var workspace = f.workspace();
+        var filter = Map.of("dueFrom", "2026-10-01", "dueTo", "2026-10-02", "sort", "DUE_DATE_ASC", "legalEntityId", entity.toString(), "debitAccount", CashierPaymentAccountKey.of(first));
+        var result = workspace.list(filter); assertThat(result.totalCount()).isEqualTo(2);
+        assertThat(result.items()).extracting(item -> item.payment().id()).containsExactly(first.terms().id(), last.terms().id());
+        var wrongCursor = new java.util.HashMap<>(filter); wrongCursor.put("beforeId", outside.terms().id().toString());
+        assertCode(() -> workspace.list(wrongCursor), "INVALID_PAYMENT_QUERY");
+        assertThat(workspace.list(Map.of("dueTo", "2026-10-01")).totalCount()).isEqualTo(2);
+        assertThat(workspace.list(Map.of("dueFrom", "2026-10-02")).totalCount()).isEqualTo(2);
+        for (var query : List.of(Map.of("dueFrom", "2026-02-30"), Map.of("dueTo", "2026-2-01"), Map.of("dueFrom", "0000-01-01"),
+                Map.of("dueTo", "10000-01-01"), Map.of("dueFrom", ""), Map.of("dueFrom", "2026-10-02", "dueTo", "2026-10-01"),
+                Map.of("undated", "true", "dueFrom", "2026-10-01"), Map.of("undated", "false"), Map.of("sort", ""))) {
+            assertCode(() -> workspace.list(query), "INVALID_PAYMENT_QUERY");
+        }
+        assertThat(workspace.list(Map.of("dueFrom", "0001-01-01", "dueTo", "9999-12-31")).totalCount()).isEqualTo(4);
+    }
+
     @Test void filteredTotalsRemainStableAcrossPagesAndRejectCursorsFromAnotherFilter() {
         var f = new Fixture(null); UUID first = f.entity(true), second = f.entity(true), hidden = f.entity(false);
         var older = f.payment(first, "CNY", "a", "debit-1", "v1");
@@ -188,6 +237,9 @@ class CashierPaymentFiltersTest {
         }
         private <T> T read(java.util.function.Supplier<T> action) { return tx.execute(ignored -> action.get()); }
         private PaymentAuthorization payment(UUID entity, String currency, String target, String reference, String accountVersion) {
+            return payment(entity, currency, target, reference, accountVersion, null);
+        }
+        private PaymentAuthorization payment(UUID entity, String currency, String target, String reference, String accountVersion, LocalDate dueDate) {
             UUID business = UUID.randomUUID(), application = UUID.randomUUID(); Instant authorized = NOW.plusSeconds(++sequence), created = NOW.minusSeconds(3);
             LocalDate date = LocalDate.of(2026, 10, 4); var amount = new Money(new BigDecimal("100"), currency);
             jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,?,?,'fixture',1,'alice','出纳筛选验收','{}','APPROVED',1,5,'ADVANCE_REQUEST',?)", application.toString(), tenant, business.toString(), business.toString());
@@ -201,7 +253,7 @@ class CashierPaymentFiltersTest {
             var queued = VoucherOperation.queue(new VoucherOperation.Input(command, target.repeat(64)), created); var claimed = queued.claim(created, Duration.ofSeconds(20));
             var posted = claimed.complete(new FinanceResult.Success<>(new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.POSTED, 1L, NOW,
                     "posting-1", "voucher-1", period.periodReference(), date, amount, amount, NOW, null)), NOW);
-            var initial = PaymentAuthorization.issue(UUID.randomUUID(), posted, new EmployeeAccountSnapshot(entity, "alice", "payee-1", "****1234", "c".repeat(64), "v1"), "finance", authorized, authorized.plusSeconds(3600));
+            var initial = PaymentAuthorization.issue(UUID.randomUUID(), posted, new EmployeeAccountSnapshot(entity, "alice", "payee-1", "****1234", "c".repeat(64), "v1"), "finance", authorized, authorized.plusSeconds(3600), dueDate);
             tx.executeWithoutResult(ignored -> { vouchers.create(queued); vouchers.update(claimed); vouchers.update(posted); createAuthorization(initial); });
             if (reference == null) return initial;
             var directory = new PaymentAccountsPort.Directory(new PaymentAccountsPort.Request(entity, currency, "cashier"), accountVersion, authorized, authorized.plusSeconds(60),

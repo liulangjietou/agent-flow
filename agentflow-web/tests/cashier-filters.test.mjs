@@ -13,7 +13,7 @@ const option = (key = KEY_A, legalEntityId = LEGAL_A) => ({ key, legalEntityId, 
 const options = () => ({ legalEntities: [{ id: LEGAL_A, name: '甲公司' }, { id: LEGAL_B, name: '乙公司' }], accounts: [option(), option(KEY_B, LEGAL_B)], nextAfterAccountKey: null })
 function row(n = 10, legal = LEGAL_A, account = null) {
   const at = new Date(Date.now() - 60_000).toISOString()
-  return { payment: { id: id(n), version: account ? 2 : 1, status: account ? 'EXECUTION_REGISTERED' : 'AUTHORIZED', purpose: 'EXPENSE_REIMBURSEMENT', applicationId: id(n + 100), businessId: id(n + 200), roundNo: 1, applicationVersion: 9, businessVersion: 3, legalEntityId: legal, employeeId: 'alice', amount: { value: '100.00', currency: 'CNY' }, maskedPayeeAccount: '****1234', authorizedBy: 'finance', authorizedAt: at, expiresAt: new Date(Date.now() + 3600_000).toISOString(), executedBy: account ? 'cashier' : null, request: null, operation: account ? { version: 1, status: 'QUEUED', updatedAt: at, observedStatus: null, paymentReference: null, receiptReference: null, completedAt: null, disputed: false, issue: null } : null, retirement: null }, actions: { execute: !account, query: false, resendOriginal: false }, debitAccount: account }
+  return { payment: { id: id(n), version: account ? 2 : 1, status: account ? 'EXECUTION_REGISTERED' : 'AUTHORIZED', purpose: 'EXPENSE_REIMBURSEMENT', applicationId: id(n + 100), businessId: id(n + 200), roundNo: 1, applicationVersion: 9, businessVersion: 3, legalEntityId: legal, employeeId: 'alice', amount: { value: '100.00', currency: 'CNY' }, maskedPayeeAccount: '****1234', authorizedBy: 'finance', authorizedAt: at, expiresAt: new Date(Date.now() + 3600_000).toISOString(), dueDate: null, executedBy: account ? 'cashier' : null, request: null, operation: account ? { version: 1, status: 'QUEUED', updatedAt: at, observedStatus: null, paymentReference: null, receiptReference: null, completedAt: null, disputed: false, issue: null } : null, retirement: null }, actions: { execute: !account, query: false, resendOriginal: false }, debitAccount: account }
 }
 const page = (items = [row()], nextBeforeId = null, totalCount = items.length) => ({ items, nextBeforeId, totalCount })
 function deferred() {
@@ -127,4 +127,43 @@ test('真实 API 仅序列化允许的筛选参数，保持无缓存和取消信
   for (const call of calls) { assert.equal(call.init.cache, 'no-store'); assert.equal(call.init.signal, signal); assert.equal(new URL(call.url, 'http://fixture').searchParams.has('tenantId'), false) }
   const first = new URL(calls[0].url, 'http://fixture'); assert.equal(first.searchParams.get('legalEntityId'), LEGAL_A); assert.equal(first.searchParams.get('debitAccount'), KEY_A); assert.equal(first.searchParams.get('beforeId'), id(10))
   assert.equal(new URL(calls[1].url, 'http://fixture').searchParams.get('afterAccountKey'), KEY_A)
+})
+
+
+test('日期范围与历史空值筛选互斥，查询保留明确日期和排序', () => {
+  assert.deepEqual(rules.cashierFilter(LEGAL_A, KEY_A, '2026-10-01', '2026-10-02', false, 'DUE_DATE_ASC'),
+    { legalEntityId: LEGAL_A, debitAccount: KEY_A, dueFrom: '2026-10-01', dueTo: '2026-10-02', sort: 'DUE_DATE_ASC' })
+  assert.deepEqual(rules.cashierFilter('', '', '', '', true, 'DUE_DATE_ASC'), { undated: true, sort: 'DUE_DATE_ASC' })
+  for (const args of [['', '', '2026-02-30'], ['', '', '2026-10-02', '2026-10-01'], ['', '', '2026-10-01', '', true], ['', '', '', '', false, 'garbage']]) {
+    assert.throws(() => rules.cashierFilter(...args))
+  }
+  const dated = row(); dated.payment.dueDate = '2026-10-01'
+  assert.throws(() => rules.validateCashierPaymentPage(page([dated]), { dueFrom: '2026-10-02' }))
+  assert.throws(() => rules.validateCashierPaymentPage(page([dated]), { undated: true }))
+})
+
+test('日期或排序改变会废弃旧游标和迟到页，执行期间保持锁定', async () => {
+  backend(); const p = mount(); await settle(); const calls = []
+  api.cashierPayments = (before, signal, filter) => { const task = deferred(); calls.push({ ...task, signal, filter }); return task.promise }
+  p.state.changeDueDate('from', '2026-10-01'); await settle()
+  p.state.changeSort('DUE_DATE_ASC'); await settle(); assert.equal(calls[0].signal.aborted, true)
+  const value = row(); value.payment.dueDate = '2026-10-02'
+  calls[1].resolve(page([value])); await settle(); calls[0].resolve(page([])); await settle()
+  assert.equal(p.state.items.length, 1); assert.equal(calls[1].before, undefined); assert.equal(calls[1].filter.sort, 'DUE_DATE_ASC')
+  p.state.saving = true; p.state.changeDueDate('to', '2026-10-05'); p.state.changeSort('AUTHORIZED_AT_DESC'); p.state.changeUndated(true)
+  assert.equal(calls.length, 2)
+  p.state.saving = false; p.state.changeUndated(true); await settle()
+  assert.equal(p.state.dueFrom, ''); assert.equal(p.state.dueTo, ''); assert.deepEqual(calls[2].filter, { undated: true, sort: 'DUE_DATE_ASC' })
+  const legacy = row(); legacy.payment.dueDate = null; calls[2].resolve(page([legacy])); await settle(); assert.match(text(p.root), /历史未设置/)
+})
+
+
+test('真实读取请求传递完整日期条件并禁用缓存', async () => {
+  globalThis.localStorage = { getItem: () => 'test-token' }; const calls = []
+  globalThis.fetch = async (url, init) => { calls.push({ url, init }); return new Response(JSON.stringify(page([])), { status: 200, headers: { 'Content-Type': 'application/json' } }) }
+  await originals.cashierPayments(undefined, new AbortController().signal, { legalEntityId: LEGAL_A, dueFrom: '2026-10-01', dueTo: '2026-10-02', sort: 'DUE_DATE_ASC' })
+  await originals.cashierPayments(undefined, new AbortController().signal, { undated: true, sort: 'DUE_DATE_ASC' })
+  const dated = new URL(calls[0].url, 'http://local.test'), legacy = new URL(calls[1].url, 'http://local.test')
+  assert.equal(dated.searchParams.get('dueFrom'), '2026-10-01'); assert.equal(dated.searchParams.get('dueTo'), '2026-10-02'); assert.equal(dated.searchParams.get('sort'), 'DUE_DATE_ASC')
+  assert.equal(legacy.searchParams.get('undated'), 'true'); assert.equal(legacy.searchParams.has('dueFrom'), false); assert.ok(calls.every(call => call.init.cache === 'no-store'))
 })

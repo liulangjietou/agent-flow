@@ -22920,6 +22920,54 @@
               ]
             },
             "description": "省略为全部；UNASSIGNED 为未固定出款账户；否则使用受控选项返回的内部筛选键。"
+          },
+          {
+            "name": "dueFrom",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?!0000)[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            "description": "付款到期日下界，含当日；不可与 undated 同用。"
+          },
+          {
+            "name": "dueTo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "pattern": "^(?!0000)[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+            },
+            "description": "付款到期日上界，含当日；不可早于 dueFrom。"
+          },
+          {
+            "name": "undated",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "enum": [
+                true
+              ]
+            },
+            "description": "仅查询历史未设置到期日；只接受 true，与日期范围互斥。"
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "AUTHORIZED_AT_DESC",
+                "DUE_DATE_ASC"
+              ],
+              "default": "AUTHORIZED_AT_DESC"
+            },
+            "description": "默认最近授权优先；到期日升序时历史空值在末尾，同日授权时间和编号降序。游标须属于同一范围。"
           }
         ]
       }

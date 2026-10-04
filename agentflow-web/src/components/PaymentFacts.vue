@@ -15,7 +15,7 @@ const date = (value: string) => new Date(value).toLocaleString('zh-CN')
     <p v-if="payment.operation?.disputed" class="payment-warning" role="alert">资金结果存在冲突。下方保留此前确认的回执，需完成对账后再处理。</p>
     <p v-if="payment.operation?.status === 'REVERSED'" class="payment-warning" role="alert">银行报告款项已退回，需要财务核对后续处理。</p>
     <p v-if="payment.retirement" class="payment-warning">原付款已安全结束：{{ retirementBasisLabels[payment.retirement.basis] }}。由 {{ payment.retirement.retiredBy }} 于 {{ date(payment.retirement.retiredAt) }} 确认，执行证据版本 {{ payment.retirement.operationVersion }}。重新付款须另行授权。</p>
-    <dl><div><dt>授权到期</dt><dd>{{ date(payment.expiresAt) }}</dd></div><div><dt>原授权号</dt><dd>{{ payment.id }}</dd></div><div v-if="payment.operation?.paymentReference"><dt>资金交易号</dt><dd>{{ payment.operation.paymentReference }}</dd></div><div v-if="payment.operation?.receiptReference"><dt>{{ payment.operation.observedStatus === 'REVERSED' ? '退回回单' : '银行回单' }}</dt><dd>{{ payment.operation.receiptReference }}<span v-if="payment.operation.completedAt"> · {{ date(payment.operation.completedAt) }}</span></dd></div></dl>
+    <dl><div><dt>付款到期日</dt><dd>{{ payment.dueDate ?? '历史未设置' }}</dd></div><div><dt>授权执行截止</dt><dd>{{ date(payment.expiresAt) }}</dd></div><div><dt>原授权号</dt><dd>{{ payment.id }}</dd></div><div v-if="payment.operation?.paymentReference"><dt>资金交易号</dt><dd>{{ payment.operation.paymentReference }}</dd></div><div v-if="payment.operation?.receiptReference"><dt>{{ payment.operation.observedStatus === 'REVERSED' ? '退回回单' : '银行回单' }}</dt><dd>{{ payment.operation.receiptReference }}<span v-if="payment.operation.completedAt"> · {{ date(payment.operation.completedAt) }}</span></dd></div></dl>
   </div>
 </template>
 

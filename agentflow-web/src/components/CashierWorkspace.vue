@@ -8,16 +8,19 @@ const props = defineProps<{ scopeKey: string; refreshVersion: number; locked?: b
 const items = ref<CashierPaymentView[]>([]), nextBeforeId = ref<string | null>(null), totalCount = ref<number | null>(null)
 const selected = ref(''), loading = ref(false), saving = ref(false), error = ref('')
 const legalEntityId = ref(''), debitAccount = ref(''), legalEntities = ref<{ id: string; name: string }[]>([]), accountOptions = ref<CashierAccountOption[]>([])
+const dueFrom = ref(''), dueTo = ref(''), undated = ref(false), sort = ref('AUTHORIZED_AT_DESC')
 const nextAccountKey = ref<string | null>(null), optionsLoading = ref(false), optionsError = ref('')
 let epoch = 0, controller: AbortController | null = null, optionsEpoch = 0, optionsController: AbortController | null = null
 function stop() { epoch++; controller?.abort(); controller = null }
 function stopOptions() { optionsEpoch++; optionsController?.abort(); optionsController = null }
 async function load(append = false) {
   if (!props.scopeKey || saving.value || append && (!nextBeforeId.value || loading.value)) return
-  const filter = cashierFilter(legalEntityId.value, debitAccount.value)
   stop(); const current = epoch, request = new AbortController(); controller = request
   const before = append ? nextBeforeId.value! : undefined; loading.value = true; error.value = ''
   if (!append) { items.value = []; nextBeforeId.value = null; totalCount.value = null }
+  let filter: ReturnType<typeof cashierFilter>
+  try { filter = cashierFilter(legalEntityId.value, debitAccount.value, dueFrom.value, dueTo.value, undated.value, sort.value) }
+  catch (cause) { error.value = paymentError(cause); items.value = []; nextBeforeId.value = null; totalCount.value = null; selected.value = ''; loading.value = false; return }
   const timeout = setTimeout(() => { if (current === epoch) { stop(); loading.value = false; items.value = []; totalCount.value = null; nextBeforeId.value = null; selected.value = ''; error.value = '付款目录读取超时，请重试。' } }, 12_000)
   try {
     const result = await api.cashierPayments(before, request.signal, filter); if (current !== epoch) return
@@ -49,14 +52,30 @@ function changeAccount(value: string) {
   if (saving.value || props.locked || value && value !== 'UNASSIGNED' && !accountOptions.value.some(item => item.key === value)) return
   debitAccount.value = value; selected.value = ''; void load()
 }
+function changeDueDate(bound: 'from' | 'to', value: string) {
+  if (saving.value || props.locked) return
+  if (bound === 'from') dueFrom.value = value; else dueTo.value = value
+  undated.value = false; selected.value = ''; void load()
+}
+function changeUndated(value: boolean) {
+  if (saving.value || props.locked) return
+  undated.value = value; if (value) { dueFrom.value = ''; dueTo.value = '' }
+  selected.value = ''; void load()
+}
+function changeSort(value: string) {
+  if (saving.value || props.locked) return
+  sort.value = value; selected.value = ''; void load()
+}
 function clearFilters() {
   if (saving.value || props.locked) return
+  dueFrom.value = ''; dueTo.value = ''; undated.value = false; sort.value = 'AUTHORIZED_AT_DESC'
   legalEntityId.value = ''; debitAccount.value = ''; selected.value = ''; void load(); void loadOptions()
 }
 function entityName(id: string) { return legalEntities.value.find(item => item.id === id)?.name ?? '法人名称暂不可用' }
 watch(() => JSON.stringify([props.scopeKey, props.refreshVersion]), () => {
   stop(); stopOptions(); items.value = []; nextBeforeId.value = null; totalCount.value = null; selected.value = ''; saving.value = false; loading.value = false; error.value = ''
   legalEntityId.value = ''; debitAccount.value = ''; legalEntities.value = []; accountOptions.value = []; nextAccountKey.value = null; optionsLoading.value = false; optionsError.value = ''
+  dueFrom.value = ''; dueTo.value = ''; undated.value = false; sort.value = 'AUTHORIZED_AT_DESC'
   if (props.scopeKey) { void load(); void loadOptions() }
 }, { immediate: true, flush: 'sync' })
 // 消息入口可定位第一页之外的原付款，详情仍通过原出纳接口复核当前范围。
@@ -70,7 +89,11 @@ onUnmounted(() => { stop(); stopOptions() })
     <div class="cashier-filters" aria-label="付款目录筛选">
       <label>法人<select aria-label="法人筛选" :value="legalEntityId" :disabled="saving || locked || !legalEntities.length" @change="changeLegalEntity(($event.target as HTMLSelectElement).value)"><option value="">全部任职法人</option><option v-for="entity in legalEntities" :key="entity.id" :value="entity.id">{{ entity.name }}</option></select></label>
       <label>出款账户<select aria-label="出款账户筛选" :value="debitAccount" :disabled="saving || locked" @change="changeAccount(($event.target as HTMLSelectElement).value)"><option value="">全部账户</option><option value="UNASSIGNED">未固定出款账户</option><option v-for="account in accountOptions" :key="account.key" :value="account.key">{{ entityName(account.legalEntityId) }} · {{ account.displayName }} {{ account.maskedAccount }} · {{ account.currency }}</option></select></label>
-      <button type="button" class="quiet" :disabled="saving || locked || (!legalEntityId && !debitAccount)" @click="clearFilters">清除筛选</button>
+      <label>付款到期日起<input aria-label="付款到期日起" type="date" min="0001-01-01" max="9999-12-31" :value="dueFrom" :disabled="saving || locked || undated" @change="changeDueDate('from', ($event.target as HTMLInputElement).value)" /></label>
+      <label>付款到期日止<input aria-label="付款到期日止" type="date" min="0001-01-01" max="9999-12-31" :value="dueTo" :disabled="saving || locked || undated" @change="changeDueDate('to', ($event.target as HTMLInputElement).value)" /></label>
+      <label>排序<select aria-label="付款排序" :value="sort" :disabled="saving || locked" @change="changeSort(($event.target as HTMLSelectElement).value)"><option value="AUTHORIZED_AT_DESC">最近授权优先</option><option value="DUE_DATE_ASC">最早付款到期日优先</option></select></label>
+      <label class="undated-filter"><input type="checkbox" aria-label="仅历史未设置到期日" :checked="undated" :disabled="saving || locked" @change="changeUndated(($event.target as HTMLInputElement).checked)" />仅历史未设置到期日</label>
+      <button type="button" class="quiet" :disabled="saving || locked || (!legalEntityId && !debitAccount && !dueFrom && !dueTo && !undated && sort === 'AUTHORIZED_AT_DESC')" @click="clearFilters">清除筛选</button>
       <button v-if="nextAccountKey" type="button" class="quiet" :disabled="optionsLoading || saving || locked" @click="loadOptions(true)">加载更多账户</button>
       <button v-if="optionsError" type="button" class="quiet" :disabled="optionsLoading || saving || locked" @click="clearFilters">重新读取筛选选项</button>
     </div>
@@ -82,7 +105,7 @@ onUnmounted(() => { stop(); stopOptions() })
     <div class="cashier-layout"><section class="cashier-list" aria-label="当前法人付款目录"><p class="cashier-note">仅显示你当前任职法人内的付款。选择一笔后核对收款人、金额和期限。</p>
       <p v-if="!loading && !items.length && !error" class="cashier-empty">当前筛选下没有付款授权。</p>
       <button v-for="item in items" :key="item.payment.id" type="button" class="cashier-item" :class="{ selected: selected === item.payment.id }" :aria-pressed="selected === item.payment.id" :disabled="saving || locked" @click="selected = item.payment.id">
-        <span>{{ item.payment.purpose === 'EMPLOYEE_ADVANCE' ? '员工借款' : '费用报销' }} · {{ item.payment.employeeId }}</span><strong>{{ item.payment.amount.currency }} {{ item.payment.amount.value }}</strong><small>{{ item.payment.operation ? paymentOperationLabels[item.payment.operation.status] : authorizationLabels[item.payment.status] }}</small><small>第 {{ item.payment.roundNo }} 轮 · {{ new Date(item.payment.authorizedAt).toLocaleString('zh-CN') }}</small><small>{{ entityName(item.payment.legalEntityId) }} · {{ item.debitAccount ? item.debitAccount.displayName + ' ' + item.debitAccount.maskedAccount : '未固定出款账户' }}</small>
+        <span>{{ item.payment.purpose === 'EMPLOYEE_ADVANCE' ? '员工借款' : '费用报销' }} · {{ item.payment.employeeId }}</span><strong>{{ item.payment.amount.currency }} {{ item.payment.amount.value }}</strong><small>{{ item.payment.operation ? paymentOperationLabels[item.payment.operation.status] : authorizationLabels[item.payment.status] }}</small><small>付款到期日 · {{ item.payment.dueDate ?? '历史未设置' }}</small><small>第 {{ item.payment.roundNo }} 轮 · {{ new Date(item.payment.authorizedAt).toLocaleString('zh-CN') }}</small><small>{{ entityName(item.payment.legalEntityId) }} · {{ item.debitAccount ? item.debitAccount.displayName + ' ' + item.debitAccount.maskedAccount : '未固定出款账户' }}</small>
       </button>
       <p v-if="loading" role="status" class="cashier-note">正在读取当前范围…</p><button v-if="nextBeforeId" type="button" class="quiet cashier-more" :disabled="loading || saving || locked" @click="load(true)">加载更多</button>
     </section>
@@ -93,6 +116,7 @@ onUnmounted(() => { stop(); stopOptions() })
 </template>
 
 <style scoped>
+.cashier-filters input[type=date]{width:100%;min-height:42px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:white;color:#203d35}.cashier-filters .undated-filter{display:flex;align-items:center;gap:8px;min-height:42px;flex:0 1 auto}
 .cashier-filters{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin:20px 0 10px}.cashier-filters label{display:grid;gap:7px;flex:1 1 230px;min-width:0;font-size:12px;color:#526861}.cashier-filters select{width:100%;min-width:0;min-height:42px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:white;color:#203d35}.cashier-filters button{min-height:42px}.cashier-total{font-size:13px;color:#315e51;font-variant-numeric:tabular-nums;margin:0 0 15px}
 
 .cashier-workspace{padding:32px 40px}.cashier-layout{display:grid;grid-template-columns:minmax(260px,330px) minmax(0,1fr);gap:22px;align-items:start}.cashier-list{border:1px solid var(--line);border-radius:12px;background:white;padding:15px;min-width:0}.cashier-note,.cashier-empty{font-size:12px;line-height:1.8;color:#657974;margin:2px 2px 14px}.cashier-item{display:grid;gap:8px;width:100%;text-align:left;border:1px solid var(--line);border-radius:9px;padding:16px;margin-top:10px;background:#fafcfb}.cashier-item.selected{border-color:#1c8170;box-shadow:inset 3px 0 #1c8170;background:#f0f8f5}.cashier-item span{font-size:12px}.cashier-item strong{font-size:21px;font-variant-numeric:tabular-nums}.cashier-item small{font-size:11px;color:#657974;overflow-wrap:anywhere}.cashier-placeholder{padding:65px 28px;border:1px dashed #b6c8c2;border-radius:12px;text-align:center}.cashier-placeholder>span{display:block;font-size:32px;color:#3e8877}.cashier-placeholder h3{font-size:17px}.cashier-placeholder p{font-size:13px;line-height:1.8;color:#657974}.cashier-error{color:#a04432;font-size:13px}.cashier-more{margin-top:12px;min-height:40px}@media(max-width:1000px){.cashier-workspace{padding:24px}.cashier-layout{grid-template-columns:1fr}.cashier-list{max-height:400px;overflow:auto}.cashier-placeholder{padding:35px 20px}}@media(max-width:600px){.cashier-workspace{padding:16px}}

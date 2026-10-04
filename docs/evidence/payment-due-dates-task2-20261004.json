@@ -1,0 +1,283 @@
+{
+  "status": "TASK2_LOCAL_VERIFIED_TASK3_PENDING",
+  "baseCommit": "76224071792dddca51b254d0c556840d3022c228",
+  "artifactDirectory": "/fyoung/tmp/agentflow-remaining-20260928/f16-task2-verified",
+  "testCount": 184,
+  "reports": [
+    {
+      "module": "agentflow-domain",
+      "name": "io.agentflow.notification.PaymentNoticeTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-domain",
+      "name": "io.agentflow.finance.PaymentAuthorizationTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-domain",
+      "name": "io.agentflow.finance.PaymentOperationTest",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-domain",
+      "name": "io.agentflow.finance.PaymentExecutionRequestTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-domain",
+      "name": "io.agentflow.finance.PaymentCommandTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-domain",
+      "name": "io.agentflow.finance.PaymentPayeeReviewTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-domain",
+      "name": "io.agentflow.finance.PaymentBatchTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-domain",
+      "name": "io.agentflow.finance.PaymentAccountsPortTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.expense.AdvanceRepaymentIntegrationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.api.OpenApiContractTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.CashierPaymentFiltersTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.PaymentBatchMigrationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.PaymentMigrationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.PaymentDisputeMigrationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.PaymentOperationIntegrationTest",
+      "tests": 57,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.PaymentPersistenceTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.PaymentDueDateMigrationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.PaymentScopeMigrationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.callback.PaymentCallbackStateTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.callback.PaymentCallbackWorkerTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.callback.PaymentCallbackVerifierTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.callback.PaymentCallbackMigrationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.PaymentPayeeReviewMigrationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.CashierPaymentQueryTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.PaymentRetirementMigrationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.PaymentExecutionRequestMigrationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.PaymentVoucherMigrationTest",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "module": "agentflow-server",
+      "name": "io.agentflow.finance.PaymentAccessTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentController.java": "4e5ad68a48e33079a4a08f3fc4af82aa844e5f2f7f33be98b9770eace0f1448a",
+    "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java": "901d45a05103bfa840c03a4d0249435ecfbe0d66113015f1369c3dcbdd2f647c",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcPaymentAuthorizationRepository.java": "7b24ef6fee3f091fc152fbe4b953f265817c812e8a2e81f27653b492b2e8a020",
+    "agentflow-server/src/main/resources/api/openapi.json": "f4b58e88da52ec2703d62664f86be93cd55ad63b37d0a7b5553b46a09c7dae11",
+    "agentflow-server/src/test/java/io/agentflow/finance/CashierPaymentFiltersTest.java": "6d20951da92a3a7edccf039683e9d476feb96b17c68dbe96aa9756d728afbe3a",
+    "agentflow-server/src/test/java/io/agentflow/finance/PaymentPersistenceTest.java": "edc1028842aaa0ba2cbee5a72f093a4c01330635a637a79c0366aa21c75b4e84",
+    "agentflow-web/scripts/check-openapi.mjs": "e7081d3b00b757f46fdc42ae151bb16f1bdf9f95562e7a98c0b3f1d35d3514b2",
+    "agentflow-web/scripts/test-requests.mjs": "a3773726ae109dbf0f58b10d04fc81e3cf4ad3369362e6f90c2be764bf68f9c2",
+    "agentflow-web/src/api.ts": "8954006846eb4647d580b947fa83d3d8ced2846c2d1c3f0e438f1c788ba8b8ac",
+    "agentflow-web/src/cashierFilters.ts": "b8b65b15514d144464607a129ac9878b39ae14a795169ff2570e7836c8502125",
+    "agentflow-web/src/components/CashierWorkspace.vue": "6adaafe4fd8f6056efe9d28a2aaabe387c0c32b923fb02f267de23707699cc96",
+    "agentflow-web/src/components/FinancePaymentStatus.vue": "605710f877eb79968e15b0701ca8e3af0b17c2248ac82ac7974e6ce2a76c8309",
+    "agentflow-web/src/components/PaymentFacts.vue": "1bb37d3e1328f1240ca22b43b2fda8b869bc9bd38b81a71b727b39df4f5d42ef",
+    "agentflow-web/src/payments.ts": "ec2c7c296e71324c1307b498db578361ddad16155a9e2418b9051a96d5322a25",
+    "agentflow-web/tests/cashier-filters.test.mjs": "84be976b8c805ebc67cb1d803638b7d6d9f3ba01924cc5a39e7ffdc767525c9b",
+    "agentflow-web/tests/payment-batches.test.mjs": "7199a6b04fb53f033697a64a422052f855282da843679e76bca9a9cdb248f903",
+    "agentflow-web/tests/payment-notifications.test.mjs": "4b131d2806c3ed0d627a45eaa8a26de9bf6a655d2096b12731ca90bb608a6132",
+    "agentflow-web/tests/payments.test.mjs": "c88cb3e8669bed65b48726c96cc6a4ba9b3743f6f7188e0d8d9adfbd9d48c838",
+    "agentflow-server/src/test/java/io/agentflow/finance/CashierPaymentQueryTest.java": "93c267010aba933a2a031a0a0441b146bc0be494c122f7062a3ef1bd7cead82e"
+  },
+  "frontendTests": 62,
+  "frontendArtifactDirectory": "/fyoung/tmp/agentflow-remaining-20260928/f16-task2-web-verified",
+  "typecheck": "PASS",
+  "build": "PASS",
+  "openApi": {
+    "result": "PASS",
+    "operations": 392,
+    "schemas": 841,
+    "requestExamples": 129
+  },
+  "javaEvidence": "184 unique scoped tests; the final 26-test run replaces overlapping reports after correcting the test-only expected HTTP status from 422 to the existing contract 400. No product change after the first scoped run.",
+  "checks": [
+    "inclusive one-sided date bounds and null-only filter",
+    "stable same-date and null-tail cursor ordering",
+    "same filtered total on every page and scoped cursor",
+    "duplicate query parameter rejected at HTTP boundary",
+    "explicit authorization date, cancellation reset and original-key recovery",
+    "late page result discarded after date or sorting changes"
+  ],
+  "browserVerified": false,
+  "postgresqlVerified": false,
+  "runtimeVerified": false
+}

@@ -17,7 +17,7 @@ globalThis.localStorage = { getItem: () => 'test-token' }
 const message = () => ({ id: messageId, applicationId, title: '付款执行需核对', businessNo: 'AP-01', kind: 'PAYMENT_ATTENTION', actor: 'system:payments', roundNo: 2, createdAt: when, readAt: null, content: '结果未知，请查询原交易。' })
 const payment = () => ({ id: paymentId, applicationId, businessId: otherId, roundNo: 2, applicationVersion: 9, businessVersion: 3,
   version: 2, status: 'EXECUTION_REGISTERED', purpose: 'EMPLOYEE_ADVANCE', legalEntityId: otherId, employeeId: 'alice', amount: { value: '100.00', currency: 'CNY' },
-  maskedPayeeAccount: '****1234', authorizedBy: 'finance', authorizedAt: when, expiresAt: '2026-10-03T13:00:00Z', executedBy: 'cashier', request: null, retirement: null,
+  maskedPayeeAccount: '****1234', authorizedBy: 'finance', authorizedAt: when, expiresAt: '2026-10-03T13:00:00Z', dueDate: null, executedBy: 'cashier', request: null, retirement: null,
   operation: { version: 4, status: 'UNKNOWN', updatedAt: when, observedStatus: null, paymentReference: null, receiptReference: null, completedAt: null, disputed: false, issue: 'CONNECTION' } })
 const target = () => ({ messageId, paymentId, view: 'CASHIER_PAYMENT', applicationId, roundNo: 2, payment: payment() })
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })
@@ -30,7 +30,7 @@ function mount(Component = Panel, input = {}) {
 
 test('登记前异常可读取原授权，实际模板明确显示尚未发送付款', async () => {
   for (const [status, issue, authorizationStatus] of [['QUEUED', 'TIMEOUT', 'AUTHORIZED'], ['BLOCKED', 'ACCOUNT_CHANGED', 'AUTHORIZED'], ['VOIDED', 'SOURCE_CHANGED', 'VOIDED'], ['EXPIRED', 'AUTHORIZATION_EXPIRED', 'EXPIRED']]) {
-    const value = target(); Object.assign(value.payment, { status: authorizationStatus, version: authorizationStatus === 'AUTHORIZED' ? 1 : 2, executedBy: null, operation: null,
+    const value = target(); Object.assign(value.payment, { status: authorizationStatus, version: authorizationStatus === 'AUTHORIZED' ? 1 : 2, dueDate: null, executedBy: null, operation: null,
       request: { id: otherId, version: 3, status, cashier: 'cashier', createdAt: when, updatedAt: when, issue } })
     api.paymentNotificationTarget = async () => value
     const p = mount()
@@ -127,7 +127,7 @@ test('实际主页面导航保留原付款或历史轮次，工作区角色和�
 })
 
 test('原出纳工作台可以定位第一页之外的付款，身份清空时删除旧选择', async () => {
-  api.cashierPayments = async () => ({ items: [], nextBeforeId: null })
+  api.cashierPayments = async () => ({ items: [], nextBeforeId: null, totalCount: 0 })
   const p = mount(Workspace, { initialPaymentId: paymentId })
   try {
     await settle(); assert.equal(p.state.items.length, 0); assert.equal(p.state.selected, paymentId)

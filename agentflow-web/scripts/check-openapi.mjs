@@ -75,7 +75,7 @@ validate({ $ref: '#/components/schemas/CashierPaymentAccountOption' }, cashierAc
 assert.equal(validator({ $ref: '#/components/schemas/CashierPaymentAccountOption' })({ ...cashierAccount, reference: 'private-account' }), false)
 assert.equal(validator({ $ref: '#/components/schemas/CashierPaymentAccountOption' })({ ...cashierAccount, maskedAccount: '1234567890123456' }), false)
 validate({ $ref: '#/components/schemas/CashierPaymentFilterOptions' }, { legalEntities: [], accounts: [], nextAfterAccountKey: null })
-assert.deepEqual(spec.paths['/api/v1/cashier/payments'].get.parameters.map(parameter => parameter.name), ['limit', 'beforeId', 'legalEntityId', 'debitAccount'])
+assert.deepEqual(spec.paths['/api/v1/cashier/payments'].get.parameters.map(parameter => parameter.name), ['limit', 'beforeId', 'legalEntityId', 'debitAccount', 'dueFrom', 'dueTo', 'undated', 'sort'])
 // 组织启用后动态规则尚未解析本轮任职；静态目录仍须具有实际可用成员。
 const assigneeSchema = { $ref: '#/components/schemas/AssigneeOption' }
 validate(assigneeSchema, { rule: 'role:ORG_SUPERVISOR_1', label: '本次任职一级主管', memberCount: 0, contextual: true })
