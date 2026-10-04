@@ -112,6 +112,7 @@ import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Act
 import type { PendingWrite } from './pendingWrites.js'
 import { rememberDraftRun, type DraftAssistReceipt } from './draftAssist'
 import { acknowledgeExplanation, type ExplanationReceipt } from './precheckExplanation'
+import { acknowledgeExpenseAssist, type ExpenseAssistReceipt } from './expenseDraftAssist'
 import { acknowledgeExtraction, extractionDrafts, type ExtractionReceipt } from './invoiceExtraction'
 
 type NodeType = 'START' | 'COPY' | 'TIMER_WAIT' | 'EVENT_WAIT' | 'SERVICE_TASK' | 'SUB_PROCESS' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
@@ -1252,6 +1253,9 @@ async function recoverOperation(id: string) {
       } else if (/^\/expense-requests\/[^/?]+\/close$/.test(request.path)) {
         notice.value = '原额度关闭结果已确认，请核对最新额度状态。'
         templateRefresh.value++
+      } else if (/^\/expense-reports\/[^/?]+\/draft-assists(?:\/[^/?]+\/(?:confirm|dismiss))?$/.test(request.path)) {
+        acknowledgeExpenseAssist(actorScope.value, request.path, result as ExpenseAssistReceipt)
+        notice.value = '原填报建议操作已确认，请查看同一条记录，再明确选择填入草稿。'
       } else if (/^\/expense-reports\/[^/?]+\/precheck-explanations(?:\/[^/?]+\/review)?$/.test(request.path)) {
         acknowledgeExplanation(actorScope.value, request.path, result as ExplanationReceipt)
         notice.value = '原预检解释操作已确认，请核对同一条记录；费用金额、检查结论和审批状态保持不变。'

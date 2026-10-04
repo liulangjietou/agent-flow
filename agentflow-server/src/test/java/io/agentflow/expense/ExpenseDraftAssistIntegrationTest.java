@@ -128,6 +128,9 @@ class ExpenseDraftAssistIntegrationTest {
         assertThat(jdbc.queryForMap("SELECT * FROM expense_report WHERE id=?", report.id().toString())).isEqualTo(beforeReport);
         assertThat(read(report, "?page=0&pageSize=1", "alice", 200).path("items")).hasSize(1);
         assertThat(read(report, "?page=1&pageSize=1", "alice", 200).path("items")).isEmpty();
+        var editorPage = read(report, "?page=0&pageSize=20", "alice", 200);
+        assertThat(editorPage.path("pageSize").asInt()).isEqualTo(20);
+        assertThat(editorPage.path("items")).hasSize(1);
     }
 
     @Test void otherUsersAdminsAndTenantsCannotPreviewReadOrReplayAnotherApplicantsData() throws Exception {
