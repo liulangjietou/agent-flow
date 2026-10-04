@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T05:12:37.502899+00:00",
+  "recordedAt": "2026-10-04T05:34:27.871296+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1028,7 +1028,7 @@
           ]
         }
       ],
-      "observed": "固定来源、授权、原件及签署人模型，单次发送与查询恢复状态机、回执修订冲突和独立结果文件约束已实现；38 个领域及服务端序列化范围用例通过。恢复首次发送状态的授权截止遗漏已先复现再修复。持久仓储、可信签署及验真适配器、当前权限编排、后台执行、接口与页面尚未接通，继续 OPEN。",
+      "observed": "固定请求、单次发送状态机及 V111 持久仓储已实现；72 个领域、序列化、JDBC、非空升级与数据库恢复用例和 6 个备份工具用例通过。216 张旧表、8 条旧记录与 2 份原件元数据保持；并发领取、迟到回执、部分文件保存及独立 H2 恢复通过。可信签署及验真适配器、当前权限编排、实际文件传输、后台、接口和页面仍待接通，继续 OPEN。",
       "references": [
         {
           "path": "docs/product-goal-gap-audit.md",
@@ -1045,6 +1045,10 @@
         {
           "path": "docs/evidence/electronic-signature-domain-20261004.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/electronic-signature-persistence-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "固定文件与签署版本、显式授权、异步状态、可验证回执、重复回调和未知结果恢复；保留原件、授权及签署结果，完成本地受控协议验收。",
@@ -1053,6 +1057,11 @@
         "status": "DOMAIN_AND_SERIALIZATION_VERIFIED_NO_ENTRYPOINT",
         "implementationCommit": "ec0eff523b17745b71d039cf51221f7335947fdf",
         "evidence": "docs/evidence/electronic-signature-domain-20261004.json"
+      },
+      "persistenceStage": {
+        "status": "PERSISTENCE_AND_LOCAL_DATABASE_RECOVERY_VERIFIED_NO_PUBLIC_ENTRYPOINT",
+        "implementationCommit": "956dc61b45a1811443f83cba94fd4faf976ff0b3",
+        "evidence": "docs/evidence/electronic-signature-persistence-20261004.json"
       }
     },
     {
@@ -3753,10 +3762,10 @@
   },
   "latestProgress": {
     "taskId": "I02",
-    "status": "DOMAIN_AND_SERIALIZATION_VERIFIED_NO_ENTRYPOINT",
-    "recordedAt": "2026-10-04T05:12:37.502899+00:00",
-    "sourceCommit": "ec0eff523b17745b71d039cf51221f7335947fdf",
-    "evidence": "docs/evidence/electronic-signature-domain-20261004.json",
+    "status": "PERSISTENCE_AND_LOCAL_DATABASE_RECOVERY_VERIFIED_NO_PUBLIC_ENTRYPOINT",
+    "recordedAt": "2026-10-04T05:34:27.871296+00:00",
+    "sourceCommit": "956dc61b45a1811443f83cba94fd4faf976ff0b3",
+    "evidence": "docs/evidence/electronic-signature-persistence-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
