@@ -66,6 +66,7 @@ const labels: Record<string, string> = {
   approvalMode: '审批方式', 'properties.approvalMode': '审批方式',
   approvalPercentage: '通过比例（%）', 'properties.approvalPercentage': '通过比例（%）',
   expenseSelfApproval: '费用自审批处理', 'properties.expenseSelfApproval': '费用自审批处理',
+  expenseDuplicateApproval: '相邻重复审批', 'properties.expenseDuplicateApproval': '相邻重复审批',
   expenseStage: '费用审批职责', 'properties.expenseStage': '费用审批职责',
   excludeApplicant: '禁止申请人办理', 'properties.excludeApplicant': '禁止申请人办理',
   differentApproverFrom: '排除前序步骤批准人', 'properties.differentApproverFrom': '排除前序步骤批准人',
@@ -91,6 +92,7 @@ export function comparisonValue(value: unknown, property = ''): string {
   if (typeof value === 'boolean') return value ? '是' : '否'
   if (typeof value === 'string') {
     if (property.endsWith('expenseSelfApproval')) return value === 'ESCALATE_SUPERVISOR' ? '申请人转本次任职的直属主管' : '待修正：' + value
+    if (property.endsWith('expenseDuplicateApproval')) return value === 'AUTO_PASS_ADJACENT' ? '自动通过相邻同人业务审批' : '待修正：' + value
     if (property.endsWith('excludeApplicant')) return value === 'true' ? '启用' : value === 'false' ? '关闭' : '待修正：' + value
     if (property.endsWith('differentApproverFrom')) return value.split(',').join('、')
     if (property.endsWith('approvalMode')) return approvalPolicyLabel(value)

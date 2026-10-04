@@ -12,6 +12,7 @@ const values = ref<Record<string, unknown>>({})
 const rawValues = ref('{}')
 const inputError = ref('')
 const nodeName = (id: string) => props.graph.nodes.find(node => node.id === id)?.name ?? id
+const duplicateApproval = computed(() => props.graph.nodes.some(node => node.type === 'START' && node.properties.expenseDuplicateApproval === 'AUTO_PASS_ADJACENT'))
 const issues = computed(() => preview.definitionErrors.map(simulationIssue))
 const outcomes = { MATCHED: '条件命中 · 已选择', NOT_MATCHED: '条件不匹配', SKIPPED: '前序已命中 · 未计算', DEFAULT_SELECTED: '使用默认分支', DEFAULT_SKIPPED: '默认分支未启用' }
 function canLocate(id: string) { return props.graph.nodes.some(node => node.id === id) || props.graph.edges.some(edge => edge.id === id) }
@@ -35,6 +36,7 @@ onBeforeUnmount(() => { preview.clear(); emit('result', null) })
 <template>
   <section class="panel simulation-panel" aria-labelledby="simulation-title">
     <div class="simulation-heading"><div><p class="eyebrow">DESIGN / SIMULATION</p><h3 id="simulation-title">模拟运行</h3><p>按当前画布和表单试算，包括未保存的修改。仅填写测试数据，不会创建申请或执行审批。</p></div><button class="quiet" aria-label="关闭模拟面板" @click="emit('close')">×</button></div>
+    <p v-if="duplicateApproval" class="simulation-help">模拟展示经过的节点，包含可能自动通过的业务节点。实际办理时才根据本轮候选、实际审批人和职责分离判断相邻重复审批，不以模拟路径代替批准事实。</p>
     <div class="simulation-layout">
       <form class="simulation-input" @submit.prevent="run"><h4>测试数据</h4><FormFields v-if="formSchema" v-model="values" :schema="formSchema" :errors="preview.fieldErrors" :disabled="locked" /><template v-else><label for="simulation-json">此流程尚未绑定表单，请输入字段值</label><textarea id="simulation-json" v-model="rawValues" :disabled="locked" rows="6" spellcheck="false" placeholder='{"amount":"6000"}' /><p class="simulation-help">使用 JSON 对象；小数和大整数请写成字符串以保留精度，例如 {"amount":"6000.50"}。</p></template><p v-if="inputError" role="alert" class="inline-error">{{ inputError }}</p><button class="primary" :disabled="locked || preview.loading">{{ preview.loading ? '正在试算…' : '运行模拟' }}</button></form>
       <div class="simulation-output" aria-live="polite" :aria-busy="preview.loading">

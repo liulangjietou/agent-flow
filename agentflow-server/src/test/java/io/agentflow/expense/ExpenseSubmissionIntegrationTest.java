@@ -55,7 +55,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * 发布定义、认证 HTTP、实际引擎、资源台账与合成财务 HTTP 联合验证正式提交及审批控制。
  * @author owlzhangfq@gmail.com
  */
-@SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true",
+@SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true", "agentflow.timers.enabled=false",
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.reversal-worker-enabled=false", "agentflow.vouchers.reversal-execution-worker-enabled=false",
         "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false", "agentflow.payments.payee-review-worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.expenses.payment-return-worker-enabled=false",
@@ -261,6 +261,8 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired io.agentflow.definition.DefinitionDraftRepository definitionRecords;
     @Autowired io.agentflow.organization.OrganizationRepository organizationRecords;
     @MockitoSpyBean io.agentflow.approval.process.JdbcTaskAuditAdapter taskAudit;
+    @Autowired io.agentflow.approval.process.TimerWaitService timerWaits;
+    @Autowired org.flowable.engine.ManagementService timerJobs;
 
     private final List<EmployeeAdvance> fifoFixtures = new ArrayList<>();
 
@@ -348,6 +350,107 @@ class ExpenseSubmissionIntegrationTest {
                 Integer.class, report.applicationId().toString())).isZero();
     }
 
+    @Test
+    void adjacentExpenseApprovalUsesActualProxyActorAndKeepsDifferentNextApproverManual() throws Exception {
+        duplicateExpenseTemplate(true);
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        var application = app(report);
+        var scope = definitionRecords.findPublished("demo", application.processKey(), application.definitionVersion()).orElseThrow();
+        var proxy = approvalProxies.create(admin, scope.id(), manager, person("bob", true), Instant.now(),
+                Instant.now().plusSeconds(3600), "业务节点代理实际人员验证");
+        var source = task(report);
+        ok(send("/api/v1/tasks/" + source.getId() + "/actions", "bob",
+                Map.of("action", "APPROVE", "proxyId", proxy.id(), "expectedVersion", application.version())), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("department");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE'",
+                Integer.class, report.applicationId().toString())).isZero();
+        var audit = json.read(jdbc.queryForObject("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='APPROVE'",
+                String.class, report.applicationId().toString()), JsonNode.class);
+        assertThat(audit.path("actor").asText()).isEqualTo("bob");
+        assertThat(audit.at("/proxyUse/proxyId").asText()).isEqualTo(proxy.id().toString());
+    }
+
+    @Test
+    void adjacentExpenseApprovalResumesOriginalTraceAfterNativeTimerWait() throws Exception {
+        duplicateExpenseTemplate(true);
+        var nodes = new ArrayList<>(expenseTemplateGraph.nodes());
+        nodes.add(new Node("duplicateWait", "审批后等待", NodeType.TIMER_WAIT, Map.of("timerDelaySeconds", "60")));
+        var edges = new ArrayList<>(expenseTemplateGraph.edges());
+        var original = edges.stream().filter(edge -> edge.source().equals("supervisor")).findFirst().orElseThrow();
+        edges.replaceAll(edge -> edge.id().equals(original.id()) ? new Edge(edge.id(), "supervisor", "duplicateWait", "") : edge);
+        edges.add(new Edge("duplicateWaitExit", "duplicateWait", original.target(), ""));
+        expenseTemplateGraph = new Graph(nodes, edges, expenseTemplateGraph.conditionLanguageVersion());
+        var report = fixture(false).report(); submit(report); budgetWorker.poll(); var source = task(report);
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(tasks(report)).isEmpty();
+        var job = timerJobs.createTimerJobQuery().processInstanceId(source.getProcessInstanceId()).singleResult();
+        assertThat(job).isNotNull(); long waitingVersion = app(report).version();
+        assertThat(timerWaits.advance(job.getId(), job.getDuedate().toInstant().minusMillis(1))).isFalse();
+        assertThat(timerWaits.advance(job.getId(), job.getDuedate().toInstant())).isTrue();
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+        assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+        assertThat(timerWaits.advance(job.getId(), job.getDuedate().toInstant())).isFalse();
+        var audit = json.read(jdbc.queryForObject("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE'",
+                String.class, report.applicationId().toString()), JsonNode.class);
+        assertThat(audit.at("/duplicateApproval/sourceTaskIds").toString()).contains(source.getId());
+    }
+
+    @Test
+    void adjacentExpenseApprovalKeepsBusinessAfterDifferentParallelPredecessorsManual() throws Exception {
+        duplicateExpenseTemplate(true);
+        var nodes = new ArrayList<>(expenseTemplateGraph.nodes());
+        nodes.addAll(List.of(new Node("duplicateFork", "并行业务", NodeType.PARALLEL_GATEWAY, Map.of()),
+                new Node("duplicateMerge", "金额路径汇合", NodeType.EXCLUSIVE_GATEWAY, Map.of()),
+                new Node("duplicateJoin", "业务汇合", NodeType.PARALLEL_GATEWAY, Map.of()),
+                new Node("parallelReview", "并行业务复核", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager)),
+                new Node("joinedBusiness", "汇合后业务确认", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager))));
+        var edges = new ArrayList<>(expenseTemplateGraph.edges());
+        edges.replaceAll(edge -> edge.source().equals("supervisor") ? new Edge(edge.id(), "supervisor", "duplicateFork", "")
+                : edge.target().equals("policyGate") ? new Edge(edge.id(), edge.source(), "duplicateMerge", edge.condition(), edge.defaultBranch()) : edge);
+        edges.addAll(List.of(new Edge("duplicateBranchA", "duplicateFork", "amountGate", ""),
+                new Edge("duplicateBranchB", "duplicateFork", "parallelReview", ""),
+                new Edge("duplicateMergeExit", "duplicateMerge", "duplicateJoin", ""),
+                new Edge("duplicateBranchBJoin", "parallelReview", "duplicateJoin", ""),
+                new Edge("duplicateJoinExit", "duplicateJoin", "joinedBusiness", ""),
+                new Edge("duplicateJoinApprovalExit", "joinedBusiness", "policyGate", "")));
+        expenseTemplateGraph = new Graph(nodes, edges, expenseTemplateGraph.conditionLanguageVersion());
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("joinedBusiness");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE'",
+                Integer.class, report.applicationId().toString())).isEqualTo(2);
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+    }
+
+    @Test
+    void adjacentExpenseApprovalConcurrentSourceRequestsAdvanceTheLongerChainOnlyOnce() throws Exception {
+        duplicateExpenseTemplate(true); lineGross = "60000";
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        var source = task(report); long version = app(report).version();
+        var barrier = new java.util.concurrent.CyclicBarrier(2);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Callable<Integer> approve = () -> {
+                barrier.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                return send("/api/v1/tasks/" + source.getId() + "/actions", "manager",
+                        Map.of("action", "APPROVE", "expectedVersion", version)).getStatus();
+            };
+            var first = pool.submit(approve); var second = pool.submit(approve);
+            var statuses = List.of(first.get(30, java.util.concurrent.TimeUnit.SECONDS), second.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            assertThat(statuses.stream().filter(status -> status == 200)).hasSize(1);
+            assertThat(statuses.stream().filter(status -> status != 200)).allMatch(status -> status == 404 || status == 409);
+        } finally { pool.shutdownNow(); }
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+        assertThat(app(report).version()).isEqualTo(version + 3);
+        var audit = jdbc.queryForList("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE' ORDER BY occurred_at,id",
+                String.class, report.applicationId().toString()).stream().map(raw -> json.read(raw, JsonNode.class)).toList();
+        assertThat(audit).hasSize(2);
+        assertThat(audit.stream().map(value -> value.path("nodeId").asText())).containsExactly("department", "executive");
+        assertThat(audit.get(0).at("/duplicateApproval/sourceNodeId").asText()).isEqualTo("supervisor");
+        assertThat(audit.get(1).at("/duplicateApproval/sourceNodeId").asText()).isEqualTo("department");
+    }
+
     private void configureTemplateDepartment(Map<String, String> changes) {
         expenseTemplateGraph = new Graph(expenseTemplateGraph.nodes().stream().map(node -> {
             if (!node.id().equals("department")) return node;
@@ -364,7 +467,10 @@ class ExpenseSubmissionIntegrationTest {
             expenseTemplateSchema = json.read(template.path("formSchema").toString(), FormSchema.class);
             expenseTemplateGraph = new Graph(graph.nodes().stream().map(node -> {
                 var properties = new HashMap<>(node.properties());
-                if (node.type() == NodeType.START && enabled) properties.put("expenseDuplicateApproval", "AUTO_PASS_ADJACENT");
+                if (node.type() == NodeType.START) {
+                    if (enabled) properties.put("expenseDuplicateApproval", "AUTO_PASS_ADJACENT");
+                    else properties.remove("expenseDuplicateApproval");
+                }
                 if (node.type() == NodeType.USER_TASK && !node.id().equals("supervisor")) {
                     properties.put("assigneeRule", properties.containsKey("expenseStage") ? "role:ORG_PERSON_" + finance
                             : io.agentflow.organization.LocalOrganizationDirectory.DEPARTMENT_HEAD_RULE);
