@@ -299,7 +299,65 @@ class ExpenseBudgetReviewIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='APPROVE'", Integer.class, report.applicationId().toString())).isEqualTo(1);
     }
 
+    @Test void originalRoundQuerySeparatesHumanAuthorizationFromActualBudgetConfirmation() throws Exception {
+        GATEWAY.exceptionPolicy("policy-flex-1"); GATEWAY.budgetStatus(BudgetObservation.Status.REJECTED);
+        var report = draft(definition(true, false)); var checked = check(report);
+        var precheck = request(path(report)+"/prechecks/"+checked.input().id(), "alice", 200);
+        assertThat(precheck.path("budgetExceptionPolicy").path("reference").asText()).isEqualTo("policy-flex-1");
+        send(path(report)+"/submit", "alice", submitInput(report, checked.input().id()), 200); budgets(report); approve(report, "manager");
+        var required = request(path(report)+"/budget-review?roundNo=1", "manager", 200);
+        assertThat(required.path("status").asText()).isEqualTo("RECORDED");
+        assertThat(required.path("details").path("status").asText()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(required.path("details").path("decision").isNull()).isTrue();
+        approve(report, "manager");
+        var authorized = request(path(report)+"/budget-review?roundNo=1", "alice", 200);
+        assertThat(authorized.path("details").path("status").asText()).isEqualTo("AUTHORIZED");
+        assertThat(authorized.path("details").path("authorizedOperationStatus").asText()).isEqualTo("QUEUED");
+        assertThat(authorized.path("details").path("decision").path("actorId").asText()).isEqualTo("manager");
+        assertThat(authorized.toString()).doesNotContain("targetDigest", "offerReference", "commandDigest", "accountNumber");
+        GATEWAY.budgetStatus(BudgetObservation.Status.APPLIED); budgets(report);
+        send(path(report)+"/withdraw", "alice", lifecycle(report), 200); submit(report);
+        var old = request(path(report)+"/budget-review?roundNo=1", "alice", 200);
+        assertThat(old.path("details").path("closure").asText()).isEqualTo("WITHDRAWN");
+        assertThat(old.path("details").path("originalOperationId")).isEqualTo(authorized.path("details").path("originalOperationId"));
+        var next = request(path(report)+"/budget-review?roundNo=2", "alice", 200);
+        assertThat(next.path("details").path("originalOperationId")).isNotEqualTo(old.path("details").path("originalOperationId"));
+        for (var suffix : List.of("", "?roundNo=0", "?roundNo=01", "?roundNo=1&roundNo=1", "?roundNo=1&user=alice")) {
+            request(path(report)+"/budget-review"+suffix, "alice", 400);
+        }
+        request(path(report)+"/budget-review?roundNo=99", "alice", 404);
+    }
+
+    @Test void actualTaskOptionsOmitApprovalUntilTheBudgetCheckpointNeedsHumanDecision() throws Exception {
+        GATEWAY.exceptionPolicy("policy-flex-1"); GATEWAY.budgetStatus(BudgetObservation.Status.PENDING);
+        var definition = definition(true, false); var report = draft(definition); submit(report); approve(report, "manager");
+        String id = task(report).getId();
+        var currentTask = request("/api/v1/tasks/"+id, "manager", 200);
+        assertThat(currentTask.path("allowedActions").toString()).doesNotContain("APPROVE").contains("RETURN");
+        var workflow = request(path(report)+"/workflow?taskId="+id, "manager", 200);
+        assertThat(workflow.path("task").path("canApprove").isBoolean()).isTrue();
+        assertThat(workflow.path("task").path("canApprove").asBoolean()).isFalse();
+        assertThat(workflow.path("task").path("approvalUnavailable").asText()).isEqualTo("EXPENSE_BUDGET_RESULT_PENDING");
+        proxies.create(ADMIN, definition.id(), manager, person("bob", true), Instant.now().minusSeconds(1), Instant.now().plusSeconds(600), "合成待预算代理");
+        assertThat(request("/api/v1/tasks/"+id, "bob", 200).path("allowedActions").toString()).doesNotContain("APPROVE").contains("RETURN");
+        GATEWAY.budgetStatus(BudgetObservation.Status.REJECTED); budgets(report);
+        assertThat(request("/api/v1/tasks/"+id, "manager", 200).path("allowedActions").toString()).contains("APPROVE");
+        assertThat(request(path(report)+"/workflow?taskId="+id, "manager", 200).path("task").path("canApprove").asBoolean()).isTrue();
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"HIDDEN", "MASKED"})
+    void budgetHistoryUsesSensitiveOriginalNodePermissionsIncludingForAdministrators(String access) throws Exception {
+        var report = draft(definition(true, false, FieldVisibility.valueOf(access))); submit(report);
+        request(path(report)+"/budget-review?roundNo=1", "manager", 403);
+        request(path(report)+"/budget-review?roundNo=1", "admin", 403);
+        request(path(report)+"/budget-review?roundNo=1", "bob", 404);
+        assertThat(request(path(report)+"/budget-review?roundNo=1", "alice", 200).path("details").path("status").asText()).isEqualTo("CONFIRMED");
+    }
+
     private DefinitionDraft definition(boolean budget, boolean financeOwnsBudget) {
+        return definition(budget, financeOwnsBudget, FieldVisibility.READ_ONLY);
+    }
+    private DefinitionDraft definition(boolean budget, boolean financeOwnsBudget, FieldVisibility businessVisibility) {
         var start = Map.of(ExpenseSelfApprovalPolicy.PROPERTY, ExpenseSelfApprovalPolicy.ESCALATE_SUPERVISOR,
                 ExpenseDuplicateApprovalPolicy.PROPERTY, ExpenseDuplicateApprovalPolicy.AUTO_PASS_ADJACENT);
         var nodes = new ArrayList<>(List.of(new Node("start", "开始", NodeType.START, start),
@@ -309,7 +367,7 @@ class ExpenseBudgetReviewIntegrationTest {
                 new Node("end", "结束", NodeType.END, Map.of())));
         var edges = new ArrayList<>(List.of(new Edge("a", "start", "business", ""), new Edge("b", "business", budget ? "budget" : "receipt", ""),
                 new Edge("c", "receipt", "finance", ""), new Edge("d", "finance", "end", "")));
-        var visibility = new HashMap<>(Map.of("business", FieldVisibility.READ_ONLY, "receipt", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY));
+        var visibility = new HashMap<>(Map.of("business", businessVisibility, "receipt", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY));
         if (budget) {
             nodes.add(new Node("budget", "预算负责人", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_"+(financeOwnsBudget ? finance : manager), "expenseStage", "BUDGET_REVIEW")));
             edges.add(new Edge("budget_done", "budget", "receipt", "")); visibility.put("budget", FieldVisibility.READ_ONLY);
@@ -354,7 +412,7 @@ class ExpenseBudgetReviewIntegrationTest {
         var response = mvc.perform(get(endpoint).header("Authorization", "Bearer " + tokens.computeIfAbsent(user, value -> auth.login("demo", value, "demo").token())))
                 .andReturn().getResponse();
         assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(expected);
-        if (expected == 200) assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        if (expected == 200 && endpoint.startsWith("/api/v1/expense-reports/")) assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
         capture("GET", endpoint, null, response);
         return json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class);
     }

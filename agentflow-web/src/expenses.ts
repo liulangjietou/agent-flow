@@ -58,7 +58,7 @@ export interface ExpenseWorkflow extends ExpenseReceipt {
   roundNo: number; canWithdraw: boolean; canCancel: boolean
   paper: null | { roundNo: number; required: boolean; received: boolean; receivedBy: string | null; receivedAt: string | null; proxyUse?: ApprovalProxyUse | null }
   budget: { ledgerStatus: string | null; confirmedCurrent: boolean; operationId: string | null; operationStatus: string | null; issue: string | null }
-  task: null | { taskId: string; stage: 'BUSINESS' | 'PRIOR_REQUEST_REVIEW' | 'RECEIPT' | 'FINANCE_REVIEW' | 'FINANCE_RECHECK'; canReceive: boolean; canReduce: boolean; reductionUnavailable: string | null; canActDirectly?: boolean; proxyOptions?: ApprovalProxyOption[] }
+  task: null | { taskId: string; stage: 'BUSINESS' | 'PRIOR_REQUEST_REVIEW' | 'BUDGET_REVIEW' | 'RECEIPT' | 'FINANCE_REVIEW' | 'FINANCE_RECHECK'; canApprove?: boolean; approvalUnavailable?: string | null; canReceive: boolean; canReduce: boolean; reductionUnavailable: string | null; canActDirectly?: boolean; proxyOptions?: ApprovalProxyOption[] }
 }
 export interface ExpenseItem extends ExpenseVersions { id: string; applicationId: string; businessNo: string; title: string; status: string; roundNo: number; createdAt: string }
 export interface ExpensePage<T> { items: T[]; nextBeforeId: string | null }
@@ -73,7 +73,7 @@ export const policyExceptionLabels: Record<ExpensePolicyException, string> = { A
 export const budgetIssues: Record<string, string> = {
   NOT_CONFIGURED: '尚未配置预算服务', TARGET_CHANGED: '预算服务配置已变化，需要核对原操作', TIMEOUT: '预算服务响应超时', CONNECTION: '暂时无法连接预算服务',
   AUTHENTICATION: '预算服务连接凭据不可用', REMOTE_FAILURE: '预算服务暂时不可用', INVALID_RESPONSE: '预算结果未通过校验', RESPONSE_TOO_LARGE: '预算结果未通过校验',
-  BUDGET_INSUFFICIENT: '可用预算不足', BUDGET_POLICY_UNAVAILABLE: '预算制度不可用', ACCOUNTING_PERIOD_CLOSED: '会计期间已关闭', COST_OBJECT_UNAVAILABLE: '成本归属不可用',
+  BUDGET_EXCEPTION_REQUIRED: '原预算操作需要独立的预算负责人审批', BUDGET_INSUFFICIENT: '可用预算不足', BUDGET_POLICY_UNAVAILABLE: '预算制度不可用', ACCOUNTING_PERIOD_CLOSED: '会计期间已关闭', COST_OBJECT_UNAVAILABLE: '成本归属不可用',
   LEGAL_ENTITY_UNAVAILABLE: '费用法人不可用', EMPLOYEE_UNAVAILABLE: '员工主数据不可用', LEDGER_VERSION_CONFLICT: '预算占用已变化，需要核对', RESERVATION_FINALIZED: '预算占用已结算或释放'
 }
 const EXPENSE_QUERY_TIMEOUT_MS = 12_000

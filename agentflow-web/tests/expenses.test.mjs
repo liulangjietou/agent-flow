@@ -97,7 +97,10 @@ test('财务 API 编码路径、只读无缓存，写入保持双版本与精确
   const { api, bindAuthenticationActor, writeRequests } = await import(process.env.AGENTFLOW_TEST_API)
   bindAuthenticationActor({ tenantId: 'demo', userId: 'finance' })
   const calls = []; let fail = false
-  globalThis.fetch = async (url, init) => { calls.push({ url, ...init }); if (fail) { fail = false; throw new Error('offline') }; return Response.json({ reportId: 'report', applicationId: 'app' }) }
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, ...init }); if (fail) { fail = false; throw new Error('offline') }
+    return Response.json(new URL(url, 'http://localhost').pathname === '/api/v1/expense-requests' ? { items: [] } : { reportId: 'report', applicationId: 'app' })
+  }
   const signal = new AbortController().signal
   await api.expenseReports({ status: 'DRAFT', beforeId: 'next+/=' }, signal); await api.expenseRequests({}, signal); await api.employeeAdvances({}, signal)
   await api.expenseReport('report/id', 2, signal); await api.expenseWorkflow('report/id', 'task/id', signal)

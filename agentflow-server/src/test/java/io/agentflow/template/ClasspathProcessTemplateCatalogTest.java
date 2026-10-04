@@ -47,7 +47,9 @@ class ClasspathProcessTemplateCatalogTest {
     void expenseTemplateRequiresExplicitNewSourceVersionWithSplitRiskDisabledAndNoInventedParameters() {
         var catalog = new ClasspathProcessTemplateCatalog(resources, json);
         var expense = catalog.get("expense-report");
-        assertThat(expense.templateVersion()).isEqualTo(5);
+        assertThat(expense.templateVersion()).isEqualTo(6);
+        assertThat(io.agentflow.expense.ExpenseBudgetApprovalPolicy.require(expense.graph(), expense.formSchema(), true)).isEqualTo("budgetReview");
+        assertThat(expense.defaultRoles()).contains("EXPENSE_BUDGET_REVIEW");
         assertThat(io.agentflow.expense.ExpenseFormContract.hasPriorControl(expense.formSchema())).isTrue();
         assertThat(io.agentflow.expense.ExpenseProcessPolicy.stage(expense.graph().node("priorReview"))).isEqualTo(io.agentflow.expense.ExpenseProcessPolicy.Stage.PRIOR_REQUEST_REVIEW);
         assertThat(io.agentflow.expense.ExpenseSelfApprovalPolicy.enabled(expense.graph())).isTrue();
@@ -57,11 +59,11 @@ class ClasspathProcessTemplateCatalogTest {
         assertThat(split.rule()).isNull();
         assertThat(split.gatewayIds()).containsExactlyInAnyOrder("amountGate", "executiveGate");
         assertThat(expense.graph().node("recheckGate").properties()).doesNotContainKey("expenseSplitRouting");
-        for (long oldVersion : List.of(1L, 2L, 3L, 4L)) {
+        for (long oldVersion : List.of(1L, 2L, 3L, 4L, 5L)) {
             assertThatThrownBy(() -> catalog.requireVersion("expense-report", oldVersion)).isInstanceOf(DomainException.class)
                     .satisfies(error -> assertThat(((DomainException) error).code()).isEqualTo("TEMPLATE_VERSION_CONFLICT"));
         }
-        assertThat(catalog.requireVersion("expense-report", 5)).isSameAs(expense);
+        assertThat(catalog.requireVersion("expense-report", 6)).isSameAs(expense);
         assertThat(catalog.get("expense-plan").templateVersion()).isEqualTo(1);
         assertThat(catalog.get("advance-request").templateVersion()).isEqualTo(1);
     }

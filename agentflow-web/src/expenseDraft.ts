@@ -22,6 +22,7 @@ export interface PrecheckSummary extends ExpenseVersions { id: string; version: 
 export interface PrecheckView {
   job: PrecheckSummary; usable: boolean; unavailableCode: string | null; initiator: InitiatorContext; accountingDate: string
   rateDate: string | null; validUntil: string | null; preview: FinancialRound | null
+  budgetExceptionPolicy?: { reference: string } | null
   priorControls?: PriorAssessment[] | null
   findings: Array<{ stage: string; lineNo: number | null; nature: 'REJECTED' | 'UNAVAILABLE'; code: string }>
 }
@@ -32,6 +33,7 @@ export const precheckStages: Record<string, string> = { INPUT: '填报内容', C
 export const precheckIssues: Record<string, string> = {
   PRIOR_REQUEST_CATEGORY_MISMATCH: '事前批准行与费用类别不一致，请重新选择',
   PRIOR_REQUEST_EXCEPTION_REASON_REQUIRED: '累计超过事前容差，请为每个相关费用行填写说明后重新检查',
+  EXPENSE_BUDGET_APPROVAL_REQUIRED: '当前流程缺少安全的预算审批节点，请联系流程管理员选择支持预算例外的发布版本',
   EXPENSE_PRIOR_APPROVAL_REQUIRED: '当前流程缺少独立额度例外审批，请联系流程管理员使用支持该控制的版本',
   INSUFFICIENT_FINANCIAL_BALANCE: '累计使用超过事前硬上限或借款可用余额',
   APPLICATION_NOT_EDITABLE: '当前单据不能编辑或提交', EXPENSE_LINES_REQUIRED: '请先保存至少一行费用', FINANCE_GATEWAY_UNAVAILABLE: '财务服务尚未配置',

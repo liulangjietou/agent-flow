@@ -52684,6 +52684,112 @@
           }
         ]
       }
+    },
+    "/api/v1/expense-reports/{id}/budget-review": {
+      "get": {
+        "operationId": "expenseBudgetReview",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "读取原报销轮次的预算审批依据",
+        "description": "完整费用明细授权同样约束管理员；隐藏或脱敏不能旁路读取。NOT_RECORDED 表示旧轮次没有保存预算审批依据，不代表预算通过。人工批准与实际预算确认分开展示，只返回真实操作和审计编号，不暴露外部授权凭据。只接受一个规范正整数 roundNo，拒绝重复和其他查询字段。",
+        "x-access": "同租户原轮次完整费用明细权限",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "轮次参数不规范或包含不支持的查询字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseBudgetReviewView"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "包含审批关联信息，禁止缓存。"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": true,
+            "description": "主单原提交轮次",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -64799,6 +64905,16 @@
               }
             ],
             "description": "原累计用量的预检依据；旧预检可能缺失，正式提交在资源锁内再次校验。"
+          },
+          "budgetExceptionPolicy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BudgetExceptionPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -65571,6 +65687,7 @@
             "enum": [
               "BUSINESS",
               "PRIOR_REQUEST_REVIEW",
+              "BUDGET_REVIEW",
               "RECEIPT",
               "FINANCE_REVIEW",
               "FINANCE_RECHECK"
@@ -65596,6 +65713,17 @@
             "items": {
               "$ref": "#/components/schemas/ApprovalProxyOption"
             }
+          },
+          "canApprove": {
+            "type": "boolean",
+            "description": "当前可办理人且本节点业务前置条件满足；实际审批仍在写入事务中重新核对。"
+          },
+          "approvalUnavailable": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "不能同意的当前原因；不影响返回的退回、驳回和签收等独立动作。"
           }
         },
         "required": [
@@ -65604,7 +65732,8 @@
           "canReceive",
           "canReduce",
           "canActDirectly",
-          "proxyOptions"
+          "proxyOptions",
+          "canApprove"
         ],
         "additionalProperties": false
       },
@@ -86758,6 +86887,7 @@
               "LEASE_EXPIRED",
               "INTERNAL_ERROR",
               "BUDGET_INSUFFICIENT",
+              "BUDGET_EXCEPTION_REQUIRED",
               "BUDGET_POLICY_UNAVAILABLE",
               "ACCOUNTING_PERIOD_CLOSED",
               "COST_OBJECT_UNAVAILABLE",
@@ -94472,6 +94602,566 @@
                 },
                 "requiresApproval": {
                   "type": "boolean"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "BudgetExceptionPolicy": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": ".*\\S.*"
+          }
+        },
+        "required": [
+          "reference"
+        ],
+        "additionalProperties": false,
+        "description": "原预检保存的可信预算政策来源，仅表示可申请例外，不代表人工批准或实际预算已确认。"
+      },
+      "ExpenseBudgetReviewDecision": {
+        "type": "object",
+        "properties": {
+          "actorId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": ".*\\S.*"
+          },
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": ".*\\S.*"
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "approvedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "actorId",
+          "taskId",
+          "auditEventId",
+          "approvedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseBudgetAutomaticPass": {
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": ".*\\S.*"
+          },
+          "auditEventId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "passedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "taskId",
+          "auditEventId",
+          "passedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseBudgetReviewDetails": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "budgetNodeId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": ".*\\S.*"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "policyReference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": ".*\\S.*"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "originalOperationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "originalOperationStatus": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "EXECUTING",
+              "UNKNOWN",
+              "QUERYING",
+              "APPLIED",
+              "REJECTED"
+            ]
+          },
+          "authorizedOperationId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "authorizedOperationStatus": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "QUEUED",
+                  "EXECUTING",
+                  "UNKNOWN",
+                  "QUERYING",
+                  "APPLIED",
+                  "REJECTED"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "WAITING_BUDGET",
+              "REVIEW_REQUIRED",
+              "AUTHORIZED",
+              "CONFIRMED",
+              "REJECTED",
+              "CLOSED"
+            ]
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseBudgetReviewDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "automaticPass": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseBudgetAutomaticPass"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "closure": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "WITHDRAWN",
+              "RETURNED",
+              "REJECTED",
+              "CANCELLED",
+              null
+            ]
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "version",
+          "financialVersion",
+          "budgetNodeId",
+          "policyReference",
+          "originalOperationId",
+          "originalOperationStatus",
+          "authorizedOperationId",
+          "authorizedOperationStatus",
+          "status",
+          "decision",
+          "automaticPass",
+          "closure",
+          "submittedAt",
+          "updatedAt"
+        ],
+        "additionalProperties": false,
+        "description": "绑定原轮次和原财务版本。仅返回独立预算操作编号、实际决策人和审计，不返回目标摘要、原例外凭据或账户信息。关闭轮次保留原事实；后续核减/释放查看当前费用状态。",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "decision": {
+                  "type": "null"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "authorizedOperationId": {
+                  "type": "null"
+                },
+                "authorizedOperationStatus": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "authorizedOperationId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "authorizedOperationStatus": {
+                  "type": "string",
+                  "enum": [
+                    "QUEUED",
+                    "EXECUTING",
+                    "UNKNOWN",
+                    "QUERYING",
+                    "APPLIED",
+                    "REJECTED"
+                  ]
+                },
+                "budgetNodeId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": ".*\\S.*"
+                },
+                "policyReference": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": ".*\\S.*"
+                },
+                "originalOperationStatus": {
+                  "const": "REJECTED"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "automaticPass": {
+                  "type": "object"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "decision": {
+                  "type": "null"
+                },
+                "budgetNodeId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": ".*\\S.*"
+                },
+                "originalOperationStatus": {
+                  "const": "APPLIED"
+                },
+                "status": {
+                  "enum": [
+                    "CONFIRMED",
+                    "CLOSED"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "CLOSED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "closure": {
+                  "type": "string"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "closure": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "WAITING_BUDGET"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "version": {
+                  "const": 1
+                },
+                "decision": {
+                  "type": "null"
+                },
+                "automaticPass": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "version": {
+                  "minimum": 2
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "REVIEW_REQUIRED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "decision": {
+                  "type": "null"
+                },
+                "automaticPass": {
+                  "type": "null"
+                },
+                "policyReference": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": ".*\\S.*"
+                },
+                "budgetNodeId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": ".*\\S.*"
+                },
+                "originalOperationStatus": {
+                  "const": "REJECTED"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "AUTHORIZED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "decision": {
+                  "$ref": "#/components/schemas/ExpenseBudgetReviewDecision"
+                },
+                "automaticPass": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "CONFIRMED"
+                },
+                "decision": {
+                  "type": "null"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "originalOperationStatus": {
+                  "const": "APPLIED"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "CONFIRMED"
+                },
+                "decision": {
+                  "type": "object"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "authorizedOperationStatus": {
+                  "const": "APPLIED"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "REJECTED"
+                },
+                "decision": {
+                  "type": "null"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "originalOperationStatus": {
+                  "const": "REJECTED"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "REJECTED"
+                },
+                "decision": {
+                  "type": "object"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "authorizedOperationStatus": {
+                  "const": "REJECTED"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ExpenseBudgetReviewView": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_RECORDED",
+              "RECORDED"
+            ]
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseBudgetReviewDetails"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "roundNo",
+          "status",
+          "details"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "NOT_RECORDED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "details": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "details": {
+                  "$ref": "#/components/schemas/ExpenseBudgetReviewDetails"
                 }
               }
             }

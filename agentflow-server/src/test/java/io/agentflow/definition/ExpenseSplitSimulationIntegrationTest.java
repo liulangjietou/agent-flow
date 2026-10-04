@@ -147,7 +147,7 @@ class ExpenseSplitSimulationIntegrationTest {
         }).toList(), base.edges(), base.conditionLanguageVersion(), base.riskPolicy());
     }
 
-    private Map<String, Object> values(String amount) { return Map.of("expenseDetails", "仅用于合成路由模拟", "amount", amount, "currency", "CNY", "overPolicy", false); }
+    private Map<String, Object> values(String amount) { return Map.of("expenseDetails", "仅用于合成路由模拟", "amount", amount, "currency", "CNY", "overPolicy", false, "priorRequestOverTolerance", false); }
     private Map<String, String> money(String amount, String currency) { return Map.of("value", amount, "currency", currency); }
     private Map<String, Object> body(Graph graph, String amount, Object synthetic) {
         var body = new LinkedHashMap<String, Object>();

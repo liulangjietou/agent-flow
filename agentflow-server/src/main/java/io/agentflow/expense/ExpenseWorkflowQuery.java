@@ -38,15 +38,17 @@ public class ExpenseWorkflowQuery {
     private final FlowableTaskAuthorization tasks;
     private final ExpenseLifecycleService lifecycle;
     private final FlowableApprovalProxyAccess proxies;
+    private final ExpenseApprovalService approvals;
 
     /** 沿用完整明细读取权限，隐藏或脱敏审批人不能从控制查询旁路取得财务事实。 */
     public ExpenseWorkflowQuery(CurrentActor actors, ExpenseDraftService drafts, ExpenseReportRepository reports,
             ApprovalApplicationFacade applications, JdbcExpenseSubmissionControlRepository controls, JdbcBudgetOccupationRepository budgets,
             JdbcBudgetOperationRepository operations, FlowableTaskAuthorization tasks, ExpenseLifecycleService lifecycle,
-            FlowableApprovalProxyAccess proxies) {
+            FlowableApprovalProxyAccess proxies, ExpenseApprovalService approvals) {
         this.actors = actors; this.drafts = drafts; this.reports = reports; this.applications = applications; this.controls = controls;
         this.budgets = budgets; this.operations = operations; this.tasks = tasks; this.lifecycle = lifecycle;
         this.proxies = proxies;
+        this.approvals = approvals;
     }
 
     /** 一个数据库快照内读取纸件、预算与版本；页面在未知结果期间只能刷新，不生成假成功。 */
@@ -77,7 +79,9 @@ public class ExpenseWorkflowQuery {
             boolean reduce = allowed && stage.finance() && control.paperReady() && confirmed;
             String reductionUnavailable = !stage.finance() ? "EXPENSE_FINANCE_TASK_REQUIRED" : delegated ? "TASK_DELEGATION_PENDING"
                     : !control.paperReady() ? "EXPENSE_PAPER_RECEIPT_REQUIRED" : !confirmed ? "EXPENSE_BUDGET_NOT_CONFIRMED" : null;
-            options = new TaskOptions(task.getId(), stage, receive, reduce, reductionUnavailable, direct, proxyOptions);
+            String approvalUnavailable = delegated ? "TASK_DELEGATION_PENDING" : !allowed ? "FORBIDDEN" : approvals.approvalFailure(application, task);
+            options = new TaskOptions(task.getId(), stage, receive, reduce, reductionUnavailable, direct, proxyOptions,
+                    approvalUnavailable == null, approvalUnavailable);
         }
         String issue = operation == null ? null : operation.failure() != null ? operation.failure().name()
                 : operation.observation() != null && operation.observation().rejection() != null ? operation.observation().rejection().name() : null;
@@ -111,5 +115,5 @@ public class ExpenseWorkflowQuery {
      * @author owlzhangfq@gmail.com
      */
     public record TaskOptions(String taskId, ExpenseProcessPolicy.Stage stage, boolean canReceive, boolean canReduce, String reductionUnavailable,
-                              boolean canActDirectly, List<FlowableApprovalProxyAccess.Option> proxyOptions) { }
+                              boolean canActDirectly, List<FlowableApprovalProxyAccess.Option> proxyOptions, boolean canApprove, String approvalUnavailable) { }
 }

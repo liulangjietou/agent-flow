@@ -294,7 +294,8 @@ class ExpenseSubmissionIntegrationTest {
         ok(act(report, "manager", "APPROVE"), 200);
 
         assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
-        assertThat(app(report).version()).isEqualTo(before + 2);
+        assertBudgetAutomaticPass(report);
+        assertThat(app(report).version()).isEqualTo(before + 3);
         var events = jdbc.queryForList("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE'",
                 String.class, report.applicationId().toString());
         assertThat(events).hasSize(1);
@@ -406,7 +407,8 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(timerWaits.advance(job.getId(), job.getDuedate().toInstant().minusMillis(1))).isFalse();
         assertThat(timerWaits.advance(job.getId(), job.getDuedate().toInstant())).isTrue();
         assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
-        assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+        assertBudgetAutomaticPass(report);
+        assertThat(app(report).version()).isEqualTo(waitingVersion + 3);
         assertThat(timerWaits.advance(job.getId(), job.getDuedate().toInstant())).isFalse();
         var audit = json.read(jdbc.queryForObject("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE'",
                 String.class, report.applicationId().toString()), JsonNode.class);
@@ -460,7 +462,8 @@ class ExpenseSubmissionIntegrationTest {
             assertThat(statuses.stream().filter(status -> status != 200)).allMatch(status -> status == 404 || status == 409);
         } finally { pool.shutdownNow(); }
         assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
-        assertThat(app(report).version()).isEqualTo(version + 3);
+        assertBudgetAutomaticPass(report);
+        assertThat(app(report).version()).isEqualTo(version + 4);
         var audit = jdbc.queryForList("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE' ORDER BY occurred_at,id",
                 String.class, report.applicationId().toString()).stream().map(raw -> json.read(raw, JsonNode.class)).toList();
         assertThat(audit).hasSize(2);
@@ -504,9 +507,10 @@ class ExpenseSubmissionIntegrationTest {
 
         assertThat(eventWaits.advance(command)).isEqualTo(EventWaitService.Outcome.ADVANCED);
         assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
-        assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+        assertBudgetAutomaticPass(report);
+        assertThat(app(report).version()).isEqualTo(waitingVersion + 3);
         assertThat(eventWaits.advance(command)).isEqualTo(EventWaitService.Outcome.STALE);
-        assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+        assertThat(app(report).version()).isEqualTo(waitingVersion + 3);
         assertThat(duplicateWaitAuditCount(report, "EVENT_RECEIVED")).isEqualTo(1);
         assertOriginalDuplicateSource(report, source);
     }
@@ -556,10 +560,11 @@ class ExpenseSubmissionIntegrationTest {
 
             assertThat(serviceOperations.claim("demo", operationId, Instant.now())).isNull();
             assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
-            assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+            assertBudgetAutomaticPass(report);
+            assertThat(app(report).version()).isEqualTo(waitingVersion + 3);
             assertThat(serviceRecords.find("demo", operationId).orElseThrow().progress()).isEqualTo(JdbcServiceTaskOperationRepository.Progress.ADVANCED);
             assertThat(serviceOperations.claim("demo", operationId, Instant.now())).isNull();
-            assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+            assertThat(app(report).version()).isEqualTo(waitingVersion + 3);
             assertThat(provider.effectCount()).isEqualTo(1);
             assertThat(duplicateWaitAuditCount(report, "SERVICE_TASK_COMPLETED")).isEqualTo(1);
             assertOriginalDuplicateSource(report, source);
@@ -601,6 +606,17 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(audit.at("/duplicateApproval/sourceTaskIds").toString()).isEqualTo(json.write(List.of(source.getId())));
         assertThat(audit.at("/duplicateApproval/subject").asText()).isEqualTo("manager");
         assertThat(audit.at("/duplicateApproval/ruleVersion").asInt()).isEqualTo(1);
+    }
+
+    private void assertBudgetAutomaticPass(ExpenseReport report) {
+        // 新模板的预算系统通过独立增加一次版本，不能计入人工或相邻同人审批。
+        var events = jdbc.queryForList("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_BUDGET'",
+                String.class, report.applicationId().toString());
+        assertThat(events).hasSize(1);
+        var event = json.read(events.get(0), JsonNode.class);
+        assertThat(event.path("actor").asText()).isEqualTo("system:budget");
+        assertThat(event.path("nodeId").asText()).isEqualTo("budgetReview");
+        assertThat(event.at("/budgetConfirmation/operationId").asText()).isNotBlank();
     }
 
     private void configureTemplateDepartment(Map<String, String> changes) {

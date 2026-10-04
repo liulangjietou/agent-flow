@@ -41,6 +41,7 @@ test('预算响应严格区分真实应用、拒绝、处理中及查无，拒�
   assert.equal(isBudgetNotification(message()), true)
   const values = [target(), applied(), { ...target(), issue: 'LEASE_EXPIRED' }, { ...target(), issue: null, observedStatus: 'PENDING' },
     { ...target(), status: 'REJECTED', issue: 'LEDGER_VERSION_CONFLICT', observedStatus: 'REJECTED' },
+    { ...target(), status: 'REJECTED', issue: 'BUDGET_EXCEPTION_REQUIRED', observedStatus: 'REJECTED' },
     ...['QUEUED', 'EXECUTING', 'QUERYING'].map(status => ({ ...target(), status, issue: null })),
     { ...target(), status: 'QUEUED', issue: null, observedStatus: 'NOT_FOUND' }]
   for (const value of values) assert.equal(readBudgetNotificationTarget(value, message()), value)

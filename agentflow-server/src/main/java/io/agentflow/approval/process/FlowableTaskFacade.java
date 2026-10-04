@@ -130,10 +130,15 @@ public class FlowableTaskFacade {
         CountersignProgress countersign = countersign(task);
         boolean direct = authorization.canAct(actor, task);
         var proxyOptions = proxies.forActor(actor, Instant.now()).options(task);
+        var allowed = direct ? delegation(task).allowedActions(task.getAssignee() != null).stream()
+                .filter(action -> countersign == null || countersign.allows(action)).toList()
+                : proxyOptions.isEmpty() ? List.<TaskAction>of() : FlowableApprovalProxyAccess.DECISIONS;
+        if (allowed.contains(TaskAction.APPROVE) && expenses.approvalFailure(application, task) != null) {
+            allowed = allowed.stream().filter(action -> action != TaskAction.APPROVE).toList();
+        }
         return new TaskView(task.getId(), task.getName(), task.getAssignee(), application.id().toString(), task.getCreateTime(),
                 application.version(), task.getOwner(), task.getDelegationState() == null ? "NONE" : task.getDelegationState().name(),
-                direct ? delegation(task).allowedActions(task.getAssignee() != null).stream()
-                        .filter(action -> countersign == null || countersign.allows(action)).toList() : proxyOptions.isEmpty() ? List.of() : FlowableApprovalProxyAccess.DECISIONS, countersign,
+                allowed, countersign,
                 task.getDueDate() == null ? null : task.getDueDate().toInstant(), direct, proxyOptions);
     }
 

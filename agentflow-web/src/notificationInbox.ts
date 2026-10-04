@@ -142,7 +142,7 @@ export const isBudgetNotification = (item: InboxMessage) => ['BUDGET_RESULT', 'B
 export const budgetActionLabels = { FREEZE: '冻结', ADJUST: '调整冻结', RELEASE: '释放', CONSUME: '消费' }
 export const budgetStatusLabels = { QUEUED: '原命令待执行', EXECUTING: '正在发送原命令', UNKNOWN: '原操作结果暂不明确', QUERYING: '正在查询原操作', APPLIED: '原操作已确认', REJECTED: '原操作已明确拒绝' }
 const budgetFailureLabels = { NOT_CONFIGURED: '预算连接尚未配置', TARGET_CHANGED: '预算连接配置已变化', TIMEOUT: '预算系统响应超时', CONNECTION: '预算系统暂时无法连接', AUTHENTICATION: '预算系统认证未通过', REMOTE_FAILURE: '预算系统暂时不可用', INVALID_RESPONSE: '预算回执未通过校验', RESPONSE_TOO_LARGE: '预算回执超出接收范围', LEASE_EXPIRED: '原执行未在期限内确认', INTERNAL_ERROR: '预算处理暂时异常' }
-const budgetRejectionLabels = { BUDGET_INSUFFICIENT: '预算余额不足', BUDGET_POLICY_UNAVAILABLE: '预算控制规则不可用', ACCOUNTING_PERIOD_CLOSED: '会计期间已关闭', COST_OBJECT_UNAVAILABLE: '成本对象不可用', LEGAL_ENTITY_UNAVAILABLE: '法人不可用', EMPLOYEE_UNAVAILABLE: '员工不可用', LEDGER_VERSION_CONFLICT: '预算台账版本存在冲突', RESERVATION_FINALIZED: '原预算占用已经结束' }
+const budgetRejectionLabels = { BUDGET_EXCEPTION_REQUIRED: '原预算操作要求独立例外审批，批准后仍需实际预算确认', BUDGET_INSUFFICIENT: '预算余额不足', BUDGET_POLICY_UNAVAILABLE: '预算控制规则不可用', ACCOUNTING_PERIOD_CLOSED: '会计期间已关闭', COST_OBJECT_UNAVAILABLE: '成本对象不可用', LEGAL_ENTITY_UNAVAILABLE: '法人不可用', EMPLOYEE_UNAVAILABLE: '员工不可用', LEDGER_VERSION_CONFLICT: '预算台账版本存在冲突', RESERVATION_FINALIZED: '原预算占用已经结束' }
 const budgetFailures = Object.keys(budgetFailureLabels), budgetRejections = Object.keys(budgetRejectionLabels)
 /** 只显示约定的稳定原因，不将远端原始错误正文带入页面。 */
 export const budgetIssueLabel = (issue: string) => ({ ...budgetFailureLabels, ...budgetRejectionLabels } as Record<string, string>)[issue] ?? '原因暂不可用'

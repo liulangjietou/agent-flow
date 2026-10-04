@@ -6,6 +6,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string | undefined]; bef
 const stages = [
   { value: 'BUSINESS', name: '普通业务审批' },
   { value: 'PRIOR_REQUEST_REVIEW', name: '事前额度例外审批' },
+  { value: 'BUDGET_REVIEW', name: '预算负责人审批' },
   { value: 'RECEIPT', name: '纸质原件签收' },
   { value: 'FINANCE_REVIEW', name: '财务审核' },
   { value: 'FINANCE_RECHECK', name: '财务复核' },
@@ -29,6 +30,7 @@ function choose(event: Event) {
       </select>
     </label>
     <p v-if="selected === 'PRIOR_REQUEST_REVIEW'">服务端累计超容差时必须经过本节点，位于财务审核之前；不能通过相邻同人规则自动跳过。流程表单需有布尔字段 priorRequestOverTolerance，值由提交时的额度依据产生。</p>
+    <p v-if="selected === 'BUDGET_REVIEW'">预算节点须单人决策，并位于所有财务审核路径之前。等待真实预算结果：原预算确认后系统通过，明确需要例外时由预算负责人审批；同意后仍须等待预算确认，不能由相邻同人规则跳过。</p>
     <p v-if="selected === 'RECEIPT'">办理人需明确确认本轮纸件后才能同意；退回或撤回后重提，需要重新签收。</p>
     <p v-else-if="selected === 'FINANCE_REVIEW' || selected === 'FINANCE_RECHECK'">同意前检查本轮纸件要求及当前核定金额的预算冻结结果。</p>
     <p v-if="selected !== 'BUSINESS'">请在字段权限中将此节点的“费用明细”设为只读。每条结束路径都须经过财务审核；需纸件时先安排签收。</p>

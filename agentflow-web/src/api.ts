@@ -844,6 +844,7 @@ export const api = {
   closeExpenseRequest: (id: string, input: ExpenseRequestCloseInput) => write<ExpenseRequestCloseReceipt>(`/expense-requests/${encodeURIComponent(id)}/close`, 'POST', '关闭事前费用额度', input),
   employeeAdvances: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceItem>>('/employee-advances' + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseReport: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<ExpenseDetail>(`/expense-reports/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  expenseBudgetReview: (id: string, roundNo: number, signal: AbortSignal) => request<unknown>(`/expense-reports/${encodeURIComponent(id)}/budget-review` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
   expenseWorkflow: (id: string, taskId: string | undefined, signal: AbortSignal) => request<ExpenseWorkflow>(`/expense-reports/${encodeURIComponent(id)}/workflow` + historyQuery({ taskId }), { signal, cache: 'no-store' }),
   receiveExpense: (id: string, taskId: string, input: ExpenseTaskCommand) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}/receive`, 'POST', '确认费用原件签收', input),
   reduceExpense: (id: string, taskId: string, input: ExpenseReduction) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}/reduce`, 'POST', '确认财务核减', input),

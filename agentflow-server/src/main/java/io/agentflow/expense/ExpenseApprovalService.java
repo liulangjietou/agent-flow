@@ -64,13 +64,25 @@ public class ExpenseApprovalService {
     /** 财务同意要求本轮当前金额已实际冻结；纸件确认不能由普通同意动作隐式生成。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void requireApproval(Application application, Task task) {
-        if (!structured(application)) return;
+        String failure = approvalFailure(application, task);
+        if (failure != null) throw new DomainException(failure, "Expense approval prerequisites are not satisfied");
+    }
+
+    /** 读模型与写入口共享前置条件，按钮状态不代替写事务内的重新核对。 */
+    public String approvalFailure(Application application, Task task) {
+        if (!structured(application)) return null;
         var context = context(application, task);
         var stage = context.control().stage(task.getTaskDefinitionKey());
         String failure = budgetReviews.approvalFailure(context.report(), context.control(), task.getTaskDefinitionKey());
-        if (failure!=null) throw new DomainException(failure, "Budget checkpoint is not awaiting human exception approval");
-        if (!stage.businessApproval()) requirePaper(context);
-        if (stage.finance()) requireBudget(context);
+        if (failure != null) return failure;
+        if (!stage.businessApproval() && !context.control().paperReady()) return "EXPENSE_PAPER_RECEIPT_REQUIRED";
+        if (stage.finance()) {
+            var position = BudgetPrecheckPort.Request.fromCurrent(context.report(), context.control().input().accountingDate());
+            if (budgets.find(context.report().tenantId(), context.report().id()).filter(value -> value.frozenFor(position)).isEmpty()) {
+                return "EXPENSE_BUDGET_NOT_CONFIRMED";
+            }
+        }
+        return null;
     }
 
     /** 实际同意审计已存在后才登记预算授权；普通业务、签收和财务任务不产生例外命令。 */
