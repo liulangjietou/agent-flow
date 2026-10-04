@@ -1871,7 +1871,7 @@
           ]
         }
       ],
-      "observed": "法人和已固定出款账户筛选已完成范围测试、固定包 H2 财务 HTTP、非空 V113→V114 升级、付款中断接续、独立恢复及真实 Vue 模板/API 联调。付款到期日采用已授权的财务显式填写并固定规则，字段仍待实施；浏览器与 PostgreSQL 验收仍待环境。F16 保持 OPEN。",
+      "observed": "法人、固定出款账户与显式付款到期日的后端、日期筛选排序和页面已完成；184 条 Java、62 条前端范围测试以及类型检查、构建、OpenAPI 通过。旧法人/账户固定包运行验收已完成，新增日期的 V116→V117 升级、旧键接续、付款中断与独立恢复正在验证；浏览器与 PostgreSQL 仍待环境，F16 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java",
@@ -1896,20 +1896,33 @@
         {
           "path": "docs/evidence/cashier-payment-filters-runtime-20261004.json",
           "line": 1
+        },
+        {
+          "path": "docs/payment-due-dates.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/payment-due-dates-task1-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/payment-due-dates-task2-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "定义可信付款到期事实并接入筛选/排序；法人和实际支付账户筛选与总数、分页一致；保持逐笔复核及当前权限；不能把借款归还日当付款到期日。",
       "dependsOn": [],
       "progress": {
-        "recordedAt": "2026-10-04T08:39:16.303510+00:00",
-        "status": "LEGAL_ENTITY_AND_ACCOUNT_VERIFIED_EXPLICIT_FINANCE_DUE_DATE_IMPLEMENTATION_PENDING",
-        "implementationCommit": "94631d3d9dbcd5a38128a315de7fe8a223d8bc3b",
+        "recordedAt": "2026-10-04T14:40:38.234090+00:00",
+        "status": "DUE_DATE_IMPLEMENTED_SCOPED_CHECKS_PASSED_RUNTIME_IN_PROGRESS",
+        "implementationCommit": "beefd17c2f1adaa862edb17349241e9cc9419bc1",
         "evidence": "docs/evidence/cashier-payment-filters-runtime-20261004.json",
         "dateQuestionPending": false,
-        "packagedRuntimePending": false,
+        "packagedRuntimePending": true,
         "browserAndPostgresPending": true,
         "dateRuleAuthorized": true,
-        "dateImplementationPending": true
+        "dateImplementationPending": false,
+        "dateRuntimePending": true
       }
     },
     {
