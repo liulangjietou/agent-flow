@@ -37,14 +37,22 @@ for (const record of records) {
     applications.set(record.response.id, record.response.applicationId)
   }
 }
-const counts = { responses: 0, successfulRequests: 0, parsedViews: 0, deniedReads: 0, prechecksWithPolicy: 0, taskOptions: 0 }
+const counts = { responses: 0, binaryResponses: 0, successfulRequests: 0, parsedViews: 0, deniedReads: 0, prechecksWithPolicy: 0, taskOptions: 0 }
 const states = new Set(), decisions = new Set()
 for (const record of records) {
   const url = new URL(record.path, 'http://127.0.0.1'), parts = url.pathname.split('/')
   const matched = paths.find(path => path.parts.length === parts.length && path.parts.every((part, i) => part === parts[i] || /^\{[^}]+\}$/.test(part)))
   const api = matched?.methods[record.method.toLowerCase()]; assert.ok(api, `Undocumented ${record.method} ${record.path}`)
   const response = api.responses[record.status] ?? api.responses.default
-  validate(response?.content?.['application/json']?.schema, record.response, `${record.status} ${record.path}`); counts.responses++
+  const schema = response?.content?.['application/json']?.schema
+  if (schema) {
+    validate(schema, record.response, `${record.status} ${record.path}`); counts.responses++
+  } else {
+    // 配套恢复会下载原件；二进制响应核对声明及实际摘要，不能套用 JSON 模式。
+    assert.ok(Object.values(response?.content ?? {}).some(value => value.schema?.type === 'string' && value.schema?.format === 'binary'), 'Missing binary response schema: ' + record.path)
+    assert.ok(/^[0-9a-f]{64}$/.test(record.response?.sha256) && Number.isSafeInteger(record.response?.size) && record.response.size > 0, 'Missing binary evidence: ' + record.path)
+    counts.binaryResponses++
+  }
   if (record.status < 300 && api.requestBody?.content?.['application/json']) {
     validate(api.requestBody.content['application/json'].schema, record.request, 'Request ' + record.path); counts.successfulRequests++
   }

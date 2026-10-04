@@ -84,9 +84,9 @@
 - Create: `scripts/check-expense-budget-exceptions.py` 及真实前端响应检查脚本
 - Modify: 规范、计划、未完成台账及 `docs/evidence/expense-budget-exceptions-*.json`
 
-- [ ] 固定 V118 `prior-controls-server-1f343ac8.jar`（SHA256 `33f721c9913d8cdf854663de2d8f2e13bd6b9a7fa63f839294182a0349edbe3f`）建立旧在审与预算状态，升级后核对旧列。
-- [ ] 实际刚性/柔性、无需例外自动推进、并发人工审批、再次拒绝、旧键/权限、三轮及动态预算状态验收。
-- [ ] 原命令受理后强退及独立配套恢复，原审批和预算号接续；各版本契约和真实前端解析通过。
+- [x] 固定 V118 `prior-controls-server-1f343ac8.jar`（SHA256 `33f721c9913d8cdf854663de2d8f2e13bd6b9a7fa63f839294182a0349edbe3f`）建立旧在审与预算状态，升级后核对旧列。
+- [x] 实际刚性/柔性、无需例外自动推进、并发人工审批、再次拒绝、旧键/权限、三轮及动态预算状态验收。
+- [x] 原命令受理后强退及独立配套恢复，原审批和预算号接续；各版本契约和真实前端解析通过。
 - [ ] 归档固定包、源码及失败/成功记录，执行一次全范围独立审查；浏览器/PG 保持 OPEN。
 
 ## 初始决策

@@ -1611,19 +1611,28 @@
           ]
         }
       ],
-      "observed": "ExpenseBudgetOutcomeHandler 对 BUDGET_INSUFFICIENT 已实现自动退回；不存在区分柔性预算及预算负责人审批的路径，刚性不足不是缺失项。",
+      "observed": "柔性政策、原轮次授权、必经预算节点、页面及模板 v6 已实现；467 项 Java、54 项前端范围及 V118→V119 实际升级、强退原号查询、277 表 1174 行配套恢复通过。正在执行全计划独立审查；浏览器与 PostgreSQL 待补验，保持 OPEN。",
       "references": [
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetOutcomeHandler.java",
-          "line": 50
+          "path": "docs/expense-budget-exceptions.md",
+          "line": 1
         },
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java",
-          "line": 114
+          "path": "docs/evidence/expense-budget-exceptions-runtime-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "外部预算明确允许柔性策略才进入指定审批；例外不得伪造冻结成功；审批后重新确认预算，未知和拒绝状态保持阻断。",
-      "dependsOn": []
+      "dependsOn": [],
+      "progress": {
+        "status": "LOCAL_IMPLEMENTATION_RUNTIME_VERIFIED_FINAL_REVIEW_PENDING",
+        "recordedAt": "2026-10-04T17:49:25.256304+00:00",
+        "runtimeCommit": "32f84e0f2852a942687455bb938bf64b1d632351",
+        "evidence": "docs/evidence/expense-budget-exceptions-runtime-20261004.json",
+        "packagedRuntimePending": false,
+        "finalReviewPassed": false,
+        "browserAndPostgresPending": true
+      }
     },
     {
       "id": "F10",
@@ -3958,10 +3967,17 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "F05",
-    "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_FINAL_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
-    "recordedAt": "2026-10-04T16:08:30.000540+00:00",
-    "evidence": "docs/evidence/expense-prior-controls-final-review-20261004.json",
+    "taskId": "F09",
+    "status": "LOCAL_IMPLEMENTATION_RUNTIME_VERIFIED_FINAL_REVIEW_PENDING",
+    "recordedAt": "2026-10-04T17:49:25.256304+00:00",
+    "evidence": "docs/evidence/expense-budget-exceptions-runtime-20261004.json",
     "knownOpenTaskCount": 34
+  },
+  "localMainIntegration": {
+    "verifiedThroughCommit": "32f84e0f2852a942687455bb938bf64b1d632351",
+    "mergeCommit": "45d0e51af0c735b6f250312d0af474023e62dbc9",
+    "originMainFetchedAtMerge": "2ac75649c026501460a59464d80f9a48ddf6ecd7",
+    "remotePush": false,
+    "note": "Completed development merged locally at user request; remote delivery remains E15 after V02."
   }
 }
