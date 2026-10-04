@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "taskId": "A04",
+  "recordedAt": "2026-10-04T11:03:50.941657+00:00",
+  "status": "LOCAL_PACKAGED_RUNTIME_VERIFIED_BROWSER_POSTGRES_PENDING",
+  "taskStatus": "OPEN",
+  "sourceCommit": "080f7458105f0911aab2976e0c98ec282517edf5",
+  "businessCodeChanged": false,
+  "evidenceDirectory": "/fyoung/tmp/agentflow-remaining-20260928/a04-runtime-verified",
+  "artifactManifestSha256": "f50a9adb4370cd07b3f7bd9e5a5421fe4ad8ba6af9bbccc2cb4b091870850106",
+  "artifactCount": 2295,
+  "harnessSources": {
+    "scripts/check-expense-risk.py": "9ae41baa22e7d69cb0763337c2365ad0242e96a5b3f289685a0b53e7522d46d7",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7",
+    "scripts/fixtures/ExpenseRiskOidcFixture.java": "5816abf77f778aaf8fbf3679f87c486659744a4fc870a9b6c2fd04ee39e0356d",
+    "agentflow-server/src/test/java/io/agentflow/auth/OidcTestProvider.java": "d0bc33ab2d51ca5622edc7bde153ea71f8cb597c9f74ab56912b8522f3b4027b",
+    "agentflow-web/scripts/check-expense-risk-runtime.mjs": "478e65a6e4d1c3cd566e5ba69da18b24652511b66920802c24003b524c6e0387"
+  },
+  "runtime": {
+    "status": "PASSED",
+    "startedAt": "2026-10-04T11:01:13.930270+00:00",
+    "beforeSha256": "900d05a413802187094f46b48977a4997d0562400d41154f09374335927fc5b0",
+    "afterSha256": "c1d06add3e855e04c89f2a8bf91006a91e4c0b40bf3b43a10c2b3e4fcce05036",
+    "database": "H2",
+    "identity": "loopback OIDC with JDBC sessions",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "oldTables": 268,
+        "changedTables": [
+          "flyway_schema_history"
+        ],
+        "addedTables": [
+          "AGENT_EXPENSE_RISK_DOCUMENT",
+          "AGENT_EXPENSE_RISK_RUN",
+          "AGENT_EXPENSE_RISK_TRANSITION"
+        ]
+      },
+      {
+        "name": "queued-restart-original-session-and-lost-receipts",
+        "runId": "814c4c7b-c137-41fe-bd44-8d6d5fbeafcf",
+        "modelCalls": 1,
+        "cookieSha256": "266a27b4efa76061f35c2deb8f3044ced4894416307f97f5f914f7b360c2a693"
+      },
+      {
+        "name": "running-crash-no-resend",
+        "runId": "3fd1d456-68d8-44e6-9bd7-6c1d83bbf61d",
+        "failure": "MODEL_TIMEOUT",
+        "modelCalls": 1
+      },
+      {
+        "name": "original-logout-cannot-be-replaced",
+        "runId": "e62ceaa2-77e2-419d-8acf-6a4c2f5f0a4d",
+        "modelCalls": 0
+      },
+      {
+        "name": "stale-source-reject-adopt-allow-dismiss",
+        "runId": "6bd2f14a-6c9f-444a-841f-b723824548ef"
+      },
+      {
+        "name": "paired-restore-and-original-human-approval",
+        "tables": 271,
+        "nextTask": "21d0f6b0-bfe3-11f1-8734-7a6e745b5b04"
+      }
+    ],
+    "finishedAt": "2026-10-04T11:02:47.275987+00:00",
+    "modelCalls": 3,
+    "httpRecords": 269,
+    "financeCalls": 16,
+    "distinctBudgetCommands": 2,
+    "ownedProcessesStopped": true
+  },
+  "contract": {
+    "status": "PASSED",
+    "counts": {
+      "responses": 167,
+      "successfulRequests": 11,
+      "input": 4,
+      "calendars": 4,
+      "page": 2,
+      "detail": 144,
+      "receipt": 7,
+      "lostResponse": 2
+    },
+    "operations": [
+      "expenseRiskCalendars",
+      "expenseRiskInput",
+      "expenseRiskRun",
+      "expenseRiskRuns",
+      "generateExpenseRisk",
+      "reviewExpenseRisk"
+    ],
+    "states": [
+      "ADOPTED",
+      "COMPLETED",
+      "DISMISSED",
+      "FAILED",
+      "QUEUED",
+      "RUNNING"
+    ],
+    "kinds": [
+      "CONSECUTIVE_INVOICES",
+      "CROSS_DOCUMENT",
+      "NON_WORKING_DAY",
+      "SAME_DAY"
+    ],
+    "failures": [
+      "INPUT_UNAVAILABLE",
+      "MODEL_TIMEOUT"
+    ],
+    "compiledSources": [
+      {
+        "path": "agentflow-web/src/expenseRisk.ts",
+        "sha256": "64fd355931684c7bc8be2675ada9ace37fb0a951c1b8eb1bdfca2a2cf3d2af8c"
+      },
+      {
+        "path": "agentflow-web/src/formSchema.ts",
+        "sha256": "a2114f9959b76d6b6d673d193227cd8802c340f4922c01db2f095eab448b91c4"
+      }
+    ],
+    "compiledDirectory": "/fyoung/tmp/agentflow-risk-contract-g66ISJ",
+    "scope": "Actual packaged HTTP response contracts and frontend parsers; no interactive browser or PostgreSQL verification."
+  },
+  "restore": {
+    "tableCount": 271,
+    "rowCount": 379,
+    "attachmentCount": 3,
+    "riskRuns": 4,
+    "riskDocuments": 8,
+    "riskTransitions": 14,
+    "pairedSyntheticPeerState": true,
+    "originalHumanApprovalContinued": true
+  },
+  "package": {
+    "sourceCommit": "080f7458105f0911aab2976e0c98ec282517edf5",
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/risk-server-080f7458.jar",
+    "jarSha256": "c1d06add3e855e04c89f2a8bf91006a91e4c0b40bf3b43a10c2b3e4fcce05036",
+    "baselineJar": "/fyoung/tmp/agentflow-remaining-20260928/cashier-filter-server-94631d3d.jar",
+    "baselineSha256": "900d05a413802187094f46b48977a4997d0562400d41154f09374335927fc5b0",
+    "baselineVersion": 114,
+    "targetVersion": 115,
+    "webDist": "/fyoung/tmp/agentflow-remaining-20260928/a04-risk-api-ui-evidence-20261004/web-dist"
+  },
+  "preservedFailures": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/a04-runtime-first",
+      "reason": "Synthetic finance identity omitted APPROVER; the original task advanced but the next task was correctly filtered. Corrected fixture role, no product change."
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/a04-runtime-contract-first-failure.json",
+      "reason": "Checker required exact Cache-Control text; OIDC valid additional directives are permitted while no-store remains mandatory. Corrected checker only."
+    }
+  ],
+  "limitations": [
+    "Actual H2 and process/HTTP evidence; no PostgreSQL verification.",
+    "Local synthetic OIDC, finance and model providers; no real enterprise integration or model quality claim.",
+    "Frontend parser checks are not interactive browser acceptance.",
+    "V02 and E15 gates remain before any push or PR."
+  ],
+  "knownOpenTaskCount": 34
+}
