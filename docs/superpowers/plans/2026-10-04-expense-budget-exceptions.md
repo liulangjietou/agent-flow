@@ -57,13 +57,13 @@
 - Modify: `ExpenseProcessPolicy`, `DefinitionValidator`, `ExpenseSelfApprovalBindings/Snapshot`, `ExpenseApprovalService`, `ExpenseBudgetOutcomeHandler`
 - Modify: `approval/process/FlowableTaskFacade.java`, `ApprovalCompletionService.java`
 - Create: `ExpenseBudgetReviewService`、独立节点推进器、恢复 worker/调度（具体包按调用职责确定）
-- Modify: `BudgetOperationService`, `ExpenseWorkflowQuery` 与对应任务审计/操作可用性协议
+- Modify: `BudgetOperationService` 与任务审计；查询操作可用性字段随 Task 4 API / 页面契约共同接入。
 - Test: 新 `ExpenseBudgetReviewIntegrationTest`，复用已有真实流程和预算夹具；相关预算、审批、子流程范围测试
 
-- [ ] 先复现柔性拒绝自动退回、预算未确认可误审批、以及独立节点与恢复缺失。
-- [ ] 提交事务创建本轮控制并绑定原预算号；全路径必经单人预算节点；真实冻结才自动推进并审计，柔性拒绝才开放人工审批。
-- [ ] 人工批准原子登记一次带原凭据的新预算命令；未知只查原号，拒绝不循环。
-- [ ] 刚性/旧定义、核减后拒绝、撤回退回重提、敏感权限/代理、子流程暂停和事务失败回归通过后本地提交。
+- [x] 先复现柔性拒绝自动退回、预算未确认可误审批、以及独立节点与恢复缺失。
+- [x] 提交事务创建本轮控制并绑定原预算号；全路径必经单人预算节点；真实冻结才自动推进并审计，柔性拒绝才开放人工审批。
+- [x] 人工批准原子登记一次带原凭据的新预算命令；未知只查原号，拒绝不循环。
+- [x] 刚性/旧定义、核减后拒绝、撤回退回重提、敏感权限/代理、子流程暂停和事务失败回归通过后本地提交。
 
 ### Task 4: 查询、费用页面、定义设计与模板
 

@@ -258,6 +258,7 @@ public class FlowableTaskFacade {
                 completion.persistProgress(application, expectedVersion, task.getProcessInstanceId(),
                         completed.processEnded(), actor.userId(), comment);
                 auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
+                expenses.taskApproved(application, task, actor.userId(), auditEventId);
                 subprocesses.afterAdvance(before, application);
             }
             default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");

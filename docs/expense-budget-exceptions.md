@@ -40,4 +40,4 @@
 
 Task 1 已完成柔性政策、明确拒绝凭据和一次人工授权协议，64 项范围测试通过。Task 2 已完成原轮次聚合和 V119 持久存储，真实 JDBC 验证源操作/财务版本/预检/审计交叉核对、并发更新、事务回滚、恢复读取及关闭状态。初次回归有一处合成轮次遗漏既有结束人和结束时间，补全夹具后六项持久化测试通过，未放宽原数据库约束。
 
-正式提交接线、必经节点与原生审批/恢复推进、API/页面及固定安装包运行验收继续实施。阶段证据见 `docs/evidence/expense-budget-exceptions-task1-20261004.json` 与 `expense-budget-exceptions-task2-20261004.json`。
+Task 3 已完成正式提交接线、必经节点、原生预算审批与恢复推进；428 项范围回归通过，包括 12 项真实预算流程用例。API/页面及固定安装包运行验收继续实施。阶段证据见 `docs/evidence/expense-budget-exceptions-task1-20261004.json` 与 `expense-budget-exceptions-task2-20261004.json`。

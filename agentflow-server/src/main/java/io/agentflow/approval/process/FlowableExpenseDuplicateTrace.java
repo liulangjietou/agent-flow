@@ -43,6 +43,7 @@ public class FlowableExpenseDuplicateTrace implements ExecutionListener, TaskLis
     /** 取消会签及委派回交不会产生批准事实；实际 assignee 已由原办理入口确认。 */
     @Override
     public void notify(DelegateTask task) {
+        if (ExpenseBudgetReviewProgress.automatic(task)) return;
         String action = String.valueOf(task.getVariable("lastAction"));
         if (!TaskListener.EVENTNAME_COMPLETE.equals(task.getEventName()) || task.getAssignee() == null
                 || !("APPROVE".equals(action) || ExpenseDuplicateApprovalPolicy.ACTION.equals(action))) throw invalid();

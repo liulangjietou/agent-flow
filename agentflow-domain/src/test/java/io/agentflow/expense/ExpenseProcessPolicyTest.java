@@ -60,6 +60,20 @@ class ExpenseProcessPolicyTest {
     }
 
     @Test
+    void budgetCheckpointMustBeSingleCommonReadableAndBeforeEveryFinancePath() {
+        var schema = schema(Map.of("budget", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY));
+        var afterFinance = chain(task("finance", "FINANCE_REVIEW"), task("budget", "BUDGET_REVIEW"));
+        assertThat(new DefinitionValidator().validate(afterFinance, schema)).contains("EXPENSE_BUDGET_APPROVAL_REQUIRED");
+        var parallel = new Node("budget", "预算审批", NodeType.USER_TASK,
+                Map.of("assigneeRule", "user:manager", "expenseStage", "BUDGET_REVIEW", "approvalMode", "ALL"));
+        assertThat(new DefinitionValidator().validate(chain(parallel, task("finance", "FINANCE_REVIEW")), schema)).contains("EXPENSE_BUDGET_APPROVAL_REQUIRED");
+        var graph = new Graph(List.of(node("start", NodeType.START), node("branch", NodeType.EXCLUSIVE_GATEWAY), task("budget", "BUDGET_REVIEW"),
+                task("finance", "FINANCE_REVIEW"), node("end", NodeType.END)), List.of(edge("a", "start", "branch"),
+                new Edge("b", "branch", "budget", "amount > 50"), new Edge("c", "branch", "finance", "", true), edge("d", "budget", "finance"), edge("e", "finance", "end")));
+        assertThat(new DefinitionValidator().validate(graph, schema)).contains("EXPENSE_BUDGET_APPROVAL_REQUIRED");
+    }
+
+    @Test
     void paperReceiptIsAnExplicitOnceOnlyFactForTheCurrentFrozenRound() {
         Instant now = Instant.parse("2026-09-28T16:00:00Z"); var first = ExpenseSubmissionControl.submitted(input(1, true), now);
         assertThat(first.paperReady()).isFalse();

@@ -136,13 +136,14 @@ public class JdbcExpenseBudgetReviewRepository {
         if (!report.applicationId().equals(input.applicationId()) || !report.currentRound().submittedAt().equals(value.submittedAt())
                 || !original.input().command().position().equals(BudgetPrecheckPort.Request.fromCurrent(report, submitted.accountingDate()))
                 || !checked.result().evidence().budget().request().equals(BudgetPrecheckPort.Request.from(report, submitted.accountingDate()))) throw inconsistent();
-        if (value.approval()!=null) audit(value, value.approval().auditEventId(), value.approval().taskId(), value.approval().actorId(), "APPROVE", value.approval().approvedAt());
-        if (value.automaticPass()!=null) audit(value, value.automaticPass().auditEventId(), value.automaticPass().taskId(), "system:budget", "AUTO_PASSED_BUDGET", value.automaticPass().passedAt());
+        if (value.approval()!=null) audit(value, value.approval().auditEventId(), value.approval().taskId(), value.approval().actorId(), "APPROVE", value.approval().approvedAt(), null);
+        if (value.automaticPass()!=null) audit(value, value.automaticPass().auditEventId(), value.automaticPass().taskId(), ExpenseBudgetApprovalPolicy.SYSTEM_ACTOR,
+                ExpenseBudgetApprovalPolicy.AUTOMATIC_ACTION, value.automaticPass().passedAt(), original);
         if (value.closure()!=null && !jdbc.queryForList("SELECT status FROM approval_submission_round WHERE tenant_id=? AND application_id=? AND round_no=?",
                 String.class, input.tenantId(), input.applicationId().toString(), input.roundNo()).equals(List.of(value.closure().name()))) throw inconsistent();
     }
 
-    private void audit(ExpenseBudgetReview value, UUID auditId, String taskId, String actor, String action, Instant at) {
+    private void audit(ExpenseBudgetReview value, UUID auditId, String taskId, String actor, String action, Instant at, BudgetOperation confirmed) {
         var input = value.input();
         var matches = jdbc.query("""
                 SELECT payload_json,occurred_at FROM audit_event WHERE tenant_id=? AND event_id=? AND aggregate_type='Task'
@@ -152,6 +153,8 @@ public class JdbcExpenseBudgetReviewRepository {
             return payload.path("roundNo").isIntegralNumber() && payload.path("roundNo").asInt()==input.roundNo()
                     && payload.path("nodeId").asText().equals(input.budgetNodeId()) && payload.path("actor").asText().equals(actor)
                     && payload.path("action").asText().equals(action) && payload.path("applicationId").asText().equals(input.applicationId().toString())
+                    && (confirmed==null || payload.at("/budgetConfirmation/operationId").asText().equals(confirmed.input().command().id().toString())
+                        && payload.at("/budgetConfirmation/commandDigest").asText().equals(confirmed.input().command().digest()))
                     && !row.getTimestamp("occurred_at").toInstant().isAfter(at);
         }, input.tenantId(), auditId.toString(), taskId, input.applicationId().toString(), actor, action);
         if (!matches.equals(List.of(true))) throw inconsistent();

@@ -12,6 +12,8 @@ import io.agentflow.expense.InvoiceKey;
 import io.agentflow.finance.BudgetCommand;
 import io.agentflow.finance.BudgetObservation;
 import io.agentflow.finance.BudgetPrecheckPort;
+import io.agentflow.finance.BudgetExceptionPolicy;
+import io.agentflow.finance.BudgetExceptionOffer;
 import io.agentflow.finance.EmployeeAccountPort;
 import io.agentflow.finance.EmployeeAccountSnapshot;
 import io.agentflow.finance.FinanceCatalog;
@@ -38,9 +40,11 @@ final class ExpenseSubprocessGatewayFixture implements AutoCloseable {
     private final Map<UUID, AtomicInteger> writes = new ConcurrentHashMap<>();
     private final Map<UUID, AtomicInteger> queries = new ConcurrentHashMap<>();
     private final Map<UUID, Instant> appliedAt = new ConcurrentHashMap<>();
+    private final Map<UUID, BudgetObservation> exceptionTerminals = new ConcurrentHashMap<>();
     private volatile Context context;
     private volatile RuntimeException failure;
     private volatile BudgetObservation.Status budgetStatus = BudgetObservation.Status.APPLIED;
+    private volatile BudgetExceptionPolicy exceptionPolicy;
 
     ExpenseSubprocessGatewayFixture() {
         try {
@@ -78,10 +82,13 @@ final class ExpenseSubprocessGatewayFixture implements AutoCloseable {
         context = new Context(json, entity, invoiceNumber, expenseGross);
         commands.clear(); writes.clear(); queries.clear(); appliedAt.clear(); failure = null;
         budgetStatus = BudgetObservation.Status.APPLIED;
+        exceptionPolicy = null; exceptionTerminals.clear();
     }
     String endpoint() { return "http://127.0.0.1:" + server.getAddress().getPort() + "/finance"; }
     RuntimeException failure() { return failure; }
     void budgetStatus(BudgetObservation.Status status) { budgetStatus = status; }
+    /** 柔性用例才显式返回外部政策，已确认终态按原命令保留。 */
+    void exceptionPolicy(String reference) { exceptionPolicy = reference == null ? null : new BudgetExceptionPolicy(reference); }
     int writes() { return writes.values().stream().mapToInt(AtomicInteger::get).sum(); }
     int queries() { return queries.values().stream().mapToInt(AtomicInteger::get).sum(); }
     int writes(UUID id) { return writes.getOrDefault(id, new AtomicInteger()).get(); }
@@ -102,7 +109,7 @@ final class ExpenseSubprocessGatewayFixture implements AutoCloseable {
             case "expense-policy" -> new ExpensePolicyPort.Assessment(new ExpensePolicySnapshot(UUID.randomUUID(), 1, current.expenseGross(), current.expenseGross(),
                     ExpensePolicySnapshot.Decision.WITHIN_LIMIT, "synthetic-tax", "synthetic-policy"), money("6"), false, Instant.now().plusSeconds(600));
             case "budget-precheck" -> new BudgetPrecheckPort.Assessment(current.json().read(data.toString(), BudgetPrecheckPort.Request.class),
-                    "synthetic-precheck", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
+                    "synthetic-precheck", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600), exceptionPolicy);
             case "budget-command", "budget-query" -> budget(current.json(), operation, data);
             default -> throw new IllegalArgumentException("Unexpected financial operation during expense subprocess approval: " + operation);
         };
@@ -122,11 +129,17 @@ final class ExpenseSubprocessGatewayFixture implements AutoCloseable {
             queries.computeIfAbsent(id, ignored -> new AtomicInteger()).incrementAndGet();
         }
         var status = budgetStatus;
-        return new BudgetObservation(command.id(), command.digest(), status,
+        if (exceptionTerminals.containsKey(command.id())) return exceptionTerminals.get(command.id());
+        boolean exception = status == BudgetObservation.Status.REJECTED && exceptionPolicy != null
+                && (command.action() == BudgetCommand.Action.FREEZE || command.action() == BudgetCommand.Action.ADJUST);
+        var observation = new BudgetObservation(command.id(), command.digest(), status,
                 status == BudgetObservation.Status.APPLIED ? command.expected() == null ? 1L : command.expected().revision() + 1 : null,
                 status == BudgetObservation.Status.APPLIED ? "synthetic-budget-" + command.id() : null,
                 status == BudgetObservation.Status.APPLIED ? appliedAt.computeIfAbsent(command.id(), ignored -> Instant.now()) : null,
-                status == BudgetObservation.Status.REJECTED ? BudgetObservation.Rejection.BUDGET_INSUFFICIENT : null);
+                status == BudgetObservation.Status.REJECTED ? exception ? BudgetObservation.Rejection.BUDGET_EXCEPTION_REQUIRED : BudgetObservation.Rejection.BUDGET_INSUFFICIENT : null,
+                exception ? new BudgetExceptionOffer(exceptionPolicy.reference(), "offer-" + command.id()) : null);
+        if (exceptionPolicy != null && (status == BudgetObservation.Status.APPLIED || status == BudgetObservation.Status.REJECTED)) exceptionTerminals.put(command.id(), observation);
+        return observation;
     }
 
     private static Money money(String amount) { return new Money(new BigDecimal(amount), "CNY"); }

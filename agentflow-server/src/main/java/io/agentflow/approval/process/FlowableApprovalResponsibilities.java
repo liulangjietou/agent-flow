@@ -56,6 +56,7 @@ public class FlowableApprovalResponsibilities implements TaskListener {
      */
     @Override
     public void notify(DelegateTask task) {
+        if (ExpenseBudgetReviewProgress.automatic(task)) return;
         if (!TaskListener.EVENTNAME_COMPLETE.equals(task.getEventName()) || task.getAssignee() == null) throw invalidScope();
         if (task.getTenantId() == null || !task.getTenantId().equals(task.getVariable("tenantId"))) throw invalidScope();
         recordParticipant(task.getProcessInstanceId(), task.getTaskDefinitionKey(), task.getAssignee());

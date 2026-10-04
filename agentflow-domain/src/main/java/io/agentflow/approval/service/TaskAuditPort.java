@@ -21,7 +21,16 @@ public interface TaskAuditPort {
                          int roundNo, String processInstanceId, String actor, String action,
                          String comment, String targetUser, String nodeId, String nodeName,
                          ApplicationStatus previousStatus, ApplicationStatus currentStatus, MembershipChange membershipChange,
-                         ApprovalProxyUse proxyUse, DuplicateApproval duplicateApproval) {
+                         ApprovalProxyUse proxyUse, DuplicateApproval duplicateApproval, BudgetConfirmation budgetConfirmation) {
+        /** 原人工和重复审批审计不补造外部预算依据。 */
+        public TaskOperation(String tenantId, String taskId, UUID applicationId, long aggregateVersion,
+                             int roundNo, String processInstanceId, String actor, String action,
+                             String comment, String targetUser, String nodeId, String nodeName,
+                             ApplicationStatus previousStatus, ApplicationStatus currentStatus, MembershipChange membershipChange,
+                             ApprovalProxyUse proxyUse, DuplicateApproval duplicateApproval) {
+            this(tenantId, taskId, applicationId, aggregateVersion, roundNo, processInstanceId, actor, action, comment,
+                    targetUser, nodeId, nodeName, previousStatus, currentStatus, membershipChange, proxyUse, duplicateApproval, null);
+        }
         /** 原人工动作保留调用契约，自动动作另带不可变的来源依据。 */
         public TaskOperation(String tenantId, String taskId, UUID applicationId, long aggregateVersion,
                              int roundNo, String processInstanceId, String actor, String action,
@@ -63,4 +72,10 @@ public interface TaskAuditPort {
                              java.util.List<String> sourceTaskIds, String subject) {
         public DuplicateApproval { sourceTaskIds = java.util.List.copyOf(sourceTaskIds); }
     }
+
+    /**
+     * 系统通过指向本轮已经实际完成的预算操作，不在通用任务审计复制敏感分摊和外部凭据。
+     * @author owlzhangfq@gmail.com
+     */
+    record BudgetConfirmation(UUID operationId, String commandDigest) { }
 }

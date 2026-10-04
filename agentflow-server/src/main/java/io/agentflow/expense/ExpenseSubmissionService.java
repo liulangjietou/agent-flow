@@ -33,19 +33,21 @@ public class ExpenseSubmissionService {
     private final ExpensePolicyConfiguration policyConfiguration;
     private final ExpenseSplitRoutingService splitRouting;
     private final JdbcExpensePriorControlRepository priorControls;
+    private final ExpenseBudgetReviewService budgetReviews;
 
     /** 外部调用由持久执行器承担，提交事务只使用仍然有效的已确认事实。 */
     public ExpenseSubmissionService(CurrentActor actors, ExpenseReportRepository reports, ApprovalApplicationFacade applications,
             DefinitionDraftRepository definitions, JdbcExpensePrecheckRepository prechecks, ExpensePrecheckService validation,
             ExpensePrecheckResources resources, ExpenseResourceChanges changes, JdbcExpenseSubmissionControlRepository controls,
             BudgetOperationService budgets, ExpensePolicyConfiguration policyConfiguration, ExpenseSplitRoutingService splitRouting,
-            JdbcExpensePriorControlRepository priorControls) {
+            JdbcExpensePriorControlRepository priorControls, ExpenseBudgetReviewService budgetReviews) {
         this.actors = actors; this.reports = reports; this.applications = applications; this.definitions = definitions;
         this.prechecks = prechecks; this.validation = validation; this.resources = resources; this.changes = changes;
         this.controls = controls; this.budgets = budgets;
         this.policyConfiguration = policyConfiguration;
         this.splitRouting = splitRouting;
         this.priorControls = priorControls;
+        this.budgetReviews = budgetReviews;
     }
 
     /** 申请人只提交双版本与预检编号；金额、任职、纸件要求和预算输入全部从服务端事实派生。 */
@@ -68,6 +70,7 @@ public class ExpenseSubmissionService {
                 .orElseThrow(() -> new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published expense process not found"));
         definition.requireStartEnabled();
         var stages = ExpenseProcessPolicy.requireSubmittable(definition.graph(), application.formSchema(), evidence.legalEntity().paperReceiptRequired());
+        String budgetNode = ExpenseBudgetApprovalPolicy.require(definition.graph(), application.formSchema(), evidence.budget().exceptionPolicy()!=null);
         var loaded = resources.load(report); Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         var preview = evidence.preview();
         var assessments = preview.originalLines().stream().collect(Collectors.toMap(value -> value.original().lineNo(), ExpenseRound.FrozenLine::assessment));
@@ -91,6 +94,7 @@ public class ExpenseSubmissionService {
                 application.roundNo(), report.version(), input.precheckId(), checked.input().accountingDate(), evidence.legalEntity().paperReceiptRequired(), stages), now);
         controls.create(control);
         var operation = budgets.reserve(actor.tenantId(), id, report.version(), checked.input().accountingDate(), checked.input().targetDigest(), now);
+        budgetReviews.submitted(control, operation, evidence.budget().exceptionPolicy(), budgetNode);
         if (!evidence.validUntil().isAfter(Instant.now())) throw new DomainException("FACTS_EXPIRED", "Expense precheck expired during submission");
         return new Receipt(id, application.id(), application.version(), report.version(), application.roundNo(), operation.input().command().id());
     }

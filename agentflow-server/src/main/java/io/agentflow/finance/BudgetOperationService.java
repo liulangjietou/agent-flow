@@ -2,6 +2,7 @@ package io.agentflow.finance;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseReportRepository;
+import io.agentflow.expense.ExpenseBudgetReview;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.context.ApplicationEventPublisher;
@@ -45,6 +46,20 @@ public class BudgetOperationService {
                         ? BudgetCommand.Action.FREEZE : BudgetCommand.Action.ADJUST,
                 BudgetPrecheckPort.Request.fromCurrent(report, date), occupation == null || occupation.confirmed() == null ? null : occupation.confirmed().expected());
         return register(occupation, new BudgetOperation.Input(command, targetDigest), now);
+    }
+
+    /** 原任务同意与审计已经存在后，以固定编号登记同分摊的例外冻结或调整。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public BudgetOperation reserveException(ExpenseBudgetReview review, Instant now) {
+        if (review.status()!=ExpenseBudgetReview.Status.AUTHORIZED) throw new DomainException("EXPENSE_BUDGET_REVIEW_NOT_ALLOWED", "Budget exception requires an approved original review");
+        var input = review.input(); reports.lock(input.tenantId(), input.reportId());
+        var original = operations.find(input.tenantId(), input.originalOperationId()).orElseThrow(BudgetOperationService::notFound);
+        var report = reports.find(input.tenantId(), input.reportId()).orElseThrow(BudgetOperationService::notFound);
+        if (!original.input().command().position().equals(BudgetPrecheckPort.Request.fromCurrent(report, original.input().command().position().accountingDate()))) {
+            throw new DomainException("CONCURRENCY_CONFLICT", "Financial position changed before budget exception registration");
+        }
+        var occupation = occupations.find(input.tenantId(), input.reportId()).orElseThrow(BudgetOperationService::notFound);
+        return register(occupation, new BudgetOperation.Input(review.retryCommand(original), input.targetDigest()), now);
     }
 
     /** 驳回或结算事务使用最后确认的冻结，不能释放尚未查清的外部操作。 */

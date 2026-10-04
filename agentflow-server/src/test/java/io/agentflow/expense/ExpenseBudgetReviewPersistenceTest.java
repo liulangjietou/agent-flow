@@ -186,7 +186,11 @@ class ExpenseBudgetReviewPersistenceTest {
         operations.create(BudgetOperation.queue(input, approved.updatedAt()));
     }
     private void audit(ExpenseBudgetReview value, UUID id, String task, String actor, String action, Instant at) {
-        var payload = Map.of("roundNo", 1, "nodeId", "budget", "actor", actor, "action", action, "applicationId", value.input().applicationId().toString());
+        var payload = new java.util.HashMap<String, Object>(Map.of("roundNo", 1, "nodeId", "budget", "actor", actor, "action", action, "applicationId", value.input().applicationId().toString()));
+        if (ExpenseBudgetApprovalPolicy.AUTOMATIC_ACTION.equals(action)) {
+            var original = operations.find(TENANT, value.input().originalOperationId()).orElseThrow().input().command();
+            payload.put("budgetConfirmation", Map.of("operationId", original.id(), "commandDigest", original.digest()));
+        }
         jdbc.update("INSERT INTO audit_event(id,tenant_id,event_id,aggregate_type,aggregate_id,aggregate_version,application_id,action,actor_id,payload_json,occurred_at) VALUES(?,?,?,'Task',?,3,?,?,?,?,?)",
                 UUID.randomUUID().toString(), TENANT, id.toString(), task, value.input().applicationId().toString(), action, actor, json.write(payload), Timestamp.from(at));
     }

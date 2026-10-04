@@ -33,16 +33,18 @@ public class ApprovalCompletionService {
     private final BudgetAdjustmentApprovalService budgets;
     private final VoucherPreparationService vouchers;
     private final ExpenseDuplicateApprovalProgress duplicateApprovals;
+    private final ExpenseBudgetReviewProgress budgetReviews;
 
     /** 保留原财务控制与同事务准备入口，不在审批事务内调用外部财务系统。 */
     public ApprovalCompletionService(ApplicationRepository applications, SubmissionRoundRepository rounds,
             ExpenseApprovalService expenses, ExpensePlanApprovalService plans, AdvanceRequestApprovalService advances,
             ProcurementPaymentApprovalService procurement, BudgetAdjustmentApprovalService budgets, VoucherPreparationService vouchers,
-            SubprocessExecutionLocks executionLocks, ExpenseDuplicateApprovalProgress duplicateApprovals) {
+            SubprocessExecutionLocks executionLocks, ExpenseDuplicateApprovalProgress duplicateApprovals, ExpenseBudgetReviewProgress budgetReviews) {
         this.applications = applications; this.rounds = rounds; this.expenses = expenses; this.plans = plans;
         this.advances = advances; this.procurement = procurement; this.budgets = budgets; this.vouchers = vouchers;
         this.executionLocks = executionLocks;
         this.duplicateApprovals = duplicateApprovals;
+        this.budgetReviews = budgetReviews;
     }
 
     /** 申请优先，再锁关联业务；返回锁后事实，防止异步推进和人工动作交错覆盖。 */
@@ -68,6 +70,7 @@ public class ApprovalCompletionService {
     public void persistProgress(Application application, long expectedVersion, String instanceId, boolean ended,
                                 String actor, String reason) {
         if (!ended) ended = duplicateApprovals.advance(application, instanceId);
+        if (!ended) ended = budgetReviews.advance(application, instanceId);
         if (ended) {
             application.approve(application.version());
             rounds.complete(application.tenantId(), application.id(), application.roundNo(), instanceId,
