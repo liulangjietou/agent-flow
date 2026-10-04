@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T04:39:03.885538+00:00",
+  "recordedAt": "2026-10-04T04:49:29.886156+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -907,7 +907,7 @@
           ]
         }
       ],
-      "observed": "V109/V110、可信来源 HTTP、持久工作器及 11 个管理员接口已有后端证据。本轮接通只读诊断和完整核对页面：69 个后端范围用例、134 个前端用例、79 个真实成功响应的生产客户端解析以及类型检查和构建通过。固定包运行验收、浏览器及 PostgreSQL 新范围尚待完成，继续 OPEN。",
+      "observed": "同步领域、V109/V110、可信 HTTP、持久工作器、11 个管理员接口、只读诊断及完整核对页面已接通。69 个后端及 134 个前端范围用例通过。固定包 14 次启动完成非空升级、强退、人工采用、冲突、原审批接续和独立恢复（262 表、366 行、1 附件）；152 份同步响应契约、146 份成功响应及 65 份本地目录页生产解析通过。浏览器和 PostgreSQL 补验待完成，继续 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationController.java",
@@ -940,6 +940,10 @@
         {
           "path": "docs/evidence/organization-sync-ui-20261004.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/organization-sync-runtime-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "以单一可信源映射组织事实，预检和具名应用变更、停用及重试均有审计；不隐式创建认证身份或授予系统角色；旧审批轮次依据保持。",
@@ -963,6 +967,11 @@
         "status": "SYSTEM_DIAGNOSTICS_AND_REVIEW_UI_VERIFIED_LOCAL",
         "implementationCommit": "c9b47341164a6025cb0c23e4eb8c03a08f4c146b",
         "evidence": "docs/evidence/organization-sync-ui-20261004.json"
+      },
+      "runtimeStage": {
+        "status": "FIXED_PACKAGE_LOCAL_H2_RUNTIME_VERIFIED_BROWSER_AND_POSTGRES_PENDING",
+        "sourceCommit": "0cbe62bdcff0a00553bc13d5619b127a201e4ffc",
+        "evidence": "docs/evidence/organization-sync-runtime-20261004.json"
       }
     },
     {
@@ -3702,10 +3711,10 @@
   },
   "latestProgress": {
     "taskId": "I01",
-    "status": "SYSTEM_DIAGNOSTICS_AND_REVIEW_UI_VERIFIED_LOCAL",
-    "recordedAt": "2026-10-04T04:39:03.885538+00:00",
-    "sourceCommit": "c9b47341164a6025cb0c23e4eb8c03a08f4c146b",
-    "evidence": "docs/evidence/organization-sync-ui-20261004.json",
+    "status": "FIXED_PACKAGE_LOCAL_H2_RUNTIME_VERIFIED_BROWSER_AND_POSTGRES_PENDING",
+    "recordedAt": "2026-10-04T04:49:29.886156+00:00",
+    "sourceCommit": "0cbe62bdcff0a00553bc13d5619b127a201e4ffc",
+    "evidence": "docs/evidence/organization-sync-runtime-20261004.json",
     "knownOpenTaskCount": 34
   }
 }

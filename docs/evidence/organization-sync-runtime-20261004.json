@@ -1,0 +1,320 @@
+{
+  "schemaVersion": 1,
+  "taskId": "I01",
+  "status": "FIXED_PACKAGE_LOCAL_H2_RUNTIME_VERIFIED_BROWSER_AND_POSTGRES_PENDING",
+  "recordedAt": "2026-10-04T04:49:29.886156+00:00",
+  "sourceCommit": "0cbe62bdcff0a00553bc13d5619b127a201e4ffc",
+  "implementationCommit": "c9b47341164a6025cb0c23e4eb8c03a08f4c146b",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "固定安装包真实 HTTP、V108 到 V110 非空升级、排队与执行中强退、人工应用、稳定组织身份、新旧审批轮次、目标变化以及数据库/附件/合成来源/应用包的独立配套恢复。",
+  "validation": {
+    "package": "PASS",
+    "runtimeStatus": "PASS",
+    "boots": [
+      {
+        "boot": 1,
+        "tag": "baseline-v108",
+        "baseline": true,
+        "workers": false,
+        "pid": 47485,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+        "sourcePath": "/hr",
+        "readySeconds": 6.99
+      },
+      {
+        "boot": 2,
+        "tag": "upgraded-v110",
+        "baseline": false,
+        "workers": false,
+        "pid": 47502,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+        "sourcePath": "/hr",
+        "readySeconds": 6.56
+      },
+      {
+        "boot": 3,
+        "tag": "queue-worker-off",
+        "baseline": false,
+        "workers": false,
+        "pid": 47513,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+        "sourcePath": "/hr",
+        "readySeconds": 6.2
+      },
+      {
+        "boot": 4,
+        "tag": "queued-restart-off",
+        "baseline": false,
+        "workers": false,
+        "pid": 47519,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+        "sourcePath": "/hr",
+        "readySeconds": 6.65
+      },
+      {
+        "boot": 5,
+        "tag": "queued-worker-on",
+        "baseline": false,
+        "workers": true,
+        "pid": 47525,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+        "sourcePath": "/hr",
+        "readySeconds": 6.56
+      },
+      {
+        "boot": 6,
+        "tag": "review-restart-off",
+        "baseline": false,
+        "workers": false,
+        "pid": 47554,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+        "sourcePath": "/hr",
+        "readySeconds": 6.56
+      },
+      {
+        "boot": 7,
+        "tag": "drift-worker-on",
+        "baseline": false,
+        "workers": true,
+        "pid": 47561,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+        "sourcePath": "/hr",
+        "readySeconds": 6.56
+      },
+      {
+        "boot": 8,
+        "tag": "inflight-worker-on",
+        "baseline": false,
+        "workers": true,
+        "pid": 47584,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+        "sourcePath": "/hr",
+        "readySeconds": 6.68
+      },
+      {
+        "boot": 9,
+        "tag": "inflight-restart",
+        "baseline": false,
+        "workers": true,
+        "pid": 47604,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+        "sourcePath": "/hr",
+        "readySeconds": 6.66
+      },
+      {
+        "boot": 10,
+        "tag": "target-original",
+        "baseline": false,
+        "workers": true,
+        "pid": 47617,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+        "sourcePath": "/hr",
+        "readySeconds": 6.66
+      },
+      {
+        "boot": 11,
+        "tag": "target-changed-off",
+        "baseline": false,
+        "workers": false,
+        "pid": 47626,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+        "sourcePath": "/hr-next",
+        "readySeconds": 6.67
+      },
+      {
+        "boot": 12,
+        "tag": "backup-queued-off",
+        "baseline": false,
+        "workers": false,
+        "pid": 47650,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+        "sourcePath": "/hr",
+        "readySeconds": 6.66
+      },
+      {
+        "boot": 13,
+        "tag": "restore-worker-off",
+        "baseline": false,
+        "workers": false,
+        "pid": 47671,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-restored-kgokes3u",
+        "sourcePath": "/hr",
+        "readySeconds": 6.55
+      },
+      {
+        "boot": 14,
+        "tag": "restore-worker-on",
+        "baseline": false,
+        "workers": true,
+        "pid": 47682,
+        "directory": "/fyoung/tmp/agentflow-organization-sync-restored-kgokes3u",
+        "sourcePath": "/hr",
+        "readySeconds": 6.64
+      }
+    ],
+    "httpExchanges": 264,
+    "organizationSyncOpenApi": {
+      "recordedAt": "2026-10-04T04:48:27.312Z",
+      "source": "/fyoung/tmp/agentflow-organization-sync-rupzdioi/sync-http.json",
+      "responses": 152,
+      "successfulRequests": 24,
+      "replayed": 4,
+      "operations": [
+        "GET /api/v1/organization/synchronization",
+        "GET /api/v1/organization/synchronization/batches",
+        "GET /api/v1/organization/synchronization/batches/{id}",
+        "GET /api/v1/organization/synchronization/batches/{id}/plans",
+        "GET /api/v1/organization/synchronization/batches/{id}/transitions",
+        "GET /api/v1/organization/synchronization/plans/{planId}",
+        "POST /api/v1/organization/synchronization/batches",
+        "POST /api/v1/organization/synchronization/batches/{id}/apply",
+        "POST /api/v1/organization/synchronization/batches/{id}/cancel",
+        "POST /api/v1/organization/synchronization/batches/{id}/preflight",
+        "POST /api/v1/organization/synchronization/batches/{id}/retry"
+      ],
+      "statuses": [
+        200,
+        201,
+        202,
+        403,
+        409
+      ]
+    },
+    "productionClient": {
+      "source": "/fyoung/tmp/agentflow-organization-sync-rupzdioi/http.json",
+      "responses": 146,
+      "successfulWrites": 24,
+      "localPages": 65,
+      "operations": [
+        "GET /api/v1/organization/synchronization",
+        "GET /api/v1/organization/synchronization/batches",
+        "GET /api/v1/organization/synchronization/batches/{id}",
+        "GET /api/v1/organization/synchronization/batches/{id}/plans",
+        "GET /api/v1/organization/synchronization/batches/{id}/transitions",
+        "GET /api/v1/organization/synchronization/plans/{planId}",
+        "POST /api/v1/organization/synchronization/batches",
+        "POST /api/v1/organization/synchronization/batches/{id}/apply",
+        "POST /api/v1/organization/synchronization/batches/{id}/cancel",
+        "POST /api/v1/organization/synchronization/batches/{id}/preflight",
+        "POST /api/v1/organization/synchronization/batches/{id}/retry"
+      ],
+      "compiledSources": "/fyoung/tmp/agentflow-i01-client-OTKJ5D"
+    },
+    "checks": {
+      "nonEmptyV108ToV110": {
+        "oldTables": 255,
+        "oldRows": 216,
+        "preservedTables": 254,
+        "newEmptyTables": [
+          "ORGANIZATION_SYNC_APPLICATION",
+          "ORGANIZATION_SYNC_BATCH",
+          "ORGANIZATION_SYNC_BINDING",
+          "ORGANIZATION_SYNC_BINDING_CHANGE",
+          "ORGANIZATION_SYNC_PLAN",
+          "ORGANIZATION_SYNC_SOURCE",
+          "ORGANIZATION_SYNC_TRANSITION"
+        ]
+      },
+      "queuedCrashReviewRestartAndExplicitApply": {
+        "batch": "cc990a6e-c765-4f40-b5d8-494b96ad3d70",
+        "plan": "2960d450-ed2e-46bc-b31f-2c46e8577518",
+        "sourceReads": 1,
+        "adoptedIdentities": 11,
+        "oldTask": "86b43de8-bfae-11f1-8079-f2600160e513",
+        "newTask": "9d8bdece-bfae-11f1-a2b8-f2600160e513",
+        "stoppedPersonPreserved": true
+      },
+      "localDriftStalePlanCancelAndExplicitRetry": {
+        "original": "a8ca78fd-f3df-442e-85d9-9ec62f7b6d7b",
+        "retry": "337bcd03-0f8d-4356-a7b0-cfc531dd154b",
+        "cursor": 2
+      },
+      "inflightCrashKeepsLeaseAndDoesNotResend": {
+        "batch": "ecd97d66-c284-446f-bd69-85ecf473958a",
+        "lease": "2026-10-04T04:47:16.302Z",
+        "sourceCalls": 1,
+        "failure": "SOURCE_TIMEOUT"
+      },
+      "changedTargetRejectsOldPlanButAllowsCancel": {
+        "batch": "d05b2852-0ba2-4c81-953d-5dc11c4a2b39"
+      },
+      "independentPairedRestore": {
+        "directory": "/fyoung/tmp/agentflow-organization-sync-restored-kgokes3u",
+        "tables": 262,
+        "rows": 366,
+        "attachmentFiles": 1,
+        "oldTaskCompleted": "86b43de8-bfae-11f1-8079-f2600160e513",
+        "queuedFirstReadAfterRestore": 1,
+        "sourceDatabaseAndFilesUnchanged": true,
+        "cursorAfterApply": 3
+      },
+      "fixedWebFilesServedOverHttp": {
+        "index.html": "72c629c04cfa0f5fce17265ebb1ef2becdfc35d5024fdd2975fcbe7805cb31ee",
+        "assets/index-KGeU_L9E.css": "e733a862e9af3f01d9e974a97d362475992e494d25b58047176e930eb59685fd",
+        "assets/index-n1PO_vdj.js": "281a2832b443d7164920e8ee670a4acfbaac543276d24f0c7c96e262885f45c9"
+      }
+    },
+    "ownedRuntimeStopped": true,
+    "firstAttempt": {
+      "status": "HARNESS_CONFIGURATION_COMPARISON_CORRECTED",
+      "cause": "关闭工作器后错误要求整个 overview 与启用时一致。检查所有重叠 GET 记录，唯一变化是预期的 workerEnabled true 到 false。第二次运行明确断言此变化并精确比较其他事实。",
+      "productionCodeChanged": false,
+      "evidence": "first-attempt/driver-diagnosis.json"
+    }
+  },
+  "preservation": {
+    "archive": "/fyoung/tmp/agentflow-remaining-20260928/i01-runtime-evidence-20261004",
+    "manifestSha256": "29191bb123a5d30547912c5bf37928cada87e22e9c2d0f752705ffdbba31eb44",
+    "files": 74,
+    "bytes": 7740767,
+    "runtimeDirectory": "/fyoung/tmp/agentflow-organization-sync-rupzdioi",
+    "restoredDirectory": "/fyoung/tmp/agentflow-organization-sync-restored-kgokes3u",
+    "largeFiles": [
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/organization-sync-server-0cbe62b.jar",
+        "sha256": "734ee4320d1832c9c3928cf78923c45f6e52ad7a71335fcd3201862aa3e0a15c",
+        "bytes": 79910559
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-draft-assist-server-a12ea9b.jar",
+        "sha256": "6389533593d0431ee6e80fb49a0e03c3b8e046bbcd1681422949dd210ddea28c",
+        "bytes": 79772803
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-organization-sync-rupzdioi/database.mv.db",
+        "sha256": "3826923755e75bb11013dc6733359ef818d43adff0026c9810129f01839c8e81",
+        "bytes": 42008576
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-organization-sync-restored-kgokes3u/database.mv.db",
+        "sha256": "6bc8c845756916c140596eebd5057cb483d082d902178dc5b08f0a6c2edd3301",
+        "bytes": 39960576
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-organization-sync-rupzdioi/server.jar",
+        "sha256": "734ee4320d1832c9c3928cf78923c45f6e52ad7a71335fcd3201862aa3e0a15c",
+        "bytes": 79910559
+      },
+      {
+        "path": "/fyoung/tmp/agentflow-organization-sync-restored-kgokes3u/server.jar",
+        "sha256": "734ee4320d1832c9c3928cf78923c45f6e52ad7a71335fcd3201862aa3e0a15c",
+        "bytes": 79910559
+      }
+    ],
+    "preservedRuntimePid": 87821,
+    "mainWorkspaceCommit": "fec4a87c6c785ddabf40ad2584060e264abddd2f",
+    "mainWorkspaceClean": true
+  },
+  "limitations": [
+    "运行环境为独立本地 H2 和明确授权的合成只读来源，不能代替 PostgreSQL 或企业 E09 联调。",
+    "浏览器受管理员策略限制，未重试、绕过或更换浏览器；固定前端文件 HTTP 下载和生产解析验证不等于浏览器验收。",
+    "PostgreSQL 新范围因既有镜像层 I/O 问题仍待补验，未重启、删除或替换环境。",
+    "I01 本地实现和固定包验收已有证据，但浏览器与 PostgreSQL 补验未通过，因此状态仍为 OPEN。V03 未完成，34 项是已登记剩余目标下限。",
+    "未推送或创建 PR；按本地优先授权，最终 V02 完成后处理 E15。"
+  ],
+  "remaining": [
+    "I01 浏览器和 PostgreSQL 新范围补验。",
+    "E09 企业组织源同步联调。",
+    "继续其他未受环境阻碍的本地开发；不得将本阶段完成误记为全项目完成。"
+  ]
+}
