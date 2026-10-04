@@ -1,0 +1,45 @@
+{
+  "recordedAt": "2026-10-04T14:47:56.128406+00:00",
+  "taskId": "F16",
+  "reviewer": "f16_final_review",
+  "reviewBase": "10bc4f2420c7c8a498a5b81407db6a28a39ad77a",
+  "reviewHead": "3848c22fc89d036758af4c001204daa380a22e0a",
+  "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
+  "critical": [],
+  "important": [],
+  "minorDeferred": [
+    {
+      "file": "agentflow-web/tests/cashier-filters.test.mjs",
+      "line": 152,
+      "finding": "Date-change mock omits received before, so its no-old-cursor assertion is vacuous; this case also does not start from an in-flight append page.",
+      "impact": "Test confidence only; production load() clears cursor and response generation prevents stale append.",
+      "recommendation": "Capture before, load a second page from a nonempty cursor, change date/sort, then resolve the late append.",
+      "decision": "Deferred under the single-final-review workflow; no demonstrated production defect."
+    }
+  ],
+  "declinedToJudge": [],
+  "evidence": [
+    "docs/evidence/payment-due-dates-task1-20261004.json",
+    "docs/evidence/payment-due-dates-task2-20261004.json",
+    "docs/evidence/payment-due-dates-runtime-20261004.json"
+  ],
+  "verification": {
+    "javaUniqueScopedTests": 184,
+    "frontendScopedTests": 62,
+    "runtimeHttpExchanges": 665,
+    "realFrontendReads": 238,
+    "browserVerified": false,
+    "postgresqlVerified": false
+  },
+  "rulings": [
+    "User authorization permits continuous local implementation without repeated design approval.",
+    "Parse raw dueDate only inside new idempotency callback to preserve legacy receipt replay.",
+    "Seed legacy V113 fixture with historical columns rather than current repository against an incomplete schema.",
+    "Reject duplicate HTTP query parameters before converting MultiValueMap to the existing service map.",
+    "Correct the test-only expected status to existing INVALID_PAYMENT_QUERY HTTP 400; do not change production status.",
+    "Native completion gates verify immutable passing artifacts and current source hashes; avoid rerunning unchanged suites.",
+    "Runtime uses synthetic finance, demo actors and bounded test leases; does not prove enterprise provider or SSO acceptance.",
+    "Check in snapshot/schema helpers to remove dependence on historical temporary scripts.",
+    "Retain local branch and worktree until V02/E15; current scoped verification takes precedence over skill default full-suite repetition."
+  ]
+}

@@ -1,0 +1,228 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F17",
+  "taskStatus": "OPEN",
+  "stage": "INDEPENDENT_VOUCHER_REVERSAL_NOTIFICATIONS_BACKEND_AND_UI",
+  "recordedAt": "2026-10-03T18:49:49.350698+00:00",
+  "implementationCommit": "9351fc1e3d8f4c6d01ccf3f2188c1d1902f0f9bf",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/Volumes/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "Independent reversal preparation, command execution, and persisted safe retirement facts for employee advance, expense accrual, and payment vouchers",
+    "Original applicant and preparation actor; actual retirement actor only receives their retirement fact",
+    "Same-transaction deduplicated inbox and outbound intents, with live source and legal-entity checks",
+    "Protected original reversal-target retains historical command and retirement even while another attempt holds original voucher",
+    "Actual Vue inbox/detail and original-round navigation with strict response and stale-result protection"
+  ],
+  "validation": {
+    "java": {
+      "result": "PASS",
+      "distinctTests": 145,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "path": "TEST-io.agentflow.api.OpenApiContractTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.expense.AdvanceRepaymentIntegrationTest.xml",
+          "tests": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+          "tests": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalCommandTest.xml",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalExecutionMigrationTest.xml",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalMigrationTest.xml",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalOperationTest.xml",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalPreparationTest.xml",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalRetirementMigrationTest.xml",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalRetirementTest.xml",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.VoucherReversalTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.ReversalNoticeTest.xml",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/reversal-notifications-final-reports"
+    },
+    "web": {
+      "result": "PASS",
+      "tests": 115,
+      "files": 11,
+      "notificationTests": 71,
+      "voucherRegressionTests": 44,
+      "logs": [
+        "/fyoung/tmp/agentflow-remaining-20260928/reversal-notifications-web-final.log",
+        "/fyoung/tmp/agentflow-remaining-20260928/reversal-notifications-web-voucher-regression.log"
+      ]
+    },
+    "typecheck": "PASS",
+    "build": "PASS",
+    "openapi": {
+      "result": "PASS",
+      "operations": 347,
+      "schemas": 695,
+      "requestExamples": 125
+    },
+    "authors": {
+      "javaFiles": 1551,
+      "namedTypes": 2977,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "diffCheck": "PASS"
+  },
+  "reproductions": [
+    {
+      "result": "EXPECTED_BEHAVIORAL_FAILURE",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/reversal-notifications-red.log",
+      "tests": 2,
+      "reason": "Preparation failure and execution lease expiry had no original-participant notification; empty recipient assertions failed."
+    },
+    {
+      "result": "EXPECTED_BEHAVIORAL_FAILURE",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/reversal-notifications-web-red.log",
+      "tests": 1,
+      "reason": "Actual rendered Inbox lacked original reversal entry."
+    },
+    {
+      "result": "EXPECTED_BEHAVIORAL_FAILURE",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/reversal-notifications-web-null-red.log",
+      "tests": 10,
+      "failed": 1,
+      "reason": "New strict response parser accepted false for a nullable nested record; added explicit object-or-null validation after observing failure."
+    }
+  ],
+  "corrections": [
+    "Initial web test setup used a repository-relative path from the web directory; no source edit occurred. The setup error is not behavioral RED.",
+    "Expanded web renderer test initially duplicated the opened binding; corrected fixture syntax before judging behavior.",
+    "Distinct retirement operator fixture initially omitted its existing APPROVER role, so original field permission correctly blocked it. Restored APPROVER alongside FINANCE in fixture; production field checks unchanged. All 38 expense reversal tests then passed."
+  ],
+  "sourceEvidence": {
+    "files": 22,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/reversal-notifications-evidence-snapshot/sources.json",
+    "verifiedAgainstCommit": "9351fc1e3d8f4c6d01ccf3f2188c1d1902f0f9bf"
+  },
+  "artifactEvidence": {
+    "files": 38,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/reversal-notifications-evidence-snapshot/artifacts.json"
+  },
+  "boundaries": [
+    "H2, synthetic finance loopback, Spring MockMvc and actual Vue host renderer; no fixed installed package or browser acceptance claimed.",
+    "Existing browser administrator-policy block and PostgreSQL Docker image-layer I/O block remain; no bypass or environment repair attempted.",
+    "Manual external reversal verification/record, expense and supplier settlements, independent budget reversal/reduction/adjustment and other recovery sources remain under F17.",
+    "Fixed-version HTTP, nonempty runtime upgrade, restart and paired restore remain pending for full F17.",
+    "Local development only; no push or PR. E15 still depends on final V02 acceptance."
+  ],
+  "goalCounting": {
+    "knownOpen": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "sessions": {
+    "97583": "EXIT_1_EXPECTED_BACKEND_RED",
+    "63703": "EXIT_1_SETUP_ERROR",
+    "71349": "EXIT_1_EXPECTED_WEB_RED",
+    "89512": "EXIT_1_TEST_SYNTAX_FIXED",
+    "41303": "EXIT_0",
+    "38984": "EXIT_0_SETUP_PATH_NOEDIT",
+    "33299": "EXIT_1_EXPECTED_PARSER_RED",
+    "74526": "EXIT_0",
+    "44875": "EXIT_0",
+    "50039": "EXIT_0",
+    "21783": "EXIT_0",
+    "31353": "EXIT_0",
+    "24529": "EXIT_0",
+    "48120": "EXIT_1_FIXTURE_ROLE_FIXED",
+    "70610": "EXIT_0",
+    "51784": "EXIT_0",
+    "42027": "EXIT_0"
+  }
+}

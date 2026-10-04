@@ -27,6 +27,8 @@ public record ExpensePrecheckJob(Input input, long version, Status status, Insta
                 || !active && (version != 3 || completedAt == null || completedAt.isBefore(startedAt) || result == null)
                 || !active && result.status() != status) throw invalid();
         if (status == Status.READY) validateEvidence(input, result.evidence(), completedAt);
+        if (!active && result.observation() != null && (result.observation().observedAt().isBefore(startedAt)
+                || result.observation().observedAt().isAfter(completedAt))) throw invalid();
     }
 
     /** 初次入库只登记输入，不修改任何财务资源。 */
@@ -105,12 +107,19 @@ public record ExpensePrecheckJob(Input input, long version, Status status, Insta
      * 完整事实和错误列表互斥，部分成功不得生成可提交快照。
      * @author owlzhangfq@gmail.com
      */
-    public record Result(ExpensePrecheckEvidence evidence, List<Finding> findings) {
+    public record Result(ExpensePrecheckEvidence evidence, List<Finding> findings, ExpensePrecheckObservation observation) {
+        /** 历史检查没有解释授权依据，读取时不补造观察时间或当前制度版本。 */
+        public Result(ExpensePrecheckEvidence evidence, List<Finding> findings) { this(evidence, findings, null); }
+
         /** 每行最多一个主错误，另允许少量整单和上下文错误。 */
         public Result {
             findings = List.copyOf(findings);
             if ((evidence == null) == findings.isEmpty() || findings.size() > ExpenseContent.MAX_LINES + 10) throw invalid();
+            if (evidence != null && observation != null && (!Objects.equals(evidence.policySelection(), observation.policySelection())
+                    || observation.validUntil().isAfter(evidence.validUntil()))) throw invalid();
         }
+        /** 附加解释所需的观察，不改变规则结论、逐行问题或可提交证据。 */
+        public Result observed(ExpensePrecheckObservation value) { return new Result(evidence, findings, value); }
         /** 单个依赖失败同样保留明确阶段。 */
         public static Result unavailable(Stage stage, String code) { return new Result(null, List.of(new Finding(stage, null, Nature.UNAVAILABLE, code))); }
         /** 根据证据决定终态，不由调用方另传“通过”标记。 */

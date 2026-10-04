@@ -1,6 +1,28 @@
-import type { InboxMessage, InboxPage, InboxQuery } from './api'
+import type { InboxMessage, InboxPage, InboxQuery, PaymentNotificationTarget, SupplierPaymentNotificationTarget, VoucherNotificationTarget, BudgetNotificationTarget, ReversalNotificationTarget, ReversalCheckNotificationTarget, ExpenseSettlementNotificationTarget, ExpenseSettlementNotificationState } from './api'
+import { validatePayment } from './payments.js'
+import { validateSupplierCashier } from './supplierCashier.js'
+import { preparationLabels, operationLabels } from './vouchers.js'
+import { settlementLabels, settlementFundingLabels } from './expenseSettlement.js'
+import { reversalCheckLabels } from './voucherReversal.js'
+import { reversalPreparationLabels, reversalExecutionLabels } from './voucherReversalExecution.js'
 
 export const notificationLabels: Record<InboxMessage['kind'], string> = {
+  SUPPLIER_PAYABLE_RESULT: '供应商应付处理结果', SUPPLIER_PAYABLE_ATTENTION: '供应商应付需核对',
+  EXPENSE_RETURN_RESULT: '报销退回核对结果', EXPENSE_RETURN_ATTENTION: '报销退回需核对',
+  DISBURSEMENT_RETURN_RESULT: '借款放款退回核对结果', DISBURSEMENT_RETURN_ATTENTION: '借款放款退回需核对', REPAYMENT_RESULT: '借款还款登记结果', REPAYMENT_ATTENTION: '借款还款需核对', REPAYMENT_REVIEW_RESULT: '还款复核裁决结果', REPAYMENT_REVIEW_ATTENTION: '还款复核需处理',
+  EXPENSE_PARTIAL_ADJUSTMENT_RESULT: '报销部分调整结果', EXPENSE_PARTIAL_ADJUSTMENT_ATTENTION: '报销部分调整需核对',
+  EXPENSE_ADJUSTMENT_RESULT: '报销资源调整结果', EXPENSE_ADJUSTMENT_ATTENTION: '报销资源调整需核对',
+  BUDGET_ADJUSTMENT_RESULT: '预算调整结果', BUDGET_ADJUSTMENT_ATTENTION: '预算调整需核对',
+  EXPENSE_SETTLEMENT_RESULT: '报销核销已完成', EXPENSE_SETTLEMENT_ATTENTION: '报销结算需核对',
+  REVERSAL_CHECK_RESULT: '外部冲销登记结果', REVERSAL_CHECK_ATTENTION: '外部冲销核对需处理',
+  REVERSAL_RESULT: '独立冲销结果更新', REVERSAL_ATTENTION: '独立冲销需核对',
+  BUDGET_RESULT: '预算操作结果更新', BUDGET_ATTENTION: '预算操作需核对',
+  VOUCHER_RESULT: '凭证结果更新', VOUCHER_ATTENTION: '凭证处理需核对',
+  SUPPLIER_RETURN_RESULT: '供应商回款核对结果', SUPPLIER_RETURN_ATTENTION: '供应商回款需核对',
+  SUPPLIER_ADJUSTMENT_RESULT: '供应商应付调整结果更新', SUPPLIER_ADJUSTMENT_ATTENTION: '供应商应付调整需核对',
+  SUPPLIER_SETTLEMENT_RESULT: '供应商结算结果更新', SUPPLIER_SETTLEMENT_ATTENTION: '供应商结算需核对',
+  SUPPLIER_PAYMENT_RESULT: '供应商付款结果更新', SUPPLIER_PAYMENT_ATTENTION: '供应商付款需核对',
+  PAYMENT_RESULT: '付款结果更新', PAYMENT_ATTENTION: '付款执行需核对',
   ADVANCE_OVERDUE: '借款逾期提醒',
   TASK_ESCALATED: '审批超时升级提醒',
   COMMENT_MENTIONED: '有人在评论中提及你',
@@ -10,6 +32,191 @@ export const notificationLabels: Record<InboxMessage['kind'], string> = {
 }
 /** 只有办理提醒尝试打开实时任务；已结束的会签直接进入仍受权限约束的申请详情。 */
 export const isTaskNotification = (item: InboxMessage) => ['TASK_PENDING', 'TASK_TRANSFERRED', 'TASK_DELEGATED', 'TASK_RESOLVED', 'TASK_OVERDUE'].includes(item.kind)
+/** 付款消息先读取受当前权限保护的原付款，不把历史消息当作本轮最新授权。 */
+export const isSupplierPaymentNotification = (item: InboxMessage) => ['SUPPLIER_PAYMENT_RESULT', 'SUPPLIER_PAYMENT_ATTENTION'].includes(item.kind)
+export const isPaymentNotification = (item: InboxMessage) => ['PAYMENT_RESULT', 'PAYMENT_ATTENTION'].includes(item.kind) || isSupplierPaymentNotification(item)
+export const isVoucherNotification = (item: InboxMessage) => ['VOUCHER_RESULT', 'VOUCHER_ATTENTION'].includes(item.kind)
+
+export const isSettlementNotification = (item: InboxMessage) => ['EXPENSE_SETTLEMENT_RESULT', 'EXPENSE_SETTLEMENT_ATTENTION'].includes(item.kind)
+/** 原修订和当前状态独立校验，拒绝把等待、预算拒绝或争议显示成已完成。 */
+export function readExpenseSettlementNotificationTarget(value: ExpenseSettlementNotificationTarget, message: InboxMessage): ExpenseSettlementNotificationTarget {
+  const invalid = () => { throw new Error('消息对应的结算修订不一致，请刷新消息后重新读取。') }
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v)
+  const positive = (v: number) => Number.isSafeInteger(v) && v > 0
+  const instant = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v))
+  const closed = (v: object, keys: string[]) => Object.keys(v).every(key => keys.includes(key))
+  const stateKeys = ['version', 'status', 'resourcesConsumed', 'budgetOperationId', 'issue', 'updatedAt']
+  const state = (v: ExpenseSettlementNotificationState) => {
+    if (!v || typeof v !== 'object' || Array.isArray(v) || !positive(v.version) || !Object.prototype.hasOwnProperty.call(settlementLabels, v.status)
+        || typeof v.resourcesConsumed !== 'boolean' || !instant(v.updatedAt) || !closed(v, stateKeys)
+        || v.budgetOperationId !== null && !uuid(v.budgetOperationId)
+        || v.issue !== null && (typeof v.issue !== 'string' || !/^[A-Z][A-Z0-9_]{0,63}$/.test(v.issue))
+        || ['BLOCKED', 'BUDGET_REJECTED', 'REVIEW_REQUIRED'].includes(v.status) !== (v.issue !== null)
+        || ['BUDGET_PENDING', 'BUDGET_REJECTED', 'SETTLED'].includes(v.status) && (!v.resourcesConsumed || v.budgetOperationId === null)
+        || ['QUEUED', 'BLOCKED'].includes(v.status) && v.budgetOperationId !== null
+        || !v.resourcesConsumed && v.budgetOperationId !== null) invalid()
+  }
+  if (!value || !isSettlementNotification(message) || value.messageId !== message.id || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || ![value.messageId, value.applicationId, value.reportId].every(uuid) || !positive(value.roundNo) || !positive(value.financialVersion)
+      || !Object.prototype.hasOwnProperty.call(settlementFundingLabels, value.funding) || !instant(value.fundingConfirmedAt)
+      || !closed(value, ['messageId', 'applicationId', 'reportId', 'roundNo', 'financialVersion', 'funding', 'fundingConfirmedAt', 'notice', 'current'])) invalid()
+  state(value.notice); state(value.current)
+  const old = value.notice, current = value.current
+  if (!['SETTLED', 'BLOCKED', 'BUDGET_REJECTED', 'REVIEW_REQUIRED'].includes(old.status)
+      || (message.kind === 'EXPENSE_SETTLEMENT_RESULT') !== (old.status === 'SETTLED') || current.version < old.version
+      || Date.parse(old.updatedAt) < Date.parse(value.fundingConfirmedAt) || Date.parse(current.updatedAt) < Date.parse(old.updatedAt)
+      || old.resourcesConsumed && !current.resourcesConsumed
+      || current.version === old.version && stateKeys.some(key => current[key as keyof typeof current] !== old[key as keyof typeof old])) invalid()
+  return value
+}
+
+export const isReversalCheckNotification = (item: InboxMessage) => ['REVERSAL_CHECK_RESULT', 'REVERSAL_CHECK_ATTENTION'].includes(item.kind)
+/** 绑定原核对；未核清、候选证据及实际登记必须分别保留，不能接受新核对替换。 */
+export function readReversalCheckNotificationTarget(value: ReversalCheckNotificationTarget, message: InboxMessage): ReversalCheckNotificationTarget {
+  const invalid = () => { throw new Error('消息对应的冲销核对记录不一致，请刷新消息后重新读取。') }
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v)
+  const positive = (v: number) => Number.isSafeInteger(v) && v > 0
+  const instant = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v))
+  const closed = (v: object, keys: string[]) => Object.keys(v).every(key => keys.includes(key))
+  const issue = (v: unknown) => v === null || typeof v === 'string' && ['NOT_CONFIGURED', 'TARGET_CHANGED', 'TIMEOUT', 'CONNECTION', 'AUTHENTICATION', 'REMOTE_FAILURE', 'INVALID_RESPONSE', 'RESPONSE_TOO_LARGE', 'INTERNAL_ERROR', 'SOURCE_UNAVAILABLE', 'SOURCE_CHANGED'].includes(v)
+  if (!value || !isReversalCheckNotification(message) || value.messageId !== message.id || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || ![value.messageId, value.checkId, value.operationId, value.applicationId, value.businessId].every(uuid) || value.checkId === value.operationId
+      || !positive(value.roundNo) || !positive(value.version) || !['EMPLOYEE_ADVANCE', 'EXPENSE_ACCRUAL', 'PAYMENT'].includes(value.kind)
+      || !Object.prototype.hasOwnProperty.call(operationLabels, value.originalStatus) || typeof value.originalHeld !== 'boolean'
+      || !Object.prototype.hasOwnProperty.call(reversalCheckLabels, value.status) || !instant(value.requestedAt) || !instant(value.updatedAt) || !issue(value.issue)
+      || ['UNAVAILABLE', 'VOIDED'].includes(value.status) !== (value.issue !== null)
+      || !closed(value, ['messageId', 'checkId', 'operationId', 'applicationId', 'businessId', 'roundNo', 'kind', 'originalStatus', 'originalHeld', 'version', 'status', 'requestedAt', 'updatedAt', 'issue', 'observation', 'record'])) invalid()
+  const observed = value.observation, record = value.record
+  if (observed !== null && (typeof observed !== 'object' || Array.isArray(observed)) || record !== null && (typeof record !== 'object' || Array.isArray(record))
+      || ['CHECKED', 'RECORDED'].includes(value.status) !== !!observed || (value.status === 'RECORDED') !== !!record) invalid()
+  if (observed && (!['UNRESOLVED', 'VERIFIED'].includes(observed.status) || !positive(observed.revision) || !instant(observed.observedAt) || !instant(observed.validUntil)
+      || (observed.status === 'VERIFIED' ? typeof observed.voucherReference !== 'string' || !observed.voucherReference.trim() || observed.voucherReference.length > 128
+        || typeof observed.accountingDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(observed.accountingDate) || !instant(observed.postedAt)
+        : observed.voucherReference !== null || observed.accountingDate !== null || observed.postedAt !== null)
+      || !closed(observed, ['status', 'revision', 'observedAt', 'validUntil', 'voucherReference', 'accountingDate', 'postedAt']))) invalid()
+  if (record && (!uuid(record.id) || !instant(record.recordedAt) || observed?.status !== 'VERIFIED' || !closed(record, ['id', 'recordedAt']))) invalid()
+  return value
+}
+
+export const isReversalNotification = (item: InboxMessage) => ['REVERSAL_RESULT', 'REVERSAL_ATTENTION'].includes(item.kind)
+/** 原冲销准备、命令和安全结束不能被新的尝试或办理权限替换。 */
+export function readReversalNotificationTarget(value: ReversalNotificationTarget, message: InboxMessage): ReversalNotificationTarget {
+  const invalid = () => { throw new Error('消息对应的冲销记录不一致，请刷新消息后重新读取。') }
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v)
+  const positive = (v: number) => Number.isSafeInteger(v) && v > 0
+  const natural = (v: number) => Number.isSafeInteger(v) && v >= 0
+  const instant = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v))
+  const issue = (v: unknown) => v === null || typeof v === 'string' && /^[A-Z_]{1,64}$/.test(v)
+  const closed = (v: object, keys: string[]) => Object.keys(v).every(key => keys.includes(key))
+  if (!value || !isReversalNotification(message) || value.messageId !== message.id || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || ![value.messageId, value.reversalId, value.operationId, value.applicationId, value.businessId].every(uuid) || !positive(value.roundNo)
+      || value.reversalId === value.operationId || !['EMPLOYEE_ADVANCE', 'EXPENSE_ACCRUAL', 'PAYMENT'].includes(value.kind)
+      || !Object.prototype.hasOwnProperty.call(operationLabels, value.originalStatus) || typeof value.originalHeld !== 'boolean'
+      || !closed(value, ['messageId', 'reversalId', 'operationId', 'applicationId', 'businessId', 'roundNo', 'kind', 'originalStatus', 'originalHeld', 'preparation', 'operation', 'retirement'])) invalid()
+  const preparation = value.preparation, operation = value.operation, retirement = value.retirement
+  if (!preparation || typeof preparation !== 'object' || Array.isArray(preparation)
+      || operation !== null && (typeof operation !== 'object' || Array.isArray(operation))
+      || retirement !== null && (typeof retirement !== 'object' || Array.isArray(retirement))
+      || preparation.id !== value.reversalId || !positive(preparation.version)
+      || !Object.prototype.hasOwnProperty.call(reversalPreparationLabels, preparation.status) || !instant(preparation.requestedAt) || !instant(preparation.updatedAt)
+      || !/^\d{4}-\d{2}-\d{2}$/.test(preparation.accountingDate) || !issue(preparation.issue)
+      || ['UNAVAILABLE', 'VOIDED'].includes(preparation.status) !== (preparation.issue !== null) || (preparation.status === 'AUTHORIZED') !== !!operation
+      || !closed(preparation, ['id', 'version', 'status', 'requestedAt', 'updatedAt', 'accountingDate', 'issue'])) invalid()
+  if (operation && (operation.id !== value.reversalId || !positive(operation.version) || !natural(operation.attempts) || !natural(operation.highestRevision)
+      || !Object.prototype.hasOwnProperty.call(reversalExecutionLabels, operation.status) || !instant(operation.updatedAt) || !instant(operation.expiresAt)
+      || !issue(operation.issue) || typeof operation.disputed !== 'boolean' || operation.status === 'RECONCILING' && !operation.disputed
+      || operation.observedStatus !== null && !['PENDING', 'POSTED', 'FAILED', 'NOT_FOUND'].includes(operation.observedStatus)
+      || (operation.observedStatus === 'POSTED' ? typeof operation.voucherReference !== 'string' || !operation.voucherReference.trim() || operation.voucherReference.length > 128 || !instant(operation.postedAt)
+        : operation.voucherReference !== null || operation.postedAt !== null)
+      || operation.status === 'POSTED' && operation.observedStatus !== 'POSTED' || operation.status === 'FAILED' && operation.observedStatus !== 'FAILED'
+      || operation.status === 'NOT_FOUND' && operation.observedStatus !== 'NOT_FOUND'
+      || !closed(operation, ['id', 'version', 'status', 'attempts', 'highestRevision', 'updatedAt', 'expiresAt', 'observedStatus', 'issue', 'disputed', 'voucherReference', 'postedAt']))) invalid()
+  if (retirement && (!operation || !uuid(retirement.id) || !instant(retirement.retiredAt)
+      || !['NEVER_DISPATCHED', 'CONFIRMED_FAILED'].includes(retirement.basis)
+      || (retirement.basis === 'NEVER_DISPATCHED' ? operation.attempts !== 0 || !['VOIDED', 'EXPIRED'].includes(operation.status) : operation.status !== 'FAILED')
+      || !closed(retirement, ['id', 'retiredAt', 'basis']))) invalid()
+  return value
+}
+
+export const isBudgetNotification = (item: InboxMessage) => ['BUDGET_RESULT', 'BUDGET_ATTENTION'].includes(item.kind)
+export const budgetActionLabels = { FREEZE: '冻结', ADJUST: '调整冻结', RELEASE: '释放', CONSUME: '消费' }
+export const budgetStatusLabels = { QUEUED: '原命令待执行', EXECUTING: '正在发送原命令', UNKNOWN: '原操作结果暂不明确', QUERYING: '正在查询原操作', APPLIED: '原操作已确认', REJECTED: '原操作已明确拒绝' }
+const budgetFailureLabels = { NOT_CONFIGURED: '预算连接尚未配置', TARGET_CHANGED: '预算连接配置已变化', TIMEOUT: '预算系统响应超时', CONNECTION: '预算系统暂时无法连接', AUTHENTICATION: '预算系统认证未通过', REMOTE_FAILURE: '预算系统暂时不可用', INVALID_RESPONSE: '预算回执未通过校验', RESPONSE_TOO_LARGE: '预算回执超出接收范围', LEASE_EXPIRED: '原执行未在期限内确认', INTERNAL_ERROR: '预算处理暂时异常' }
+const budgetRejectionLabels = { BUDGET_INSUFFICIENT: '预算余额不足', BUDGET_POLICY_UNAVAILABLE: '预算控制规则不可用', ACCOUNTING_PERIOD_CLOSED: '会计期间已关闭', COST_OBJECT_UNAVAILABLE: '成本对象不可用', LEGAL_ENTITY_UNAVAILABLE: '法人不可用', EMPLOYEE_UNAVAILABLE: '员工不可用', LEDGER_VERSION_CONFLICT: '预算台账版本存在冲突', RESERVATION_FINALIZED: '原预算占用已经结束' }
+const budgetFailures = Object.keys(budgetFailureLabels), budgetRejections = Object.keys(budgetRejectionLabels)
+/** 只显示约定的稳定原因，不将远端原始错误正文带入页面。 */
+export const budgetIssueLabel = (issue: string) => ({ ...budgetFailureLabels, ...budgetRejectionLabels } as Record<string, string>)[issue] ?? '原因暂不可用'
+/** 原消息只定位固定命令；严格区分处理中、查询查无、业务拒绝和实际应用。 */
+export function readBudgetNotificationTarget(value: BudgetNotificationTarget, message: InboxMessage): BudgetNotificationTarget {
+  const invalid = () => { throw new Error('消息对应的预算记录不一致，请刷新消息后重新读取。') }
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v)
+  const positive = (v: unknown) => typeof v === 'number' && Number.isSafeInteger(v) && v > 0
+  const instant = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v))
+  if (!value || !isBudgetNotification(message) || value.messageId !== message.id || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || ![value.messageId, value.operationId, value.applicationId, value.reportId].every(uuid) || ![value.roundNo, value.financialVersion, value.version].every(positive)
+      || !Number.isSafeInteger(value.attempts) || value.attempts < 0 || !instant(value.updatedAt)
+      || !Object.prototype.hasOwnProperty.call(budgetActionLabels, value.action) || !Object.prototype.hasOwnProperty.call(budgetStatusLabels, value.status)
+      || Object.keys(value).some(key => !['messageId', 'operationId', 'applicationId', 'reportId', 'roundNo', 'financialVersion', 'action', 'status', 'version', 'attempts', 'updatedAt', 'observedStatus', 'issue', 'ledgerRevision', 'reference', 'appliedAt'].includes(key))) invalid()
+  const applied = value.status === 'APPLIED'
+  if (applied ? value.observedStatus !== 'APPLIED' || value.issue !== null || !positive(value.ledgerRevision) || !instant(value.appliedAt)
+      || typeof value.reference !== 'string' || !value.reference.trim() || value.reference.length > 128
+    : value.ledgerRevision !== null || value.appliedAt !== null || value.reference !== null) invalid()
+  if (value.status === 'REJECTED' && (value.observedStatus !== 'REJECTED' || !budgetRejections.includes(value.issue ?? ''))) invalid()
+  if (value.status === 'UNKNOWN' && !(value.observedStatus === 'PENDING' && value.issue === null || value.observedStatus === null && budgetFailures.includes(value.issue ?? ''))) invalid()
+  if (value.status === 'QUEUED' && (value.issue !== null || value.observedStatus !== null && value.observedStatus !== 'NOT_FOUND')) invalid()
+  if (['EXECUTING', 'QUERYING'].includes(value.status) && (value.issue !== null || value.observedStatus !== null)) invalid()
+  return value
+}
+
+/** 原准备和过账必须同号；消息详情没有写入许可，也不接受同轮最新准备替换旧编号。 */
+export function readVoucherNotificationTarget(value: VoucherNotificationTarget, message: InboxMessage): VoucherNotificationTarget {
+  const invalid = () => { throw new Error('消息对应的凭证记录不一致，请刷新消息后重新读取。') }
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(v)
+  const positive = (v: number) => Number.isSafeInteger(v) && v > 0
+  const instant = (v: unknown) => typeof v === 'string' && Number.isFinite(Date.parse(v))
+  const issue = (v: unknown) => v === null || typeof v === 'string' && /^[A-Z][A-Z0-9_]{0,127}$/.test(v)
+  if (!value || !isVoucherNotification(message) || value.messageId !== message.id || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || ![value.messageId, value.voucherId, value.applicationId, value.businessId].every(uuid) || !positive(value.roundNo)
+      || !['EMPLOYEE_ADVANCE', 'EXPENSE_ACCRUAL', 'PAYMENT'].includes(value.kind) || typeof value.reversalBound !== 'boolean'
+      || Object.keys(value).some(key => !['messageId', 'voucherId', 'applicationId', 'businessId', 'roundNo', 'kind', 'preparation', 'operation', 'reversalBound'].includes(key))) invalid()
+  const preparation = value.preparation, operation = value.operation
+  if (preparation === undefined || operation === undefined || !preparation && !operation || value.reversalBound && !operation) invalid()
+  if (preparation && (preparation.id !== value.voucherId || !Object.prototype.hasOwnProperty.call(preparationLabels, preparation.status) || !positive(preparation.attempt)
+      || !instant(preparation.createdAt) || !issue(preparation.issue)
+      || (['QUEUED', 'RUNNING'].includes(preparation.status) ? preparation.completedAt !== null : !instant(preparation.completedAt))
+      || (preparation.status === 'READY') !== !!operation)) invalid()
+  if (operation && (operation.id !== value.voucherId || operation.kind !== value.kind || !Object.prototype.hasOwnProperty.call(operationLabels, operation.status)
+      || !positive(operation.version) || !Number.isSafeInteger(operation.attempts) || operation.attempts < 0 || typeof operation.disputed !== 'boolean'
+      || !instant(operation.updatedAt) || !instant(operation.sendExpiresAt) || !/^\d{4}-\d{2}-\d{2}$/.test(operation.accountingDate)
+      || !issue(operation.issue) || operation.observedStatus !== null && !['PENDING', 'POSTED', 'FAILED', 'REVERSED', 'NOT_FOUND'].includes(operation.observedStatus)
+      || operation.voucherReference !== null && (typeof operation.voucherReference !== 'string' || !operation.voucherReference.trim() || operation.voucherReference.length > 256)
+      || operation.postedAt !== null && !instant(operation.postedAt))) invalid()
+  return value
+}
+/** 原消息、轮次和付款三个标识必须同时匹配，损坏响应不能成为财务入口。 */
+export function readPaymentNotificationTarget(value: PaymentNotificationTarget, message: InboxMessage): PaymentNotificationTarget {
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v)
+  if (!value || !isPaymentNotification(message) || isSupplierPaymentNotification(message) || value.messageId !== message.id || !uuid(value.messageId) || !uuid(value.paymentId)
+      || !uuid(value.applicationId) || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || !Number.isSafeInteger(value.roundNo) || value.roundNo < 1 || !['APPLICATION_ROUND', 'CASHIER_PAYMENT'].includes(value.view)) throw new Error('消息对应的付款记录不一致，请刷新消息后重新读取。')
+  const payment = validatePayment(value.payment, value.paymentId)
+  if (payment.applicationId !== value.applicationId || payment.roundNo !== value.roundNo) throw new Error('付款不属于该消息记录的申请轮次。')
+  return value
+}
+
+/** 原授权与原出纳请求同时匹配，消息只读投影不能携带资金操作许可。 */
+export function readSupplierPaymentNotificationTarget(value: SupplierPaymentNotificationTarget, message: InboxMessage): SupplierPaymentNotificationTarget {
+  const uuid = (v: unknown) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(v)
+  if (!value || !isSupplierPaymentNotification(message) || value.messageId !== message.id || !uuid(value.messageId) || !uuid(value.paymentId)
+      || !uuid(value.executionRequestId) || !uuid(value.applicationId) || value.applicationId !== message.applicationId || value.roundNo !== message.roundNo
+      || !Number.isSafeInteger(value.roundNo) || value.roundNo < 1 || !['APPLICATION_ROUND', 'CASHIER_PAYMENT'].includes(value.view)
+      || typeof value.canOpenCashier !== 'boolean') throw new Error('消息对应的供应商付款记录不一致，请重新读取。')
+  const payment = validateSupplierCashier(value.payment, value.paymentId)
+  if (payment.applicationId !== value.applicationId || payment.roundNo !== value.roundNo || payment.preparation?.id !== value.executionRequestId
+      || payment.actions.execute || payment.actions.query || payment.actions.resendOriginal
+      || value.canOpenCashier && (value.view !== 'CASHIER_PAYMENT' || !['QUEUED', 'RUNNING', 'READY'].includes(payment.preparation.status))) throw new Error('供应商原选择或只读权限不一致，请重新读取。')
+  return value
+}
 
 /**
  * 消息查询绑定当前账号与未读筛选，取消、失败与分页均不混入其他上下文的记录。

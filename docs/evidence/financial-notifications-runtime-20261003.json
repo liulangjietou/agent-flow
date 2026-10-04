@@ -1,0 +1,2186 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T23:05:26.538033+00:00",
+  "task": "F17",
+  "status": "FIXED_BACKEND_RUNTIME_AND_RESTORE_VERIFIED_REMAINING_SOURCES_REPRODUCED_TASK_OPEN",
+  "sourceCommit": "6bc1d184009fee36b0d99cbee6a74a195fca250d",
+  "branch": "codex/governance-identifier-integration",
+  "knownOpenTaskCount": 34,
+  "businessCodeChanged": false,
+  "sourceAudit": {
+    "implementedFamilies": 17,
+    "publisherLocations": 55,
+    "financeGatewayOperationCount": 42,
+    "complete": false,
+    "findings": [
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableReviewService.java",
+        "methods": [
+          "claim",
+          "finish",
+          "fail",
+          "available"
+        ],
+        "status": "MISSING_NOTIFICATION_EVENT_REPRODUCED",
+        "scenario": "原财务复核失败已保存 UNAVAILABLE，原财务操作者未收到对应消息。",
+        "reproduction": "payableReviewFailureNotifiesOriginalParticipant"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableHoldService.java",
+        "methods": [
+          "claim",
+          "finish",
+          "fail",
+          "query",
+          "resend"
+        ],
+        "status": "MISSING_NOTIFICATION_EVENT_REPRODUCED",
+        "scenario": "原 ERP 预留进入 UNKNOWN，申请人与原授权人没有收到异常消息。",
+        "reproduction": "payableHoldUnknownNotifiesOriginalParticipants"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableHoldService.java",
+        "methods": [
+          "retire"
+        ],
+        "status": "MISSING_NOTIFICATION_EVENT_REPRODUCED",
+        "scenario": "安全结束记录已持久化，但没有原申请人与原授权人的结果消息。",
+        "reproduction": "payableAuthorizationRetirementNotifiesActualDecision"
+      }
+    ],
+    "coverageArtifact": "audit/financial-notifications-source-coverage.json"
+  },
+  "validation": {
+    "java": {
+      "status": "PASS",
+      "distinctTestCases": 408,
+      "classCount": 32,
+      "classes": [
+        {
+          "class": "io.agentflow.expense.AdvanceRepaymentCheckTest",
+          "tests": 6,
+          "sha256": "6c62b2e418ab2b39bf2f613824d94c21470a64c371aac85f959af3b7bfbe17f6"
+        },
+        {
+          "class": "io.agentflow.expense.AdvanceRepaymentReviewCheckTest",
+          "tests": 6,
+          "sha256": "4a565a417453421e092feeb9eb44ff27774c8a86c3765b567daf2b19f0aa334a"
+        },
+        {
+          "class": "io.agentflow.expense.AdvanceDisbursementReturnTest",
+          "tests": 12,
+          "sha256": "c07e9b30bc948d9d9121c160e00a9cb9277784c72f8817c1de6cebac8bceba01"
+        },
+        {
+          "class": "io.agentflow.expense.ExpensePaymentReturnTest",
+          "tests": 11,
+          "sha256": "85e32d705ec68a9823c5ba2f39078ec544262ebf5a383177f74a0f424eaefc64"
+        },
+        {
+          "class": "io.agentflow.notification.ReversalNoticeTest",
+          "tests": 2,
+          "sha256": "ec1ec13a8490e1ea80cd3fee2731b1d6c399f0e341fd7889fdcd16572f3295f7"
+        },
+        {
+          "class": "io.agentflow.notification.ReversalCheckNoticeTest",
+          "tests": 2,
+          "sha256": "75351d9ca2348e871e8f0e855185a7707d1b3ec359d2dba5ad35414f19fa97cf"
+        },
+        {
+          "class": "io.agentflow.notification.VoucherNoticeTest",
+          "tests": 2,
+          "sha256": "95b6f0bfc558509a1927809570f4792f316aa504e56711284244026a259d4201"
+        },
+        {
+          "class": "io.agentflow.notification.ExpensePartialAdjustmentNoticeTest",
+          "tests": 1,
+          "sha256": "e70d6f9c8c240fd242a22c48c3692737df67df65c6f4aca368aea1bd2f1b9fd6"
+        },
+        {
+          "class": "io.agentflow.notification.BudgetNoticeTest",
+          "tests": 2,
+          "sha256": "3281f104ef890ea2524117072fc999920413ac0d8f7d058dcace242412ff80b0"
+        },
+        {
+          "class": "io.agentflow.notification.ExpenseSettlementNoticeTest",
+          "tests": 2,
+          "sha256": "42ae607e533e863a17540f4514d93611293e23f1509eaef2f70ba82013376312"
+        },
+        {
+          "class": "io.agentflow.notification.PaymentNoticeTest",
+          "tests": 2,
+          "sha256": "ac2c1ffa28a4f6d65fb3380bf77a0cb17be4415a986e736d6a1166065aa3476b"
+        },
+        {
+          "class": "io.agentflow.notification.SupplierPaymentNoticeTest",
+          "tests": 2,
+          "sha256": "1c7ac7642a931b56a3adbfda274420f4fe7ec05796b70d8044e983319d4e5dea"
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierSettlementNoticeTest",
+          "tests": 3,
+          "sha256": "53aa6e8507c15754144e552738004dc7cdd6322d167c48207ade76e3ff9d6e34"
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierAdjustmentNoticeTest",
+          "tests": 3,
+          "sha256": "79e6fbefaeee15a5d22da94a4c70ac9a824a47ca4659ce0642102809430903e0"
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierReturnNoticeTest",
+          "tests": 4,
+          "sha256": "d6605a482e4a935e4181a6f07fdb5e998f543e6cc7b8d7c49736891a25f237da"
+        },
+        {
+          "class": "io.agentflow.finance.ExpenseResourceAdjustmentTest",
+          "tests": 10,
+          "sha256": "6b115e44ba36153eeb43480b8031a37c9fb1da140664d8a62254e82823a38ad6"
+        },
+        {
+          "class": "io.agentflow.budget.BudgetAdjustmentOperationTest",
+          "tests": 9,
+          "sha256": "08dcbde319e317582fdedc7e72c0c027f80eb0147560620c130761afe38e788d"
+        },
+        {
+          "class": "io.agentflow.budget.BudgetAdjustmentReviewTest",
+          "tests": 6,
+          "sha256": "23cecafb9f6fe530de32705d0a2938949f72128bebedbe13d0164c621687d7be"
+        },
+        {
+          "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+          "tests": 30,
+          "sha256": "4bee0e7032e1ed35cec6e3104cc244c80e2a911f31d09f4afb282fed7ce81b15"
+        },
+        {
+          "class": "io.agentflow.expense.AdvanceRepaymentIntegrationTest",
+          "tests": 29,
+          "sha256": "149f7ab2210b966230b4735b46ec08edb991195fa9a58c98da6e4f965259c30b"
+        },
+        {
+          "class": "io.agentflow.notification.NotificationDeliveryIntegrationTest",
+          "tests": 13,
+          "sha256": "916fe1971cc46905f5c99c7f09b9bec4145affd75e264a802f0962f1f0692918"
+        },
+        {
+          "class": "io.agentflow.notification.SmtpNotificationTransportTest",
+          "tests": 5,
+          "sha256": "d8851fe179f8f45b1acccee9ba30434f77ee81677e7b8403c34b1d7e2ca90b0b"
+        },
+        {
+          "class": "io.agentflow.notification.NotificationDeliveryApiIntegrationTest",
+          "tests": 8,
+          "sha256": "92eabe502ce2d9277525488f4d2bb727e6256099b60921148b606df8a99c5cad"
+        },
+        {
+          "class": "io.agentflow.notification.WeComNotificationTransportTest",
+          "tests": 9,
+          "sha256": "fe5502a0f5e4269743e0cf523a0a0b263210d14d96d8a97ccd8b9a102a2ff89a"
+        },
+        {
+          "class": "io.agentflow.notification.WeComNotificationConfigurationTest",
+          "tests": 3,
+          "sha256": "7aced30d8d836c8caeff231b2e6e3c3389d37cabc81d0a17d80a659605164c34"
+        },
+        {
+          "class": "io.agentflow.notification.InboxIntegrationTest",
+          "tests": 9,
+          "sha256": "a5110bd5ebc747bbac6ecb094c6a116af395ee9090a95380f055735e4a5c231e"
+        },
+        {
+          "class": "io.agentflow.procurement.SupplierFinanceWorkflowTest",
+          "tests": 86,
+          "sha256": "f78f3bde6400b5f58fb227ffd6a5b45317cba18db3553014a34bc5571d3e8dd4"
+        },
+        {
+          "class": "io.agentflow.api.OpenApiContractTest",
+          "tests": 7,
+          "sha256": "036ddf902c863e72ad1ccc271d1775fcd9d70d77a23209c2c873abf9b7f096ef"
+        },
+        {
+          "class": "io.agentflow.finance.BudgetOperationIntegrationTest",
+          "tests": 13,
+          "sha256": "b40d3806075ac608b2f8ee0d518e5e9796309d7e9b2891ab55da98a27dae584f"
+        },
+        {
+          "class": "io.agentflow.finance.VoucherOperationIntegrationTest",
+          "tests": 34,
+          "sha256": "0d835eea771c05e00c5a2b06cfdf4fb710086b6da1792b121a2675a00ec5c3bf"
+        },
+        {
+          "class": "io.agentflow.finance.PaymentOperationIntegrationTest",
+          "tests": 57,
+          "sha256": "b6a8a20bbead487c3d624017049b5d2750cdc0729cf39b02b2ee03cacd6594f4"
+        },
+        {
+          "class": "io.agentflow.budget.BudgetAdjustmentFinanceWorkflowTest",
+          "tests": 20,
+          "sha256": "6c56dadbfff93e6bbc7de857db7256d2f51b53ff7a8d1c0b446fa3e57b74756c"
+        }
+      ],
+      "counting": "Actual distinct (classname,name) XML cases from Running classes in this invocation, no stale reports or annotation counts."
+    },
+    "runtime": {
+      "status": "PASS",
+      "sourceCommit": "6bc1d184009fee36b0d99cbee6a74a195fca250d",
+      "jarSha256": "814aad25835bf05b001849adb4929bcc74b922769bb46cce22c8feb94bfc3c4b",
+      "syntheticOnly": true,
+      "checks": {
+        "queuedMessagesAndIntentsSurvivedCrash": true,
+        "unknownPaymentRecoveredSameAuthorization": true,
+        "bankAcceptedCommandCount": 1,
+        "historyMessageStillReadsOriginalPayment": true,
+        "currentFinanceScopeRevocation": true,
+        "historicalAdvanceAccrualStillReadsOriginalRound": true,
+        "smtpUnknownSurvivedRestartWithoutAutoResend": true,
+        "explicitRetryRequiresDuplicateAcknowledgement": true,
+        "explicitRetryKeepsDeliveryId": true,
+        "externalDeliveryDidNotChangeApprovalOrPayment": true,
+        "minimalSmtpAndImBodies": true,
+        "revokedPaymentIntentsSuppressed": true
+      },
+      "boots": [
+        {
+          "boot": 1,
+          "pid": 94966,
+          "deliveryEnabled": false,
+          "readySeconds": 9.24
+        },
+        {
+          "boot": 2,
+          "pid": 95109,
+          "deliveryEnabled": false,
+          "readySeconds": 9.89
+        },
+        {
+          "boot": 3,
+          "pid": 95160,
+          "deliveryEnabled": true,
+          "readySeconds": 7.65
+        },
+        {
+          "boot": 4,
+          "pid": 95798,
+          "deliveryEnabled": true,
+          "readySeconds": 8.25
+        },
+        {
+          "boot": 5,
+          "pid": 95945,
+          "deliveryEnabled": true,
+          "readySeconds": 7.66
+        }
+      ],
+      "attemptDiagnostics": [
+        {
+          "stage": "POST_CRASH_PREFLIGHT",
+          "error": "[Errno 48] Address already in use",
+          "verifiedOldProcessGone": true,
+          "sameDatabaseRetained": true
+        },
+        {
+          "stage": "VOUCHER_SCOPE_ASSERTION",
+          "error": "",
+          "verifiedOldProcessGone": true,
+          "sameDatabaseRetained": true,
+          "resolution": "Harness corrected to original policy: payment notices require current legal-entity appointment; ordinary advance accrual retains historical approval access. Production jar unchanged."
+        },
+        {
+          "stage": "DUPLICATE_ACK_STATUS_ASSERTION",
+          "error": "('POST', '/notifications/deliveries/bd710e4e-a785-43ee-8f04-a6bc69b19f36/retry', 400, {'traceId': 'e4859b38-dbd4-49ab-8e38-9ba9dad8494e', 'message': 'Acknowledge possible duplicate notification before retry', 'path': '/api/v1/notifications/deliveries/bd710e4e-a785-43ee-8f04-a6bc69b19f36/retry', 'code': 'NOTIFICATION_DUPLICATE_ACK_REQUIRED'})",
+          "verifiedOldProcessGone": true,
+          "sameDatabaseRetained": true,
+          "resolution": "Harness corrected to documented 400 NOTIFICATION_DUPLICATE_ACK_REQUIRED, already covered by NotificationDeliveryApiIntegrationTest. Production jar unchanged."
+        }
+      ],
+      "applicationId": "52f19ffb-7e61-4676-afb2-d5183d8dd641",
+      "authorizationId": "01f8018f-fa62-44f4-a812-69f0dc263f50",
+      "unknownInboxId": "beae0506-aedc-356b-906d-426f6d6efd77",
+      "successInboxId": "2f29ff6b-bd8d-33b8-8dd0-575aa9a96da3",
+      "unknownDeliveryId": "bd710e4e-a785-43ee-8f04-a6bc69b19f36",
+      "smtpReceipts": 12,
+      "imReceipts": 11,
+      "finalDeliveryCounts": {
+        "ACCEPTED": 22,
+        "UNKNOWN": 0,
+        "SUPPRESSED": 4
+      }
+    },
+    "restore": {
+      "status": "PASS",
+      "sourceCommit": "6bc1d184009fee36b0d99cbee6a74a195fca250d",
+      "directory": "/fyoung/tmp/agentflow-financial-notification-restore-j97gvl60",
+      "jarSha256": "814aad25835bf05b001849adb4929bcc74b922769bb46cce22c8feb94bfc3c4b",
+      "syntheticOnly": true,
+      "checks": {
+        "allTableRowsAndSchemasPreserved": true,
+        "preservedTables": 253,
+        "preservedRows": 427,
+        "attachmentsPreserved": 0,
+        "originalInboxAndDeliveryRowsPreserved": true,
+        "originalPaymentAndApprovalUnchanged": true,
+        "originalUnknownNoticeResolvesSamePayment": true,
+        "currentScopeStillEnforced": true,
+        "notificationTablesUnchangedAfterReads": [
+          "NOTIFICATION_DELIVERY_EVENT",
+          "NOTIFICATION_DISPATCH",
+          "NOTIFICATION_INBOX",
+          "NOTIFICATION_PREFERENCES",
+          "NOTIFICATION_PREFERENCE_CHANGE"
+        ],
+        "originalSourceUnchanged": true
+      },
+      "backendPid": 96911,
+      "backendPort": 51175,
+      "ownedRuntimeStopped": true
+    },
+    "httpContracts": {
+      "status": "PASS",
+      "sourceCommit": "6bc1d184009fee36b0d99cbee6a74a195fca250d",
+      "jarSha256": "814aad25835bf05b001849adb4929bcc74b922769bb46cce22c8feb94bfc3c4b",
+      "counts": {
+        "responses": 230,
+        "successfulRequests": 43,
+        "paymentTargets": 2,
+        "voucherTargets": 3,
+        "deliveryItems": 1040,
+        "retryReceipts": 1
+      },
+      "operationCount": 39,
+      "operations": [
+        "actOnCashierPayment",
+        "advanceRequestCheckOptions",
+        "authorizeApplicationPayment",
+        "copyTemplate",
+        "createAdvanceRequest",
+        "createOrganizationAppointment",
+        "createOrganizationPerson",
+        "createOrganizationUnit",
+        "currentAccountMapping",
+        "currentExpensePolicy",
+        "expenseCategories",
+        "getAdvanceRequest",
+        "getAdvanceRequestCheck",
+        "getApplication",
+        "getApplicationPayments",
+        "getCashierPayment",
+        "getCashierPaymentAccounts",
+        "inbox",
+        "initializeOrganization",
+        "listTasks",
+        "notificationDeliveries",
+        "notificationPreferences",
+        "paymentNotificationTarget",
+        "publishAccountMapping",
+        "publishDefinition",
+        "publishExpensePolicy",
+        "queueAdvanceRequestCheck",
+        "retryNotificationDelivery",
+        "reviseExpenseCategories",
+        "reviseNotificationPreferences",
+        "saveAccountMappingDraft",
+        "saveExpensePolicyDraft",
+        "setOrganizationSupervisor",
+        "submitAdvanceRequest",
+        "taskAction",
+        "updateDefinition",
+        "updateOrganizationAppointment",
+        "validateDefinition",
+        "voucherNotificationTarget"
+      ],
+      "deliveryStates": [
+        "ACCEPTED",
+        "IN_FLIGHT",
+        "PENDING",
+        "SUPPRESSED",
+        "UNKNOWN"
+      ],
+      "compiledSources": [
+        {
+          "path": "agentflow-web/src/notificationInbox.ts",
+          "sha256": "e9483c583594666a06f6280869da9e4c74def91f519b9d0e64609e1a6656acc9"
+        },
+        {
+          "path": "agentflow-web/src/payments.ts",
+          "sha256": "7b898af9b962302a29e241717d133bf567ee0a99417c199495ab3708bc114a98"
+        },
+        {
+          "path": "agentflow-web/src/supplierCashier.ts",
+          "sha256": "478c6c183659297ea638e77ce8eb6bb41d92090c2ec58fed0f8c430039062ee3"
+        },
+        {
+          "path": "agentflow-web/src/expenses.ts",
+          "sha256": "2c2bb4abfd86c3a11cd1ce925059e4c5aedb664c0a86c257e88a358a0f26d9ec"
+        },
+        {
+          "path": "agentflow-web/src/supplierFinance.ts",
+          "sha256": "22d74685dc214e4093c6571825a90b49c0b3546a4f1cf4bd5608a12f4725e85f"
+        },
+        {
+          "path": "agentflow-web/src/vouchers.ts",
+          "sha256": "37076cb9b1013cb25ebdfc9a780a70a82b20cd248de7406b24afcd661edbe49d"
+        },
+        {
+          "path": "agentflow-web/src/expenseSettlement.ts",
+          "sha256": "a99c37cf02ac2cd6facd730c78e7be7c99b4b7f28c6e4e16ae6f2c95c1bce7b2"
+        },
+        {
+          "path": "agentflow-web/src/voucherReversal.ts",
+          "sha256": "fd6def3a97b0d7159f334f953aebb872a92f132e7e1460cdd41b72236cd235fc"
+        },
+        {
+          "path": "agentflow-web/src/voucherReversalExecution.ts",
+          "sha256": "ef541c09cc3aec1e92d5ff0f94dc79e262cb47dfe3d3e8a053a3980eefa256a7"
+        },
+        {
+          "path": "agentflow-web/src/notificationDeliveries.ts",
+          "sha256": "beea10730fc68c8058fd6fd6f081a5e37ea17a8c581b587d689d627a53ffa3f1"
+        }
+      ],
+      "compiledDirectory": "/fyoung/tmp/agentflow-financial-notice-contract-whaNsd",
+      "scope": "Actual fixed-backend-package HTTP and isolated restored responses; current frontend parser validation, not interactive browser acceptance."
+    },
+    "frontendPriorStage": {
+      "evidence": "docs/evidence/partial-expense-notifications-20261003.json",
+      "tests": 190,
+      "rerun": false,
+      "scope": "同一产品源码；当前另核对真实 HTTP 和 10 个页面解析模块。"
+    },
+    "sourceReproduction": {
+      "status": "EXPECTED_RED",
+      "cases": [
+        {
+          "name": "payableReviewFailureNotifiesOriginalParticipant",
+          "failure": "\nExpecting ArrayList:\n  []\nto contain:\n  [\"finance\"]\nbut could not find the following element(s):\n  [\"finance\"]\n",
+          "error": null
+        },
+        {
+          "name": "payableAuthorizationRetirementNotifiesActualDecision",
+          "failure": "\nExpecting actual:\n  []\nto contain exactly in any order:\n  [\"alice\", \"finance\"]\nbut could not find the following elements:\n  [\"alice\", \"finance\"]\n",
+          "error": null
+        },
+        {
+          "name": "payableHoldUnknownNotifiesOriginalParticipants",
+          "failure": "\nExpecting actual:\n  []\nto contain exactly in any order:\n  [\"alice\", \"finance\"]\nbut could not find the following elements:\n  [\"alice\", \"finance\"]\n",
+          "error": null
+        }
+      ],
+      "productionChanged": false,
+      "rootCause": "SupplierPayableReviewService and SupplierPayableHoldService persist review, hold and retirement facts without notification events; existing supplier payment listeners begin only after a cashier execution request."
+    }
+  },
+  "investigation": {
+    "runtimeHarnessCorrections": [
+      {
+        "stage": "POST_CRASH_PREFLIGHT",
+        "error": "[Errno 48] Address already in use",
+        "verifiedOldProcessGone": true,
+        "sameDatabaseRetained": true
+      },
+      {
+        "stage": "VOUCHER_SCOPE_ASSERTION",
+        "error": "",
+        "verifiedOldProcessGone": true,
+        "sameDatabaseRetained": true,
+        "resolution": "Harness corrected to original policy: payment notices require current legal-entity appointment; ordinary advance accrual retains historical approval access. Production jar unchanged."
+      },
+      {
+        "stage": "DUPLICATE_ACK_STATUS_ASSERTION",
+        "error": "('POST', '/notifications/deliveries/bd710e4e-a785-43ee-8f04-a6bc69b19f36/retry', 400, {'traceId': 'e4859b38-dbd4-49ab-8e38-9ba9dad8494e', 'message': 'Acknowledge possible duplicate notification before retry', 'path': '/api/v1/notifications/deliveries/bd710e4e-a785-43ee-8f04-a6bc69b19f36/retry', 'code': 'NOTIFICATION_DUPLICATE_ACK_REQUIRED'})",
+        "verifiedOldProcessGone": true,
+        "sameDatabaseRetained": true,
+        "resolution": "Harness corrected to documented 400 NOTIFICATION_DUPLICATE_ACK_REQUIRED, already covered by NotificationDeliveryApiIntegrationTest. Production jar unchanged."
+      }
+    ],
+    "restoreHarnessCorrection": "首轮 HTTP 比较只加载最后阶段，缺少出纳消息的前阶段基线。最终使用全部实际阶段记录；全表内容、结构与序列比较一直保持严格一致。首轮失败日志保留。",
+    "frontendPackaging": "后端 jar 与 Web 分开部署；未将缺少内嵌静态文件误判为产品缺陷。",
+    "reproductionFixture": "3 个失败用例及补丁已单独保存，现有测试源恢复为 sourceCommit 的原字节，后续修复重新应用该补丁。"
+  },
+  "limits": [
+    "本地合成财务、SMTP、IM 与 H2 文件库，不能替代 E01–E08 企业联调。",
+    "恢复样例没有附件，附件数 0；本次不声称验证新的原件恢复。",
+    "固定后端 HTTP 和前端解析器不等于实际浏览器或 PostgreSQL 验收。",
+    "已有 17 类通知通过组合门禁，不表示剩余应付来源已经实现。",
+    "未向 GitHub 推送、未创建 PR；V02 最终本地验收仍先于 E15。"
+  ],
+  "remaining": [
+    "实现已复现的供应商应付复核、原预留和授权安全结束通知、权限及页面。",
+    "新来源接通后按改动范围回归并更新固定包验收。",
+    "浏览器与 PostgreSQL 新范围补验。",
+    "V03 原条款核对、V02 最终本地验收、E01–E15 外部验收与交付。"
+  ],
+  "fixedPackage": {
+    "path": "/fyoung/tmp/agentflow-financial-notifications-ehuveosx/server.jar",
+    "sha256": "814aad25835bf05b001849adb4929bcc74b922769bb46cce22c8feb94bfc3c4b"
+  },
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/financial-notifications-acceptance-evidence-snapshot",
+  "sourceHashes": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/BudgetAdjustmentNotice.java",
+      "sha256": "874688fecb5fe3d00a8fa9a5e9157a20e3a95100df2a4d412837ad6bc5fe0eee"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/BudgetNotice.java",
+      "sha256": "3b7ed334196ea1941b2538081b54c19abb6d7ce15e53e0adb09122122f82eb98"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/DisbursementReturnNotice.java",
+      "sha256": "474c416a71e85dee5f6f0151f2beea6636184d8b89b1a5e66a50c881836b6319"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/ExpenseAdjustmentNotice.java",
+      "sha256": "c0b56a9ac0e09ed446f955e316c63687ec4de026d2536a4e13b96f9d6ba2bf04"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/ExpensePartialAdjustmentNotice.java",
+      "sha256": "4d1cd62095c05bc269c923a45bc3da22a53a0d15ce9c7f076194cebcc2d994f0"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/ExpenseReturnNotice.java",
+      "sha256": "a8d36eea4500b144019ea23e193f92e32b72662e08332962dc9690134fa21a60"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/ExpenseSettlementNotice.java",
+      "sha256": "f4c25fa1f199b8f88b81d0ecc63902126876d9851c36194cba96bf1c4a1ac351"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/PaymentNotice.java",
+      "sha256": "b85b2efe1762d15df7b7dd77c2ca5f116f7bc8c35333767cb5ac8fa37e238869"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/RepaymentNotice.java",
+      "sha256": "b884d8834128364d8a46337c46abb71d48545fd070845f589b3191954fb72117"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/RepaymentReviewNotice.java",
+      "sha256": "1b9f4ff5d14a3640604ea963b7bb9357de0c72548ed3e7ceef5f2e2784bdd44e"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/ReversalCheckNotice.java",
+      "sha256": "f2d3ea49ed0a0aa8a3ab4fbee7a586b3fe345b3390b63e602401574a9011d635"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/ReversalNotice.java",
+      "sha256": "0b971710fc743ebec339ccb85ca420526f1f26c26315e6c36a67bcb53d5b8bc5"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/SupplierAdjustmentNotice.java",
+      "sha256": "b3a386da05b93c9cdc00f15510761edabf60afae44db50ea7912230f506ee78b"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/SupplierPaymentNotice.java",
+      "sha256": "db1ff58e1245691d2141e73cac10b58d9ea03c6968b18f81c03085fc0ef2b9b2"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/SupplierReturnNotice.java",
+      "sha256": "a694d29c4bbd4e3d1058efa6165f6206fd00b348823325865db5ca530c46ec57"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/SupplierSettlementNotice.java",
+      "sha256": "ab52f034ca69c9ce1d83673cb13b85de84a77db8961ce6434e22f5b02206a299"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/VoucherNotice.java",
+      "sha256": "28db50fd8de0e674788bd5efda53c4a28607573741e3d59a9b5c72aa9211ae34"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentExecutionService.java",
+      "sha256": "91e886287692cd0bbb84023c3f91aba7630d224ef8d6df9d1ec300890b36cb1d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentReviewService.java",
+      "sha256": "4e94f1915662772c2c3286d31cd1780dceeca662755a9cb17741e2cd7f0a6906"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceDisbursementReturnService.java",
+      "sha256": "3356c544021efc0ffb275c8dc4f77e2c13ef33486541590b4f7691bb488a5e83"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentReviewService.java",
+      "sha256": "8db0f87822c6fe6131c8e731672800453551a7d0e02ca8007d9cde24f8fc2cfc"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentService.java",
+      "sha256": "c30a7b70068d18810eec9d65b6ed062bdec3a6c01b68e15cb27aa95b0d35d9e3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentActions.java",
+      "sha256": "3918d908ed6562bcac3a061bca2d921d4c5828d6ebc64088f3f3d672114b7d09"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentDisputes.java",
+      "sha256": "25f06ec84e30a9b4f6489cad84081b2dba065ed417e63e57bc716dea8813e3fd"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentExecution.java",
+      "sha256": "0956d8da9327fb442cd8b78f5ddf59228e52dda02bf211e21b08a0ad98ff42cd"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentFinance.java",
+      "sha256": "04f49319e532fa5a08032b5a75e95c69e2b5a41ba8a88d53ecb978c53a975f76"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialPreparationService.java",
+      "sha256": "ccf619c4ecce6ab9bd60949abfddc008b24a0051ec56754b56a37c57807c40e3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePaymentReturnService.java",
+      "sha256": "26773a637d131fd6b2f00a01bb4b6299ba55075c297b96975e4e8963f6542cad"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseReductionService.java",
+      "sha256": "536d6d060c20b087bbe50c1cc2dc92b56ad839d3a761730f1c220b3b4e3f7896"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentActionService.java",
+      "sha256": "796db3f8fd11961e9ac4ee4bda37271b7ce7d126e2fa73aaeb845e788c0f4ed0"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentBudgetExecution.java",
+      "sha256": "188df2ec5d9f468b182510ca2598415a7bc52787ff09d3e3c9fb23b41bc0fcfd"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentExecution.java",
+      "sha256": "d16ca7552a40ed300a07e1dad327150de1894bb56e6a3a2aadfeef9c8659d330"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentPreparationService.java",
+      "sha256": "68f8758a96c8e7e85d47df815cbb5a4690e0810d80e28c02c70b1d3e57f0caf2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSettlementChanges.java",
+      "sha256": "99ecacbc4ababf4a60c1142d9a781f50cc0f92e38d73a3b00791756f19b6a322"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/BudgetOperationService.java",
+      "sha256": "e46ac2f58b42368043bc840843a149cc1e72385e597fb96fbd93100a3ebd48c5"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/FinanceGatewayClient.java",
+      "sha256": "daeaa76b499cd5821d22b59e2ee3cd87db6afb9992c6b231160c28bfc0f3e5ca"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentDisputeService.java",
+      "sha256": "b5f932ae271c739fa7333248e822e95071f03fb80e0687b99ad7b10d168d65bf"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentExecutionRequestService.java",
+      "sha256": "f4de5ee7be301047241acd8ea49b4124dbe1dba45671c0a156019d07bf8cb2fa"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationService.java",
+      "sha256": "1032b4deaef2f6deef80864d6b4c209cf8e08859d5d47fd8288a7f9a211b5037"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherDisputeService.java",
+      "sha256": "5b099714bcfa9b5da7a9bff70ab5db153337edf688cd3276e225aa481539ee6b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherOperationService.java",
+      "sha256": "ee2377ecae967e7ae0d494adce6af206615123dcf24b7a0cf390957cf0c6b54d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherPreparationService.java",
+      "sha256": "de4e81e5ae97297ab4398934f01d0beccfb7e9b050c3d3e1552e84a3adedf85a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalExecutionService.java",
+      "sha256": "96415fed3904bbfc222c9437764cbdeab5ac1c59cdea82bac2792f506d6781b8"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalPreparationService.java",
+      "sha256": "091dda03515ba78fc1f31acc4cf07b62f72d1ce8bf16f4f4e859bf979dc69cdb"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalRetirementService.java",
+      "sha256": "0e61a64b4b8eec1c4b5c67b56f433f85340d022474bcca507a51220d6c07d0c3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalService.java",
+      "sha256": "369719b01c6c21063f5c96087c777fa950af8db3ded0440ad18f9796a3ad0f3b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ApprovalNotificationService.java",
+      "sha256": "898cec55cb9d5bf336fc372effa1779d4deaf84d7f01df1b08017ca64c7a6794"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/BudgetAdjustmentNotificationAccess.java",
+      "sha256": "660c62f03a82b1655f0e6d9fbe607c5f67ae0e1c0e1ca9f3b0a827e65c2776c5"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/BudgetAdjustmentNotificationController.java",
+      "sha256": "c7c6c0311afc77d9334da1df5809a535031aa9b99b5884e05052351123e29ee2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/BudgetAdjustmentNotificationService.java",
+      "sha256": "fc1f751a3fd6ee0777546f60820ecc568c54fcec68df682a916164dcea6a34f2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/BudgetNotificationAccess.java",
+      "sha256": "89864fe1180f72b71706cc8c98969692aa60abc0da24c4e98d0b69ab1f903c75"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/BudgetNotificationController.java",
+      "sha256": "f1fba1c0288a40672e3bb55ba19b8024b6eaa75ac5b9919c93c8898e7cc013dc"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/BudgetNotificationService.java",
+      "sha256": "94dd1710928383117976e938c5e28bfd766af9e295a15330e25a08aa9f34e381"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/DisbursementReturnNotificationAccess.java",
+      "sha256": "0c3eac04b9b62afe9f5015faeca9742505891dce5207269c979cec5e3fe71487"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/DisbursementReturnNotificationController.java",
+      "sha256": "2fbb64a4909a013c5bff77591324e8156679e844adbda55994a0395601c1c1f3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/DisbursementReturnNotificationService.java",
+      "sha256": "fa76d1a3b47904e2c38cccaadc51c444d4de74b86738d3b2770989ba11d41d03"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpenseAdjustmentNotificationAccess.java",
+      "sha256": "0f84d8f8bbcf58a6cad9f739f9ae7d1b883b2da9f67c287f63a96049a279ae37"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpenseAdjustmentNotificationController.java",
+      "sha256": "8b7f63653c0ba743b153a4881cf92fbcd7ee7f7574043f01b26bd05665a6a00c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpenseAdjustmentNotificationService.java",
+      "sha256": "84186e10ae96443693ff0e80135e4584a2896a87a4d12dd74e63801b3c90b550"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpensePartialAdjustmentNotificationAccess.java",
+      "sha256": "77b55e7b9dc968888537d3ec483a7d9d0d28e76839b5410b6617e5842a6950a3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpensePartialAdjustmentNotificationController.java",
+      "sha256": "d847e86fce3aca7613544a55c94e7a05305f18c0c6baf445240a4e4a618cf88a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpensePartialAdjustmentNotificationService.java",
+      "sha256": "e2400400f29c2b2409a85a571c1fba1f63389f0cf78fa4eab369a6a4c20b8995"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpenseReturnNotificationAccess.java",
+      "sha256": "0e78cc25d59f65b0b98488c01c740f5e6168804a991f7798f8c84e24553c3656"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpenseReturnNotificationController.java",
+      "sha256": "9ab60e2e736d2a929aabb7fae6baa755c8c042de561c35ee9f720fa52f2f7809"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpenseReturnNotificationService.java",
+      "sha256": "a5b494d0aabd793416776d739ff90146368c2a8db74ff6f7c053780db525713a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpenseSettlementNotificationAccess.java",
+      "sha256": "e92c1432fa9d667978ef1a6f8737ef60145cc4927f1495b3f73bd72de5b57a5b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpenseSettlementNotificationController.java",
+      "sha256": "d00ed79dc1a42fddbfc8c01e2e0b893435b624d14932be220bcdd146e6e22fc7"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpenseSettlementNotificationService.java",
+      "sha256": "110e7d4afee53b8bfdbfabe034d0c2144a75d3312edbba73d4eca12248ad8f18"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java",
+      "sha256": "d029af2150b2e331277f0cc73ad857e8af9d79c923e13ff337fd79fd51f0a403"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/PaymentNotificationAccess.java",
+      "sha256": "9e6c691c105edf2d3373bf49b24348dca1b9214c63534a2334fde7f7eb343e07"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/PaymentNotificationController.java",
+      "sha256": "873800e529dd9abc7911043d5a2df0512596e8d598876a367e39418b6a65bc68"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/PaymentNotificationService.java",
+      "sha256": "c0bfa7efbe17319c2621df8d5546bd9b9331cae3997ce9f916f47dc3468f07be"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/RepaymentNotificationAccess.java",
+      "sha256": "3f94710057c7b55407af653e88be835a66a538eec479f9d8f31ebe790dad34ad"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/RepaymentNotificationController.java",
+      "sha256": "5be6c0ad85f65a3c94844b16c656581a0a616fedf0bfc7d5a6576d6553a87d49"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/RepaymentNotificationService.java",
+      "sha256": "6d186ef22a802f7521c566fe15e335e296593b9a7e1004228df90cd3716ad3c2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/RepaymentReviewNotificationAccess.java",
+      "sha256": "8164bb97a1efc9ca6a0c715066848a81bc288d9753d5565665093109844c9521"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/RepaymentReviewNotificationController.java",
+      "sha256": "059f057297cde35d46b05f3cd46cd884a52755f4b9101df4f8ee837e64191b1a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/RepaymentReviewNotificationService.java",
+      "sha256": "f88f05a91a9afc375f2e590da1b61c2e7a10009458c9e1bb09f627c03fc1b94c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ReversalCheckNotificationAccess.java",
+      "sha256": "a540225e1ec74103d61ff30f85067efc64ccdabfbab82f6bd339d9a22fe6687f"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ReversalCheckNotificationController.java",
+      "sha256": "66360b0c1d960a569870fa4a3b7ec345b512e7fb9f45d5ba2ac29b0db1c7f906"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ReversalCheckNotificationService.java",
+      "sha256": "a28c28471b2e284807402f60b5dd9754f12e9bb3b2ce3a63f9d41a85c246f775"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ReversalNotificationAccess.java",
+      "sha256": "57f66f93dbc5b5c1b7898afa0f1ebca47603ae18aae45b980fc507920ab88dde"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ReversalNotificationController.java",
+      "sha256": "e352b77bf41a6fda7405414e99159a464cb58c8337b508ebc05f44a32bba1b1d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ReversalNotificationService.java",
+      "sha256": "01af7ca34c0e7549f35aefaead7533b25eaa25d877dced005fed9d95cddf995d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierAdjustmentNotificationAccess.java",
+      "sha256": "c0dce41028f7db670a0358d0c9efab84271085b2289c55408651e412767663d5"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierAdjustmentNotificationController.java",
+      "sha256": "fba0a8bd4010babba10fa4190a30117ddef65ea0259d0815f97057b1e7222433"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierAdjustmentNotificationService.java",
+      "sha256": "0148befed4a516b08a50574d7232214232db6aa1317a8b5a5bea53acbf692d47"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierPaymentNotificationAccess.java",
+      "sha256": "e40dafc425de692c85da4c54e63c05ce9da1c006c224a403fd0f9a095806982c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierPaymentNotificationController.java",
+      "sha256": "3bcf79f0b2546b9cdffeaafdfe01d77853746078927d3e4820c51abc2ab48995"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierPaymentNotificationService.java",
+      "sha256": "2e42a6fafe4914f91df2395eda129be207c38f118e8565ce797a75358bb85d10"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierReturnNotificationAccess.java",
+      "sha256": "f8e6379fbc7bdbaac1b931a1512170684bf8daf990ad5c43e7def0451bf9bafc"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierReturnNotificationController.java",
+      "sha256": "6fdf0c7b4062eb96ef8e3b7a8dc780e797c9c066d44b8f512351a5a2dde18abc"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierReturnNotificationService.java",
+      "sha256": "9cbb8c409eb12a279a88fba6d5c9e36ae863fcb8215ed59e7e6076d70122c9f9"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierSettlementNotificationAccess.java",
+      "sha256": "73b513283cf6246318d498d5d7403f7e7da92958e43eeb39718d244ba152fe97"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierSettlementNotificationController.java",
+      "sha256": "f49a0c6838f43fb1d11eb86efe92c4bed68d921d760cedbab445183526d4550b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierSettlementNotificationService.java",
+      "sha256": "1f7cece7b25a2023c909bb09458f485a4bad91c198f8843b7d42afa1372ddffc"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/VoucherNotificationAccess.java",
+      "sha256": "5c40e1a044509df3b5135704a6a5d1cec07f6e3a40b42d8430930e1a34eae991"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/VoucherNotificationController.java",
+      "sha256": "d5085867df9dc8f1e46297258b754fda51c8fdbdce94324d5a203cbd4e943975"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/VoucherNotificationService.java",
+      "sha256": "413e545d6f424673596b4ea7f98a64da918a63b13a0471d81cdda8f45b868b2e"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentCompletionService.java",
+      "sha256": "764ffe7a4aaa8b20390100ed64aeba3d4867e21ce562f737ceb0fc6120311b74"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentDisputeService.java",
+      "sha256": "3617a22bc7076cffaa3465809f9369a1c6ac71d5393eb71a31e79d12a90b9ee1"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentPreparationService.java",
+      "sha256": "8ff525763a2b9615fc32f710175c734caa8bf0eb4ce192c0a91da10a4a808458"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentService.java",
+      "sha256": "310b795f62233fd1fbd505b09ff55807e55495f225f275a5a5289747f4d4a0d0"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableHoldService.java",
+      "sha256": "235826cee789ebcc50a7e61de073f612553ab167ccc80808bd6f128dff4b36e7"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableReviewService.java",
+      "sha256": "cfbeda278a15f80df7fc47a9b3d0e08bec2346af61d7f8ab1c4e1a408eae74c3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentDisputeService.java",
+      "sha256": "7306b01b07305e2654b53cc1f14bef158e93ce65d845d8e9d2923b4534583597"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentExecutionService.java",
+      "sha256": "4c00f3ac8a679f07d2c9777852d151daad25de130c64c41261bb7b396e0c1c57"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentReturnService.java",
+      "sha256": "503644c55576bafa760074ba9895dc72b9a366e564d6cd375fcbd422b8cb5d6d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentService.java",
+      "sha256": "f64a8862959f344a38a1fea37dd93ad313967410bb65dd8719d9ba6a90752efe"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierSettlementDisputeService.java",
+      "sha256": "9f7d11e4742003ca29077be81d1464bc022fbe843c775285eb9a939d362689ba"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierSettlementPreparationService.java",
+      "sha256": "c8bb1839825adeb0a54aec444af997970eba74bc4d93e9b70595562cb50946a2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierSettlementService.java",
+      "sha256": "563be2591dc863272c1ffe90872f24837b0bd38157a104d5e6431a7f8d5c0af1"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "13a74944e5d7d5e4235db93863fb236525976412892f7caad907945826af000b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/procurement/SupplierFinanceWorkflowTest.java",
+      "sha256": "7f85ad66f9c7bb28ec2c0aa50fdaf80b5e8887a330bac45c202521a84a33e699"
+    },
+    {
+      "path": "agentflow-web/src/expenseSettlement.ts",
+      "sha256": "a99c37cf02ac2cd6facd730c78e7be7c99b4b7f28c6e4e16ae6f2c95c1bce7b2"
+    },
+    {
+      "path": "agentflow-web/src/expenses.ts",
+      "sha256": "2c2bb4abfd86c3a11cd1ce925059e4c5aedb664c0a86c257e88a358a0f26d9ec"
+    },
+    {
+      "path": "agentflow-web/src/notificationDeliveries.ts",
+      "sha256": "beea10730fc68c8058fd6fd6f081a5e37ea17a8c581b587d689d627a53ffa3f1"
+    },
+    {
+      "path": "agentflow-web/src/notificationInbox.ts",
+      "sha256": "e9483c583594666a06f6280869da9e4c74def91f519b9d0e64609e1a6656acc9"
+    },
+    {
+      "path": "agentflow-web/src/payments.ts",
+      "sha256": "7b898af9b962302a29e241717d133bf567ee0a99417c199495ab3708bc114a98"
+    },
+    {
+      "path": "agentflow-web/src/supplierCashier.ts",
+      "sha256": "478c6c183659297ea638e77ce8eb6bb41d92090c2ec58fed0f8c430039062ee3"
+    },
+    {
+      "path": "agentflow-web/src/supplierFinance.ts",
+      "sha256": "22d74685dc214e4093c6571825a90b49c0b3546a4f1cf4bd5608a12f4725e85f"
+    },
+    {
+      "path": "agentflow-web/src/voucherReversal.ts",
+      "sha256": "fd6def3a97b0d7159f334f953aebb872a92f132e7e1460cdd41b72236cd235fc"
+    },
+    {
+      "path": "agentflow-web/src/voucherReversalExecution.ts",
+      "sha256": "ef541c09cc3aec1e92d5ff0f94dc79e262cb47dfe3d3e8a053a3980eefa256a7"
+    },
+    {
+      "path": "agentflow-web/src/vouchers.ts",
+      "sha256": "37076cb9b1013cb25ebdfc9a780a70a82b20cd248de7406b24afcd661edbe49d"
+    }
+  ],
+  "artifactHashes": [
+    {
+      "path": "audit/check-financial-notification-runtime.mjs",
+      "size": 5661,
+      "sha256": "90c676e19f34854f6d340cfcd5b90fa611407424a232ae44ea8b48a7cab31f24"
+    },
+    {
+      "path": "audit/financial-notifications-acceptance-delivery-final.log",
+      "size": 183,
+      "sha256": "ced75694ddaa97465242829b6d31c286c3718771f71740025ada60ca0e0a8bdb"
+    },
+    {
+      "path": "audit/financial-notifications-acceptance-delivery-resume.log",
+      "size": 994,
+      "sha256": "36f4c7c1ecfcfd67cef8c75636b731da8c635d4ecc1f75c82fb88675eb5e5502"
+    },
+    {
+      "path": "audit/financial-notifications-acceptance-java-summary.json",
+      "size": 6120,
+      "sha256": "10899198fd89be2834ed2f2dcfc9ca2ec13ae556ef8b4c2d7dc82610e18730b2"
+    },
+    {
+      "path": "audit/financial-notifications-acceptance-java.log",
+      "size": 341376,
+      "sha256": "6a5a3b6965e603430baa0e4849cd1e699bef77d53dd5e51a094bde648c59b8da"
+    },
+    {
+      "path": "audit/financial-notifications-acceptance-maven-command.json",
+      "size": 1259,
+      "sha256": "ea26dd44c2117d977f0335e1a95f693fe78537412ec518db70284f62359df274"
+    },
+    {
+      "path": "audit/financial-notifications-acceptance-package.log",
+      "size": 13873,
+      "sha256": "1ea673d8ed85e4e645cfa0eeb8bc2b5807ec5615e8beed75ea99ebb9da96b515"
+    },
+    {
+      "path": "audit/financial-notifications-acceptance-resume.log",
+      "size": 627,
+      "sha256": "5c780d5ba41ebe03abc94f3dc2e3075ea97641137c4b70203df57673d1aabeb5"
+    },
+    {
+      "path": "audit/financial-notifications-acceptance-runtime.log",
+      "size": 591,
+      "sha256": "28c1bb6d480f996b25c8ccdfcec3abd96aaf11cb9c21094ab68a0d56fbbfe072"
+    },
+    {
+      "path": "audit/financial-notifications-packaged-web.json",
+      "size": 476,
+      "sha256": "6f739234b091441a1ccb973df229875c213e0c37e27405775c00989111149e0b"
+    },
+    {
+      "path": "audit/financial-notifications-restore-attempt1.log",
+      "size": 405,
+      "sha256": "975b05a865a4e086f265724c1054a6dbdbe5f870999d842306e5d62cc9beb538"
+    },
+    {
+      "path": "audit/financial-notifications-restore.log",
+      "size": 971,
+      "sha256": "bc0afc3a73106940b218b9c0ab135a518f7831f7a5a75a8fda1344f0817725ca"
+    },
+    {
+      "path": "audit/financial-notifications-runtime-contract.json",
+      "size": 3371,
+      "sha256": "fe74f808a42df015f8ede890bf18fee289b23b07b997eaec3836d22a4ead1a45"
+    },
+    {
+      "path": "audit/financial-notifications-runtime-contract.log",
+      "size": 187,
+      "sha256": "22a12aaaa3abe0b4430243d5d41d5f6ca0b314a6553cb68991db8ba796a047ba"
+    },
+    {
+      "path": "audit/financial-notifications-source-audit.py",
+      "size": 3915,
+      "sha256": "ca42898e976fc56b352c1ae1d8b7ff17cf8457a1cb9234abb1cbae31dc17686a"
+    },
+    {
+      "path": "audit/financial-notifications-source-coverage.json",
+      "size": 46004,
+      "sha256": "9f570f466ef584aa8d8d0e0bbeedba1743ad7c7afecc6c7543a77c768c10fded"
+    },
+    {
+      "path": "audit/prepare-financial-notification-acceptance.py",
+      "size": 3777,
+      "sha256": "44e1dc56604d357648256595e181dd920e49bba34555cbe947ab4d4134438e5d"
+    },
+    {
+      "path": "audit/restore-financial-notifications.py",
+      "size": 10312,
+      "sha256": "94cc4e5e26078f63589f0428d8fe1f96d3e728e5c5249011c264bb3aed7a3578"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.api.OpenApiContractTest.xml",
+      "size": 74650,
+      "sha256": "036ddf902c863e72ad1ccc271d1775fcd9d70d77a23209c2c873abf9b7f096ef"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.budget.BudgetAdjustmentFinanceWorkflowTest.xml",
+      "size": 77357,
+      "sha256": "6c56dadbfff93e6bbc7de857db7256d2f51b53ff7a8d1c0b446fa3e57b74756c"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.budget.BudgetAdjustmentOperationTest.xml",
+      "size": 12438,
+      "sha256": "08dcbde319e317582fdedc7e72c0c027f80eb0147560620c130761afe38e788d"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.budget.BudgetAdjustmentReviewTest.xml",
+      "size": 11907,
+      "sha256": "23cecafb9f6fe530de32705d0a2938949f72128bebedbe13d0164c621687d7be"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.expense.AdvanceDisbursementReturnTest.xml",
+      "size": 13013,
+      "sha256": "c07e9b30bc948d9d9121c160e00a9cb9277784c72f8817c1de6cebac8bceba01"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.expense.AdvanceRepaymentCheckTest.xml",
+      "size": 11899,
+      "sha256": "6c62b2e418ab2b39bf2f613824d94c21470a64c371aac85f959af3b7bfbe17f6"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.expense.AdvanceRepaymentIntegrationTest.xml",
+      "size": 78834,
+      "sha256": "149f7ab2210b966230b4735b46ec08edb991195fa9a58c98da6e4f965259c30b"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.expense.AdvanceRepaymentReviewCheckTest.xml",
+      "size": 11947,
+      "sha256": "4a565a417453421e092feeb9eb44ff27774c8a86c3765b567daf2b19f0aa334a"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.expense.ExpensePaymentReturnTest.xml",
+      "size": 12708,
+      "sha256": "85e32d705ec68a9823c5ba2f39078ec544262ebf5a383177f74a0f424eaefc64"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "size": 78787,
+      "sha256": "4bee0e7032e1ed35cec6e3104cc244c80e2a911f31d09f4afb282fed7ce81b15"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.finance.BudgetOperationIntegrationTest.xml",
+      "size": 75471,
+      "sha256": "b40d3806075ac608b2f8ee0d518e5e9796309d7e9b2891ab55da98a27dae584f"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.finance.ExpenseResourceAdjustmentTest.xml",
+      "size": 12615,
+      "sha256": "6b115e44ba36153eeb43480b8031a37c9fb1da140664d8a62254e82823a38ad6"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.finance.PaymentOperationIntegrationTest.xml",
+      "size": 83650,
+      "sha256": "b6a8a20bbead487c3d624017049b5d2750cdc0729cf39b02b2ee03cacd6594f4"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.finance.VoucherOperationIntegrationTest.xml",
+      "size": 79665,
+      "sha256": "0d835eea771c05e00c5a2b06cfdf4fb710086b6da1792b121a2675a00ec5c3bf"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.BudgetNoticeTest.xml",
+      "size": 11218,
+      "sha256": "3281f104ef890ea2524117072fc999920413ac0d8f7d058dcace242412ff80b0"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.ExpensePartialAdjustmentNoticeTest.xml",
+      "size": 11126,
+      "sha256": "e70d6f9c8c240fd242a22c48c3692737df67df65c6f4aca368aea1bd2f1b9fd6"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.ExpenseSettlementNoticeTest.xml",
+      "size": 11280,
+      "sha256": "42ae607e533e863a17540f4514d93611293e23f1509eaef2f70ba82013376312"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+      "size": 75139,
+      "sha256": "a5110bd5ebc747bbac6ecb094c6a116af395ee9090a95380f055735e4a5c231e"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+      "size": 75267,
+      "sha256": "92eabe502ce2d9277525488f4d2bb727e6256099b60921148b606df8a99c5cad"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+      "size": 75532,
+      "sha256": "916fe1971cc46905f5c99c7f09b9bec4145affd75e264a802f0962f1f0692918"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.PaymentNoticeTest.xml",
+      "size": 11255,
+      "sha256": "ac2c1ffa28a4f6d65fb3380bf77a0cb17be4415a986e736d6a1166065aa3476b"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.ReversalCheckNoticeTest.xml",
+      "size": 11239,
+      "sha256": "75351d9ca2348e871e8f0e855185a7707d1b3ec359d2dba5ad35414f19fa97cf"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.ReversalNoticeTest.xml",
+      "size": 11224,
+      "sha256": "ec1ec13a8490e1ea80cd3fee2731b1d6c399f0e341fd7889fdcd16572f3295f7"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.SmtpNotificationTransportTest.xml",
+      "size": 44833,
+      "sha256": "d8851fe179f8f45b1acccee9ba30434f77ee81677e7b8403c34b1d7e2ca90b0b"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.SupplierPaymentNoticeTest.xml",
+      "size": 11250,
+      "sha256": "1c7ac7642a931b56a3adbfda274420f4fe7ec05796b70d8044e983319d4e5dea"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.VoucherNoticeTest.xml",
+      "size": 11255,
+      "sha256": "95b6f0bfc558509a1927809570f4792f316aa504e56711284244026a259d4201"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.WeComNotificationConfigurationTest.xml",
+      "size": 44539,
+      "sha256": "7aced30d8d836c8caeff231b2e6e3c3389d37cabc81d0a17d80a659605164c34"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.notification.WeComNotificationTransportTest.xml",
+      "size": 45466,
+      "sha256": "fe5502a0f5e4269743e0cf523a0a0b263210d14d96d8a97ccd8b9a102a2ff89a"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.procurement.SupplierAdjustmentNoticeTest.xml",
+      "size": 11437,
+      "sha256": "79e6fbefaeee15a5d22da94a4c70ac9a824a47ca4659ce0642102809430903e0"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.procurement.SupplierFinanceWorkflowTest.xml",
+      "size": 88462,
+      "sha256": "f78f3bde6400b5f58fb227ffd6a5b45317cba18db3553014a34bc5571d3e8dd4"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.procurement.SupplierReturnNoticeTest.xml",
+      "size": 11602,
+      "sha256": "d6605a482e4a935e4181a6f07fdb5e998f543e6cc7b8d7c49736891a25f237da"
+    },
+    {
+      "path": "java-reports/TEST-io.agentflow.procurement.SupplierSettlementNoticeTest.xml",
+      "size": 11437,
+      "sha256": "53aa6e8507c15754144e552738004dc7cdd6322d167c48207ade76e3ff9d6e34"
+    },
+    {
+      "path": "reproduction/reproduce-supplier-payable-notification-gaps.py",
+      "size": 3167,
+      "sha256": "a52a46b8120b010d6497d95379d8063f435674830803f713cc13a2e002eeb887"
+    },
+    {
+      "path": "reproduction/supplier-payable-notifications-red-cases.txt",
+      "size": 2432,
+      "sha256": "5c56b2cb7dea09223c3172a9418b2e10db43f40e6f37fe0b7223940075fb92e1"
+    },
+    {
+      "path": "reproduction/supplier-payable-notifications-red-summary.json",
+      "size": 1115,
+      "sha256": "362e8a48677338f8740110b58bda19011adeafa3181b247c275a90b361176b85"
+    },
+    {
+      "path": "reproduction/supplier-payable-notifications-red.log",
+      "size": 45999,
+      "sha256": "c837c5dfc7f54bec6fabc90d01697bb7a27fe3f74cc9e62ab11262d46cce9db8"
+    },
+    {
+      "path": "reproduction/supplier-payable-notifications-red.patch",
+      "size": 3340,
+      "sha256": "4f8dc8d8b808d8ce1e5257ba0db730be23e7caf2de87da85ce6805f8d34a9ebf"
+    },
+    {
+      "path": "reproduction/supplier-payable-notifications-red.xml",
+      "size": 75655,
+      "sha256": "622fd19f8534d02fa0504aadeb2a563c8f631aa33f8ad3aabb7e8055987b8425"
+    },
+    {
+      "path": "restore/SnapshotH2.java",
+      "size": 2043,
+      "sha256": "a7b09a69190df4260ba76f337ad6b3a4a13c0473a771d46734b9e12b9bd0bbf8"
+    },
+    {
+      "path": "restore/after-boot-tables.tsv",
+      "size": 23368,
+      "sha256": "7edf7f19fb0bccf694182f034fd25fcbda3de7202a8f2387b6d805f8645f1a9f"
+    },
+    {
+      "path": "restore/backup/database.sql",
+      "size": 769568,
+      "sha256": "a337b25d11ca831584f70a11f5e88e3fb02447b2be998854ce34d6d1be871afe"
+    },
+    {
+      "path": "restore/backup/financial-template-journey-finance-receipts.json",
+      "size": 14036,
+      "sha256": "39ac44a4e8063295a2e0818b20b3dfd4a318cc100a37c8134c6d7a04c532428b"
+    },
+    {
+      "path": "restore/backup/im-receipts.json",
+      "size": 3357,
+      "sha256": "57b174b06973e0fc8a2259c1354da9e0ce82594668d851cb332a1e8a41ab722c"
+    },
+    {
+      "path": "restore/backup/manifest.json",
+      "size": 393,
+      "sha256": "6ac7c040f0f967fa22b77fe0166cbf7408d5e9961340e590f3e410a1380ec6eb"
+    },
+    {
+      "path": "restore/backup/smtp-receipts.json",
+      "size": 4368,
+      "sha256": "4240130da646ac3bb0329b835d175facc766efb25d3bec9dc476b682f4513c1e"
+    },
+    {
+      "path": "restore/backup.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "restore/boot.log",
+      "size": 8411,
+      "sha256": "f3ce9ee28ef85df9b55bc9b264213c10daf1a4d5eab8e86ae2f4435b08e72457"
+    },
+    {
+      "path": "restore/http.json",
+      "size": 31951,
+      "sha256": "760a0728a2e9cd3537f36417cf5dec1c0909f80ecc7117400b67b205babc644a"
+    },
+    {
+      "path": "restore/restore.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "restore/restored-content.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "restore/restored-content.sql",
+      "size": 769456,
+      "sha256": "740337bf26f8d0cbf58492b2eb92681ff27c114b96af3909e42c5e8b375561b7"
+    },
+    {
+      "path": "restore/restored-tables.tsv",
+      "size": 23368,
+      "sha256": "7edf7f19fb0bccf694182f034fd25fcbda3de7202a8f2387b6d805f8645f1a9f"
+    },
+    {
+      "path": "restore/result.json",
+      "size": 952,
+      "sha256": "34d7ced78f5bf2d04ee0d242cced2636fa92366058ef3b83669d07af71d52444"
+    },
+    {
+      "path": "restore/source-content.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "restore/source-content.sql",
+      "size": 769456,
+      "sha256": "79f052e8bc07647d35ed97275fe14b0b048e8b8aab80d267ac9da0a0729aaf65"
+    },
+    {
+      "path": "restore/source-tables.tsv",
+      "size": 23368,
+      "sha256": "7edf7f19fb0bccf694182f034fd25fcbda3de7202a8f2387b6d805f8645f1a9f"
+    },
+    {
+      "path": "runtime/before-crash.json",
+      "size": 12229,
+      "sha256": "a3d0ba52575fb5f3c2afa15348942cafbc6d095f4cd53aa0b851263432ce22eb"
+    },
+    {
+      "path": "runtime/boot-1.log",
+      "size": 30176,
+      "sha256": "c87d763749de2fbbf8b7267846be26e6ec20f7a35a2fadb8cf9757bd4b1488e3"
+    },
+    {
+      "path": "runtime/boot-2.log",
+      "size": 8379,
+      "sha256": "1822b1cf2db19f7d70687b0a5f90fb4c6387269d4ea21d94c6f48faee38ba8cf"
+    },
+    {
+      "path": "runtime/boot-3.log",
+      "size": 8378,
+      "sha256": "e7553801e2e705f37343e3d02aa7c0dd0127a322ebc673e3bff493fa10d914d9"
+    },
+    {
+      "path": "runtime/boot-4.log",
+      "size": 8378,
+      "sha256": "a00008decc291f2b53a96a33bd8a714dfede48e147612555ffc1f0fc987b3ee6"
+    },
+    {
+      "path": "runtime/boot-5.log",
+      "size": 8379,
+      "sha256": "648756ec987ab77bdf61361ae03573fcbecf05c1f4fafb3d2e1b41043dade00a"
+    },
+    {
+      "path": "runtime/expense_managed_client.py",
+      "size": 2917,
+      "sha256": "cb6df0774f15309dcb195518ce1991f4b734ce9a5aabf866ff62f7566450b810"
+    },
+    {
+      "path": "runtime/finance-delivery-resume-4.log",
+      "size": 46,
+      "sha256": "dbbecda0757ab703fa87bd807dbf6f95fd4b8069520e3e2cb51e596c899263a5"
+    },
+    {
+      "path": "runtime/finance-delivery-resume.log",
+      "size": 46,
+      "sha256": "dbbecda0757ab703fa87bd807dbf6f95fd4b8069520e3e2cb51e596c899263a5"
+    },
+    {
+      "path": "runtime/finance-resume.log",
+      "size": 46,
+      "sha256": "dbbecda0757ab703fa87bd807dbf6f95fd4b8069520e3e2cb51e596c899263a5"
+    },
+    {
+      "path": "runtime/finance.log",
+      "size": 46,
+      "sha256": "dbbecda0757ab703fa87bd807dbf6f95fd4b8069520e3e2cb51e596c899263a5"
+    },
+    {
+      "path": "runtime/financial-template-examples-download-expense-report.json",
+      "size": 23714,
+      "sha256": "b6336357278ed96118d9b38a764e2dec06baed21b67fbbc149046819aeb59f62"
+    },
+    {
+      "path": "runtime/financial-template-journey-finance-calls.jsonl",
+      "size": 13493,
+      "sha256": "a39ccbb15ccf30e4aa1cfa35e47cf9641428febd1fa370da5d48e5b37ff28be7"
+    },
+    {
+      "path": "runtime/financial-template-journey-finance-receipts.json",
+      "size": 14036,
+      "sha256": "39ac44a4e8063295a2e0818b20b3dfd4a318cc100a37c8134c6d7a04c532428b"
+    },
+    {
+      "path": "runtime/financial-template-journey-finance.py",
+      "size": 17278,
+      "sha256": "4016cd43c3414db309d9bd153923525a4527bcc94435663459aeab821adf6113"
+    },
+    {
+      "path": "runtime/financial-template-journey-http-notifications-after-crash.json",
+      "size": 35611,
+      "sha256": "c3086ca12aa9fd1baec633d8e82f643be839b3f7fe9672f1ad966119186e2b6e"
+    },
+    {
+      "path": "runtime/financial-template-journey-http-notifications-delivery.json",
+      "size": 329038,
+      "sha256": "3ea849ebdb186116b5d4218e55cf841b6e5c03116276c9a198761cf7679fa2fd"
+    },
+    {
+      "path": "runtime/financial-template-journey-http-notifications-setup.json",
+      "size": 190543,
+      "sha256": "f762d98e07bd6cb454b0c6efdbd0e00c6b6e93429901d76627e0512db2510185"
+    },
+    {
+      "path": "runtime/financial-template-journey-http-notifications-unknown-restart-5.json",
+      "size": 198197,
+      "sha256": "a55ae17474976e561cfa3487ff857b66733c9ecefce9ede6f84d63f220a7079c"
+    },
+    {
+      "path": "runtime/financial-template-journey-http-notifications-unknown-restart.json",
+      "size": 20229,
+      "sha256": "608c85da761636b236912344d4c5b5a26be015311901f521fc3b7afc86469038"
+    },
+    {
+      "path": "runtime/financial-template-journey-runtime.json",
+      "size": 593,
+      "sha256": "c038c25623c16b5c63722e553b2902cb078ca861a241199c54c941e8c77ee9e5"
+    },
+    {
+      "path": "runtime/financial-template-journey.json",
+      "size": 32858,
+      "sha256": "dfe9e5deb9215a87bba2686e581d7022e7cddc4b3b7dcd4c3216c3afe74b7eda"
+    },
+    {
+      "path": "runtime/financial_template_journey.py",
+      "size": 12179,
+      "sha256": "869894ea84b716e613d587f7436cb8052673d8d9eb1acf3bc45c1c10379d4ca8"
+    },
+    {
+      "path": "runtime/im-receipts.json",
+      "size": 3357,
+      "sha256": "57b174b06973e0fc8a2259c1354da9e0ce82594668d851cb332a1e8a41ab722c"
+    },
+    {
+      "path": "runtime/im-receipts.json.attempt2",
+      "size": 3357,
+      "sha256": "57b174b06973e0fc8a2259c1354da9e0ce82594668d851cb332a1e8a41ab722c"
+    },
+    {
+      "path": "runtime/im-receipts.json.attempt3",
+      "size": 3357,
+      "sha256": "57b174b06973e0fc8a2259c1354da9e0ce82594668d851cb332a1e8a41ab722c"
+    },
+    {
+      "path": "runtime/result.json",
+      "size": 3038,
+      "sha256": "1e57ff1cebbbc07b61697bb462b0eaa6a3942e2e5052c46753971d7df0427c6a"
+    },
+    {
+      "path": "runtime/result.json.attempt2",
+      "size": 1012,
+      "sha256": "a002e5083001fcf3f0ae75d39a469031cd4efb646af603ffd1a1fe419a80cb1f"
+    },
+    {
+      "path": "runtime/result.json.attempt3",
+      "size": 1877,
+      "sha256": "d9d828eb251bf9eb18739679cd78f161af7b52c84974b460d75505f956e6d4cf"
+    },
+    {
+      "path": "runtime/run_acceptance.py",
+      "size": 25068,
+      "sha256": "467a35b0cb494c3be1cf84cc9b1083685dce9e831d570aa551e281f00ae5dcf1"
+    },
+    {
+      "path": "runtime/run_acceptance.py.attempt2",
+      "size": 21169,
+      "sha256": "380ef7fe2f002cf9296dbd846fdc9aa7a0001e1ccd6590c1d03a267a67887216"
+    },
+    {
+      "path": "runtime/run_acceptance.py.attempt3",
+      "size": 24683,
+      "sha256": "164c0543bd310446a137c36275774cbe5c3089565dbbb7ddf11b711bf2bb1553"
+    },
+    {
+      "path": "runtime/run_acceptance_attempt1.py",
+      "size": 19393,
+      "sha256": "1012aed78bd5f845eaac6f5a9be8d0cc92796c950344662909f65c1a74c090de"
+    },
+    {
+      "path": "runtime/smtp-receipts.json",
+      "size": 4368,
+      "sha256": "4240130da646ac3bb0329b835d175facc766efb25d3bec9dc476b682f4513c1e"
+    },
+    {
+      "path": "runtime/smtp-receipts.json.attempt2",
+      "size": 4005,
+      "sha256": "1164bd1196e7f5cd8d74e5c9ffe070c917a37ffbe3c2e7f38b21882c5b4b9fbe"
+    },
+    {
+      "path": "runtime/smtp-receipts.json.attempt3",
+      "size": 4005,
+      "sha256": "1164bd1196e7f5cd8d74e5c9ffe070c917a37ffbe3c2e7f38b21882c5b4b9fbe"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/BudgetAdjustmentNotice.java",
+      "size": 4639,
+      "sha256": "874688fecb5fe3d00a8fa9a5e9157a20e3a95100df2a4d412837ad6bc5fe0eee"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/BudgetNotice.java",
+      "size": 3018,
+      "sha256": "3b7ed334196ea1941b2538081b54c19abb6d7ce15e53e0adb09122122f82eb98"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/DisbursementReturnNotice.java",
+      "size": 4031,
+      "sha256": "474c416a71e85dee5f6f0151f2beea6636184d8b89b1a5e66a50c881836b6319"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/ExpenseAdjustmentNotice.java",
+      "size": 4540,
+      "sha256": "c0b56a9ac0e09ed446f955e316c63687ec4de026d2536a4e13b96f9d6ba2bf04"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/ExpensePartialAdjustmentNotice.java",
+      "size": 6973,
+      "sha256": "4d1cd62095c05bc269c923a45bc3da22a53a0d15ce9c7f076194cebcc2d994f0"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/ExpenseReturnNotice.java",
+      "size": 3380,
+      "sha256": "a8d36eea4500b144019ea23e193f92e32b72662e08332962dc9690134fa21a60"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/ExpenseSettlementNotice.java",
+      "size": 2881,
+      "sha256": "f4c25fa1f199b8f88b81d0ecc63902126876d9851c36194cba96bf1c4a1ac351"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/PaymentNotice.java",
+      "size": 4847,
+      "sha256": "b85b2efe1762d15df7b7dd77c2ca5f116f7bc8c35333767cb5ac8fa37e238869"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/RepaymentNotice.java",
+      "size": 3346,
+      "sha256": "b884d8834128364d8a46337c46abb71d48545fd070845f589b3191954fb72117"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/RepaymentReviewNotice.java",
+      "size": 3960,
+      "sha256": "1b9f4ff5d14a3640604ea963b7bb9357de0c72548ed3e7ceef5f2e2784bdd44e"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/ReversalCheckNotice.java",
+      "size": 2989,
+      "sha256": "f2d3ea49ed0a0aa8a3ab4fbee7a586b3fe345b3390b63e602401574a9011d635"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/ReversalNotice.java",
+      "size": 4509,
+      "sha256": "0b971710fc743ebec339ccb85ca420526f1f26c26315e6c36a67bcb53d5b8bc5"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/SupplierAdjustmentNotice.java",
+      "size": 4144,
+      "sha256": "b3a386da05b93c9cdc00f15510761edabf60afae44db50ea7912230f506ee78b"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/SupplierPaymentNotice.java",
+      "size": 5272,
+      "sha256": "db1ff58e1245691d2141e73cac10b58d9ea03c6968b18f81c03085fc0ef2b9b2"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/SupplierReturnNotice.java",
+      "size": 3407,
+      "sha256": "a694d29c4bbd4e3d1058efa6165f6206fd00b348823325865db5ca530c46ec57"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/SupplierSettlementNotice.java",
+      "size": 4098,
+      "sha256": "ab52f034ca69c9ce1d83673cb13b85de84a77db8961ce6434e22f5b02206a299"
+    },
+    {
+      "path": "source/agentflow-domain/src/main/java/io/agentflow/notification/VoucherNotice.java",
+      "size": 4372,
+      "sha256": "28db50fd8de0e674788bd5efda53c4a28607573741e3d59a9b5c72aa9211ae34"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentExecutionService.java",
+      "size": 7705,
+      "sha256": "91e886287692cd0bbb84023c3f91aba7630d224ef8d6df9d1ec300890b36cb1d"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentReviewService.java",
+      "size": 6651,
+      "sha256": "4e94f1915662772c2c3286d31cd1780dceeca662755a9cb17741e2cd7f0a6906"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/AdvanceDisbursementReturnService.java",
+      "size": 14643,
+      "sha256": "3356c544021efc0ffb275c8dc4f77e2c13ef33486541590b4f7691bb488a5e83"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentReviewService.java",
+      "size": 15091,
+      "sha256": "8db0f87822c6fe6131c8e731672800453551a7d0e02ca8007d9cde24f8fc2cfc"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentService.java",
+      "size": 13570,
+      "sha256": "c30a7b70068d18810eec9d65b6ed062bdec3a6c01b68e15cb27aa95b0d35d9e3"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentActions.java",
+      "size": 14348,
+      "sha256": "3918d908ed6562bcac3a061bca2d921d4c5828d6ebc64088f3f3d672114b7d09"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentDisputes.java",
+      "size": 7338,
+      "sha256": "25f06ec84e30a9b4f6489cad84081b2dba065ed417e63e57bc716dea8813e3fd"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentExecution.java",
+      "size": 3920,
+      "sha256": "0956d8da9327fb442cd8b78f5ddf59228e52dda02bf211e21b08a0ad98ff42cd"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentFinance.java",
+      "size": 10993,
+      "sha256": "04f49319e532fa5a08032b5a75e95c69e2b5a41ba8a88d53ecb978c53a975f76"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialPreparationService.java",
+      "size": 12627,
+      "sha256": "ccf619c4ecce6ab9bd60949abfddc008b24a0051ec56754b56a37c57807c40e3"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/ExpensePaymentReturnService.java",
+      "size": 15060,
+      "sha256": "26773a637d131fd6b2f00a01bb4b6299ba55075c297b96975e4e8963f6542cad"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/ExpenseReductionService.java",
+      "size": 6797,
+      "sha256": "536d6d060c20b087bbe50c1cc2dc92b56ad839d3a761730f1c220b3b4e3f7896"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentActionService.java",
+      "size": 10950,
+      "sha256": "796db3f8fd11961e9ac4ee4bda37271b7ce7d126e2fa73aaeb845e788c0f4ed0"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentBudgetExecution.java",
+      "size": 9385,
+      "sha256": "188df2ec5d9f468b182510ca2598415a7bc52787ff09d3e3c9fb23b41bc0fcfd"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentExecution.java",
+      "size": 4215,
+      "sha256": "d16ca7552a40ed300a07e1dad327150de1894bb56e6a3a2aadfeef9c8659d330"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentPreparationService.java",
+      "size": 12414,
+      "sha256": "68f8758a96c8e7e85d47df815cbb5a4690e0810d80e28c02c70b1d3e57f0caf2"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/expense/ExpenseSettlementChanges.java",
+      "size": 1178,
+      "sha256": "99ecacbc4ababf4a60c1142d9a781f50cc0f92e38d73a3b00791756f19b6a322"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/finance/BudgetOperationService.java",
+      "size": 7328,
+      "sha256": "e46ac2f58b42368043bc840843a149cc1e72385e597fb96fbd93100a3ebd48c5"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/finance/FinanceGatewayClient.java",
+      "size": 35743,
+      "sha256": "daeaa76b499cd5821d22b59e2ee3cd87db6afb9992c6b231160c28bfc0f3e5ca"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/finance/PaymentDisputeService.java",
+      "size": 8127,
+      "sha256": "b5f932ae271c739fa7333248e822e95071f03fb80e0687b99ad7b10d168d65bf"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/finance/PaymentExecutionRequestService.java",
+      "size": 8133,
+      "sha256": "f4de5ee7be301047241acd8ea49b4124dbe1dba45671c0a156019d07bf8cb2fa"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationService.java",
+      "size": 9842,
+      "sha256": "1032b4deaef2f6deef80864d6b4c209cf8e08859d5d47fd8288a7f9a211b5037"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/finance/VoucherDisputeService.java",
+      "size": 10668,
+      "sha256": "5b099714bcfa9b5da7a9bff70ab5db153337edf688cd3276e225aa481539ee6b"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/finance/VoucherOperationService.java",
+      "size": 6783,
+      "sha256": "ee2377ecae967e7ae0d494adce6af206615123dcf24b7a0cf390957cf0c6b54d"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/finance/VoucherPreparationService.java",
+      "size": 11279,
+      "sha256": "de4e81e5ae97297ab4398934f01d0beccfb7e9b050c3d3e1552e84a3adedf85a"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalExecutionService.java",
+      "size": 9078,
+      "sha256": "96415fed3904bbfc222c9437764cbdeab5ac1c59cdea82bac2792f506d6781b8"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalPreparationService.java",
+      "size": 17029,
+      "sha256": "091dda03515ba78fc1f31acc4cf07b62f72d1ce8bf16f4f4e859bf979dc69cdb"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalRetirementService.java",
+      "size": 6714,
+      "sha256": "0e61a64b4b8eec1c4b5c67b56f433f85340d022474bcca507a51220d6c07d0c3"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalService.java",
+      "size": 14273,
+      "sha256": "369719b01c6c21063f5c96087c777fa950af8db3ded0440ad18f9796a3ad0f3b"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ApprovalNotificationService.java",
+      "size": 13827,
+      "sha256": "898cec55cb9d5bf336fc372effa1779d4deaf84d7f01df1b08017ca64c7a6794"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/BudgetAdjustmentNotificationAccess.java",
+      "size": 11609,
+      "sha256": "660c62f03a82b1655f0e6d9fbe607c5f67ae0e1c0e1ca9f3b0a827e65c2776c5"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/BudgetAdjustmentNotificationController.java",
+      "size": 1451,
+      "sha256": "c7c6c0311afc77d9334da1df5809a535031aa9b99b5884e05052351123e29ee2"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/BudgetAdjustmentNotificationService.java",
+      "size": 3450,
+      "sha256": "fc1f751a3fd6ee0777546f60820ecc568c54fcec68df682a916164dcea6a34f2"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/BudgetNotificationAccess.java",
+      "size": 8952,
+      "sha256": "89864fe1180f72b71706cc8c98969692aa60abc0da24c4e98d0b69ab1f903c75"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/BudgetNotificationController.java",
+      "size": 1377,
+      "sha256": "f1fba1c0288a40672e3bb55ba19b8024b6eaa75ac5b9919c93c8898e7cc013dc"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/BudgetNotificationService.java",
+      "size": 2146,
+      "sha256": "94dd1710928383117976e938c5e28bfd766af9e295a15330e25a08aa9f34e381"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/DisbursementReturnNotificationAccess.java",
+      "size": 9403,
+      "sha256": "0c3eac04b9b62afe9f5015faeca9742505891dce5207269c979cec5e3fe71487"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/DisbursementReturnNotificationController.java",
+      "size": 1465,
+      "sha256": "2fbb64a4909a013c5bff77591324e8156679e844adbda55994a0395601c1c1f3"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/DisbursementReturnNotificationService.java",
+      "size": 2238,
+      "sha256": "fa76d1a3b47904e2c38cccaadc51c444d4de74b86738d3b2770989ba11d41d03"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ExpenseAdjustmentNotificationAccess.java",
+      "size": 13946,
+      "sha256": "0f84d8f8bbcf58a6cad9f739f9ae7d1b883b2da9f67c287f63a96049a279ae37"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ExpenseAdjustmentNotificationController.java",
+      "size": 1479,
+      "sha256": "8b7f63653c0ba743b153a4881cf92fbcd7ee7f7574043f01b26bd05665a6a00c"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ExpenseAdjustmentNotificationService.java",
+      "size": 4304,
+      "sha256": "84186e10ae96443693ff0e80135e4584a2896a87a4d12dd74e63801b3c90b550"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ExpensePartialAdjustmentNotificationAccess.java",
+      "size": 15397,
+      "sha256": "77b55e7b9dc968888537d3ec483a7d9d0d28e76839b5410b6617e5842a6950a3"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ExpensePartialAdjustmentNotificationController.java",
+      "size": 1521,
+      "sha256": "d847e86fce3aca7613544a55c94e7a05305f18c0c6baf445240a4e4a618cf88a"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ExpensePartialAdjustmentNotificationService.java",
+      "size": 5466,
+      "sha256": "e2400400f29c2b2409a85a571c1fba1f63389f0cf78fa4eab369a6a4c20b8995"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ExpenseReturnNotificationAccess.java",
+      "size": 9358,
+      "sha256": "0e78cc25d59f65b0b98488c01c740f5e6168804a991f7798f8c84e24553c3656"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ExpenseReturnNotificationController.java",
+      "size": 1424,
+      "sha256": "9ab60e2e736d2a929aabb7fae6baa755c8c042de561c35ee9f720fa52f2f7809"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ExpenseReturnNotificationService.java",
+      "size": 2198,
+      "sha256": "a5b494d0aabd793416776d739ff90146368c2a8db74ff6f7c053780db525713a"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ExpenseSettlementNotificationAccess.java",
+      "size": 11275,
+      "sha256": "e92c1432fa9d667978ef1a6f8737ef60145cc4927f1495b3f73bd72de5b57a5b"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ExpenseSettlementNotificationController.java",
+      "size": 1452,
+      "sha256": "d00ed79dc1a42fddbfc8c01e2e0b893435b624d14932be220bcdd146e6e22fc7"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ExpenseSettlementNotificationService.java",
+      "size": 2233,
+      "sha256": "110e7d4afee53b8bfdbfabe034d0c2144a75d3312edbba73d4eca12248ad8f18"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java",
+      "size": 10836,
+      "sha256": "d029af2150b2e331277f0cc73ad857e8af9d79c923e13ff337fd79fd51f0a403"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/PaymentNotificationAccess.java",
+      "size": 7153,
+      "sha256": "9e6c691c105edf2d3373bf49b24348dca1b9214c63534a2334fde7f7eb343e07"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/PaymentNotificationController.java",
+      "size": 1408,
+      "sha256": "873800e529dd9abc7911043d5a2df0512596e8d598876a367e39418b6a65bc68"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/PaymentNotificationService.java",
+      "size": 3710,
+      "sha256": "c0bfa7efbe17319c2621df8d5546bd9b9331cae3997ce9f916f47dc3468f07be"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/RepaymentNotificationAccess.java",
+      "size": 9295,
+      "sha256": "3f94710057c7b55407af653e88be835a66a538eec479f9d8f31ebe790dad34ad"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/RepaymentNotificationController.java",
+      "size": 1404,
+      "sha256": "5be6c0ad85f65a3c94844b16c656581a0a616fedf0bfc7d5a6576d6553a87d49"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/RepaymentNotificationService.java",
+      "size": 2170,
+      "sha256": "6d186ef22a802f7521c566fe15e335e296593b9a7e1004228df90cd3716ad3c2"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/RepaymentReviewNotificationAccess.java",
+      "size": 9886,
+      "sha256": "8164bb97a1efc9ca6a0c715066848a81bc288d9753d5565665093109844c9521"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/RepaymentReviewNotificationController.java",
+      "size": 1444,
+      "sha256": "059f057297cde35d46b05f3cd46cd884a52755f4b9101df4f8ee837e64191b1a"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/RepaymentReviewNotificationService.java",
+      "size": 2219,
+      "sha256": "f88f05a91a9afc375f2e590da1b61c2e7a10009458c9e1bb09f627c03fc1b94c"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ReversalCheckNotificationAccess.java",
+      "size": 9058,
+      "sha256": "a540225e1ec74103d61ff30f85067efc64ccdabfbab82f6bd339d9a22fe6687f"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ReversalCheckNotificationController.java",
+      "size": 1448,
+      "sha256": "66360b0c1d960a569870fa4a3b7ec345b512e7fb9f45d5ba2ac29b0db1c7f906"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ReversalCheckNotificationService.java",
+      "size": 2149,
+      "sha256": "a28c28471b2e284807402f60b5dd9754f12e9bb3b2ce3a63f9d41a85c246f775"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ReversalNotificationAccess.java",
+      "size": 10679,
+      "sha256": "57f66f93dbc5b5c1b7898afa0f1ebca47603ae18aae45b980fc507920ab88dde"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ReversalNotificationController.java",
+      "size": 1405,
+      "sha256": "e352b77bf41a6fda7405414e99159a464cb58c8337b508ebc05f44a32bba1b1d"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/ReversalNotificationService.java",
+      "size": 3134,
+      "sha256": "01af7ca34c0e7549f35aefaead7533b25eaa25d877dced005fed9d95cddf995d"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/SupplierAdjustmentNotificationAccess.java",
+      "size": 10869,
+      "sha256": "c0dce41028f7db670a0358d0c9efab84271085b2289c55408651e412767663d5"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/SupplierAdjustmentNotificationController.java",
+      "size": 1468,
+      "sha256": "fba0a8bd4010babba10fa4190a30117ddef65ea0259d0815f97057b1e7222433"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/SupplierAdjustmentNotificationService.java",
+      "size": 4461,
+      "sha256": "0148befed4a516b08a50574d7232214232db6aa1317a8b5a5bea53acbf692d47"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/SupplierPaymentNotificationAccess.java",
+      "size": 8363,
+      "sha256": "e40dafc425de692c85da4c54e63c05ce9da1c006c224a403fd0f9a095806982c"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/SupplierPaymentNotificationController.java",
+      "size": 1475,
+      "sha256": "3bcf79f0b2546b9cdffeaafdfe01d77853746078927d3e4820c51abc2ab48995"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/SupplierPaymentNotificationService.java",
+      "size": 4161,
+      "sha256": "2e42a6fafe4914f91df2395eda129be207c38f118e8565ce797a75358bb85d10"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/SupplierReturnNotificationAccess.java",
+      "size": 9321,
+      "sha256": "f8e6379fbc7bdbaac1b931a1512170684bf8daf990ad5c43e7def0451bf9bafc"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/SupplierReturnNotificationController.java",
+      "size": 1434,
+      "sha256": "6fdf0c7b4062eb96ef8e3b7a8dc780e797c9c066d44b8f512351a5a2dde18abc"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/SupplierReturnNotificationService.java",
+      "size": 2270,
+      "sha256": "9cbb8c409eb12a279a88fba6d5c9e36ae863fcb8215ed59e7e6076d70122c9f9"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/SupplierSettlementNotificationAccess.java",
+      "size": 10390,
+      "sha256": "73b513283cf6246318d498d5d7403f7e7da92958e43eeb39718d244ba152fe97"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/SupplierSettlementNotificationController.java",
+      "size": 1462,
+      "sha256": "f49a0c6838f43fb1d11eb86efe92c4bed68d921d760cedbab445183526d4550b"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/SupplierSettlementNotificationService.java",
+      "size": 4296,
+      "sha256": "1f7cece7b25a2023c909bb09458f485a4bad91c198f8843b7d42afa1372ddffc"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/VoucherNotificationAccess.java",
+      "size": 9957,
+      "sha256": "5c40e1a044509df3b5135704a6a5d1cec07f6e3a40b42d8430930e1a34eae991"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/VoucherNotificationController.java",
+      "size": 1408,
+      "sha256": "d5085867df9dc8f1e46297258b754fda51c8fdbdce94324d5a203cbd4e943975"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/notification/VoucherNotificationService.java",
+      "size": 2732,
+      "sha256": "413e545d6f424673596b4ea7f98a64da918a63b13a0471d81cdda8f45b868b2e"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentCompletionService.java",
+      "size": 4142,
+      "sha256": "764ffe7a4aaa8b20390100ed64aeba3d4867e21ce562f737ceb0fc6120311b74"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentDisputeService.java",
+      "size": 11411,
+      "sha256": "3617a22bc7076cffaa3465809f9369a1c6ac71d5393eb71a31e79d12a90b9ee1"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentPreparationService.java",
+      "size": 6796,
+      "sha256": "8ff525763a2b9615fc32f710175c734caa8bf0eb4ce192c0a91da10a4a808458"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentService.java",
+      "size": 8637,
+      "sha256": "310b795f62233fd1fbd505b09ff55807e55495f225f275a5a5289747f4d4a0d0"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableHoldService.java",
+      "size": 7637,
+      "sha256": "235826cee789ebcc50a7e61de073f612553ab167ccc80808bd6f128dff4b36e7"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableReviewService.java",
+      "size": 6750,
+      "sha256": "cfbeda278a15f80df7fc47a9b3d0e08bec2346af61d7f8ab1c4e1a408eae74c3"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentDisputeService.java",
+      "size": 11515,
+      "sha256": "7306b01b07305e2654b53cc1f14bef158e93ce65d845d8e9d2923b4534583597"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentExecutionService.java",
+      "size": 7697,
+      "sha256": "4c00f3ac8a679f07d2c9777852d151daad25de130c64c41261bb7b396e0c1c57"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentReturnService.java",
+      "size": 15298,
+      "sha256": "503644c55576bafa760074ba9895dc72b9a366e564d6cd375fcbd422b8cb5d6d"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentService.java",
+      "size": 8710,
+      "sha256": "f64a8862959f344a38a1fea37dd93ad313967410bb65dd8719d9ba6a90752efe"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierSettlementDisputeService.java",
+      "size": 10645,
+      "sha256": "9f7d11e4742003ca29077be81d1464bc022fbe843c775285eb9a939d362689ba"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierSettlementPreparationService.java",
+      "size": 6712,
+      "sha256": "c8bb1839825adeb0a54aec444af997970eba74bc4d93e9b70595562cb50946a2"
+    },
+    {
+      "path": "source/agentflow-server/src/main/java/io/agentflow/procurement/SupplierSettlementService.java",
+      "size": 9766,
+      "sha256": "563be2591dc863272c1ffe90872f24837b0bd38157a104d5e6431a7f8d5c0af1"
+    },
+    {
+      "path": "source/agentflow-server/src/main/resources/api/openapi.json",
+      "size": 2502239,
+      "sha256": "13a74944e5d7d5e4235db93863fb236525976412892f7caad907945826af000b"
+    },
+    {
+      "path": "source/agentflow-server/src/test/java/io/agentflow/procurement/SupplierFinanceWorkflowTest.java",
+      "size": 199298,
+      "sha256": "7f85ad66f9c7bb28ec2c0aa50fdaf80b5e8887a330bac45c202521a84a33e699"
+    },
+    {
+      "path": "source/agentflow-web/src/expenseSettlement.ts",
+      "size": 7603,
+      "sha256": "a99c37cf02ac2cd6facd730c78e7be7c99b4b7f28c6e4e16ae6f2c95c1bce7b2"
+    },
+    {
+      "path": "source/agentflow-web/src/expenses.ts",
+      "size": 16015,
+      "sha256": "2c2bb4abfd86c3a11cd1ce925059e4c5aedb664c0a86c257e88a358a0f26d9ec"
+    },
+    {
+      "path": "source/agentflow-web/src/notificationDeliveries.ts",
+      "size": 12203,
+      "sha256": "beea10730fc68c8058fd6fd6f081a5e37ea17a8c581b587d689d627a53ffa3f1"
+    },
+    {
+      "path": "source/agentflow-web/src/notificationInbox.ts",
+      "size": 27864,
+      "sha256": "e9483c583594666a06f6280869da9e4c74def91f519b9d0e64609e1a6656acc9"
+    },
+    {
+      "path": "source/agentflow-web/src/payments.ts",
+      "size": 26350,
+      "sha256": "7b898af9b962302a29e241717d133bf567ee0a99417c199495ab3708bc114a98"
+    },
+    {
+      "path": "source/agentflow-web/src/supplierCashier.ts",
+      "size": 11863,
+      "sha256": "478c6c183659297ea638e77ce8eb6bb41d92090c2ec58fed0f8c430039062ee3"
+    },
+    {
+      "path": "source/agentflow-web/src/supplierFinance.ts",
+      "size": 12334,
+      "sha256": "22d74685dc214e4093c6571825a90b49c0b3546a4f1cf4bd5608a12f4725e85f"
+    },
+    {
+      "path": "source/agentflow-web/src/voucherReversal.ts",
+      "size": 12087,
+      "sha256": "fd6def3a97b0d7159f334f953aebb872a92f132e7e1460cdd41b72236cd235fc"
+    },
+    {
+      "path": "source/agentflow-web/src/voucherReversalExecution.ts",
+      "size": 23000,
+      "sha256": "ef541c09cc3aec1e92d5ff0f94dc79e262cb47dfe3d3e8a053a3980eefa256a7"
+    },
+    {
+      "path": "source/agentflow-web/src/vouchers.ts",
+      "size": 16449,
+      "sha256": "37076cb9b1013cb25ebdfc9a780a70a82b20cd248de7406b24afcd661edbe49d"
+    }
+  ]
+}

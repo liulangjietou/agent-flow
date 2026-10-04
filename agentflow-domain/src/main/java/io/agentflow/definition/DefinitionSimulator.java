@@ -1,7 +1,11 @@
 package io.agentflow.definition;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.expense.ExpenseFormContract;
+import io.agentflow.expense.ExpenseSplitRiskPolicy;
+import io.agentflow.finance.Money;
 import io.agentflow.form.FormSchema;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ArrayDeque;
@@ -21,12 +25,19 @@ public final class DefinitionSimulator {
 
     /** 一次完成图与表单校验，并返回节点、连线及按实际顺序产生的分支依据。 */
     public Result simulateDetailed(Graph graph, FormSchema formSchema, EvaluationContext context) {
+        return simulateDetailed(graph, formSchema, context, null);
+    }
+
+    /** 合成路由金额只影响明确标记的业务网关，不查询费用记录，也不改写本单输入。 */
+    public Result simulateDetailed(Graph graph, FormSchema formSchema, EvaluationContext context, Money splitRoutingAmount) {
         List<String> errors = new DefinitionValidator().validate(graph, formSchema);
         if (!errors.isEmpty()) throw new DefinitionValidationException(errors);
         if (formSchema != null) {
             formSchema.validateSubmission(context.values());
             context = new EvaluationContext(context.values(), formSchema.fieldTypes());
         }
+        var splitPolicy = ExpenseSplitRiskPolicy.from(graph);
+        var splitContext = splitContext(context, splitPolicy, splitRoutingAmount);
         List<String> path = new ArrayList<>();
         List<String> edgeIds = new ArrayList<>();
         List<Decision> decisions = new ArrayList<>();
@@ -47,7 +58,7 @@ public final class DefinitionSimulator {
             List<Edge> outgoing = graph.edges().stream().filter(edge -> edge.source().equals(source)).toList();
             List<Edge> selected = outgoing;
             if (current.type() != NodeType.PARALLEL_GATEWAY) {
-                Decision decision = select(source, outgoing, context, graph.conditionLanguageVersion());
+                Decision decision = select(source, outgoing, splitPolicy.gatewayIds().contains(source) ? splitContext : context, graph.conditionLanguageVersion());
                 if (current.type() == NodeType.EXCLUSIVE_GATEWAY && outgoing.size() > 1) decisions.add(decision);
                 selected = outgoing.stream().filter(edge -> edge.id().equals(decision.selectedEdgeId())).toList();
             }
@@ -57,6 +68,28 @@ public final class DefinitionSimulator {
             }
         }
         return new Result(path, edgeIds, decisions);
+    }
+
+    private EvaluationContext splitContext(EvaluationContext original, ExpenseSplitRiskPolicy.Configuration policy, Money synthetic) {
+        if (policy.mode() != ExpenseSplitRiskPolicy.Mode.ENABLED) {
+            if (synthetic != null) throw new DomainException("EXPENSE_SPLIT_SIMULATION_UNEXPECTED", "Synthetic routing amount requires an enabled split rule");
+            return original;
+        }
+        if (synthetic == null) throw new DomainException("EXPENSE_SPLIT_SIMULATION_REQUIRED", "Enabled split simulation requires an explicit synthetic routing amount");
+        Money ownAmount;
+        try {
+            ownAmount = new Money(new BigDecimal(String.valueOf(original.value(ExpenseFormContract.AMOUNT))),
+                    String.valueOf(original.value(ExpenseFormContract.CURRENCY)));
+        } catch (IllegalArgumentException | DomainException invalidMoney) { throw invalidSplitAmount(); }
+        if (!synthetic.currency().equals(policy.rule().threshold().currency()) || !synthetic.currency().equals(ownAmount.currency())
+                || synthetic.value().compareTo(ownAmount.value()) < 0) throw invalidSplitAmount();
+        var values = new HashMap<>(original.values());
+        values.put(ExpenseFormContract.AMOUNT, synthetic.value());
+        return new EvaluationContext(values, original.fieldTypes());
+    }
+
+    private DomainException invalidSplitAmount() {
+        return new DomainException("EXPENSE_SPLIT_SIMULATION_INVALID", "Synthetic routing amount must match the rule currency and cannot reduce the original amount");
     }
 
     private Decision select(String nodeId, List<Edge> outgoing, EvaluationContext context, int languageVersion) {

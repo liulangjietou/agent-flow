@@ -71,7 +71,7 @@ public class ExpenseWorkspaceQuery {
         for (var id : ids.stream().limit(page.limit()).toList()) {
             var value = values.get(id); var lines = value.approvedLines().stream().map(line -> {
                 var balance = value.balance(line.lineNo());
-                return new PriorLine(line.lineNo(), line.approvedAmount(), balance.limit(), balance.available(), balance.reserved(), balance.consumed());
+                return new PriorLine(line.lineNo(), line.approvedAmount(), balance.limit(), balance.available(), balance.reserved(), balance.consumed(), line.control(), line.hardLimit(), balance.exceeded());
             }).toList();
             items.add(new PriorItem(id, value.applicationId(), value.legalEntityId(), value.version(), value.closed(), lines));
         }
@@ -135,7 +135,8 @@ public class ExpenseWorkspaceQuery {
      * 批准行余额，不返回占用它的其他报销编号。
      * @author owlzhangfq@gmail.com
      */
-    public record PriorLine(int lineNo, Money approved, Money limit, Money available, Money reserved, Money consumed) { }
+    public record PriorLine(int lineNo, Money approved, Money limit, Money available, Money reserved, Money consumed,
+            ExpensePriorControl.Snapshot control, boolean hardLimit, Money exceeded) { }
     /**
      * 已批准事前额度的当前事实。
      * @author owlzhangfq@gmail.com

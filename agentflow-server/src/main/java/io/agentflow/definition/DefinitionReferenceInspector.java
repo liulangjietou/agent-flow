@@ -3,6 +3,7 @@ package io.agentflow.definition;
 import io.agentflow.approval.copy.CopyRecipient;
 import io.agentflow.calendar.BusinessCalendarRepository;
 import io.agentflow.event.EventContractBindings;
+import io.agentflow.servicetask.ServiceTaskBindings;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -19,13 +20,15 @@ public class DefinitionReferenceInspector {
     private final DefinitionAssigneeDirectory assignees;
     private final BusinessCalendarRepository calendars;
     private final EventContractBindings eventContracts;
+    private final ServiceTaskBindings serviceTasks;
 
     /** 跨聚合读取属于应用编排，不放进流程图领域校验器。 */
     public DefinitionReferenceInspector(DefinitionAssigneeDirectory assignees, BusinessCalendarRepository calendars,
-                                        EventContractBindings eventContracts) {
+                                        EventContractBindings eventContracts, ServiceTaskBindings serviceTasks) {
         this.assignees = assignees;
         this.calendars = calendars;
         this.eventContracts = eventContracts;
+        this.serviceTasks = serviceTasks;
     }
 
     /** 结构校验通过后读取当前租户目录，只返回节点规则码，不修改引用内容。 */
@@ -66,6 +69,7 @@ public class DefinitionReferenceInspector {
             });
         }
         errors.addAll(eventContracts.inspect(tenantId, graph));
+        errors.addAll(serviceTasks.inspect(tenantId, graph, schema));
         return List.copyOf(errors);
     }
 }

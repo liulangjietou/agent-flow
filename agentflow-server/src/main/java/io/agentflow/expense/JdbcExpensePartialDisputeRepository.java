@@ -98,7 +98,8 @@ public class JdbcExpensePartialDisputeRepository {
         if (values.size() != 1 || values.get(0).version() != version || !values.get(0).input().equals(current.input())) throw inconsistent();
         return values.get(0);
     }
-    private List<ExpensePartialAdjustment> revisions(ExpensePartialAdjustment current) {
+    /** 返回截至指定修订的连续原记录，供争议证明及原编号通知共同核对。 */
+    public List<ExpensePartialAdjustment> revisions(ExpensePartialAdjustment current) {
         var values = jdbc.query("SELECT version,state_json FROM expense_partial_adjustment_revision WHERE tenant_id=? AND adjustment_id=? AND version<=? ORDER BY version", (row, index) -> {
             var value = json.read(row.getString("state_json"), ExpensePartialAdjustment.class);
             if (value.version() != index + 1L || value.version() != row.getLong("version") || !value.input().equals(current.input())) throw inconsistent();

@@ -9,6 +9,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -56,6 +57,12 @@ public class JdbcSupplierPaymentReturnRepository {
                 decision.receipt().status().name(), decision.registeredBy(), timestamp(decision.receipt().observedAt()), timestamp(decision.registeredAt()), json.write(decision));
         for (var entry : next.entries()) if (entry.registrationId().equals(decision.id())) funds.record(decision, entry);
         return next;
+    }
+
+    /** 原消息只按实际决定编号恢复，不扫描历史或替换成最近一次登记。 */
+    public Optional<Registered> find(String tenant, UUID id) {
+        return jdbc.query("SELECT * FROM supplier_payment_return_registration WHERE tenant_id=? AND id=?", (row, index) ->
+                new Registered(row.getLong("return_version"), restore(row, tenant, UUID.fromString(row.getString("payment_id")))), tenant, id.toString()).stream().findFirst();
     }
 
     /** 恢复决定时回放原查询和账本修订，不以当前银行状态改写历史登记。 */

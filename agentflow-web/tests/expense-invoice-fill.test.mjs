@@ -18,6 +18,15 @@ const line = () => ({ lineNo: 1, categoryCode: 'OFFICE', incurredOn: '2026-09-30
   invoiceIds: [], priorRequest: null, allocations: [{ costCenter: 'IT', projectCode: null, amount: money('60.00') }, { costCenter: 'IT2', projectCode: null, amount: money('40.00') }], description: '本人填写', exceptionReason: null })
 const content = () => ({ legalEntityId: 'legal', title: '本人报销', type: 'DAILY', lines: [line(), { ...line(), lineNo: 2, description: '另一行' }], advanceOffsets: [] })
 const history = page => ({ items: [run(), { ...run(), id: 'unconfirmed', status: 'COMPLETED', version: 3 }], total: 21, page, pageSize: 20 })
+
+test('已计算补贴不能通过票面助手覆盖金额或币种', () => {
+  const input = { ...line(), unit: 'DAY', endedOn: '2026-09-30', allowance: {
+    policy: { selection: { policyId: 'daily-policy', policyVersion: 1, categoryRevision: 1, activeRevision: 1, definitionDigest: 'a'.repeat(64) }, ruleKey: 'daily', factSourceReference: 'trusted' },
+    calculation: { startsOn: '2026-09-30', endsOn: '2026-09-30', days: 1, rule: { dailyRate: money('100.00'), dayCountBasis: 'CALENDAR_DAYS_INCLUSIVE' }, gross: money('100.00') } } }
+  const before = JSON.stringify(input)
+  assert.throws(() => expense.fillExpenseLineFromInvoice(input, invoice(), run(), ['GROSS_AMOUNT', 'CURRENCY'], true), /补贴金额按行程自动计算/)
+  assert.equal(JSON.stringify(input), before)
+})
 function reads() {
   api.invoices = async () => ({ items: [invoice()], nextBeforeId: null })
   api.invoice = async () => invoice(); api.invoiceExtractionRuns = async (_, page) => history(page); api.invoiceExtractionRun = async () => run()

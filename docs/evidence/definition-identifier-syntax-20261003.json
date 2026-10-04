@@ -1,0 +1,338 @@
+{
+  "schemaVersion": 1,
+  "taskId": "V02",
+  "subissue": "Workflow process/node/edge identifiers pass draft validation but fail publication",
+  "subissueClosed": true,
+  "taskClosed": false,
+  "recordedAt": "2026-10-03T12:35:45.773723+00:00",
+  "implementationCommit": "1a46d5d99486604bd9557587b351afb094d1344d",
+  "authorCommentsCommit": "0e43d42e45b017fe99b93add57b3bf9e23c9db2b",
+  "branch": "codex/governance-identifier-integration",
+  "rootCause": "The common structural validator checked identity uniqueness but not the lexical NCName constraint required by unchanged BPMN serialization; invalid existing drafts reached the engine.",
+  "coverageGap": "Identifier tests covered namespace collisions but did not cover malformed identifiers through validation, persistence and real publication. The new failing tests retain valid Unicode cases.",
+  "fix": "Validate original process/node/edge IDs in DefinitionValidator with a fixed local JAXP NCName schema; reject whitespace normalization; keep original drafts readable and immutable process keys intact; expose stable UI diagnostics.",
+  "verification": {
+    "red": {
+      "domain": {
+        "tests": 26,
+        "failures": 14,
+        "errors": 0
+      },
+      "api": {
+        "tests": 24,
+        "failures": 6,
+        "errors": 2
+      },
+      "web": "New human-readable diagnostic assertion failed before labels were added"
+    },
+    "java": {
+      "suites": 9,
+      "tests": 106,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "web": {
+      "tests": 36,
+      "failures": 0,
+      "productionBuild": "PASS",
+      "existingLargeBundleWarning": true
+    },
+    "openapi": {
+      "status": "PASS",
+      "operations": 337,
+      "schemas": 677,
+      "requestExamples": 123
+    },
+    "packaging": {
+      "status": "PASS",
+      "testsSkipped": true,
+      "reason": "Same functional sources passed the scoped 106-test gate before packaging; subsequent Java changes were author comments only",
+      "jar": "/fyoung/tmp/agentflow-remaining-20260928/definition-id-lexical-server.jar",
+      "sha256": "a0719d179c13bf08870d7bc24b8a78c97b39c1dfb96041acb348c0bced1b697e"
+    },
+    "actualHttpUpgrade": {
+      "result": "PASS",
+      "directory": "/fyoung/tmp/agentflow-identifier-upgrade-bth63irw",
+      "synthetic": true,
+      "legacyJarSha256": "5c94e4361d12f091e4c4fca2bbb9eaf4099844f18bafe3c2ae4421ccdc0bd4ef",
+      "fixedJarSha256": "a0719d179c13bf08870d7bc24b8a78c97b39c1dfb96041acb348c0bced1b697e",
+      "legacyDraftsPreserved": 3,
+      "correctedDefinitionsPublished": 3,
+      "originalHumanTaskContinued": true,
+      "oldDefinitionUnchanged": true,
+      "invalidCreateUpdatePublishRejected": true,
+      "originalProcessKeyPreserved": true,
+      "responses": 42,
+      "applicationId": "042c18bb-e2ad-4fd2-84e4-07140d504752",
+      "originalTaskId": "737fbeaf-bf26-11f1-961a-aa6266142e72"
+    },
+    "ownedProcessesStopped": true,
+    "authors": {
+      "javaFiles": 1504,
+      "namedTypes": 2885,
+      "missingTags": 0,
+      "parseErrors": 0
+    },
+    "browser": "NOT_RUN",
+    "postgres": "NOT_RUN"
+  },
+  "adjacentFindings": [
+    {
+      "case": "ServiceTaskDomain stale unsupported-type assertion",
+      "change": "Replaced obsolete unsupported-type expectation with mandatory declared-binding rejection; included dedicated service definition and public API tests."
+    },
+    {
+      "case": "Six existing nested types failed author-tag audit",
+      "change": "Added missing tags and moved inline tags to proper Javadoc block tags; verified AST audit only, no business changes."
+    }
+  ],
+  "limits": [
+    "范围测试与固定包 H2 升级不能替代 V02 最终整体验收",
+    "未执行真实浏览器和 PostgreSQL 新范围补测；原环境限制保持",
+    "原流程标识不自动改写；非法旧流程标识须显式新建正确标识的草稿"
+  ],
+  "counting": {
+    "knownOpenTasks": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "lowerBound": true,
+    "noNewIndependentTask": true
+  },
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/definition-id-lexical-evidence-snapshot",
+  "artifactCount": 32,
+  "bearerTokenRedactionsInEvidenceCopies": 0,
+  "artifacts": [
+    {
+      "path": "definition-id-lexical-api-red.log",
+      "size": 321836,
+      "sha256": "4fc3bc67e2eaeb76e4ad1ab2e6141fa7cabad3caa707c034681d8d1f2b54e7aa"
+    },
+    {
+      "path": "definition-id-lexical-api-red.xml",
+      "size": 354079,
+      "sha256": "883c8294c6251f820c0e79833519c5280f0e56133d40ba0c14b8f663d9735652"
+    },
+    {
+      "path": "definition-id-lexical-authors-verified.log",
+      "size": 73,
+      "sha256": "df7a54be315af821d032eb7bec17f3d8672bef1e6b4869c39fd213982eac417f"
+    },
+    {
+      "path": "definition-id-lexical-authors.log",
+      "size": 1026,
+      "sha256": "42ca2ea7781e32844c81cb7b831a99b8f288deca007033e849c51b5c02de28de"
+    },
+    {
+      "path": "definition-id-lexical-build.log",
+      "size": 781,
+      "sha256": "92dae417d22b21e96d78c7c56d96a846d92cdac285f4ce966b631114d6fc3061"
+    },
+    {
+      "path": "definition-id-lexical-domain-red.log",
+      "size": 60204,
+      "sha256": "fab8bcda96a78073746ded70f6c84f6d4db7a6a45c92d6e324f4d4e6cd95a06b"
+    },
+    {
+      "path": "definition-id-lexical-domain-red.xml",
+      "size": 65227,
+      "sha256": "8f4a8fed23e369b7aeb051d1941ff9522447c79d4a8f32a6b221ecbb30dcb5d1"
+    },
+    {
+      "path": "definition-id-lexical-http-upgrade.log",
+      "size": 622,
+      "sha256": "2625437665ee54a5ac4da8e49bc4e1a377603a6fb3f32270db6945f27704c71a"
+    },
+    {
+      "path": "definition-id-lexical-java-green.log",
+      "size": 8628,
+      "sha256": "650cddece1b7ccff3db326c47820ddaa163b0e6bf8939437a7e673946004d5bc"
+    },
+    {
+      "path": "definition-id-lexical-java-verified.log",
+      "size": 195238,
+      "sha256": "966586079ae35da578ca9894c3438242f2d67b98617d862b24c2f0c5a3961720"
+    },
+    {
+      "path": "definition-id-lexical-openapi.log",
+      "size": 71,
+      "sha256": "bfe5d35a3b7586cdd18bbc3bdd289b0370bcc39d38161c58b19d353f372f5e21"
+    },
+    {
+      "path": "definition-id-lexical-package.log",
+      "size": 13873,
+      "sha256": "1e59cbd384fecd95a522895580d3c1088acb92513cf946969923bf0aa733e3da"
+    },
+    {
+      "path": "definition-id-lexical-web-green.log",
+      "size": 3703,
+      "sha256": "02cdaf6f0a6905fe2a245002b19c1ee8e8b04ec711c21c8e1353229787523c7a"
+    },
+    {
+      "path": "definition-id-lexical-web-red.log",
+      "size": 4689,
+      "sha256": "8cc045d9d261e7f3996f336475fd5207724c9c6761ecf788f9d75f102edddb4f"
+    },
+    {
+      "path": "http/responses.json",
+      "size": 71700,
+      "sha256": "ee6b6791657bf35a36308e0284d0091c27f9d2a4d08ceb78a727cd7024a9d2c5"
+    },
+    {
+      "path": "http/result.json",
+      "size": 652,
+      "sha256": "d9e4dd27cdb57b118572ac05479714f6563d4508fdbc3a40b8ec53e0a7b7b875"
+    },
+    {
+      "path": "http/runtime-1.log",
+      "size": 37152,
+      "sha256": "38d453705a1a9c3ed5a769c87ca9e98374ba92039f1174052b40631885209a6a"
+    },
+    {
+      "path": "http/runtime-2.log",
+      "size": 14714,
+      "sha256": "7951d83026b647f327220b36b11481f45fae3dc234e5bb90af216ca567f6b7d4"
+    },
+    {
+      "path": "http/runtime.yaml",
+      "size": 964,
+      "sha256": "ff3c480088acba4055a45e6c9b72725808890e77d6411490feedbdff77eb2a45"
+    },
+    {
+      "path": "java/TEST-io.agentflow.definition.DefinitionApplicationServiceTest.xml",
+      "size": 43859,
+      "sha256": "03e3b9a94e8c8f6a29db7ea9e8f990467a27239086f78606bd261cbf996e6612"
+    },
+    {
+      "path": "java/TEST-io.agentflow.definition.DefinitionDeploymentIntegrationTest.xml",
+      "size": 73108,
+      "sha256": "08dae7172ad49a9d35945352190c3d3de633a9c3ed0c49aef6b3a8d861f00e91"
+    },
+    {
+      "path": "java/TEST-io.agentflow.definition.DefinitionDomainTest.xml",
+      "size": 11399,
+      "sha256": "b927bb462d62512364271471ab424dcc1caf82635a18a7e3b2471247ad09a071"
+    },
+    {
+      "path": "java/TEST-io.agentflow.definition.DefinitionIdentifierIntegrationTest.xml",
+      "size": 77016,
+      "sha256": "efc0318ed3541b5e1389707d7aafdbe585cb8ed44b344ae31b6c5f42218bd53e"
+    },
+    {
+      "path": "java/TEST-io.agentflow.definition.DefinitionIdentifierTest.xml",
+      "size": 14180,
+      "sha256": "986a026e35081f0c3ce94ffb95549345b0e6b57d0e6f98501e16b5385d8e6a6a"
+    },
+    {
+      "path": "java/TEST-io.agentflow.definition.DefinitionPreviewIntegrationTest.xml",
+      "size": 74919,
+      "sha256": "2e834a200680fcf833676ae4fa7af6aa678be8216244f801cb51ec48d8db9ce2"
+    },
+    {
+      "path": "java/TEST-io.agentflow.definition.DefinitionPublicationIntegrationTest.xml",
+      "size": 73711,
+      "sha256": "bafaecf0d9f23f6e8570b32518234e1511d801b71f80e599624b28846f2a3635"
+    },
+    {
+      "path": "java/TEST-io.agentflow.definition.ServiceTaskDefinitionTest.xml",
+      "size": 10937,
+      "sha256": "6458697af047ac39320c621e14ded7d13b0d2a44caa3e88a6af28536ba06cbf7"
+    },
+    {
+      "path": "java/TEST-io.agentflow.servicetask.ServiceTaskPublicApiIntegrationTest.xml",
+      "size": 113365,
+      "sha256": "60045bc6afb1601c941030eff94c32a738a30a032cdc62b362f980bb0436e9a1"
+    },
+    {
+      "path": "verify-definition-identifier-upgrade.py",
+      "size": 7084,
+      "sha256": "a36704ea358fe4645900e9b4c420f5a69497112e3f63aa770ca45d46ffc426e2"
+    },
+    {
+      "path": "web-dist/assets/index-Cps5AohS.js",
+      "size": 1714460,
+      "sha256": "02ab173fb07892e35e106e4892c70629a9b8346c5ae58df082073a84a84a39ad"
+    },
+    {
+      "path": "web-dist/assets/index-xwBq8Km-.css",
+      "size": 388674,
+      "sha256": "54cf328f13dd6a2622fceeba5cdccaaa0f83d264a0bffb149dd5241c3f721085"
+    },
+    {
+      "path": "web-dist/index.html",
+      "size": 420,
+      "sha256": "9248f3530e05b94cb06b5a8c7beeb7b7e31dabc0b9eebed72d614fb1d54a1d6f"
+    }
+  ],
+  "sources": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionIdentifiers.java",
+      "commit": "1a46d5d99486604bd9557587b351afb094d1344d",
+      "sha256": "fee6ce9eb01e11904e0e0a48354b94e487e0984171b76804c1718defd12f8229"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java",
+      "commit": "1a46d5d99486604bd9557587b351afb094d1344d",
+      "sha256": "60105a04924a3bfdada0b894406d572a88d89c9b0a18f063388ad9b8ced2da74"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/definition/DefinitionDomainTest.java",
+      "commit": "1a46d5d99486604bd9557587b351afb094d1344d",
+      "sha256": "c35c54a3eef660561a2ec18a17cbb7f992d92742ffecfe9d8fa0256abb0a1cc6"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/definition/DefinitionIdentifierTest.java",
+      "commit": "1a46d5d99486604bd9557587b351afb094d1344d",
+      "sha256": "d34fdbd7336ee0a470a87df60bc63d415f9b77baddbeff2815d23924a7cad960"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "commit": "1a46d5d99486604bd9557587b351afb094d1344d",
+      "sha256": "0c386af014379ef00ee22c69362a23b898a916ddbb15eff626ebe21ff43ba620"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/definition/DefinitionIdentifierIntegrationTest.java",
+      "commit": "1a46d5d99486604bd9557587b351afb094d1344d",
+      "sha256": "710cd8868f77d07fae9431f037091aaf77313304e624460c1a12718cd0c3b23f"
+    },
+    {
+      "path": "agentflow-web/src/definitionSimulation.ts",
+      "commit": "1a46d5d99486604bd9557587b351afb094d1344d",
+      "sha256": "372002e16263abfa4c017943a970a9eb94a8bb62d5c4924152bd1248cb284ee6"
+    },
+    {
+      "path": "agentflow-web/tests/portable-template.test.mjs",
+      "commit": "1a46d5d99486604bd9557587b351afb094d1344d",
+      "sha256": "6681fda27b98a3fca1e448ad5e2bcff54c8f0a175b4460930a6040976927be17"
+    },
+    {
+      "path": "agentflow-web/tests/simulation.test.mjs",
+      "commit": "1a46d5d99486604bd9557587b351afb094d1344d",
+      "sha256": "9cdb173376544cbf53efe31d87749e63a0e2e7ac766a40f04cb25bf67912408b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskRuntimeService.java",
+      "commit": "0e43d42e45b017fe99b93add57b3bf9e23c9db2b",
+      "sha256": "15904733b8ba3de2c9544b2a1bdf02fd17d900534859c7b9a2c240ca0f72d45b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseBudgetRetentionIntegrationTest.java",
+      "commit": "0e43d42e45b017fe99b93add57b3bf9e23c9db2b",
+      "sha256": "e552b666970344d996ba77c5ca2711eeefa4e4f76bbbd03f0752ea861284d8c3"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/servicetask/ServiceTaskFileDurabilityTest.java",
+      "commit": "0e43d42e45b017fe99b93add57b3bf9e23c9db2b",
+      "sha256": "7cd7bd13c055c685b9774b68d4eb4b96b70d995c7f37a98b3688d4b8ee7d40aa"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/servicetask/ServiceTaskTestProvider.java",
+      "commit": "0e43d42e45b017fe99b93add57b3bf9e23c9db2b",
+      "sha256": "baacadd730eec14cb7e38d0df290ed22f37079f15742f7eb1189f51995aa432b"
+    }
+  ],
+  "references": [
+    "https://www.w3.org/TR/xmlschema-2/#NCName"
+  ]
+}

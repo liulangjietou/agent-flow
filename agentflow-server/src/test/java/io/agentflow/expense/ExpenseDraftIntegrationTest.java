@@ -60,6 +60,8 @@ class ExpenseDraftIntegrationTest {
     @Autowired ApplicationRepository applicationRepository;
     @Autowired ExpenseReportRepository reports;
     @Autowired ExpenseDraftService drafts;
+    @Autowired ExpenseAllowancePreparation allowances;
+    @Autowired ExpenseBudgetRetentionConfiguration retentionConfiguration;
     @Autowired JdbcTemplate jdbc;
     @Autowired TaskService tasks;
 
@@ -153,7 +155,7 @@ class ExpenseDraftIntegrationTest {
     void missingSensitiveDetailsContractCannotCreateAnExpenseApplication() {
         actors.set(new Actor("demo", "alice", Set.of("EMPLOYEE")));
         try {
-            fails("EXPENSE_FORM_CONTRACT_REQUIRED", () -> drafts.create("invalid-" + UUID.randomUUID(), "expense-reimbursement", 1, content("旧表单", "10")));
+            fails("EXPENSE_FORM_CONTRACT_REQUIRED", () -> drafts.create("invalid-" + UUID.randomUUID(), "expense-reimbursement", 1, allowances.prepare(content("旧表单", "10"))));
             var fields = schema(FieldVisibility.READ_ONLY).fields().stream().map(field -> ExpenseFormContract.DETAILS.equals(field.key())
                     ? new FormSchema.Field(field.key(), field.label(), field.type(), true, null, null, null, null, null) : field).toList();
             fails("EXPENSE_FORM_CONTRACT_REQUIRED", () -> ExpenseFormContract.requireSchema(new FormSchema(2, fields)));
@@ -193,13 +195,45 @@ class ExpenseDraftIntegrationTest {
     }
 
     @Test
+    void capturedRetentionUsesOriginalRoundPermissionsAndSurvivesDraftAndConfigurationChanges() throws Exception {
+        var previous = retentionConfiguration.getTenants();
+        try {
+            for (var visibility : List.of(FieldVisibility.READ_ONLY, FieldVisibility.MASKED)) {
+                var policy = new ExpenseBudgetRetentionConfiguration.Tenant(); policy.setEnabled(true); policy.setRetentionDays(3);
+                retentionConfiguration.setTenants(Map.of("demo", policy));
+                var draft = ok(send(post("/api/v1/expense-reports"), "alice", createBody(published(visibility), content("期限权限场景", "10"))), 201);
+                submitFixture(draft);
+                var task = tasks.createTaskQuery().processVariableValueEquals("applicationId", draft.path("applicationId").asText()).singleResult();
+                var returned = ok(send(post("/api/v1/tasks/" + task.getId() + "/actions"), "manager",
+                        Map.of("action", "RETURN", "comment", "补齐凭据", "expectedVersion", 3)), 200);
+                var captured = ok(send(get(path(draft)), "alice", null), 200).path("budgetRetention");
+                assertThat(captured.path("roundNo").asInt()).isEqualTo(1);
+                assertThat(captured.path("retentionDays").asInt()).isEqualTo(3);
+                assertThat(captured.path("status").asText()).isEqualTo("RETAINED");
+                policy.setRetentionDays(9);
+                var revised = ok(send(post(path(draft) + "/revise"), "alice",
+                        revision(returned.path("version").asLong(), 2, content("已补正内容", "20"))), 200);
+                assertThat(revised.path("budgetRetention")).isEqualTo(captured);
+                var historyPath = path(draft) + "?roundNo=1";
+                assertThat(ok(send(get(historyPath), "alice", null), 200).path("budgetRetention")).isEqualTo(captured);
+                if (visibility == FieldVisibility.READ_ONLY) {
+                    assertThat(ok(send(get(historyPath), "manager", null), 200).path("budgetRetention")).isEqualTo(captured);
+                } else assertThat(send(get(historyPath), "manager", null).getStatus()).isEqualTo(403);
+                assertThat(send(get(historyPath), "admin", null).getStatus()).isEqualTo(403);
+                assertThat(send(get(path(draft)), "manager", null).getStatus()).isEqualTo(404);
+                assertThat(send(get(historyPath), "bob", null).getStatus()).isEqualTo(404);
+            }
+        } finally { retentionConfiguration.setTenants(previous); }
+    }
+
+    @Test
     void failedFinancialJournalInsertRollsBackBothAggregateUpdates() throws Exception {
         var draft = create();
         var appId = draft.path("applicationId").asText();
         jdbc.update("INSERT INTO expense_report_revision(tenant_id,report_id,financial_version,actor_id,operation,state_json) SELECT tenant_id,report_id,2,actor_id,operation,state_json FROM expense_report_revision WHERE tenant_id='demo' AND report_id=?", id(draft).toString());
         actors.set(new Actor("demo", "alice", Set.of("EMPLOYEE")));
         try {
-            assertThatThrownBy(() -> drafts.revise(id(draft), 1, 1, content("不应保存", "20")))
+            assertThatThrownBy(() -> drafts.revise(id(draft), 1, 1, allowances.prepare(content("不应保存", "20"))))
                     .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         } finally { actors.clear(); }
         assertThat(reports.find("demo", id(draft)).orElseThrow().version()).isEqualTo(1);

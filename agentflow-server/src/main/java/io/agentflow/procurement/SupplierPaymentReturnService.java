@@ -21,6 +21,7 @@ import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -31,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SupplierPaymentReturnService {
     private static final Duration QUERY_LEASE = Duration.ofSeconds(90);
     private final CurrentActor actors;
+    private final ApplicationEventPublisher events;
     private final SupplierSettlementAccess access;
     private final SupplierPaymentReturnSources sources;
     private final JdbcSupplierPaymentReturnCheckRepository checks;
@@ -42,8 +44,8 @@ public class SupplierPaymentReturnService {
     /** 网络读取留给事务外工作器，财务决定与审计在原申请事务内保存。 */
     public SupplierPaymentReturnService(CurrentActor actors, SupplierSettlementAccess access, SupplierPaymentReturnSources sources,
             JdbcSupplierPaymentReturnCheckRepository checks, JdbcSupplierPaymentReturnsRepository ledgers,
-            JdbcSupplierPaymentReturnRepository registrations, JdbcTemplate jdbc, JsonUtil json) {
-        this.actors = actors; this.access = access; this.sources = sources; this.checks = checks; this.ledgers = ledgers;
+            JdbcSupplierPaymentReturnRepository registrations, JdbcTemplate jdbc, JsonUtil json, ApplicationEventPublisher events) {
+        this.actors = actors; this.events = events; this.access = access; this.sources = sources; this.checks = checks; this.ledgers = ledgers;
         this.registrations = registrations; this.jdbc = jdbc; this.json = json;
     }
 
@@ -84,7 +86,9 @@ public class SupplierPaymentReturnService {
         catch (DuplicateKeyException duplicate) {
             throw new DomainException("SUPPLIER_PAYMENT_RETURN_ALREADY_RECORDED", "Bank receipt is already registered to a financial source");
         }
-        return receipt(source, check.resolve(decision, now), decision.id(), next, audit(source, decision.id(), next.version(), "REGISTER", input.comment(), now));
+        var resolved = check.resolve(decision, now); var event = audit(source, decision.id(), next.version(), "REGISTER", input.comment(), now);
+        events.publishEvent(new SupplierPaymentReturnChanged(resolved));
+        return receipt(source, resolved, decision.id(), next, event);
     }
 
     /** 页面与写入口共用守卫，尚未登记的其他财务原件同样约束累计证据。 */
@@ -109,9 +113,9 @@ public class SupplierPaymentReturnService {
     public SupplierPaymentReturnCheck claim(String tenant, UUID id, Instant at) {
         var initial = checks.find(tenant, id).orElse(null); if (initial == null || !initial.active()) return null;
         var source = sources.locked(tenant, initial.input().request().command().id()); var current = checks.find(tenant, id).orElseThrow(); var now = time(at);
-        if (current.expired(now)) { checks.update(current.fail(SupplierPaymentReturnCheck.Issue.TIMEOUT, now)); return null; }
+        if (current.expired(now)) { save(current.fail(SupplierPaymentReturnCheck.Issue.TIMEOUT, now)); return null; }
         if (current.status() != SupplierPaymentReturnCheck.Status.QUEUED || !available(current, source, now)) return null;
-        var claimed = current.claim(now, QUERY_LEASE); checks.update(claimed); return claimed;
+        var claimed = current.claim(now, QUERY_LEASE); save(claimed); return claimed;
     }
 
     /** 新入款、未核清或矛盾证据先冻结同一应付，查询不能自动登记资金。 */
@@ -120,7 +124,7 @@ public class SupplierPaymentReturnService {
         var input = claimed.input(); var source = sources.locked(input.tenantId(), input.request().command().id());
         var current = current(claimed); if (current == null) return; var now = time(at);
         if (!available(current, source, now)) return;
-        var completed = current.complete(result, now); checks.update(completed); if (completed.receipt() == null) return;
+        var completed = current.complete(result, now); save(completed); if (completed.receipt() == null) return;
         var ledger = ledgers.find(input.tenantId(), input.request().command().id()).orElseThrow(SupplierPaymentReturnService::conflict);
         var proof = completed.receipt(); var recorded = ledger.entries().stream().map(SupplierPaymentReturns.Entry::proof).toList();
         boolean same = proof.status() != SupplierPaymentReturnPort.Status.UNRESOLVED && proof.returns().size() == recorded.size()
@@ -132,9 +136,12 @@ public class SupplierPaymentReturnService {
     @Transactional
     public void fail(SupplierPaymentReturnCheck claimed, Instant at) {
         sources.locked(claimed.input().tenantId(), claimed.input().request().command().id()); var current = current(claimed);
-        if (current != null) checks.update(current.fail(SupplierPaymentReturnCheck.Issue.INTERNAL_ERROR, time(at)));
+        if (current != null) save(current.fail(SupplierPaymentReturnCheck.Issue.INTERNAL_ERROR, time(at)));
     }
 
+    private void save(SupplierPaymentReturnCheck value) {
+        checks.update(value); events.publishEvent(new SupplierPaymentReturnChanged(value));
+    }
     private boolean evidenceChanged(SupplierPaymentReturnCheck check, SupplierPaymentReturns ledger) {
         return checks.history(check.input().tenantId(), check.input().request().command().id()).stream().anyMatch(value -> !check.receipt().continues(value.receipt()))
                 || ledgers.accountingReceipts(ledger).stream().anyMatch(value -> !check.receipt().continues(value));
@@ -145,7 +152,7 @@ public class SupplierPaymentReturnService {
     }
     private boolean available(SupplierPaymentReturnCheck check, SupplierPaymentReturnSources.Source source, Instant now) {
         try { sources.requireCheck(check, source); sources.requireFinance(source, check.input().requestedBy()); return true; }
-        catch (DomainException changed) { checks.update(check.voidSource(now)); return false; }
+        catch (DomainException changed) { save(check.voidSource(now)); return false; }
     }
     private SupplierPaymentReturnCheck current(SupplierPaymentReturnCheck claimed) {
         return checks.find(claimed.input().tenantId(), claimed.input().id()).filter(value -> value.equals(claimed) && value.status() == SupplierPaymentReturnCheck.Status.RUNNING).orElse(null);

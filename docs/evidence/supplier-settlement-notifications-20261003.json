@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F17",
+  "taskStatus": "OPEN",
+  "stage": "SUPPLIER_SETTLEMENT_NOTIFICATIONS_BACKEND_UI_SCOPE_VERIFIED",
+  "recordedAt": "2026-10-03T19:53:18.416270+00:00",
+  "implementationCommit": "6e327ff6558c522adcf6f7526e5af7c8908a5f11",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "原结算准备失败与执行异常的同事务通知",
+    "ERP 确认与实际本地占用完成分开通知，同事务完成只生成完成事实",
+    "人工裁决与实际安全结束分别驱动通知，已拒绝且执行版本未变化也通知真实结束",
+    "原申请人、本次准备财务及安全结束实际人员，当前法人和原轮次字段权限复核",
+    "旧消息固定原准备及结算编号，不能借用后一次结算完成凭据",
+    "同原意图同事实去重，正常等待及主动查询安静",
+    "只读详情、真实 Vue 消息入口、身份切换/超时/迟到结果清除及原轮次导航"
+  ],
+  "validation": {
+    "java": {
+      "result": "PASS",
+      "distinctTests": 186,
+      "byClass": {
+        "io.agentflow.procurement.SupplierSettlementPreparationTest": 6,
+        "io.agentflow.procurement.ProcurementPayableTest": 6,
+        "io.agentflow.procurement.SupplierSettlementDisputeResolutionTest": 8,
+        "io.agentflow.procurement.SupplierSettlementClosureTest": 6,
+        "io.agentflow.procurement.SupplierPayableSettlementTest": 13,
+        "io.agentflow.procurement.SupplierSettlementNoticeTest": 3,
+        "io.agentflow.notification.NotificationDeliveryApiIntegrationTest": 8,
+        "io.agentflow.api.OpenApiContractTest": 7,
+        "io.agentflow.notification.InboxIntegrationTest": 9,
+        "io.agentflow.procurement.SupplierSettlementPersistenceTest": 38,
+        "io.agentflow.procurement.SupplierFinanceWorkflowTest": 69,
+        "io.agentflow.notification.NotificationDeliveryIntegrationTest": 13
+      },
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-notifications-final-reports"
+    },
+    "web": {
+      "result": "PASS",
+      "tests": 114,
+      "files": 12,
+      "newNotificationTests": 8,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-notifications-web.log"
+    },
+    "typecheck": {
+      "result": "PASS",
+      "session": "84912",
+      "command": "node node_modules/vue-tsc/bin/vue-tsc.js --noEmit"
+    },
+    "build": {
+      "result": "PASS",
+      "session": "84912",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-notifications-build.log"
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 350,
+      "schemas": 705,
+      "requestExamples": 125
+    },
+    "authors": {
+      "javaFiles": 1570,
+      "namedTypes": 3019,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "diffCheck": "PASS"
+  },
+  "reproductions": {
+    "backend": {
+      "result": "EXPECTED_RED",
+      "tests": 3,
+      "reason": "实际准备阻断、ERP 成功但本地待完成和最终完成均缺少通知，断言实际消息为空。",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-notifications-red-fixed-fixture.log"
+    },
+    "web": {
+      "result": "EXPECTED_RED",
+      "tests": 1,
+      "reason": "真实消息中心没有查看供应商结算按钮。",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-notifications-web-red.log"
+    }
+  },
+  "corrections": [
+    "第一次 Maven 仅因新增测试缺少 FinanceResult import 编译失败；修正夹具后得到三项行为失败，再修改生产代码。该编译失败不作为行为复现。"
+  ],
+  "sourceEvidence": {
+    "files": 23,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-notifications-evidence-snapshot/sources.json",
+    "verifiedAgainstCommit": "6e327ff6558c522adcf6f7526e5af7c8908a5f11"
+  },
+  "artifactEvidence": {
+    "files": 22,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/supplier-settlement-notifications-evidence-snapshot/artifacts.json"
+  },
+  "boundaries": [
+    "本地范围 Java/H2、实际 Vue 组件与构建通过；没有宣称本阶段固定安装包、真实 HTTP/浏览器或 PostgreSQL 验收完成。",
+    "真实企业通知、财务系统与远端 PR/CI 仍分别验收。",
+    "未重试管理员策略阻断的浏览器或镜像层 I/O 阻断的 PostgreSQL；未推送或创建 PR。",
+    "F17 的其他独立财务恢复来源及完整固定包验收仍待完成。"
+  ],
+  "goalCounting": {
+    "knownOpen": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "sessions": {
+    "47138": "EXIT_1_FIXTURE_IMPORT_COMPILE_FAILURE_FIXED",
+    "18044": "EXIT_1_EXPECTED_WEB_RED",
+    "12140": "EXIT_1_EXPECTED_BACKEND_RED",
+    "19622": "EXIT_0_WEB_8",
+    "84912": "EXIT_0_TYPECHECK_BUILD",
+    "71271": "EXIT_0_JAVA_186",
+    "49340": "EXIT_0_OPENAPI_WEB_114",
+    "3410": "EXIT_0_AUTHORS"
+  }
+}

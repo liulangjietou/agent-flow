@@ -1,0 +1,945 @@
+{
+  "schemaVersion": 1,
+  "taskId": "W01",
+  "stage": "PUBLIC_DESIGN_AND_RESTART_VERIFIED",
+  "taskClosed": false,
+  "recordedAt": "2026-10-03T11:47:22.471935+00:00",
+  "implementationCommit": "ef4aefcd36be0d8a9ae04cfd62b2b9fe11422d9d",
+  "branch": "codex/governance-identifier-integration",
+  "summary": "可信目录、设计绑定、主子流程预检和设计器公开入口已完成；范围回归及安装包默认文件库三轮执行中强退恢复通过。运行状态页面与其余环境及配套恢复验收待完成，W01 不关闭。",
+  "scope": [
+    "按租户和流程管理角色读取可信操作目录、完整版本和原摘要；目标与凭据不外露",
+    "草稿保留已停用原引用；发布、模拟、主流程提交和子流程激活校验当前可用性、权限与映射值",
+    "两个设计视图、模板、比较、撤销及节点定位保存原契约和显式字段映射",
+    "纯模拟没有外发，隐藏或脱敏字段不可发送；原字段敏感性约束管理员",
+    "独立 H2 文件库安装包通过目录、设计、模拟、发布、提交、合成服务调用和人工审批"
+  ],
+  "verification": {
+    "h2": {
+      "tests": 177,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": 20,
+      "note": "最终范围回归包含公开设计、原生执行、相邻流程及文件库回归；与旧阶段测试重叠，不累加。"
+    },
+    "web": {
+      "testsPassed": 79,
+      "productionBuild": "PASS",
+      "existingLargeBundleWarning": true
+    },
+    "openapi": {
+      "status": "PASS",
+      "operations": 336,
+      "schemas": 675,
+      "requestExamples": 123
+    },
+    "actualHttp": {
+      "status": "PASS",
+      "syntheticReceiver": true,
+      "directoryVersion": "9223372036854775807",
+      "sensitiveFieldNotSent": true,
+      "externalEffectCount": 1,
+      "humanApprovalRequired": true,
+      "responseDirectory": "http"
+    },
+    "postgres": {
+      "status": "NOT_RUN",
+      "reason": "Existing Docker image layer access returned input/output error before Maven or test container creation",
+      "historicalBackendEvidence": "service-task-backend-20261003.json"
+    },
+    "browser": {
+      "status": "NOT_RUN",
+      "reason": "Browser security check unavailable: administrator policy could not be verified; no workaround or screenshots"
+    },
+    "durabilityInvestigation": {
+      "status": "PROCESS_CRASH_RECOVERY_VERIFIED",
+      "initialDelayedWriteRed": "Minimal committed insert is lost with the original 500 ms write delay.",
+      "synchronousFileModeRejected": "WRITE_DELAY=0 plus ACCESS_MODE_DATA=rws still loses the claim after graceful reopen and forced exit.",
+      "fragmentedFileRed": "Generated JDBC fixture: update committed version 2, force process exit, reopen returns version 1. Confirmed by JUnit before product configuration change.",
+      "coverageGap": "Prior in-process transaction, lease, and fresh-file insert tests did not cover reopened files with reusable free regions.",
+      "configuration": "WRITE_DELAY=0;REUSE_SPACE=FALSE",
+      "independentComparisons": {
+        "capturedRealDatabase": 10,
+        "generatedFragmentedDatabase": 10,
+        "result": "PASS"
+      },
+      "formalRegression": "PASS: insert/update independent-process regressions and full startup settings",
+      "defaultPackagedRestart": {
+        "status": "PASS",
+        "cycles": 3,
+        "gracefulReopenBeforeEachCrash": true,
+        "executeCalls": 3,
+        "originalOperationQueries": 3,
+        "humanApprovals": 3,
+        "jarSha256": "7ac70639626e44dd1c22c1db5b55b41f7730d3ee840ea623e04ab2bf1a6726fb",
+        "result": "durability/restart/result.json",
+        "receiver": "durability/restart/receiver.json",
+        "command": "python3 scripts/check-service-task-restart.py --java \"$JAVA_HOME/bin/java\" --jar <fixed-package.jar> --cycles 3"
+      },
+      "tradeoff": "Appending instead of reusing file regions increases H2 file growth.",
+      "limits": [
+        "Process termination only; not a power-loss guarantee",
+        "Database and external receiver coordinated backup/restore is not covered"
+      ]
+    }
+  },
+  "redGreen": [
+    {
+      "case": "SERVICE_TASK canvas coordinates",
+      "red": "service-task-canvas-red.log",
+      "cause": "服务节点策略把设计器的合法 x/y 当成额外执行参数而拒绝",
+      "fix": "仅允许有界有限坐标，不进入参数投影"
+    },
+    {
+      "case": "Optional catalogue cursors",
+      "red": "service-task-response-contract-red.log",
+      "cause": "全局 Jackson 省略空游标，客户端和契约却强制要求键存在",
+      "fix": "游标字段允许省略；非空时仍严格校验字符串类型和完整版本"
+    },
+    {
+      "case": "H2 reopened fragmented file loses committed claim",
+      "red": "service-task-fragment-regression-red.log",
+      "cause": "Immediate external dispatch relied on a durable claim; H2 file defaults allowed delayed writes and reused regions that reproduced loss on crash recovery. Earlier tests did not kill an independent process against a reopened fragmented file.",
+      "fix": "Default file URL uses WRITE_DELAY=0 and REUSE_SPACE=FALSE; tests insert and update through independent JVM processes."
+    }
+  ],
+  "limits": [
+    "授权运行状态接口与页面仍待开发",
+    "本次没有执行真实浏览器交互、PostgreSQL 补测或配套备份恢复",
+    "强退恢复为独立回环进程和合成接收方验收，不等于断电或真实企业接收方验收",
+    "H2 禁用区块复用后文件增长更快，自定义文件 URL 也须保留两个持久性设置"
+  ],
+  "remaining": {
+    "knownOpenTasks": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "lowerBound": true,
+    "fullRequirementAuditComplete": false
+  },
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/service-task-public-evidence-snapshot",
+  "artifactCount": 133,
+  "artifacts": [
+    {
+      "path": "durability/captured-claim-green.log",
+      "sha256": "453fb82978c2fa08c0504f25a632a87ddf2b5ad64abbb8c3143f8b6d7f656c11",
+      "bytes": 755
+    },
+    {
+      "path": "durability/captured-claim-red.log",
+      "sha256": "a0fb5981df2bd22832cb0731683a24429cfb7b445a071b4ad14eb042f0526921",
+      "bytes": 211
+    },
+    {
+      "path": "durability/default-restart.log",
+      "sha256": "b3f1407907319b92b30e697eaa51eeff86062fb4f8b8c742fc63e913e514feff",
+      "bytes": 734
+    },
+    {
+      "path": "durability/delayed-flush-minimal-red.log",
+      "sha256": "0ccc6144cef7f94fd45c31a8e6acf2998e7bb8258d64739389c09dc7d8ddfde2",
+      "bytes": 12510
+    },
+    {
+      "path": "durability/final-package.log",
+      "sha256": "94b6c1c408ea0b79797137c3b7a88b94fa2f0dd7ce069fab6c5b41749e4bdb72",
+      "bytes": 582722
+    },
+    {
+      "path": "durability/fragment-junit-red.log",
+      "sha256": "3541a9063763924242382be2eca290034a771cd3e7debf0bd99649ffed9da4cb",
+      "bytes": 14548
+    },
+    {
+      "path": "durability/fragment-junit-red.xml",
+      "sha256": "d097e68fba7122c009c841ff286be8ab5c9cdfb4dcc48c04f15af06970f4248b",
+      "bytes": 43537
+    },
+    {
+      "path": "durability/generated-fragment-green.log",
+      "sha256": "f736cf8aceadb7ec7d8bff80681ece427cab31735181649e96754f992b323794",
+      "bytes": 784
+    },
+    {
+      "path": "durability/generated-fragment-red.log",
+      "sha256": "703bc9feba343b3bb8bc66df684f1503bb9a84349b256c871a0ccae8bcdc0dcb",
+      "bytes": 220
+    },
+    {
+      "path": "durability/restart/receiver.json",
+      "sha256": "30d17342315fb08606085f4897071aec7bb8f42ab88fbe1aae9e3a580573ad8c",
+      "bytes": 4620
+    },
+    {
+      "path": "durability/restart/result.json",
+      "sha256": "3671b3d27ccbe018d1662a6e43cb37c1e1552be825108dde7ba27cc867276ac7",
+      "bytes": 888
+    },
+    {
+      "path": "durability/restart/runtime-1.log",
+      "sha256": "8e5a7c4913c5447346fbd7cf7d2940eb5cfbeefe38acad5109ef1786e2f8d453",
+      "bytes": 37151
+    },
+    {
+      "path": "durability/restart/runtime-2.log",
+      "sha256": "776e59855e2d0014ac08d8120f6c49ba16b5aa2a5620b510d9c8d0ac1eb7b805",
+      "bytes": 14205
+    },
+    {
+      "path": "durability/restart/runtime-3.log",
+      "sha256": "81f8441b10b632c97afddfc79ff79d5a585eced68ac55b2d0107ba988ddec762",
+      "bytes": 14878
+    },
+    {
+      "path": "durability/restart/runtime-4.log",
+      "sha256": "7ababbebfccd94a1266129f860ff41931413cb59255f650b13192086e5b623af",
+      "bytes": 14205
+    },
+    {
+      "path": "durability/restart/runtime-5.log",
+      "sha256": "ec0a7072bdf8689f9f30a2a50fbbbb6c95a89af38b45cfcb04120653a694c7e3",
+      "bytes": 14877
+    },
+    {
+      "path": "durability/restart/runtime-6.log",
+      "sha256": "5dadb6bce1ed1581de18b3207194e00a9d4a6189de8e5f80cae718ce4b31493c",
+      "bytes": 14204
+    },
+    {
+      "path": "durability/restart/runtime-7.log",
+      "sha256": "a9f500fe18029540d3d3cc1c355106a10e2462d6e9281835fce3f82ba27dec06",
+      "bytes": 14878
+    },
+    {
+      "path": "durability/restart/runtime.yaml",
+      "sha256": "6a09d620c0d1d7d2b74a9bb4b9877cef246d095a3ecb13d947ef2625a57b5e21",
+      "bytes": 961
+    },
+    {
+      "path": "durability/rws-reopened-default-failed.log",
+      "sha256": "f39947366acd618ac202780e8719b3b5bd9f29deef51ae65fe0d028c16143a7d",
+      "bytes": 945
+    },
+    {
+      "path": "h2/TEST-io.agentflow.approval.SubprocessPublicApiIntegrationTest.xml",
+      "sha256": "41ac13ac434a73bbe0b7b7425abdfc6cc6427b5d41a1bd571fd8471c28f5fc35",
+      "bytes": 113098
+    },
+    {
+      "path": "h2/TEST-io.agentflow.approval.SubprocessStartIntegrationTest.xml",
+      "sha256": "42c118f60fe3fc6e2c124ab472bafcc5466500e3449ba073b5cc677be1eafae0",
+      "bytes": 183647
+    },
+    {
+      "path": "h2/TEST-io.agentflow.definition.DefinitionApplicationServiceTest.xml",
+      "sha256": "49b8ff4b4316602d24f4d1d463898fe2a5cfd42a80df59102da54c1b9c7363ef",
+      "bytes": 43788
+    },
+    {
+      "path": "h2/TEST-io.agentflow.definition.DefinitionAvailabilityIntegrationTest.xml",
+      "sha256": "4e686a93e689f7254f089ebfa4f735f2774ac0b7a6fffaa8632bd2dd6ddc074e",
+      "bytes": 74939
+    },
+    {
+      "path": "h2/TEST-io.agentflow.definition.DefinitionDeploymentIntegrationTest.xml",
+      "sha256": "629dd778a03be028f482c73232c3524cf0b46335c5bcd8aad56127a13f3f587a",
+      "bytes": 73037
+    },
+    {
+      "path": "h2/TEST-io.agentflow.definition.DefinitionPreviewIntegrationTest.xml",
+      "sha256": "571f42ea93508fcae87792f41308f4d2c8b90a7e9230dff51b66b101afdd86f3",
+      "bytes": 74845
+    },
+    {
+      "path": "h2/TEST-io.agentflow.definition.DefinitionPublicationIntegrationTest.xml",
+      "sha256": "c5604015bb564ba16b36805457ae346f424a894ae996f127e4068eb576b98976",
+      "bytes": 73638
+    },
+    {
+      "path": "h2/TEST-io.agentflow.definition.ServiceTaskDefinitionTest.xml",
+      "sha256": "f643d43b778767256bd50cb442bea16ff90ddee22e0358dfb38489899721c462",
+      "bytes": 10882
+    },
+    {
+      "path": "h2/TEST-io.agentflow.definition.ServiceTaskInputsTest.xml",
+      "sha256": "943205e498290c699a19cbb37d523cb91743cc947b9c7276ff911b39256e2274",
+      "bytes": 10904
+    },
+    {
+      "path": "h2/TEST-io.agentflow.definition.SubprocessDeploymentIntegrationTest.xml",
+      "sha256": "b1c6bc3e09a243376b8004f857b3e1d2d49de7dad76508674eda48974b5e1166",
+      "bytes": 97063
+    },
+    {
+      "path": "h2/TEST-io.agentflow.servicetask.ServiceTaskCommandTest.xml",
+      "sha256": "f18c68652923c9d57be4365a718ced0fe42bcae24cca9c26a7e58614b355e4c2",
+      "bytes": 10562
+    },
+    {
+      "path": "h2/TEST-io.agentflow.servicetask.ServiceTaskContractTest.xml",
+      "sha256": "b3ce0007546edd27095c4cc1f213a20ffacb365fd76f90dd6d410bf5f0b57df5",
+      "bytes": 11752
+    },
+    {
+      "path": "h2/TEST-io.agentflow.servicetask.ServiceTaskGatewayTest.xml",
+      "sha256": "14d77a19854376e80b628d4773f5024e2d496cb1870f4669fdc13f88d544dc1c",
+      "bytes": 44248
+    },
+    {
+      "path": "h2/TEST-io.agentflow.servicetask.ServiceTaskMigrationTest.xml",
+      "sha256": "ccdeed554e00f8f8d7ff4b27c753d1e60590fb546e332f7de577a1b7dc88dd10",
+      "bytes": 67912
+    },
+    {
+      "path": "h2/TEST-io.agentflow.servicetask.ServiceTaskOperationTest.xml",
+      "sha256": "8a38abe8880d158acd00646247837bdd7bd1fe543669e83353b6ed272910cff3",
+      "bytes": 11498
+    },
+    {
+      "path": "h2/TEST-io.agentflow.servicetask.ServiceTaskPublicApiIntegrationTest.xml",
+      "sha256": "9ca7700f2225212bb56262e3b6684d521b0878f236fec67a2eda40f4d46150a8",
+      "bytes": 112210
+    },
+    {
+      "path": "h2/TEST-io.agentflow.servicetask.ServiceTaskRuntimeIntegrationTest.xml",
+      "sha256": "45af8beed0396983c6299a316e655fcd2688937d5065f86f9c2ca5db669e748f",
+      "bytes": 116676
+    },
+    {
+      "path": "h2/TEST-io.agentflow.servicetask.ServiceTaskSerializationTest.xml",
+      "sha256": "5bc67b10ce834a7c36bf84a3922178c0fbfe3c121656c87f091913a4c9836781",
+      "bytes": 43672
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.approval.SubprocessPublicApiIntegrationTest.xml",
+      "sha256": "d7a9131851a0c1b78dfee382ce6ae126120906e6647259eab519cb9f3f8242b8",
+      "bytes": 113314
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.approval.SubprocessStartIntegrationTest.xml",
+      "sha256": "6e172ad6f51ae21cd60fe604d24c28de58d89bf5a048b77b888ac41b08829905",
+      "bytes": 183987
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.definition.DefinitionApplicationServiceTest.xml",
+      "sha256": "7e336852c8d79c91adcf263bffb4978ea420ebd352c48fb9571b6c86fd54d015",
+      "bytes": 43974
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.definition.DefinitionAvailabilityIntegrationTest.xml",
+      "sha256": "4f843c4c91f68f937f926aab992191168652bf6276e1d7900eb3c9a57f6c260c",
+      "bytes": 75129
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.definition.DefinitionDeploymentIntegrationTest.xml",
+      "sha256": "61ca59cb61d74e48789566e5a749878b80bad01a609e605d286debaa2fe38c1c",
+      "bytes": 73225
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.definition.DefinitionPreviewIntegrationTest.xml",
+      "sha256": "c48b1dfa0705816a322c087c02a34747610b49c41c8a19254a2d38a798c45956",
+      "bytes": 75034
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.definition.DefinitionPublicationIntegrationTest.xml",
+      "sha256": "67e7e33757aa4a70052a2b7178c37b71a227a87a61ccb8ddb759a4df246f4d76",
+      "bytes": 73828
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.definition.ServiceTaskDefinitionTest.xml",
+      "sha256": "96a6d42352e3c5a79ad09349686823211ea100a3d1e7ebdc1bf121ddb24fafc9",
+      "bytes": 11007
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.definition.ServiceTaskInputsTest.xml",
+      "sha256": "2a91460f390eea8c9df2077de851fea217827d691b1b3f5d866ec48561fd8cc9",
+      "bytes": 11028
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.definition.SubprocessDeploymentIntegrationTest.xml",
+      "sha256": "7a945a82096033a3997cd1e44a3dd32a7fba3fc75f96fb1683a452aed1f2ca13",
+      "bytes": 97320
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.servicetask.ServiceTaskCommandTest.xml",
+      "sha256": "f869280d6ccd17891e6d48c6984e3fc52566f16dce969b78096e3b195718309f",
+      "bytes": 10689
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.servicetask.ServiceTaskContractTest.xml",
+      "sha256": "68a475ae85068d8d1c78a04d6e0f74677aa018ab4a7ec3c009c63123d1792219",
+      "bytes": 11879
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.servicetask.ServiceTaskFileDurabilityTest.xml",
+      "sha256": "7c3c842b112f0342d8a1c83a5dbcf879568b5bda38baabdb66d5284c4afa6f36",
+      "bytes": 43693
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.servicetask.ServiceTaskFileRuntimeTest.xml",
+      "sha256": "84f290f510910d0397fe7ee6d803c69da82e38f7daa189783948e51e75eed77b",
+      "bytes": 72703
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.servicetask.ServiceTaskGatewayTest.xml",
+      "sha256": "c8bb902611f4161e220025012e791b0233f7bdb015a483b4a0945b1692dc53d5",
+      "bytes": 44436
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.servicetask.ServiceTaskMigrationTest.xml",
+      "sha256": "27ae2cd63e1771d794654d3d2d64a837213114baefce3e0a9afa17f91f77ae1f",
+      "bytes": 68100
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.servicetask.ServiceTaskOperationTest.xml",
+      "sha256": "333a01aac2e88449ac46bdb351a3b46f2e6ae597de2d7d83c72b5921f673bfb3",
+      "bytes": 11623
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.servicetask.ServiceTaskPublicApiIntegrationTest.xml",
+      "sha256": "908023f73ba61ec96a99d13cff839b3dd641139b52356d9258e392a9b100f466",
+      "bytes": 112437
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.servicetask.ServiceTaskRuntimeIntegrationTest.xml",
+      "sha256": "bc242305650766dbf3cfef8e120f71f3e8a4650bfac5eb08790684bbb68944f8",
+      "bytes": 116905
+    },
+    {
+      "path": "h2-durable-default/TEST-io.agentflow.servicetask.ServiceTaskSerializationTest.xml",
+      "sha256": "efc70e41a67a29b0cd73038a4b80f20491da4257950977b8fb2a242b7e9eaa71",
+      "bytes": 43860
+    },
+    {
+      "path": "h2-durable-default/summary.json",
+      "sha256": "7eb764f6c3206f1540b0fcbfe423fb018bf43cb8c563d4eff32338569957e8f6",
+      "bytes": 3321
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.approval.SubprocessPublicApiIntegrationTest.xml",
+      "sha256": "7976e95238405cd19b5fae4c5a94cf014867de5a91573ef711a443f64294c89d",
+      "bytes": 113245
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.approval.SubprocessStartIntegrationTest.xml",
+      "sha256": "16218ccfb67d56421c2b6ddfcda84062308bb4ca02172166bb61f6a1bf105038",
+      "bytes": 183911
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.definition.DefinitionApplicationServiceTest.xml",
+      "sha256": "074f4e99aa63851453b6bb95d7261aefe84f2d2ed048fb54061179046d5bb473",
+      "bytes": 43908
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.definition.DefinitionAvailabilityIntegrationTest.xml",
+      "sha256": "cd35a04d5d07ecd2b8bca320b756b28846dcb5b5b799902e1d1f0974b4ec8118",
+      "bytes": 75059
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.definition.DefinitionDeploymentIntegrationTest.xml",
+      "sha256": "8fc25e7afabda2ad54da8edf387fb772fb4f1abe474c1f0eb9a99a1aeef5019d",
+      "bytes": 73156
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.definition.DefinitionPreviewIntegrationTest.xml",
+      "sha256": "20306d90dd39cb74dcca86860397c8111d5f15af3302b79fa178c0bcf4ea131c",
+      "bytes": 74963
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.definition.DefinitionPublicationIntegrationTest.xml",
+      "sha256": "974e4fb4b9feab9c737fe910d3e1af53c392110e6425bff80d460591f0c3d1b7",
+      "bytes": 73757
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.definition.ServiceTaskDefinitionTest.xml",
+      "sha256": "150f2fb4ba4757b007ac6f1b7fb041c6905c33820f1af078b9cd4f4f50cf1ac5",
+      "bytes": 10938
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.definition.ServiceTaskInputsTest.xml",
+      "sha256": "608fd29cb7851ce5ed7441a99f0c87d21d3ff0020842f0e34d661dc51096a73a",
+      "bytes": 10959
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.definition.SubprocessDeploymentIntegrationTest.xml",
+      "sha256": "8ddb2758b71c4d60b31d36023286832fe52bb30812e17fe2d660d6d5176043b0",
+      "bytes": 97249
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.servicetask.ServiceTaskCommandTest.xml",
+      "sha256": "f24a6ee4c086b6094fd87bf1691d9425702539ab47b0019df964e457ad14b7d6",
+      "bytes": 10620
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.servicetask.ServiceTaskContractTest.xml",
+      "sha256": "1633eac00ce77439fc1ab5277ca6f3f2ef9159189a652be03e8baa8924de144e",
+      "bytes": 11808
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.servicetask.ServiceTaskFileDurabilityTest.xml",
+      "sha256": "b43b6fd68bbeaeec18750fd66533eca4cd3e2a4e32246e273c83fac61608548b",
+      "bytes": 43453
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.servicetask.ServiceTaskFileRuntimeTest.xml",
+      "sha256": "1aabdb2dd615fb75eca7c5106f42f442ae18942a32ba40650798f8aa5c5fd199",
+      "bytes": 72550
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.servicetask.ServiceTaskGatewayTest.xml",
+      "sha256": "2700fff4894409f928a323a930f4587399c65f52f268d0ad4ce6c69d6448fc02",
+      "bytes": 44369
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.servicetask.ServiceTaskMigrationTest.xml",
+      "sha256": "f3430079635f7ea41cd3526242ddf96f00cc2f2e37944a6bfadf484e5cf77151",
+      "bytes": 68032
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.servicetask.ServiceTaskOperationTest.xml",
+      "sha256": "4838341892905d9faedcfb3134056530b52e0297f7af0a566c6195ef3f3e5c70",
+      "bytes": 11552
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.servicetask.ServiceTaskPublicApiIntegrationTest.xml",
+      "sha256": "824661405991cbf184f776e3b02bca6f921060a607bf0eba95f61edd7e6ea00f",
+      "bytes": 112369
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.servicetask.ServiceTaskRuntimeIntegrationTest.xml",
+      "sha256": "da383686f515044f9eff090186460e41c13d1200e51c6dfb6c442f833812d8da",
+      "bytes": 116838
+    },
+    {
+      "path": "h2-final/TEST-io.agentflow.servicetask.ServiceTaskSerializationTest.xml",
+      "sha256": "314d80a71ee9e054234e6d2e5894ae75f53045b3c8a25a3e2438cdd708b5e84b",
+      "bytes": 43791
+    },
+    {
+      "path": "h2-final/summary.json",
+      "sha256": "0de7474f2978f7a0f6f71c0b4b99e5a9f5bca2de5f9bc0801c42ab1118a5b079",
+      "bytes": 83
+    },
+    {
+      "path": "h2-summary.json",
+      "sha256": "c6afe4dc1dd580336122b83bda87d596fae05073be1014b6af64905e5dc00342",
+      "bytes": 2970
+    },
+    {
+      "path": "http/01-directory.json",
+      "sha256": "10b3f7ec5e21e655affcc9a1d3504eff1cd0a568d35f059468fcf3972b952b69",
+      "bytes": 602
+    },
+    {
+      "path": "http/02-versions.json",
+      "sha256": "a9e3db79ed53a718131dd95f77e05f0dd0cbf072980f23e765a1e859a9392a18",
+      "bytes": 1451
+    },
+    {
+      "path": "http/03-applicant-forbidden.json",
+      "sha256": "1e8b316b883c406eaec724c368cbf318bded6eb59bb375be574e1997e7ac5d47",
+      "bytes": 356
+    },
+    {
+      "path": "http/04-created-draft.json",
+      "sha256": "891cf17321338d6293db406c0a9d8722e9eabfc8b5f702c5e81250e7b5f93d22",
+      "bytes": 4854
+    },
+    {
+      "path": "http/05-original-draft.json",
+      "sha256": "c554aa6a2fc7d0f79b1285ceabefc04df7dee5e74d6f678b679d43a7327c23b4",
+      "bytes": 2590
+    },
+    {
+      "path": "http/06-pure-simulation.json",
+      "sha256": "d07850ca033ae34a6e563ed01f8bd79d3d0d1b28d48cd849caa3c92afa11d7c7",
+      "bytes": 2650
+    },
+    {
+      "path": "http/07-published.json",
+      "sha256": "c1b83ef44feea4045b2b45abc553cb961fce72211c6e605a0ee750f351837e21",
+      "bytes": 2702
+    },
+    {
+      "path": "http/08-application.json",
+      "sha256": "de09bb404dc4a2c58a2ce41d2b0c0b42542868d99a73e0f647b6e3fe6cdff06a",
+      "bytes": 1357
+    },
+    {
+      "path": "http/09-submitted.json",
+      "sha256": "c122f4f808d8dbd6f3509daf8cee9e63260d56c3a9a1f02344a7f0f13fd49e84",
+      "bytes": 1089
+    },
+    {
+      "path": "http/10-real-human-task.json",
+      "sha256": "23553803cc8294e95e8101a99e832f3633b97bc98d3e52ba159d49b6f6ce04a7",
+      "bytes": 629
+    },
+    {
+      "path": "http/11-before-human.json",
+      "sha256": "89a9cd4dc4c51e9e1f84ffc39aa9970355deb5c86593a63fdb6d1afcbd979993",
+      "bytes": 1051
+    },
+    {
+      "path": "http/12-human-approved.json",
+      "sha256": "5f1e4023a87f9cc63c58f9671ff6e742274d418f1d317648d96f04ae5fa91c80",
+      "bytes": 471
+    },
+    {
+      "path": "http/13-application-approved.json",
+      "sha256": "6befffd841d2a7d7ab14f830a8aa30abe6870fadf0219ab915af53386be72544",
+      "bytes": 1048
+    },
+    {
+      "path": "red/25-crash-diagnostic-application.json",
+      "sha256": "533cabe5d9bcd733bf63adf4906148d7ae980c538448c819343730e83f324536",
+      "bytes": 357
+    },
+    {
+      "path": "red/service-task-file-durability-red.log",
+      "sha256": "0ccc6144cef7f94fd45c31a8e6acf2998e7bb8258d64739389c09dc7d8ddfde2",
+      "bytes": 12510
+    },
+    {
+      "path": "red/service-task-public-h2-delayed-flush-red.json",
+      "sha256": "d8d0d7c3fc5f6960538214e54905c5e97b9131ac16ab16db608be6a75f6477d0",
+      "bytes": 1040
+    },
+    {
+      "path": "red/service-task-public-h2-delayed-flush-red.log",
+      "sha256": "06c6d8af5c8b768115f1b140cd445db0ea7f799cc428f5635a6fcc1aecd47c5a",
+      "bytes": 247
+    },
+    {
+      "path": "red/service-task-public-runtime-after-crash.log",
+      "sha256": "00bdd683bd0a636b31258b1a8962f402f9c4cb9d35bbb3b8dad8cff45224f5e5",
+      "bytes": 7713
+    },
+    {
+      "path": "red/service-task-public-runtime-before-crash.log",
+      "sha256": "b29468317845a51c7a07e0805ac26951e50e1c01bb658f8bc452d7283f9cc03e",
+      "bytes": 7713
+    },
+    {
+      "path": "service-task-canvas-red.log",
+      "sha256": "04d724358cdd3c3fd97802891f39cf93915d3103dc3783403c80b84493414168",
+      "bytes": 6269
+    },
+    {
+      "path": "service-task-concurrent-durability-diagnostic.log",
+      "sha256": "64e636b597663dd31b6e7df210df8b19cc9f3d7e247f4b0caaa96bd8e294933b",
+      "bytes": 908
+    },
+    {
+      "path": "service-task-existing-durability-diagnostic.log",
+      "sha256": "73fda9e1de72708d8b99fb6e287d2fceb393b9017248a17f2b1e897e6dfd910e",
+      "bytes": 1540
+    },
+    {
+      "path": "service-task-file-runtime-green.log",
+      "sha256": "971185d119f49a144ff3558c2e06e298b6714f00b7cf9b4ab8e29f8b7ce2370d",
+      "bytes": 39846
+    },
+    {
+      "path": "service-task-public-final-package.log",
+      "sha256": "7623137a89d5f8071cb2c9625112201adf69c42d7158038c02b3545547d601a6",
+      "bytes": 550329
+    },
+    {
+      "path": "service-task-public-openapi.log",
+      "sha256": "169ebded7cce29554fa25244743917f9e2e100643d2c4ecafef4ac4fdc9bd4c9",
+      "bytes": 141
+    },
+    {
+      "path": "service-task-public-postgres-result.log",
+      "sha256": "a4e551d1ae7a5b557baffbcf9d70887ecaf6253eb9dc998d80ae7e83c02790d6",
+      "bytes": 893
+    },
+    {
+      "path": "service-task-public-regression.log",
+      "sha256": "31a5ae13b53ed78b4f4f08ef83d4f0270aa93c589343c444625e7a42f7048ae1",
+      "bytes": 547554
+    },
+    {
+      "path": "service-task-public-restart-confirmed-1/20-restart-application.json",
+      "sha256": "6d1087a57228ecfc4996f00b89beebec0591283629a00f9155da79206fdabc0f",
+      "bytes": 1347
+    },
+    {
+      "path": "service-task-public-restart-confirmed-1/21-restart-submit.json",
+      "sha256": "0718f4d7adedf27321f9c6b64b20d6f1b0d7c7ee7f6b8c2a658c6d0c04e999c6",
+      "bytes": 1084
+    },
+    {
+      "path": "service-task-public-restart-confirmed-1/22-recovered-original-application.json",
+      "sha256": "0b8947ad75696de068d65cf59e7606e7c846f9790e2aac91057938942b551eb9",
+      "bytes": 1046
+    },
+    {
+      "path": "service-task-public-restart-confirmed-1/23-recovered-human-approved.json",
+      "sha256": "1b76ed8d2f19118eceeb46501c511646fbdf9639e3286e583bd34c60eac667b6",
+      "bytes": 468
+    },
+    {
+      "path": "service-task-public-restart-confirmed-1/24-restart-final.json",
+      "sha256": "fe4e0a509b0a702ae86a2b6f2f167fb359c46eac0a6384e6a16778bb71367639",
+      "bytes": 1043
+    },
+    {
+      "path": "service-task-public-restart-confirmed-1/service-task-public-restart-diagnostic-result.log",
+      "sha256": "8b60716d4bf26fde1f3a99d6d1f9560fdf8e26f19d4774a5e21a54989112a546",
+      "bytes": 942
+    },
+    {
+      "path": "service-task-public-restart-confirmed-1/service-task-public-restart-evidence.json",
+      "sha256": "e50c93477b05d9cae41502ee956eb2467619d1518f0926949b3edf1559715f55",
+      "bytes": 1076
+    },
+    {
+      "path": "service-task-public-restart-confirmed-1/service-task-public-runtime-after-crash.log",
+      "sha256": "c52336438041ed42c52f479417ba8bc80f067b1bf8a01ee88494d6860fef0785",
+      "bytes": 14361
+    },
+    {
+      "path": "service-task-public-restart-confirmed-1/service-task-public-runtime-before-crash.log",
+      "sha256": "c1d528a35868510d6cc298754a5852663858c487dacfe85925a4453133b46a2e",
+      "bytes": 14362
+    },
+    {
+      "path": "service-task-public-restart-confirmed-1/service-task-public-runtime-config.yaml",
+      "sha256": "6fe02d01c5401908019ecbfcec2f50051df0ca892a1609491e4c59f2df131b8e",
+      "bytes": 2328
+    },
+    {
+      "path": "service-task-public-restart-confirmed-delay-red/service-task-public-restart-confirmation-result.log",
+      "sha256": "a8e693a89fa3b985a9b3b87fe71545d91cf84d300402b18b828df80785ee0b14",
+      "bytes": 2030
+    },
+    {
+      "path": "service-task-public-restart-confirmed-delay-red/service-task-public-restart-evidence.json",
+      "sha256": "3e8161f01fc645251cde445be52c0ff0fc7d94452fa6fc0a8b74c096f97de06a",
+      "bytes": 1125
+    },
+    {
+      "path": "service-task-public-restart-confirmed-delay-red/service-task-public-runtime-after-crash.log",
+      "sha256": "a5626db5b4ad81e2985b9365bf9ff3349aded82efeba73587938a81700446ded",
+      "bytes": 14361
+    },
+    {
+      "path": "service-task-public-restart-confirmed-delay-red/service-task-public-runtime-before-crash.log",
+      "sha256": "9691df07579b534480e609586d53b9710557f38d264f4b6180e11d6109f3cd3a",
+      "bytes": 14362
+    },
+    {
+      "path": "service-task-public-restart-confirmed-delay-red/service-task-public-runtime-config.yaml",
+      "sha256": "6fe02d01c5401908019ecbfcec2f50051df0ca892a1609491e4c59f2df131b8e",
+      "bytes": 2328
+    },
+    {
+      "path": "service-task-public-synchronous-package.log",
+      "sha256": "b1fdbefa64557bfed6c66031dbd4c36affe67c80455377ef51a1d72bd0ca4dcd",
+      "bytes": 579256
+    },
+    {
+      "path": "service-task-public-transaction-captured-red/service-task-public-transaction-probed-restart-evidence.json",
+      "sha256": "9b4110fa25c3077830ed1131f9aea54a7c8b03820650070d9cbaed71b46cbc71",
+      "bytes": 921
+    },
+    {
+      "path": "service-task-public-transaction-captured-red/service-task-public-transaction-probed-restart-result.log",
+      "sha256": "bc5e7506130fcca5df4ac9ac2968038f9c919146fe7cd3c1793f899b73813921",
+      "bytes": 2049
+    },
+    {
+      "path": "service-task-public-transaction-captured-red/service-task-public-transaction-probed-runtime-after-crash.log",
+      "sha256": "ff1ef662f2b93e5587da54df5ea2be42c703cedb13e7732597ac6d75adc2bc00",
+      "bytes": 31109
+    },
+    {
+      "path": "service-task-public-transaction-captured-red/service-task-public-transaction-probed-runtime-before-crash.log",
+      "sha256": "cd2403c747faf44bdd58ac7bedc6497b6474235a7838255078e2265252f52f16",
+      "bytes": 16540
+    },
+    {
+      "path": "service-task-public-transaction-captured-red/service-task-transaction-crash-store-info.log",
+      "sha256": "d33bab1eafde7394eb8d7719cda3399b261ed91433b6e36017e6aa9f29b52fec",
+      "bytes": 873
+    },
+    {
+      "path": "service-task-response-contract-green.log",
+      "sha256": "df1f95719db5502769d316c3c8afbad777cfbb926e069ae351f8debe284863a6",
+      "bytes": 101
+    },
+    {
+      "path": "service-task-response-contract-red.log",
+      "sha256": "585fb71bf87397bee9b2b22cc6ae76f8cbb9e63da51bd982051db53e3a49013b",
+      "bytes": 439
+    },
+    {
+      "path": "service-task-web-build.log",
+      "sha256": "9d60de2a7b084d0332d14ca9aeebad5ac85ac16b0ecab53f0ec033a0cfd51126",
+      "bytes": 781
+    },
+    {
+      "path": "service-task-web-tests.log",
+      "sha256": "728681fae03b7ed4b238c10113c1af1f2347c0e892a11ad64777d5af9bdec95f",
+      "bytes": 7948
+    }
+  ],
+  "sources": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java",
+      "sha256": "9aa5ee58c875eb17dbe5ac6cee584cd918169449e00a7e3a687ecd9f39db0367"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/definition/ServiceTaskInputs.java",
+      "sha256": "e8bacdb195d353679ee880cc65df99d5a67aa32f775137052b06346cf342b6c0"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/definition/ServiceTaskPolicy.java",
+      "sha256": "9c3bf686f0e8d5ab6c416e008368998ca492b818e670c2529dd7141ee4009f10"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/definition/ServiceTaskDefinitionTest.java",
+      "sha256": "de82c4bc07803ce1c0a2f2d57a717b44e41f09827ca78a2de62aadbdbfd90407"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java",
+      "sha256": "7dd459700966d09165c27a1d15533928592ddefbdd0e8122492722562a8119c2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/SubprocessStartService.java",
+      "sha256": "3e8d223810753c85e12bbdf9753670d839fd86c84bfb10227b3270052d02d64c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableProcessRuntimeAdapter.java",
+      "sha256": "b1ff2e05d7d26a942b010d1ee6ea41f25317be1f9ba12bfc06c50d72c094d60d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/definition/DefinitionApplicationService.java",
+      "sha256": "c66295fc6cb140e4c0dd64067e7ef3ebddda72aab5ab55867b89676cf862d469"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/definition/DefinitionController.java",
+      "sha256": "a68937e991989b9d2350ec75aa6b3d3acdf473de821fcdd3c9e2ffe7a3f608f3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/definition/DefinitionReferenceInspector.java",
+      "sha256": "b8d99603c900d2a13aeec73db40be748dbcc74434529f55915f8eeecd3826f3d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/DefinitionServiceTaskController.java",
+      "sha256": "cb01b847dc66870880ef4e62faceddb1db915e6a42105187b7a2afb4abf31750"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskBindings.java",
+      "sha256": "994721e3327640ebf5d29c400bac808cc2a6c69371dd2272f4cf6c65144b985e"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskCatalog.java",
+      "sha256": "50d6d7be753ccea0d6d6a55051b54f76e92cfeeb0ea5d914a870fc96703672ad"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskCatalogQuery.java",
+      "sha256": "22dc023d67b9705d15594bbdb1e3e333483c79b52ef7009819b976ddc420a814"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskCatalogViews.java",
+      "sha256": "22f4a367e6ffc67853bacba0e2f4862274a33b2e8191d8430c7e1ee41234104e"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "0938f973703f50272fca540674c1409bff9638d96d51d6d4d2581bc1f19cd30c"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/application.yml",
+      "sha256": "09ee4b49ddbfac31ed0cdf762829e9f484d89a5c7123e97e455d8ad7ccea7d3e"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/definition/DefinitionApplicationServiceTest.java",
+      "sha256": "f29848d4afd812cf0338b8d8520e885722f89770f6f88523ecddcd613da3052c"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/servicetask/ServiceTaskFileDurabilityTest.java",
+      "sha256": "670d6b080cb6f015c5e5c528f657de9feadb5b14a2912e41a9034503d12d364a"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/servicetask/ServiceTaskFileRuntimeTest.java",
+      "sha256": "6d81acfe34dd6b199f9c33dd6f154935c34b67ee25de9cc167015b3cbee8666b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/servicetask/ServiceTaskPublicApiIntegrationTest.java",
+      "sha256": "65e9812ee8f48022bc353c8a80c5f3c1c4753f7a3bd00c9868bf2e18575a515a"
+    },
+    {
+      "path": "agentflow-web/scripts/check-openapi.mjs",
+      "sha256": "f692f36f8423913c01311191b600de26d96eee1f83bd1f44353d0093c4fe5f1a"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "4fd5333d4a5440e0cc897a7ddfa443c57eebd0a783ecb50c9d9743175b1a6a32"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "sha256": "a0cb280eecd89cbafb9ab2968b4137fc0527fbb2e06f23be4c164c0f00e7f5a0"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "1d2fa65a1be8b618528d505b741e09f2e5813412bb67907279cd2733a45a6721"
+    },
+    {
+      "path": "agentflow-web/src/components/DefinitionServiceTask.vue",
+      "sha256": "5c2f31f0bdd5645727aca78830417e0d2a3b3b5fbff3b4797a8f045edfc235b9"
+    },
+    {
+      "path": "agentflow-web/src/components/DefinitionSimulation.vue",
+      "sha256": "2a7f7032be29b50b5bcff32093d6e2ee17ef735f3b0c403fe46fe9563959545b"
+    },
+    {
+      "path": "agentflow-web/src/components/QuickDesigner.vue",
+      "sha256": "8465de80836eac79408301cf1e7e7c93cf5213f6436351301792364a3c8feb1b"
+    },
+    {
+      "path": "agentflow-web/src/components/QuickSequence.vue",
+      "sha256": "de936d4187149d88333beca6d4851fa502bb0960a481be5b7f6b4fcd181da980"
+    },
+    {
+      "path": "agentflow-web/src/components/RoundDiagram.vue",
+      "sha256": "e92f2131669c56271581184302829deacf220bf9aff55253e5fe5f50f22f21d0"
+    },
+    {
+      "path": "agentflow-web/src/definitionComparison.ts",
+      "sha256": "ea9f12b8a86ab82616236bfbc0eea6bf2d81cd32b92221002e020346bac89d5c"
+    },
+    {
+      "path": "agentflow-web/src/definitionSimulation.ts",
+      "sha256": "3377b735c8ea5c3da0f056568c79da4a80e0877037fe84c84fe61bc740c17f01"
+    },
+    {
+      "path": "agentflow-web/src/designerGraph.ts",
+      "sha256": "1947e36e95ed8c7fe596c6f902c7e05715b462c03d467a5d8bdfa82f7fd48c00"
+    },
+    {
+      "path": "agentflow-web/src/portableTemplate.ts",
+      "sha256": "09c4a95dabdc3d2fd8de857e6d3de87936eba59a33dbabcf00370ed854c8a71b"
+    },
+    {
+      "path": "agentflow-web/src/quickDesigner.ts",
+      "sha256": "531b41d8b973706b66a52f26255a2f29834ddf1b74e658a4de73d5f576d71e0e"
+    },
+    {
+      "path": "agentflow-web/src/serviceTasks.ts",
+      "sha256": "4605497d998a3658eaa2e3df7f0800256748d6220c14ff1c78eed39449fff67b"
+    },
+    {
+      "path": "agentflow-web/tests/service-tasks.test.mjs",
+      "sha256": "66860e322101512de49be465385107cd4f217d3c20ff84249609d0d416bee009"
+    },
+    {
+      "path": "scripts/check-service-task-restart.py",
+      "sha256": "7132af907e670567be0ec68f4aaf31ae3a8050ce2607ea7d0895beb0529950c9"
+    }
+  ],
+  "durabilityCommit": "bb95a51ce3e89c19f2c973518d949214f8dc1366"
+}

@@ -7,6 +7,7 @@ import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.approval.service.ApplicationParticipantPort;
 import io.agentflow.approval.service.TaskRecipientDirectory;
 import io.agentflow.common.CurrentActor;
+import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormFieldProjection;
 import io.agentflow.form.FormSchema;
@@ -42,15 +43,21 @@ public class ApplicationFieldViews {
 
     /** 文件元数据和下载必须使用与页面相同的当轮字段投影，不能沿用前端显示结果授权。 */
     public FormFieldProjection attachmentView(Application application, Integer roundNo) {
+        return attachmentViewForActor(actors.actor(), application, roundNo);
+    }
+
+    /** 后台以重新认证的主体复用当轮字段规则，跨租户不能借申请人同名绕过投影。 */
+    public FormFieldProjection attachmentViewForActor(Actor actor, Application application, Integer roundNo) {
+        if (!actor.tenantId().equals(application.tenantId())) throw new DomainException("NOT_FOUND", "Application not found");
         if (roundNo != null) {
             if (roundNo < 1) throw new DomainException("INVALID_ATTACHMENT_QUERY", "Round number must be positive");
             var round = rounds.findByRound(application.tenantId(), application.id(), roundNo)
                     .orElseThrow(() -> new DomainException("NOT_FOUND", "Submission round not found"));
-            return project(application, round.formSchema(), round.payload(), round.processInstanceId());
+            return project(actor, application, round.formSchema(), round.payload(), round.processInstanceId());
         }
         String process = application.status() == ApplicationStatus.IN_APPROVAL
                 ? rounds.findByRound(application.tenantId(), application.id(), application.roundNo()).map(SubmissionRound::processInstanceId).orElse(null) : null;
-        return project(application, application.formSchema(), application.payload(), process);
+        return project(actor, application, application.formSchema(), application.payload(), process);
     }
 
     /** 每轮只使用该轮的节点参与事实；不能从其他轮次继承更宽的权限。 */
@@ -70,7 +77,10 @@ public class ApplicationFieldViews {
     }
 
     private FormFieldProjection project(Application application, FormSchema schema, Map<String, Object> payload, String process) {
-        var actor = actors.actor();
+        return project(actors.actor(), application, schema, payload, process);
+    }
+
+    private FormFieldProjection project(Actor actor, Application application, FormSchema schema, Map<String, Object> payload, String process) {
         if (actor.userId().equals(application.createdBy()) || schema == null) return new FormFieldProjection(schema, payload, false);
         Set<String> nodes = process != null && actor.hasRole("APPROVER") && recipients.eligible(actor.tenantId(), actor.userId())
                 ? participants.stream().flatMap(port -> port.readableNodes(application.tenantId(), process, actor).stream())

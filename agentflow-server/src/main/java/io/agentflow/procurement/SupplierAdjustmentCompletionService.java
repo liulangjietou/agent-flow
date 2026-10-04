@@ -4,6 +4,7 @@ import io.agentflow.common.DomainException;
 import io.agentflow.finance.JdbcFinanceReceiptCreditRepository;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class SupplierAdjustmentCompletionService {
+    private final ApplicationEventPublisher events;
     private final JdbcSupplierAdjustmentSources sources;
     private final JdbcSupplierPayableAdjustmentRepository operations;
     private final JdbcSupplierPaymentOperationRepository payments;
@@ -24,8 +26,8 @@ public class SupplierAdjustmentCompletionService {
     /** 跨聚合提交由应用服务编排，账本状态变化仍由领域对象验证。 */
     public SupplierAdjustmentCompletionService(JdbcSupplierAdjustmentSources sources, JdbcSupplierPayableAdjustmentRepository operations,
             JdbcSupplierPaymentOperationRepository payments, JdbcSupplierPaymentReturnsRepository returns, JdbcSupplierPaymentReturnCheckRepository checks,
-            JdbcSupplierAdjustmentCompletions completions, JdbcFinanceReceiptCreditRepository credits, JdbcProcurementPayableReservationRepository reservations) {
-        this.sources = sources; this.operations = operations; this.payments = payments; this.returns = returns; this.checks = checks;
+            JdbcSupplierAdjustmentCompletions completions, JdbcFinanceReceiptCreditRepository credits, JdbcProcurementPayableReservationRepository reservations, ApplicationEventPublisher events) {
+        this.events = events; this.sources = sources; this.operations = operations; this.payments = payments; this.returns = returns; this.checks = checks;
         this.completions = completions; this.credits = credits; this.reservations = reservations;
     }
 
@@ -50,6 +52,7 @@ public class SupplierAdjustmentCompletionService {
         // 先追加被完成表引用的账本修订，再建立完成外键，最后更新现行账本与所有业务引用。
         returns.stageAccounting(proof); completions.create(proof); returns.completeAccounting(proof);
         credits.account(proof); reservations.completeAdjustment(proof); operations.complete(proof);
+        events.publishEvent(new SupplierAdjustmentChanged.Completed(tenant, proof));
         return proof;
     }
 

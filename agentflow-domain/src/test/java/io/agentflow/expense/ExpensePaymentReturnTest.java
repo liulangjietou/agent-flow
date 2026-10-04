@@ -3,6 +3,7 @@ package io.agentflow.expense;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.*;
+import io.agentflow.notification.ExpenseReturnNotice;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -138,6 +139,39 @@ class ExpensePaymentReturnTest {
         assertThat(cumulative.entries().get(1).registrationId()).isEqualTo(second.id());
         assertInvalid(() -> cumulative.register(decision(receipt(ExpensePaymentReturnPort.Status.CONFIRMED), "finance")));
         assertInvalid(() -> new ExpensePaymentReturns(request, cumulative.version(), cumulative.entries(), false, cumulative.createdAt(), cumulative.updatedAt()));
+    }
+
+    @Test void returnNoticesDistinguishQueriesFromActualRegistrationsAndKeepOriginalFact() {
+        for (var outcome : List.of(ExpensePaymentReturnPort.Status.CONFIRMED, ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED, ExpensePaymentReturnPort.Status.RETURNED)) {
+            var queued = ExpensePaymentReturnCheck.queue(new ExpensePaymentReturnCheck.Input(UUID.randomUUID(), "tenant-a", "b".repeat(64), 3, request, "finance", NOW));
+            var running = queued.claim(NOW, Duration.ofSeconds(90));
+            assertThat(ExpenseReturnNotice.from(queued)).isEmpty(); assertThat(ExpenseReturnNotice.from(running)).isEmpty();
+            var proof = outcome == ExpensePaymentReturnPort.Status.CONFIRMED ? receipt(outcome)
+                    : receipt(outcome, item("notice", outcome == ExpensePaymentReturnPort.Status.RETURNED ? "100" : "20"));
+            var checked = running.complete(new FinanceResult.Success<>(proof), NOW.plusSeconds(1));
+            assertThat(ExpenseReturnNotice.from(checked)).isEqualTo(outcome == ExpensePaymentReturnPort.Status.CONFIRMED
+                    ? java.util.Optional.empty() : java.util.Optional.of(ExpenseReturnNotice.RETURN_REVIEW));
+            assertThat(ExpenseReturnNotice.RECORDED.presentIn(checked)).isFalse();
+            var decision = new ExpensePaymentReturn(UUID.randomUUID(), "tenant-a", checked.input().id(), proof, "finance", NOW.plusSeconds(2), "notice-proof", "明确登记原件");
+            var resolved = checked.resolve(decision, decision.registeredAt()); assertThat(ExpenseReturnNotice.from(resolved)).contains(ExpenseReturnNotice.RECORDED);
+            assertThat(ExpenseReturnNotice.RETURN_REVIEW.presentIn(resolved)).isEqualTo(outcome != ExpensePaymentReturnPort.Status.CONFIRMED);
+        }
+    }
+    @Test void unresolvedOrUnavailableReturnEvidenceNeverClaimsRegistration() {
+        var queued = ExpensePaymentReturnCheck.queue(new ExpensePaymentReturnCheck.Input(UUID.randomUUID(), "tenant-a", "b".repeat(64), 3, request, "finance", NOW));
+        var running = queued.claim(NOW, Duration.ofSeconds(90));
+        var unresolved = running.complete(new FinanceResult.Success<>(receipt(ExpensePaymentReturnPort.Status.UNRESOLVED)), NOW.plusSeconds(1));
+        assertThat(ExpenseReturnNotice.from(unresolved)).contains(ExpenseReturnNotice.UNRESOLVED);
+        assertThat(ExpenseReturnNotice.RECORDED.presentIn(unresolved)).isFalse();
+        assertThat(ExpenseReturnNotice.from(running.fail(ExpensePaymentReturnCheck.Issue.TIMEOUT, NOW.plusSeconds(91)))).contains(ExpenseReturnNotice.UNAVAILABLE);
+        assertThat(ExpenseReturnNotice.from(running.voidSource(NOW.plusSeconds(1)))).contains(ExpenseReturnNotice.SOURCE_CHANGED);
+    }
+    @Test void returnNoticeKeysRequireCanonicalQueryIdentityAndKnownFact() {
+        var id = UUID.fromString("abcdefab-abcd-abcd-abcd-abcdefabcdef");
+        for (var fact : ExpenseReturnNotice.values()) assertThat(ExpenseReturnNotice.source(fact.eventKey(id))).contains(new ExpenseReturnNotice.Source(id, fact));
+        for (String key : List.of("supplier-return:" + id + ":RECORDED", "expense-return:1-1-1-1-1:RECORDED", "expense-return:" + id + ":CONFIRMED",
+                "expense-return:" + id + ":RECORDED:2", "expense-return:" + id.toString().toUpperCase() + ":RECORDED")) assertThat(ExpenseReturnNotice.source(key)).isEmpty();
+        assertThat(ExpenseReturnNotice.source(null)).isEmpty();
     }
 
     private ExpenseSettlement settlement() {

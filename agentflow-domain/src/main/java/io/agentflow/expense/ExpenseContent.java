@@ -33,6 +33,17 @@ public record ExpenseContent(UUID legalEntityId, Type type, String title, List<E
                 throw new DomainException("INVALID_ADVANCE_OFFSET", "Advance selections must be unique and positive");
             }
         }
+        var allowances = lines.stream().filter(line -> line.allowance() != null).toList();
+        for (int index = 0; index < allowances.size(); index++) {
+            var first = allowances.get(index);
+            for (int other = index + 1; other < allowances.size(); other++) {
+                var second = allowances.get(other);
+                if (first.categoryCode().equals(second.categoryCode()) && !first.endedOn().isBefore(second.incurredOn())
+                        && !second.endedOn().isBefore(first.incurredOn())) {
+                    throw new DomainException("ALLOWANCE_ITINERARY_OVERLAP", "The same allowance category cannot claim overlapping itinerary days in one report");
+                }
+            }
+        }
         lines = List.copyOf(lines); advanceOffsets = List.copyOf(advanceOffsets);
     }
 

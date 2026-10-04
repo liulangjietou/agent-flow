@@ -5,6 +5,7 @@ import io.agentflow.definition.DefinitionModels.Graph;
 import io.agentflow.definition.DefinitionModels.Node;
 import io.agentflow.definition.DefinitionModels.NodeType;
 import io.agentflow.form.FormSchema;
+import io.agentflow.form.FieldVisibility;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -20,6 +21,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * @author owlzhangfq@gmail.com
  */
 class ProcessTemplateTest {
+    @Test
+    void expenseScenarioRetainsItsFormWhenCheckingReceiptAndFinanceStages() {
+        Graph graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()),
+                new Node("receipt", "原件签收", NodeType.USER_TASK, Map.of("assigneeRule", "role:FINANCE", "expenseStage", "RECEIPT")),
+                new Node("finance", "财务审核", NodeType.USER_TASK, Map.of("assigneeRule", "role:FINANCE", "expenseStage", "FINANCE_REVIEW")),
+                new Node("end", "结束", NodeType.END, Map.of())), List.of(new Edge("a", "start", "receipt", ""),
+                new Edge("b", "receipt", "finance", ""), new Edge("c", "finance", "end", "")));
+        FormSchema schema = new FormSchema(2, List.of(
+                new FormSchema.Field("expenseDetails", "费用明细", FormSchema.FieldType.TEXT, true, null, null, null, null, List.of(),
+                        null, null, true, Map.of("receipt", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY)),
+                new FormSchema.Field("amount", "核定额", FormSchema.FieldType.NUMBER, true, null, null, null, null, List.of()),
+                new FormSchema.Field("currency", "本位币", FormSchema.FieldType.TEXT, true, null, null, null, null, List.of()),
+                new FormSchema.Field("overPolicy", "制度例外", FormSchema.FieldType.BOOLEAN, true, null, null, null, null, List.of())));
+        var scenario = scenario(Map.of("expenseDetails", "原明细", "amount", "80.00", "currency", "CNY", "overPolicy", false),
+                List.of("start", "receipt", "finance", "end"), Map.of());
+        var template = new ProcessTemplate("expense-case", 1, "报销", "财务", "说明", "范围", "EXPENSE", List.of(), List.of("FINANCE"),
+                Map.of(), List.of(), "不覆盖副本", Map.of(), false, graph, schema, List.of(scenario));
+        template.verifyScenarios();
+    }
+
     @Test
     void freezesNestedPayloadAndRetainsExplicitNulls() {
         Map<String, Object> nested = new HashMap<>();

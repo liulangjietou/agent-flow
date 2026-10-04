@@ -36,10 +36,30 @@ class DefinitionIdentifierTest {
         assertThat(validator.validate(graph("Approve"))).isEmpty();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "2review", "-edge", ".edge", "edge:part", "with space", " edge", "edge ", "a\nb", "a\tb", "a/b", "a&b", "a\u0001b", "\u0301start"})
+    void rejectsUnpublishableIdentifiersInAllThreeNamespaces(String id) {
+        assertThat(validator.validate(graph(id, "first"))).containsExactly("INVALID_NODE_ID:" + id);
+        assertThat(validator.validate(graph(id))).containsExactly("INVALID_EDGE_ID:" + id);
+        assertThat(validator.validate(graph("first"), null, id)).containsExactly("INVALID_PROCESS_KEY:" + id);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"_review", "review-1.2", "审批节点", "équipe", "a\u0301", "a\u00b7b", "xml", "xmlns"})
+    void preservesValidUnicodeAndCaseSensitiveIdentifiers(String id) {
+        assertThat(validator.validate(graph(id, "first"))).isEmpty();
+        assertThat(validator.validate(graph(id))).isEmpty();
+        assertThat(validator.validate(graph("first"), null, id)).isEmpty();
+    }
+
     private Graph graph(String firstEdgeId) {
+        return graph("approve", firstEdgeId);
+    }
+
+    private Graph graph(String nodeId, String firstEdgeId) {
         return new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of()),
-                new Node("approve", "审批", NodeType.USER_TASK, Map.of("assigneeRule", "user:manager")),
+                new Node(nodeId, "审批", NodeType.USER_TASK, Map.of("assigneeRule", "user:manager")),
                 new Node("end", "结束", NodeType.END, Map.of())),
-                List.of(new Edge(firstEdgeId, "start", "approve", ""), new Edge("last", "approve", "end", "")));
+                List.of(new Edge(firstEdgeId, "start", nodeId, ""), new Edge("last", nodeId, "end", "")));
     }
 }

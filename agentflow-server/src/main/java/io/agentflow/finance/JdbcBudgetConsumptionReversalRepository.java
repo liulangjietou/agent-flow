@@ -65,6 +65,15 @@ public class JdbcBudgetConsumptionReversalRepository {
                     return value;
                 }, tenant, id.toString(), version).stream().findFirst();
     }
+    /** 消息回溯只读取同一原指令的准确修订，不将当前结果替换为历史事实。 */
+    public List<BudgetConsumptionReversalOperation> revisions(String tenant, UUID id) {
+        return jdbc.query("SELECT version,state_json FROM budget_consumption_reversal_operation_revision WHERE tenant_id=? AND operation_id=? ORDER BY version",
+                (row, index) -> {
+                    var value = json.read(row.getString("state_json"), BudgetConsumptionReversalOperation.class);
+                    if (!value.input().command().source().tenantId().equals(tenant) || !value.input().command().id().equals(id)
+                            || value.version() != row.getLong("version")) throw inconsistent(); return value;
+                }, tenant, id.toString());
+    }
     /** 未知按持久退避查询，租约超时不得被扫描器改成首次发送。 */
     public List<Candidate> due(Instant at) {
         return jdbc.query("""

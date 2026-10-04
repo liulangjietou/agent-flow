@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "taskId": "I01",
+  "status": "PARTIAL_FOUNDATION_VERIFIED_NO_USER_ENTRYPOINT",
+  "recordedAt": "2026-10-04T03:24:16.527085+00:00",
+  "sourceCommit": "7cbb27278549cc7073afe4c6a2fce68c2389817b",
+  "baselineCommit": "e7e9c02571c088a09e9f2252ecd37925f72ae50c",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "来源增量协议、同步批次状态、稳定映射、V109 五表迁移与 JDBC 事务基础；未实现来源 HTTP、预检、应用服务、管理 API、工作器或页面。",
+  "validation": {
+    "status": "PASS",
+    "uniqueTestCases": 102,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "classes": {
+      "OrganizationSyncDeltaTest": 26,
+      "OrganizationSyncBatchTest": 21,
+      "OrganizationSyncCodecTest": 24,
+      "OrganizationSyncPersistenceTest": 23,
+      "OrganizationSyncMigrationTest": 1,
+      "OrganizationIntegrationTest": 7
+    },
+    "deduplication": "按实际 Surefire (classname,name) 精确去重；最终协议类 24 个用例的报告替换第一轮该类报告，不与第一轮 102 相加。",
+    "initialSelectedGateExitCode": 0,
+    "finalCodecGateExitCode": 0,
+    "authorCheck": "Java files=1662, named types=3256, missing author tags=0, parse errors=0",
+    "stagedDiffCheck": "PASS",
+    "database": "H2",
+    "newFeatureTests": "新增功能基础测试；UTF-8 字节上限断言加强未修改产品代码，不记作产品缺陷 RED。"
+  },
+  "verifiedBoundaries": [
+    "只接受精确租户、来源、原游标及严格组织事实协议；拒绝角色、密码和非契约字段。",
+    "同租户只允许一个注册来源及一个待处理批次；待人工核对的 RECEIVED 继续占位。",
+    "原租约在仓储恢复后保持，取消拒绝迟到响应；这不等同于进程重启验收。",
+    "真实双线程排队和有锁领取各有一个成功者。",
+    "测试组合原组织服务与同步仓储后，映射历史写入失败使组织、审计、批次、映射和游标整体回滚；该测试组合不是已实现的同步应用服务。",
+    "映射通过租户、类型和真实本地修订检查，读取必须与最近映射历史原文一致。",
+    "V108 到 V109 测试保留五张已填充组织及审批表、旧 Flyway 历史，新增五张空表，重复迁移零执行。"
+  ],
+  "pending": [
+    "预检、已有实体显式绑定、本地漂移和引用冲突处置。",
+    "最终组织关系校验、具名应用服务和完整核对计划持久化。",
+    "有界可信来源 HTTP、工作器、配置变化与恢复处理。",
+    "鉴权与幂等管理 API、OpenAPI、系统检查及管理页面。",
+    "固定安装包运行、进程重启、升级和配套恢复；原轮次接续。",
+    "浏览器与 PostgreSQL 补验，以及 E09 真实企业组织源联调。"
+  ],
+  "taskClosed": false,
+  "knownOpenTaskCount": 34,
+  "sources": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/organization/OrganizationSyncBatch.java",
+      "bytes": 8928,
+      "sha256": "f577684875b5934107db70d827effe1470385467e35e2dd1aedf08174cd83cd0"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/organization/OrganizationSyncBinding.java",
+      "bytes": 1631,
+      "sha256": "667e2481359db708391c64b57b479fb252065344a0c1f5d54ec96ed1f9c89c44"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/organization/OrganizationSyncDelta.java",
+      "bytes": 4312,
+      "sha256": "7ea1077826f3cbe6936b84d6334b82a75b158deff1df53cccec66818bedd3450"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/organization/OrganizationSyncKey.java",
+      "bytes": 1642,
+      "sha256": "6f26ca31a4b2ccd291ea77f9583a9b6415712e6b8b0dbe88c8c7bdeacd7bb574"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/organization/OrganizationSyncSource.java",
+      "bytes": 1958,
+      "sha256": "71ec4c23f31a702a8f292a0b9ccb55fa435e1848f98ef05cfd1996380e07025d"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/organization/OrganizationSyncBatchTest.java",
+      "bytes": 8830,
+      "sha256": "14c7d2645e6c2ce650edcf70e99aaa91ceadcbc2f4168fb4c8834248e966b5ff"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/organization/OrganizationSyncDeltaTest.java",
+      "bytes": 7103,
+      "sha256": "b2a6df952681221baab4d632b831943fb8552b9a31b05cf3a777cc924708efeb"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/JdbcOrganizationSyncRepository.java",
+      "bytes": 17792,
+      "sha256": "75875927582068e3e6599e05079c36ecc74918bce15c773c6054bcef31fa6158"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationSyncCodec.java",
+      "bytes": 5062,
+      "sha256": "42f4ea2c27940bbcd5e8f13e15d4360a134284e2d0e0db826b4f69963c977093"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/db/migration/V109__organization_sync.sql",
+      "bytes": 5343,
+      "sha256": "b72b136df4f48af297119ea00aa4d016d8308f9416febcfbb33a591a558adea7"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/organization/OrganizationSyncCodecTest.java",
+      "bytes": 6420,
+      "sha256": "4bc963cffd41170e500667177697db401651c2883dbbd311f66f6930f8c8910b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/organization/OrganizationSyncMigrationTest.java",
+      "bytes": 3793,
+      "sha256": "13f707bee1f9e598f6a81cf0f6e7666b41e59e127eee6ec0e865d2bb8074f425"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/organization/OrganizationSyncPersistenceTest.java",
+      "bytes": 22369,
+      "sha256": "d09ff0b8d65fa162a9d486f9f50dbb270893e4dbcfa891a9973e37cf1d2d2884"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-foundation-evidence-20261004/TEST-io.agentflow.organization.OrganizationSyncDeltaTest.xml",
+      "bytes": 13877,
+      "sha256": "cb612ca53cd6f1f696bc4a803f41830ef838a53a90278aea0c001e7b73f1c236"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-foundation-evidence-20261004/TEST-io.agentflow.organization.OrganizationSyncBatchTest.xml",
+      "bytes": 13256,
+      "sha256": "778e9141904aebc8f87782c0209eeb636ecefc78098e11ece1f8187b14119b48"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-foundation-evidence-20261004/TEST-io.agentflow.organization.OrganizationSyncCodecTest.xml",
+      "bytes": 46102,
+      "sha256": "cd73bf753d69482ad492b51d4057a2691b2f73db064fb9cb23fe4011a12be3d1"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-foundation-evidence-20261004/TEST-io.agentflow.organization.OrganizationSyncPersistenceTest.xml",
+      "bytes": 430092,
+      "sha256": "a0785b34b9c70158d5a73b008d97d37901e85333f57cb4b5acbdd3c19e2cfbe2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-foundation-evidence-20261004/TEST-io.agentflow.organization.OrganizationSyncMigrationTest.xml",
+      "bytes": 68180,
+      "sha256": "845bced5e5df95c859d4526753731e234ac762e057cd5ce89cc58d270cdd0bd7"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-foundation-evidence-20261004/TEST-io.agentflow.organization.OrganizationIntegrationTest.xml",
+      "bytes": 75888,
+      "sha256": "7d5fd3ae25fad5b7454ee0c83afc5da4f79c5ce23639bf9b8fdb20e82af26909"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-foundation-evidence-20261004/i01-foundation-current-summary.json",
+      "bytes": 16654,
+      "sha256": "6939eb43980973ac154959fc37705c73a77d88f8b5bbd7a55e2a6a6016baaa8a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-foundation-evidence-20261004/i01-foundation-first.log",
+      "bytes": 453418,
+      "sha256": "aa6c44bf8dad7268d2e5d31d6b3443a397f37b506612b5efd63a560d06801ba5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-foundation-evidence-20261004/i01-codec-final.log",
+      "bytes": 12308,
+      "sha256": "44615b3f5bee447d8e0f471d358f43bb45c5f5bdcc90282598bbdcaf6e5bb240"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-foundation-evidence-20261004/i01-foundation-authors-final.log",
+      "bytes": 73,
+      "sha256": "b858e692a75f5c44bc1e68e6d522ed0503a543c4c7e9e0cb9a905272d7c67edb"
+    }
+  ]
+}

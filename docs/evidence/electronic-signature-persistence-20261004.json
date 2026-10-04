@@ -1,0 +1,170 @@
+{
+  "taskId": "I02",
+  "status": "PERSISTENCE_AND_LOCAL_DATABASE_RECOVERY_VERIFIED_NO_PUBLIC_ENTRYPOINT",
+  "recordedAt": "2026-10-04T05:33:39.280839+00:00",
+  "implementationCommit": "956dc61b45a1811443f83cba94fd4faf976ff0b3",
+  "baseCommit": "d4ab93de87663e0faee9202cbddf39b0fc2637f3",
+  "domainImplementationCommit": "ec0eff523b17745b71d039cf51221f7335947fdf",
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/i02-persistence-evidence-20261004",
+  "manifestSha256": "7f627e7912f6b57f7173237431ceb89e3285c026cded61c99c91175530a53b7a",
+  "sourceFiles": [
+    {
+      "path": "implementation/agentflow-domain/src/main/java/io/agentflow/signature/SignatureOperation.java",
+      "size": 14283,
+      "sha256": "847ee0cfbb5ac4c16467cb3bc91c1f93d5d7867521255414fc9b2c18063015b8"
+    },
+    {
+      "path": "implementation/agentflow-domain/src/main/java/io/agentflow/signature/SignatureReceipt.java",
+      "size": 6500,
+      "sha256": "0c34c10c0a1e50bda9e78bb396853183a95c34a42247e6286b1644a4890bf617"
+    },
+    {
+      "path": "implementation/agentflow-domain/src/main/java/io/agentflow/signature/SignatureRequest.java",
+      "size": 7981,
+      "sha256": "1fc2d7d3b1e253302ffeae65d4774887f36b5ae7a495c0cc7984027fb7b9edf6"
+    },
+    {
+      "path": "implementation/agentflow-domain/src/test/java/io/agentflow/signature/SignatureOperationTest.java",
+      "size": 17525,
+      "sha256": "413f179212b50ffba16e7a438915be223d4f6637390746b6a562a99f0c183cfe"
+    },
+    {
+      "path": "implementation/agentflow-domain/src/test/java/io/agentflow/signature/SignatureReceiptTest.java",
+      "size": 8454,
+      "sha256": "5f4838835d898ca75f96371144c55d233c6fe3d7f8abb10fa5415fcbccdb5c28"
+    },
+    {
+      "path": "implementation/agentflow-domain/src/test/java/io/agentflow/signature/SignatureRequestTest.java",
+      "size": 9934,
+      "sha256": "36cc65c3a0b79eb9aefd8fe6feb56e4fe2442c35e63ec349d8b56b766aa49cd6"
+    },
+    {
+      "path": "implementation/agentflow-domain/src/test/java/io/agentflow/signature/SignatureTestFixtures.java",
+      "size": 2637,
+      "sha256": "3c6c8651d672a35bf2e048e9958503ff9587ebcd68cccd775d60411d2af645ab"
+    },
+    {
+      "path": "implementation/agentflow-server/src/main/java/io/agentflow/signature/JdbcSignatureOperationRepository.java",
+      "size": 18443,
+      "sha256": "3423d91c24f07050068c0eb65b430412d4ae00426bb419bb8d563bf389582a00"
+    },
+    {
+      "path": "implementation/agentflow-server/src/test/java/io/agentflow/signature/SignatureDatabaseRecoveryTest.java",
+      "size": 6871,
+      "sha256": "6ccd209c23e10d6a0c57a27190c30a183c601bfb338270fbd1f405e430e805db"
+    },
+    {
+      "path": "implementation/agentflow-server/src/test/java/io/agentflow/signature/SignatureMigrationTest.java",
+      "size": 4047,
+      "sha256": "52e0cc3bf477b65c7ec4ff16e3671c760b0ddf883c51205f88a133a4013e2353"
+    },
+    {
+      "path": "implementation/agentflow-server/src/test/java/io/agentflow/signature/SignaturePersistenceFixtures.java",
+      "size": 6198,
+      "sha256": "1f966a2838a4d52eac046058e3ba7c0174bfd01edc1e309d8df0cbc495059a2c"
+    },
+    {
+      "path": "implementation/agentflow-server/src/test/java/io/agentflow/signature/SignaturePersistenceTest.java",
+      "size": 21133,
+      "sha256": "3748cb6b1f19589facd5fe91aae1daa28a81a3b202055f9d3c998cb1329817ad"
+    },
+    {
+      "path": "implementation/agentflow-server/src/test/java/io/agentflow/signature/SignatureSerializationTest.java",
+      "size": 5763,
+      "sha256": "bd348133d2d72ce4c17cd5d744ec1cf9356bbe451d0d84dc0c594affac47640e"
+    },
+    {
+      "path": "implementation/agentflow-server/src/main/resources/db/migration/V111__document_signatures.sql",
+      "size": 6382,
+      "sha256": "a58d491d9d8ef6ceb98bc4e50f80b0442bb3bab09e117dbac9a0e446220a74d0"
+    }
+  ],
+  "javaTests": {
+    "unique": 72,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "classes": {
+      "SignatureRequestTest": 9,
+      "SignatureReceiptTest": 9,
+      "SignatureOperationTest": 17,
+      "SignatureSerializationTest": 3,
+      "SignaturePersistenceTest": 32,
+      "SignatureMigrationTest": 1,
+      "SignatureDatabaseRecoveryTest": 1
+    }
+  },
+  "counting": "The 72 unique final (classname,name) cases include the previous 38 domain/serialization cases; no reruns are added.",
+  "backupToolTests": {
+    "command": "env TMPDIR=/fyoung/tmp python3 -m unittest discover -s scripts/tests -p test_production_attachments.py",
+    "tests": 6,
+    "result": "PASS"
+  },
+  "authorGate": {
+    "javaFiles": 1692,
+    "namedTypes": 3330,
+    "missingAuthorTags": 0,
+    "parseErrors": 0
+  },
+  "redGreen": {
+    "firstRun": {
+      "unique": 30,
+      "failures": 3,
+      "errors": 1
+    },
+    "failures": [
+      "Three SQL CHECKs accepted null active-slot or scheduler facts because UNKNOWN is not FALSE.",
+      "A valid 1 ns lease had equal truncated microsecond indexes and was rejected by the strict SQL greater-than check."
+    ],
+    "fixes": [
+      "Explicit nonnull SQL predicates keep active operations indexed.",
+      "SQL scheduling indexes permit equal microseconds; the exact original JSON still enforces a positive lease."
+    ],
+    "green": "All four reproduction cases pass in the final selected scope."
+  },
+  "migration": {
+    "from": "110",
+    "to": "111",
+    "engine": "H2",
+    "previousTables": 216,
+    "previousRows": 8,
+    "previousFileMetadata": 2,
+    "newTables": 4,
+    "newTablesInitiallyEmpty": true,
+    "oldRowsAndFileInventoryPreserved": true,
+    "fileInventoryColumnTypesPreserved": true,
+    "rerunAndChecksumValidation": "PASS"
+  },
+  "recovery": {
+    "engine": "H2 using current application.yml file database defaults",
+    "gracefulReopen": "PASS",
+    "independentSqlRestore": "PASS",
+    "originalOperationAndTargetPreserved": true,
+    "unconfirmedSendRecoversByQuery": true,
+    "partialReadyFilesAndSavedClaimRevisionPreserved": true,
+    "restoredOperationCompletesFromRemainingFileAcknowledgement": true,
+    "sourceDatabaseRowsUnchangedAfterRestoredWrites": true,
+    "actualProviderCalled": false,
+    "physicalSignedFileBytesVerified": false,
+    "packagedRuntimeCrashAcceptance": false
+  },
+  "verifiedScope": [
+    "Tenant and exact approved current round, frozen attachment and same-fingerprint READY original bindings.",
+    "One active operation per round, immutable original input, optimistic claims and callback/late-worker conflict.",
+    "Atomic state/history/result reservations, per-file READY under a current lease and completion only after every READY row.",
+    "Original content and reserved result identities remain separate; backup inventory uses the existing UPLOADING/READY contract.",
+    "Corrupt source, digest, target and result metadata fail closed; transaction rollback leaves no partial transition."
+  ],
+  "remainingScope": [
+    "Trusted signer profiles and actual verified provider adapter with retained signature receipt proof.",
+    "Current application and field authorization orchestration, actual file transfer, worker and callback inbox.",
+    "Public API, UI and diagnostics.",
+    "Fixed-package crash and paired database/physical-file recovery acceptance.",
+    "Browser, PostgreSQL and E10 real enterprise signature acceptance."
+  ],
+  "ledger": {
+    "status": "OPEN",
+    "knownOpenTaskCount": 34,
+    "completeInventory": false
+  }
+}

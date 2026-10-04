@@ -1,7 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createRenderer, reactive } from 'vue'
-const { policyGuidanceContext, policyGuidanceQuery, readPolicyGuidance, policyGuidanceMessages } = await import(process.env.AGENTFLOW_TEST_POLICY_GUIDANCE)
+import { createRenderer, createSSRApp, reactive } from 'vue'
+import { renderToString } from '@vue/server-renderer'
+const { policyGuidanceContext, policyGuidanceQuery, readPolicyGuidance, policyGuidanceMessages, applyAllowancePreview } = await import(process.env.AGENTFLOW_TEST_POLICY_GUIDANCE)
+const { default: LineEditor } = await import(process.env.AGENTFLOW_TEST_EXPENSELINEEDITORRENDERED)
+const { default: LineEditorPanel } = await import(process.env.AGENTFLOW_TEST_EXPENSELINEEDITORPANEL)
 const { default: Panel } = await import(process.env.AGENTFLOW_TEST_EXPENSEPOLICYGUIDANCEPANEL)
 const { default: Rendered } = await import(process.env.AGENTFLOW_TEST_EXPENSEPOLICYGUIDANCERENDERED)
 const { api, bindAuthenticationActor, writeRequests } = await import(process.env.AGENTFLOW_TEST_API)
@@ -24,6 +27,78 @@ function panel(rendered = false) {
   return { props, root, state: mounted.$.setupState, close() { app.unmount(); Object.assign(api, originals) } }
 }
 function visible(node) { return [node.text ?? '', ...(node.children ?? []).map(visible)].join(' ') }
+
+function allowanceResult() {
+  const input = { ...context(), unit: 'DAY', incurredOn: '2024-02-28', endedOn: '2024-03-01' }, view = result(input)
+  view.guidance.constraints = { effect: 'ALLOW', allowedServiceLevels: [], priorRequestRequired: false,
+    fixedAllowance: { dailyRate: { value: '100.00', currency: 'CNY' }, dayCountBasis: 'CALENDAR_DAYS_INCLUSIVE' } }
+  view.allowance = { policy: { selection: copy(view.guidance.selection), ruleKey: view.guidance.ruleKey, factSourceReference: view.guidance.factSourceReference },
+    calculation: { startsOn: input.incurredOn, endsOn: input.endedOn, days: 3, rule: copy(view.guidance.constraints.fixedAllowance), gross: { value: '300.00', currency: 'CNY' } } }
+  return view
+}
+function allowanceLine() {
+  return { ...line(), unit: 'DAY', incurredOn: '2024-02-28', endedOn: '2024-03-01', allocations: [{ costCenter: 'IT', projectCode: null, amount: { value: '400.00', currency: 'CNY' } }] }
+}
+
+test('补贴提示绑定结束日期，验证含闰日的金额等式与同一制度来源', () => {
+  const view = allowanceResult(), before = copy(view), parsed = readPolicyGuidance(view, view.context)
+  assert.equal(new URLSearchParams(policyGuidanceQuery(view.context)).get('endedOn'), '2024-03-01')
+  assert.equal(parsed.allowance.calculation.days, 3); assert.equal(parsed.allowance.calculation.gross.value, '300.00')
+  parsed.allowance.calculation.rule.dailyRate.value = '900.00'; assert.deepEqual(view, before)
+  for (const change of [v => { v.allowance.calculation.days = 4 }, v => { v.allowance.calculation.gross.value = '301.00' },
+    v => { v.allowance.calculation.rule.dailyRate.value = '101.00' }, v => { v.allowance.calculation.endsOn = '2024-03-02' },
+    v => { v.allowance.policy.selection.categoryRevision++ }, v => { v.allowance.policy.factSourceReference = 'wrong-source' },
+    v => { v.guidance.selection = null }, v => { delete v.allowance }, v => { v.context.endedOn = '2024-03-02' }]) {
+    const invalid = allowanceResult(); change(invalid); assert.throws(() => readPolicyGuidance(invalid, view.context))
+  }
+})
+
+test('补贴未填结束日期只显示制度，普通按天费用不产生自动金额', () => {
+  const pending = allowanceResult(); delete pending.context.endedOn; delete pending.allowance
+  assert.equal(readPolicyGuidance(pending, pending.context).allowance, undefined)
+  const ordinary = result({ ...context(), unit: 'DAY' }); ordinary.guidance.constraints.limitUnit = 'DAY'
+  assert.equal(readPolicyGuidance(ordinary, ordinary.context).allowance, undefined)
+  assert.match(policyGuidanceMessages(pending.guidance, { ...allowanceLine(), endedOn: null }).find(m => m.code === 'ALLOWANCE_DATES').text, /结束日期/)
+})
+
+test('采纳补贴计算保持精确金额，唯一分摊同步，多笔分摊及发票必须人工核对', () => {
+  const view = readPolicyGuidance(allowanceResult(), allowanceResult().context), input = allowanceLine(), before = copy(input)
+  const filled = applyAllowancePreview(input, view)
+  assert.equal(filled.quantity, '3'); assert.equal(filled.claimedGross.value, '300.00'); assert.equal(filled.claimedTax.value, '0.00')
+  assert.equal(filled.allocations[0].amount.value, '300.00'); assert.deepEqual(input, before)
+  const split = { ...input, invoiceIds: [POLICY], allocations: [input.allocations[0], { costCenter: 'SALES', projectCode: null, amount: { value: '10.00', currency: 'CNY' } }] }
+  const adjusted = applyAllowancePreview(split, view)
+  assert.deepEqual(adjusted.allocations, split.allocations); assert.deepEqual(adjusted.invoiceIds, [POLICY])
+  assert.throws(() => applyAllowancePreview({ ...input, endedOn: '2024-03-02' }, view), /费用条件已变化/)
+})
+
+test('费用编辑器显示补贴计算依据，并将金额天数和税额呈现为只读', async () => {
+  const input = applyAllowancePreview(allowanceLine(), allowanceResult())
+  const html = await renderToString(createSSRApp(LineEditor, { modelValue: input, catalog: catalog(), legalEntityId: ENTITY, reportType: 'TRAVEL', scopeKey: 'demo:alice', locked: false }))
+  assert.match(html, /补贴天数（自动）/); assert.match(html, /补贴金额（自动）/); assert.match(html, /100.00 \/ 天 × 3 天 = 300.00/)
+  assert.equal((html.match(/readonly/g) ?? []).length, 3)
+  const ordinary = await renderToString(createSSRApp(LineEditor, { modelValue: line(), catalog: catalog(), legalEntityId: ENTITY, reportType: 'TRAVEL', scopeKey: 'demo:alice', locked: false }))
+  assert.equal((ordinary.match(/readonly/g) ?? []).length, 0)
+})
+
+test('修改行程清除旧计算，迟到预览不能带回旧金额，锁定期间也不能修改', async () => {
+  const props = reactive({ modelValue: allowanceLine(), catalog: catalog(), legalEntityId: ENTITY, reportType: 'TRAVEL', scopeKey: 'demo:alice', locked: false,
+    'onUpdate:modelValue': value => { props.modelValue = value } })
+  const app = renderer.createApp({ ...LineEditorPanel, setup: (_, ctx) => LineEditorPanel.setup(props, ctx), render: () => null }, props)
+  // 查询维度必须来自本人类别目录。
+  props.catalog.categories[0].units = ['DAY']
+  const mounted = app.mount({ children: [] }), state = mounted.$.setupState
+  try {
+    const original = allowanceResult(); state.acceptGuidance(original)
+    assert.equal(props.modelValue.claimedGross.value, '300.00'); assert.equal(state.isAllowance, true)
+    props.modelValue.endedOn = '2024-03-02'; state.clearAllowance()
+    assert.equal(props.modelValue.allowance, null); assert.equal(props.modelValue.claimedGross.value, '')
+    state.acceptGuidance(original); assert.equal(props.modelValue.claimedGross.value, '')
+    const next = allowanceResult(); next.context.endedOn = '2024-03-02'; next.allowance.calculation.endsOn = '2024-03-02'; next.allowance.calculation.days = 4; next.allowance.calculation.gross.value = '400.00'
+    state.acceptGuidance(next); assert.equal(props.modelValue.claimedGross.value, '400.00')
+    props.locked = true; state.clearAllowance(true); assert.equal(props.modelValue.allowance.calculation.days, 4)
+  } finally { app.unmount() }
+})
 
 test('提示输入覆盖所有费用类型，只从本人目录选维度，不携带金额、职级或员工覆盖', () => {
   for (const type of ['TRAVEL', 'DAILY', 'ENTERTAINMENT', 'TRAINING', 'OTHER']) {

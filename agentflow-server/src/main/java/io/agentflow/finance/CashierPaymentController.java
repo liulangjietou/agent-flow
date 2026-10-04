@@ -1,11 +1,13 @@
 package io.agentflow.finance;
 
 import io.agentflow.api.idempotency.IdempotencyExecutor;
+import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,8 +34,19 @@ public class CashierPaymentController {
     }
     /** SQL 内按当前法人任职分页过滤。 */
     @GetMapping
-    public ResponseEntity<CashierPaymentWorkspace.Page> list(@RequestParam Map<String, String> parameters) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(workspace.list(parameters));
+    public ResponseEntity<CashierPaymentWorkspace.Page> list(@RequestParam MultiValueMap<String, String> parameters) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(workspace.list(single(parameters)));
+    }
+    /** 当前任职法人及历史已固定账户均从受控事实读取，响应不含原始账户引用。 */
+    @GetMapping("/filter-options")
+    public ResponseEntity<CashierPaymentWorkspace.FilterOptions> filterOptions(@RequestParam MultiValueMap<String, String> parameters) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(workspace.filterOptions(single(parameters)));
+    }
+    private static Map<String, String> single(MultiValueMap<String, String> parameters) {
+        if (parameters.values().stream().anyMatch(values -> values.size() != 1)) {
+            throw new DomainException("INVALID_PAYMENT_QUERY", "Each cashier filter or pagination parameter must occur only once");
+        }
+        return parameters.toSingleValueMap();
     }
     /** 不返回付款命令、完整账号或完整申请。 */
     @GetMapping("/{id}")

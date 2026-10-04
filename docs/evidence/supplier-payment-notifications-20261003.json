@@ -1,0 +1,330 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F17",
+  "taskStatus": "OPEN",
+  "stage": "SUPPLIER_PAYMENT_NOTIFICATIONS_BACKEND_AND_UI",
+  "recordedAt": "2026-10-03T15:11:19.728117+00:00",
+  "implementationCommit": "40b220d2459e289eb8a4b23524fa7fa31b422ac1",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/Volumes/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "Supplier cashier request checks, bank outcomes and dispute resolution notifications",
+    "Immutable original authorization plus original execution-request identity",
+    "Minimal original internal participants, atomic inbox and outbound intents, current recipient/entity checks",
+    "Protected supplier-payment-target API, original-request facts, actual Vue message/detail/navigation"
+  ],
+  "validation": {
+    "java": {
+      "result": "PASS",
+      "tests": 314,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "path": "TEST-io.agentflow.api.OpenApiContractTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.PaymentOperationIntegrationTest.xml",
+          "tests": 62,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.SupplierPaymentNoticeTest.xml",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.procurement.SupplierAdjustmentPersistenceTest.xml",
+          "tests": 47,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.procurement.SupplierFinanceWorkflowTest.xml",
+          "tests": 61,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.procurement.SupplierPaymentDisputeResolutionTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.procurement.SupplierPaymentExecutionRequestTest.xml",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.procurement.SupplierPaymentOperationTest.xml",
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.procurement.SupplierPaymentPersistenceTest.xml",
+          "tests": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.procurement.SupplierSettlementPersistenceTest.xml",
+          "tests": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "countingNote": "Counts distinct testcase identities from 13 final XML reports. The matched gate passed all suites except one new fixture; the whole 61-case workflow suite passed after fixture-only repair and replaces its earlier report. Other Java production/test sources did not change between those two runs; repeated cases are not added."
+    },
+    "web": {
+      "result": "PASS",
+      "tests": 71,
+      "files": [
+        "supplier-payment-notifications.test.mjs",
+        "payment-notifications.test.mjs",
+        "notifications.test.mjs",
+        "payments.test.mjs",
+        "notification-deliveries.test.mjs",
+        "supplier-cashier.test.mjs"
+      ],
+      "method": "Actual compiled Vue scripts/templates, SSR facts and real App navigation, using Node renderer; not actual browser acceptance."
+    },
+    "typecheck": {
+      "result": "PASS"
+    },
+    "build": {
+      "result": "PASS",
+      "output": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-notifications-web-dist",
+      "warning": "Existing bundle-size warning remains."
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 344,
+      "schemas": 689,
+      "requestExamples": 125
+    },
+    "authors": {
+      "result": "PASS",
+      "javaFiles": 1532,
+      "namedTypes": 2942,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "diffCheck": {
+      "result": "PASS"
+    }
+  },
+  "scenarios": [
+    "Actual successful supplier payment notifies only original applicant, finance authorizer and cashier; repeated query does not duplicate result.",
+    "Original recipients read current protected facts; strangers, lost legal-entity appointment and alternate query identities are rejected.",
+    "Stopped cashier request retains its own identity and null bank operation after a later request under the same authorization successfully pays.",
+    "Request expiry and fault-injected notice insertion roll back together; retry commits the original expiry and three minimal messages.",
+    "Bank conflict and explicit resolution preserve distinct facts without repeating an earlier success notification.",
+    "Current cashier entity loss suppresses the original outbound intent before any dispatch attempt.",
+    "Valid PENDING bank observation and explicit query do not emit anomaly notices; an injected query failure through the bank service produces UNKNOWN attention.",
+    "Actual message template reads only after clicking, shows stopped original request and provides no navigation to a later cashier selection.",
+    "Original supplier workspace can locate an authorization outside the first directory page; role, identity change and stale response guards remain."
+  ],
+  "redEvidence": {
+    "log": "supplier-payment-notifications-red.log",
+    "expectedFailure": "Actual paidBank workflow succeeded but notice recipients were [] instead of alice, finance and cashier."
+  },
+  "earlierAttempts": {
+    "fixtureRepair": "New PENDING fixture initially omitted mandatory bank paymentReference. Gateway correctly classified that invalid response as UNKNOWN. Fixture now supplies BANK-1 and explicitly asserts accepted PENDING and null failure before asserting no anomaly notices. Production validation was not changed.",
+    "retainedFailedXml": "java-earlier/TEST-io.agentflow.procurement.SupplierFinanceWorkflowTest.xml",
+    "runTotalsNotAddedSeparately": [
+      "supplier-payment-notifications-first.log",
+      "supplier-payment-notifications-final.log"
+    ]
+  },
+  "migration": {
+    "newMigration": false,
+    "newGetEndpoint": "/api/v1/notifications/{id}/supplier-payment-target",
+    "newKinds": [
+      "SUPPLIER_PAYMENT_RESULT",
+      "SUPPLIER_PAYMENT_ATTENTION"
+    ],
+    "historicalBackfill": false
+  },
+  "notCompleted": [
+    "Voucher, budget, settlement and other financial exception producer coverage",
+    "Whole F17 fixed-package HTTP, nonempty upgrade and restart/recovery acceptance",
+    "Actual browser and PostgreSQL new-range acceptance",
+    "Enterprise SMTP/IM and financial-system acceptance (separate E tasks)"
+  ],
+  "constraints": [
+    "Local-only commit; no push, PR or CI in this phase.",
+    "No browser-policy bypass or Docker/PostgreSQL repair attempted.",
+    "Synthetic financial gateway and H2 integration tests do not prove enterprise acceptance."
+  ],
+  "sourceManifest": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java",
+      "sha256": "495db3d7a780ba23072167c5c6bc2261fb73a5614c4ab62d06c00601c6e48f16"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/SupplierPaymentNotice.java",
+      "sha256": "db1ff58e1245691d2141e73cac10b58d9ea03c6968b18f81c03085fc0ef2b9b2"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/notification/SupplierPaymentNoticeTest.java",
+      "sha256": "aedd6302d1f151f7129730c7eb979f66ad8bf4c3ef154a763042135bf7fb27f9"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java",
+      "sha256": "a7ff4dbf565cc4a0783a8746c6a82c0bc782c03f209ddc5d4727e6fd0d0091fc"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierPaymentNotificationAccess.java",
+      "sha256": "e40dafc425de692c85da4c54e63c05ce9da1c006c224a403fd0f9a095806982c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierPaymentNotificationController.java",
+      "sha256": "3bcf79f0b2546b9cdffeaafdfe01d77853746078927d3e4820c51abc2ab48995"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/SupplierPaymentNotificationService.java",
+      "sha256": "2e42a6fafe4914f91df2395eda129be207c38f118e8565ce797a75358bb85d10"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/JdbcSupplierPaymentExecutionRepository.java",
+      "sha256": "4a165bba0c75715ecf8218ee1df54d4c1c06b1aba4d0b77c496426002be1e6fe"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierCashierWorkspace.java",
+      "sha256": "1cfb7aa86c8ceaa6177494975e5642a32c31d87a5bee782fc34fd7728f29d339"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentChanged.java",
+      "sha256": "045361ac4f98ddd26f25aa6bd0ea66c5c0287dfe651eff55b5d8ca5fc1644b94"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentDisputeService.java",
+      "sha256": "7306b01b07305e2654b53cc1f14bef158e93ce65d845d8e9d2923b4534583597"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentExecutionChanged.java",
+      "sha256": "a9c5c913448c40c991897df5e2db14f5f9b7da5990c30529050204b7f744d50c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentExecutionService.java",
+      "sha256": "4c00f3ac8a679f07d2c9777852d151daad25de130c64c41261bb7b396e0c1c57"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentService.java",
+      "sha256": "f64a8862959f344a38a1fea37dd93ad313967410bb65dd8719d9ba6a90752efe"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "391517c32958d0a1bc4be2196688d2c7d09789cf65d37b6294ef8607ca9362f1"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/procurement/SupplierAdjustmentPersistenceTest.java",
+      "sha256": "5b83b5371d21605fbcc552e389bac5d34d71b3dda86056617e94ed0d1fdd4311"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/procurement/SupplierFinanceWorkflowTest.java",
+      "sha256": "cbcc708a6e6a82a3c19355994ed34f5d5bf2f357a7a6306db0503e8be2987b5c"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/procurement/SupplierPaymentPersistenceTest.java",
+      "sha256": "6e803343eb1039a02416ab368f8fe0630d1b54a962dbc411ce335ca02f143186"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/procurement/SupplierSettlementPersistenceTest.java",
+      "sha256": "e3c7e6b95dbd5cab66a337d04770ec63e328464548406795e262d42fe89de8a9"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "81914c0cacb4c93df3d000b61d4525503b51b4104c23f205a2cb64d5915090cd"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "sha256": "3a5cd2af944f8fdf5b77938f90a40be045299259c83ae43d38adc4d5122700c8"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "e7084c3fb2ef1f54a744a8e91b61e1608b1efe34bc20a72e2017d09b02deaf04"
+    },
+    {
+      "path": "agentflow-web/src/components/NotificationInbox.vue",
+      "sha256": "d672f83e55f0888240e7d662b04cd6f29a0230b0c6e57850559a0c15e1b02b07"
+    },
+    {
+      "path": "agentflow-web/src/components/PaymentNotificationDetail.vue",
+      "sha256": "6ecc870b8ad6d4daf335db8fb438a6dbb9b3ed03199e81cfd99afae5074d3538"
+    },
+    {
+      "path": "agentflow-web/src/components/SupplierCashierDetail.vue",
+      "sha256": "6de042477e2261ea62561dfd7ef80bf44d4cc89d840f4fdc7681ca066815d1b2"
+    },
+    {
+      "path": "agentflow-web/src/components/SupplierCashierWorkspace.vue",
+      "sha256": "4faa5f8c22af3c2086ddbf3dd871ce35cc0e2b0106e7717c826fe9bc55ff6f74"
+    },
+    {
+      "path": "agentflow-web/src/components/SupplierPaymentFacts.vue",
+      "sha256": "dc764f9652d9f2b2951e36260f06d19fa73c99cb5814f6bbeccea83e70a58a39"
+    },
+    {
+      "path": "agentflow-web/src/notificationInbox.ts",
+      "sha256": "84bbeafc629325d8c9060bbc87559c94b1af67c2b915310287875532d7f75a60"
+    },
+    {
+      "path": "agentflow-web/tests/supplier-payment-notifications.test.mjs",
+      "sha256": "23173dd026aaf6cfd3c344629a06c8dc997b226ba464a7b86a0b2ae01b94df71"
+    }
+  ],
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-notifications-evidence-snapshot",
+  "artifactManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/supplier-payment-notifications-evidence-snapshot/artifact-manifest.json",
+    "sha256": "b466d0207f33b747cf8cd8c85a1896446d1916162dd64887feb4338160947572",
+    "files": 28
+  },
+  "remainingCount": {
+    "knownOpenTaskCount": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  }
+}

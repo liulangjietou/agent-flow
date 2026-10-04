@@ -10,16 +10,22 @@ import { readResponsibilities, type ApprovalResponsibilities } from '../approval
 import DefinitionCopyRecipient from './DefinitionCopyRecipient.vue'
 import DefinitionDeadline from './DefinitionDeadline.vue'
 import DefinitionTimerWait from './DefinitionTimerWait.vue'
+import DefinitionServiceTask from './DefinitionServiceTask.vue'
+import { readServiceTaskBinding, type ServiceTaskBinding } from '../serviceTasks'
 import DefinitionEventWait from './DefinitionEventWait.vue'
 import DefinitionSubprocess from './DefinitionSubprocess.vue'
 import { readSubprocessBinding, type SubprocessBinding } from '../subprocessDesigner'
 import type { EventBinding } from '../events'
 import DefinitionExpenseStage from './DefinitionExpenseStage.vue'
+import DefinitionExpenseSelfApproval from './DefinitionExpenseSelfApproval.vue'
+import DefinitionExpenseDuplicateApproval from './DefinitionExpenseDuplicateApproval.vue'
+import DefinitionExpenseSplitRisk from './DefinitionExpenseSplitRisk.vue'
+import type { SplitRuleFields } from '../expenseSplitPolicy'
 import { readDesignerDeadline, type DesignerDeadline } from '../designerGraph'
 import ConditionEditor from './ConditionEditor.vue'
 import { describeBranch, branchTooltip } from '../conditionPresentation'
 const props = defineProps<{ graph: Graph; formSchema: FormSchema | null; selectedNode: string; selectedEdge: string; locked: boolean; scopeKey: string; invalidNodes: string[]; simulatedNodes: string[]; simulatedEdges: string[] }>()
-const emit = defineEmits<{ responsibilities: [id: string, value: ApprovalResponsibilities]; subprocess: [id: string, value: SubprocessBinding]; eventContract: [id: string, value: EventBinding]; policy: [id: string, mode: string, percentage: string | undefined]; expenseStage: [id: string, value: string | undefined]; command: [value: QuickCommand]; selectNode: [id: string]; selectEdge: [id: string]; advanced: []; beforeChange: []; node: [id: string, patch: Partial<GraphNode>]; deadline: [id: string, value: DesignerDeadline | undefined]; edge: [id: string, condition: string]; defaultBranch: [edge: GraphEdge] }>()
+const emit = defineEmits<{ serviceTask: [id: string, value: ServiceTaskBinding]; responsibilities: [id: string, value: ApprovalResponsibilities]; subprocess: [id: string, value: SubprocessBinding]; eventContract: [id: string, value: EventBinding]; policy: [id: string, mode: string, percentage: string | undefined]; expenseStage: [id: string, value: string | undefined]; expenseSelfApproval: [id: string, value: string | undefined]; expenseDuplicateApproval: [id: string, value: string | undefined]; expenseSplitRule: [id: string, value: SplitRuleFields]; expenseSplitGateway: [id: string, value: string | undefined]; command: [value: QuickCommand]; selectNode: [id: string]; selectEdge: [id: string]; advanced: []; beforeChange: []; node: [id: string, patch: Partial<GraphNode>]; deadline: [id: string, value: DesignerDeadline | undefined]; edge: [id: string, condition: string]; defaultBranch: [edge: GraphEdge] }>()
 const projection = computed(() => projectQuickGraph(props.graph))
 const selected = computed(() => props.graph.nodes.find(node => node.id === props.selectedNode))
 const selectedDeadline = computed(() => selected.value ? readDesignerDeadline(selected.value.properties) : undefined)
@@ -41,11 +47,11 @@ const branchCount = computed(() => {
   return branch ? quickNodeIds(branch.sequence).length : 0
 })
 const adjacent = computed(() => {
-  if (!selected.value || !['USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'SUB_PROCESS'].includes(selected.value.type)) return {}
+  if (!selected.value || !['USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'SERVICE_TASK', 'SUB_PROCESS'].includes(selected.value.type)) return {}
   const incoming = props.graph.edges.filter(edge => edge.target === selected.value!.id)
-  const before = incoming.length === 1 ? props.graph.nodes.find(node => node.id === incoming[0]!.source && ['USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'SUB_PROCESS'].includes(node.type)) : null
+  const before = incoming.length === 1 ? props.graph.nodes.find(node => node.id === incoming[0]!.source && ['USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'SERVICE_TASK', 'SUB_PROCESS'].includes(node.type)) : null
   const target = props.graph.edges.find(edge => edge.source === selected.value!.id)?.target
-  const after = props.graph.nodes.find(node => node.id === target && ['USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'SUB_PROCESS'].includes(node.type))
+  const after = props.graph.nodes.find(node => node.id === target && ['USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'SERVICE_TASK', 'SUB_PROCESS'].includes(node.type))
   return { before: before?.id, after: after && props.graph.edges.filter(edge => edge.target === after.id).length === 1 ? after.id : undefined }
 })
 function properties(key: string, value: string) { if (selected.value) emit('node', selected.value.id, { properties: { ...selected.value.properties, [key]: value } }) }
@@ -65,13 +71,17 @@ function moveBranch(direction: -1 | 1) { if (gateway.value && selectedLine.value
         <template v-if="selected">
           <p class="eyebrow">{{ isGateway(selected) ? 'BRANCH' : 'STEP' }}</p><h3>{{ selected.name }}</h3>
           <label>步骤名称<input :value="selected.name" @focus="emit('beforeChange')" @input="emit('node', selected.id, { name: ($event.target as HTMLInputElement).value })" /></label>
-          <template v-if="['USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'SUB_PROCESS'].includes(selected.type)">
+          <DefinitionExpenseSelfApproval v-if="selected.type === 'START'" :model-value="selected.properties.expenseSelfApproval" :form-schema="formSchema" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('expenseSelfApproval', selected.id, $event)" />
+          <DefinitionExpenseDuplicateApproval v-if="selected.type === 'START'" :model-value="selected.properties.expenseDuplicateApproval" :self-approval="selected.properties.expenseSelfApproval" :form-schema="formSchema" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('expenseDuplicateApproval', selected.id, $event)" />
+          <DefinitionExpenseSplitRisk :node-id="selected.id" :graph="graph" :form-schema="formSchema" :disabled="locked" @before-change="emit('beforeChange')" @rule="(id, value) => emit('expenseSplitRule', id, value)" @gateway="(id, value) => emit('expenseSplitGateway', id, value)" />
+          <template v-if="['USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'SERVICE_TASK', 'SUB_PROCESS'].includes(selected.type)">
             <DefinitionSubprocess v-if="selected.type === 'SUB_PROCESS'" :key="selected.id" :node-id="selected.id" :form-schema="formSchema" :model-value="readSubprocessBinding(selected.properties) ?? { inputs: {} }" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('subprocess', selected.id, $event)" />
+            <DefinitionServiceTask v-if="selected.type === 'SERVICE_TASK'" :key="selected.id" :node-id="selected.id" :form-schema="formSchema" :model-value="readServiceTaskBinding(selected.properties) ?? { inputs: {} }" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('serviceTask', selected.id, $event)" />
             <DefinitionEventWait v-if="selected.type === 'EVENT_WAIT'" :key="selected.id" :model-value="{ key: selected.properties.eventContractKey, version: selected.properties.eventContractVersion }" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('eventContract', selected.id, $event)" />
             <DefinitionTimerWait v-if="selected.type === 'TIMER_WAIT'" :key="selected.id" :model-value="selected.properties.timerDelaySeconds" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="properties('timerDelaySeconds', $event)" />
             <DefinitionCopyRecipient v-if="selected.type === 'COPY'" :key="selected.id" :model-value="selected.properties.recipientRule ?? ''" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="properties('recipientRule', $event)" />
             <DefinitionAssignee v-if="selected.type === 'USER_TASK'" :key="selected.id" :model-value="selected.properties.assigneeRule ?? ''" :form-schema="formSchema" :approval-mode="selected.properties.approvalMode ?? 'SINGLE'" :approval-percentage="selected.properties.approvalPercentage" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="properties('assigneeRule', $event)" @policy="(mode, percentage) => emit('policy', selected!.id, mode, percentage)" />
-            <DefinitionResponsibilities v-if="selected.type === 'USER_TASK'" :key="selected.id" :node-id="selected.id" :graph="graph" :model-value="readResponsibilities(selected.properties)" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('responsibilities', selected.id, $event)" />
+            <DefinitionResponsibilities v-if="selected.type === 'USER_TASK'" :key="selected.id" :node-id="selected.id" :graph="graph" :expense-policy-enabled="graph.nodes.some(item => item.type === 'START' && item.properties.expenseSelfApproval === 'ESCALATE_SUPERVISOR')" :model-value="readResponsibilities(selected.properties)" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('responsibilities', selected.id, $event)" />
             <DefinitionExpenseStage v-if="selected.type === 'USER_TASK'" :model-value="selected.properties.expenseStage" :form-schema="formSchema" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="emit('expenseStage', selected.id, $event)" />
             <DefinitionDeadline v-if="selected.type === 'USER_TASK'" :key="selected.id" :model-value="selectedDeadline" :scope-key="scopeKey" :disabled="locked" @before-change="emit('beforeChange')" @update:model-value="changeDeadline" />
             <div class="quick-move"><button type="button" class="secondary" :disabled="!adjacent.before" @click="emit('command', { kind: 'swapTasks', firstId: adjacent.before!, secondId: selected.id })">上移一步</button><button type="button" class="secondary" :disabled="!adjacent.after" @click="emit('command', { kind: 'swapTasks', firstId: selected.id, secondId: adjacent.after! })">下移一步</button></div>

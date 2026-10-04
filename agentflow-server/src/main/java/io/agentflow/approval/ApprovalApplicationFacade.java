@@ -243,7 +243,11 @@ public class ApprovalApplicationFacade {
 
     /** 获取申请。 */
     public Application get(UUID id) {
-        Actor actor = currentActor.actor();
+        return getForActor(currentActor.actor(), id);
+    }
+
+    /** 后台复用真实认证主体的申请权限，不通过线程上下文模拟管理员。 */
+    public Application getForActor(Actor actor, UUID id) {
         Application application = service.get(actor.tenantId(), id);
         if (!isVisible(actor, application)) {
             throw new DomainException("NOT_FOUND", "Application not found");

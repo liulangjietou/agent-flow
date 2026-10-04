@@ -65,8 +65,17 @@ const labels: Record<string, string> = {
   recipientRule: '抄送收件规则', 'properties.recipientRule': '抄送收件规则',
   approvalMode: '审批方式', 'properties.approvalMode': '审批方式',
   approvalPercentage: '通过比例（%）', 'properties.approvalPercentage': '通过比例（%）',
+  expenseSelfApproval: '费用自审批处理', 'properties.expenseSelfApproval': '费用自审批处理',
+  expenseDuplicateApproval: '相邻重复审批', 'properties.expenseDuplicateApproval': '相邻重复审批',
+  expenseSplitRisk: '跨单拆分风险规则', 'properties.expenseSplitRisk': '跨单拆分风险规则',
+  expenseSplitWindowDays: '跨单滚动窗口（天）', 'properties.expenseSplitWindowDays': '跨单滚动窗口（天）',
+  expenseSplitThreshold: '同类费用风险阈值', 'properties.expenseSplitThreshold': '同类费用风险阈值',
+  expenseSplitCurrency: '跨单规则本位币', 'properties.expenseSplitCurrency': '跨单规则本位币',
+  expenseSplitRouting: '网关金额依据', 'properties.expenseSplitRouting': '网关金额依据',
+  expenseStage: '费用审批职责', 'properties.expenseStage': '费用审批职责',
   excludeApplicant: '禁止申请人办理', 'properties.excludeApplicant': '禁止申请人办理',
   differentApproverFrom: '排除前序步骤批准人', 'properties.differentApproverFrom': '排除前序步骤批准人',
+  serviceOperationKey: '服务操作', 'properties.serviceOperationKey': '服务操作', serviceOperationVersion: '服务版本', 'properties.serviceOperationVersion': '服务版本', serviceContractDigest: '服务契约', 'properties.serviceContractDigest': '服务契约',
   eventContractKey: '引用事件', 'properties.eventContractKey': '引用事件', eventContractVersion: '事件发布版本', 'properties.eventContractVersion': '事件发布版本',
   subprocessKey: '子流程标识', 'properties.subprocessKey': '子流程标识', subprocessVersion: '子流程发布版本', 'properties.subprocessVersion': '子流程发布版本',
   timerDelaySeconds: '等待时长（秒）', 'properties.timerDelaySeconds': '等待时长（秒）',
@@ -79,7 +88,7 @@ const own = <T>(values: Record<string, T>, key: string): T | undefined => Object
 
 /** 未知配置保留原键，避免静默隐藏新增属性。 */
 export const comparisonProperty = (property: string) => property.startsWith('properties.subprocessInput.')
-  ? `子流程输入 ${property.slice('properties.subprocessInput.'.length)}` : own(labels, property) ?? property
+  ? `子流程输入 ${property.slice('properties.subprocessInput.'.length)}` : property.startsWith('properties.serviceInput.') ? `服务参数 ${property.slice('properties.serviceInput.'.length)}` : own(labels, property) ?? property
 
 /** 仅格式化文本供 Vue 转义渲染，不将版本配置解释为 HTML。 */
 export function comparisonValue(value: unknown, property = ''): string {
@@ -87,6 +96,10 @@ export function comparisonValue(value: unknown, property = ''): string {
   if (value === '') return '空值'
   if (typeof value === 'boolean') return value ? '是' : '否'
   if (typeof value === 'string') {
+    if (property.endsWith('expenseSelfApproval')) return value === 'ESCALATE_SUPERVISOR' ? '申请人转本次任职的直属主管' : '待修正：' + value
+    if (property.endsWith('expenseDuplicateApproval')) return value === 'AUTO_PASS_ADJACENT' ? '自动通过相邻同人业务审批' : '待修正：' + value
+    if (property.endsWith('expenseSplitRisk')) return value === 'ENABLED' ? '启用跨单规则' : value === 'DISABLED' ? '关闭跨单规则' : '待修正：' + value
+    if (property.endsWith('expenseSplitRouting')) return value === 'AGGREGATE_AMOUNT' ? '使用冻结跨单路由金额' : '待修正：' + value
     if (property.endsWith('excludeApplicant')) return value === 'true' ? '启用' : value === 'false' ? '关闭' : '待修正：' + value
     if (property.endsWith('differentApproverFrom')) return value.split(',').join('、')
     if (property.endsWith('approvalMode')) return approvalPolicyLabel(value)

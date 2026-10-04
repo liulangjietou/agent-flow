@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,13 +33,14 @@ public class SupplierAdjustmentDisputeService {
     private final SupplierAdjustmentAccess access;
     private final JdbcSupplierAdjustmentSources sources;
     private final JdbcSupplierPayableAdjustmentRepository adjustments;
+    private final ApplicationEventPublisher events;
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
 
     /** 原号查询复用既有调整入口；裁决事务不执行银行或 ERP 网络调用。 */
     public SupplierAdjustmentDisputeService(CurrentActor actors, SupplierAdjustmentAccess access, JdbcSupplierAdjustmentSources sources,
-            JdbcSupplierPayableAdjustmentRepository adjustments, JdbcTemplate jdbc, JsonUtil json) {
-        this.actors = actors; this.access = access; this.sources = sources; this.adjustments = adjustments; this.jdbc = jdbc; this.json = json;
+            JdbcSupplierPayableAdjustmentRepository adjustments, JdbcTemplate jdbc, JsonUtil json, ApplicationEventPublisher events) {
+        this.events = events; this.actors = actors; this.access = access; this.sources = sources; this.adjustments = adjustments; this.jdbc = jdbc; this.json = json;
     }
 
     /** 历史决定与当前候选分别展示，读取仍受原轮次完整财务字段权限约束。 */
@@ -70,6 +72,7 @@ public class SupplierAdjustmentDisputeService {
                 actors.actor().userId(), now, input.evidenceReference().trim(), input.comment());
         var after = adjustments.resolve(decision);
         var event = audit(before, after, decision, now); var source = before.command().source().returns().request().command().holdCommand().authorization().source().reservation().source();
+        events.publishEvent(new SupplierAdjustmentChanged.Operation(after));
         return new Receipt(id, before.command().source().returns().request().command().id(), source.requestId(), source.applicationId(), source.round().roundNo(), after.version(), after.status(), decision.id(), event);
     }
 

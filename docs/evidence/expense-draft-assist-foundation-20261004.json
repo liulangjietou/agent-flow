@@ -1,0 +1,369 @@
+{
+  "schemaVersion": 1,
+  "taskId": "A03",
+  "status": "PARTIAL_FOUNDATION_VERIFIED_NO_USER_ENTRYPOINT",
+  "recordedAt": "2026-10-04T01:53:33.883655+00:00",
+  "sourceCommit": "49a706c492f77bea02f40daa4bf0b667a79e1efc",
+  "baselineCommit": "87e7a35d06c423425be390eff3c4e0eea8cdb5eb",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "Expense draft itinerary/category/allocation contracts, source-only model adapter, granular confirmation aggregate, JDBC persistence and V107-to-V108 migration. Application service, worker, API, UI and complete runtime acceptance remain pending.",
+  "validation": {
+    "red": {
+      "exitCode": 1,
+      "uniqueTestCases": 49,
+      "actualFailures": [
+        {
+          "class": "io.agentflow.agent.ExpenseDraftAssistRunTest",
+          "name": "noReliableRecommendationMayCompleteEmptyAndBeDismissedWithoutInventingALine",
+          "type": "io.agentflow.common.DomainException",
+          "message": "Expense draft suggestion does not match the authorized itinerary and catalog"
+        }
+      ],
+      "serverTestsExecuted": false
+    },
+    "fix": "Permit a legitimate empty suggestion; prompt permits zero lines. All source, catalog and output-field checks remain.",
+    "contractAndModel": {
+      "exitCode": 0,
+      "uniqueTestCases": 76,
+      "suites": [
+        {
+          "class": "io.agentflow.agent.ExpenseDraftAssistRunTest",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.agent.DraftAssistRunTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.agent.PrecheckExplanationRunTest",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.agent.ExpenseDraftModelTest",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.agent.AssistConfigurationTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "persistenceAndMigration": {
+      "exitCode": 0,
+      "uniqueTestCases": 68,
+      "suites": [
+        {
+          "class": "io.agentflow.agent.ExpenseDraftAssistRunTest",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.agent.ExpenseDraftModelTest",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.agent.ExpenseDraftAssistPersistenceTest",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.agent.ExpenseDraftAssistMigrationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "class": "io.agentflow.agent.PrecheckExplanationMigrationTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "testCompilationRepair": "Initial persistence gate stopped during server test compilation due to AssertJ generic overload ambiguity. Explicit Boolean local fixed the test; this was not counted as product RED or server test execution.",
+    "uniqueGreenTestCasesAcrossStages": 95,
+    "deduplication": "Exact (classname,name) from the reports of the explicitly executed classes; parameterized names retained.",
+    "authorCheck": "Java files=1645, named types=3211, missing author tags=0, parse errors=0"
+  },
+  "verifiedBoundaries": [
+    "Only selected catalog and itinerary sources sent to a real loopback synthetic model; private report identifiers and unselected catalog excluded.",
+    "Extra money, allowance, date, approval and unknown fields rejected; evidence and authorized category/unit/allocation codes matched exactly.",
+    "Confirmation records only explicit itinerary/category/allocation parts and preserves application/financial versions.",
+    "Current editable owner and both versions required when persisting a queued run.",
+    "Actual concurrent queue/locked claims yield one winner; stale updates cannot append history.",
+    "Initial/review transition failure rolls back the run row; retry preserves exact original output and selected parts.",
+    "Reconstructed repository retains the original running lease; persisted failure rejects a late completion. This is not process restart acceptance.",
+    "Nonempty V107-to-V108 migration preserves seven existing business/agent tables and old Flyway history; FK, active-run, stage, lease and transition constraints exercised."
+  ],
+  "pending": [
+    "Applicant-only current catalog preparation outside transactions, displayed source consent and model/finance target checks.",
+    "Durable claim/sendable/finish worker and current source checks before transmission.",
+    "HTTP authorization, idempotency, strict request shapes, OpenAPI and application integration tests.",
+    "ExpenseEditor granular review and unsaved draft fill, with original ExpenseDraftService/allowance save path.",
+    "Fixed-package HTTP runtime, process restart and matched backup/restore acceptance.",
+    "Browser and PostgreSQL acceptance; actual enterprise model quality remains E08."
+  ],
+  "remainingTasks": {
+    "open": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "inventoryComplete": false
+  },
+  "sourceFiles": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseDraftAssistInput.java",
+      "sha256": "279cb5c3a4f07d1755e3ccf996c1f3b2aedf52597ac9c71e52b1a94feee80af2",
+      "bytes": 5975
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseDraftAssistRun.java",
+      "sha256": "06741d2fba7fc66b9676483591c5f38c6556b21c9c3d1721fbefcc38ca4e7e6c",
+      "bytes": 8977
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseDraftModelPort.java",
+      "sha256": "bba61bf5544598ab9bade9a11e1435d055f2dd6e6b2b96bbc2a4b1e50146795c",
+      "bytes": 381
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseDraftSuggestion.java",
+      "sha256": "0a4596714baf4a59bff58df49ad53c346686d1dc5b956b47120b9a553607e7ed",
+      "bytes": 5637
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/agent/ExpenseDraftAssistRunTest.java",
+      "sha256": "e7ea00d55caa7dd1b94adb21054c5a4c8f4947e8888237a943b6d66e1426a9b2",
+      "bytes": 11907
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistInputs.java",
+      "sha256": "2939d5b80f30a34534c99675fc4b75837153d7bc000a7c7fc22e773ef229f9e8",
+      "bytes": 6104
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/JdbcExpenseDraftAssistRepository.java",
+      "sha256": "2c1b6fa9fc14749a78da6dbb37b6e86c22b53af8efc577ec8172334b72b891cd",
+      "bytes": 9217
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/OpenAiCompatibleExpenseDraftModel.java",
+      "sha256": "1c230f606bed0f7ce91dbd296766942b0c1656cc3e6805131a233904bc80b026",
+      "bytes": 4885
+    },
+    {
+      "path": "agentflow-server/src/main/resources/db/migration/V108__expense_draft_assist_runs.sql",
+      "sha256": "7ed289c78dd6fa57b56681edcc110b77c01b5746c8b5761e4e3cb4dcc08cd5d1",
+      "bytes": 2686
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/agent/ExpenseDraftAssistMigrationTest.java",
+      "sha256": "6408d52ef5ed3c5c1565a9c96abe0af5152a7364b9376fecd0bb28de24b78f86",
+      "bytes": 7953
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/agent/ExpenseDraftAssistPersistenceTest.java",
+      "sha256": "f952f57405d10a6159697423e318cdd874b70f3a76e61b24a9a40bf262017174",
+      "bytes": 17432
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/agent/ExpenseDraftModelTest.java",
+      "sha256": "f51e209c25e56b80dde353b7c248be4c7718172a4186feaa8e5ad9c78e8701b6",
+      "bytes": 12375
+    }
+  ],
+  "evidenceSnapshot": {
+    "root": "/fyoung/tmp/agentflow-remaining-20260928/expense-draft-assist-foundation-evidence-snapshot",
+    "files": [
+      {
+        "path": "source/agentflow-domain/src/main/java/io/agentflow/agent/ExpenseDraftAssistInput.java",
+        "sha256": "279cb5c3a4f07d1755e3ccf996c1f3b2aedf52597ac9c71e52b1a94feee80af2",
+        "bytes": 5975
+      },
+      {
+        "path": "source/agentflow-domain/src/main/java/io/agentflow/agent/ExpenseDraftAssistRun.java",
+        "sha256": "06741d2fba7fc66b9676483591c5f38c6556b21c9c3d1721fbefcc38ca4e7e6c",
+        "bytes": 8977
+      },
+      {
+        "path": "source/agentflow-domain/src/main/java/io/agentflow/agent/ExpenseDraftModelPort.java",
+        "sha256": "bba61bf5544598ab9bade9a11e1435d055f2dd6e6b2b96bbc2a4b1e50146795c",
+        "bytes": 381
+      },
+      {
+        "path": "source/agentflow-domain/src/main/java/io/agentflow/agent/ExpenseDraftSuggestion.java",
+        "sha256": "0a4596714baf4a59bff58df49ad53c346686d1dc5b956b47120b9a553607e7ed",
+        "bytes": 5637
+      },
+      {
+        "path": "source/agentflow-domain/src/test/java/io/agentflow/agent/ExpenseDraftAssistRunTest.java",
+        "sha256": "e7ea00d55caa7dd1b94adb21054c5a4c8f4947e8888237a943b6d66e1426a9b2",
+        "bytes": 11907
+      },
+      {
+        "path": "source/agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistInputs.java",
+        "sha256": "2939d5b80f30a34534c99675fc4b75837153d7bc000a7c7fc22e773ef229f9e8",
+        "bytes": 6104
+      },
+      {
+        "path": "source/agentflow-server/src/main/java/io/agentflow/agent/JdbcExpenseDraftAssistRepository.java",
+        "sha256": "2c1b6fa9fc14749a78da6dbb37b6e86c22b53af8efc577ec8172334b72b891cd",
+        "bytes": 9217
+      },
+      {
+        "path": "source/agentflow-server/src/main/java/io/agentflow/agent/OpenAiCompatibleExpenseDraftModel.java",
+        "sha256": "1c230f606bed0f7ce91dbd296766942b0c1656cc3e6805131a233904bc80b026",
+        "bytes": 4885
+      },
+      {
+        "path": "source/agentflow-server/src/main/resources/db/migration/V108__expense_draft_assist_runs.sql",
+        "sha256": "7ed289c78dd6fa57b56681edcc110b77c01b5746c8b5761e4e3cb4dcc08cd5d1",
+        "bytes": 2686
+      },
+      {
+        "path": "source/agentflow-server/src/test/java/io/agentflow/agent/ExpenseDraftAssistMigrationTest.java",
+        "sha256": "6408d52ef5ed3c5c1565a9c96abe0af5152a7364b9376fecd0bb28de24b78f86",
+        "bytes": 7953
+      },
+      {
+        "path": "source/agentflow-server/src/test/java/io/agentflow/agent/ExpenseDraftAssistPersistenceTest.java",
+        "sha256": "f952f57405d10a6159697423e318cdd874b70f3a76e61b24a9a40bf262017174",
+        "bytes": 17432
+      },
+      {
+        "path": "source/agentflow-server/src/test/java/io/agentflow/agent/ExpenseDraftModelTest.java",
+        "sha256": "f51e209c25e56b80dde353b7c248be4c7718172a4186feaa8e5ad9c78e8701b6",
+        "bytes": 12375
+      },
+      {
+        "path": "validation/a03-contract-model-red-reports/TEST-io.agentflow.agent.DraftAssistRunTest.xml",
+        "sha256": "33d6a5c0a79a673a906232677e1fc951959ae5ec2879e4ab60c5155d138a926b",
+        "bytes": 10706
+      },
+      {
+        "path": "validation/a03-contract-model-red-reports/TEST-io.agentflow.agent.ExpenseDraftAssistRunTest.xml",
+        "sha256": "168a010ff9f6bfb9dde41e18e25554babef26879b1ded8ec51858a9b3ce34092",
+        "bytes": 15259
+      },
+      {
+        "path": "validation/a03-contract-model-red-reports/TEST-io.agentflow.agent.PrecheckExplanationRunTest.xml",
+        "sha256": "b78b781637264814683fe96cf848c38a219bbcd784f555626ac8d8d26d9b8863",
+        "bytes": 12157
+      },
+      {
+        "path": "validation/a03-contract-model-green-reports/TEST-io.agentflow.agent.AssistConfigurationTest.xml",
+        "sha256": "bdc7ac5ae4c96b74f834ba8086d3e58178c460a27ded012fb4553f844b19e915",
+        "bytes": 43522
+      },
+      {
+        "path": "validation/a03-contract-model-green-reports/TEST-io.agentflow.agent.DraftAssistRunTest.xml",
+        "sha256": "f15edf62116f2642169a46cdb485359a0ce9c6913ed82eb0518938c5b266a3c0",
+        "bytes": 10713
+      },
+      {
+        "path": "validation/a03-contract-model-green-reports/TEST-io.agentflow.agent.ExpenseDraftAssistRunTest.xml",
+        "sha256": "17a027fdffc7a7ce0224da62d695a200aae3fd3707a9f8a121c2b43c0bf7e714",
+        "bytes": 14456
+      },
+      {
+        "path": "validation/a03-contract-model-green-reports/TEST-io.agentflow.agent.ExpenseDraftModelTest.xml",
+        "sha256": "1aa5771661c4e2dd581850b98b0f01596be4dfce2b6db791d7253e513175f0ff",
+        "bytes": 45292
+      },
+      {
+        "path": "validation/a03-contract-model-green-reports/TEST-io.agentflow.agent.PrecheckExplanationRunTest.xml",
+        "sha256": "949da271c2cb0f72914c1e76ac1e41897e288f66c589c53ffcaf7fb068355991",
+        "bytes": 12167
+      },
+      {
+        "path": "validation/a03-persistence-verified-reports/TEST-io.agentflow.agent.ExpenseDraftAssistMigrationTest.xml",
+        "sha256": "eb624fe5b2a7e44bb97b9388b4624ef2123de038cb46522bb210ee830d9d79c7",
+        "bytes": 61087
+      },
+      {
+        "path": "validation/a03-persistence-verified-reports/TEST-io.agentflow.agent.ExpenseDraftAssistPersistenceTest.xml",
+        "sha256": "98b263daf6100768a0e451b8731ec014a3ea1479b266fd5903a07f0561ae49a7",
+        "bytes": 326643
+      },
+      {
+        "path": "validation/a03-persistence-verified-reports/TEST-io.agentflow.agent.ExpenseDraftAssistRunTest.xml",
+        "sha256": "d6a990ab564fe34c43f75fd7ac9104cca143114b410433a3d873c10100838368",
+        "bytes": 14480
+      },
+      {
+        "path": "validation/a03-persistence-verified-reports/TEST-io.agentflow.agent.ExpenseDraftModelTest.xml",
+        "sha256": "d0e0019d876d2890f119fa05cd36bf098dcdb208926452c520b3fa4304c13c08",
+        "bytes": 45389
+      },
+      {
+        "path": "validation/a03-persistence-verified-reports/TEST-io.agentflow.agent.PrecheckExplanationMigrationTest.xml",
+        "sha256": "8cff7055eecaceea016d75feb37373407f70e6087481990c8d89f37ae1e5cd46",
+        "bytes": 60945
+      },
+      {
+        "path": "validation/a03-contract-model-initial-java.log",
+        "sha256": "5efb54979379b2d3e15214ab8b3fe6f69ab209b379b07d50c262085ef8328909",
+        "bytes": 8893
+      },
+      {
+        "path": "validation/a03-contract-model-green-java.log",
+        "sha256": "1277e98ada6677554d80c046367536d8c43daa1213790c203658424b92031c58",
+        "bytes": 14456
+      },
+      {
+        "path": "validation/a03-persistence-java.log",
+        "sha256": "3764f653deb7eaa240ac1cdfcec7e8d521f564feae8b149ca2ee89fb644d189b",
+        "bytes": 15840
+      },
+      {
+        "path": "validation/a03-persistence-java-retry.log",
+        "sha256": "26a156c25c9b774723b21e4586ebb7fedcef88fcd1168ef387abe85fbd04e31c",
+        "bytes": 330322
+      },
+      {
+        "path": "validation/a03-foundation-authors.log",
+        "sha256": "32b86fea266d6d22d5c0fe633eccd1fc071449ec0e2d0de6f2807fe0a0132a78",
+        "bytes": 73
+      },
+      {
+        "path": "validation/a03-contract-model-red-summary.json",
+        "sha256": "82f51a6543c24f85e41fdb74c7136ffd6eae450e48a05e495db18171c3d6eb0b",
+        "bytes": 1802
+      },
+      {
+        "path": "validation/a03-contract-model-green-summary.json",
+        "sha256": "c36180d6dc6ae88ad87a590067eef3c32c251b0b8765ebb9e5e119a9513178f8",
+        "bytes": 2101
+      },
+      {
+        "path": "validation/a03-persistence-java-summary.json",
+        "sha256": "b64020861df6ea111381cdcd92c4e36ce5c46f36d947b6de560b972600f6e58b",
+        "bytes": 2171
+      }
+    ]
+  }
+}

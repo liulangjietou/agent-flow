@@ -2,6 +2,7 @@ package io.agentflow.expense;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AdvanceDisbursementReturnPort;
+import io.agentflow.notification.DisbursementReturnNotice;
 import io.agentflow.finance.AdvanceRepaymentPort;
 import io.agentflow.finance.EmployeeAccountSnapshot;
 import io.agentflow.finance.FinanceResult;
@@ -127,6 +128,52 @@ class AdvanceDisbursementReturnTest {
         var timedOut = claimed.complete(new FinanceResult.Success<>(facts), NOW.plusSeconds(90)); assertThat(timedOut.issue()).isEqualTo(AdvanceDisbursementReturnCheck.Issue.TIMEOUT);
         assertThat(queued.voidSource(NOW).status()).isEqualTo(AdvanceDisbursementReturnCheck.Status.VOIDED);
         assertThat(checked.usable(NOW.plusSeconds(300))).isFalse();
+    }
+
+    @Test void disbursementNoticesSeparateObservedFundsFromActualDecisions() {
+        for (String amount : List.of("0", "20", "100")) {
+            var queued = AdvanceDisbursementReturnCheck.queue(new AdvanceDisbursementReturnCheck.Input(UUID.randomUUID(), "demo", "b".repeat(64), 3, request, "finance", NOW));
+            var running = queued.claim(NOW, Duration.ofSeconds(90));
+            assertThat(DisbursementReturnNotice.from(queued)).isEmpty(); assertThat(DisbursementReturnNotice.from(running)).isEmpty();
+            var proof = receipt(amount.equals("0") ? List.of() : List.of(item("notice", amount)));
+            var checked = running.complete(new FinanceResult.Success<>(proof), NOW.plusSeconds(1));
+            assertThat(DisbursementReturnNotice.from(checked)).isEqualTo(amount.equals("0") ? java.util.Optional.empty() : java.util.Optional.of(DisbursementReturnNotice.RETURN_REVIEW));
+            assertThat(DisbursementReturnNotice.RESOLVED.presentIn(checked)).isFalse();
+            var decision = new AdvanceDisbursementReturn(UUID.randomUUID(), "demo", checked.input().id(), proof, "finance", NOW.plusSeconds(2), "notice-proof", "明确核对原放款");
+            var resolved = checked.resolve(decision, decision.resolvedAt()); assertThat(DisbursementReturnNotice.from(resolved)).contains(DisbursementReturnNotice.RESOLVED);
+            assertThat(DisbursementReturnNotice.RETURN_REVIEW.presentIn(resolved)).isEqualTo(!amount.equals("0"));
+        }
+    }
+    @Test void disbursementUnknownFailureAndRevocationNeverClaimDebtWasChanged() {
+        var queued = AdvanceDisbursementReturnCheck.queue(new AdvanceDisbursementReturnCheck.Input(UUID.randomUUID(), "demo", "b".repeat(64), 3, request, "finance", NOW));
+        var running = queued.claim(NOW, Duration.ofSeconds(90));
+        var proof = new AdvanceDisbursementReturnPort.Receipt(request, AdvanceDisbursementReturnPort.Status.UNRESOLVED, 2, NOW, NOW.plusSeconds(300), null, List.of());
+        var unknown = running.complete(new FinanceResult.Success<>(proof), NOW.plusSeconds(1));
+        assertThat(DisbursementReturnNotice.from(unknown)).contains(DisbursementReturnNotice.UNRESOLVED); assertThat(DisbursementReturnNotice.RESOLVED.presentIn(unknown)).isFalse();
+        assertThat(DisbursementReturnNotice.from(running.fail(AdvanceDisbursementReturnCheck.Issue.TIMEOUT, NOW.plusSeconds(91)))).contains(DisbursementReturnNotice.UNAVAILABLE);
+        assertThat(DisbursementReturnNotice.from(running.voidSource(NOW.plusSeconds(1)))).contains(DisbursementReturnNotice.SOURCE_CHANGED);
+    }
+    @Test void disbursementNoticeKeysRequireOriginalCanonicalCheckAndKnownFact() {
+        var id = UUID.fromString("abcdefab-abcd-abcd-abcd-abcdefabcdef");
+        for (var fact : DisbursementReturnNotice.values()) assertThat(DisbursementReturnNotice.source(fact.eventKey(id))).contains(new DisbursementReturnNotice.Source(id, fact));
+        for (String key : List.of("expense-return:" + id + ":RESOLVED", "disbursement-return:1-1-1-1-1:RESOLVED", "disbursement-return:" + id + ":CONFIRMED",
+                "disbursement-return:" + id + ":RESOLVED:2", "disbursement-return:" + id.toString().toUpperCase() + ":RESOLVED")) assertThat(DisbursementReturnNotice.source(key)).isEmpty();
+        assertThat(DisbursementReturnNotice.source(null)).isEmpty();
+    }
+
+    @Test void noticesKeepOriginalComparisonAndSuppressAlreadyAcceptedReturns() {
+        var queued = AdvanceDisbursementReturnCheck.queue(new AdvanceDisbursementReturnCheck.Input(UUID.randomUUID(), "demo", "b".repeat(64), 3, request, "finance", NOW));
+        var running = queued.claim(NOW, Duration.ofSeconds(90));
+        var confirmed = running.complete(new FinanceResult.Success<>(receipt(List.of())), NOW.plusSeconds(1));
+        var conflict = confirmed.withReviewRequirement(true);
+        assertThat(DisbursementReturnNotice.from(confirmed)).isEmpty(); assertThat(DisbursementReturnNotice.from(conflict)).contains(DisbursementReturnNotice.REVIEW_REQUIRED);
+        fails("DISBURSEMENT_RETURN_CHECK_CONFLICT", () -> conflict.withReviewRequirement(false));
+        var decision = new AdvanceDisbursementReturn(UUID.randomUUID(), "demo", conflict.input().id(), conflict.receipt(), "finance", NOW.plusSeconds(2), "proof", "本次明确裁决");
+        assertThat(DisbursementReturnNotice.REVIEW_REQUIRED.presentIn(conflict.resolve(decision, decision.resolvedAt()))).isTrue();
+        var returned = running.complete(new FinanceResult.Success<>(receipt(List.of(item("noticed-return", "20")))), NOW.plusSeconds(1));
+        assertThat(DisbursementReturnNotice.from(returned)).contains(DisbursementReturnNotice.RETURN_REVIEW);
+        assertThat(DisbursementReturnNotice.from(returned.withReviewRequirement(false))).isEmpty();
+        assertThat(DisbursementReturnNotice.from(returned.withReviewRequirement(true))).contains(DisbursementReturnNotice.RETURN_REVIEW);
     }
 
     private void apply(EmployeeAdvance advance, List<AdvanceDisbursementReturnPort.ReturnItem> items) { advance.requirePaymentReview(advance.version()); advance.resolveDisbursementReview(advance.version(), decision(items)); }

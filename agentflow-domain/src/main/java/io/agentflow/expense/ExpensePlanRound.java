@@ -32,10 +32,15 @@ public record ExpensePlanRound(int roundNo, long submittedPlanVersion, String su
                 || lines.size() != content.lines().size() || managedCategoryRevision != null && managedCategoryRevision < 1) throw invalid();
         LocalDate date = LocalDate.ofInstant(submittedAt, ZoneId.of(legalEntity.timeZone()));
         Money total = Money.zero(legalEntity.baseCurrency());
+        var controls = new java.util.HashMap<String, ExpensePriorControl.Snapshot>();
         for (int index = 0; index < lines.size(); index++) {
             var line = lines.get(index);
             if (line == null || !line.original().equals(content.lines().get(index)) || !date.equals(line.rate().rateDate())
-                    || !legalEntity.baseCurrency().equals(line.amount().currency())) throw invalid();
+                    || !legalEntity.baseCurrency().equals(line.amount().currency())
+                    || line.priorControl() != null && !java.util.Objects.equals(managedCategoryRevision, line.priorControl().categoryRevision())) throw invalid();
+            String category = line.original().categoryCode();
+            if (controls.containsKey(category) && !java.util.Objects.equals(controls.get(category), line.priorControl())) throw invalid();
+            controls.put(category, line.priorControl());
             total = total.plus(line.amount());
         }
         lines = List.copyOf(lines);
@@ -50,11 +55,17 @@ public record ExpensePlanRound(int roundNo, long submittedPlanVersion, String su
      * 一行批准请求的候选金额；是否批准仍由实际审批结果决定。
      * @author owlzhangfq@gmail.com
      */
-    public record FrozenLine(ExpensePlanContent.Line original, ExpenseExchangeRate rate, Money amount, List<CostAllocation> allocations) {
+    public record FrozenLine(ExpensePlanContent.Line original, ExpenseExchangeRate rate, Money amount, List<CostAllocation> allocations,
+                             ExpensePriorControl.Snapshot priorControl) {
+        /** 历史轮次继续保留没有控制来源的原状态。 */
+        public FrozenLine(ExpensePlanContent.Line original, ExpenseExchangeRate rate, Money amount, List<CostAllocation> allocations) {
+            this(original, rate, amount, allocations, null);
+        }
         /** 原币、汇率、折算额和按整分平衡的成本分摊必须一致。 */
         public FrozenLine {
             if (original == null || rate == null || amount == null || amount.value().signum() <= 0
-                    || !amount.equals(rate.convert(original.amount())) || !CostAllocation.apportion(original.allocations(), amount).equals(allocations)) throw invalid();
+                    || !amount.equals(rate.convert(original.amount())) || !CostAllocation.apportion(original.allocations(), amount).equals(allocations)
+                    || priorControl != null && !priorControl.categoryCode().equals(original.categoryCode())) throw invalid();
             allocations = List.copyOf(allocations);
         }
     }

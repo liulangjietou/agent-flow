@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.nio.ByteBuffer;
@@ -13,11 +14,18 @@ import java.util.UUID;
  * 一次不可改写的预算命令；重提和核减原子替换原占用，重试继续使用同一编号和摘要。
  * @author owlzhangfq@gmail.com
  */
-public record BudgetCommand(UUID id, String tenantId, Action action, BudgetPrecheckPort.Request position, Expected expected) {
-    /** 首次冻结没有前置台账，后续命令必须指向上次确认的预算版本及凭据。 */
+public record BudgetCommand(UUID id, String tenantId, Action action, BudgetPrecheckPort.Request position, Expected expected,
+                            @JsonInclude(JsonInclude.Include.NON_NULL) BudgetExceptionApproval exceptionApproval) {
+    /** 原构造不产生例外授权，历史 JSON 和命令摘要逐字保持。 */
+    public BudgetCommand(UUID id, String tenantId, Action action, BudgetPrecheckPort.Request position, Expected expected) {
+        this(id, tenantId, action, position, expected, null);
+    }
+    /** 首次冻结没有前置台账；释放后的重新冻结及其他后续命令沿用上次确认的版本和凭据。 */
     public BudgetCommand {
         if (id == null || StringUtils.isBlank(tenantId) || tenantId.length() > 64 || action == null || position == null
-                || (action == Action.FREEZE) != (expected == null)) throw invalid();
+                || action != Action.FREEZE && expected == null) throw invalid();
+        if (exceptionApproval != null && (action != Action.FREEZE && action != Action.ADJUST
+                || id.equals(exceptionApproval.originalOperationId()) || !exceptionApproval.matches(tenantId, action, position, expected))) throw invalid();
     }
 
     /**
@@ -27,7 +35,7 @@ public record BudgetCommand(UUID id, String tenantId, Action action, BudgetPrech
     public String digest() {
         try {
             var digest = MessageDigest.getInstance("SHA-256");
-            add(digest, "agentflow-budget-command-1", id.toString(), tenantId, action.name(), position.reportId().toString(),
+            add(digest, exceptionApproval == null ? "agentflow-budget-command-1" : "agentflow-budget-command-2", id.toString(), tenantId, action.name(), position.reportId().toString(),
                     Integer.toString(position.roundNo()), Long.toString(position.financialVersion()), position.employeeId(),
                     position.legalEntityId().toString(), position.baseCurrency(), position.accountingDate().toString(),
                     Integer.toString(position.allocations().size()));
@@ -36,6 +44,11 @@ public record BudgetCommand(UUID id, String tenantId, Action action, BudgetPrech
                         item.cost().costCenter(), item.cost().projectCode(), item.cost().amount().value().toPlainString(), item.cost().amount().currency());
             }
             add(digest, expected == null ? null : Long.toString(expected.revision()), expected == null ? null : expected.reference());
+            if (exceptionApproval != null) {
+                add(digest, exceptionApproval.originalOperationId().toString(), exceptionApproval.originalCommandDigest(), exceptionApproval.targetDigest(),
+                        exceptionApproval.policyReference(), exceptionApproval.offerReference(), exceptionApproval.taskId(), exceptionApproval.actorId(),
+                        exceptionApproval.auditEventId().toString(), exceptionApproval.approvedAt().toString());
+            }
             return HexFormat.of().formatHex(digest.digest());
         } catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 is unavailable", impossible); }
     }

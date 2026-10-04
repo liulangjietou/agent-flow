@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import org.springframework.context.ApplicationEventPublisher;
+
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class ExpensePartialAdjustmentActions {
+    private final ApplicationEventPublisher events;
     private final CurrentActor actors;
     private final ExpenseResourceAdjustmentAccess access;
     private final ExpenseReportRepository reports;
@@ -31,7 +34,8 @@ public class ExpensePartialAdjustmentActions {
     /** 编排层复用差额执行和原件查询，状态是否合法仍由各自领域对象判断。 */
     public ExpensePartialAdjustmentActions(CurrentActor actors, ExpenseResourceAdjustmentAccess access, ExpenseReportRepository reports,
             JdbcExpenseSettlementRepository settlements, JdbcExpensePartialAdjustmentRepository adjustments, ExpensePartialAdjustmentFinance finance,
-            ExpensePartialAdjustmentSources sources, ExpensePartialOriginalQueries originals, ExpensePartialAdjustmentAudit audit) {
+            ExpensePartialAdjustmentSources sources, ExpensePartialOriginalQueries originals, ExpensePartialAdjustmentAudit audit, ApplicationEventPublisher events) {
+        this.events = events;
         this.actors = actors; this.access = access; this.reports = reports; this.settlements = settlements; this.adjustments = adjustments;
         this.finance = finance; this.sources = sources; this.originals = originals; this.audit = audit;
     }
@@ -83,6 +87,7 @@ public class ExpensePartialAdjustmentActions {
         var report = locked(id, input.roundNo(), input.applicationVersion(), input.businessVersion(), input.settlementVersion());
         var before = adjustment(report, input.adjustmentId(), input.adjustmentVersion()); var now = now(); currentSource(before, now);
         var after = before.retire(actors.actor().userId(), input.evidenceReference(), input.reason(), now); adjustments.update(after);
+        events.publishEvent(new ExpensePartialAdjustmentChanged.Retired(after));
         var event = audit.record(report, after.id(), after.version(), ExpensePartialAdjustmentAudit.Action.RETIRE, input.reason(), now);
         return receipt(report, after, event);
     }

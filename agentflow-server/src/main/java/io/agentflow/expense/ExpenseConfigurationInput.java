@@ -15,6 +15,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -43,10 +44,22 @@ public final class ExpenseConfigurationInput {
     public record Category(@NotBlank @JsonDeserialize(using = Text.class) String code,
             @NotBlank @JsonDeserialize(using = Text.class) String name,
             @NotNull @JsonDeserialize(contentUsing = Text.class) List<@NotNull String> units,
-            @NotNull @JsonDeserialize(using = Flag.class) Boolean active) {
+            @NotNull @JsonDeserialize(using = Flag.class) Boolean active, @Valid PriorControl priorControl) {
         /** 类型和值校验通过后进入类别领域模型。 */
-        public ExpenseCategoryCatalog.Category domain() { return new ExpenseCategoryCatalog.Category(code, name, units.stream().map(value -> enumeration(value, ExpenseLine.Unit.class)).toList(), active); }
+        public ExpenseCategoryCatalog.Category domain() { return new ExpenseCategoryCatalog.Category(code, name,
+                units.stream().map(value -> enumeration(value, ExpenseLine.Unit.class)).toList(), active, priorControl == null ? null : priorControl.domain()); }
         /** 类别没有删除或归属改写字段。 */
+        @JsonAnySetter public void rejectUnknown(String name, Object value) { throw unknown(); }
+    }
+    /**
+     * 模式和容差通过封闭配置入口明确给出，不能附带客户端批准结论。
+     * @author owlzhangfq@gmail.com
+     */
+    public record PriorControl(@NotBlank @JsonDeserialize(using = Text.class) String mode,
+                               @JsonDeserialize(using = Fraction.class) BigDecimal toleranceFraction) {
+        /** 模式和比例的组合范围由控制值对象统一校验。 */
+        public ExpensePriorControl domain() { return new ExpensePriorControl(enumeration(mode, ExpensePriorControl.Mode.class), toleranceFraction); }
+        /** 未知控制属性不能被静默保存。 */
         @JsonAnySetter public void rejectUnknown(String name, Object value) { throw unknown(); }
     }
     /**
@@ -114,11 +127,25 @@ public final class ExpenseConfigurationInput {
             @JsonDeserialize(using = Text.class) String limitUnit, @JsonDeserialize(using = Days.class) Integer invoiceMaxAgeDays,
             @JsonDeserialize(using = Text.class) String invoiceAgeAction,
             @NotNull @JsonDeserialize(contentUsing = Text.class) List<@NotNull String> allowedServiceLevels,
-            @NotNull @JsonDeserialize(using = Flag.class) Boolean priorRequestRequired) {
+            @NotNull @JsonDeserialize(using = Flag.class) Boolean priorRequestRequired,
+            @Valid Allowance fixedAllowance) {
         /** 限额金额使用系统既有精确十进制协议。 */
         public ExpensePolicyDefinition.Constraints domain() { return new ExpensePolicyDefinition.Constraints(enumeration(effect, ExpensePolicyDefinition.Effect.class), unitPriceLimit,
-                enumeration(limitUnit, ExpenseLine.Unit.class), invoiceMaxAgeDays, enumeration(invoiceAgeAction, ExpensePolicyDefinition.AgeAction.class), allowedServiceLevels, priorRequestRequired); }
+                enumeration(limitUnit, ExpenseLine.Unit.class), invoiceMaxAgeDays, enumeration(invoiceAgeAction, ExpensePolicyDefinition.AgeAction.class), allowedServiceLevels, priorRequestRequired,
+                fixedAllowance == null ? null : fixedAllowance.domain()); }
         /** 未声明的约束必须失败，不能让管理员误以为已发布。 */
+        @JsonAnySetter public void rejectUnknown(String name, Object value) { throw unknown(); }
+    }
+
+    /**
+     * 定额补贴必须显式声明每日金额和天数依据，不接受客户端扩展的计算参数。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Allowance(@NotNull Money dailyRate,
+            @NotBlank @JsonDeserialize(using = Text.class) String dayCountBasis) {
+        /** 金额与天数规则的一致性由补贴领域模型负责。 */
+        public ExpenseAllowanceRule domain() { return new ExpenseAllowanceRule(dailyRate, enumeration(dayCountBasis, ExpenseAllowanceRule.DayCountBasis.class)); }
+        /** 未知参数不能被静默忽略后发布。 */
         @JsonAnySetter public void rejectUnknown(String name, Object value) { throw unknown(); }
     }
 
@@ -167,6 +194,19 @@ public final class ExpenseConfigurationInput {
         @Override public Boolean deserialize(JsonParser parser, DeserializationContext context) throws IOException {
             if (!parser.hasToken(JsonToken.VALUE_TRUE) && !parser.hasToken(JsonToken.VALUE_FALSE)) throw context.wrongTokenException(parser, Boolean.class, JsonToken.VALUE_TRUE, "Expected boolean configuration flag");
             return parser.getBooleanValue();
+        }
+    }
+    /**
+     * 容差是精确 JSON 数值，不接受字符串或布尔值的隐式转换。
+     * @author owlzhangfq@gmail.com
+     */
+    public static final class Fraction extends JsonDeserializer<BigDecimal> {
+        /** 数值范围和精度由事前控制值对象验证。 */
+        @Override public BigDecimal deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+            if (!parser.hasToken(JsonToken.VALUE_NUMBER_INT) && !parser.hasToken(JsonToken.VALUE_NUMBER_FLOAT)) {
+                throw context.wrongTokenException(parser, BigDecimal.class, JsonToken.VALUE_NUMBER_FLOAT, "Expected numeric tolerance fraction");
+            }
+            return parser.getDecimalValue();
         }
     }
     /**

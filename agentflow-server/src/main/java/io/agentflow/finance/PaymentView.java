@@ -2,6 +2,7 @@ package io.agentflow.finance;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -12,14 +13,14 @@ import java.util.UUID;
 public record PaymentView(UUID id, long version, PaymentAuthorization.Status status, PaymentCommand.Purpose purpose,
                           UUID applicationId, UUID businessId, int roundNo, long applicationVersion, long businessVersion,
                           UUID legalEntityId, String employeeId, Money amount, String maskedPayeeAccount,
-                          String authorizedBy, Instant authorizedAt, Instant expiresAt, String executedBy,
+                          String authorizedBy, Instant authorizedAt, Instant expiresAt, LocalDate dueDate, String executedBy,
                           Request request, Operation operation, Retirement retirement) {
     /** 出纳和申请人均不会经共享状态对象得到原命令或原始资金回执。 */
     public static PaymentView of(PaymentAuthorization value, PaymentExecutionRequest request, PaymentOperation operation) {
         var terms = value.terms(); var binding = terms.binding(); var decision = value.decision();
         return new PaymentView(terms.id(), value.version(), value.status(), terms.purpose(), binding.applicationId(), binding.businessId(), binding.roundNo(),
                 binding.applicationVersion(), binding.businessVersion(), terms.payee().legalEntityId(), terms.payee().employeeId(), terms.amount(), terms.payee().maskedAccount(),
-                decision.authorizedBy(), decision.authorizedAt(), decision.expiresAt(), value.execution() == null ? null : value.execution().command().authorization().executedBy(),
+                decision.authorizedBy(), decision.authorizedAt(), decision.expiresAt(), decision.dueDate(), value.execution() == null ? null : value.execution().command().authorization().executedBy(),
                 request == null ? null : new Request(request.input().id(), request.version(), request.status(), request.input().cashier(), request.createdAt(), request.updatedAt(), request.failure() == null ? null : request.failure().name()),
                 operation == null ? null : operation(operation), value.retirement() == null ? null : new Retirement(value.retirement().retiredBy(),
                         value.retirement().retiredAt(), value.retirement().operationVersion(), value.retirement().basis()));

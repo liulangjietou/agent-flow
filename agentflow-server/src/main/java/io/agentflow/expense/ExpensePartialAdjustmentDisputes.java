@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import org.springframework.context.ApplicationEventPublisher;
+
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class ExpensePartialAdjustmentDisputes {
+    private final ApplicationEventPublisher events;
     private final CurrentActor actors;
     private final ExpenseResourceAdjustmentAccess access;
     private final ExpenseReportRepository reports;
@@ -29,7 +32,8 @@ public class ExpensePartialAdjustmentDisputes {
     /** 应用层编排实际权限与持久历史，财务效果和可裁决规则仍由领域状态负责。 */
     public ExpensePartialAdjustmentDisputes(CurrentActor actors, ExpenseResourceAdjustmentAccess access, ExpenseReportRepository reports,
             JdbcExpenseSettlementRepository settlements, JdbcExpensePartialAdjustmentRepository adjustments,
-            JdbcExpensePartialDisputeRepository disputes, ExpensePartialAdjustmentAudit audit) {
+            JdbcExpensePartialDisputeRepository disputes, ExpensePartialAdjustmentAudit audit, ApplicationEventPublisher events) {
+        this.events = events;
         this.actors = actors; this.access = access; this.reports = reports; this.settlements = settlements;
         this.adjustments = adjustments; this.disputes = disputes; this.audit = audit;
     }
@@ -55,6 +59,7 @@ public class ExpensePartialAdjustmentDisputes {
                 budget != null ? budget.operationId() : accrual.operationId(), before.version(), Math.incrementExact(before.version()),
                 budget, accrual, actor.userId(), now, input.evidenceReference(), input.comment());
         var after = adjustments.resolve(decision); var event = audit.dispute(report, decision, after);
+        events.publishEvent(new ExpensePartialAdjustmentChanged.Resolved(after, decision));
         return new ExpensePartialAdjustmentAudit.Receipt(reportId, input.roundNo(), after.id(), after.version(), null, null, event);
     }
 

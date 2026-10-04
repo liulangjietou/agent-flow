@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "taskId": "V02",
+  "taskStatus": "OPEN",
+  "subissueStatus": "VERIFIED",
+  "recordedAt": "2026-10-04T11:07:34.104223+00:00",
+  "baselineCommit": "301e8de3c8755e921a363c116dff747e33243394",
+  "trigger": "Unknown explanation status combined with absent version in page or detail responses",
+  "rootCause": "Unknown status lookup returned undefined and equaled the missing version. The shared summary reader did not first require a positive version.",
+  "coverageGap": "Earlier tests changed status or version independently, keeping the other field valid.",
+  "callChain": [
+    "PrecheckExplanationPanel history and detail loaders",
+    "api.precheckExplanationRuns/precheckExplanationRun",
+    "readExplanationPage/readExplanationDetail shared summary validator"
+  ],
+  "fix": "Require a positive version before comparing the known status version; malformed responses use the existing RESPONSE_UNREADABLE path.",
+  "red": {
+    "exitCode": 1,
+    "failures": 2,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/v02-precheck-response-evidence-20261004/v02-precheck-version-red.log"
+  },
+  "regression": {
+    "exitCode": 0,
+    "tests": 69,
+    "files": [
+      "precheck-explanation.test.mjs",
+      "expense-risk.test.mjs",
+      "requests.test.mjs"
+    ]
+  },
+  "typecheckExit": 0,
+  "buildExit": 0,
+  "historicalResponseCompatibility": {
+    "result": "PASS",
+    "counts": {
+      "responses": 274,
+      "successfulRequests": 12,
+      "input": 9,
+      "page": 1,
+      "detail": 237,
+      "receipt": 12,
+      "lostResponse": 2
+    },
+    "operations": [
+      "generatePrecheckExplanation",
+      "precheckExplanation",
+      "precheckExplanationInput",
+      "precheckExplanations",
+      "reviewPrecheckExplanation"
+    ],
+    "states": [
+      "ADOPTED",
+      "COMPLETED",
+      "DISMISSED",
+      "FAILED",
+      "QUEUED",
+      "RUNNING"
+    ],
+    "outcomes": [
+      "BLOCKED",
+      "READY",
+      "UNAVAILABLE"
+    ],
+    "failures": [
+      "INPUT_UNAVAILABLE",
+      "INVALID_MODEL_OUTPUT",
+      "MODEL_TIMEOUT"
+    ],
+    "compiledSources": [
+      {
+        "path": "agentflow-web/src/precheckExplanation.ts",
+        "sha256": "3fa172c046f8b4f60cf84159c9472686e959579f22a12f88eb0e9ab25c4cbb26"
+      },
+      {
+        "path": "agentflow-web/src/formSchema.ts",
+        "sha256": "a2114f9959b76d6b6d673d193227cd8802c340f4922c01db2f095eab448b91c4"
+      },
+      {
+        "path": "agentflow-web/src/expenseDraft.ts",
+        "sha256": "7e6e196b6727bf417425db6f1949606e3be8d360112a335af7355d74735a2133"
+      },
+      {
+        "path": "agentflow-web/src/expenses.ts",
+        "sha256": "2c2bb4abfd86c3a11cd1ce925059e4c5aedb664c0a86c257e88a358a0f26d9ec"
+      },
+      {
+        "path": "agentflow-web/src/invoiceExtraction.ts",
+        "sha256": "e9b83643071e9f4905dc5b6656d03f184835198133c972f5b984a396fe081542"
+      }
+    ],
+    "compiledDirectory": "/fyoung/tmp/agentflow-explanation-contract-4hzfzC",
+    "scope": "Actual packaged HTTP response contracts and current frontend parsers; no interactive browser or PostgreSQL verification."
+  },
+  "artifactDirectory": "/fyoung/tmp/agentflow-remaining-20260928/v02-precheck-response-evidence-20261004",
+  "artifactCount": 25,
+  "manifestSha256": "7a69da18155e57d21db4576f4093aca4937dde20266432ca8caa3b1c6654592c",
+  "sourceHashes": {
+    "agentflow-web/src/precheckExplanation.ts": "3fa172c046f8b4f60cf84159c9472686e959579f22a12f88eb0e9ab25c4cbb26",
+    "agentflow-web/tests/precheck-explanation.test.mjs": "51c907d54909ebc72a8c51668f94067afc0f00b867dd8102db3dda2ca990b425",
+    "agentflow-web/scripts/test-requests.mjs": "9fb8e38462e440116314ab11d374006db0266d1ab2ee433276a28fa1de92c65a",
+    "agentflow-web/scripts/check-precheck-explanation-runtime.mjs": "ddf7d64b4d6d438355f0e4369f456938574a3744e41775350c7ca9f19cb0d869"
+  },
+  "otherStatusReadersAudited": [
+    "expenseRisk.ts: positive version before ownValue",
+    "draftAssist.ts: positive version before ownValue",
+    "invoiceExtraction.ts: explicit own status key",
+    "expenseDraftAssist.ts: explicit own status key"
+  ],
+  "limits": [
+    "This is one verified V02 subissue, not final project acceptance.",
+    "274 responses are hash-verified historical packaged HTTP inputs, rechecked with the new parser; the backend was not restarted for this frontend-only fix.",
+    "No interactive browser or PostgreSQL claim.",
+    "Existing large frontend chunk warning remains."
+  ]
+}

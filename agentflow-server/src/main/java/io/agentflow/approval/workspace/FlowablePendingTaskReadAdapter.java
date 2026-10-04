@@ -2,6 +2,7 @@ package io.agentflow.approval.workspace;
 
 import io.agentflow.approval.service.TaskRecipientDirectory;
 import io.agentflow.approval.process.FlowableApprovalProxyAccess;
+import io.agentflow.approval.process.FlowableTaskAuthorization;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.common.Actor;
@@ -27,12 +28,14 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
     private final JsonUtil json;
     private final TaskRecipientDirectory recipients;
     private final FlowableApprovalProxyAccess proxies;
+    private final FlowableTaskAuthorization authorization;
 
     /** 共享审批与引擎数据源；所有写入仍通过原审批应用服务。 */
     public FlowablePendingTaskReadAdapter(JdbcTemplate jdbc, TaskRecipientDirectory recipients, JsonUtil json,
-                                          FlowableApprovalProxyAccess proxies) {
+                                          FlowableApprovalProxyAccess proxies, FlowableTaskAuthorization authorization) {
         this.jdbc = jdbc; this.recipients = recipients; this.json = json;
         this.proxies = proxies;
+        this.authorization = authorization;
     }
 
     /** 将授权分页和完整计数组合读取，空的后续页在同一只读事务内补取计数。 */
@@ -41,6 +44,7 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
     public Result read(Actor actor, Query query) {
         if (!actor.hasRole("APPROVER") || !recipients.eligible(actor.tenantId(), actor.userId())) return new Result(List.of(), 0);
         var proxyTaskIds = proxies.forActor(actor, query.deadlineAt()).taskIds();
+        var conflictingTasks = authorization.conflictingExpenseTaskIds(actor);
         var parameters = new ArrayList<Object>();
         // 窗口先统计全部授权匹配项，外层再应用游标与上限，避免翻页后总数缩水。
         StringBuilder sql = new StringBuilder("""
@@ -49,7 +53,7 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
                            a.id,a.business_no,a.title,a.process_key,a.definition_version,a.created_by,a.search_amount,a.round_no,
                            r.initiator_legal_entity_name,r.initiator_department_name,r.initiator_position_name,r.risk_json,
                            COUNT(*) OVER () AS matching_total
-                """).append(where(actor, query, proxyTaskIds, parameters)).append(") p");
+                """).append(where(actor, query, proxyTaskIds, conflictingTasks, parameters)).append(") p");
         if (query.afterTime() != null) {
             sql.append(" WHERE (p.CREATE_TIME_>? OR (p.CREATE_TIME_=? AND p.ID_>?))");
             parameters.addAll(List.of(Timestamp.from(query.afterTime()), Timestamp.from(query.afterTime()), query.afterId()));
@@ -68,7 +72,7 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
         if (!page.items().isEmpty() || query.afterTime() == null) return page;
         // 后续页可能因办理完成而变空；同一只读事务内补取总数，不能把前面的待办误报为零。
         parameters.clear();
-        long total = jdbc.queryForObject("SELECT COUNT(*) " + where(actor, query, proxyTaskIds, parameters), Long.class, parameters.toArray());
+        long total = jdbc.queryForObject("SELECT COUNT(*) " + where(actor, query, proxyTaskIds, conflictingTasks, parameters), Long.class, parameters.toArray());
         return new Result(List.of(), total);
     }
 
@@ -86,7 +90,7 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
                         : json.read(row.getString("risk_json"), SubmissionRisk.class));
     }
 
-    private StringBuilder where(Actor actor, Query query, List<String> proxyTaskIds, List<Object> parameters) {
+    private StringBuilder where(Actor actor, Query query, List<String> proxyTaskIds, List<String> conflictingTasks, List<Object> parameters) {
         var sql = new StringBuilder(io.agentflow.approval.process.FlowableActiveTaskSql.fromCurrentApplicationsWithRound()); parameters.add(actor.tenantId());
         sql.append(" AND (t.ASSIGNEE_=? OR (t.ASSIGNEE_ IS NULL AND EXISTS (SELECT 1 FROM ACT_RU_IDENTITYLINK i WHERE i.TASK_ID_=t.ID_ AND i.TYPE_='candidate' AND (i.USER_ID_=?");
         parameters.add(actor.userId()); parameters.add(actor.userId());
@@ -100,6 +104,10 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
             parameters.addAll(proxyTaskIds);
         }
         sql.append(")");
+        if (!conflictingTasks.isEmpty()) {
+            sql.append(" AND t.ID_ NOT IN (").append(String.join(",", Collections.nCopies(conflictingTasks.size(), "?"))).append(")");
+            parameters.addAll(conflictingTasks);
+        }
         switch (query.assignment()) {
             case "assigned" -> sql.append(" AND t.ASSIGNEE_ IS NOT NULL");
             case "unclaimed" -> sql.append(" AND t.ASSIGNEE_ IS NULL");

@@ -1,0 +1,898 @@
+{
+  "schemaVersion": 1,
+  "taskId": "A03",
+  "status": "BACKEND_VERIFIED_UI_AND_RUNTIME_PENDING",
+  "recordedAt": "2026-10-04T02:19:59.754802+00:00",
+  "sourceCommit": "8bc8608b81b1256043e91fb65f8cd4f2498312ac",
+  "baselineCommit": "9f8a0dd5958f1145a33255d6dd1d22e360abb083",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "Applicant-only preview, queue, history, detail, confirmation and dismissal; current directory preparation outside transactions, durable worker and scheduler. Expense UI/client and fixed-package runtime acceptance remain pending.",
+  "validation": {
+    "java": {
+      "result": "PASS",
+      "exitCode": 0,
+      "uniqueTestCases": 98,
+      "testSuites": [
+        {
+          "class": "io.agentflow.agent.ExpenseDraftAssistRunTest",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/a03-backend-final-reports/TEST-io.agentflow.agent.ExpenseDraftAssistRunTest.xml"
+        },
+        {
+          "class": "io.agentflow.agent.ExpenseDraftModelTest",
+          "tests": 19,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/a03-backend-final-reports/TEST-io.agentflow.agent.ExpenseDraftModelTest.xml"
+        },
+        {
+          "class": "io.agentflow.agent.ExpenseDraftAssistPersistenceTest",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/a03-backend-final-reports/TEST-io.agentflow.agent.ExpenseDraftAssistPersistenceTest.xml"
+        },
+        {
+          "class": "io.agentflow.agent.AssistSchedulingTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/a03-backend-final-reports/TEST-io.agentflow.agent.AssistSchedulingTest.xml"
+        },
+        {
+          "class": "io.agentflow.expense.ExpenseDraftAssistIntegrationTest",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/a03-backend-final-reports/TEST-io.agentflow.expense.ExpenseDraftAssistIntegrationTest.xml"
+        }
+      ],
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/a03-backend-final-java.log"
+    },
+    "behavioralRed": {
+      "method": "queuedSourceChangesAreStoppedBeforeModelHttp(String)[7]",
+      "boundary": "claim at exact microsecond source expiry",
+      "rootCause": "millisecond normalization happened before checking externally supplied source validUntil",
+      "gap": "previous domain fixtures used integral millisecond timestamps"
+    },
+    "fix": "Preserve actual Instant precision for source expiry checks; normalize only persisted lifecycle timestamps. Exact microsecond expiry now fails before model transmission.",
+    "testFixtureRepairs": [
+      "Java nested enum type-use import fixed before any server test execution; not a behavioral RED.",
+      "MockMvc propagates uncaught injected storage failure as ServletException, so rollback/retry assertions follow that actual exception.",
+      "Post-claim source-expiry fixture claims one second before the source deadline, keeping the original lease live and isolating source expiry; production timeout priority is unchanged."
+    ],
+    "actualApplicationContract": {
+      "result": "PASS",
+      "directory": "/fyoung/tmp/agentflow-remaining-20260928/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989",
+      "responses": 107,
+      "successfulRequests": 61,
+      "operations": [
+        "previewExpenseDraftAssist",
+        "generateExpenseDraftAssist",
+        "confirmExpenseDraftAssist",
+        "expenseDraftAssistRun",
+        "dismissExpenseDraftAssist",
+        "expenseDraftAssistRuns"
+      ],
+      "httpStatuses": [
+        200,
+        202,
+        400,
+        403,
+        404,
+        409,
+        422
+      ],
+      "observedRunStatuses": [
+        "COMPLETED",
+        "CONFIRMED",
+        "DISMISSED",
+        "QUEUED"
+      ],
+      "sourceSnapshots": 39
+    },
+    "contractScope": "MockMvc application requests/responses with real loopback financial-directory and model HTTP. This is not fixed-package server, process restart, browser or PostgreSQL acceptance.",
+    "openApi": {
+      "result": "PASS",
+      "operations": 366,
+      "schemas": 767,
+      "requestExamples": 129
+    },
+    "authors": "Java files=1650, named types=3231, missing author tags=0, parse errors=0",
+    "uniqueGreenTestCasesAcrossStages": 127,
+    "deduplication": "Exact (classname,name) from explicitly preserved successful reports across foundation, persistence and backend stages."
+  },
+  "verifiedBoundaries": [
+    "Original applicant, tenant and report binding checked before request preparation and idempotent replay; administrator status alone does not grant access.",
+    "Exact displayed-source consent binds original double versions, original catalog expiry and model target; refresh cannot extend expiry.",
+    "Current finance directory is read again before model HTTP and confirmation; selected-name/version/revocation and configuration changes fail.",
+    "Only selected brief, itinerary and directory are sent to the model; amounts and unselected private data excluded.",
+    "Confirmation records only explicit original proposal parts and leaves application/financial versions and business tables unchanged.",
+    "Concurrent claim and confirmation yield one transition; expired leases and late results do not retransmit or overwrite failure.",
+    "Injected review-trace failure rolls back state and idempotency; same key can retry once after storage recovery.",
+    "Generated suggestions become unconfirmable after application/financial revision or approval submission.",
+    "Nullable project allocation, category omission, empty suggestions and stable invalid/unavailable model outcomes are preserved."
+  ],
+  "pending": [
+    "ExpenseEditor client parsing, displayed-source consent and granular unsaved fill.",
+    "Original expense save/allowance path regression after UI integration.",
+    "Fixed-package HTTP runtime, process restart and paired restore.",
+    "Browser and PostgreSQL acceptance; enterprise model quality remains E08."
+  ],
+  "remainingTasks": {
+    "open": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "inventoryComplete": false
+  },
+  "sourceFiles": [
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/AssistScheduling.java",
+      "sha256": "ed3c398f04249fd4a6bd7942f7f860fc0511ea2db2a1c8f86931980b2d1a7195",
+      "bytes": 2525
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistController.java",
+      "sha256": "dd59f5ced12a38f5385cc4f111e7331773fbb49c75336080281bf201c7bb15b4",
+      "bytes": 10565
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistInputs.java",
+      "sha256": "722bf296b685819a9cb5bdf3c09177cff7c27706ab65946d5338ffd5a1f27dcc",
+      "bytes": 6371
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistPreparation.java",
+      "sha256": "8e455584a1b87a25cc11b7e2446293c9d2c5f538bb37cf2bd69533c1ffbb97fd",
+      "bytes": 6643
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistService.java",
+      "sha256": "36b8e6169bcbcfa383d948d390ee82b9c64ed0d0eefd839d0975cbe910af8985",
+      "bytes": 16244
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistWorker.java",
+      "sha256": "6ed0ea54dd9a7b6d6cbef350773962cd45aec51978888b5860482166645406cf",
+      "bytes": 2558
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "c0f12bd2b5ff121dae160fae909e015cc2bc55966b23348e745cf96f3213a4f9",
+      "bytes": 2567437
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/agent/AssistSchedulingTest.java",
+      "sha256": "bc80a6c9de59be9ca0d9c4b2bef6ca7b234216549475b6ea02ffd8498be5f1a2",
+      "bytes": 3047
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseDraftAssistIntegrationTest.java",
+      "sha256": "e7eda7a9733c33bfe66435a65d63567e3fb2ce5dfa7a44d21d5232b1b4f0b127",
+      "bytes": 31235
+    }
+  ],
+  "evidenceSnapshot": {
+    "root": "/fyoung/tmp/agentflow-remaining-20260928/expense-draft-assist-backend-evidence-snapshot",
+    "files": [
+      {
+        "path": "source/agentflow-server/src/main/java/io/agentflow/agent/AssistScheduling.java",
+        "sha256": "ed3c398f04249fd4a6bd7942f7f860fc0511ea2db2a1c8f86931980b2d1a7195",
+        "bytes": 2525
+      },
+      {
+        "path": "source/agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistController.java",
+        "sha256": "dd59f5ced12a38f5385cc4f111e7331773fbb49c75336080281bf201c7bb15b4",
+        "bytes": 10565
+      },
+      {
+        "path": "source/agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistInputs.java",
+        "sha256": "722bf296b685819a9cb5bdf3c09177cff7c27706ab65946d5338ffd5a1f27dcc",
+        "bytes": 6371
+      },
+      {
+        "path": "source/agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistPreparation.java",
+        "sha256": "8e455584a1b87a25cc11b7e2446293c9d2c5f538bb37cf2bd69533c1ffbb97fd",
+        "bytes": 6643
+      },
+      {
+        "path": "source/agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistService.java",
+        "sha256": "36b8e6169bcbcfa383d948d390ee82b9c64ed0d0eefd839d0975cbe910af8985",
+        "bytes": 16244
+      },
+      {
+        "path": "source/agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistWorker.java",
+        "sha256": "6ed0ea54dd9a7b6d6cbef350773962cd45aec51978888b5860482166645406cf",
+        "bytes": 2558
+      },
+      {
+        "path": "source/agentflow-server/src/main/resources/api/openapi.json",
+        "sha256": "c0f12bd2b5ff121dae160fae909e015cc2bc55966b23348e745cf96f3213a4f9",
+        "bytes": 2567437
+      },
+      {
+        "path": "source/agentflow-server/src/test/java/io/agentflow/agent/AssistSchedulingTest.java",
+        "sha256": "bc80a6c9de59be9ca0d9c4b2bef6ca7b234216549475b6ea02ffd8498be5f1a2",
+        "bytes": 3047
+      },
+      {
+        "path": "source/agentflow-server/src/test/java/io/agentflow/expense/ExpenseDraftAssistIntegrationTest.java",
+        "sha256": "e7eda7a9733c33bfe66435a65d63567e3fb2ce5dfa7a44d21d5232b1b4f0b127",
+        "bytes": 31235
+      },
+      {
+        "path": "validation/a03-backend-authors-final.log",
+        "sha256": "02dc75bfed00c78a34583847aa7eaba4e045edde7278b853fee7684b86b69d47",
+        "bytes": 73
+      },
+      {
+        "path": "validation/a03-backend-final-java-summary.json",
+        "sha256": "4f5e10b182f42c79603f97eac62091ac38427a4379b3695ddf6f844d4a796055",
+        "bytes": 17580
+      },
+      {
+        "path": "validation/a03-backend-final-java.log",
+        "sha256": "feabbe52d7dc2f5a0e5aba86c4e5466d19d5fbd3da87b9f7999723df6c6a905b",
+        "bytes": 427105
+      },
+      {
+        "path": "validation/a03-backend-final-reports/TEST-io.agentflow.agent.AssistSchedulingTest.xml",
+        "sha256": "30e2e1b26aa0ea2bc4f7d4801dd0cfe2ef49ad8ec5c46e7963ac2566155ff506",
+        "bytes": 43339
+      },
+      {
+        "path": "validation/a03-backend-final-reports/TEST-io.agentflow.agent.ExpenseDraftAssistPersistenceTest.xml",
+        "sha256": "fc8bf28a6ae58eb7e0a665f9b07799961c8269eb3f619a30eb74005cd729cc74",
+        "bytes": 430189
+      },
+      {
+        "path": "validation/a03-backend-final-reports/TEST-io.agentflow.agent.ExpenseDraftAssistRunTest.xml",
+        "sha256": "3da1d455691f67ce515ff075d013ce1b3fa3fc1dd233ebc8e0ee1b772260dfaa",
+        "bytes": 14471
+      },
+      {
+        "path": "validation/a03-backend-final-reports/TEST-io.agentflow.agent.ExpenseDraftModelTest.xml",
+        "sha256": "2301b53746edd3eaead93162069f344d601f58b9c062204774985efeca0c595d",
+        "bytes": 45861
+      },
+      {
+        "path": "validation/a03-backend-final-reports/TEST-io.agentflow.expense.ExpenseDraftAssistIntegrationTest.xml",
+        "sha256": "461f34aa1d119787781fc100aecbb12e15fe003a567d7c4bc44880b9533eb68f",
+        "bytes": 77919
+      },
+      {
+        "path": "validation/a03-backend-first-executed-reports/TEST-io.agentflow.agent.AssistSchedulingTest.xml",
+        "sha256": "16e100b0cfa0e4ccfd280ecf4bef37d4daa99067fa6f08f261fde624fc57419f",
+        "bytes": 43338
+      },
+      {
+        "path": "validation/a03-backend-first-executed-reports/TEST-io.agentflow.agent.ExpenseDraftAssistPersistenceTest.xml",
+        "sha256": "9c9ff2195a2ba58d083ebfbd091852eaa8e7f3c904a471ae67420e0c05656bb8",
+        "bytes": 430187
+      },
+      {
+        "path": "validation/a03-backend-first-executed-reports/TEST-io.agentflow.agent.ExpenseDraftAssistRunTest.xml",
+        "sha256": "1c711273c2608f03330a3133a89d20be9bca7e1165962aaf68db0e5ba57eae0f",
+        "bytes": 14467
+      },
+      {
+        "path": "validation/a03-backend-first-executed-reports/TEST-io.agentflow.agent.ExpenseDraftModelTest.xml",
+        "sha256": "39107ad8ee20075d195e156ec1541879c129cf89c4bffc39b11133c11a07319a",
+        "bytes": 45862
+      },
+      {
+        "path": "validation/a03-backend-first-executed-reports/TEST-io.agentflow.expense.ExpenseDraftAssistIntegrationTest.xml",
+        "sha256": "f57ddd301c7d14441c94f2f8e6aaaad54fda7a31055fdd5fa12d85098b47cac3",
+        "bytes": 108372
+      },
+      {
+        "path": "validation/a03-backend-first-executed-summary.json",
+        "sha256": "c4428e252b694cc99e09d7372d6de36b17d017db6981d2e25edd056ad51af2c9",
+        "bytes": 1491
+      },
+      {
+        "path": "validation/a03-backend-initial-java.log",
+        "sha256": "37f81fac0283ae96a19afaaecfe4e6c2bb664fb4181fa2559239d52804e382d2",
+        "bytes": 9070
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0001.json",
+        "sha256": "dc6ca4249fc93b4bcfeb1b1fbce29f5d61063e417197533c679cc6eaa76059ed",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0002.json",
+        "sha256": "6fe79a3104ebcdae0d4592460e8c586aefd42fabbc3562d8b052eb8ecda9c4a8",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0003.json",
+        "sha256": "f7af41ea067e7c4ec2e763b6f9e844618494270c41b6c72c01967addf992a241",
+        "bytes": 356
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0004.json",
+        "sha256": "f7af41ea067e7c4ec2e763b6f9e844618494270c41b6c72c01967addf992a241",
+        "bytes": 356
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0005.json",
+        "sha256": "efa6d67deefe5fdc8902a0e66a732c16bbf45f72220f8be57b6f388219164330",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0006.json",
+        "sha256": "2e8f3e80f6441cf1e3731b1b6d95d3e847589c7e49c7e847ed07d066e3b897ed",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0007.json",
+        "sha256": "93f878e910245cdd8a702e563f0f6362ca2e1740d964e94c1e30c4d63d00f7a2",
+        "bytes": 2265
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0008.json",
+        "sha256": "404d0e0c76905fea02bf43910d92649be9ef4291f986629f4767ebbe1d3bc8e2",
+        "bytes": 568
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0009.json",
+        "sha256": "dc6d528575d128b825924a92e8fbee79d656df0b69d0e7a5f5a5325ed323fbe5",
+        "bytes": 212
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0010.json",
+        "sha256": "bcc6a60cdcbda9dac9ec107b4ac56a58c99a1e51645456f0c89692052fa9c853",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0011.json",
+        "sha256": "d1413be8c35f778eb4b2f6dc9a13c094bc11797f20b1f0631e7516487c990d23",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0012.json",
+        "sha256": "f85c48d7c90334d071372f587e82163efe82fd6586bd7817343562db159b4fa5",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0013.json",
+        "sha256": "627780e80f3db6730dc645d2df2653dabc28fbe011f8a84db5c3583f06f18e57",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0014.json",
+        "sha256": "0d92e5a53ac7506610d6a189628507d98972559aa8fbac353a7f4ee3ca998ef4",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0015.json",
+        "sha256": "116eadfa22dbe882462bdc2175efff5f19103bca5879c622bc63189a3d78a76e",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0016.json",
+        "sha256": "9fbbff1d929dc6c03062d4018f56b5c3d5d86b6fca26613164eea602608fc54f",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0017.json",
+        "sha256": "9863f9bb56411c8d376ef92d6d10827ee9546811da06f4ccd548099496c90e26",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0018.json",
+        "sha256": "d718e8cb950e57a7c1a330515aaba7116e93402bb4394692b5fb134c2b52c256",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0019.json",
+        "sha256": "16118376e7f35459901c4b2622e459e7c26db3209df413fd6e5b32262866c8d3",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0020.json",
+        "sha256": "ca450e438d0620fa35c848f556ed7ff105c4f95deff90926052af3c07f6c2681",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0021.json",
+        "sha256": "da1c0209ff4fcb393f5efa4fc22b71cdffa90fb621fa3a79f155b9b250edafcf",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0022.json",
+        "sha256": "f91610db8d36392b7dcfc6b6aa9282ae38cbee47f190d8f9c3ae7f60cdf062e5",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0023.json",
+        "sha256": "b286d65605aec6f09bb2cff16a82b67d8a559651d72d0335a38a83c38348adff",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0024.json",
+        "sha256": "1ad0e2153543d26b3e0d6dff4a4566d388c269bf92116699e8e92ca9d6d4a39e",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0025.json",
+        "sha256": "e0449017a971b7b183fcc90ad66feb079dc2c1345f412acff9135ebcc70f7abd",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0026.json",
+        "sha256": "881176514f42d83210d5fe40371311f273c628c8f7192cd9d1f5ded9c8cc1992",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0027.json",
+        "sha256": "7d55aecfbe5b321b3e2654333c1e5e1b12cb099b05a7e026dd52b38109eaeacc",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0028.json",
+        "sha256": "5f5aac76fc7a7c2442cbb0d2764ce87a51625d342914927abecaba110605d23a",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0029.json",
+        "sha256": "8064da30c4edc0974aec6efc0b9f4e9a78c7fe1c126ca41995ac7310fe1b76f6",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0030.json",
+        "sha256": "cdd7c336aa759f6281691baee2313a2da0377d14a8778a4c27d02b6979143a03",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0031.json",
+        "sha256": "1f4640fbd0f58a206f687076410a21efc46ee92ed130ca9a8c558684154db68a",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0032.json",
+        "sha256": "017dab0dd3f20fbd6d59e713ee1a0e72c05dbe5a9e15b7c2dfcfeac3e97b9f44",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0033.json",
+        "sha256": "c3318b90c30dc66193783aff62947a9b67a49282caa38708ed557f31cbfa2e85",
+        "bytes": 778
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0034.json",
+        "sha256": "b773b14cc37ce281f6cefbe9ffae1d21d8e9427a31ae5e07c5fd12473913d5c1",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0035.json",
+        "sha256": "8a365c49f8638710c5b34c2cc3110ea7f4e2833fe63897f534f80f6d3556783b",
+        "bytes": 808
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0036.json",
+        "sha256": "f9c9ff52f325794a4f42dbb077803eb75722752e803be54214af6b4c91fabdd6",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0037.json",
+        "sha256": "233d2b50d6c40e64e1fd5da2f5ec0500a151dfffc2fb65393a33b4a73b3b0359",
+        "bytes": 808
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0038.json",
+        "sha256": "4ee193af28a8c4f819195d8c949972e3aeba00445b284f81e706cbc484867d4c",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0039.json",
+        "sha256": "d9303e1211e385c8e3a8b0d7dc4518e4911fc104c902cbbe15039a125da021e9",
+        "bytes": 818
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0040.json",
+        "sha256": "8a6e6a459f947e49b4771be32955faca2c122c1fd0d42f3695a2034987eb0925",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0041.json",
+        "sha256": "80dc220e0562b60439acb71a54368db3e14ba87aaa2e8018ee18d7befeb439e7",
+        "bytes": 806
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0042.json",
+        "sha256": "b4389ccf88a21097385a7bb30136c605c9f77b760230b0c6e37f92d696ece72b",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0043.json",
+        "sha256": "8cbfcf592a096c9acedf20f5a06c5d31528ec56cea2fcd3b3af191b7de43cab3",
+        "bytes": 808
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0044.json",
+        "sha256": "e6411eafd9efb70aa19922cbd4c3fec788c381e4f2763ad3e28a487dc82f9d10",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0045.json",
+        "sha256": "6565e15be1de3d90556fb2f231b3cfcc17e22bad84519ea7b4f57c56fb489a2b",
+        "bytes": 794
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0046.json",
+        "sha256": "e39d3e619b6c8772f421881234361d43f0a310650d573578e30d48e2f00be9a0",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0047.json",
+        "sha256": "52dafe8c6bf5ec7bde70a9ff00e4902080dd269caefe26965af6e4f48545a9f7",
+        "bytes": 808
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0048.json",
+        "sha256": "2194f49355b3f7bd6279c0db355d79b50ec9b94f22f1e74d635ce3cbd0976d56",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0049.json",
+        "sha256": "b90d9a7387680dee4d43b93daef0635753500665c306de34c267d275170977d9",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0050.json",
+        "sha256": "cedf97a1d05cc3a48d74a0dfd4260b7c668d010164871723acaa34ba8d218260",
+        "bytes": 2681
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0051.json",
+        "sha256": "04665f1c5494b0c05db4a9c191591512776567c0c609d9d2ca0a5cae3b27a4d4",
+        "bytes": 545
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0052.json",
+        "sha256": "e81a5baa0a597e7be5026aafe8d65ffe405e18cbae48034e1c2c50cbba4af4d9",
+        "bytes": 212
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0053.json",
+        "sha256": "f5d655e96ba77bf8d166ca80428a09fb5c216aaf6708c2ff53dec291266305be",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0054.json",
+        "sha256": "621e6fc2e7ecc4e37d82457bc176d001dbd7d20a4545f11c03388f6a4dda3f33",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0055.json",
+        "sha256": "e58200d135a736d5335926dfd2d603ac4e1c04273fbaa52a02e47b41d8eb882d",
+        "bytes": 2681
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0056.json",
+        "sha256": "31932c47a86f3f2d282037df1c3903575d9db8b3f53bfbbb904e9b6166c81a6b",
+        "bytes": 545
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0057.json",
+        "sha256": "03da6d2df095d9bb0bf2e0448135bafabf72aa37d5e85c84d10f7b7b4db7eda4",
+        "bytes": 212
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0058.json",
+        "sha256": "2208312d45546efc8a0c896258642016473b8d0fc68aa1f2a960cc83cb28d78c",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0059.json",
+        "sha256": "385447645245c9920a2f43a4613ed2ed590c637bbc95fdd29b2afd11f52c3b2f",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0060.json",
+        "sha256": "953d2150350855b68e89953ab4916d502ea159de334b1129d86ae5c10910395f",
+        "bytes": 2681
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0061.json",
+        "sha256": "0ccf999d8121711c3ce37f82403f84c420abf05d4c12ce518ba237c98fa71270",
+        "bytes": 545
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0062.json",
+        "sha256": "ab7e693eeeb5a8fb6e65648b679ea0407606ca6772840f61114c9d0f81f65ae0",
+        "bytes": 212
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0063.json",
+        "sha256": "5fba41afd1832bc7910bffdd42597bfd25566ba18b0a5d5a1e6a636890f0d65c",
+        "bytes": 600
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0064.json",
+        "sha256": "f9ea61729d65eb918b263ea4a842b1a6707ed6fa5290774b46c1b1f155abaa4c",
+        "bytes": 600
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0065.json",
+        "sha256": "b928d18136e9f150ead914fa44a85d5c890ce0fd0c78b40f0a84aaf2a18ee59b",
+        "bytes": 600
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0066.json",
+        "sha256": "afed694f9984e42b26bba22b894856b1db6e20b0e2a8bf7339d4b1401d579c33",
+        "bytes": 290
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0067.json",
+        "sha256": "5756ba26431e2994d5eba30b80ea8c11bb757c197e1b862a68a89cc41c03a15b",
+        "bytes": 290
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0068.json",
+        "sha256": "7d83db0dc0aaf4f19b98d19444093db077939b57acae81adeb25534d29cc9c0b",
+        "bytes": 296
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0069.json",
+        "sha256": "741bea4c2da2e2d7c4e79cbd0447881b36695f9f559c3d0309cbe967c453bc84",
+        "bytes": 294
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0070.json",
+        "sha256": "867678b0f1646044b4cb6b9581631ffc739c8e4a45a4433af4de58ec57c5a927",
+        "bytes": 296
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0071.json",
+        "sha256": "a80fac543b22ce6e346358c38b73ca4f92cc2450fa77fd6eb5f35ffcbe86e72b",
+        "bytes": 606
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0072.json",
+        "sha256": "871ee1cb95b6c8aa264d533de57f0021b8d930bd367b47706e33fe84f0122cdc",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0073.json",
+        "sha256": "814e7550cb6977ab69906289043f4cd194e6410c2427c242d92609392fbbc697",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0074.json",
+        "sha256": "08b99fdcc1699e00bd8a61216f8c6bd87cc2460a286f3e3c59fbb8f96f2a4de6",
+        "bytes": 2667
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0075.json",
+        "sha256": "ca96754cc66b9595262434a1f3ff8d5435284d543588c254aebfc236dd299e78",
+        "bytes": 555
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0076.json",
+        "sha256": "b7ae1a624d776f2072f251de1da0036229f2b7a978a96dcf9e65b82632993d38",
+        "bytes": 212
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0077.json",
+        "sha256": "1b57680451abce97e3133bcfb3f7969ecaaa0ee0877ccfa43bf45555c0eb29a9",
+        "bytes": 2749
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0078.json",
+        "sha256": "807e57a0b854f7f21ce5fb95c9bf2fe7929994e7974b8063f802fb5f1a72f7ad",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0079.json",
+        "sha256": "a55bab92fee2f18eddd48dfc463b8d036e8945c1b742343380d9b12f17c3a65a",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0080.json",
+        "sha256": "79dce19bc19ce6b4fa81aa3132b86cdee7dd6f9a960fc53832d5b255814dbce0",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0081.json",
+        "sha256": "00ab0e2983c4738020b64ae526197912592d1a4598fb8027979d279c0e67b387",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0082.json",
+        "sha256": "4ea3b7fe4e3f29a267840a136ae801ff8055750f055e0a11835a5a0365d246c3",
+        "bytes": 584
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0083.json",
+        "sha256": "33af700eeab109153bb6da8daca5417131fe917b3fccf8282d9aad259224e408",
+        "bytes": 268
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0084.json",
+        "sha256": "e22e59fc8a50e4b01ec3ef066ab6bea5e6a5184c1aba9c1dbbd2dc6df37af130",
+        "bytes": 342
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0085.json",
+        "sha256": "f282b2bd93031f19b672ece198ead25ab80f6ced5b0938fe82e429d4588443c2",
+        "bytes": 786
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0086.json",
+        "sha256": "8f816624d743c8d9acf619b82075a05fbe620e991dd31b9b311752a24d58c49a",
+        "bytes": 584
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0087.json",
+        "sha256": "ed2cb3bea427f383f77cc93d0d652c2b3a0189539c04e4511eadf0a7a16b1350",
+        "bytes": 268
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0088.json",
+        "sha256": "94b4308293822487a1b1b626646efbe645434499883f2ca1fd45b2b3b05778b0",
+        "bytes": 342
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0089.json",
+        "sha256": "2d5de027268c5920fc2be6d12c18764a20fb252f688859451d32bef82c941cf7",
+        "bytes": 786
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0090.json",
+        "sha256": "882390df4db76233220bce6ac09cfa9c1f1a7efde2a7c5e12a394ba619ad366e",
+        "bytes": 342
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0091.json",
+        "sha256": "edb6b89c314ceae4eb9fdff2b367fe4680686e5b9b5ea87532564c4cc87b50a0",
+        "bytes": 342
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0092.json",
+        "sha256": "962a6bf2a26c936d0596e243228340bcb0f21debec5668a81c59237859689147",
+        "bytes": 808
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0093.json",
+        "sha256": "d57b0cff72feddb45f00978e2287797fcb5828233026230580eff6c0772ac22c",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0094.json",
+        "sha256": "725fb29f8845d6b4bfec283b713a2fe23e7cf9600b1d29416d90c97850e60e59",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0095.json",
+        "sha256": "ec682168254ca37c88ccfc9b6656b443346b373a96c74657d22eab6995691af3",
+        "bytes": 2647
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0096.json",
+        "sha256": "c35b1ed14271601bc6e89e6bfccaf6d35d38bf2fd1acbc643aef0b61d025d8a3",
+        "bytes": 327
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0097.json",
+        "sha256": "f84048e1175d6e75e535b93eaa4c5390f7bd31f2d148c27fd89bf6b797719853",
+        "bytes": 2789
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0098.json",
+        "sha256": "49ed57659930aacf4c86e72588b344b0e5d402a9d8368a9554c565c124655245",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0099.json",
+        "sha256": "48a1e83261f555b738d7173bc29f4e80ef54f279cbb874bb486db23a4bdaa544",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0100.json",
+        "sha256": "48a1e83261f555b738d7173bc29f4e80ef54f279cbb874bb486db23a4bdaa544",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0101.json",
+        "sha256": "ea141f761174c014efb1f003c1cb011349c21d2d610b2a8b43871e1ee3199eb8",
+        "bytes": 809
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0102.json",
+        "sha256": "d342517a93e3e4ea58a0173363c6fdb3ce62794cf9482b12f3478a51e4d8eebc",
+        "bytes": 2667
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0103.json",
+        "sha256": "85b517ff5bc1983f05ac5646d3b318bb8b16a2243a32c444ea0a079118ffd19c",
+        "bytes": 356
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0104.json",
+        "sha256": "85b517ff5bc1983f05ac5646d3b318bb8b16a2243a32c444ea0a079118ffd19c",
+        "bytes": 356
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0105.json",
+        "sha256": "cafd8c5acf2fe928615c5389ab7509aba7fe6f97577f9ea482e7406734eb2a3a",
+        "bytes": 2838
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0106.json",
+        "sha256": "6170edbddbc6fb4529b82af8c86b5df9805c8cf05407293454018dadff93c02b",
+        "bytes": 291
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/0107.json",
+        "sha256": "e0a869b82fba3cd0c90572d14d6800df3c74a7447a77580b17e7e7e66d8e6ad2",
+        "bytes": 130
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/contract-result.json",
+        "sha256": "715cd6d5665a04434e43d2b1f8a2f89864300505f20ffea48c6977c3de4ca407",
+        "bytes": 614
+      },
+      {
+        "path": "validation/a03-backend-observations-df72549c-7609-4dab-9be8-ff83ec547989/manifest.json",
+        "sha256": "6031fd75844061e92945578e73837ae0c330ca91127dd8903f19891ac087bcf5",
+        "bytes": 177
+      },
+      {
+        "path": "validation/a03-backend-openapi-final.log",
+        "sha256": "effd7ba80fc599fa54b03621837780a173a83e9c51788145ad6787bfa53dc2cc",
+        "bytes": 71
+      },
+      {
+        "path": "validation/a03-backend-precision-fix-java.log",
+        "sha256": "08fd68f72c645ff92fec2047c30cdf116a21957c18060d55286bff2dc9412d33",
+        "bytes": 432512
+      },
+      {
+        "path": "validation/a03-backend-precision-reports/TEST-io.agentflow.agent.AssistSchedulingTest.xml",
+        "sha256": "26c7fd8a419cf83eec96a9a4ca2d2c82102b07f896156fc3ddd6b208868b3ea1",
+        "bytes": 43331
+      },
+      {
+        "path": "validation/a03-backend-precision-reports/TEST-io.agentflow.agent.ExpenseDraftAssistPersistenceTest.xml",
+        "sha256": "1bf14600a19be709d6d04d2ff8e1e2bf45716094354a52eb85a6f7b71e6571e4",
+        "bytes": 430180
+      },
+      {
+        "path": "validation/a03-backend-precision-reports/TEST-io.agentflow.agent.ExpenseDraftAssistRunTest.xml",
+        "sha256": "8a3a6d30760b4fd540091407cf59ab5ec88bfb788b9b83aee61de8a10315c100",
+        "bytes": 14471
+      },
+      {
+        "path": "validation/a03-backend-precision-reports/TEST-io.agentflow.agent.ExpenseDraftModelTest.xml",
+        "sha256": "a383cc74a275e7791bc27da437833ab65c28d4a17ebc2ee57061e798b19b51bf",
+        "bytes": 45854
+      },
+      {
+        "path": "validation/a03-backend-precision-reports/TEST-io.agentflow.expense.ExpenseDraftAssistIntegrationTest.xml",
+        "sha256": "089f68b6e6b1eeb2c0d8a0c5a1eb590c3819917d61b8ef8538d520af3795591f",
+        "bytes": 80600
+      },
+      {
+        "path": "validation/a03-backend-retry-java.log",
+        "sha256": "7597cc241a8a530600addbe100d05a926fe1317d27e0d0d89a258bd8b413ccb2",
+        "bytes": 460357
+      },
+      {
+        "path": "validation/check-a03-backend-observations.mjs",
+        "sha256": "5dafc8a35ea6de56c260d47ed45d1f2dd69f9458f26f35075dbe9d44750fd0b5",
+        "bytes": 5332
+      }
+    ]
+  }
+}

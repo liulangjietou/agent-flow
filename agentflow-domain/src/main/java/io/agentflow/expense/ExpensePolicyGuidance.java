@@ -43,11 +43,16 @@ public record ExpensePolicyGuidance(UUID policyId, long policyVersion, String po
      * @author owlzhangfq@gmail.com
      */
     public record Context(UUID legalEntityId, ExpenseContent.Type reportType, String categoryCode, String cityCode,
-                          LocalDate incurredOn, String currency, ExpenseLine.Unit unit) {
+                          LocalDate incurredOn, String currency, ExpenseLine.Unit unit, LocalDate endedOn) {
+        /** 普通费用继续支持只指定发生日的提示请求。 */
+        public Context(UUID legalEntityId, ExpenseContent.Type reportType, String categoryCode, String cityCode,
+                       LocalDate incurredOn, String currency, ExpenseLine.Unit unit) {
+            this(legalEntityId, reportType, categoryCode, cityCode, incurredOn, currency, unit, null);
+        }
         /** 只读输入在入口统一校验，完整费用行的金额与分摊由保存服务负责。 */
         public Context {
             if (legalEntityId == null || reportType == null || !text(categoryCode, 64) || !text(cityCode, 128)
-                    || incurredOn == null || !supportedCurrency(currency) || unit == null) {
+                    || incurredOn == null || endedOn != null && endedOn.isBefore(incurredOn) || !supportedCurrency(currency) || unit == null) {
                 throw new DomainException("INVALID_EXPENSE_GUIDANCE_QUERY", "Expense policy guidance dimensions are invalid");
             }
         }

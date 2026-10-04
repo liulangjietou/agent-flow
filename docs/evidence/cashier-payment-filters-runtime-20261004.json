@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-04T08:39:16.303510+00:00",
+  "taskId": "F16",
+  "status": "LEGAL_ENTITY_AND_ACCOUNT_FIXED_PACKAGE_H2_AND_COMPONENT_HTTP_VERIFIED_DATE_RULE_PENDING",
+  "sourceCommit": "94631d3d9dbcd5a38128a315de7fe8a223d8bc3b",
+  "branch": "codex/governance-identifier-integration",
+  "remainingTaskCount": 34,
+  "artifacts": {
+    "recordedAt": "2026-10-04T08:27:59.256022+00:00",
+    "sourceCommit": "94631d3d9dbcd5a38128a315de7fe8a223d8bc3b",
+    "jar": "/fyoung/tmp/agentflow-remaining-20260928/cashier-filter-server-94631d3d.jar",
+    "jarSha256": "900d05a413802187094f46b48977a4997d0562400d41154f09374335927fc5b0",
+    "baselineJar": "/fyoung/tmp/agentflow-remaining-20260928/signature-server-f44e21c.jar",
+    "baselineSha256": "6ac23beffa6b9b4137ff7cf43ce029efddd57fd8ec81f823d5766ebd8dd1e560",
+    "baselineSchema": 113,
+    "targetSchema": 114,
+    "webDist": "/fyoung/tmp/agentflow-remaining-20260928/cashier-filter-web-94631d3d",
+    "webFiles": {
+      "index.html": "df7b515aa612f3c11b4c7d2df77fda254cfe73e3e3468576a8a96d1054c3c5de",
+      "assets/index-CThxcfRr.js": "cc878508288290f4fa0bbbd731278bc3021e1dc4cc0fbd3b083a45b66689e34a",
+      "assets/index-76Mdj1KN.css": "576f4074afd88fca7913d62bac4d33630c7f6074eb7b1d4b19a5c94a331d17d3"
+    }
+  },
+  "runtime": {
+    "directory": "/fyoung/tmp/agentflow-cashier-runtime-gd145_si",
+    "result": {
+      "status": "PASS",
+      "syntheticOnly": true,
+      "browserAcceptance": false,
+      "postgresAcceptance": false,
+      "checks": {
+        "organizationAndPublishedConfiguration": {
+          "legalEntities": 3,
+          "cashierAppointments": 3,
+          "publishedFinancialTemplates": 2
+        },
+        "nonemptyV113ToV114": {
+          "preservedTables": 267,
+          "oldRows": 810,
+          "originalPaymentAuthorizations": 7,
+          "executedPaymentCommands": 5,
+          "oldColumnsUnchanged": true
+        },
+        "filtersAfterUpgrade": {
+          "visibleAuthorizations": 6,
+          "hiddenAuthorization": "4038bf22-320e-4aab-b531-093d7268e544",
+          "stableSameAccountAcrossVersions": true,
+          "filterCountAcrossPages": 2,
+          "accountOptionCount": 3,
+          "bothEmployeeAdvanceAndExpense": true
+        },
+        "revokedAppointmentAffectsListCountOptionsAndCursor": true,
+        "filtersAfterForcedRestart": {
+          "visibleAuthorizations": 6,
+          "hiddenAuthorization": "4038bf22-320e-4aab-b531-093d7268e544",
+          "stableSameAccountAcrossVersions": true,
+          "filterCountAcrossPages": 2,
+          "accountOptionCount": 4,
+          "bothEmployeeAdvanceAndExpense": true
+        },
+        "fixedAccountSurvivesCrashAndOriginalCommandReconciles": {
+          "originalAuthorization": "1b2a3080-13b6-484c-a2f6-fd1d95297fb9",
+          "acceptedCommands": 1,
+          "receivedCommands": 1,
+          "originalActionReplay": true
+        },
+        "filtersAfterIndependentRestore": {
+          "visibleAuthorizations": 6,
+          "hiddenAuthorization": "4038bf22-320e-4aab-b531-093d7268e544",
+          "stableSameAccountAcrossVersions": true,
+          "filterCountAcrossPages": 2,
+          "accountOptionCount": 4,
+          "bothEmployeeAdvanceAndExpense": true
+        },
+        "independentRestoreAndOldAuthorizationContinues": {
+          "tables": 268,
+          "rows": 969,
+          "schemaStatements": 2101,
+          "sourceDatabaseUnchanged": true,
+          "oldAuthorization": "0cae46ac-3f43-4006-9cd1-f7462e29449c",
+          "oldAccountKeyRetained": true,
+          "restoreDirectory": "/fyoung/tmp/agentflow-cashier-restored-tafqma5q"
+        }
+      },
+      "boots": [
+        {
+          "boot": 1,
+          "tag": "baseline-v113",
+          "baseline": true,
+          "workers": true,
+          "pid": 74148,
+          "directory": "/fyoung/tmp/agentflow-cashier-runtime-gd145_si",
+          "readySeconds": 7.88
+        },
+        {
+          "boot": 2,
+          "tag": "upgraded-v114-worker-off",
+          "baseline": false,
+          "workers": false,
+          "pid": 74182,
+          "directory": "/fyoung/tmp/agentflow-cashier-runtime-gd145_si",
+          "readySeconds": 6.65
+        },
+        {
+          "boot": 3,
+          "tag": "fixed-package-worker-on",
+          "baseline": false,
+          "workers": true,
+          "pid": 74191,
+          "directory": "/fyoung/tmp/agentflow-cashier-runtime-gd145_si",
+          "readySeconds": 6.65
+        },
+        {
+          "boot": 4,
+          "tag": "resume-original-payment",
+          "baseline": false,
+          "workers": true,
+          "pid": 74209,
+          "directory": "/fyoung/tmp/agentflow-cashier-runtime-gd145_si",
+          "readySeconds": 6.63
+        },
+        {
+          "boot": 5,
+          "tag": "independently-restored-worker-on",
+          "baseline": false,
+          "workers": true,
+          "pid": 74277,
+          "directory": "/fyoung/tmp/agentflow-cashier-restored-tafqma5q",
+          "readySeconds": 6.58
+        }
+      ],
+      "httpResponses": 324,
+      "providerCalls": 102,
+      "ownedServicesStopped": true
+    },
+    "contracts": {
+      "result": "PASS",
+      "httpExchanges": 324,
+      "responseContracts": 324,
+      "baselineResponses": 196,
+      "fixedResponses": 128,
+      "requestContracts": 97,
+      "emptyResponses": 0,
+      "realFrontendReads": 35,
+      "browserAcceptance": false
+    }
+  },
+  "componentHttp": {
+    "directory": "/fyoung/tmp/agentflow-cashier-ui-z5yypmoz",
+    "result": "PASS",
+    "checks": [
+      "initialSixVisibleAuthorizations",
+      "sameAccountAcrossVersionsHasTwoRows",
+      "unassignedAuthorizationRemainsSeparate",
+      "entityAndAccountComposeAtServer",
+      "externalLockPreventsFilterChange",
+      "identityChangeClearsRowsCountsOptionsAndSelection",
+      "currentAppointmentRemovalChangesLiveRowsAndOptions",
+      "refreshRestoresCurrentScope"
+    ],
+    "httpExchanges": 19,
+    "successfulReads": 17,
+    "forbiddenReads": 2,
+    "actualComponentTemplate": true,
+    "actualApiModule": true,
+    "detailComponentStubbed": true,
+    "browserAcceptance": false
+  },
+  "priorAttempts": [
+    {
+      "directory": "/fyoung/tmp/agentflow-cashier-runtime-xw_o780p",
+      "classification": "FIXTURE_ERROR",
+      "finding": "Copy used obsolete expense template version 1; public API correctly rejected it with TEMPLATE_VERSION_CONFLICT."
+    },
+    {
+      "directory": "/fyoung/tmp/agentflow-cashier-runtime-tb1m8jn1",
+      "classification": "FIXTURE_ERROR",
+      "finding": "Catalog exposes templateVersion, not version. Driver changed to the observed contract."
+    },
+    {
+      "directory": "/fyoung/tmp/agentflow-cashier-runtime-3cx9nvp8",
+      "classification": "FIXTURE_TIMING_ERROR",
+      "finding": "Driver attempted approval before budget occupation was confirmed; backend correctly rejected with EXPENSE_BUDGET_NOT_CONFIRMED. Final driver waits on public workflow budget.confirmedCurrent and preserves immutable raw HTTP responses."
+    }
+  ],
+  "sourceManifest": [
+    {
+      "path": "agentflow-server/src/main/java/db/migration/V114__Index_cashier_payment_account.java",
+      "sha256": "7d1d2bfb3027a2864d70826420ff318b2258d3884c708287120a615a01f35401"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentAccountKey.java",
+      "sha256": "9ec317e47320a0077a98fef6cf2d12777f5b0661a79003fdb8db8496812acbf3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentController.java",
+      "sha256": "55dd076b01fb081fc9bfbc3f11a05e06449f2614fded626d2d9fe78f209ff635"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java",
+      "sha256": "03a8d13a0f47f276841e8a85316b590fc912dad2b40ae07ee6c4bf1dfe14644d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/JdbcPaymentAuthorizationRepository.java",
+      "sha256": "383eb09e50f40ae1f290c0f17b5abc3e8b0ee799ba6edad6ce18d5be9932ebc9"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentPersonnel.java",
+      "sha256": "c9c40497b98ee8f9617b39d8e41a5219f0c32ce575fea5973012906ebebfe002"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "54f23b819b96abb8643543930473abc0a4150d48cf498e0462100575c6baa3c8"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/finance/CashierPaymentFiltersTest.java",
+      "sha256": "22dca5dde0e3cee4bb8943be571a04ae8cca686b01d703601efaa897a3f99ae0"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/finance/PaymentPersistenceTest.java",
+      "sha256": "d585caf373b509f9b618c484a5ec662511b9434a0c845d39b08d9261a93e46d5"
+    },
+    {
+      "path": "agentflow-web/scripts/check-openapi.mjs",
+      "sha256": "1efb774b59860a4704e2adbbcf5cecf4f7623df4717919e53d34967fd3ec85d4"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "71dc5ee2f0cd4f3dd805d21c3978e6fcb58bcb295479ec46230e43c8487d0b8e"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "55ea853e81b496eeab795519b898a05a8ae9734605f0ec4a3d9eb2bff275e61d"
+    },
+    {
+      "path": "agentflow-web/src/cashierFilters.ts",
+      "sha256": "ab5edace7f4cd1269a98ed19a5763546dafc4318980dbc9310d9b6b2127f7db5"
+    },
+    {
+      "path": "agentflow-web/src/components/CashierWorkspace.vue",
+      "sha256": "5cd4ccf3fd48785246966f6148fe2a8a7a9882235639200187e85d96362e5c22"
+    },
+    {
+      "path": "agentflow-web/src/payments.ts",
+      "sha256": "7e70af8b2a580b5ae4688d14a9b7e6962fd38315eee595566450384da977eaaa"
+    },
+    {
+      "path": "agentflow-web/tests/cashier-filters.test.mjs",
+      "sha256": "20c5400dacff7248343bfbf7014854a7d0f9ab275abca79720aa9717211d5871"
+    },
+    {
+      "path": "agentflow-web/tests/payments.test.mjs",
+      "sha256": "b3411ce9c1121cd930b84020bf4ce9b01338b67f84dea6ba3e11c6b9d50bcd0f"
+    }
+  ],
+  "archive": {
+    "directory": "/fyoung/tmp/agentflow-remaining-20260928/f16-runtime-evidence-20261004",
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/f16-runtime-evidence-20261004/manifest.json",
+    "manifestSha256": "41da7e9284e2756e754cd96f5cd88dfb41500500e6bb6eddd4911795633f51c7",
+    "files": 145,
+    "bytes": 29932555,
+    "verified": true
+  },
+  "limits": [
+    "F16 remains OPEN because due-date source and authorization-time write rules await the business answer. No due-date field or expiry rule has been changed.",
+    "The finance provider and tenants are synthetic. This does not establish actual ERP, budget, bank, SSO or enterprise-source acceptance.",
+    "H2 upgrade and recovery are verified; PostgreSQL and browser restrictions remain. The real Vue template uses a custom renderer, with payment detail stubbed, and does not establish browser layout, keyboard or touch acceptance.",
+    "No push, PR or CI acceptance is claimed. Six application processes from the successful runtime and component runs stopped; the pre-existing PID 87821 stayed live."
+  ]
+}

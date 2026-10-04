@@ -31,18 +31,20 @@ public class ExpenseController {
     private final ExpenseApprovalService approvals;
     private final ExpenseLifecycleService lifecycle;
     private final ExpenseReductionService reductions;
+    private final ExpenseAllowancePreparation allowances;
 
     /** 财务写入继续使用平台请求幂等及实际认证主体。 */
     public ExpenseController(ExpenseDraftService drafts, IdempotencyExecutor idempotency, ExpenseSubmissionService submissions,
-            ExpenseApprovalService approvals, ExpenseLifecycleService lifecycle, ExpenseReductionService reductions) {
+            ExpenseApprovalService approvals, ExpenseLifecycleService lifecycle, ExpenseReductionService reductions, ExpenseAllowancePreparation allowances) {
         this.drafts = drafts; this.idempotency = idempotency; this.submissions = submissions; this.approvals = approvals; this.lifecycle = lifecycle; this.reductions = reductions;
+        this.allowances = allowances;
     }
 
     /** 创建草稿，只绑定可用的已发布费用流程。 */
     @PostMapping
     public ResponseEntity<String> create(@Valid @RequestBody CreateRequest request, HttpServletRequest http) {
-        return idempotency.execute(http, HttpStatus.CREATED,
-                () -> drafts.create(request.businessNo(), request.processKey(), request.definitionVersion(), request.content()));
+        return idempotency.executePrepared(http, HttpStatus.CREATED, () -> allowances.prepare(request.content()),
+                prepared -> drafts.create(request.businessNo(), request.processKey(), request.definitionVersion(), prepared));
     }
 
     /** 查询自己的当前草稿或某个有节点字段权限的历史轮次。 */
@@ -52,8 +54,8 @@ public class ExpenseController {
     /** 完整替换当前费用内容，申请和财务版本必须同时匹配。 */
     @PostMapping("/{id}/revise")
     public ResponseEntity<String> revise(@PathVariable UUID id, @Valid @RequestBody ReviseRequest request, HttpServletRequest http) {
-        return idempotency.execute(http, HttpStatus.OK,
-                () -> drafts.revise(id, request.applicationVersion(), request.financialVersion(), request.content()));
+        return idempotency.executePrepared(http, HttpStatus.OK, () -> allowances.prepare(request.content()),
+                prepared -> drafts.revise(id, request.applicationVersion(), request.financialVersion(), prepared));
     }
 
     /** 正式提交与重提共用实际预检、双版本和当前审批轮次。 */

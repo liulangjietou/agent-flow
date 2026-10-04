@@ -113,11 +113,11 @@ class SupplierAdjustmentPersistenceTest {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
             return null;
         }).when(personnel).requireEligible(eq(tenant), anyString(), eq(entity));
-        holdService = proxy(new SupplierPayableHoldService(approvedSources, authorizations, holds, personnel, 30));
+        holdService = proxy(new SupplierPayableHoldService(approvedSources, authorizations, holds, personnel, 30, event -> { }));
         sources = new SupplierPaymentSources(approvedSources, authorizations, holds, personnel);
         requests = new JdbcSupplierPaymentExecutionRepository(jdbc, json, holds);
         payments = new JdbcSupplierPaymentOperationRepository(jdbc, json, requests, holds, authorizations);
-        preparation = proxy(new SupplierPaymentExecutionService(sources, requests, payments, 30)); bank = proxy(new SupplierPaymentService(sources, payments, 30));
+        preparation = proxy(new SupplierPaymentExecutionService(sources, requests, payments, event -> { }, 30)); bank = proxy(new SupplierPaymentService(sources, payments, event -> { }, 30));
         returnLedgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json));
         returnChecks = new JdbcSupplierPaymentReturnCheckRepository(jdbc, json);
         returnRegistrations = new JdbcSupplierPaymentReturnRepository(jdbc, json, returnLedgers, returnChecks, payments, new JdbcFinanceReceiptCreditRepository(jdbc));
@@ -126,11 +126,11 @@ class SupplierAdjustmentPersistenceTest {
         adjustments = new JdbcSupplierPayableAdjustmentRepository(jdbc, json, adjustmentIntents, adjustmentSources);
         completions = new JdbcSupplierAdjustmentCompletions(jdbc, json);
         completion = proxy(new SupplierAdjustmentCompletionService(adjustmentSources, adjustments, payments, returnLedgers, returnChecks, completions,
-                new JdbcFinanceReceiptCreditRepository(jdbc), reservations));
+                new JdbcFinanceReceiptCreditRepository(jdbc), reservations, event -> { }));
         var settlementSources = new SupplierSettlementSources(sources, approvedSources, payments, personnel, returnGuard);
         var eligibility = new SupplierAdjustmentSources(adjustmentSources, settlementSources, sources);
-        adjustmentPreparation = proxy(new SupplierAdjustmentPreparationService(adjustmentSources, eligibility, adjustmentIntents, adjustments, 30));
-        adjustmentExecution = proxy(new SupplierAdjustmentService(adjustmentSources, eligibility, settlementSources, adjustments, 30));
+        adjustmentPreparation = proxy(new SupplierAdjustmentPreparationService(adjustmentSources, eligibility, adjustmentIntents, adjustments, event -> { }, 30));
+        adjustmentExecution = proxy(new SupplierAdjustmentService(adjustmentSources, eligibility, settlementSources, adjustments, event -> { }, 30));
     }
 
 

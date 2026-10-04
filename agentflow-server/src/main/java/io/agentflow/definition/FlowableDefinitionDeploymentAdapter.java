@@ -66,6 +66,9 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
 
         static String write(DefinitionDraft draft, Map<String, String> subprocesses) {
             Graph graph = draft.graph();
+            boolean expenseSelfApproval = io.agentflow.expense.ExpenseSelfApprovalPolicy.enabled(graph);
+            boolean expenseDuplicateApproval = io.agentflow.expense.ExpenseDuplicateApprovalPolicy.enabled(graph);
+            var expenseSplit = io.agentflow.expense.ExpenseSplitRiskPolicy.from(graph);
             var decisionSources = graph.nodes().stream().filter(node -> node.type() == NodeType.USER_TASK)
                     .flatMap(node -> ApprovalResponsibilityPolicy.fromProperties(node.properties()).differentApproverFrom().stream())
                     .collect(java.util.stream.Collectors.toSet());
@@ -83,7 +86,7 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                             .append(escape(node.name())).append("\"/>");
                     case END -> xml.append("<endEvent id=\"").append(escape(node.id())).append("\" name=\"")
                             .append(escape(node.name())).append("\"/>");
-                    case USER_TASK -> appendUserTask(xml, node, decisionSources.contains(node.id()));
+                    case USER_TASK -> appendUserTask(xml, node, expenseSelfApproval || decisionSources.contains(node.id()), expenseSelfApproval, expenseDuplicateApproval);
                     case SUB_PROCESS -> xml.append("<callActivity id=\"").append(escape(node.id()))
                             .append("\" name=\"").append(escape(node.name())).append("\" calledElement=\"")
                             .append(escape(Objects.requireNonNull(subprocesses.get(node.id()), "Bound subprocess definition is required")))
@@ -96,6 +99,9 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                             .append("\" name=\"").append(escape(node.name())).append("\"><timerEventDefinition><timeDuration>")
                             .append(TimerWaitPolicy.fromProperties(node.properties()).duration())
                             .append("</timeDuration></timerEventDefinition></intermediateCatchEvent>");
+                    case SERVICE_TASK -> xml.append("<receiveTask id=\"").append(escape(node.id())).append("\" name=\"")
+                            .append(escape(node.name())).append("\"><extensionElements><flowable:executionListener event=\"start\" ")
+                            .append("delegateExpression=\"${flowableServiceTaskArrival}\"/></extensionElements></receiveTask>");
                     case COPY -> {
                         String encodedRule = Base64.getEncoder().encodeToString(node.properties().get("recipientRule")
                                 .getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -112,9 +118,13 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
             for (Edge edge : graph.edges()) {
                 xml.append("<sequenceFlow id=\"").append(escape(edge.id())).append("\" sourceRef=\"")
                         .append(escape(edge.source())).append("\" targetRef=\"").append(escape(edge.target())).append("\">");
+                if (expenseDuplicateApproval) xml.append("<extensionElements><flowable:executionListener event=\"take\" delegateExpression=\"${flowableExpenseDuplicateTrace}\"/></extensionElements>");
                 if (!edge.condition().isBlank()) {
                     String encodedCondition = Base64.getEncoder().encodeToString(edge.condition().getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                    xml.append("<conditionExpression xsi:type=\"tFormalExpression\">${flowableConditionEvaluator.matches(execution, '")
+                    boolean aggregateAmount = expenseSplit.mode() == io.agentflow.expense.ExpenseSplitRiskPolicy.Mode.ENABLED
+                            && expenseSplit.gatewayIds().contains(edge.source());
+                    xml.append("<conditionExpression xsi:type=\"tFormalExpression\">${flowableConditionEvaluator.")
+                            .append(aggregateAmount ? "matchesExpenseSplit" : "matches").append("(execution, '")
                             .append(encodedCondition).append("', ").append(graph.conditionLanguageVersion()).append(")}</conditionExpression>");
                 }
                 xml.append("</sequenceFlow>");
@@ -152,22 +162,24 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
             xml.append("/>");
         }
 
-        private static void appendUserTask(StringBuilder xml, Node node, boolean recordDecision) {
+        private static void appendUserTask(StringBuilder xml, Node node, boolean recordDecision, boolean expenseSelfApproval, boolean expenseDuplicateApproval) {
             String rule = Objects.requireNonNull(node.properties().get("assigneeRule"), "assigneeRule");
             xml.append("<userTask id=\"").append(escape(node.id())).append("\" name=\"")
                     .append(escape(node.name())).append("\"");
             ApprovalPolicy policy = node.approvalPolicy();
-            var responsibilities = ApprovalResponsibilityPolicy.fromProperties(node.properties());
+            var configured = ApprovalResponsibilityPolicy.fromProperties(node.properties());
+            var responsibilities = expenseSelfApproval
+                    ? new ApprovalResponsibilityPolicy(true, configured.differentApproverFrom()) : configured;
             String encodedRule = Base64.getEncoder().encodeToString(rule.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             String encodedReferences = Base64.getEncoder().encodeToString(String.join(",", responsibilities.differentApproverFrom())
                     .getBytes(java.nio.charset.StandardCharsets.UTF_8));
             if (policy.multiInstance()) {
                 // 全员模式保留既有表达式；其他方式只传入已校验枚举及整数，不能插入自定义表达式。
                 xml.append(" flowable:assignee=\"${agentflowCountersignUser}\">");
-                if (recordDecision) appendDecisionListener(xml);
+                if (recordDecision) appendDecisionListener(xml, expenseDuplicateApproval);
                 xml.append("<multiInstanceLoopCharacteristics isSequential=\"false\" ")
                         .append("flowable:collection=\"${flowableCountersignMembers.")
-                        .append(responsibilities.enabled() ? "resolveWithResponsibilities" : "resolve")
+                        .append(expenseSelfApproval ? "resolveExpense" : responsibilities.enabled() ? "resolveWithResponsibilities" : "resolve")
                         .append("(execution, '").append(encodedRule).append("'");
                 if (policy.mode() != ApprovalMode.ALL || responsibilities.enabled()) xml.append(", '").append(policy.mode().name()).append("', ").append(policy.percentage());
                 if (responsibilities.enabled()) xml.append(", ").append(responsibilities.excludeApplicant()).append(", '").append(encodedReferences).append("'");
@@ -180,7 +192,8 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
             }
             if (responsibilities.enabled()) {
                 // 角色必须先展开成真实人员再排除，不能保留候选组使冲突账号仍能领取。
-                xml.append(" flowable:candidateUsers=\"${flowableApprovalResponsibilities.resolve(execution, '")
+                xml.append(" flowable:candidateUsers=\"${flowableApprovalResponsibilities.")
+                        .append(expenseSelfApproval ? "resolveExpense" : "resolve").append("(execution, '")
                         .append(encodedRule).append("', ").append(responsibilities.excludeApplicant()).append(", '")
                         .append(encodedReferences).append("')}\"");
             } else if (FormAssigneePolicy.isFieldRule(rule) || io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)) {
@@ -195,12 +208,14 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                 throw new IllegalArgumentException("Unsupported assigneeRule: " + rule);
             }
             if (recordDecision) {
-                xml.append(">"); appendDecisionListener(xml); xml.append("</userTask>");
+                xml.append(">"); appendDecisionListener(xml, expenseDuplicateApproval); xml.append("</userTask>");
             } else xml.append("/>");
         }
 
-        private static void appendDecisionListener(StringBuilder xml) {
-            xml.append("<extensionElements><flowable:taskListener event=\"complete\" delegateExpression=\"${flowableApprovalResponsibilities}\"/></extensionElements>");
+        private static void appendDecisionListener(StringBuilder xml, boolean expenseDuplicateApproval) {
+            xml.append("<extensionElements><flowable:taskListener event=\"complete\" delegateExpression=\"${flowableApprovalResponsibilities}\"/>");
+            if (expenseDuplicateApproval) xml.append("<flowable:taskListener event=\"complete\" delegateExpression=\"${flowableExpenseDuplicateTrace}\"/>");
+            xml.append("</extensionElements>");
         }
 
         private static String escape(String value) {

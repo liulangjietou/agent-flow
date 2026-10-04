@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "taskId": "I01",
+  "status": "SYSTEM_DIAGNOSTICS_AND_REVIEW_UI_VERIFIED_LOCAL",
+  "recordedAt": "2026-10-04T04:39:03.885538+00:00",
+  "sourceCommit": "c9b47341164a6025cb0c23e4eb8c03a08f4c146b",
+  "baselineCommit": "4aa4f6bca13ffec77e83b6f4ddec6728540dbc4b",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "租户只读组织同步诊断、管理员核对页面、当前身份绑定读取、明确采用本地记录、原回执恢复及历史计划呈现。",
+  "validation": {
+    "backend": {
+      "selectedClasses": [
+        "SystemCheckServiceTest",
+        "SystemDiagnosticsConfigurationTest",
+        "SystemChecksIntegrationTest",
+        "SystemAdapterChecksIntegrationTest",
+        "OrganizationSyncApiIntegrationTest"
+      ],
+      "unique": 69,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "classes": {
+        "SystemCheckServiceTest": 13,
+        "SystemDiagnosticsConfigurationTest": 7,
+        "SystemChecksIntegrationTest": 10,
+        "SystemAdapterChecksIntegrationTest": 2,
+        "OrganizationSyncApiIntegrationTest": 37
+      }
+    },
+    "frontend": {
+      "tests": 134,
+      "uniqueNames": 134,
+      "pass": 134,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "selectedFiles": [
+        "organization-sync.test.mjs",
+        "organization-sync-panel.test.mjs",
+        "organization.test.mjs",
+        "organization-panel.test.mjs",
+        "system-checks.test.mjs",
+        "requests.test.mjs",
+        "authentication.test.mjs",
+        "expense-draft-assist.test.mjs",
+        "approval-proxies.test.mjs",
+        "timer-waits.test.mjs",
+        "tenant-initialization.test.mjs"
+      ]
+    },
+    "productionClientContract": {
+      "responses": 79,
+      "successfulWrites": 37,
+      "operations": [
+        "GET /api/v1/organization/synchronization",
+        "GET /api/v1/organization/synchronization/batches",
+        "GET /api/v1/organization/synchronization/batches/{id}",
+        "GET /api/v1/organization/synchronization/batches/{id}/plans",
+        "GET /api/v1/organization/synchronization/batches/{id}/transitions",
+        "GET /api/v1/organization/synchronization/plans/{planId}",
+        "POST /api/v1/organization/synchronization/batches",
+        "POST /api/v1/organization/synchronization/batches/{id}/apply",
+        "POST /api/v1/organization/synchronization/batches/{id}/cancel",
+        "POST /api/v1/organization/synchronization/batches/{id}/preflight",
+        "POST /api/v1/organization/synchronization/batches/{id}/retry"
+      ]
+    },
+    "typecheck": "PASS",
+    "viteBuild": "PASS",
+    "buildWarning": "现有单体入口产物超过 500 kB，保留构建提示；本阶段没有进行无关架构拆分。",
+    "authors": {
+      "javaFiles": 1679,
+      "namedTypes": 3304,
+      "missingAuthorTags": 0,
+      "parseErrors": 0
+    },
+    "redBeforeFix": [
+      {
+        "scope": "迟到写回执与本地草稿导航",
+        "tests": 9,
+        "pass": 7,
+        "fail": 2,
+        "artifact": "i01-ui-red-20261004/manifest.json"
+      },
+      {
+        "scope": "姓名和主体按原文显示",
+        "tests": 15,
+        "pass": 14,
+        "fail": 1,
+        "artifact": "i01-values-red-20261004/manifest.json"
+      },
+      {
+        "scope": "父级失权清空同步正文",
+        "tests": 16,
+        "pass": 15,
+        "fail": 1,
+        "artifact": "i01-parent-denial-red-20261004/manifest.json"
+      }
+    ]
+  },
+  "verified": [
+    "系统检查只查询本租户登记身份，不注册来源、不读取人员正文、不请求外部服务；配置状态始终不等于企业联调验收。",
+    "批次列表、来源事实、明确本地选择及当前修订、计划前后值、冲突、分页与原状态轨迹可以在真实 Vue 组件和模板中核对。",
+    "排队、取消、重试、应用单独确认；预检只生成计划，回执恢复只定位原记录，不触发下一步应用。",
+    "收到不完整或串记录的成功回执仍保留原幂等键及逐字节请求体。",
+    "账号切换、失权、超时和卸载隔离迟到读写；父级失权同步清空子页正文；本地未保存草稿优先显示。",
+    "业务姓名、稳定主体及前后值按原文显示，不能按枚举名翻译。"
+  ],
+  "limitations": [
+    "真实模板使用 Node 自定义 Vue 渲染器测试，不是浏览器可视验收。",
+    "浏览器受管理员策略限制，未重试、绕过或改用其他浏览器。",
+    "PostgreSQL 镜像层 I/O 受阻，未进行新范围 PostgreSQL 验收；未重启或删除相关环境。",
+    "本阶段尚未完成固定安装包真实 HTTP、非空升级、独立进程重启、配套恢复和旧审批轮次接续验收。",
+    "企业真实组织来源联调另属 E09；I01 继续 OPEN，项目仍有 34 项已登记未完成目标，V03 未完成因此计数是下限。"
+  ],
+  "preservation": {
+    "archive": "/fyoung/tmp/agentflow-remaining-20260928/i01-ui-evidence-20261004",
+    "manifestSha256": "3c1f95dd5f3bf39ebd0e600e6acf2a786c8b60a6f64e62c488efaf9a8f047fd7",
+    "files": 48,
+    "bytes": 3724815,
+    "preservedRuntimePid": 87821,
+    "mainWorkspaceUnchanged": true
+  },
+  "sourceFiles": [
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/system/SystemCheckService.java",
+      "sha256": "e62c2937be8a080ffd26fd445c3a4f9ac9ba813119ab1dd0bc5e35a8c57ec9ee"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/system/SystemDiagnostics.java",
+      "sha256": "7f6a0bf55268fd95f0f48906b1867ae9b872277926346aa20bec211eb7154e53"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/system/SystemCheckServiceTest.java",
+      "sha256": "ad52ea4fc97890363aacfcb062f6ea5790c58a5b12e4babca509de849f9ad857"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/system/SystemChecksIntegrationTest.java",
+      "sha256": "e6cbff71c430df16798cee2fd683d2a10588114c32ffbb8d87e55d6eb4202d58"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/system/SystemDiagnosticsConfigurationTest.java",
+      "sha256": "3d4977163ae83aea941da5050ab0f8501cdcf35bf980ccb4559b5221b090b7c6"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "67ec02a5bab44338a2590b276c46835ea525b1ae02914f5e3ab2724a973a72fd"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "sha256": "e79a42934a7f4e37ca271e4723dfface3e356cc82006de4faecc0c90218ce600"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "1f80dd44e59f0ca1c111f68f0593e93ee28e95333cd1e6a9a3753016ed759e1b"
+    },
+    {
+      "path": "agentflow-web/src/components/OrganizationDirectory.vue",
+      "sha256": "e1d980eaa73188aea3e7edd45d6f6dc1916e20e79407884226afb8047972657b"
+    },
+    {
+      "path": "agentflow-web/src/components/OrganizationSyncValue.vue",
+      "sha256": "0035fd608d0ed15533187ab64178414fb578aadaa21d171630c4f209139bf370"
+    },
+    {
+      "path": "agentflow-web/src/components/OrganizationSynchronization.vue",
+      "sha256": "006e0da3143e7a343c9ed683c81b7dc9c969ca6bbc48370bc9cd89895740691e"
+    },
+    {
+      "path": "agentflow-web/src/components/SystemChecks.vue",
+      "sha256": "c5de7ba5fcae729113d42ab67c9b0298591673789f6569ff23e53fce99239de0"
+    },
+    {
+      "path": "agentflow-web/src/organizationSync.ts",
+      "sha256": "30f4a65ebf69550f3e219e617f1bbf1f205af4fbbff6d741f692893c70de5e50"
+    },
+    {
+      "path": "agentflow-web/src/organizationSyncRead.ts",
+      "sha256": "4aa44f323ab6873c05237ad701d9db8305fd9f383681b68b32d239bd70d9c04a"
+    },
+    {
+      "path": "agentflow-web/tests/organization-sync-fixtures.mjs",
+      "sha256": "c30c22fc3ffd07c1d147a82fb334a5e20537e6337df6c2f657358e67f9576c2f"
+    },
+    {
+      "path": "agentflow-web/tests/organization-sync-panel.test.mjs",
+      "sha256": "a915da8baef63acc962c6bdaf0fe225fba45ba2ea1e7fd491d371f7792714c76"
+    },
+    {
+      "path": "agentflow-web/tests/organization-sync.test.mjs",
+      "sha256": "445f66fe49ad36c391b03605739be656671fcf3565ae7e640a90d2727dfdad64"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "i01-system-checks.log",
+      "sha256": "b08d3bed41d7bd510a1f0eb2d0db1b1b2b038f0a960c031c8be4c4d24306858c"
+    },
+    {
+      "path": "i01-system-checks-summary.json",
+      "sha256": "3c4531be81e310a583e20e507acd4e4c19193d4ca81cb4748ae1dd5a2906d1b2"
+    },
+    {
+      "path": "i01-ui-final-v2.log",
+      "sha256": "7cedcfbde82b24b64e8e55ae07ce8fe4c858d4e5ff67fe428034f89fc378c9ee"
+    },
+    {
+      "path": "i01-ui-final-summary.json",
+      "sha256": "b564ed8db0bc3e1800305b67fd20c8b5a6c0b5b5e9aead572b6300f1d3911f5d"
+    },
+    {
+      "path": "i01-client-contract-final-v2-summary.json",
+      "sha256": "df18a9ede2279883668f1aba4e3c3e7f63bc1b2668d85cd48e0c3d73dc636756"
+    },
+    {
+      "path": "i01-ui-build-final.log",
+      "sha256": "b5d4d07539b1381972a2614d73e5d7719d666b15e92ef43963ce3a290c181c35"
+    },
+    {
+      "path": "i01-ui-authors.log",
+      "sha256": "8d5725fa3aa497da3235ee9edc2046031fc168c41d370f758a8df68209d751a4"
+    },
+    {
+      "path": "i01-backend-http-final.json",
+      "sha256": "34c5432ba0407502bd089a55f9531c3bc1693d77bd6854d8b52c3be3ff24c091"
+    }
+  ],
+  "remaining": [
+    "固定包 HTTP、非空升级、重启、配套恢复及原审批轮次接续验收。",
+    "策略和环境恢复后补浏览器与 PostgreSQL 新范围验收。",
+    "企业实际来源另行 E09 联调。"
+  ]
+}

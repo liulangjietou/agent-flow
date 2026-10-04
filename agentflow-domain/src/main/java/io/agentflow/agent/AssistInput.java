@@ -37,7 +37,7 @@ public record AssistInput(UUID applicationId, long applicationVersion, int round
      * @author owlzhangfq@gmail.com
      */
     public record Reference(String sourceId, String contentDigest) {
-        private static final Pattern SOURCE_ID = Pattern.compile("(?:application|form):[A-Za-z][A-Za-z0-9_.\\[\\]-]{0,128}");
+        private static final Pattern SOURCE_ID = Pattern.compile("(?:application|form|precheck|expense):[A-Za-z][A-Za-z0-9_.\\[\\]-]{0,128}");
         private static final Pattern SHA256 = Pattern.compile("[a-f0-9]{64}");
 
         /** 标识是输入清单中的不透明键，禁止被当成 URL、文件路径或工具调用执行。 */

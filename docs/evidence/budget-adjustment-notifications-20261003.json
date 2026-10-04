@@ -1,0 +1,439 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T21:58:01.424976+00:00",
+  "task": "F17",
+  "status": "LOCAL_IMPLEMENTATION_AND_SCOPE_VALIDATION_COMPLETE_F17_REMAINS_OPEN",
+  "sourceCommit": "d0bac54f3cf6741daa6c5dcb0f0f69362245bcec",
+  "branch": "codex/governance-identifier-integration",
+  "knownOpenTaskCount": 34,
+  "sourceTrace": {
+    "callers": [
+      "BudgetAdjustmentFinanceController",
+      "BudgetAdjustmentFinanceActions",
+      "BudgetAdjustmentReviewWorker",
+      "BudgetAdjustmentExecutionWorker"
+    ],
+    "owners": "Budget domain owns original review, command, result, conflict and retirement; application services publish only after persistence in the finance transaction. Notification access proves original approved request revision and historical message fact/time while checking current original-round permissions.",
+    "downstream": [
+      "original approved request revision",
+      "review revisions",
+      "operation revisions",
+      "retirement proof",
+      "inbox",
+      "outbound dispatch intention",
+      "audit"
+    ]
+  },
+  "delivered": [
+    "授权前台账复核不可用、条件不满足、来源停止的独立消息",
+    "原预算指令未知、查无、拒绝、生效、矛盾、到期、停止和安全结束通知",
+    "原来源详情与原轮次导航；未知消息可显示同一指令后续结果，新授权不替换旧来源",
+    "通知失败回滚查询、操作修订、安全结束与外发意向；实时任职和字段权限校验",
+    "持久批准修订及原操作历史证明消息事实和发生时刻；重复事件和原键回放去重",
+    "实际 Vue 组件覆盖只读入口、真实结果与冲突模板、身份变化、权限丢失、超时、卸载和导航锁"
+  ],
+  "redEvidence": [
+    {
+      "session": 39427,
+      "exit": 1,
+      "tests": 4,
+      "failures": 4,
+      "errors": 0,
+      "reason": "Real review failure, unknown, conflicting receipt and safe retirement paths produced no original applicant/finance notices."
+    },
+    {
+      "session": 94615,
+      "exit": 1,
+      "reason": "Actual rendered inbox lacked 查看预算调整."
+    }
+  ],
+  "validation": {
+    "java": {
+      "distinctTests": 113,
+      "byClass": {
+        "io.agentflow.budget.BudgetAdjustmentOperationTest": 9,
+        "io.agentflow.budget.BudgetAdjustmentReviewTest": 6,
+        "io.agentflow.budget.BudgetAdjustmentCommandTest": 8,
+        "io.agentflow.budget.BudgetAdjustmentRequestTest": 5,
+        "io.agentflow.budget.BudgetAdjustmentFinanceWorkflowTest": 20,
+        "io.agentflow.budget.BudgetAdjustmentExecutionPersistenceTest": 17,
+        "io.agentflow.finance.GatewayBudgetAdjustmentTest": 6,
+        "io.agentflow.finance.GatewayBudgetLedgerTest": 5,
+        "io.agentflow.notification.InboxIntegrationTest": 9,
+        "io.agentflow.notification.NotificationDeliveryApiIntegrationTest": 8,
+        "io.agentflow.notification.NotificationDeliveryIntegrationTest": 13,
+        "io.agentflow.api.OpenApiContractTest": 7
+      },
+      "byModule": {
+        "agentflow-domain": 28,
+        "agentflow-server": 85
+      },
+      "newIntegrationCases": 9,
+      "newDomainCases": 3,
+      "allPassed": true,
+      "rawRuns": [
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-domain/TEST-io.agentflow.budget.BudgetAdjustmentOperationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-domain/TEST-io.agentflow.budget.BudgetAdjustmentReviewTest.xml",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-domain/TEST-io.agentflow.budget.BudgetAdjustmentCommandTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-domain/TEST-io.agentflow.budget.BudgetAdjustmentRequestTest.xml",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.budget.BudgetAdjustmentFinanceWorkflowTest.xml",
+          "tests": 20,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.budget.BudgetAdjustmentExecutionPersistenceTest.xml",
+          "tests": 17,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.finance.GatewayBudgetAdjustmentTest.xml",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.finance.GatewayBudgetLedgerTest.xml",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.api.OpenApiContractTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "frontend": {
+      "tests": 220,
+      "passed": 220,
+      "failed": 0,
+      "files": 20,
+      "newNoticeTests": 10,
+      "selection": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-web-files.json"
+    },
+    "typecheck": "PASS after correcting stale imported label names in new component; initial compiler diagnostics retained",
+    "productionBuild": {
+      "result": "PASS",
+      "remainingWarning": "existing chunk larger than 500 kB"
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 357,
+      "schemas": 730,
+      "requestExamples": 125
+    },
+    "authors": {
+      "result": "PASS",
+      "files": 1608,
+      "namedTypes": 3112,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "diffCheck": "PASS"
+  },
+  "sourceHashes": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/BudgetAdjustmentNotice.java",
+      "sha256": "874688fecb5fe3d00a8fa9a5e9157a20e3a95100df2a4d412837ad6bc5fe0eee"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java",
+      "sha256": "4478d873bda8609b90515afe5662083a340c8628cdb66096ecb14a4843c074c3"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/budget/BudgetAdjustmentOperationTest.java",
+      "sha256": "36f8517254118e1008fa43a822a60edd88803a4f15e9ff94d34ee1ccf64103fb"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/budget/BudgetAdjustmentReviewTest.java",
+      "sha256": "cd44605d35260284f636eba6b06feb4e91b0eea80b7d4afa14503bc506b372e7"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentExecutionService.java",
+      "sha256": "91e886287692cd0bbb84023c3f91aba7630d224ef8d6df9d1ec300890b36cb1d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentOperationChanged.java",
+      "sha256": "71ca52b543f16e15ea7b29f7ef3c87a61f367cd1c15cffb33f034d09628a4526"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentReviewChanged.java",
+      "sha256": "d1e6bfa2ef884f6ad5f6c0d4edbd2a782d9f33bfe8a98dffc6353d9f622e4e9a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentReviewService.java",
+      "sha256": "4e94f1915662772c2c3286d31cd1780dceeca662755a9cb17741e2cd7f0a6906"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/budget/JdbcBudgetAdjustmentOperationRepository.java",
+      "sha256": "f0615088a63d782ac5e18765dd949b8e63dd4db29563ad1a37b6b611ba20af75"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/BudgetAdjustmentNotificationAccess.java",
+      "sha256": "660c62f03a82b1655f0e6d9fbe607c5f67ae0e1c0e1ca9f3b0a827e65c2776c5"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/BudgetAdjustmentNotificationController.java",
+      "sha256": "c7c6c0311afc77d9334da1df5809a535031aa9b99b5884e05052351123e29ee2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/BudgetAdjustmentNotificationService.java",
+      "sha256": "fc1f751a3fd6ee0777546f60820ecc568c54fcec68df682a916164dcea6a34f2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java",
+      "sha256": "464ff5e82b0a0b5594b6782f2ec66bdb539d60f92204842e099ebe06e7a71bf9"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "a7c3b357ceecea758e1714f60d52b70e1afc4ecf64c874e6850a638eafef44b4"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java",
+      "sha256": "0e85ffcdca4eb6367b1d378d1300f178cb6c07be2feb3c60fa275520c795b3d4"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/budget/BudgetAdjustmentExecutionPersistenceTest.java",
+      "sha256": "68483d01672a2dc4c5465ceaba80cc67af48b9834c0c900af5df30bb0db7b864"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/budget/BudgetAdjustmentFinanceWorkflowTest.java",
+      "sha256": "82a4cfedd40168f391ead88db20c3abcc40df353ec6357f4b2fc460a4a1ecb71"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "505b55444ca352b623a827f93d01be214139941996e476afe690e6d9b621f787"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "sha256": "0c5eb84b94ee63753c80d3afd6fbe86ef3d82fbc2dda24080a82f96f1327b70b"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "b14219b2072ed62c1e7506531c994ad355cf561f0b7382b0a4f55298c299c857"
+    },
+    {
+      "path": "agentflow-web/src/budgetAdjustmentNotification.ts",
+      "sha256": "e9651e67716d9d1f037eb18804e43d30af3076407fb4beffc70d55f4360171af"
+    },
+    {
+      "path": "agentflow-web/src/components/BudgetAdjustmentNotificationDetail.vue",
+      "sha256": "921d58ff775ddf5ab403b5140f3177f4fa3f501fd1ba83a357dd643674abed81"
+    },
+    {
+      "path": "agentflow-web/src/components/NotificationInbox.vue",
+      "sha256": "452f9b16fa6be178b59c0aba90d06d25c4fa024fa811066c2371209dcdfc5a4d"
+    },
+    {
+      "path": "agentflow-web/src/notificationInbox.ts",
+      "sha256": "2c80485ba7b942d2898e649c0cb05e07a8cb1dc0cfc22abc21bb5fb72db89112"
+    },
+    {
+      "path": "agentflow-web/tests/budget-adjustment-notifications.test.mjs",
+      "sha256": "91d612c03abb6eb5284e70cfa92eebf711fd90632f379eddbda54cacd20c1234"
+    }
+  ],
+  "artifactHashes": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-authors.log",
+      "sha256": "eef13fec079480b3491353887ad4af40c8ff0248684e63eebb04bc487221e206",
+      "bytes": 73
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-build.log",
+      "sha256": "123f012af8bcb4c476af5edb2ee5704591e67cef20b2f99b10e547ad28c87a60",
+      "bytes": 718
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-domain/TEST-io.agentflow.budget.BudgetAdjustmentCommandTest.xml",
+      "sha256": "6226201e4509dbf3b23ede19314e1400bc9d2a9e1eacc6d3231df2a11f62e01e",
+      "bytes": 11583
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-domain/TEST-io.agentflow.budget.BudgetAdjustmentOperationTest.xml",
+      "sha256": "93285553acb05cc9435d7bd9f93c908e0dc5d56b9d61c814fd93af2773704c69",
+      "bytes": 11804
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-domain/TEST-io.agentflow.budget.BudgetAdjustmentRequestTest.xml",
+      "sha256": "8d388748281b97916bb31f940708ee623afb6b2a342132153ec0209fb2fd7983",
+      "bytes": 11130
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-domain/TEST-io.agentflow.budget.BudgetAdjustmentReviewTest.xml",
+      "sha256": "a44ebd5c939cff5778874dcdbcd02033a138301b27914b0c6da5bd66288d1c87",
+      "bytes": 11274
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.api.OpenApiContractTest.xml",
+      "sha256": "3c57c0ab34bae322e864ee48f9311ca341e564280c244f071088f34ebfd9e933",
+      "bytes": 74007
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.budget.BudgetAdjustmentExecutionPersistenceTest.xml",
+      "sha256": "fa2b8bbdc72cef06fd5fa8c801f28c4de7319e7f35b4d0160ce1dc8026c962a1",
+      "bytes": 530776
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.budget.BudgetAdjustmentFinanceWorkflowTest.xml",
+      "sha256": "b060ef6ceef018a3feca2771b2e4024af45c50689e9d03d2bdf9b7ac45b7fa7d",
+      "bytes": 76711
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.finance.GatewayBudgetAdjustmentTest.xml",
+      "sha256": "db4a9a71449024a972818640e8954c9ccf119ed0e0146eb19534a7aef04311ea",
+      "bytes": 44288
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.finance.GatewayBudgetLedgerTest.xml",
+      "sha256": "3ca4cc569f7250570c0c358f6ead8ec557e1e7755631a181cac33b8e2df60ed8",
+      "bytes": 44183
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+      "sha256": "b82367cc4fd1f75367e8317e03bab1376d8f707fc65ad04799347b8d92bb2688",
+      "bytes": 74495
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+      "sha256": "d49f42ed23163a88e37079e83ef4db5afd78087219395e5dfeb8541506444f1e",
+      "bytes": 74624
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-final-reports/agentflow-server/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+      "sha256": "e2b3632b9d0e575b856a60cbe4d21ddfbd8575a986ed13f2646e4a249909beae",
+      "bytes": 74842
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-inbox-green.log",
+      "sha256": "d7d0b818f58a7703ed0632fd4da5e79e4aafb7582ab5ff1f6f1856d46dd395a0",
+      "bytes": 190
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-inbox-red.log",
+      "sha256": "f100a517fd29a0a19baebcbc245a4e04c909046f743b10a4fcc3ea1dfb2d07bf",
+      "bytes": 930
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-java-summary.json",
+      "sha256": "a3947724942a0e4d4a31297b8f3fcd23e6a0b0d903042e331c4d8635b3390e6a",
+      "bytes": 4233
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-next-audit.json",
+      "sha256": "cd1403a0ccd932b7283746ec3fda2d937f7a8d38dbf539370f59e191178f7de6",
+      "bytes": 1074
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-openapi.log",
+      "sha256": "f253f81ee931c1fa32002c4617890b2af8d98c4d7d54468d63979fb4e82a9bf4",
+      "bytes": 71
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-red-reports/TEST-io.agentflow.budget.BudgetAdjustmentFinanceWorkflowTest.xml",
+      "sha256": "fff24582863360b957faedce0d77171384d5195e854e3d687b2fb278d5e4970a",
+      "bytes": 76935
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-red.log",
+      "sha256": "d0104da962ab8be33009453a0a12bc7a88e53f947ed18b6c5aa9576bcba028e0",
+      "bytes": 47485
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-scope.log",
+      "sha256": "be3545735e07d4625128244aff878bfea1a263e229e9cfd80c5aaa57b0c17daf",
+      "bytes": 647706
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-source-manifest.json",
+      "sha256": "20f87eb5cf14d41d58669f53a4dc0795a78a0cb1fae2370ce4c47a67c62c7c5a",
+      "bytes": 4464
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-typecheck-initial.log",
+      "sha256": "73b17fe9ddc546b1ee70060da65ac9575549bd2441c63274f1d99fca84861b49",
+      "bytes": 812
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-typecheck.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-web-files.json",
+      "sha256": "9f63aa613b149885568e8b3646525eeb51b37e8cb6fce2a453485337e462c73d",
+      "bytes": 808
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-web-final.log",
+      "sha256": "e94b012042f5e5077d01dee206b9bb542be144eca82c25951d87200ffbeb1785",
+      "bytes": 20854
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/budget-adjustment-notifications-web-initial.log",
+      "sha256": "58046993a195e71f8f60641e8597953da76bd8d68df772757f0046969a64b1a7",
+      "bytes": 1022
+    }
+  ],
+  "remaining": [
+    "F17: expense resource adjustment and remaining independent financial exception sources require call-chain and notification coverage audit.",
+    "F17: fixed package, real browser, PostgreSQL and enterprise environment acceptance remain pending.",
+    "Known open ledger stays 34; inventory V03 is incomplete.",
+    "Local-first delivery: E15 remains dependent on V02; no push or PR in this stage."
+  ]
+}

@@ -8,7 +8,7 @@ const emit = defineEmits<{ busy: [value: boolean] }>()
 const view = ref<FinancePaymentView | null>(null), loading = ref(false), saving = ref(false), requiresRefresh = ref(false), unconfirmed = ref(false)
 type Action = FinancePaymentAction | 'RESOLVE_DISPUTE'
 const actionLabels = { ...financePaymentLabels, RESOLVE_DISPUTE: '确认原付款对账结果' }
-const error = ref(''), notice = ref(''), pending = ref<Action | null>(null), comment = ref(''), evidenceReference = ref(''), validityMinutes = ref(15), form = ref<HTMLFormElement | null>(null)
+const error = ref(''), notice = ref(''), pending = ref<Action | null>(null), comment = ref(''), evidenceReference = ref(''), validityMinutes = ref(15), dueDate = ref(''), form = ref<HTMLFormElement | null>(null)
 let epoch = 0, controller: AbortController | null = null
 function syncPending() {
   const current = writeRequests.pending().some(entry => entry.path === `/applications/${encodeURIComponent(props.applicationId)}/payments/authorizations` || entry.path.startsWith('/payments/'))
@@ -22,7 +22,7 @@ function stop() { epoch++; controller?.abort(); controller = null }
 async function load() {
   if (saving.value || !props.scopeKey) return
   stop(); const current = epoch, request = new AbortController(); controller = request; loading.value = true
-  view.value = null; pending.value = null; comment.value = ''; evidenceReference.value = ''; error.value = ''
+  view.value = null; pending.value = null; comment.value = ''; evidenceReference.value = ''; dueDate.value = ''; error.value = ''
   const binding: PaymentBinding = { applicationId: props.applicationId, businessId: props.businessId, roundNo: props.roundNo, applicationVersion: props.applicationVersion, businessVersion: props.businessVersion }
   const timeout = setTimeout(() => { if (current === epoch) { stop(); loading.value = false; error.value = '付款状态读取超时，请重新查询。' } }, 12_000)
   try {
@@ -35,13 +35,13 @@ async function load() {
 function allowed(action: Action) { return action === 'RESOLVE_DISPUTE' ? !!view.value?.dispute?.canResolve : !!view.value?.actions[financePaymentActionKeys[action]] }
 function prepare(action: Action) {
   if (blocked.value || !allowed(action)) return
-  pending.value = action; comment.value = ''; evidenceReference.value = ''; error.value = ''; notice.value = ''; const current = epoch
+  pending.value = action; comment.value = ''; evidenceReference.value = ''; dueDate.value = ''; error.value = ''; notice.value = ''; const current = epoch
   void nextTick(() => { if (current === epoch) form.value?.querySelector('textarea')?.focus() })
 }
 async function execute() {
   const value = view.value, action = pending.value; if (!value || !action || blocked.value) return
   let input
-  try { input = action === 'RESOLVE_DISPUTE' ? paymentDisputeInput(value, evidenceReference.value, comment.value) : financePaymentInput(value, action, comment.value, validityMinutes.value * 60) } catch (cause) { error.value = paymentError(cause); return }
+  try { input = action === 'RESOLVE_DISPUTE' ? paymentDisputeInput(value, evidenceReference.value, comment.value) : financePaymentInput(value, action, comment.value, validityMinutes.value * 60, Date.now(), dueDate.value) } catch (cause) { error.value = paymentError(cause); return }
   const current = epoch; saving.value = true; emit('busy', true); error.value = ''
   try {
     if ('outcome' in input) {
@@ -63,7 +63,7 @@ async function execute() {
   finally { if (current === epoch) { saving.value = false; syncPending(); emit('busy', false) } }
 }
 watch(() => JSON.stringify([props.scopeKey, props.applicationId, props.businessId, props.roundNo, props.applicationVersion, props.businessVersion]), () => {
-  stop(); view.value = null; loading.value = false; saving.value = false; error.value = ''; notice.value = ''; pending.value = null; comment.value = ''; evidenceReference.value = ''; requiresRefresh.value = false; validityMinutes.value = 15
+  stop(); view.value = null; loading.value = false; saving.value = false; error.value = ''; notice.value = ''; pending.value = null; comment.value = ''; evidenceReference.value = ''; dueDate.value = ''; requiresRefresh.value = false; validityMinutes.value = 15
   syncPending(); emit('busy', false); if (props.scopeKey) void load()
 }, { immediate: true, flush: 'sync' })
 onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
@@ -107,10 +107,11 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
         <p v-else-if="pending === 'RETIRE'">确认原命令从未发送，或资金系统已确认终态失败。结束后保留原记录，重新付款需要财务再次授权和独立出纳确认；本次操作不会发起付款。</p>
         <p v-else-if="pending === 'RESOLVE_DISPUTE'">确认采用：{{ disputeOutcomeLabels[view.dispute!.candidate!.outcome] }}。原交易和冲突历史保留；成功结论仅恢复与原到账依据一致的资金使用，退回结论保留原账及后续调整要求。</p>
         <p v-else>只查询原交易及回单，不发起新的付款。</p>
+        <label v-if="pending === 'AUTHORIZE' || pending === 'AUTHORIZE_REVIEWED'">付款到期日<input v-model="dueDate" aria-label="付款到期日" type="date" min="0001-01-01" max="9999-12-31" required :disabled="saving" /><small>按本次业务约定填写；此日期不会延长授权有效期。</small></label>
         <label v-if="pending === 'AUTHORIZE' || pending === 'AUTHORIZE_REVIEWED'">授权有效期（分钟）<input v-model.number="validityMinutes" type="number" min="1" max="1440" step="1" required :disabled="saving" /></label>
         <label v-if="pending === 'RESOLVE_DISPUTE'">对账凭据编号<input v-model="evidenceReference" type="text" maxlength="128" required :disabled="saving" placeholder="银行或资金系统对账材料编号" /></label>
         <label>办理说明<textarea v-model="comment" maxlength="2000" required rows="3" :disabled="saving" placeholder="说明本次授权、停止或核对的依据" /></label>
-        <div class="payment-buttons"><button class="primary" :disabled="blocked">{{ saving ? '正在登记…' : pending === 'RESOLVE_DISPUTE' ? '确认裁决并保存' : '确认' + actionLabels[pending] }}</button><button type="button" class="quiet" :disabled="saving" @click="pending = null; comment = ''; evidenceReference = ''">取消</button></div>
+        <div class="payment-buttons"><button class="primary" :disabled="blocked">{{ saving ? '正在登记…' : pending === 'RESOLVE_DISPUTE' ? '确认裁决并保存' : '确认' + actionLabels[pending] }}</button><button type="button" class="quiet" :disabled="saving" @click="pending = null; comment = ''; evidenceReference = ''; dueDate = ''">取消</button></div>
       </form>
     </template>
   </section>

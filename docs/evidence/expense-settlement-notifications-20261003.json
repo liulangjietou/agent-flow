@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F17",
+  "taskStatus": "OPEN",
+  "stage": "EXPENSE_SETTLEMENT_REVISION_NOTIFICATIONS_BACKEND_AND_UI",
+  "recordedAt": "2026-10-03T19:34:32.390251+00:00",
+  "implementationCommit": "d78674dd5ed4df9c3e3a07202034fb0b76f0e9be",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/Volumes/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "All four original settlement writers route state/revision persistence and event publication through one transactional application service. Domain transitions and original resource, budget and financial invariants stay in their existing owners.",
+    "Persisted BLOCKED, BUDGET_REJECTED, REVIEW_REQUIRED and SETTLED revisions generate minimal original-participant messages and dispatch intents. QUEUED and BUDGET_PENDING stay quiet.",
+    "Original applicant, original accounting preparation and payment authorization participants are proven from immutable sources; zero amount uses only an adjustment actor proven by the exact financial revision. Current personnel and legal-entity appointments are rechecked.",
+    "Original notice revision and current settlement state are read separately under current original-round field permissions. No amount, account, receipt detail or action permission is returned. Actual Vue detail preserves history, funding distinctions and guarded original-round navigation."
+  ],
+  "validation": {
+    "java": {
+      "result": "PASS",
+      "distinctTests": 179,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "path": "TEST-io.agentflow.api.OpenApiContractTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.expense.ExpensePaymentReturnTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.expense.ExpenseSettlementPersistenceTest.xml",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.expense.ExpenseSettlementTest.xml",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+          "tests": 125,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.ExpenseSettlementNoticeTest.xml",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/expense-settlement-notifications-final-reports"
+    },
+    "web": {
+      "result": "PASS",
+      "tests": 140,
+      "files": 14,
+      "newNotificationTests": 8,
+      "existingSettlementTests": 7,
+      "otherNotificationAndVoucherTests": 125,
+      "logs": [
+        "/fyoung/tmp/agentflow-remaining-20260928/expense-settlement-notifications-web-final.log"
+      ]
+    },
+    "typecheck": "PASS",
+    "build": "PASS",
+    "openapi": {
+      "result": "PASS",
+      "operations": 349,
+      "schemas": 700,
+      "requestExamples": 125
+    },
+    "authors": {
+      "javaFiles": 1564,
+      "namedTypes": 3002,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "diffCheck": "PASS"
+  },
+  "reproductions": [
+    {
+      "result": "EXPECTED_BEHAVIORAL_FAILURE",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-settlement-notifications-red.log",
+      "tests": 2,
+      "failures": 2,
+      "errors": 0,
+      "reason": "Actual persisted settlement completion and blocked resources had empty original-recipient notification queries."
+    },
+    {
+      "result": "EXPECTED_BEHAVIORAL_FAILURE",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/expense-settlement-notifications-web-red.log",
+      "tests": 1,
+      "reason": "Actual Inbox lacked original settlement entry."
+    }
+  ],
+  "corrections": [
+    "First new UI run could not resolve an extensionless import in the Node ESM harness. Corrected to the existing .js import convention; this setup failure is not behavioral RED.",
+    "Initial Java selection included unmatched migration-class names. Counts come only from actual XML test identities; the authoritative ExpenseSettlementPersistenceTest was then run with four passing cases and added to the final snapshot."
+  ],
+  "sourceEvidence": {
+    "files": 25,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/expense-settlement-notifications-evidence-snapshot/sources.json",
+    "verifiedAgainstCommit": "d78674dd5ed4df9c3e3a07202034fb0b76f0e9be"
+  },
+  "artifactEvidence": {
+    "files": 36,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/expense-settlement-notifications-evidence-snapshot/artifacts.json"
+  },
+  "boundaries": [
+    "H2, synthetic finance protocol, Spring MockMvc and actual Vue host renderer; no installed-package, browser, PostgreSQL or enterprise acceptance claimed.",
+    "Existing browser administrator-policy block and PostgreSQL image-layer I/O block remain unchanged; no bypass or environment repair attempted.",
+    "Supplier settlement and adjustment, distinct expense return and resource recovery, and independent budget recovery/adjustment sources require the next F17 source audit and implementation.",
+    "Fixed-version HTTP, nonempty runtime upgrade, restart and paired restore remain pending for full F17.",
+    "Local development only; no push or PR before final V02/E15 gate."
+  ],
+  "goalCounting": {
+    "knownOpen": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "sessions": {
+    "80482": "EXIT_1_EXPECTED_BACKEND_RED",
+    "94199": "EXIT_1_EXPECTED_WEB_RED",
+    "32973": "EXIT_0",
+    "74420": "EXIT_1_ESM_IMPORT_SETUP_FIXED",
+    "14168": "EXIT_0",
+    "83688": "EXIT_0",
+    "48075": "EXIT_0",
+    "66528": "EXIT_0",
+    "96986": "EXIT_0",
+    "66701": "EXIT_0"
+  }
+}

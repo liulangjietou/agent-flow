@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F17",
+  "taskStatus": "OPEN",
+  "stage": "EXPENSE_BUDGET_OPERATION_NOTIFICATIONS_BACKEND_AND_UI",
+  "recordedAt": "2026-10-03T18:25:31.638769+00:00",
+  "implementationCommit": "2e20706437525d50af807f7e0017dfb76803a350",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/Volumes/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "Expense FREEZE, ADJUST, RELEASE and CONSUME original command facts",
+    "Immutable original financial revision proves applicant and exact-version reducer; no inference from current roles",
+    "Separate Changed event preserves terminal-only Completed business semantics",
+    "Atomic minimal inbox and outbound intents with live source/recipient checks",
+    "Protected original budget-target, actual Vue inbox/detail, original-round navigation and stale-response protection"
+  ],
+  "validation": {
+    "java": {
+      "result": "PASS",
+      "distinctTests": 85,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "path": "TEST-io.agentflow.api.OpenApiContractTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.expense.ExpenseBudgetRetentionIntegrationTest.xml",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.BudgetOperationIntegrationTest.xml",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.finance.BudgetOperationTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.BudgetNoticeTest.xml",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "matchedLog": "/fyoung/tmp/agentflow-remaining-20260928/budget-notifications-matched.log",
+      "finalBudgetLog": "/fyoung/tmp/agentflow-remaining-20260928/budget-notifications-delivery-final.log",
+      "counting": "BudgetOperationIntegrationTest final 13 replaces matched 13. Other final suites retained from matched run. Count actual distinct testcase identities; reruns are not added."
+    },
+    "web": {
+      "result": "PASS",
+      "tests": 77,
+      "failures": 0,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-notifications-web-final.log",
+      "files": [
+        "budget-notifications.test.mjs",
+        "voucher-notifications.test.mjs",
+        "supplier-payment-notifications.test.mjs",
+        "payment-notifications.test.mjs",
+        "notifications.test.mjs",
+        "notification-deliveries.test.mjs",
+        "vouchers.test.mjs"
+      ]
+    },
+    "typecheck": {
+      "result": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-notifications-typecheck-complete.log"
+    },
+    "build": {
+      "result": "PASS",
+      "warning": "Existing bundle-size warning remains",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-notifications-build.log"
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 346,
+      "schemas": 691,
+      "requestExamples": 125,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-notifications-openapi.log"
+    },
+    "authors": {
+      "result": "PASS",
+      "files": 1544,
+      "types": 2963,
+      "missing": 0,
+      "parseErrors": 0,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-notifications-authors-final.log"
+    }
+  },
+  "reproductions": [
+    {
+      "result": "EXPECTED_BEHAVIORAL_FAILURE",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-notifications-red.log",
+      "tests": 2,
+      "reason": "Persisted UNKNOWN and expired lease had no applicant notification. Assertions failed with empty recipients; no fixture/compile error."
+    },
+    {
+      "result": "EXPECTED_BEHAVIORAL_FAILURE",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/budget-notifications-web-red.log",
+      "tests": 1,
+      "reason": "Actual rendered Inbox lacked the dedicated original-budget link."
+    }
+  ],
+  "corrections": [
+    "Initial typecheck rejected Object.hasOwn under the existing TypeScript target; replaced with Object.prototype.hasOwnProperty.call, retaining supported browser/target settings."
+  ],
+  "sourceEvidence": {
+    "files": 20,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/budget-notifications-evidence-snapshot/sources.json",
+    "verifiedAgainstCommit": "2e20706437525d50af807f7e0017dfb76803a350"
+  },
+  "artifactEvidence": {
+    "files": 30,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/budget-notifications-evidence-snapshot/artifacts.json"
+  },
+  "boundaries": [
+    "H2, controlled synthetic loopback finance, Spring MockMvc, and actual Vue host-renderer tests; no fixed installed package or browser acceptance claimed.",
+    "Browser administrator-policy block and PostgreSQL Docker image-layer I/O block remain; no bypass or environment mutation attempted.",
+    "New event facts apply to original expense budget operations. Independent consumption reversal/reduction, budget adjustments, settlements, supplier accounting and independent voucher reversal notification source coverage remains under F17.",
+    "F17 requires whole-source inventory and fixed-package nonempty upgrade/restart/restore acceptance; scope tests do not close the task.",
+    "Enterprise notification channels and budget system acceptance remain external.",
+    "Local implementation only; no push or PR."
+  ],
+  "goalCounting": {
+    "knownOpen": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "sessions": {
+    "35251": "EXIT_1_EXPECTED_RED",
+    "7417": "EXIT_1_EXPECTED_RED",
+    "69341": "EXIT_0",
+    "27070": "EXIT_0",
+    "39711": "EXIT_2_TYPECHECK_FIXED",
+    "53248": "EXIT_0",
+    "83119": "EXIT_0",
+    "73494": "EXIT_0",
+    "61971": "EXIT_0",
+    "52111": "EXIT_0",
+    "7142": "EXIT_0",
+    "58483": "EXIT_0",
+    "97127": "EXIT_0",
+    "45526": "EXIT_0"
+  }
+}

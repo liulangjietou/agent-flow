@@ -1,0 +1,309 @@
+{
+  "schemaVersion": 1,
+  "taskId": "A02",
+  "stage": "Persistent sourced precheck explanation backend and public API",
+  "status": "STAGE_VERIFIED_TASK_OPEN",
+  "taskClosed": false,
+  "recordedAt": "2026-10-03T13:21:21.936990+00:00",
+  "implementationCommit": "c6de5f110418fd4b6842d2225acd49581dea4f24",
+  "branch": "codex/governance-identifier-integration",
+  "implementation": [
+    "Owner-only source catalog and explicit bounded source selection bind application/report versions, original precheck and trusted model target.",
+    "Persisted queue, compound owner/check/version foreign keys, active uniqueness, immutable source context and versioned transition audit.",
+    "Claim and pre-send checks reuse authoritative precheck freshness; model HTTP uses existing bounded transaction-free transport.",
+    "Strict per-issue explanation output requires exact sent evidence, rejects missing or invented issues, extra fields and tool calls.",
+    "Manual adoption records selected issues only, with no financial/application/rule outcome writes; stale results remain readable or dismissible.",
+    "Five public API operations with strict requests, bounded history, no-store reads and minimal idempotent receipts."
+  ],
+  "verification": {
+    "result": "PASS",
+    "recordedAt": "2026-10-03T13:20:42.183646+00:00",
+    "verifiedUniqueCases": 132,
+    "suites": [
+      {
+        "name": "io.agentflow.agent.PrecheckExplanationRunTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.agent.DraftAssistRunTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.agent.AssistRunTest",
+        "tests": 15,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.agent.AssistValueObjectsTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.agent.PrecheckExplanationMigrationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.agent.AssistSchedulingTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.expense.ExpensePrecheckIntegrationTest",
+        "tests": 27,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.expense.PrecheckExplanationIntegrationTest",
+        "tests": 22,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.api.OpenApiContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.agent.AssistExecutionIntegrationTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "name": "io.agentflow.agent.DraftAssistIntegrationTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "openapi": {
+      "result": "PASS",
+      "operations": 342,
+      "schemas": 687,
+      "requestExamples": 125
+    },
+    "authors": {
+      "javaFiles": 1519,
+      "namedTypes": 2920,
+      "missingTags": 0,
+      "parseErrors": 0
+    },
+    "bearerRedactions": 0,
+    "preliminaryCommandIssue": "First Maven invocation did not start because a custom PATH omitted the configured Maven directory; subsequent runs used the absolute Maven executable.",
+    "initialScopeCases": 41,
+    "finalScopeCases": 45,
+    "relatedRegressionCases": 87,
+    "countMethod": "132 unique test cases in the final single Maven run across 11 suites; earlier 41-case pass is not added. Prior freshness evidence counts are separate and overlap.",
+    "database": "H2 2.5.250; synthetic persisted expense prechecks and actual loopback model HTTP",
+    "upgrade": "Nonempty Flyway V106 to V107 test preserves applications, reports, report revisions, prechecks and precheck revisions; no runtime package upgrade claimed.",
+    "postgres": "NOT_RUN_EXISTING_ENVIRONMENT_BLOCKER",
+    "browser": "NOT_RUN_EXISTING_ENVIRONMENT_BLOCKER",
+    "frontend": "NOT_IMPLEMENTED_IN_THIS_STAGE",
+    "actualPackagedUpgrade": "NOT_RUN",
+    "actualProcessRestart": "NOT_RUN",
+    "enterpriseModelQuality": "NOT_EVALUATED"
+  },
+  "remaining": [
+    "Expense UI source consent, explanation evidence review and manual disposition",
+    "Identity switching, outdated reads, request uncertainty and original-key recovery in UI",
+    "Fixed package with nonempty upgrade, queued/running restart and original-key recovery",
+    "Applicable real browser and PostgreSQL checks after existing environment blockers resolve"
+  ],
+  "counting": {
+    "knownOpenTasks": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "lowerBound": true
+  },
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/precheck-explanation-backend-evidence-snapshot",
+  "artifactCount": 17,
+  "artifacts": [
+    {
+      "path": "TEST-io.agentflow.agent.AssistExecutionIntegrationTest.xml",
+      "size": 74971,
+      "sha256": "36de851b105474fb9f0eb0be40fe4423857aed87471a0bea122ab61d360376ee"
+    },
+    {
+      "path": "TEST-io.agentflow.agent.AssistRunTest.xml",
+      "size": 12213,
+      "sha256": "2fd9642a999f9754219367323c89409f20606c34d718693735e15a1de612e4a4"
+    },
+    {
+      "path": "TEST-io.agentflow.agent.AssistSchedulingTest.xml",
+      "size": 43427,
+      "sha256": "c71f802dd2d9dbfd599f80ab4168756a0facdd05423656a12ed94e51bff0568f"
+    },
+    {
+      "path": "TEST-io.agentflow.agent.AssistValueObjectsTest.xml",
+      "size": 12214,
+      "sha256": "1b807f04852bd7966ca909bdafc6cd3daf038e0dd66943618940b5f5bcf3fcd4"
+    },
+    {
+      "path": "TEST-io.agentflow.agent.DraftAssistIntegrationTest.xml",
+      "size": 74868,
+      "sha256": "83455bedbd7487b82808a7652dd0bea15efadfce602d75ba1b3a6a4c4a8c6560"
+    },
+    {
+      "path": "TEST-io.agentflow.agent.DraftAssistRunTest.xml",
+      "size": 10943,
+      "sha256": "6da783b975981f04b90e57c51c73251196829ae206374251aa00fe1a26392837"
+    },
+    {
+      "path": "TEST-io.agentflow.agent.PrecheckExplanationMigrationTest.xml",
+      "size": 68099,
+      "sha256": "6cffb278058b013c3fb55502b8bace24efc9d8145a4eecc2997c05fb1e409d56"
+    },
+    {
+      "path": "TEST-io.agentflow.agent.PrecheckExplanationRunTest.xml",
+      "size": 12382,
+      "sha256": "a423e9c85a5e0e88472536eca2a876716dc4d4201175769bd9581768d3af1c53"
+    },
+    {
+      "path": "TEST-io.agentflow.api.OpenApiContractTest.xml",
+      "size": 73777,
+      "sha256": "837f0cb5aa8fe93a1b14b2108fd96bd827edaabb2f7862c169892d4b2fd51d68"
+    },
+    {
+      "path": "TEST-io.agentflow.expense.ExpensePrecheckIntegrationTest.xml",
+      "size": 77333,
+      "sha256": "d2a3c49628817005b4b62cf327e719530d5c38f7bc6cde1618565cca34531de6"
+    },
+    {
+      "path": "TEST-io.agentflow.expense.PrecheckExplanationIntegrationTest.xml",
+      "size": 76391,
+      "sha256": "79dfc1c8d854cd66f354df8ce78d4a390d8a997c0ad5fe21e5b62cbff29823cf"
+    },
+    {
+      "path": "precheck-explanation-authors-final.log",
+      "size": 73,
+      "sha256": "27f4d00d6e3c6e56a521570734e639bf9e1cb91e6c7e53bafe27082452001553"
+    },
+    {
+      "path": "precheck-explanation-backend-regression.log",
+      "size": 187232,
+      "sha256": "f1030f46be12c9f51ceff808636c4710964a565213a63eff7ab254eb69cac4d8"
+    },
+    {
+      "path": "precheck-explanation-backend-scope-1.log",
+      "size": 30,
+      "sha256": "69fa239934fd02b68ddf2fdfe02e73ce79b8606cdefb4eacdc20fd914ae3e983"
+    },
+    {
+      "path": "precheck-explanation-backend-scope-2.log",
+      "size": 98106,
+      "sha256": "7efd1482ce588e6d46117a19edf1b3b10b1b213290b252fc13c328b0fc14861e"
+    },
+    {
+      "path": "precheck-explanation-backend-verification.json",
+      "size": 2229,
+      "sha256": "994b6a0131615cf6b68b4ca843b7f74d76c838cc4a4adec441ba4fef71a53f06"
+    },
+    {
+      "path": "precheck-explanation-openapi-final.log",
+      "size": 71,
+      "sha256": "ddfa2e60843f16b570c51f2cd74fa235ae652e10a396823675f89424b771c24e"
+    }
+  ],
+  "sourceCount": 19,
+  "sources": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/AssistInput.java",
+      "sha256": "61d73c824c41605cb1f816d177d5565cbf82e63a9184389f43a6a4417c6aa9d3"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationInput.java",
+      "sha256": "8c955c960f36d9011e99538b4a3d212faeadfe9932e93b530950e096d23ecf8c"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationModelPort.java",
+      "sha256": "2c2dbd9f93bb8481457e2d4427607d6921cb9d3711601e204b84a8ee9f57214a"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationRun.java",
+      "sha256": "ea94c22d0ecd4d37aa8f63a4d3cd66e253ff9e6c34464eaa04bde6a0917df6e8"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationSuggestion.java",
+      "sha256": "14e1b629acc19e4fea81115e8b1a802942ed44dbf982b2b6db70bfc072c98d2a"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/agent/PrecheckExplanationRunTest.java",
+      "sha256": "e85960a88282ecda81be428956a527fa462fdb8855cb9c1194ff45a8acdd40e4"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/AssistScheduling.java",
+      "sha256": "1169628d72008ff17836cbf21a13da6b1f832f7403102f1d790216f281a7df8c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/JdbcPrecheckExplanationRepository.java",
+      "sha256": "8cd1fffc170b37a3201a92be5312a4c18da73249098a111b52d2b299a417a548"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/OpenAiCompatiblePrecheckExplanationModel.java",
+      "sha256": "95cc0860ac9fe60cf9173ee4524f668d0cee9b92aa1182daa2e739d7534a1d2f"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationController.java",
+      "sha256": "11c5511023eb632326758967b9410c8f498b760cfb510063b8b7972b971a956d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationService.java",
+      "sha256": "9efd68fd883225351000c610c967cbd1623fa85e44f804e18b6b4eeda0c7ed29"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationSources.java",
+      "sha256": "a94b67d73b1266fbcb0b3b0d5468c6a92ec897f916cc8a53aafe9a504304a685"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationWorker.java",
+      "sha256": "20cb0e0bc842e8103c8c00764e2fa298f10d37aa746695fe0b382bc395c85193"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "ebdc1d32da378d91a9e57fe76803c644d697ca3712c9689260a830777b59d2a2"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/db/migration/V107__precheck_explanation_runs.sql",
+      "sha256": "e483614bd775552a5bc1bfe92c237d2c285b4b9dad0d4099d6a8c763167a22f4"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/agent/PrecheckExplanationMigrationTest.java",
+      "sha256": "e8720fdbe937f51b5ab07b178e4f24e921bfc6c7ae16461564ebcb6211c3b437"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java",
+      "sha256": "4292989c96f8a3dd2a309d7d637dcbacd75fdb309ebfe79fdd9a1270212e596b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/PrecheckExplanationIntegrationTest.java",
+      "sha256": "eb3364359155ade0d9e5482d15b0739744fe74bdc7c8dcd58b6ed17b45c75142"
+    },
+    {
+      "path": "agentflow-web/scripts/check-openapi.mjs",
+      "sha256": "926a6ffc20dbd206d89aa7d559b5b9947807098cda9052a03e1ddcf18c917bb9"
+    }
+  ]
+}

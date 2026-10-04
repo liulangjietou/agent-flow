@@ -49,6 +49,34 @@ public class JdbcDisbursementResolutionRepository {
     public Optional<AdvanceDisbursementReturn> latest(String tenant, UUID advanceId) {
         return jdbc.query("SELECT * FROM advance_disbursement_resolution WHERE tenant_id=? AND advance_id=? ORDER BY advance_version DESC LIMIT 1", row(), tenant, advanceId.toString()).stream().findFirst();
     }
+    /** 按原决定恢复被消费查询及相邻借款修订，最新余额不能替代历史裁决。 */
+    public Optional<Resolved> find(String tenant, UUID id) {
+        return jdbc.query("""
+                SELECT r.*,p.state_json AS prior_check_json,c.state_json AS resolved_check_json
+                FROM advance_disbursement_resolution r
+                JOIN disbursement_return_check_revision p ON p.tenant_id=r.tenant_id AND p.check_id=r.check_id AND p.version=r.check_version-1
+                JOIN disbursement_return_check_revision c ON c.tenant_id=r.tenant_id AND c.check_id=r.check_id AND c.version=r.check_version
+                WHERE r.tenant_id=? AND r.id=?
+                """, (row, index) -> {
+            var decision = row().mapRow(row, index); var advanceId = decision.receipt().request().command().binding().businessId();
+            long version = row.getLong("advance_version"), checkVersion = row.getLong("check_version");
+            var before = revision(tenant, advanceId, version - 1); var after = revision(tenant, advanceId, version);
+            var prior = json.read(row.getString("prior_check_json"), AdvanceDisbursementReturnCheck.class);
+            var resolved = json.read(row.getString("resolved_check_json"), AdvanceDisbursementReturnCheck.class);
+            if (!decision.id().equals(id) || !decision.tenantId().equals(tenant) || before.version() != version - 1 || after.version() != version
+                    || !before.tenantId().equals(tenant) || !after.tenantId().equals(tenant) || !before.id().equals(advanceId) || !after.id().equals(advanceId)
+                    || prior.version() != checkVersion - 1 || resolved.version() != checkVersion || !prior.input().id().equals(decision.checkId())
+                    || !prior.input().tenantId().equals(tenant) || !prior.resolve(decision, decision.resolvedAt()).equals(resolved)) throw changed();
+            before.resolveDisbursementReview(before.version(), decision);
+            if (!before.state().equals(after.state())) throw changed();
+            return new Resolved(version, decision);
+        }, tenant, id.toString()).stream().findFirst();
+    }
+    /**
+     * 该次决定对应的借款修订，不提供当前可用额或办理许可。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Resolved(long advanceVersion, AdvanceDisbursementReturn decision) { }
     private EmployeeAdvance revision(String tenant, UUID id, long version) {
         return jdbc.query("SELECT state_json FROM finance_resource_revision WHERE tenant_id=? AND resource_type='ADVANCE' AND resource_id=? AND version=?",
                 (row, index) -> EmployeeAdvance.restore(json.read(row.getString("state_json"), EmployeeAdvance.State.class)), tenant, id.toString(), version).stream().findFirst().orElseThrow(JdbcDisbursementResolutionRepository::changed);

@@ -17,7 +17,7 @@ const marker = 'round-arrow-' + useId()
 const sortedRounds = computed(() => [...props.rounds].sort((a, b) => b.roundNo - a.roundNo))
 const roundLabels: Record<string, string> = { IN_APPROVAL: '审批中', APPROVED: '已批准', RETURNED: '已退回', REJECTED: '已驳回', WITHDRAWN: '已撤回' }
 const states = { NOT_REACHED: '未记录到达', ACTIVE: '当前节点', LEFT: '已离开' }
-const typeNames: Record<string, string> = { START: '开始', END: '结束', USER_TASK: '审批', COPY: '抄送', TIMER_WAIT: '定时等待', EVENT_WAIT: '事件等待', SUB_PROCESS: '子流程', EXCLUSIVE_GATEWAY: '条件网关', PARALLEL_GATEWAY: '并行网关', OTHER: '流程节点' }
+const typeNames: Record<string, string> = { START: '开始', END: '结束', USER_TASK: '审批', COPY: '抄送', TIMER_WAIT: '定时等待', SERVICE_TASK: '服务任务', EVENT_WAIT: '事件等待', SUB_PROCESS: '子流程', EXCLUSIVE_GATEWAY: '条件网关', PARALLEL_GATEWAY: '并行网关', OTHER: '流程节点' }
 const edges = computed(() => (query.value?.edges ?? []).map(edge => ({ ...edge, condition: '' })))
 const takenIds = computed(() => new Set(edges.value.filter(edge => edge.state === 'TAKEN').map(edge => edge.id)))
 const records = computed(() => query.value ? traversalRecords(query.value) : [])

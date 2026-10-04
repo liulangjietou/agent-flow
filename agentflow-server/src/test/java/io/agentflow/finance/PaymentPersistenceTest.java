@@ -1,6 +1,7 @@
 package io.agentflow.finance;
 
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
@@ -65,6 +66,52 @@ class PaymentPersistenceTest {
         assertThat(jdbc.queryForList("SELECT version FROM payment_authorization_revision WHERE tenant_id=? AND authorization_id=? ORDER BY version", Long.class, TENANT, authorization.terms().id().toString())).containsExactly(1L, 2L);
     }
 
+    @Test void historicalMissingDateJsonStillMatchesOriginalDecisionForEveryUnexecutedTransition() {
+        var legacyJson = new JsonUtil(JsonMapper.builder().findAndAddModules().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .serializationInclusion(JsonInclude.Include.NON_NULL).build());
+        var repository = new JdbcPaymentAuthorizationRepository(jdbc, legacyJson);
+        for (String transition : List.of("EXECUTE", "VOID", "EXPIRE")) {
+            var voucher = voucher(); var initial = authorization(voucher);
+            tx.executeWithoutResult(status -> repository.create(initial));
+            String decision = jdbc.queryForObject("SELECT decision_json FROM payment_authorization WHERE tenant_id=? AND id=?", String.class, TENANT, initial.terms().id().toString());
+            assertThat(decision).doesNotContain("dueDate");
+            var restored = new JdbcPaymentAuthorizationRepository(jdbc, legacyJson).find(TENANT, initial.terms().id()).orElseThrow();
+            assertThat(restored.decision().dueDate()).isNull(); assertThat(legacyJson.write(restored.decision())).isEqualTo(decision);
+            var changed = switch (transition) {
+                case "EXECUTE" -> execute(restored, voucher);
+                case "VOID" -> restored.voidBeforeExecution("finance", "旧授权继续作废", NOW);
+                default -> restored.expire(restored.decision().expiresAt());
+            };
+            tx.executeWithoutResult(status -> repository.update(changed));
+            assertThat(repository.find(TENANT, initial.terms().id())).contains(changed);
+            assertThat(jdbc.queryForObject("SELECT decision_json FROM payment_authorization WHERE tenant_id=? AND id=?", String.class, TENANT, initial.terms().id().toString())).isEqualTo(decision);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_authorization_revision WHERE tenant_id=? AND authorization_id=?", Integer.class, TENANT, initial.terms().id().toString())).isEqualTo(2);
+        }
+    }
+
+    @Test void storedDueDateCannotBeChangedAndDivergentDateProjectionFailsClosed() {
+        var voucher = voucher(); var dueDate = LocalDate.of(2026, 10, 1); var initial = authorization(voucher, dueDate);
+        tx.executeWithoutResult(status -> authorizations.create(initial));
+        assertThat(new JdbcPaymentAuthorizationRepository(jdbc, json).find(TENANT, initial.terms().id())).contains(initial);
+        var alteredDecision = new PaymentAuthorization.Decision("finance", NOW, initial.decision().expiresAt(), dueDate.plusDays(1));
+        var altered = new PaymentAuthorization(initial.terms(), alteredDecision, 1, PaymentAuthorization.Status.AUTHORIZED, NOW, null, null)
+                .voidBeforeExecution("finance", "不能改写原日期", NOW);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> authorizations.update(altered))).isInstanceOf(DomainException.class);
+        var queued = register(initial, voucher);
+        assertThat(authorizations.find(TENANT, initial.terms().id()).orElseThrow().decision().dueDate()).isEqualTo(dueDate);
+        assertThat(queued.input().command().authorization().expiresAt()).isEqualTo(initial.decision().expiresAt());
+        jdbc.update("UPDATE payment_authorization SET due_date=? WHERE tenant_id=? AND id=?", dueDate.plusDays(1), TENANT, initial.terms().id().toString());
+        assertThatThrownBy(() -> authorizations.find(TENANT, initial.terms().id())).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test void earliestAndLatestCalendarDatesSurviveJdbcWithoutTimeZoneConversion() {
+        for (var dueDate : List.of(PaymentAuthorization.MIN_DUE_DATE, PaymentAuthorization.MAX_DUE_DATE)) {
+            var value = authorization(voucher(), dueDate); tx.executeWithoutResult(status -> authorizations.create(value));
+            assertThat(authorizations.find(TENANT, value.terms().id()).orElseThrow().decision().dueDate()).isEqualTo(dueDate);
+            assertThat(jdbc.queryForObject("SELECT due_date FROM payment_authorization WHERE tenant_id=? AND id=?", LocalDate.class, TENANT, value.terms().id().toString())).isEqualTo(dueDate);
+        }
+    }
+
     @Test void activeAuthorizationIsUniqueAndOnlyUnexecutedVoidReleasesTheBusiness() {
         var voucher = voucher(); var first = issue(voucher); var other = authorization(voucher);
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> authorizations.create(other))).isInstanceOf(DataIntegrityViolationException.class);
@@ -124,18 +171,21 @@ class PaymentPersistenceTest {
             organization.save(TENANT, new OrganizationUnit(entity, OrganizationUnit.Kind.LEGAL_ENTITY, "付款法人", null, null, true, 1), 0);
             organization.save(TENANT, department, 0); organization.save(TENANT, position, 0); organization.save(TENANT, person, 0); organization.save(TENANT, appointment, 0);
         });
-        assertThat(authorizations.cashierPage(TENANT, subject, null, null, 1)).containsExactly(visible);
-        assertThat(authorizations.cashierPage("foreign", subject, null, null, 1)).isEmpty();
+        assertThat(authorizations.cashierPage(TENANT, subject, JdbcPaymentAuthorizationRepository.CashierFilter.ALL, null, 1)).containsExactly(visible);
+        assertThat(authorizations.cashierPage("foreign", subject, JdbcPaymentAuthorizationRepository.CashierFilter.ALL, null, 1)).isEmpty();
         assertThat(new PaymentPersonnel(jdbc).eligible(TENANT, subject, hidden.terms().payee().legalEntityId())).isFalse();
         tx.executeWithoutResult(status -> organization.save(TENANT, appointment.revise(false, 1), 1));
-        assertThat(authorizations.cashierPage(TENANT, subject, null, null, 1)).isEmpty();
+        assertThat(authorizations.cashierPage(TENANT, subject, JdbcPaymentAuthorizationRepository.CashierFilter.ALL, null, 1)).isEmpty();
         jdbc.update("UPDATE payment_authorization SET legal_entity_id=? WHERE tenant_id=? AND id=?", hidden.terms().payee().legalEntityId().toString(), TENANT, visible.terms().id().toString());
         assertThatThrownBy(() -> authorizations.find(TENANT, visible.terms().id())).isInstanceOf(IllegalStateException.class);
     }
 
     private PaymentAuthorization issue(VoucherOperation voucher) { var value = authorization(voucher); tx.executeWithoutResult(status -> authorizations.create(value)); return value; }
     private PaymentAuthorization authorization(VoucherOperation voucher) {
-        return PaymentAuthorization.issue(UUID.randomUUID(), voucher, new EmployeeAccountSnapshot(voucher.input().command().legalEntityId(), "alice", "payee-1", "****1234", "a".repeat(64), "v1"), "finance", NOW, NOW.plusSeconds(3600));
+        return authorization(voucher, null);
+    }
+    private PaymentAuthorization authorization(VoucherOperation voucher, LocalDate dueDate) {
+        return PaymentAuthorization.issue(UUID.randomUUID(), voucher, new EmployeeAccountSnapshot(voucher.input().command().legalEntityId(), "alice", "payee-1", "****1234", "a".repeat(64), "v1"), "finance", NOW, NOW.plusSeconds(3600), dueDate);
     }
     private PaymentOperation register(PaymentAuthorization authorization, VoucherOperation voucher) {
         var executed = execute(authorization, voucher); var queued = PaymentOperation.queue(executed, NOW);

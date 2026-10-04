@@ -44,7 +44,8 @@ import static org.assertj.core.api.Assertions.*;
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.finance-gateway.enabled=true", "agentflow.budgets.worker-enabled=false",
-        "agentflow.budgets.lease-seconds=15", "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false"})
+        "agentflow.budgets.lease-seconds=15", "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false",
+        "agentflow.notifications.delivery-worker-enabled=false"})
 class BudgetOperationIntegrationTest {
     private static final LocalDate DATE = LocalDate.of(2026, 9, 28);
     private static final UUID ENTITY = UUID.randomUUID();
@@ -67,6 +68,10 @@ class BudgetOperationIntegrationTest {
     @Autowired BudgetOperationWorker worker;
     @Autowired BudgetSystemPort gateway;
     @Autowired FinanceGatewayConfiguration configuration;
+    @Autowired io.agentflow.organization.OrganizationRepository organization;
+    @Autowired io.agentflow.notification.NotificationPreferencesService notificationPreferences;
+    @Autowired io.agentflow.notification.NotificationDeliveryService notificationDeliveries;
+    @Autowired io.agentflow.notification.JdbcNotificationDeliveryStore notificationStore;
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry values) {
@@ -94,6 +99,99 @@ class BudgetOperationIntegrationTest {
         }
     }
     @AfterAll static void stop() { SERVER.stop(0); HTTP_THREADS.shutdownNow(); }
+
+    @Test
+    void unknownBudgetResultNotifiesOriginalApplicantOnceAndDoesNotExposeFinancialDetails() {
+        noticePeople(); var report = report(true); var job = reserve(report); UUID id = job.input().command().id();
+        var claimed = execution.claim("demo", id, job.createdAt()); execution.fail(claimed, claimed.updatedAt().plusSeconds(1));
+        assertThat(noticeRecipients(id, "UNKNOWN")).containsExactly("alice");
+        var unknown = reload(job); var query = execution.claim("demo", id, unknown.nextAttemptAt());
+        execution.fail(query, query.updatedAt().plusSeconds(1));
+        assertThat(noticeRecipients(id, "UNKNOWN")).containsExactly("alice");
+        assertThat(jdbc.queryForList("SELECT content FROM notification_inbox WHERE event_key=?", String.class, "budget:" + id + ":UNKNOWN"))
+                .allSatisfy(content -> assertThat(content).contains("暂不明确").doesNotContain("100.00", "synthetic-account", "1234", "合成明细"));
+        assertThat(WRITES.get()).isZero(); assertThat(reload(job).status()).isEqualTo(BudgetOperation.Status.UNKNOWN);
+    }
+
+    @Test
+    void expiredBudgetLeaseNotifiesWithoutInventingRejectionOrBlindResend() {
+        noticePeople(); var report = report(true); var job = reserve(report); UUID id = job.input().command().id();
+        var claimed = execution.claim("demo", id, job.createdAt());
+        assertThat(execution.claim("demo", id, claimed.leaseUntil())).isNull();
+        assertThat(reload(job).failure()).isEqualTo(BudgetOperation.Failure.LEASE_EXPIRED);
+        assertThat(noticeRecipients(id, "UNKNOWN")).containsExactly("alice");
+        assertThat(noticeRecipients(id, "REJECTED")).isEmpty(); assertThat(WRITES.get()).isZero();
+    }
+
+    private List<String> noticeRecipients(UUID id, String fact) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? ORDER BY recipient_id",
+                String.class, "budget:" + id + ":" + fact);
+    }
+
+    @Test
+    void acceptedPendingIsQuietAndAuthoritativeAbsenceKeepsOriginalRetryThenReportsAppliedOnce() {
+        noticePeople(); var report = report(true); var job = reserve(report); var command = job.input().command();
+        var claim = execution.claim("demo", command.id(), job.createdAt());
+        execution.finish(claim, new FinanceResult.Success<>(new BudgetObservation(command.id(), command.digest(), BudgetObservation.Status.PENDING, null, null, null, null)), claim.updatedAt().plusSeconds(1));
+        assertThat(noticeRecipients(command.id(), "UNKNOWN")).isEmpty();
+        var pending = reload(job); var query = execution.claim("demo", command.id(), pending.nextAttemptAt());
+        execution.finish(query, new FinanceResult.Success<>(new BudgetObservation(command.id(), command.digest(), BudgetObservation.Status.NOT_FOUND, null, null, null, null)), query.updatedAt().plusSeconds(1));
+        assertThat(noticeRecipients(command.id(), "NOT_FOUND")).containsExactly("alice");
+        var retry = execution.claim("demo", command.id(), reload(job).nextAttemptAt());
+        assertThat(retry.input()).isEqualTo(job.input());
+        execution.finish(retry, new FinanceResult.Success<>(applied(command)), retry.updatedAt().plusSeconds(1));
+        execution.finish(query, rejected(query, BudgetObservation.Rejection.BUDGET_INSUFFICIENT), retry.updatedAt().plusSeconds(2));
+        assertThat(noticeRecipients(command.id(), "APPLIED")).containsExactly("alice");
+        assertThat(noticeRecipients(command.id(), "REJECTED")).isEmpty(); assertThat(reload(job).status()).isEqualTo(BudgetOperation.Status.APPLIED);
+    }
+
+    @Test
+    void noticeAndOutboundIntentRollbackWithBudgetStateAndInactiveRecipientCannotSend() {
+        noticePeople(); var recipient = new io.agentflow.common.Actor("demo", "alice", java.util.Set.of("USER"));
+        var preference = notificationPreferences.get(recipient); notificationPreferences.revise(recipient, preference.version(), true, false);
+        var report = report(true); var job = reserve(report); UUID id = job.input().command().id();
+        var claim = execution.claim("demo", id, job.createdAt());
+        try {
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT budget_notice_fixture CHECK(application_id<>'" + report.applicationId() + "' OR kind<>'BUDGET_ATTENTION')");
+            try { assertThatThrownBy(() -> execution.fail(claim, claim.updatedAt().plusSeconds(1))).isInstanceOf(DataIntegrityViolationException.class); }
+            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT budget_notice_fixture"); }
+            assertThat(reload(job)).isEqualTo(claim); assertThat(noticeRecipients(id, "UNKNOWN")).isEmpty();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox n ON d.inbox_id=n.id WHERE n.application_id=?", Long.class,
+                    report.applicationId().toString())).isZero();
+            execution.fail(claim, claim.updatedAt().plusSeconds(1));
+            String messageId = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", String.class, "budget:" + id + ":UNKNOWN");
+            var deliveries = jdbc.queryForList("SELECT id FROM notification_dispatch WHERE tenant_id='demo' AND inbox_id=?", String.class, messageId);
+            assertThat(deliveries).hasSize(1); UUID deliveryId = UUID.fromString(deliveries.get(0));
+            var other = reserve(report(true)); UUID otherId = other.input().command().id();
+            var otherClaim = execution.claim("demo", otherId, other.createdAt()); execution.fail(otherClaim, otherClaim.updatedAt().plusSeconds(1));
+            String otherMessage = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", String.class, "budget:" + otherId + ":UNKNOWN");
+            UUID otherDelivery = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE tenant_id='demo' AND inbox_id=?", String.class, otherMessage));
+            jdbc.update("UPDATE notification_inbox SET round_no=2 WHERE id=?", otherMessage);
+            try { assertThat(notificationDeliveries.claim(otherDelivery, now().plusSeconds(30))).isNull(); }
+            finally { jdbc.update("UPDATE notification_inbox SET round_no=1 WHERE id=?", otherMessage); }
+            var mismatched = notificationStore.get(recipient, otherDelivery).orElseThrow();
+            assertThat(mismatched.progress().errorCode()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.FailureCode.MESSAGE_UNAVAILABLE);
+            assertThat(mismatched.progress().attempts()).isZero();
+            jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='alice'");
+            assertThat(notificationDeliveries.claim(deliveryId, now().plusSeconds(30))).isNull();
+            var delivery = notificationStore.get(recipient, deliveryId).orElseThrow();
+            assertThat(delivery.progress().errorCode()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.FailureCode.RECIPIENT_INACTIVE);
+            assertThat(delivery.progress().attempts()).isZero();
+        } finally {
+            jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject='alice'");
+            var current = notificationPreferences.get(recipient); notificationPreferences.revise(recipient, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
+        }
+    }
+
+    private void noticePeople() {
+        tx().executeWithoutResult(status -> {
+            if (!organization.initialized("demo")) organization.initialize("demo", "admin", now());
+            for (String user : List.of("alice", "finance")) {
+                if (organization.personBySubject("demo", user).isEmpty()) organization.save("demo",
+                        new io.agentflow.organization.OrganizationPerson(UUID.randomUUID(), user, user, true, !user.equals("alice"), 1), 0);
+            }
+        });
+    }
 
     @Test
     void actualWorkerPublishesCommittedCommandAndPersistsConfirmedLedgerWithEveryRevision() {
@@ -201,14 +299,34 @@ class BudgetOperationIntegrationTest {
 
     @Test
     void releaseAndConsumeUseLastConfirmedPositionAndSealTheLedger() {
+        noticePeople();
         for (var action : List.of(BudgetCommand.Action.RELEASE, BudgetCommand.Action.CONSUME)) {
             var report = report(true); reserve(report); worker.poll(); var held = occupation(report).confirmed();
             var last = tx().execute(transaction -> execution.finalizeOccupation("demo", report.id(), action, now())); worker.poll();
             assertThat(last.input().command().position()).isEqualTo(held.position());
             assertThat(occupation(report).status().name()).isEqualTo(action == BudgetCommand.Action.RELEASE ? "RELEASED" : "CONSUMED");
             assertThat(occupation(report).confirmed().revision()).isEqualTo(2);
+            assertThat(noticeRecipients(last.input().command().id(), "APPLIED")).containsExactly("alice");
             assertThatThrownBy(() -> reserve(report)).isInstanceOf(DomainException.class);
         }
+    }
+
+    @Test
+    void releasedLedgerRefreezesANewRoundWithTheOriginalReleaseReceipt() {
+        var report = report(true); reserve(report); worker.poll();
+        tx().executeWithoutResult(transaction -> execution.finalizeOccupation("demo", report.id(), BudgetCommand.Action.RELEASE, now()));
+        worker.poll(); var released = occupation(report).confirmed();
+        long previous = report.version(); freeze(report); reports.update(report, previous, "alice", "SYNTHETIC_RESUBMIT");
+        var next = reserve(report);
+        assertThat(next.input().command().action()).isEqualTo(BudgetCommand.Action.FREEZE);
+        assertThat(next.input().command().expected()).isEqualTo(released.expected());
+        assertThat(occupation(report).status()).isEqualTo(BudgetOccupation.Status.RELEASED);
+        assertThat(occupation(report).frozenFor(position(report))).isFalse();
+        worker.poll();
+        assertThat(occupation(report).frozenFor(position(report))).isTrue();
+        assertThat(occupation(report).confirmed().revision()).isEqualTo(3);
+        assertThat(operations.find("demo", next.input().command().id()).orElseThrow().status()).isEqualTo(BudgetOperation.Status.APPLIED);
+        assertThat(WRITES.get()).isEqualTo(3);
     }
 
     @Test
@@ -244,7 +362,7 @@ class BudgetOperationIntegrationTest {
     private void freeze(ExpenseReport report) {
         var assessment = new ExpenseAssessment(new ExpenseExchangeRate("CNY", "CNY", BigDecimal.ONE, "synthetic-rate", DATE),
                 new ExpensePolicySnapshot(UUID.randomUUID(), 1, money("100"), money("100"), ExpensePolicySnapshot.Decision.WITHIN_LIMIT, "synthetic-tax", "synthetic-policy"), money("0"));
-        report.freeze(1, 1, "CNY", new EmployeeAccountSnapshot(ENTITY, "alice", "synthetic-account", "****1234", "a".repeat(64), "v1"), Map.of(1, assessment), "alice", now());
+        report.freeze(report.version(), report.rounds().size() + 1, "CNY", new EmployeeAccountSnapshot(ENTITY, "alice", "synthetic-account", "****1234", "a".repeat(64), "v1"), Map.of(1, assessment), "alice", now());
     }
     private BudgetOperation reserve(ExpenseReport report) { return tx().execute(transaction -> execution.reserve("demo", report.id(), report.version(), DATE, target(), now())); }
     private BudgetOccupation occupation(ExpenseReport report) { return occupations.find("demo", report.id()).orElseThrow(); }

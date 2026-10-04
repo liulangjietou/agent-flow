@@ -1,0 +1,93 @@
+{
+  "recordedAt": "2026-10-04T12:41:22.883950+00:00",
+  "task": "F04",
+  "scope": "READ_UI_ONLY_DESIGNERS_AND_TEMPLATE_PENDING",
+  "taskRemainsOpen": true,
+  "baselineCommit": "6bee7bc8808d1b6cc765bf0fcabc290a91d248e9",
+  "red": [
+    {
+      "scope": "reader-and-query",
+      "tests": 11,
+      "failures": 9,
+      "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-read-ui-red"
+    },
+    {
+      "scope": "actual-vue-panel-api-and-parent-wiring",
+      "tests": 6,
+      "failures": 6,
+      "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-read-panel-red"
+    },
+    {
+      "scope": "metadata-only-maximum-round-boundary",
+      "tests": 19,
+      "failures": 1,
+      "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-read-round-boundary-red",
+      "rootCause": "Only positivity was checked for top-level roundNo; full details had an int32 limit, but metadata-only restricted/unrecorded views bypassed that guard. A shared validRound predicate now covers all three read boundaries."
+    }
+  ],
+  "initialLoaderFailure": {
+    "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-read-ui-loader-failure",
+    "note": "Missing test module environment binding corrected before behavioral RED; not counted as behavior evidence."
+  },
+  "green": {
+    "tests": 53,
+    "failures": 0,
+    "testFiles": [
+      "expense-split-routing.test.mjs",
+      "expense-split-panel.test.mjs",
+      "expense-risk.test.mjs",
+      "expenses.test.mjs"
+    ],
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/f04-read-ui-regression.log",
+    "typeCheck": true,
+    "build": true,
+    "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/f04-read-ui-build.log",
+    "knownBuildWarning": "Existing application bundle remains above the Vite 500 kB chunk threshold."
+  },
+  "actualResponseReplay": {
+    "status": "PASSED",
+    "scope": "SPRING_MVC_RESPONSE_REPLAY_THROUGH_UI_READER",
+    "responses": 21,
+    "states": [
+      "CLEAR",
+      "DISABLED",
+      "NOT_RECORDED",
+      "RESTRICTED",
+      "SPLIT_SUSPECTED",
+      "UNCONFIGURED"
+    ],
+    "responseDirectory": "/fyoung/tmp/agentflow-remaining-20260928/f04-read-responses-a9d2605d-275a-477b-ad7c-2baa3f46a783",
+    "compiledDirectory": "/fyoung/tmp/agentflow-remaining-20260928/f04-read-ui-contract-n8RSnj",
+    "sourceSha256": {
+      "agentflow-web/src/expenses.ts": "2c2bb4abfd86c3a11cd1ce925059e4c5aedb664c0a86c257e88a358a0f26d9ec",
+      "agentflow-web/src/expenseSplitRouting.ts": "08feba535ca057d190195cef0669f81b32034cb1ab8ee6ac4430ad1c82b3408d"
+    }
+  },
+  "sourceSha256": {
+    "agentflow-web/src/expenseSplitRouting.ts": "08feba535ca057d190195cef0669f81b32034cb1ab8ee6ac4430ad1c82b3408d",
+    "agentflow-web/src/components/ExpenseSplitRoutingPanel.vue": "3ccbb521cecd16165b0abb3707871cf70fd6d58766db9e07c59e8f36c1f17749",
+    "agentflow-web/src/components/ExpenseDetail.vue": "84b5161c9c4141bd832c27ff36b122c5694626f1876fc5462fb279322f228945",
+    "agentflow-web/src/api.ts": "5b9c954d13b58d03293e4a8108a832fc4f722695302be14b44d6eefec3847478",
+    "agentflow-web/scripts/test-requests.mjs": "7d56aea3f67e888fcff40edede81e5bc59ccc55828e255f6ad2a9d7b5840f360",
+    "agentflow-web/tests/expense-split-routing.test.mjs": "92f8185664bbb3b7bd0ab88ef7be7b4a10b3353604c89edcd79412ff456494bb",
+    "agentflow-web/tests/expense-split-panel.test.mjs": "a5ff361b76c5589878808f26d518872cc14913850b16f9ae8eaa1e8972097a33",
+    "agentflow-web/tests/fixtures/expense-split-routing.mjs": "5aa6b2dcdf5d24f49ede5c8d9130aed9ea8324b4e96f3e6839799dcb022d2c72"
+  },
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-read-ui-verified",
+  "manifestSha256": "9562467c0346ece6fec87a4a0b42e21c9c29a1a31850c04bca711ff5060264a1",
+  "verified": [
+    "all six states displayed distinctly; restricted and absent evidence cannot masquerade as no risk",
+    "deep closed response shape, original report/application/round/version, same-scope sources, exact decimal and nanosecond window validation",
+    "render-only consistency validation never writes or replaces server routing evidence",
+    "account/round/version changes and unmount abort reads and clear details; late success/error cannot replace the new context",
+    "source documents paged by ten with only selected line details expanded; refresh clears the previous expansion",
+    "GET carries explicit round only, no write request, no-store and AbortSignal retained",
+    "actual Vue rendering escapes text and does not present pre-engine DRAFT status as current approval status"
+  ],
+  "pending": [
+    "both designers and portable template configuration",
+    "explicit synthetic aggregate input in simulation and template upgrade",
+    "fixed-package upgrade/restart/paired restore",
+    "browser and PostgreSQL acceptance"
+  ]
+}

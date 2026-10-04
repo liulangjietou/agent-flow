@@ -392,6 +392,8 @@ docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
 
 需要 Java 17+、Maven 3.9+，以及 Node.js 20.19+ 或 22.12+。
 
+默认使用 H2 文件库，首次启动会由 Flyway 创建业务表，Flowable 自动创建引擎表并部署 `expense-reimbursement` 示例流程。默认文件连接关闭延迟写入及区块复用（`WRITE_DELAY=0;REUSE_SPACE=FALSE`）；自定义 H2 文件库 URL 时也须保留这些设置。禁用区块复用会使文件增长更快；相关验证与维护边界见[服务任务说明](docs/service-tasks.md)。
+
 ```bash
 git clone https://github.com/liulangjietou/agent-flow.git
 cd agent-flow

@@ -13,7 +13,7 @@ import java.util.UUID;
  * @author owlzhangfq@gmail.com
  */
 public record AdvanceRepaymentCheck(Input input, long version, Status status, Instant updatedAt, Instant leaseUntil,
-                                    AdvanceRepaymentPort.Receipt receipt, UUID repaymentId, Issue issue) {
+                                    AdvanceRepaymentPort.Receipt receipt, UUID repaymentId, Issue issue, UUID reviewRepaymentId) {
     /** 状态恢复保持租约和外部原件，不把排队、超时或查无伪装成已还款。 */
     public AdvanceRepaymentCheck {
         if (input == null || version < 1 || status == null || updatedAt == null || updatedAt.isBefore(input.requestedAt())) throw invalid();
@@ -22,14 +22,15 @@ public record AdvanceRepaymentCheck(Input input, long version, Status status, In
         if (observed ? receipt == null || !receipt.matches(input.request(), updatedAt) || issue != null : receipt != null) throw invalid();
         if (status == Status.RECORDED ? repaymentId == null || receipt.status() != AdvanceRepaymentPort.Status.CONFIRMED : repaymentId != null) throw invalid();
         if ((status == Status.UNAVAILABLE || status == Status.VOIDED) != (issue != null)) throw invalid();
+        if (reviewRepaymentId != null && status != Status.CHECKED) throw invalid();
     }
     /** 仅冻结查询目标与原放款身份，金额由后续外部回执取得。 */
-    public static AdvanceRepaymentCheck queue(Input input) { return new AdvanceRepaymentCheck(input, 1, Status.QUEUED, input.requestedAt(), null, null, null, null); }
+    public static AdvanceRepaymentCheck queue(Input input) { return new AdvanceRepaymentCheck(input, 1, Status.QUEUED, input.requestedAt(), null, null, null, null, null); }
     /** 同一任务只领取一次，崩溃超时结束本次查询，人工可建立新查询。 */
     public AdvanceRepaymentCheck claim(Instant now, Duration lease) {
         requireTime(now);
         if (status != Status.QUEUED || lease == null || lease.isZero() || lease.isNegative()) throw conflict();
-        return new AdvanceRepaymentCheck(input, version + 1, Status.RUNNING, now, now.plus(lease), null, null, null);
+        return new AdvanceRepaymentCheck(input, version + 1, Status.RUNNING, now, now.plus(lease), null, null, null, null);
     }
     /** 外部成功仅保存只读事实，真正冲减仍需要确认当前余额版本。 */
     public AdvanceRepaymentCheck complete(FinanceResult<AdvanceRepaymentPort.Receipt> result, Instant now) {
@@ -37,7 +38,7 @@ public record AdvanceRepaymentCheck(Input input, long version, Status status, In
         if (expired(now)) return fail(Issue.TIMEOUT, now);
         if (result instanceof FinanceResult.Success<AdvanceRepaymentPort.Receipt> success) {
             if (!success.value().matches(input.request(), now)) return fail(Issue.INVALID_RESPONSE, now);
-            return new AdvanceRepaymentCheck(input, version + 1, Status.CHECKED, now, null, success.value(), null, null);
+            return new AdvanceRepaymentCheck(input, version + 1, Status.CHECKED, now, null, success.value(), null, null, null);
         }
         if (result instanceof FinanceResult.Rejected<AdvanceRepaymentPort.Receipt>) return fail(Issue.SOURCE_UNAVAILABLE, now);
         return fail(result instanceof FinanceResult.Unavailable<AdvanceRepaymentPort.Receipt> unavailable ? Issue.valueOf(unavailable.failure().name()) : Issue.INVALID_RESPONSE, now);
@@ -45,22 +46,27 @@ public record AdvanceRepaymentCheck(Input input, long version, Status status, In
     /** 暂时失败保留原请求，不续期旧事实，不产生资金含义。 */
     public AdvanceRepaymentCheck fail(Issue reason, Instant now) {
         requireRunning(now); if (reason == null) throw invalid();
-        return new AdvanceRepaymentCheck(input, version + 1, Status.UNAVAILABLE, now, null, null, null, reason);
+        return new AdvanceRepaymentCheck(input, version + 1, Status.UNAVAILABLE, now, null, null, null, reason, null);
     }
     /** 来源或人员失效使未完成查询结束，历史查询仍保留。 */
     public AdvanceRepaymentCheck voidSource(Instant now) {
         requireTime(now); if (!active()) throw conflict();
-        return new AdvanceRepaymentCheck(input, version + 1, Status.VOIDED, now, null, null, null, Issue.SOURCE_CHANGED);
+        return new AdvanceRepaymentCheck(input, version + 1, Status.VOIDED, now, null, null, null, Issue.SOURCE_CHANGED, null);
+    }
+    /** 完成查询时保留它触发的原还款复核，后续余额和裁决不能改写这一历史依据。 */
+    public AdvanceRepaymentCheck requiringReview(UUID originalRepaymentId) {
+        if (status != Status.CHECKED || originalRepaymentId == null || reviewRepaymentId != null && !reviewRepaymentId.equals(originalRepaymentId)) throw conflict();
+        return new AdvanceRepaymentCheck(input, version, status, updatedAt, leaseUntil, receipt, repaymentId, issue, originalRepaymentId);
     }
     /** 已展示的收款事实单次消费，确认者必须是发起本次查询的独立财务。 */
     public AdvanceRepaymentCheck record(AdvanceRepayment repayment, Instant now) {
         requireTime(now);
         if (!usable(now) || repayment == null || !repayment.checkId().equals(input.id()) || !repayment.tenantId().equals(input.tenantId())
                 || !repayment.recordedBy().equals(input.requestedBy()) || !repayment.recordedAt().equals(now) || !repayment.receipt().equals(receipt)) throw conflict();
-        return new AdvanceRepaymentCheck(input, version + 1, Status.RECORDED, now, null, receipt, repayment.id(), null);
+        return new AdvanceRepaymentCheck(input, version + 1, Status.RECORDED, now, null, receipt, repayment.id(), null, null);
     }
     /** 有效期不因读取页面自动延长，待确认的原件必须仍在五分钟窗口内。 */
-    public boolean usable(Instant now) { return status == Status.CHECKED && receipt.status() == AdvanceRepaymentPort.Status.CONFIRMED && receipt.matches(input.request(), now); }
+    public boolean usable(Instant now) { return status == Status.CHECKED && reviewRepaymentId == null && receipt.status() == AdvanceRepaymentPort.Status.CONFIRMED && receipt.matches(input.request(), now); }
     public boolean active() { return status == Status.QUEUED || status == Status.RUNNING; }
     public boolean expired(Instant now) { return status == Status.RUNNING && !now.isBefore(leaseUntil); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }

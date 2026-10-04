@@ -4,6 +4,7 @@ import { api, type TemplateCopyInput } from '../api'
 import { fieldErrorMessage, fieldTypes, ownValue } from '../formSchema'
 import { TemplateCatalog, validateTemplateCopy } from '../templateCenter'
 import FormFields from './FormFields.vue'
+import FinancialTemplateCompanion from './FinancialTemplateCompanion.vue'
 
 const props = defineProps<{ examplesOnly?: boolean; scopeKey: string; refreshVersion: number; locked: boolean; hasUnsavedDefinition: boolean }>()
 const emit = defineEmits<{ copy: [templateKey: string, body: TemplateCopyInput]; open: [definitionId: string]; returnDesigner: []; import: [] }>()
@@ -20,10 +21,12 @@ const visibleTemplates = computed(() => {
 })
 const copyInput = computed<TemplateCopyInput>(() => ({ key: targetKey.value.trim(), name: targetName.value.trim(), templateVersion: selected.value?.templateVersion ?? 0 }))
 const copyErrors = computed(() => attempted.value ? validateTemplateCopy(copyInput.value) : {})
-const businessLabels = { FORM: '表单审批', PROCUREMENT_PAYMENT: '采购付款', BUDGET_ADJUSTMENT: '预算调整' }
+const businessLabels = { FORM: '表单审批', PROCUREMENT_PAYMENT: '采购付款', BUDGET_ADJUSTMENT: '预算调整', EXPENSE: '费用报销', EXPENSE_PLAN: '事前申请', ADVANCE_REQUEST: '借款申请' }
 const statusLabels: Record<string, string> = { DRAFT: '草稿', PUBLISHED: '已发布', ARCHIVED: '已归档' }
 const notificationLabels: Record<string, string> = { SUBMITTED: '提交后', RETURNED: '退回后', APPROVED: '批准后' }
-const roleLabels: Record<string, string> = { MANAGER: '经理审批组（示例）', ADMIN: '额外复核组（示例）', FINANCE: '财务复核（复制后绑定实际人员或岗位）', ORG_SUPERVISOR_1: '本次任职直属主管' }
+const roleLabels: Record<string, string> = { MANAGER: '经理审批组（示例）', ADMIN: '额外复核组（示例）', FINANCE: '财务复核（复制后绑定实际人员或岗位）', ORG_SUPERVISOR_1: '本次任职直属主管',
+  EXPENSE_DEPARTMENT_HEAD: '部门负责人（复制后绑定）', EXPENSE_EXECUTIVE: '分管负责人（复制后绑定）', EXPENSE_POLICY_OWNER: '费用归口负责人（复制后绑定）',
+  EXPENSE_PRIOR_REVIEW: '事前额度例外审批人（复制后绑定）', EXPENSE_RECEIPT: '财务收单人员（复制后绑定）', EXPENSE_FINANCE_RECHECK: '财务复核负责人（复制后绑定）' }
 const nodeName = (id: string) => selected.value?.graph.nodes.find(node => node.id === id)?.name ?? id
 const fieldName = (key: string) => selected.value?.formSchema.fields.find(field => field.key === key)?.label ?? key
 const fieldTypeName = (type: string) => fieldTypes.find(item => item.value === type)?.label ?? type
@@ -71,6 +74,7 @@ onUnmounted(() => catalog.clear())
         <article v-if="selected" :key="selected.key" class="panel template-detail">
           <div class="template-detail-heading"><div><p class="eyebrow">{{ selected.key }} / V{{ selected.templateVersion }}</p><h3>{{ selected.name }}</h3><p>{{ selected.description }}</p></div><span class="status-chip">{{ businessLabels[selected.businessType] }}</span></div>
           <section class="template-section"><h4>适用范围</h4><p>{{ selected.scope }}</p></section>
+          <FinancialTemplateCompanion v-if="selected.companion" :template-key="selected.key" :scope-key="scopeKey" :summary="selected.companion" :locked="locked" />
           <form v-if="!examplesOnly" class="template-copy-form" novalidate @submit.prevent="copy">
             <h4>复制为我的流程草稿</h4><p>复制后进入设计器；审批角色与示例阈值需核对，发布由你决定。</p>
             <fieldset :disabled="locked"><label for="template-target-key">目标流程标识<input id="template-target-key" v-model="targetKey" aria-required="true" :aria-invalid="!!copyErrors.key" :aria-describedby="copyErrors.key ? 'template-key-error' : undefined" /><small v-if="copyErrors.key" id="template-key-error" class="inline-error">{{ copyErrors.key }}</small></label><label for="template-target-name">目标流程名称<input id="template-target-name" v-model="targetName" aria-required="true" :aria-invalid="!!copyErrors.name" :aria-describedby="copyErrors.name ? 'template-name-error' : undefined" /><small v-if="copyErrors.name" id="template-name-error" class="inline-error">{{ copyErrors.name }}</small></label></fieldset>

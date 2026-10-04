@@ -63,6 +63,34 @@ public class JdbcAdvanceRepaymentRepository {
         args.add(limit);
         return jdbc.query("SELECT * FROM advance_repayment WHERE tenant_id=? AND advance_id=?" + filter + " ORDER BY recorded_at DESC,id DESC LIMIT ?", row(), args.toArray());
     }
+    /** 按原登记恢复被消费查询及相邻借款修订，最新余额不能替代历史登记。 */
+    public Optional<Recorded> findRecorded(String tenant, UUID id) {
+        return jdbc.query("""
+                SELECT r.*,p.state_json AS prior_check_json,c.state_json AS recorded_check_json
+                FROM advance_repayment r
+                JOIN advance_repayment_check_revision p ON p.tenant_id=r.tenant_id AND p.check_id=r.check_id AND p.version=r.check_version-1
+                JOIN advance_repayment_check_revision c ON c.tenant_id=r.tenant_id AND c.check_id=r.check_id AND c.version=r.check_version
+                WHERE r.tenant_id=? AND r.id=?
+                """, (row, index) -> {
+            var repayment = row().mapRow(row, index); var advanceId = repayment.receipt().request().advanceId();
+            long version = row.getLong("advance_version"), checkVersion = row.getLong("check_version");
+            var before = revision(tenant, advanceId, version - 1); var after = revision(tenant, advanceId, version);
+            var prior = json.read(row.getString("prior_check_json"), AdvanceRepaymentCheck.class);
+            var recorded = json.read(row.getString("recorded_check_json"), AdvanceRepaymentCheck.class);
+            if (!repayment.id().equals(id) || !repayment.tenantId().equals(tenant) || before.version() != version - 1 || after.version() != version
+                    || !before.tenantId().equals(tenant) || !after.tenantId().equals(tenant) || !before.id().equals(advanceId) || !after.id().equals(advanceId)
+                    || prior.version() != checkVersion - 1 || recorded.version() != checkVersion || !prior.input().id().equals(repayment.checkId())
+                    || !prior.input().tenantId().equals(tenant) || !prior.record(repayment, repayment.recordedAt()).equals(recorded)) throw changed();
+            before.repay(before.version(), repayment);
+            if (!before.state().equals(after.state())) throw changed();
+            return new Recorded(version, repayment);
+        }, tenant, id.toString()).stream().findFirst();
+    }
+    /**
+     * 该次登记对应的借款修订，不提供当前可用额或办理许可。
+     * @author owlzhangfq@gmail.com
+     */
+    public record Recorded(long advanceVersion, AdvanceRepayment repayment) { }
     private EmployeeAdvance revision(String tenant, UUID id, long version) {
         return jdbc.query("SELECT state_json FROM finance_resource_revision WHERE tenant_id=? AND resource_type='ADVANCE' AND resource_id=? AND version=?",
                 (row, index) -> EmployeeAdvance.restore(json.read(row.getString("state_json"), EmployeeAdvance.State.class)), tenant, id.toString(), version).stream().findFirst().orElseThrow(JdbcAdvanceRepaymentRepository::changed);

@@ -1,0 +1,216 @@
+{
+  "taskId": "I02",
+  "status": "TRUSTED_PROFILE_AND_PERSISTED_RAW_RECEIPT_VERIFIED_NO_HTTP_OR_PUBLIC_ENTRYPOINT",
+  "recordedAt": "2026-10-04T05:52:00.763020+00:00",
+  "implementationCommit": "caff66d5d7b5928078b12b53ee0dc141f7cc1331",
+  "baseCommit": "9a3ee8aca6ee89da4968f7bf1f83b4da1e7e2239",
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/i02-receipt-evidence-20261004",
+  "manifestSha256": "cada0ebb3de96c84d9bcffeb5dcf4b68f662fd2ef1e3c82a2be61a7b1355d2d8",
+  "sourceFiles": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/signature/SignatureOperation.java",
+      "sha256": "847ee0cfbb5ac4c16467cb3bc91c1f93d5d7867521255414fc9b2c18063015b8"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/signature/SignatureReceipt.java",
+      "sha256": "0c34c10c0a1e50bda9e78bb396853183a95c34a42247e6286b1644a4890bf617"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/signature/SignatureRequest.java",
+      "sha256": "1fc2d7d3b1e253302ffeae65d4774887f36b5ae7a495c0cc7984027fb7b9edf6"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/signature/SignatureOperationTest.java",
+      "sha256": "413f179212b50ffba16e7a438915be223d4f6637390746b6a562a99f0c183cfe"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/signature/SignatureReceiptTest.java",
+      "sha256": "5f4838835d898ca75f96371144c55d233c6fe3d7f8abb10fa5415fcbccdb5c28"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/signature/SignatureRequestTest.java",
+      "sha256": "36cc65c3a0b79eb9aefd8fe6feb56e4fe2442c35e63ec349d8b56b766aa49cd6"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/signature/SignatureTestFixtures.java",
+      "sha256": "3c6c8651d672a35bf2e048e9958503ff9587ebcd68cccd775d60411d2af645ab"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/JdbcSignatureEvidenceRepository.java",
+      "sha256": "73e2b69e6665c68051734a49e892a475c160806336e47faf7de7f2242b4428e7"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/JdbcSignatureOperationRepository.java",
+      "sha256": "3423d91c24f07050068c0eb65b430412d4ae00426bb419bb8d563bf389582a00"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureGatewayConfiguration.java",
+      "sha256": "b9922945a9b046bc84703bafecd30a87452a1414271c9cc453aeb7544dbe1783"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureProfile.java",
+      "sha256": "1ada04a0469b6273e1b8a26d39df27cdd0ac5f384695ba1ceff7173668ed2292"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureReceiptVerifier.java",
+      "sha256": "cd9191b2a5bfce4c1281f49813657d4fdfb1dc70518144f3c05375c40cd18238"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureDatabaseRecoveryTest.java",
+      "sha256": "6ccd209c23e10d6a0c57a27190c30a183c601bfb338270fbd1f405e430e805db"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureEvidencePersistenceTest.java",
+      "sha256": "1174e5ee8645c1ddfc941e0f114303c5d6103c5d50733398079d5789543e2755"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureGatewayConfigurationTest.java",
+      "sha256": "07de19db837b882604a13e612940c93e9dcc83d430f8c3e1c84f8aa1d60fa242"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureMigrationTest.java",
+      "sha256": "52e0cc3bf477b65c7ec4ff16e3671c760b0ddf883c51205f88a133a4013e2353"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignaturePersistenceFixtures.java",
+      "sha256": "1f966a2838a4d52eac046058e3ba7c0174bfd01edc1e309d8df0cbc495059a2c"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignaturePersistenceTest.java",
+      "sha256": "3748cb6b1f19589facd5fe91aae1daa28a81a3b202055f9d3c998cb1329817ad"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureProfileTest.java",
+      "sha256": "51ba2cfe18c2f99effc270f8a21f331765362845e3e4aebf4b20f1d0cf8a9aef"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureReceiptVerifierTest.java",
+      "sha256": "25a42133a8154ef95b0e49df040438dffe610d19e1e99d74d5b79321caf2a69b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureSerializationTest.java",
+      "sha256": "bd348133d2d72ce4c17cd5d744ec1cf9356bbe451d0d84dc0c594affac47640e"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/signature/SignatureVerificationFixtures.java",
+      "sha256": "2dc8d4dd307c7382c3ec4296736dab45b7878ace9e2c98d25f140aa202a8d1f2"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/db/migration/V111__document_signatures.sql",
+      "sha256": "a58d491d9d8ef6ceb98bc4e50f80b0442bb3bab09e117dbac9a0e446220a74d0"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/db/migration/V112__signature_receipt_evidence.sql",
+      "sha256": "d4cb28c236ab81376870502c8ca3d1b2e0ff46605583731cd5de1856ec33267a"
+    }
+  ],
+  "javaTests": {
+    "recordedAt": "2026-10-04T05:50:48.454329+00:00",
+    "stage": "i02-verification-final",
+    "selectedClasses": [
+      "SignatureRequestTest",
+      "SignatureReceiptTest",
+      "SignatureOperationTest",
+      "SignatureSerializationTest",
+      "SignaturePersistenceTest",
+      "SignatureMigrationTest",
+      "SignatureDatabaseRecoveryTest",
+      "SignatureProfileTest",
+      "SignatureGatewayConfigurationTest",
+      "SignatureReceiptVerifierTest",
+      "SignatureEvidencePersistenceTest"
+    ],
+    "executed": 144,
+    "unique": 144,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "classes": {
+      "SignatureRequestTest": 9,
+      "SignatureReceiptTest": 9,
+      "SignatureOperationTest": 17,
+      "SignatureSerializationTest": 3,
+      "SignaturePersistenceTest": 32,
+      "SignatureMigrationTest": 1,
+      "SignatureDatabaseRecoveryTest": 1,
+      "SignatureProfileTest": 11,
+      "SignatureGatewayConfigurationTest": 15,
+      "SignatureReceiptVerifierTest": 31,
+      "SignatureEvidencePersistenceTest": 15
+    }
+  },
+  "counting": "144 unique classname/name pairs include the 72 previously verified domain and persistence cases plus 72 new trust and evidence cases; repeated runs are not added.",
+  "authorGate": {
+    "javaFiles": 1701,
+    "namedTypes": 3345,
+    "missingAuthorTags": 0,
+    "parseErrors": 0
+  },
+  "redGreen": {
+    "firstRun": {
+      "unique": 72,
+      "failures": 1,
+      "errors": 1
+    },
+    "productDefect": "A JSON null accepted-history record raised NullPointerException instead of SIGNATURE_EVIDENCE_CORRUPT. The failing parameterized case was captured before adding the deserialization-boundary null guard.",
+    "testCorrection": "NOT_FOUND was initially supplied during first send. The existing domain correctly rejected it. The test now times out the send and queries the original operation; no domain retry behavior was changed.",
+    "finalRun": "144 unique cases passed with zero failures, errors or skips."
+  },
+  "migration": {
+    "from": "111",
+    "to": "112",
+    "database": "H2",
+    "previousTables": 220,
+    "previousRows": 10,
+    "existingTablesAndInventoryPreserved": true,
+    "fabricatedEvidenceRows": 0,
+    "rerunMigrations": 0,
+    "postgresqlVerified": false
+  },
+  "recovery": {
+    "databaseDefaultUrlConfigurationUsed": true,
+    "independentSqlRestore": true,
+    "restoredFileDatabaseReopened": true,
+    "proofReverifiedWithoutCurrentConfigOrNetwork": true,
+    "sourceUnaffectedByRestoredDatabaseChanges": true,
+    "actualSignedFilesOrPackagedCrashVerified": false
+  },
+  "verifiedScope": [
+    "Trusted exact tenant/profile version and actor/signer/key binding; no admin signing privilege bypass.",
+    "Safe fixed destination configuration and separate target digest; token and timeout rotation do not alter the target.",
+    "JDK Ed25519 verification of domain-prefixed raw bytes with strict bounded UTF-8 and JSON, and exact original request binding.",
+    "Full raw bytes, detached signature, immutable public-key profile snapshot and nanosecond verification time retained.",
+    "Proof and accepted business state share a mandatory transaction and roll back together.",
+    "Duplicate proofs retain the first verification time and accepted revision. Query NOT_FOUND remains query-only recovery.",
+    "Stored evidence is reverified against original request and accepted history; forged keys, bodies, signatures and changed indexes are rejected.",
+    "Nonempty migration and independent H2 recovery preserve existing source data."
+  ],
+  "remainingScope": [
+    "HTTP submit/query/fixed artifact transport and actual immutable file byte verification.",
+    "Current application, field and signing authorization orchestration.",
+    "Worker claims, callback handling, API and user-facing operation pages.",
+    "Fixed-package process interruption and database/original/result-file paired recovery.",
+    "Browser and PostgreSQL acceptance remain blocked by existing environment restrictions.",
+    "E10 actual provider, signed document signatures, certificate chain, revocation and timestamp acceptance."
+  ],
+  "references": [
+    {
+      "title": "Java 17 standard security algorithm names",
+      "url": "https://docs.oracle.com/en/java/javase/17/docs/specs/security/standard-names.html"
+    },
+    {
+      "title": "Java 17 Signature API",
+      "url": "https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/security/Signature.html"
+    }
+  ],
+  "ledger": {
+    "registered": 42,
+    "completed": 8,
+    "open": 34,
+    "implementationRemaining": 9,
+    "implementedAwaitingVerification": 7,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  }
+}

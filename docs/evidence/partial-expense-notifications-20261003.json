@@ -1,0 +1,424 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-10-03T22:39:24.509677+00:00",
+  "task": "F17",
+  "status": "PARTIAL_EXPENSE_ADJUSTMENT_NOTIFICATIONS_SCOPE_VERIFIED_TASK_OPEN",
+  "sourceCommit": "d9b23246402b05f49b0522d800ef3c40df3998eb",
+  "branch": "codex/governance-identifier-integration",
+  "knownOpenTaskCount": 34,
+  "sourceTrace": {
+    "callers": [
+      "ExpensePartialAdjustmentController",
+      "ExpensePartialAdjustmentWorker"
+    ],
+    "services": [
+      "ExpensePartialPreparationService",
+      "ExpensePartialAdjustmentFinance",
+      "ExpensePartialAdjustmentExecution",
+      "ExpensePartialAdjustmentActions",
+      "ExpensePartialAdjustmentDisputes"
+    ],
+    "downstream": [
+      "JdbcExpensePartialPreparationRepository",
+      "JdbcExpensePartialAdjustmentRepository",
+      "JdbcExpensePartialDisputeRepository",
+      "JdbcExpenseSettlementRepository",
+      "ApplicationRepository",
+      "InboxRepository",
+      "NotificationDeliveryService"
+    ],
+    "responsibility": "Applications publish actual saved facts in their transactions; domain controls business states, repositories prove persisted sources, notification access checks immutable IDs and current scope."
+  },
+  "delivered": [
+    "Single-side preparation unavailable/voided; ordinary waiting and successful preparation quiet",
+    "Budget and accrual original commands report independent unknown/not-found/refused/expired/stopped/conflict/success facts",
+    "Actual local-resource block/completion and actual safe retirement",
+    "Named dispute decisions bind exact original command and actual decision ID",
+    "Original-operation last revision survives independent reauthorization; replacement command cannot replace old message",
+    "Current recipient eligibility and original-round field/finance scope; same-transaction inbox/dispatch intents; read-only no-store GET",
+    "Actual inbox template, closed DTO validation, cancellation, late-result guard, original-round navigation"
+  ],
+  "redEvidence": {
+    "backend": {
+      "tests": 5,
+      "failures": 5,
+      "errors": 0,
+      "reportDirectory": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-red-reports",
+      "reason": "Existing workflow tests asserted finance/resources/disputes but did not assert resulting messages; new real-service tests saw zero recipients."
+    },
+    "frontend": {
+      "tests": 1,
+      "failures": 1,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-web-red-actual.log",
+      "reason": "Actual Vue inbox lacked the partial-adjustment detail action."
+    }
+  },
+  "validation": {
+    "java": {
+      "status": "PASS",
+      "distinctCases": 149,
+      "classes": [
+        {
+          "class": "io.agentflow.notification.ExpensePartialAdjustmentNoticeTest",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "sha256": "1df36ece899b1ef94260b0cdc88893d312fa75a20589b24813c7e58ecddc4366"
+        },
+        {
+          "class": "io.agentflow.finance.ExpensePartialAdjustmentPreparationTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "sha256": "ab365b8bce264281a55115a32df0e8e0f1acc4a67125b5a0a59434d417821c8f"
+        },
+        {
+          "class": "io.agentflow.finance.ExpenseAccrualReductionOperationTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "sha256": "7ea33ae2d85f061e7215fa20c396eca06bcea88c39f66281673d23e3dec394a2"
+        },
+        {
+          "class": "io.agentflow.finance.BudgetConsumptionReductionOperationTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "sha256": "f7673b6466ca95ac4aec5895bbf00c77c1bdf161985f5a238c445beae29ffe34"
+        },
+        {
+          "class": "io.agentflow.finance.ExpensePartialAdjustmentTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "sha256": "9eaf621b9adab46929fd792230d8f6f0045a2256fab282b5b46dc52a2dd21cf0"
+        },
+        {
+          "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+          "tests": 69,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "sha256": "1ccfe686ce02be3f1bd241f00c66143c467d600f89396fee86da1ef7acaa1bcc"
+        },
+        {
+          "class": "io.agentflow.notification.NotificationDeliveryIntegrationTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "sha256": "28e8c006272fca967871184f8f731f80d051909bfe59335a9717a5e271c0b01f"
+        },
+        {
+          "class": "io.agentflow.notification.NotificationDeliveryApiIntegrationTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "sha256": "3e82f01a1d3f3e574169208e244e53e8686aff2072e3bab58dbd7cf1a3caf82d"
+        },
+        {
+          "class": "io.agentflow.notification.InboxIntegrationTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "sha256": "8c09f17a1dc63175bc64724c4ce3088e9de316938ee653996ccd8fdcce348420"
+        },
+        {
+          "class": "io.agentflow.api.OpenApiContractTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0,
+          "sha256": "384253a502fb23a3314ada45fe04f0428cc56fea7fa3e2cdcf41d7a8b41ee4a8"
+        }
+      ],
+      "counting": "Distinct actual XML (classname,name); only Running classes from this completed invocation. No annotation counts or stale report files.",
+      "scopeLog": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-scope.log"
+    },
+    "newJavaCases": {
+      "notificationIntegration": 8,
+      "domainSourceBinding": 1,
+      "extendedExistingReauthorizationCase": 1
+    },
+    "web": {
+      "tests": 190,
+      "pass": 190,
+      "fail": 0,
+      "files": [
+        "budget-adjustment-notifications.test.mjs",
+        "budget-notifications.test.mjs",
+        "disbursement-return-notifications.test.mjs",
+        "expense-adjustment-notifications.test.mjs",
+        "expense-partial-adjustment-notifications.test.mjs",
+        "expense-return-notifications.test.mjs",
+        "expense-settlement-notifications.test.mjs",
+        "notifications.test.mjs",
+        "payment-notifications.test.mjs",
+        "repayment-notifications.test.mjs",
+        "repayment-review-notifications.test.mjs",
+        "reversal-check-notifications.test.mjs",
+        "reversal-notifications.test.mjs",
+        "supplier-adjustment-notifications.test.mjs",
+        "supplier-payment-notifications.test.mjs",
+        "supplier-return-notifications.test.mjs",
+        "supplier-settlement-notifications.test.mjs",
+        "voucher-notifications.test.mjs",
+        "expense-partial-adjustment.test.mjs"
+      ],
+      "newCases": 10
+    },
+    "openapi": {
+      "operations": 359,
+      "schemas": 743,
+      "requestExamples": 125,
+      "responseRecordMappings": 7,
+      "status": "PASS"
+    },
+    "typeCheck": "PASS",
+    "productionBuild": "PASS with existing large-chunk warning",
+    "authorCheck": {
+      "javaFiles": 1619,
+      "namedTypes": 3153,
+      "missingAuthors": 0,
+      "parseErrors": 0
+    },
+    "gitDiffCheck": "PASS",
+    "javaChangesAfterScope": "Only author JavaDoc tag formatting; final author parser passed. No semantic or test changes after the successful Maven run.",
+    "corrections": [
+      "First frontend RED invocation incorrectly prefixed filename with tests/; excluded as setup error. Corrected actual inbox RED is separately retained.",
+      "Initial frontend entry run found missing .js module suffix; initial type check found missing inbox labels for two new kinds. Both fixed before final 190-case web scope, type and build validation.",
+      "Initial author checker reported 18 inline tags; normalized to multiline JavaDoc, final scan zero missing."
+    ],
+    "environment": "Isolated H2 with actual Spring authentication, Flowable, repositories and explicitly synthetic finance peers; no browser or enterprise claim"
+  },
+  "sourceHashes": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentChanged.java",
+      "sha256": "31dd762caa7f18a89085bf15f7a70f263036da2b02350f364cae054d758bcf37"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/ExpensePartialAdjustmentNotice.java",
+      "sha256": "4d1cd62095c05bc269c923a45bc3da22a53a0d15ce9c7f076194cebcc2d994f0"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java",
+      "sha256": "aa06f7b7755415e9caabf5719fd27de126e4d15e2a7356ce845290f2d1d0c32b"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/notification/ExpensePartialAdjustmentNoticeTest.java",
+      "sha256": "d6e139ff39539696ee685892ceac51ecc3f686ad4b4429e07214adced27d0b7f"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentActions.java",
+      "sha256": "3918d908ed6562bcac3a061bca2d921d4c5828d6ebc64088f3f3d672114b7d09"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentDisputes.java",
+      "sha256": "25f06ec84e30a9b4f6489cad84081b2dba065ed417e63e57bc716dea8813e3fd"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentExecution.java",
+      "sha256": "0956d8da9327fb442cd8b78f5ddf59228e52dda02bf211e21b08a0ad98ff42cd"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentFinance.java",
+      "sha256": "04f49319e532fa5a08032b5a75e95c69e2b5a41ba8a88d53ecb978c53a975f76"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialPreparationService.java",
+      "sha256": "ccf619c4ecce6ab9bd60949abfddc008b24a0051ec56754b56a37c57807c40e3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpensePartialDisputeRepository.java",
+      "sha256": "6b39496fe87f9b1fa99ca2c0d46f693d15e29d18a3c2611997ebb81d95fc2a43"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpensePartialAdjustmentNotificationAccess.java",
+      "sha256": "77b55e7b9dc968888537d3ec483a7d9d0d28e76839b5410b6617e5842a6950a3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpensePartialAdjustmentNotificationController.java",
+      "sha256": "d847e86fce3aca7613544a55c94e7a05305f18c0c6baf445240a4e4a618cf88a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ExpensePartialAdjustmentNotificationService.java",
+      "sha256": "e2400400f29c2b2409a85a571c1fba1f63389f0cf78fa4eab369a6a4c20b8995"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java",
+      "sha256": "d029af2150b2e331277f0cc73ad857e8af9d79c923e13ff337fd79fd51f0a403"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "13a74944e5d7d5e4235db93863fb236525976412892f7caad907945826af000b"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java",
+      "sha256": "85a940078063dfb109dc33c4f154553480bfe812f532d7229f97dc9b02b47616"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+      "sha256": "131484fe2eb0aeb9d2de7bb397903fde251c31cf0c2b9e1b81b243e1d9423017"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "122b102be659c581b48ced187a0d06edd03ca9cfbac24770c5102a3c63821421"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "sha256": "06cfbf93f838416c5fce192c86c0325daba7a00aaf943f6aaa6fcfc88bf06095"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "1eea04c40187fd81d976203dd349e5cf3617100ec10a465f1715cf2b36d4c3ea"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpensePartialAdjustmentNotificationDetail.vue",
+      "sha256": "9a7536fa9c8b9fce4513c108ab6502f176e213925177f3b68c724ffaab18c69e"
+    },
+    {
+      "path": "agentflow-web/src/components/NotificationInbox.vue",
+      "sha256": "6281b953bdb9d0804b54285a00d681f186a3d33341a2fe733d7ca153bd00a3bb"
+    },
+    {
+      "path": "agentflow-web/src/expensePartialAdjustmentNotification.ts",
+      "sha256": "f83c9d25e70f24ae1ab4d6ef3e6c9de24e1643e08556cfa1ebc852dc539552b9"
+    },
+    {
+      "path": "agentflow-web/src/notificationInbox.ts",
+      "sha256": "e9483c583594666a06f6280869da9e4c74def91f519b9d0e64609e1a6656acc9"
+    },
+    {
+      "path": "agentflow-web/tests/expense-partial-adjustment-notifications.test.mjs",
+      "sha256": "541133f970e839cdb19400270ec2d5ae3a6e690f9a49671e0458820a2d1802ce"
+    }
+  ],
+  "artifactHashes": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-authors-final.log",
+      "sha256": "9f70e9ae160ef19c92baaa6e1de70864f405b41b9f3d71cf0354b204238a7cfa"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-authors.log",
+      "sha256": "2302aec8defcacc099b1cbf402e411a4fb1aaa6e33ec344668b15f629cbd845a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-build.log",
+      "sha256": "d4f02fe80981d849688dfa4bf793adf10c2b03a56940b87b51d29d8c75b057d3"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-final-reports/TEST-io.agentflow.api.OpenApiContractTest.xml",
+      "sha256": "384253a502fb23a3314ada45fe04f0428cc56fea7fa3e2cdcf41d7a8b41ee4a8"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-final-reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "sha256": "1ccfe686ce02be3f1bd241f00c66143c467d600f89396fee86da1ef7acaa1bcc"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-final-reports/TEST-io.agentflow.finance.BudgetConsumptionReductionOperationTest.xml",
+      "sha256": "f7673b6466ca95ac4aec5895bbf00c77c1bdf161985f5a238c445beae29ffe34"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-final-reports/TEST-io.agentflow.finance.ExpenseAccrualReductionOperationTest.xml",
+      "sha256": "7ea33ae2d85f061e7215fa20c396eca06bcea88c39f66281673d23e3dec394a2"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-final-reports/TEST-io.agentflow.finance.ExpensePartialAdjustmentPreparationTest.xml",
+      "sha256": "ab365b8bce264281a55115a32df0e8e0f1acc4a67125b5a0a59434d417821c8f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-final-reports/TEST-io.agentflow.finance.ExpensePartialAdjustmentTest.xml",
+      "sha256": "9eaf621b9adab46929fd792230d8f6f0045a2256fab282b5b46dc52a2dd21cf0"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-final-reports/TEST-io.agentflow.notification.ExpensePartialAdjustmentNoticeTest.xml",
+      "sha256": "1df36ece899b1ef94260b0cdc88893d312fa75a20589b24813c7e58ecddc4366"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-final-reports/TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+      "sha256": "8c09f17a1dc63175bc64724c4ce3088e9de316938ee653996ccd8fdcce348420"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-final-reports/TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+      "sha256": "3e82f01a1d3f3e574169208e244e53e8686aff2072e3bab58dbd7cf1a3caf82d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-final-reports/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+      "sha256": "28e8c006272fca967871184f8f731f80d051909bfe59335a9717a5e271c0b01f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-java-summary.json",
+      "sha256": "a9bad82e32ab5ed2f2ff31f6447ed5a988a644c47b300052133c08ef6f5bb4d5"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-openapi.log",
+      "sha256": "de688798f1670b5d968ab6fcd039e65bffa3083eae85dff0ae7615d37114235a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-red-reports/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "sha256": "df45bf59cccb15a25b29d0a96757b4367df31e41728ad577ef3dde9b0f59e3da"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-red.log",
+      "sha256": "74009ede6aae2c777a0f1636ac195717b76f524d75222dbe406cb47acda2e38e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-review.json",
+      "sha256": "9c20834b57e4069c0f796a0dcc8ac907e9d902a9ae623235650a883145ffd03c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-scope.log",
+      "sha256": "0bda6a95d75b8279dcf32ea467fecf3c62c332abec3505e5b72e5682b37e5a14"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-source-manifest.json",
+      "sha256": "fbb7a38289c4c6b6a1aaabfb53d1023189ba7157adcd5fbe4cd2bf62ed850d8f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-vue-tsc-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-vue-tsc.log",
+      "sha256": "28deb3faf0e7ebc4b7e0e37f2791f14d9fad8ef91aeb3b4176e265cc185e8d59"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-web-entry.log",
+      "sha256": "08b636d661ce1a8483118f08f910ce8051867411aee45321ccdc3d82ad14729c"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-web-files.json",
+      "sha256": "c1b279f711f6090c9000583bdc005eda773f648556f03f03303f36d887eb5ebb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-web-new.log",
+      "sha256": "2fc63309fc36c537c5b143528584884eb7d382c9143e09c57b50dff7a3d8683f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-web-red-actual.log",
+      "sha256": "20ba2cd46046d685cedc41737d97266efc3f8398e3968672970c4bd782cb5e31"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-web-red.log",
+      "sha256": "e98d676582f497203590497bb18dde9ac6e3fa1fdb00bb0b8ca2b7b3029d2113"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/partial-expense-notifications-web-scope.log",
+      "sha256": "d28060a3b9e17c3e52723f0ccbf6cb9906d6779a201be963c2da99fd7d653103"
+    }
+  ],
+  "remaining": [
+    "F17 coverage audit for remaining original source families",
+    "F17 fixed-package notification runtime, persistence/restart and combined delivery acceptance",
+    "Browser/PostgreSQL acceptance not performed; administrator policy/image I/O blockers were not bypassed",
+    "Real enterprise finance and messaging acceptance",
+    "V02 final local gate before E15 remote push/PR/CI; overall goal remains active"
+  ]
+}

@@ -45,7 +45,7 @@ class DefinitionIdentifierIntegrationTest {
     @Autowired RepositoryService engine;
 
     @ParameterizedTest
-    @ValueSource(strings = {"node-edge", "process-node", "process-edge"})
+    @ValueSource(strings = {"node-edge", "process-node", "process-edge", "invalid-node", "invalid-edge", "invalid-process"})
     void previewReportsEveryIdentifierNamespaceConflict(String scenario) throws Exception {
         String key = key(scenario);
         mvc.perform(post("/api/v1/process-definitions/validate").header("Authorization", token())
@@ -54,7 +54,7 @@ class DefinitionIdentifierIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"node-edge", "process-node", "process-edge"})
+    @ValueSource(strings = {"node-edge", "process-node", "process-edge", "invalid-node", "invalid-edge"})
     void invalidCreationAndUpdateNeverPersistPartialState(String scenario) throws Exception {
         String key = key(scenario);
         int originalCount = drafts.findAll("demo", null).size();
@@ -75,7 +75,7 @@ class DefinitionIdentifierIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"node-edge", "process-node", "process-edge"})
+    @ValueSource(strings = {"node-edge", "process-node", "process-edge", "invalid-node", "invalid-edge"})
     void legacyDraftCanBeCorrectedAfterPublicationIsRejectedBeforeDeployment(String scenario) throws Exception {
         String key = key(scenario);
         // 仓储中模拟旧版本已经接受的非法草稿，不经过新版创建用例。
@@ -106,10 +106,51 @@ class DefinitionIdentifierIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("errors").isEmpty());
     }
 
+    @Test
+    void invalidProcessKeyIsRejectedAtCreationAndLegacyPublicationWithoutChangingItsIdentity() throws Exception {
+        String key = "0-" + UUID.randomUUID();
+        int originalCount = drafts.findAll("demo", null).size();
+        mvc.perform(post("/api/v1/process-definitions").header("Authorization", token()).contentType("application/json")
+                        .content(json.write(Map.of("key", key, "name", "非法流程标识", "graph", validGraph()))))
+                .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("details.definitionErrors", hasItem("INVALID_PROCESS_KEY:" + key)));
+        assertThat(drafts.findAll("demo", null)).hasSize(originalCount);
+        var legacy = DefinitionDraft.create(UUID.randomUUID(), "demo", key, "历史非法流程标识", validGraph());
+        drafts.save(legacy);
+        mvc.perform(post("/api/v1/process-definitions/" + legacy.id() + "/publish?expectedRevision=0")
+                        .header("Authorization", token()).contentType("application/json").content("{\"changeNote\":\"保留原标识\"}"))
+                .andExpect(status().isUnprocessableEntity()).andExpect(jsonPath("details.definitionErrors", hasItem("INVALID_PROCESS_KEY:" + key)));
+        var unchanged = service.get("demo", legacy.id());
+        assertThat(unchanged.key()).isEqualTo(key);
+        assertThat(unchanged.status()).isEqualTo(DraftStatus.DRAFT);
+        assertThat(unchanged.revision()).isZero();
+        assertThat(unchanged.version()).isZero();
+        assertThat(publications.findByDefinition("demo", legacy.id())).isEmpty();
+        assertThat(engine.createProcessDefinitionQuery().processDefinitionTenantId("demo").processDefinitionKey(key).count()).isZero();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"审批节点", "équipe", "_review-1.2", "a\u0301", "a\u00b7b", "xmlns"})
+    void validUnicodeIdentifiersKeepTheirOriginalTextThroughRealEngineDeployment(String id) {
+        String key = "流程-" + UUID.randomUUID();
+        Graph graph = new Graph(List.of(new Node("begin", "开始", NodeType.START, Map.of()),
+                new Node(id, "审批", NodeType.USER_TASK, Map.of("assigneeRule", "user:manager")),
+                new Node("finish", "结束", NodeType.END, Map.of())),
+                List.of(new Edge("入线-" + id, "begin", id, ""), new Edge("出线", id, "finish", "")));
+        var draft = service.create("demo", key, "合法原标识", graph);
+        var published = service.publish(new Actor("demo", "admin", Set.of("ADMIN")), draft.id(), 0, "核对字符原样保留");
+        var engineDefinition = engine.createProcessDefinitionQuery().processDefinitionTenantId("demo").processDefinitionKey(key).singleResult();
+        var model = engine.getBpmnModel(engineDefinition.getId()).getMainProcess();
+        assertThat(model.getId()).isEqualTo(key);
+        assertThat(model.getFlowElement(id).getId()).isEqualTo(id);
+        assertThat(model.getFlowElement("入线-" + id).getId()).isEqualTo("入线-" + id);
+        assertThat(published.graph()).isEqualTo(graph);
+    }
+
     private String key(String scenario) {
         return switch (scenario) {
             case "process-node" -> "approve";
             case "process-edge" -> "first";
+            case "invalid-process" -> "0";
             default -> "identifier-" + UUID.randomUUID();
         };
     }
@@ -118,14 +159,19 @@ class DefinitionIdentifierIntegrationTest {
         return switch (scenario) {
             case "process-node" -> "PROCESS_KEY_CONFLICT:approve";
             case "process-edge" -> "PROCESS_KEY_CONFLICT:first";
+            case "invalid-node" -> "INVALID_NODE_ID:0";
+            case "invalid-edge" -> "INVALID_EDGE_ID:0";
+            case "invalid-process" -> "INVALID_PROCESS_KEY:0";
             default -> "NODE_EDGE_ID_CONFLICT:approve";
         };
     }
 
     private Graph graph(String scenario) {
         var original = validGraph();
-        return new Graph(List.of(original.nodes().get(0), new Node("approve", "审批", NodeType.USER_TASK, Map.of("assigneeRule", "user:manager")), original.nodes().get(2)),
-                List.of(new Edge(scenario.equals("node-edge") ? "approve" : "first", "begin", "approve", ""), new Edge("last", "approve", "finish", "")));
+        String nodeId = scenario.equals("invalid-node") ? "0" : "approve";
+        String edgeId = scenario.equals("node-edge") ? "approve" : scenario.equals("invalid-edge") ? "0" : "first";
+        return new Graph(List.of(original.nodes().get(0), new Node(nodeId, "审批", NodeType.USER_TASK, Map.of("assigneeRule", "user:manager")), original.nodes().get(2)),
+                List.of(new Edge(edgeId, "begin", nodeId, ""), new Edge("last", nodeId, "finish", "")));
     }
 
     private Graph validGraph() {

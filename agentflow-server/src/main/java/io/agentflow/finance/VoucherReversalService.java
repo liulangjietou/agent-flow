@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.sql.Timestamp;
@@ -35,11 +36,12 @@ public class VoucherReversalService {
     private final JdbcVoucherReversalRecordRepository records;
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
+    private final ApplicationEventPublisher events;
     /** 复用现有独立财务和法人任职检查，不建立另一套敏感字段旁路。 */
     public VoucherReversalService(CurrentActor actors, VoucherDisputeService access, VoucherReversalSources sources, PaymentPersonnel personnel,
-            JdbcVoucherReversalCheckRepository checks, JdbcVoucherReversalRecordRepository records, JdbcTemplate jdbc, JsonUtil json) {
+            JdbcVoucherReversalCheckRepository checks, JdbcVoucherReversalRecordRepository records, JdbcTemplate jdbc, JsonUtil json, ApplicationEventPublisher events) {
         this.actors = actors; this.access = access; this.sources = sources; this.personnel = personnel;
-        this.checks = checks; this.records = records; this.jdbc = jdbc; this.json = json;
+        this.checks = checks; this.records = records; this.jdbc = jdbc; this.json = json; this.events = events;
     }
     /** 幂等回放之前仍必须具有原轮次完整字段权限及当前独立财务身份。 */
     public void authorize(UUID applicationId, UUID operationId, int roundNo) { access.requireFinance(applicationId, operationId, roundNo); }
@@ -69,6 +71,8 @@ public class VoucherReversalService {
         if (issue != null) throw new DomainException(issue, "Reversal record requires fresh unchanged evidence for the current original voucher");
         var record = new VoucherReversalRecord(UUID.randomUUID(), actor.tenantId(), check.input().id(), source.current().version(), check.receipt(), actor.userId(), now, input.evidenceReference(), input.comment());
         var consumed = check.record(record, now); checks.update(consumed); records.create(record);
+        // 登记仓储先验证已消费核对；两者都保存后才能发布登记结果，任一步失败均回滚。
+        events.publishEvent(new VoucherReversalCheckChanged(check, consumed));
         var event = audit(source, record.id(), consumed.version(), "VOUCHER_REVERSAL_RECORD", input.comment(), now);
         return new ActionReceipt(applicationId, operationId, input.roundNo(), check.input().id(), consumed.version(), record.id(), source.current().version(), event);
     }
@@ -95,27 +99,27 @@ public class VoucherReversalService {
     public VoucherReversalCheck claim(String tenant, UUID id, Instant at) {
         var initial = checks.find(tenant, id).orElse(null); if (initial == null || !initial.active()) return null;
         var source = sources.locked(tenant, initial.input().request().command().id()); var current = checks.find(tenant, id).orElseThrow(); var now = time(at);
-        if (current.expired(now)) { checks.update(current.fail(VoucherReversalCheck.Issue.TIMEOUT, now)); return null; }
+        if (current.expired(now)) { persist(current, current.fail(VoucherReversalCheck.Issue.TIMEOUT, now)); return null; }
         if (current.status() != VoucherReversalCheck.Status.QUEUED || !available(current, source, now)) return null;
-        var claimed = current.claim(now, QUERY_LEASE); checks.update(claimed); return claimed;
+        var claimed = current.claim(now, QUERY_LEASE); persist(current, claimed); return claimed;
     }
     /** 保存外部读取结果只形成待确认候选，不改动任何原会计或资金资源。 */
     @Transactional
     public void finish(VoucherReversalCheck claimed, FinanceResult<VoucherReversalPort.Receipt> result, Instant at) {
         var source = sources.locked(claimed.input().tenantId(), claimed.input().request().command().id()); var current = current(claimed); if (current == null) return; var now = time(at);
-        if (available(current, source, now)) checks.update(current.complete(result, now));
+        if (available(current, source, now)) persist(current, current.complete(result, now));
     }
     /** 外部失败不形成财务结论，新查询需由财务明确发起。 */
     @Transactional
     public void fail(VoucherReversalCheck claimed, Instant at) {
         sources.locked(claimed.input().tenantId(), claimed.input().request().command().id()); var current = current(claimed);
-        if (current != null) checks.update(current.fail(VoucherReversalCheck.Issue.INTERNAL_ERROR, time(at)));
+        if (current != null) persist(current, current.fail(VoucherReversalCheck.Issue.INTERNAL_ERROR, time(at)));
     }
     private boolean available(VoucherReversalCheck check, VoucherReversalSources.Source source, Instant now) {
         try {
             requireRecordableSource(source); requireCheck(check, source);
             personnel.requireEligible(check.input().tenantId(), check.input().requestedBy(), source.request().command().legalEntityId()); return true;
-        } catch (DomainException changed) { checks.update(check.voidSource(now)); return false; }
+        } catch (DomainException changed) { persist(check, check.voidSource(now)); return false; }
     }
     private void requireRecordableSource(VoucherReversalSources.Source source) {
         if (records.forOperation(source.request().command().tenantId(), source.request().command().id()).isPresent()) throw new DomainException("VOUCHER_REVERSAL_ALREADY_RECORDED", "Original voucher already has an independent reversal record");
@@ -138,6 +142,9 @@ public class VoucherReversalService {
                 """, UUID.randomUUID().toString(), command.tenantId(), event.toString(), aggregateId.toString(), version, command.binding().applicationId().toString(), action, actors.actor().userId(),
                 json.write(Map.of("operationId", command.id(), "roundNo", command.binding().roundNo(), "authorizedRole", "FINANCE", "comment", comment)), Timestamp.from(at));
         return event;
+    }
+    private void persist(VoucherReversalCheck previous, VoucherReversalCheck next) {
+        checks.update(next); events.publishEvent(new VoucherReversalCheckChanged(previous, next));
     }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed application, business, voucher or reversal query changed"); }

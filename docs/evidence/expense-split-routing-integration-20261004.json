@@ -1,0 +1,114 @@
+{
+  "recordedAt": "2026-10-04T12:16:21.869630+00:00",
+  "task": "F04",
+  "scope": "SUBMISSION_TRANSACTION_AND_FLOWABLE",
+  "taskRemainsOpen": true,
+  "baselineCommit": "d276cc2219e30c26ab317707c6d61324e4d2a49b",
+  "red": {
+    "tests": 7,
+    "failures": 3,
+    "errors": 4,
+    "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-runtime-red",
+    "interpretation": "3 behavioral assertion failures: concurrent aggregate route ignored, missing/malformed context allowed. 3 missing-snapshot errors. 1 injected rollback assertion expected an HTTP result but MockMvc propagated ServletException; assertion corrected without changing business behavior."
+  },
+  "green": {
+    "tests": 356,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "reports": [
+      {
+        "className": "ExpenseSplitRoutingIntegrationTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "0cde5ce92c0e1fb02961fa0e9e6994366221e8d90170121699432555493a0d29"
+      },
+      {
+        "className": "ExpenseSplitRoutingPersistenceTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "452b57feda7db73ffa1c5d76bf3820c06c949bd9b23f2c258382a2bf352e73aa"
+      },
+      {
+        "className": "ExpenseSubmissionIntegrationTest",
+        "tests": 296,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "c64a26efa4f2e8b6728d326b710c1dc2fef7ef1783c864bd7d18287f951cd0bf"
+      },
+      {
+        "className": "ExpenseRiskIntegrationTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "8bb6708d240bda0dc86a93af0390adf46d6a72f8b1ce9c43b0586750215dd60a"
+      },
+      {
+        "className": "ExpenseSubprocessIntegrationTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "21dcf1a84ea92543f9c7fc2d79ee6794468806ff5a26edafce3d640e1e27722f"
+      },
+      {
+        "className": "DefinitionApplicationServiceTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "0d70c1f81c4f2dfeb2ce60c27b58b2d03323054bde4dfcf658837e9bb3829b35"
+      },
+      {
+        "className": "DefinitionDeploymentIntegrationTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "a1f85bf37a270171b992231630addd80039c522d4fdfc63ffe2f5a3510f9def9"
+      }
+    ],
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/f04-routing-regression.log",
+    "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-routing-regression",
+    "manifestSha256": "e0165de7178d90e598f07094aa06367b3d260caa2478d7c1badb208bc0b6be3e"
+  },
+  "initialGreen": {
+    "tests": 7,
+    "failures": 0,
+    "errors": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/f04-runtime-green.log",
+    "countsAreNotAdditive": true
+  },
+  "expandedTestCompileCorrection": "/fyoung/tmp/agentflow-remaining-20260928/f04-routing-regression-initial-compile.log",
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableProcessRuntimeAdapter.java": "26d363d16edfc9f8d56142e79d05399fdbb3a0176f2e64dc52e745e157806010",
+    "agentflow-server/src/main/java/io/agentflow/definition/FlowableConditionEvaluator.java": "30c0f7aeae6caa3a2f3eb7063c972517b6ec0ffdcc4c915693e9d0ac0ca7a5b6",
+    "agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java": "4b7a984962806b1ba987491299742cc2a53d88144cdb778539f4315b3e8b3cf2",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSubmissionService.java": "ac2964f150e431dcf788429401e09f4341937dc1f81bd1f4a873565f8b97f1ec",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSplitRoutingBindings.java": "325c8e92fac51be8dc3da0d04bc4246ef162a1c98207b02ff0076f9d896e24d9",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSplitRoutingService.java": "ae3dbe687483c229257212790b0f7ed068080112d1679e0ffb751807b5ea20bc",
+    "agentflow-server/src/test/java/io/agentflow/approval/ExpenseSubprocessGatewayFixture.java": "7d90c432f39e5ebfb68a9305ced164fb45c678e6dab5aa8e32f24e6c1bfc6390",
+    "agentflow-server/src/test/java/io/agentflow/approval/ExpenseSplitRoutingIntegrationTest.java": "dd74cbbcb3c7c60f0b431f194ea75feb462b22abb9920274b86f912215d23bf1"
+  },
+  "verified": [
+    "concurrent 4000 + 4000 submissions freeze independent 4000/8000 routing amounts and follow actual Flowable manager/higher paths",
+    "after reduction to 3000, financial gateway uses current own amount while business routing remains frozen at 8000",
+    "missing, malformed, cross-application, cross-round, cross-definition, cross-rule, cross-gateway and cross-currency context prevents task completion atomically",
+    "UNCONFIGURED and DISABLED continue own-amount routes with explicit stored states",
+    "post-engine budget persistence failure rolls back process, financial round, routing parent and sources; retry succeeds",
+    "withdrawn source excluded; resubmission compares only current effective other reports and preserves previous snapshots",
+    "new published rule applies only to new submissions; in-flight original definition uses original snapshot"
+  ],
+  "pending": [
+    "authorized original-round read API",
+    "designers, template and detail panel",
+    "fixed-package upgrade/restart/paired restore acceptance",
+    "browser and PostgreSQL acceptance"
+  ]
+}

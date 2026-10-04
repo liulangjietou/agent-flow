@@ -1,0 +1,269 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F10",
+  "status": "LOCAL_IMPLEMENTATION_VERIFIED_PENDING_RUNTIME_ACCEPTANCE",
+  "recordedAt": "2026-10-03T08:20:36.619220+00:00",
+  "implementationCommit": "e987dcf705ab4f9d9fbbdd14072c53593bec6dcd",
+  "branch": "codex/governance-identifier-integration",
+  "taskRemainsOpen": true,
+  "knownOpenTaskCount": 35,
+  "implementationFiles": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseBudgetRetention.java": "b20131c69de319d96c9c8b65b1d4a5f748f307113cee82da9aac4a62efc7c2b0",
+    "agentflow-domain/src/main/java/io/agentflow/finance/BudgetCommand.java": "eadb1d807fba43fe6bf47e3884fa30b72290f07d0e5cc378ec687c4750050919",
+    "agentflow-domain/src/main/java/io/agentflow/finance/BudgetOccupation.java": "cc12f1feb6d0a052d8c9f710c87ffb606a3e18cdd86c488e4ca43f5a9dbcd041",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseBudgetRetentionTest.java": "b2868c46aa3d4ce5d37fdb0b8fe4a900317147265a23ce4d3ea8201983307429",
+    "agentflow-domain/src/test/java/io/agentflow/finance/BudgetCommandTest.java": "06083568d86d19f7997461d8a5549742b5ac9a9efcbe266f7ccde39f14e63a2c",
+    "agentflow-domain/src/test/java/io/agentflow/finance/BudgetRefreezeTest.java": "1e2c2fda767ecee4cab0163d37b48c4816d265212a5dace515c5c3d281467ea1",
+    "agentflow-server/src/main/java/io/agentflow/approval/JdbcSubmissionRoundRepository.java": "acdb26f4241282a2a7234200282a6a2c1d6f456c21f81ecd38596d545bf627aa",
+    "agentflow-server/src/main/java/io/agentflow/approval/SubmissionRoundCompleted.java": "fe787f92755718b837fcf786bf02a94d34c06daf3901a314e821d1372e290ab5",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetRetentionConfiguration.java": "56c4034b28c9939987d9f087078ebe37a0358e8edd264d1003439a735b7d7084",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetRetentionListener.java": "7e25708d339c33c55479c52042441374d0dd5eb541bf5e4a79c589c4d84f67f3",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetRetentionScheduling.java": "69cd2c72d61fa1a17f55d40be350a9a8b511c25cff8057cb2344aec71ada6a33",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetRetentionService.java": "faafc3b7b3be402b72a3c8590db45a141d541e41d722246b7bae6dd684c21e55",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseDraftService.java": "6fa68e1580a12c65716835cbeea228a162bdbcf672d3e746cee860ca9359d5d3",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseResponse.java": "28f638af0be4eed3c3058cc1bb023d98c5047a4220616eb4b9a314384b8e531b",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseBudgetRetentionRepository.java": "0268a6a7b394d3d608504acbaafae9e3ab91a5ab7a5c144526679b0eb0514e2e",
+    "agentflow-server/src/main/java/io/agentflow/finance/BudgetOperationService.java": "ad33c003d74b3b45da9f7abb7d123e1fb8ff95e3684adccafb1523ddcde6ad25",
+    "agentflow-server/src/main/resources/api/openapi.json": "192c2fefc8ceff5f535723078e960cd1bdca1ca4515aec8b0d73db47f0799061",
+    "agentflow-server/src/main/resources/db/migration/V105__expense_budget_retention.sql": "5aaa41d9b303cca9500ced087b8f938650cc1a523cccbaf37938baa3f47ff3ee",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "389238b4460461856a3dae3cfc546d534e71589f076ed7ea5343c9d505f40c71",
+    "agentflow-server/src/test/java/io/agentflow/approval/FormSchemaMigrationTest.java": "1c940402f1d51fb53cfde8e0f8df84f9ade4ebaf851b7e097d9cc8f74bbca1e3",
+    "agentflow-server/src/test/java/io/agentflow/approval/SubmissionRiskMigrationTest.java": "91e5652a169e422a3e3f3d63ea1f8364f3b21780791ab5d17e11d63011658530",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseBudgetRetentionConfigurationTest.java": "9602cef4b253d4710d0c87f3d501e803de31aac28b7a573409fdfbaf9fc6b921",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseBudgetRetentionIntegrationTest.java": "3e4668cf491a5d92d4bcdb0c1c08b177a670be1ce49680601cf52dc953439d1a",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseBudgetRetentionMigrationTest.java": "141ce0114442e6a4c6420b1852d3fbd6a6cb6b655df3543b3ef9d8f790d29b4d",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseBudgetRetentionSchedulingTest.java": "504f7794f469d66052377281d3951153098141b32a07ce3349a79fdb3d4709b0",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseDraftIntegrationTest.java": "7a546a50afe4868053ae047ab9aa7282294d1bf3de0c3da3e3522dd4b78c7fc5",
+    "agentflow-server/src/test/java/io/agentflow/finance/BudgetOperationIntegrationTest.java": "a6036b7b1e11dfc16dbfb81466f80f857d32415231601ef5f6d4685a25f724f1",
+    "agentflow-server/src/test/java/io/agentflow/finance/GatewayBudgetSystemTest.java": "6ff08de702f5cd42b2fbcedd912754866c7078ec528db86e7a9483f5abba7ca3",
+    "agentflow-web/scripts/test-requests.mjs": "66e9f061d2c1b8763bac93b0fcbf94a688f6eac2029992a407a2c647e9d485e4",
+    "agentflow-web/src/components/ExpenseBudgetRetentionStatus.vue": "d54f779049f01bdc174ec48c28b1a18f5e1db80c15fc4a5ca1b685642a07717f",
+    "agentflow-web/src/components/ExpenseDetail.vue": "b040a806c06a644212b8fc4fff1b98b87988e2d41124dd3c8306996a62b6fc5a",
+    "agentflow-web/src/expenses.ts": "2c2bb4abfd86c3a11cd1ce925059e4c5aedb664c0a86c257e88a358a0f26d9ec",
+    "agentflow-web/tests/expense-budget-retention.test.mjs": "a8ee5628ff83c8afb02cab879c87ac0d15de9fea5531029448b0928077e706e0",
+    "docs/budget-operations.md": "706774375ca0b44396e18a653cbd47c2395c9f2fd04a1bec0785621a682b49dd",
+    "docs/expense-submission.md": "27e71d4c042bde174a98b149de2daaf14f322c139663cfbb03117d737ba030e7"
+  },
+  "verified": [
+    "显式租户期限固定于真实退回或撤回轮次，草稿编辑与配置更新不移动截止时刻",
+    "单据锁下到期与重提的两种顺序，未知原命令先对账，旧释放不能覆盖新冻结",
+    "释放失败保持真实冻结与拒绝原因，未确认释放不重复创建命令",
+    "轮次结论、期限、预算队列与状态修订同事务；无事务入口 RED 后改为写入前失败",
+    "释放后携带原释放凭据重新冻结，新轮次和财务版本强制递增，已核销不能重新冻结",
+    "租户隔离、固定期限防改写、复合键跨页、历史轮次权限、管理员及脱敏限制",
+    "V104 至 V105 非空迁移保留原报告、轮次与预算行，不补造历史期限"
+  ],
+  "java": {
+    "uniqueH2AndDomainCases": 328,
+    "suites": {
+      "io.agentflow.expense.ExpenseBudgetRetentionTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-backend-regression.log"
+      },
+      "io.agentflow.finance.BudgetCommandTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-backend-regression.log"
+      },
+      "io.agentflow.finance.BudgetRefreezeTest": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-backend-regression.log"
+      },
+      "io.agentflow.expense.ExpenseBudgetRetentionConfigurationTest": {
+        "tests": 2,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-backend-regression.log"
+      },
+      "io.agentflow.expense.ExpenseBudgetRetentionSchedulingTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-backend-regression.log"
+      },
+      "io.agentflow.expense.ExpenseBudgetRetentionIntegrationTest": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-transaction-green.log"
+      },
+      "io.agentflow.finance.GatewayBudgetSystemTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-backend-regression.log"
+      },
+      "io.agentflow.finance.BudgetOperationIntegrationTest": {
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-backend-regression.log"
+      },
+      "io.agentflow.approval.SubmissionRiskMigrationTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-transaction-green.log"
+      },
+      "io.agentflow.approval.FormSchemaMigrationTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-transaction-green.log"
+      },
+      "io.agentflow.expense.ExpenseSubmissionIntegrationTest": {
+        "tests": 231,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-backend-regression.log"
+      },
+      "io.agentflow.expense.ExpenseBudgetRetentionMigrationTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-authorization.log"
+      },
+      "io.agentflow.expense.ExpenseDraftIntegrationTest": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-transaction-green.log"
+      },
+      "io.agentflow.api.OpenApiContractTest": {
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-authorization.log"
+      },
+      "io.agentflow.approval.ApplicationWithdrawalIntegrationTest": {
+        "tests": 21,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-postgres.log"
+      },
+      "io.agentflow.approval.ExpenseSubprocessIntegrationTest": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-postgres.log"
+      }
+    },
+    "postgresCases": 12,
+    "postgresSuites": {
+      "io.agentflow.expense.ExpenseBudgetRetentionIntegrationTest": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-postgres.log"
+      },
+      "io.agentflow.expense.ExpenseBudgetRetentionMigrationTest": {
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "log": "expense-budget-retention-postgres.log"
+      }
+    },
+    "mixedRunNote": "最后一轮共 45 项，其中预算保留 12 项使用 PostgreSQL；通用撤回 21 项和费用子流程 12 项使用 H2，已计入 H2 范围。"
+  },
+  "frontend": {
+    "passed": 1112,
+    "failed": 0,
+    "build": "PASS",
+    "openApiOperations": 333,
+    "openApiSchemas": 671,
+    "requestExamples": 123,
+    "newRetentionRenderedTests": 3
+  },
+  "notYetVerified": [
+    "固定安装包的独立运行与既有验收库升级",
+    "实际 HTTP 调度释放、公开预检重提及子流程退回的完整场景",
+    "桌面及 390 像素浏览器的实际页面检查",
+    "执行中退出、重启后原号查询及配套恢复"
+  ],
+  "limits": [
+    "本次资金与制度均为合成夹具，不代替 E05 企业预算系统联调",
+    "未创建 PR 或运行远端 CI；E15 仍依赖 V02",
+    "全项目原始条款核对 V03 未完成，35 为已确认最低数量"
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-backend-first.log",
+      "sha256": "fbe30d3a09eea2ef3628a50f659502494b222dc2ee1c95545f65654348ec2b6e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-backend-regression.log",
+      "sha256": "6e0e82ba174d5a70594e82eb6db4c3cdbed605d45302b4faee1e84dab98e2994"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-authorization.log",
+      "sha256": "f42ab264ea0674b243196f8df0cda49c2f5e0a1f12dcf300f5798722a86c3cec"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-transaction-green.log",
+      "sha256": "fb381783279eec67224fe3ea818a2c9c128cd1f757b3972b893e32ba65975d60"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-refreeze-red.log",
+      "sha256": "100a6ecf1bd598cf22cb27cdaf6750227a3963df5ac8c52b083cf043de91a68a"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-refreeze-green.log",
+      "sha256": "f8a1007a0612312e42048051ae12abee47459957440ecaabe48cdfaa9d65b706"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-refreeze-sql-red.log",
+      "sha256": "2286466e1fbcf89a16a6209b0921a91b72721fd52c674e566f28086158d6a2b6"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-refreeze-sql-red.xml",
+      "sha256": "9cd585f777d25fd23087d47356ba482d92759b5223a190c2ebd8de0247a11d10"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-transaction-red.log",
+      "sha256": "c4053bcb0ac3500b812c8dfb4546e6782669d23026c1ae5ed4524e1c2ccb8d6b"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-transaction-red.xml",
+      "sha256": "cf3cdc98a1de22eb4e3405dd6cb127206e40dae3e07d61ae2c21d71086258cba"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-postgres.log",
+      "sha256": "11602acad5e87b5c7f63726815e53775df2b9066b4a732f17654f873b512c38e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-postgres.json",
+      "sha256": "a1de3e201fd5515b7744fd298f920f7e693c6fd63d1223872486f1035290efef"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-web-tests.log",
+      "sha256": "1f6710193579b5cdfcae87042bf3bab201e9400313729a27155fe1a15cc52819"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-budget-retention-web-build.log",
+      "sha256": "e153c9acd8ff7bc24c4820c7cd86181b5551070324d175a6f9ffb86a32088035"
+    }
+  ]
+}

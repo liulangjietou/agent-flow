@@ -1,0 +1,140 @@
+{
+  "taskId": "A04",
+  "status": "LOCAL_PERSISTENCE_AND_EXECUTION_VERIFIED_PUBLIC_API_UI_RUNTIME_PENDING",
+  "recordedAt": "2026-10-04T10:11:05.994537+00:00",
+  "baseCommit": "1cea2ec5cea3815f7834155e4fb5771a28cd6d40",
+  "sourceFiles": {
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseRiskEvidenceTest.java": "02cfd14a3b66ccaf01feb64fe201f835d38406615703e5f31c03b46160b744d1",
+    "agentflow-domain/src/test/java/io/agentflow/agent/ExpenseRiskRunTest.java": "e52e31f33277d9eaa157a035cc71b14a17104ff8311aece72eefed97c9cab802",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseRiskEvidence.java": "e0abb5e3b4ecd1e0c24077e8570e02eac3192cde0d3df0855116cb3b598af5fc",
+    "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskInput.java": "dec4501bafdfb6293ddcf824849510f2f1208a1cafc103d2dc1b326b591e6dda",
+    "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskSuggestion.java": "f5935ae2a68c5930410e4aac8ba204d7c610fb51c14be0e073c95d6b97b48f8c",
+    "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskModelPort.java": "6307af66b409a6c0093acc2d937870c54bea519e911e9651fb86e329c3af632c",
+    "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskRun.java": "5b6b0f4ff2185384f46569a9c1966ba862f66a2ad1854e1b48083bb2d2af4229",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskExecutionTest.java": "211db132e4f15ffa052da532f46d77fd128fcedf1dea35da57dfde0031a3d8f4",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskPersistenceTest.java": "47478123a03d4b5615a7255958c44cc1a7030e633b0863a08ba69fa48c5320d9",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskModelTest.java": "ab5fbb5ab79d65d106583ebdfdf13f9fdfaa4a41d421cec4a5cc5cdfaa59201b",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskSourcesTest.java": "82d4b0fd52197ac355e98ad0da72f5577526250e2d1ba7b345d736a05bf4499d",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskAccessTest.java": "14a9635daf4a108f8317282a48949ad28d64ab40d7cae418947611fc3143428e",
+    "agentflow-server/src/main/java/io/agentflow/agent/OpenAiCompatibleExpenseRiskModel.java": "aebbb45d2c898e008d642ee446769e09cbfd6526ddfd51ad93909f891f20400f",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskWorker.java": "1dfc933a71ccd36639984b5c721c6c6c7ff9f6fd66bbf1f521d13e1fcb477b14",
+    "agentflow-server/src/main/java/io/agentflow/agent/JdbcExpenseRiskRepository.java": "aea52759fa4cd3da431376bdd5138dfc388ca0b503f9e30f54b27ab5b81dec85",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskService.java": "3184f25848116daf6fa3c9bf327530e84354acec42227169e020392eeb7fa59d",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskAccess.java": "8d31954e668feec28cb3874c150fdbd39ed7b1b2527429769ac1a77d2ee9d3bc",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskSources.java": "3b56979d364c0c910fa5a623dff033a0b3c70c7c1df352aed2bfb24d3187e4b6",
+    "agentflow-server/src/main/resources/db/migration/V115__expense_risk_runs.sql": "dfe4e45ea2ee5162144b699b162fd35101286af12246946ee479f4b6a286f59e",
+    "agentflow-server/src/main/java/io/agentflow/agent/AssistScheduling.java": "4493af829bd08f81908a79d09bc442ef7632226380e4329f154076ecf0c9235e",
+    "agentflow-server/src/test/java/io/agentflow/agent/AssistSchedulingTest.java": "dde0988096dbe7c9791747f62bddc58ee08196e44728f64ae04287e4db7ee7d3",
+    "agentflow-server/src/main/java/io/agentflow/auth/DeferredActorAuthentication.java": "1b01ecb773ebb634d1665499a1bd4c236e569729b984240b115cdb0e4866d795",
+    "agentflow-server/src/test/java/io/agentflow/auth/DeferredActorAuthenticationTest.java": "e18fbf8137ab13e795bc30de92017dff1b1152b57bebdbfec800c2604c8883f1"
+  },
+  "validation": {
+    "uniquePassedTestCases": 129,
+    "testClasses": [
+      {
+        "testClass": "ExpenseRiskExecutionTest",
+        "passed": 31,
+        "report": "reports/TEST-io.agentflow.agent.ExpenseRiskExecutionTest.xml",
+        "sha256": "48aecaa19d865c790ac228d0550a48054c33256d2534ceedbb4c12dbec8dc89c",
+        "run": "a04-risk-execution-retry-20261004T100721Z-run.json"
+      },
+      {
+        "testClass": "ExpenseRiskAccessTest",
+        "passed": 16,
+        "report": "reports/TEST-io.agentflow.agent.ExpenseRiskAccessTest.xml",
+        "sha256": "9ef3f6c4f1d5337386ff18a4988a10178974af308e46bfcf36d8f914a60723f2",
+        "run": "a04-risk-execution-20261004T100425Z-run.json"
+      },
+      {
+        "testClass": "ExpenseRiskPersistenceTest",
+        "passed": 25,
+        "report": "reports/TEST-io.agentflow.agent.ExpenseRiskPersistenceTest.xml",
+        "sha256": "e7136812a66dd5690c3a883439927f4fa8b37664685331e459328d8edc7ef7d7",
+        "run": "a04-risk-execution-20261004T100425Z-run.json"
+      },
+      {
+        "testClass": "ExpenseRiskRunTest",
+        "passed": 23,
+        "report": "reports/TEST-io.agentflow.agent.ExpenseRiskRunTest.xml",
+        "sha256": "fcd55ded14963671d4674dea58719dbbe905262802fe212fed472a781af1a9dc",
+        "run": "a04-risk-execution-20261004T100425Z-run.json"
+      },
+      {
+        "testClass": "ExpenseRiskSourcesTest",
+        "passed": 7,
+        "report": "reports/TEST-io.agentflow.agent.ExpenseRiskSourcesTest.xml",
+        "sha256": "bc51aeb14fcdc5aebfff68ec6df360a30f3eccce62489d4d48d73d0471119214",
+        "run": "a04-risk-execution-20261004T100425Z-run.json"
+      },
+      {
+        "testClass": "ExpenseRiskModelTest",
+        "passed": 18,
+        "report": "reports/TEST-io.agentflow.agent.ExpenseRiskModelTest.xml",
+        "sha256": "4801fc37c716c209dc80d7a094cd6c2ab894ba7901ecd9fd39f2849222c23073",
+        "run": "a04-risk-execution-20261004T100425Z-run.json"
+      },
+      {
+        "testClass": "AssistSchedulingTest",
+        "passed": 2,
+        "report": "reports/TEST-io.agentflow.agent.AssistSchedulingTest.xml",
+        "sha256": "acbb3df1fc31b4832f58eadcbbb16cf86c20185761a4c031ea547df50b3bf577",
+        "run": "a04-risk-execution-retry-20261004T100721Z-run.json"
+      },
+      {
+        "testClass": "DeferredActorAuthenticationTest",
+        "passed": 7,
+        "report": "reports/TEST-io.agentflow.auth.DeferredActorAuthenticationTest.xml",
+        "sha256": "b57a5ea9afbd45501712c1f54a75c76d46f2ec89961d4991a02d2b083f92ec03",
+        "run": "a04-risk-execution-20261004T100425Z-run.json"
+      }
+    ],
+    "productionSourcesUnchangedBetweenRuns": true,
+    "scope": "Real H2 migration, JDBC, Spring transactions, service recreation, worker and scheduler with controlled source authorization/model ports; existing original-login tests included",
+    "sourceHashesMatched": true,
+    "persistenceAdjacentRegression": {
+      "passed": 66,
+      "newPersistenceCases": 25,
+      "note": "Earlier separate persistence run; overlaps with this 129-case scope; do not add the totals",
+      "archive": "/fyoung/tmp/agentflow-remaining-20260928/a04-risk-persistence-20261004T095753Z-evidence"
+    }
+  },
+  "archive": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a04-risk-execution-evidence-20261004",
+    "manifestSha256": "ccfd8c7d244ede0f83f598b0cc21ca89bd11b82a33abba1b06211b59959084df",
+    "verifier": "/fyoung/tmp/agentflow-remaining-20260928/a04-risk-execution-verified.json"
+  },
+  "implemented": [
+    "V115 risk run/source/transition storage and atomic optimistic writes",
+    "Original login binding and fresh deferred authentication before send",
+    "Actor/task/source preview fingerprint and explicit source selection",
+    "Stable multi-application lock ordering and single active primary run",
+    "Transaction-free model work and independent failure settlement after authorization rollback",
+    "Non-renewable lease, timeout without resend, late-result rejection",
+    "Authorized history and current-reviewer adoption/dismissal without business writes",
+    "Existing dedicated scheduler integration"
+  ],
+  "notImplementedOrNotAccepted": [
+    "Public HTTP API",
+    "Real Flowable decision and field-authorization integration",
+    "Real process restart",
+    "UI",
+    "Browser",
+    "PostgreSQL",
+    "Enterprise model quality"
+  ],
+  "fixtureFailures": {
+    "assertionCompilation": 1,
+    "modelRestubbingCases": 5,
+    "schedulerMissingTransactionManagerCases": 1,
+    "productionDefect": false,
+    "archives": [
+      "/fyoung/tmp/agentflow-remaining-20260928/a04-risk-persistence-first-compile-failure",
+      "/fyoung/tmp/agentflow-remaining-20260928/a04-risk-execution-first-reports"
+    ]
+  },
+  "knownOpenTaskCount": 34,
+  "mainCheckoutUnchanged": true,
+  "existingMainRuntimePid": 87821,
+  "remotePush": false,
+  "pullRequest": null
+}

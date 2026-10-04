@@ -1,0 +1,122 @@
+{
+  "taskId": "A04",
+  "status": "LOCAL_DOMAIN_ACCESS_SOURCES_AND_MODEL_FOUNDATION_VERIFIED_FULL_FLOW_PENDING",
+  "recordedAt": "2026-10-04T09:46:18.675532+00:00",
+  "baseCommit": "83158b6b72a2d44972a9ea47a5292db3b4c97903",
+  "sourceFiles": {
+    "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskInput.java": "dec4501bafdfb6293ddcf824849510f2f1208a1cafc103d2dc1b326b591e6dda",
+    "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskModelPort.java": "6307af66b409a6c0093acc2d937870c54bea519e911e9651fb86e329c3af632c",
+    "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskRun.java": "5b6b0f4ff2185384f46569a9c1966ba862f66a2ad1854e1b48083bb2d2af4229",
+    "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskSuggestion.java": "f5935ae2a68c5930410e4aac8ba204d7c610fb51c14be0e073c95d6b97b48f8c",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseRiskEvidence.java": "e0abb5e3b4ecd1e0c24077e8570e02eac3192cde0d3df0855116cb3b598af5fc",
+    "agentflow-domain/src/test/java/io/agentflow/agent/ExpenseRiskRunTest.java": "e52e31f33277d9eaa157a035cc71b14a17104ff8311aece72eefed97c9cab802",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseRiskEvidenceTest.java": "02cfd14a3b66ccaf01feb64fe201f835d38406615703e5f31c03b46160b744d1",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskAccess.java": "b0b323f8316f664337fb5f960b1c9ea5970a45c80956b4aa1f688cb01817e17e",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskSources.java": "3b56979d364c0c910fa5a623dff033a0b3c70c7c1df352aed2bfb24d3187e4b6",
+    "agentflow-server/src/main/java/io/agentflow/agent/OpenAiCompatibleExpenseRiskModel.java": "aebbb45d2c898e008d642ee446769e09cbfd6526ddfd51ad93909f891f20400f",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskAccessTest.java": "43d5b9f5d0c30a15a2c890674530844439952f6b42e171434027141910feafba",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskModelTest.java": "ab5fbb5ab79d65d106583ebdfdf13f9fdfaa4a41d421cec4a5cc5cdfaa59201b",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskSourcesTest.java": "82d4b0fd52197ac355e98ad0da72f5577526250e2d1ba7b345d736a05bf4499d"
+  },
+  "validation": {
+    "uniquePassedTestCases": 154,
+    "newFeatureTestCases": 74,
+    "regressionTestCases": 80,
+    "testClasses": [
+      {
+        "testClass": "ExpenseRiskEvidenceTest",
+        "passed": 12,
+        "report": "reports/TEST-io.agentflow.expense.ExpenseRiskEvidenceTest.xml",
+        "sha256": "7741c51c4143609192986be8b45afd0233027e13f2aa8c9223fc7a1c5a1d5bac"
+      },
+      {
+        "testClass": "ExpenseRiskRunTest",
+        "passed": 23,
+        "report": "reports/TEST-io.agentflow.agent.ExpenseRiskRunTest.xml",
+        "sha256": "062690667d5e1444306bbbc490c5a2af857dac00539093fb5616e870df2e1699"
+      },
+      {
+        "testClass": "ExpenseReportTest",
+        "passed": 17,
+        "report": "reports/TEST-io.agentflow.expense.ExpenseReportTest.xml",
+        "sha256": "1fb7d7764036d6a8d1e2ed34fc7a3250e597de7230a03492af80e83332f18eb3"
+      },
+      {
+        "testClass": "ExpenseResourcesTest",
+        "passed": 18,
+        "report": "reports/TEST-io.agentflow.expense.ExpenseResourcesTest.xml",
+        "sha256": "7a730ca27bcfe6206372b3fa0da78ce455a172753461a98a3b2e25ada5969eb3"
+      },
+      {
+        "testClass": "ExpenseSubmissionResourcesTest",
+        "passed": 23,
+        "report": "reports/TEST-io.agentflow.expense.ExpenseSubmissionResourcesTest.xml",
+        "sha256": "41ee475abdaf1a35a95e1c20aeaaf1f39c2cba21019d125421175d801f6162f4"
+      },
+      {
+        "testClass": "BusinessCalendarTest",
+        "passed": 8,
+        "report": "reports/TEST-io.agentflow.calendar.BusinessCalendarTest.xml",
+        "sha256": "c939e374c5e0d64445580755721e94ce0800d08f7405ce95ef8702e1363f6a05"
+      },
+      {
+        "testClass": "PrecheckExplanationRunTest",
+        "passed": 14,
+        "report": "reports/TEST-io.agentflow.agent.PrecheckExplanationRunTest.xml",
+        "sha256": "87f219569d064cd662b674fce6ea4d7cb8e1384195a33493c37f653e2950491d"
+      },
+      {
+        "testClass": "ExpenseRiskSourcesTest",
+        "passed": 7,
+        "report": "reports/TEST-io.agentflow.agent.ExpenseRiskSourcesTest.xml",
+        "sha256": "50cca723f0c74db8825a886035a736acb9db7c95bed53b3ae5ecab682304ad5a"
+      },
+      {
+        "testClass": "ExpenseRiskModelTest",
+        "passed": 18,
+        "report": "reports/TEST-io.agentflow.agent.ExpenseRiskModelTest.xml",
+        "sha256": "56b62a08a7c25fbb63a77e2371f98b33fcbb6bc221af192451ec7b7688504a1d"
+      },
+      {
+        "testClass": "ExpenseRiskAccessTest",
+        "passed": 14,
+        "report": "reports/TEST-io.agentflow.agent.ExpenseRiskAccessTest.xml",
+        "sha256": "4694e8fe7228b708ee3c43de832bdd730bff43975add67fdd68945804fe1039b"
+      }
+    ],
+    "notes": [
+      "The first full scope run included 3 invalid calendar fixtures; corrected without weakening CalendarRules.",
+      "The second server scope run included 1 invalid Mockito matcher fixture; corrected without changing production code.",
+      "Current domain sources match the first run; current model and source projection match the second run; access test fixture matches the final successful run.",
+      "Real Flowable authorization, persistence, API, UI, packaged runtime, browser and PostgreSQL are not accepted by these tests."
+    ]
+  },
+  "archive": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a04-risk-foundation-evidence-20261004",
+    "manifestSha256": "161ec553665898ece25834ada65dba6fce02d4227d4ee16eccc6bd4d9ad3670d",
+    "files": 33,
+    "bytes": 421569
+  },
+  "implemented": [
+    "Four deterministic local evidence groups with exact numeric invoice comparison and original-currency sums",
+    "Current decision and per-document frozen-round detail permission boundary, with same applicant and legal-entity comparison scope",
+    "Current invoice verification coverage and explicit versioned working-calendar binding",
+    "Explicitly selected deidentified sources and strict reference-bound HTTP model output",
+    "Independent leased execution and source-bound human-review domain state"
+  ],
+  "notImplementedOrNotAccepted": [
+    "Persistent run queue and transition audit",
+    "Original authentication-session binding in the worker, current authorization before sending, and restart handling",
+    "Public API and OpenAPI contract",
+    "Expense approval page and actual user interactions",
+    "Real Flowable authorization integration and concurrency rollback",
+    "Packaged upgrade, restart and paired restore",
+    "Browser and PostgreSQL acceptance",
+    "Real enterprise model quality"
+  ],
+  "knownOpenTaskCount": 34,
+  "mainCheckoutUnchanged": true,
+  "existingMainRuntimePid": 87821,
+  "remotePush": false,
+  "pullRequest": null
+}

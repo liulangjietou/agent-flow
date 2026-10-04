@@ -22,12 +22,13 @@ public class ExpenseSettlementRegistration {
     private final JdbcPaymentOperationRepository payments;
     private final JdbcVoucherOperationRepository vouchers;
     private final JdbcVoucherPreparationRepository preparations;
+    private final ExpenseSettlementChanges changes;
 
     /** 原报销锁保证重复回执、后台补登与消费只形成一份账本。 */
     public ExpenseSettlementRegistration(ExpenseReportRepository reports, JdbcExpenseSettlementRepository settlements, ExpenseSettlementSources sources,
-            JdbcPaymentOperationRepository payments, JdbcVoucherOperationRepository vouchers, JdbcVoucherPreparationRepository preparations) {
+            JdbcPaymentOperationRepository payments, JdbcVoucherOperationRepository vouchers, JdbcVoucherPreparationRepository preparations, ExpenseSettlementChanges changes) {
         this.reports = reports; this.settlements = settlements; this.sources = sources;
-        this.payments = payments; this.vouchers = vouchers; this.preparations = preparations;
+        this.payments = payments; this.vouchers = vouchers; this.preparations = preparations; this.changes = changes;
     }
 
     /** 到账与结算意图原子保存，争议只冻结原账本，不撤销已经消耗的资源。 */
@@ -93,7 +94,7 @@ public class ExpenseSettlementRegistration {
         } else if (!current.input().equals(input)) review(current, "EXPENSE_FUNDING_CONFLICT");
     }
     private void review(ExpenseSettlement current, String code) {
-        var next = current.requireReview(code, now()); if (next != current) settlements.update(next);
+        var next = current.requireReview(code, now()); if (next != current) changes.persist(current, next);
     }
     private ExpenseReport report(String tenant, UUID id) { return reports.find(tenant, id).orElseThrow(ExpenseSettlementRegistration::notFound); }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }

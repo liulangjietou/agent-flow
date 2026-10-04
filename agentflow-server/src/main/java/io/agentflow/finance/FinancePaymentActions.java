@@ -14,6 +14,8 @@ import jakarta.validation.constraints.Size;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
@@ -42,9 +44,10 @@ public class FinancePaymentActions {
         this.actors = actors; this.access = access; this.voucherSources = voucherSources; this.paymentSources = paymentSources;
         this.vouchers = vouchers; this.authorizations = authorizations; this.operations = operations; this.execution = execution; this.audit = audit; this.reviews = reviews;
     }
-    /** 锁后从实际批准和挂账派生金额与账户，客户端只携带展示版本、期限和理由。 */
+    /** 新写入在幂等回调内验证日期，保留缺日期的旧正文原键重放能力。 */
     @Transactional
     public Receipt authorize(UUID applicationId, Authorize input) {
+        var dueDate = dueDate(input.dueDate());
         var initial = access.requireFinance(applicationId, input.roundNo()); voucherSources.lock(initial.source());
         var context = access.requireFinance(applicationId, input.roundNo()); var application = context.application(); var now = now();
         if (application.version() != input.applicationVersion() || context.businessVersion() != input.businessVersion()) throw conflict();
@@ -59,7 +62,7 @@ public class FinancePaymentActions {
         }
         var review = input.payeeReviewId() == null ? null : reviews.requireReady(application.tenantId(), input.payeeReviewId(), input.payeeReviewVersion(), voucher, actors.actor().userId(), now);
         if (review != null) payee = review.account().snapshot();
-        var authorization = PaymentAuthorization.issue(UUID.randomUUID(), voucher, payee, actors.actor().userId(), now, now.plusSeconds(input.validitySeconds()));
+        var authorization = PaymentAuthorization.issue(UUID.randomUUID(), voucher, payee, actors.actor().userId(), now, now.plusSeconds(input.validitySeconds()), dueDate);
         authorizations.create(authorization);
         if (review != null) reviews.consume(review, authorization, now);
         var event = audit.record(authorization, authorization.terms().id(), authorization.version(), "FINANCE", "PAYMENT_AUTHORIZE", null, authorization.status().name(), input.comment(), now);
@@ -101,6 +104,15 @@ public class FinancePaymentActions {
         return new Receipt(binding.applicationId(), binding.businessId(), binding.roundNo(), value.terms().id(), value.version(), action, operationVersion, value.decision().expiresAt(), event);
     }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
+    private static LocalDate dueDate(String value) {
+        if (value != null && value.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) {
+            try {
+                var date = LocalDate.parse(value);
+                if (!date.isBefore(PaymentAuthorization.MIN_DUE_DATE)) return date;
+            } catch (DateTimeParseException ignored) { /* 统一拒绝不存在的日期，不做宽松修正。 */ }
+        }
+        throw new DomainException("INVALID_PAYMENT_DUE_DATE", "A valid explicit payment due date in YYYY-MM-DD format is required");
+    }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed payment, voucher or financial version changed"); }
     private static DomainException changedSource() { return new DomainException("PAYMENT_SOURCE_CHANGED", "Current approved financial source and posted voucher are required"); }
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Original payment operation not found"); }
@@ -116,7 +128,7 @@ public class FinancePaymentActions {
     public record Authorize(@Positive int roundNo, @Positive long applicationVersion, @Positive long businessVersion,
                             @NotNull UUID voucherOperationId, @Positive long voucherVersion,
                             @Min(MIN_VALIDITY_SECONDS) @Max(MAX_VALIDITY_SECONDS) int validitySeconds, @NotBlank @Size(max = 2000) String comment,
-                            UUID payeeReviewId, @Positive Long payeeReviewVersion) {
+                            UUID payeeReviewId, @Positive Long payeeReviewVersion, String dueDate) {
         /** 换账户必须同时携带复核标识和刚展示的版本，缺一不能退回普通授权。 */
         public Authorize { if ((payeeReviewId == null) != (payeeReviewVersion == null)) throw new IllegalArgumentException("Payee review identity and version must be supplied together"); }
         /** 不静默忽略客户端夹带的财务事实。 */

@@ -102,18 +102,18 @@ class SupplierPaymentPersistenceTest {
             if (disabled.contains(invocation.<String>getArgument(1))) throw new DomainException("PAYMENT_ACTOR_UNAVAILABLE", "Synthetic inactive appointment");
             return null;
         }).when(personnel).requireEligible(eq(tenant), anyString(), eq(entity));
-        holdService = proxy(new SupplierPayableHoldService(approvedSources, authorizations, holds, personnel, 30));
+        holdService = proxy(new SupplierPayableHoldService(approvedSources, authorizations, holds, personnel, 30, event -> { }));
         sources = new SupplierPaymentSources(approvedSources, authorizations, holds, personnel);
         requests = new JdbcSupplierPaymentExecutionRepository(jdbc, json, holds);
         payments = new JdbcSupplierPaymentOperationRepository(jdbc, json, requests, holds, authorizations);
-        preparation = proxy(new SupplierPaymentExecutionService(sources, requests, payments, 30)); bank = proxy(new SupplierPaymentService(sources, payments, 30));
+        preparation = proxy(new SupplierPaymentExecutionService(sources, requests, payments, event -> { }, 30)); bank = proxy(new SupplierPaymentService(sources, payments, event -> { }, 30));
         returnLedgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json));
         returnChecks = new JdbcSupplierPaymentReturnCheckRepository(jdbc, json);
         returnRegistrations = new JdbcSupplierPaymentReturnRepository(jdbc, json, returnLedgers, returnChecks, payments, new JdbcFinanceReceiptCreditRepository(jdbc));
         returnActor = mock(CurrentActor.class); when(returnActor.actor()).thenReturn(new Actor(tenant, "finance", Set.of("FINANCE")));
         returnAccess = mock(SupplierSettlementAccess.class);
         var returnSources = new SupplierPaymentReturnSources(sources, payments, new SupplierSettlementSources(sources, approvedSources, payments, personnel, returnGuard));
-        returnService = proxy(new SupplierPaymentReturnService(returnActor, returnAccess, returnSources, returnChecks, returnLedgers, returnRegistrations, jdbc, json));
+        returnService = proxy(new SupplierPaymentReturnService(returnActor, returnAccess, returnSources, returnChecks, returnLedgers, returnRegistrations, jdbc, json, org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class)));
     }
 
     @Test void cashierChoiceRegistrationAndAllBankRevisionsSurviveRepositoryRecreation() {

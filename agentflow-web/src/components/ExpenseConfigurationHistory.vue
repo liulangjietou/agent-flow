@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
+import { priorControlLabel } from '../expensePriorControl'
 import { expenseUnits, type CategoryVersionSummary, type PolicyVersionSummary, type PolicyActivation, type ConfigurationHistory,
   type ExpenseCategories, type ExpensePolicyDefinition } from '../expenseConfiguration'
 import { ConfigurationRead } from '../expenseConfigurationRead'
@@ -72,7 +73,7 @@ onUnmounted(clear)
     <form v-if="mode === 'policies' && policyId" class="draft-history" @submit.prevent="openDraft"><label>历史草稿修订<input v-model="draftNumber" type="number" min="1" :max="draftRevision" step="1" required /></label><button class="secondary" type="submit" :disabled="detail.loading">查看草稿修订</button><small>可查 1 至 {{ draftRevision }}，含尚未发布的修改</small></form>
     <p v-if="detail.error" class="history-error" role="alert">{{ detail.error }}</p><p v-if="detail.loading" role="status">正在读取历史正文…</p>
     <section v-if="detail.value" class="history-detail" aria-label="历史版本正文"><div class="history-heading"><h4>{{ detail.value.title }}</h4><button class="quiet" type="button" @click="detail.clear()">关闭正文</button></div><p>{{ detail.value.by }} · {{ when(detail.value.at) }}</p><p class="history-comment">{{ detail.value.comment }}</p><p v-if="detail.value.sourceCategory">来源：草稿修订 {{ detail.value.sourceDraft }}，类别修订 {{ detail.value.sourceCategory }}</p>
-      <div v-if="detail.value.categories" class="category-history"><article v-for="category in detail.value.categories.categories" :key="category.code"><strong>{{ category.name }}</strong><span>{{ category.code }} · {{ category.active ? '启用' : '停用' }}</span><span>允许单位：{{ category.units.map(unit => expenseUnits[unit]).join('、') }}</span></article></div>
+      <div v-if="detail.value.categories" class="category-history"><article v-for="category in detail.value.categories.categories" :key="category.code"><strong>{{ category.name }}</strong><span>{{ category.code }} · {{ category.active ? '启用' : '停用' }}</span><span>允许单位：{{ category.units.map(unit => expenseUnits[unit]).join('、') }}</span><span>事前额度：{{ priorControlLabel(category.priorControl) }}</span></article></div>
       <ExpensePolicySummary v-if="detail.value.definition" :definition="detail.value.definition" />
     </section>
   </section>

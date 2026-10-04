@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import type { Graph } from '../api'
 import { MAX_RESPONSIBILITY_REFERENCES, priorApprovalNodes, responsibilityReferenceIssue, type ApprovalResponsibilities } from '../approvalResponsibilities'
 
-const props = defineProps<{ modelValue: ApprovalResponsibilities; graph: Graph; nodeId: string; disabled: boolean }>()
+const props = defineProps<{ modelValue: ApprovalResponsibilities; graph: Graph; nodeId: string; disabled: boolean; expensePolicyEnabled?: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [value: ApprovalResponsibilities]; beforeChange: [] }>()
 const choices = computed(() => priorApprovalNodes(props.graph, props.nodeId))
 const selected = computed(() => props.modelValue.differentApproverFrom?.split(',') ?? [])
@@ -19,6 +19,7 @@ function update(value: ApprovalResponsibilities) {
   emit('beforeChange'); emit('update:modelValue', value)
 }
 function chooseApplicant(event: Event) {
+  if (props.expensePolicyEnabled && excludeValid.value) return
   const value = (event.target as HTMLSelectElement).value
   if (!['', 'true', 'false'].includes(value)) return
   update({ ...props.modelValue, excludeApplicant: value || undefined })
@@ -36,7 +37,8 @@ function clearReferences() { update({ ...props.modelValue, differentApproverFrom
 <template>
   <section class="responsibility-config" aria-label="职责分离配置">
     <h4>职责分离</h4>
-    <label>申请人限制
+    <p v-if="expensePolicyEnabled">费用策略强制禁止申请人办理，并隔离实际业务审批人与财务办理人。原节点配置保留，关闭费用策略后生效。</p>
+    <label v-if="!expensePolicyEnabled || !excludeValid">申请人限制
       <select :value="modelValue.excludeApplicant ?? ''" :disabled="disabled" @change="chooseApplicant">
         <option value="">未设置 · 沿用原选人规则</option>
         <option value="true">禁止申请人办理</option>

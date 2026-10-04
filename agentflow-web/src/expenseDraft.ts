@@ -1,3 +1,4 @@
+import type { PriorAssessment } from './expensePriorControl'
 import type { Definition } from './api'
 import type { InitiatorContext } from './initiatorContext'
 import type { InvoiceItem } from './invoiceWallet'
@@ -21,6 +22,7 @@ export interface PrecheckSummary extends ExpenseVersions { id: string; version: 
 export interface PrecheckView {
   job: PrecheckSummary; usable: boolean; unavailableCode: string | null; initiator: InitiatorContext; accountingDate: string
   rateDate: string | null; validUntil: string | null; preview: FinancialRound | null
+  priorControls?: PriorAssessment[] | null
   findings: Array<{ stage: string; lineNo: number | null; nature: 'REJECTED' | 'UNAVAILABLE'; code: string }>
 }
 
@@ -28,6 +30,10 @@ export const expenseUnits: Record<ExpenseLine['unit'], string> = { ITEM: '项', 
 export const precheckStatuses: Record<PrecheckSummary['status'], string> = { QUEUED: '等待检查', RUNNING: '正在检查', READY: '检查完成', BLOCKED: '费用检查未通过', UNAVAILABLE: '检查未完成' }
 export const precheckStages: Record<string, string> = { INPUT: '填报内容', CATALOG: '财务主数据', ACCOUNT: '收款账户', INVOICE: '发票', RATE: '汇率', POLICY: '费用标准', RESOURCES: '额度与借款', BUDGET: '预算', CONTEXT: '单据与任职', SYSTEM: '预检服务' }
 export const precheckIssues: Record<string, string> = {
+  PRIOR_REQUEST_CATEGORY_MISMATCH: '事前批准行与费用类别不一致，请重新选择',
+  PRIOR_REQUEST_EXCEPTION_REASON_REQUIRED: '累计超过事前容差，请为每个相关费用行填写说明后重新检查',
+  EXPENSE_PRIOR_APPROVAL_REQUIRED: '当前流程缺少独立额度例外审批，请联系流程管理员使用支持该控制的版本',
+  INSUFFICIENT_FINANCIAL_BALANCE: '累计使用超过事前硬上限或借款可用余额',
   APPLICATION_NOT_EDITABLE: '当前单据不能编辑或提交', EXPENSE_LINES_REQUIRED: '请先保存至少一行费用', FINANCE_GATEWAY_UNAVAILABLE: '财务服务尚未配置',
   PRECHECK_NOT_READY: '检查尚未通过', PRECHECK_SUPERSEDED: '已有更新的检查，请刷新结果', FACTS_EXPIRED: '财务事实已过期，请重新检查',
   POLICY_CONFIGURATION_CHANGED: '费用制度或类别版本已变化，请重新检查后提交',
@@ -40,10 +46,11 @@ export const precheckIssues: Record<string, string> = {
 }
 
 /** 完整费用字段契约与后端一致，选错通用流程时不创建不适用的草稿。 */
-export function expenseDefinition(definition: Definition | null): boolean {
+export function expenseDefinition(definition: Pick<Definition, 'formSchema'> | null): boolean {
   const fields = definition?.formSchema?.fields
-  const types: Record<string, string> = { expenseDetails: 'TEXT', amount: 'NUMBER', currency: 'TEXT', overPolicy: 'BOOLEAN' }
-  return !!fields && fields.length === 4 && new Set(fields.map(field => field.key)).size === 4
+  const types: Record<string, string> = { expenseDetails: 'TEXT', amount: 'NUMBER', currency: 'TEXT', overPolicy: 'BOOLEAN', priorRequestOverTolerance: 'BOOLEAN' }
+  return !!fields && [4, 5].includes(fields.length) && new Set(fields.map(field => field.key)).size === fields.length
+    && ['expenseDetails', 'amount', 'currency', 'overPolicy'].every(key => fields.some(field => field.key === key))
     && fields.every(field => field.required && types[field.key] === field.type && (field.key !== 'expenseDetails' || field.sensitive === true))
 }
 
@@ -75,6 +82,9 @@ export function expenseContent(input: ExpenseContent, catalog: FinanceCatalog, n
     const currency = line.claimedGross.currency
     if (!/^[A-Z]{3}$/.test(currency)) fail('请填写三位大写币种代码。')
     const gross = amountMinor(line.claimedGross.value), tax = amountMinor(line.claimedTax.value)
+    if (line.allowance && (Number(quantity) !== line.allowance.calculation.days || line.incurredOn !== line.allowance.calculation.startsOn
+      || line.endedOn !== line.allowance.calculation.endsOn || line.unit !== 'DAY' || currency !== line.allowance.calculation.gross.currency
+      || gross !== amountMinor(line.allowance.calculation.gross.value) || tax !== 0n || line.invoiceIds.length)) fail('请重新计算补贴，保留系统金额并移除补贴行的发票。')
     if (gross <= 0n || tax > gross) fail('含税金额须大于零，税额不能超过含税额。')
     const targets = new Set<string>()
     let allocated = 0n
@@ -148,6 +158,7 @@ export function invoiceFillCurrencyConfirmation(line: ExpenseLine, run: Extracti
 /** 仅更新本地费用输入，既不引用发票，也不保存、查验或提交；分摊金额由本人核对。 */
 export function fillExpenseLineFromInvoice(line: ExpenseLine, invoice: InvoiceItem, run: ExtractionDetail,
     selected: InvoiceFillField[], currencyConfirmed: boolean): ExpenseLine {
+  if (line.allowance) throw new Error('补贴金额按行程自动计算，不能从票面带入金额或币种。')
   if (run.status !== 'CONFIRMED' || !extractionMatches(run.input, invoice)) throw new Error('本人确认记录或原件已变化，请重新选择来源。')
   const choices = invoiceFillChoices(run, line)
   if (!selected.length || new Set(selected).size !== selected.length || selected.some(field => !choices.some(choice => choice.field === field))) throw new Error('请逐项勾选已确认的金额或币种。')

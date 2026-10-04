@@ -40,14 +40,19 @@ public class ExpenseApprovalService {
     private final ApplicationRepository applications;
     private final TaskService tasks;
     private final ExpensePrecheckResources resources;
+    private final io.agentflow.approval.process.FlowableApprovalResponsibilities responsibilities;
+    private final ExpenseBudgetReviewService budgetReviews;
 
     /** 通用审批和财务动作共享申请锁、当前任务授权和财务版本。 */
     public ExpenseApprovalService(ExpenseReportRepository reports, JdbcExpenseSubmissionControlRepository controls,
             JdbcBudgetOccupationRepository budgets, FlowableTaskAuthorization authorization, CurrentActor actors,
-            ApplicationRepository applications, TaskService tasks, ExpensePrecheckResources resources) {
+            ApplicationRepository applications, TaskService tasks, ExpensePrecheckResources resources,
+            io.agentflow.approval.process.FlowableApprovalResponsibilities responsibilities, ExpenseBudgetReviewService budgetReviews) {
         this.reports = reports; this.controls = controls; this.budgets = budgets; this.authorization = authorization;
         this.actors = actors; this.applications = applications; this.tasks = tasks;
         this.resources = resources;
+        this.responsibilities = responsibilities;
+        this.budgetReviews = budgetReviews;
     }
 
     /** 审批动作先固定财务上下文，再重新读取任务，避免等待锁期间任务已经被撤回。 */
@@ -62,8 +67,20 @@ public class ExpenseApprovalService {
         if (!structured(application)) return;
         var context = context(application, task);
         var stage = context.control().stage(task.getTaskDefinitionKey());
-        if (stage != ExpenseProcessPolicy.Stage.BUSINESS) requirePaper(context);
+        String failure = budgetReviews.approvalFailure(context.report(), context.control(), task.getTaskDefinitionKey());
+        if (failure!=null) throw new DomainException(failure, "Budget checkpoint is not awaiting human exception approval");
+        if (!stage.businessApproval()) requirePaper(context);
         if (stage.finance()) requireBudget(context);
+    }
+
+    /** 实际同意审计已存在后才登记预算授权；普通业务、签收和财务任务不产生例外命令。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void taskApproved(Application application, Task task, String actor, String auditId) {
+        if (!structured(application)) return;
+        var control = controls.find(application.tenantId(), application.businessReference().id(), application.roundNo()).orElseThrow(ExpenseApprovalService::notFound);
+        if (control.stage(task.getTaskDefinitionKey())==ExpenseProcessPolicy.Stage.BUDGET_REVIEW) {
+            budgetReviews.approved(application, task.getId(), task.getTaskDefinitionKey(), actor, UUID.fromString(auditId));
+        }
     }
 
     /** 只有当前签收节点的实际可决策人可以确认纸件；受托待归还状态不能代签。 */
@@ -79,6 +96,7 @@ public class ExpenseApprovalService {
         // 签收不是最终审批；纯代理不能通过领取留下超过授权期限的任务权利。
         if (decision.proxyUse() == null && task.getAssignee() == null) tasks.claim(taskId, actor.userId());
         controls.update(received); applications.update(application, input.applicationVersion());
+        responsibilities.recordExpenseReceipt(task, actor.userId());
         return new Receipt(reportId, application.id(), application.version(), context.report().version(), application.roundNo(), received.version());
     }
 

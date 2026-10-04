@@ -70,14 +70,18 @@ function process(value: unknown, version: 1 | 2): PortableProcess {
   for (const raw of g.nodes) {
     const n = object(raw, ['id', 'name', 'type', 'properties'], ['id', 'name', 'type', 'properties'], '节点')
     text(n.id, '节点标识', 128); text(n.name, '节点名称', 256)
-    if (!['START', 'END', 'USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'SUB_PROCESS', 'EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(n.type as string)) throw new Error('模板包含当前版本不支持的节点类型。')
+    if (!['START', 'END', 'USER_TASK', 'COPY', 'TIMER_WAIT', 'EVENT_WAIT', 'SERVICE_TASK', 'SUB_PROCESS', 'EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(n.type as string)) throw new Error('模板包含当前版本不支持的节点类型。')
     const inputs = n.type === 'SUB_PROCESS' && n.properties && typeof n.properties === 'object'
       ? Object.keys(n.properties).filter(key => key.startsWith('subprocessInput.') && subprocessFieldKey(key.slice('subprocessInput.'.length))) : []
+    const serviceInputs = n.type === 'SERVICE_TASK' && n.properties && typeof n.properties === 'object'
+      ? Object.keys(n.properties).filter(key => key.startsWith('serviceInput.') && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key.slice('serviceInput.'.length))) : []
+    if (serviceInputs.length > 16) throw new Error('服务任务最多映射 16 个参数。')
     if (inputs.length > 50) throw new Error('子流程最多映射 50 个输入字段。')
-    const properties = object(n.properties, ['x', 'y', 'assigneeRule', 'recipientRule', 'approvalMode', 'approvalPercentage', 'excludeApplicant', 'differentApproverFrom', 'timerDelaySeconds', 'eventContractKey', 'eventContractVersion',
+    const properties = object(n.properties, n.type === 'SERVICE_TASK' ? ['x', 'y', 'serviceOperationKey', 'serviceOperationVersion', 'serviceContractDigest', ...serviceInputs] : ['x', 'y', 'assigneeRule', 'recipientRule', 'approvalMode', 'approvalPercentage', 'excludeApplicant', 'differentApproverFrom', 'expenseStage', 'expenseSelfApproval', 'expenseDuplicateApproval', 'expenseSplitRisk', 'expenseSplitWindowDays', 'expenseSplitThreshold', 'expenseSplitCurrency', 'expenseSplitRouting', 'timerDelaySeconds', 'eventContractKey', 'eventContractVersion',
       'deadlineCalendarId', 'deadlineCalendarRevision', 'deadlineWorkingMinutes', 'escalationWorkingMinutes', 'escalationRecipientRule', ...(n.type === 'SUB_PROCESS' ? ['subprocessKey', 'subprocessVersion', ...inputs] : [])], [], '节点配置')
     for (const [key, value] of Object.entries(properties)) {
       text(value, `节点配置 ${key}`, key === 'differentApproverFrom' ? MAX_RESPONSIBILITY_REFERENCE_TEXT : 256)
+      if (serviceInputs.includes(key) && !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(value as string)) throw new Error('服务参数只能引用表单字段标识。')
       if (inputs.includes(key) && !subprocessFieldKey(value)) throw new Error('子流程输入只能引用父表单字段标识，不能使用路径或表达式。')
       if ((key === 'x' || key === 'y') && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > 1_000_000)) throw new Error('节点位置必须在 0 至 1000000 之间。')
     }

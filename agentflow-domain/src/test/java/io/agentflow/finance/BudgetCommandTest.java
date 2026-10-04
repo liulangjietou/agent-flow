@@ -38,7 +38,9 @@ class BudgetCommandTest {
     @Test
     void onlyInitialFreezeCanOmitPriorLedgerAndInvalidEvidenceFailsImmediately() {
         var command = command("100", null);
-        assertThatThrownBy(() -> new BudgetCommand(ID, "tenant-a", BudgetCommand.Action.FREEZE, command.position(), new BudgetCommand.Expected(1, "v1"))).isInstanceOf(DomainException.class);
+        var reopened = new BudgetCommand(ID, "tenant-a", BudgetCommand.Action.FREEZE, command.position(), new BudgetCommand.Expected(1, "v1"));
+        assertThat(reopened.digest()).isNotEqualTo(command.digest());
+        assertThatThrownBy(() -> BudgetOccupation.begin(new BudgetOperation.Input(reopened, "a".repeat(64)))).isInstanceOf(DomainException.class);
         for (var action : List.of(BudgetCommand.Action.ADJUST, BudgetCommand.Action.RELEASE, BudgetCommand.Action.CONSUME)) {
             assertThatThrownBy(() -> new BudgetCommand(ID, "tenant-a", action, command.position(), null)).isInstanceOf(DomainException.class);
         }

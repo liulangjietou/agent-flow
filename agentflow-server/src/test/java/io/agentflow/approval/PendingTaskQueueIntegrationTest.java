@@ -58,6 +58,7 @@ class PendingTaskQueueIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PendingTaskReadPort reader;
     @Autowired io.agentflow.approval.process.FlowableApprovalProxyAccess proxies;
+    @Autowired io.agentflow.approval.process.FlowableTaskAuthorization taskAuthorization;
 
     @Test
     void deadlineFilterUsesRealDueDatesAndTheSameAuthorizedSetForRowsAndTotal() throws Exception {
@@ -273,7 +274,7 @@ class PendingTaskQueueIntegrationTest {
         var statements = new ArrayList<String>();
         var actor = mock(CurrentActor.class);
         when(actor.actor()).thenReturn(new Actor("demo", "manager", Set.of("APPROVER", "MANAGER")));
-        var controller = new PendingTaskController(actor, new FlowablePendingTaskReadAdapter(observedJdbc(statements), auth, json, proxies), json);
+        var controller = new PendingTaskController(actor, new FlowablePendingTaskReadAdapter(observedJdbc(statements), auth, json, proxies, taskAuthorization), json);
         var first = controller.list(Map.of("processKey", key, "limit", "2"));
         assertThat(first.items()).hasSize(2);
         assertThat(first.total()).isEqualTo(5);

@@ -224,7 +224,7 @@ test('实际资源选择器过滤法人、失效发票和他单占用，单据�
 })
 
 test('实际资源选择器仅引用当前法人的开放批准行与本位币借款', async () => {
-  api.expenseRequests = async () => ({ items: [{ id: 'prior', legalEntityId: 'legal', closed: false, lines: [{ lineNo: 5 }] }, { id: 'closed', legalEntityId: 'legal', closed: true, lines: [{ lineNo: 6 }] }] })
+  api.expenseRequests = async () => ({ items: [{ id: 'prior', legalEntityId: 'legal', closed: false, lines: [{ lineNo: 5, approved: money('100.00') }] }, { id: 'closed', legalEntityId: 'legal', closed: true, lines: [{ lineNo: 6, approved: money('100.00') }] }] })
   api.employeeAdvances = async () => ({ items: [{ id: 'advance', legalEntityId: 'legal', paid: money('80.00'), status: 'PAID_OUT' }, { id: 'foreign', legalEntityId: 'legal', paid: money('90.00', 'USD'), status: 'PAID_OUT' }, { id: 'held', legalEntityId: 'legal', paid: money('80.00'), status: 'PAYMENT_REVIEW' }] })
   const p = panel(Funding, { scopeKey: 'alice', reportId: 'report', baseCurrency: 'CNY', locked: false, modelValue: content() })
   try {

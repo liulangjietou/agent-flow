@@ -9,6 +9,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,11 +24,13 @@ public class SupplierPayableHoldService {
     private final JdbcSupplierPayableHoldRepository operations;
     private final PaymentPersonnel personnel;
     private final Duration lease;
+    private final ApplicationEventPublisher events;
 
     /** 租约覆盖一次有界网关请求，超期通过原命令恢复。 */
     public SupplierPayableHoldService(ApprovedSupplierPaymentSources sources, JdbcSupplierPaymentAuthorizationRepository authorizations,
                                       JdbcSupplierPayableHoldRepository operations, PaymentPersonnel personnel,
-                                      @Value("${agentflow.supplier-payments.hold-lease-seconds:90}") int leaseSeconds) {
+                                      @Value("${agentflow.supplier-payments.hold-lease-seconds:90}") int leaseSeconds, ApplicationEventPublisher events) {
+        this.events = events;
         if (leaseSeconds < 15 || leaseSeconds > 300) throw new IllegalArgumentException("Supplier hold lease must be between 15 and 300 seconds");
         this.sources = sources; this.authorizations = authorizations; this.operations = operations; this.personnel = personnel; this.lease = Duration.ofSeconds(leaseSeconds);
     }
@@ -50,38 +53,38 @@ public class SupplierPayableHoldService {
     public SupplierPayableHoldOperation claim(String tenant, UUID id, Instant now) {
         var current = locked(tenant, id); if (current == null) return null; now = time(now);
         if (authorizations.retirement(tenant, id).isPresent()) return null;
-        if (current.expired(now)) { operations.update(current.expire(now)); return null; }
+        if (current.expired(now)) { persist(current.expire(now)); return null; }
         if (current.running() || current.nextAttemptAt() == null || now.isBefore(current.nextAttemptAt())) return null;
         if (current.status() == SupplierPayableHoldOperation.Status.QUEUED) {
             try { requireSource(current.command().authorization()); }
-            catch (DomainException changed) { operations.update(current.voidBeforeSend(now)); return null; }
+            catch (DomainException changed) { persist(current.voidBeforeSend(now)); return null; }
         }
-        var claimed = current.claim(now, lease); operations.update(claimed); return claimed.running() ? claimed : null;
+        var claimed = current.claim(now, lease); persist(claimed); return claimed.running() ? claimed : null;
     }
 
     /** 当前领取版本下保存原响应，迟到进程不能覆盖其他领取或已确认结果。 */
     @Transactional
     public void finish(SupplierPayableHoldOperation claimed, FinanceResult<SupplierPayableHoldObservation> result, Instant now) {
-        var current = currentClaim(claimed); if (current != null) operations.update(current.complete(result, time(now)));
+        var current = currentClaim(claimed); if (current != null) persist(current.complete(result, time(now)));
     }
 
     /** 已领取后不能用本地异常宣称未预留，下一步只查询原命令。 */
     @Transactional
     public void fail(SupplierPayableHoldOperation claimed, SupplierPayableHoldOperation.Failure reason, Instant now) {
-        var current = currentClaim(claimed); if (current != null) operations.update(current.unavailable(reason, time(now)));
+        var current = currentClaim(claimed); if (current != null) persist(current.unavailable(reason, time(now)));
     }
 
     /** 已通过公开入口权限核验的明确查询，仍使用原版本、原目标和原编号。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public SupplierPayableHoldOperation query(String tenant, UUID id, long expectedVersion, Instant now) {
-        var current = currentVersion(tenant, id, expectedVersion); var next = current.requestQuery(time(now)); operations.update(next); return next;
+        var current = currentVersion(tenant, id, expectedVersion); var next = current.requestQuery(time(now)); persist(next); return next;
     }
 
     /** 权威查无后的人工重试也重新核验实际批准与财务任职，不能扩大金额或替换账户。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public SupplierPayableHoldOperation resend(String tenant, UUID id, long expectedVersion, Instant now) {
         var current = currentVersion(tenant, id, expectedVersion); requireSource(current.command().authorization());
-        var next = current.retryNotFound(time(now)); operations.update(next); return next;
+        var next = current.retryNotFound(time(now)); persist(next); return next;
     }
 
     /** 已通过财务及原轮次字段权限的独立人员，按安全证据结束原授权并释放本地授权独占。 */
@@ -89,8 +92,9 @@ public class SupplierPayableHoldService {
     public SupplierAuthorizationRetirement retire(String tenant, UUID id, long expectedVersion, String finance, Instant now) {
         var current = currentVersion(tenant, id, expectedVersion); var source = current.command().authorization().source().reservation().source();
         personnel.requireEligible(tenant, finance, source.round().content().legalEntityId()); now = time(now);
-        var stopped = current.stopForRetirement(now); if (!stopped.equals(current)) operations.update(stopped);
-        var decision = SupplierAuthorizationRetirement.from(stopped, finance, now); authorizations.retire(tenant, decision); return decision;
+        var stopped = current.stopForRetirement(now); if (!stopped.equals(current)) persist(stopped);
+        var decision = SupplierAuthorizationRetirement.from(stopped, finance, now); authorizations.retire(tenant, decision);
+        events.publishEvent(new SupplierPayableChanged.Hold(stopped, decision)); return decision;
     }
 
     private SupplierPayableHoldOperation locked(String tenant, UUID id) {
@@ -107,6 +111,10 @@ public class SupplierPayableHoldService {
     private void requireSource(SupplierPaymentAuthorization authorization) {
         sources.requireCurrent(authorization); var source = authorization.source().reservation().source();
         personnel.requireEligible(source.tenantId(), authorization.authorizedBy(), source.round().content().legalEntityId());
+    }
+    private void persist(SupplierPayableHoldOperation value) {
+        operations.update(value);
+        events.publishEvent(new SupplierPayableChanged.Hold(value, null));
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Original supplier payment authorization or hold version changed"); }

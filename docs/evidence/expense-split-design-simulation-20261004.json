@@ -1,0 +1,234 @@
+{
+  "recordedAt": "2026-10-04T13:04:17.891681+00:00",
+  "task": "F04",
+  "scope": "DESIGNERS_TEMPLATE_AND_SYNTHETIC_SIMULATION",
+  "taskRemainsOpen": true,
+  "baselineCommit": "6bee7bc8808d1b6cc765bf0fcabc290a91d248e9",
+  "red": [
+    {
+      "scope": "shared-designer-policy-and-roundtrip",
+      "tests": 11,
+      "failures": 11,
+      "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-designer-red"
+    },
+    {
+      "scope": "synthetic-simulation-ui",
+      "tests": 5,
+      "failures": 5,
+      "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-simulation-ui-red"
+    },
+    {
+      "scope": "orphan-rule-and-misplaced-gateway-clearing",
+      "tests": 13,
+      "failures": 2,
+      "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-designer-orphan-red"
+    },
+    {
+      "scope": "backend-simulation-and-template",
+      "tests": 46,
+      "failures": 16,
+      "errors": 0,
+      "behavioralFailures": 15,
+      "unrelatedTestExpectationFailures": 1,
+      "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-simulation-red",
+      "note": "One header assertion wrongly required an exact Cache-Control value; existing response already included no-store."
+    }
+  ],
+  "harnessCorrections": [
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/f04-designer-invocation-error.log",
+      "reason": "Corrected working directory and test argument before executing tests."
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/f04-designer-loader-error.log",
+      "reason": "Added explicit .js imports for native ESM test loading; not behavioral RED."
+    },
+    {
+      "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-simulation-first-verification",
+      "reason": "Nine invalid money requests were correctly rejected with existing INVALID_MONEY HTTP 422; test incorrectly expected 400. Existing API mapping preserved."
+    },
+    {
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/f04-task5-contract-fixture-error.log",
+      "reason": "Raw catalog notification names are uppercase; portable definitions use lowercase, as ProcessTemplate.executableNotificationTexts already maps. Corrected only replay fixture."
+    }
+  ],
+  "green": {
+    "uniqueJavaTests": 118,
+    "javaClasses": [
+      {
+        "class": "io.agentflow.definition.ExpenseSplitSimulationIntegrationTest",
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.template.ClasspathProcessTemplateCatalogTest",
+        "tests": 30,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.template.ClasspathFinancialTemplateExamplesTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.template.TemplateCopyMigrationTest",
+        "tests": 1,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.template.ProcessTemplateIntegrationTest",
+        "tests": 33,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.definition.DefinitionPreviewIntegrationTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.definition.DefinitionSimulationTraceTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.definition.SimulationStructureTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.template.ProcessTemplateTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "class": "io.agentflow.api.OpenApiContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ],
+    "frontendTests": 146,
+    "frontendFiles": [
+      "expense-split-designer.test.mjs",
+      "expense-split-simulation.test.mjs",
+      "expense-split-routing.test.mjs",
+      "expense-split-panel.test.mjs",
+      "portable-template.test.mjs",
+      "comparison.test.mjs",
+      "designer-graph.test.mjs",
+      "quick-designer.test.mjs",
+      "expense-origination.test.mjs",
+      "expense-self-approval.test.mjs",
+      "expense-duplicate-approval.test.mjs",
+      "simulation.test.mjs",
+      "templates.test.mjs"
+    ],
+    "typeCheck": true,
+    "productionBuild": true,
+    "knownBuildWarning": "Existing application chunk exceeds 500 kB."
+  },
+  "contract": {
+    "status": "PASSED",
+    "counts": {
+      "responses": 27,
+      "successfulRequests": 8,
+      "previewReplays": 7,
+      "savedReplays": 1,
+      "mutationsRejected": 9
+    },
+    "states": {
+      "200": 8,
+      "401": 1,
+      "403": 1,
+      "422": 17
+    },
+    "codes": [
+      "EXPENSE_SPLIT_SIMULATION_INVALID",
+      "EXPENSE_SPLIT_SIMULATION_REQUIRED",
+      "EXPENSE_SPLIT_SIMULATION_UNEXPECTED",
+      "FORBIDDEN",
+      "FORM_VALIDATION_FAILED",
+      "INVALID_MONEY",
+      "UNAUTHENTICATED"
+    ],
+    "templateVersion": 4,
+    "compiledSources": {
+      "definitionSimulation": "84a5a2941b508c032643a0f8479f12425af2bf75f260503a02646846f9f61a47",
+      "portableTemplate": "bcbc41f77806ed5df5b9246b63591d322634998b9da0c242f0cb5ce12469cae6",
+      "notificationTexts": "abaa1d6a08f3b7f1687f77e7a5586c1a2a862337456f7984fdb5dde63de1288b",
+      "formSchema": "a2114f9959b76d6b6d673d193227cd8802c340f4922c01db2f095eab448b91c4",
+      "subprocessDesigner": "dd78192286071429defc38a097b48ba17eaae7bc9175236fdd22046923ad999a",
+      "approvalResponsibilities": "1d8786038e232519284fe9fbb523764bfa16d01fdf303d629175ac8cae0f5ca9"
+    },
+    "compiledDirectory": "/fyoung/tmp/agentflow-f04-task5-contract-8diDaE",
+    "scope": "Actual MVC contracts and production model replays, without browser or PostgreSQL acceptance."
+  },
+  "openApi": {
+    "result": "PASS",
+    "operations": 392,
+    "schemas": 839,
+    "requestExamples": 129
+  },
+  "templateVersion": 4,
+  "companionVersion": 4,
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionSimulator.java": "66417fefff1c820652ce9633bc0d9fc756fb24f71e6276134dde01d70cf897cc",
+    "agentflow-server/src/main/java/io/agentflow/definition/DefinitionApplicationService.java": "f406e6a404470b9749b2c83f9233a09edba075ab7111a64c004c9f4509dbc6f9",
+    "agentflow-server/src/main/java/io/agentflow/definition/DefinitionController.java": "1ce213e136d42b4a3e4f6d2c7686596e81e116aaa8a82bda7272d8814b5dad60",
+    "agentflow-server/src/main/resources/api/openapi.json": "f2cc9fe49b07596290ba34b30c84e8914b30b6dbddd2ffc9694e6657513d25eb",
+    "agentflow-server/src/main/resources/process-template-examples/employee-finance.json": "4e4a4b07064db668eb0d8de32215def8205d6aaf1f5f23e9b0b4135d7bada7e1",
+    "agentflow-server/src/main/resources/process-templates/expense-report.json": "151b7da93e681dfa3be7060bff4beb775ab85ef945713f7cfc910b196d9a14a5",
+    "agentflow-server/src/test/java/io/agentflow/template/ClasspathFinancialTemplateExamplesTest.java": "6b6bbe36fd6d34236d47bb7c8931883253b9440162c196b37f95448d1ff65f28",
+    "agentflow-server/src/test/java/io/agentflow/template/ClasspathProcessTemplateCatalogTest.java": "30e507be56a6de031dec82d87beb541ad5c9c65870ebae4fa3a78faf3fd898dd",
+    "agentflow-web/scripts/test-requests.mjs": "beda09dde6c3b85be4ef3375415cea4bd25608d95dc7576800f27931acef8db3",
+    "agentflow-web/src/App.vue": "af4e0f860dcfaee1065205e1a29cec9a77edd9b5085316d467b227e476e1581a",
+    "agentflow-web/src/api.ts": "ddaa1d895b565e0aac01dd899d2aedbd73d1986812a18b13211e78509b8357b8",
+    "agentflow-web/src/components/DefinitionSimulation.vue": "6f3ee15410ee1bde76bfd55ee3f3417f2c0e0f661fdea20d3a3644e4dab94753",
+    "agentflow-web/src/components/QuickDesigner.vue": "92235eaf2e4956c781a6cfbf72a3e4c55c767565b7096c12d05798e0f5b84615",
+    "agentflow-web/src/definitionComparison.ts": "85f43cfbea49ae25850f9e4492bf1521f213eda16e5a063dc4b618c1f1b7d1f8",
+    "agentflow-web/src/definitionSimulation.ts": "84a5a2941b508c032643a0f8479f12425af2bf75f260503a02646846f9f61a47",
+    "agentflow-web/src/expenseDraft.ts": "2bd087c10e9519f778437aec5151bf371e7d1a7306e41c877864c780a8f8ede5",
+    "agentflow-web/src/portableTemplate.ts": "bcbc41f77806ed5df5b9246b63591d322634998b9da0c242f0cb5ce12469cae6",
+    "agentflow-server/src/test/java/io/agentflow/definition/ExpenseSplitSimulationIntegrationTest.java": "65ecaec08a28d1213a738e5e9f46e28801035fa94ca447f3fd4e0b09d6d84f57",
+    "agentflow-web/src/components/DefinitionExpenseSplitRisk.vue": "5f8b22710d1a2de93a0171dd6b1a512dc2030c82f89627f52ad8c066125c5933",
+    "agentflow-web/src/expenseSplitPolicy.ts": "7b90557986c3d1bc9e512eb37195163e85818fde4a01c0d4c227f79977c0caa1",
+    "agentflow-web/tests/expense-split-designer.test.mjs": "dc1eb1ffecbae7f0ac516111505055c44ab1d93621e55819e190dc002baab1d6",
+    "agentflow-web/tests/expense-split-simulation.test.mjs": "34d9139491666a304628bcd3afe690c95cebb38980287dc380b6199d634f4c8a"
+  },
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-task5-verified",
+  "manifestSha256": "3ae3b12082634773fd45089f61fca0153b2a72bb0f0716800bcfceee47888a70",
+  "verified": [
+    "Both design views edit exact shared properties, preserve unknown metadata, guard financial reachability, and allow explicit cleanup.",
+    "Portable export/import and human-readable diff preserve all five properties.",
+    "Synthetic Money is separate from original values and affects only marked business gateways; inactive rules reject it.",
+    "Real MVC tests cover both preview and saved simulation, exact threshold, currencies, own-amount floor, strict Money transport, permissions and unchanged resource counts.",
+    "Template and companion v4 default DISABLED without enterprise window, threshold or currency; original scenario paths preserved.",
+    "Editing inputs, design or scope cancels stale results; actual Vue render and production model tested."
+  ],
+  "pending": [
+    "fixed package V115 to V116 nonempty upgrade and HTTP runtime",
+    "crash/restart and paired restore",
+    "one independent final F04 reviewer",
+    "browser acceptance",
+    "PostgreSQL acceptance"
+  ]
+}

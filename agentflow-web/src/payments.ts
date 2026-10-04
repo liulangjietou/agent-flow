@@ -13,7 +13,7 @@ export const cashierPaymentLabels: Record<CashierPaymentAction, string> = { EXEC
 export interface PaymentBinding { applicationId: string; businessId: string; roundNo: number; applicationVersion: number; businessVersion: number }
 export interface PaymentView extends PaymentBinding {
   id: string; version: number; status: keyof typeof authorizationLabels; purpose: 'EMPLOYEE_ADVANCE' | 'EXPENSE_REIMBURSEMENT'
-  legalEntityId: string; employeeId: string; amount: Money; maskedPayeeAccount: string; authorizedBy: string; authorizedAt: string; expiresAt: string; executedBy: string | null
+  legalEntityId: string; employeeId: string; amount: Money; maskedPayeeAccount: string; authorizedBy: string; authorizedAt: string; expiresAt: string; dueDate: string | null; executedBy: string | null
   request: null | { id: string; version: number; status: keyof typeof paymentRequestLabels; cashier: string; createdAt: string; updatedAt: string; issue: string | null }
   operation: null | { version: number; status: keyof typeof paymentOperationLabels; updatedAt: string; observedStatus: 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'REVERSED' | 'NOT_FOUND' | null; paymentReference: string | null; receiptReference: string | null; completedAt: string | null; disputed: boolean; issue: string | null }
   retirement: null | { retiredBy: string; retiredAt: string; operationVersion: number; basis: keyof typeof retirementBasisLabels }
@@ -29,11 +29,15 @@ export interface PaymentDisputeView {
 export interface PaymentDisputeInput { authorizationVersion: number; operationVersion: number; outcome: 'SUCCEEDED' | 'FAILED' | 'REVERSED'; evidenceReference: string; comment: string }
 export interface PaymentDisputeReceipt { applicationId: string; authorizationId: string; resolutionId: string; operationVersion: number; outcome: PaymentDisputeInput['outcome']; auditEventId: string }
 export interface FinancePaymentView extends PaymentBinding { voucherOperationId: string | null; voucherVersion: number | null; payable: Money | null; payment: PaymentView | null; payeeReview: PayeeReview | null; dispute: PaymentDisputeView | null; actions: { authorize: boolean; voidAuthorization: boolean; query: boolean; retire: boolean; reviewAccount: boolean; authorizeReviewed: boolean } }
-export interface CashierPaymentView { payment: PaymentView; actions: { execute: boolean; query: boolean; resendOriginal: boolean } }
-export interface CashierPaymentPage { items: CashierPaymentView[]; nextBeforeId: string | null }
+export interface CashierAccountOption { key: string; legalEntityId: string; currency: string; displayName: string; maskedAccount: string }
+export type CashierPaymentSort = 'AUTHORIZED_AT_DESC' | 'DUE_DATE_ASC'
+export interface CashierPaymentFilter { legalEntityId?: string; debitAccount?: string; dueFrom?: string; dueTo?: string; undated?: true; sort?: CashierPaymentSort }
+export interface CashierFilterOptions { legalEntities: { id: string; name: string }[]; accounts: CashierAccountOption[]; nextAfterAccountKey: string | null }
+export interface CashierPaymentView { payment: PaymentView; actions: { execute: boolean; query: boolean; resendOriginal: boolean }; debitAccount: CashierAccountOption | null }
+export interface CashierPaymentPage { items: CashierPaymentView[]; nextBeforeId: string | null; totalCount: number }
 export interface DebitAccount { reference: string; displayName: string; maskedAccount: string; currency: string; sourceVersion: string }
 export interface PaymentAccounts { authorizationId: string; authorizationVersion: number; validUntil: string; items: DebitAccount[] }
-export interface PaymentAuthorizationInput { roundNo: number; applicationVersion: number; businessVersion: number; voucherOperationId: string; voucherVersion: number; validitySeconds: number; comment: string; payeeReviewId?: string; payeeReviewVersion?: number }
+export interface PaymentAuthorizationInput { roundNo: number; applicationVersion: number; businessVersion: number; voucherOperationId: string; voucherVersion: number; validitySeconds: number; dueDate: string; comment: string; payeeReviewId?: string; payeeReviewVersion?: number }
 export interface PayeeReviewInput { authorizationVersion: number; voucherVersion: number; comment: string }
 export interface PayeeReviewReceipt { applicationId: string; authorizationId: string; reviewId: string; reviewVersion: number; auditEventId: string }
 export interface FinancePaymentActionInput { action: 'VOID' | 'QUERY' | 'RETIRE'; authorizationVersion: number; operationVersion?: number; comment: string }
@@ -47,12 +51,20 @@ const money = (value: Money | null) => !!value && typeof value.value === 'string
 const mask = (value: string) => typeof value === 'string' && /(?:\*{2,}|•{2,}|[xX]{2,})/.test(value) && /^[0-9*•xX -]+$/.test(value) && !/[0-9]{5,}/.test(value) && value.replace(/[^0-9]/g, '').length <= 8
 const bindingKeys = ['applicationId', 'businessId', 'roundNo', 'applicationVersion', 'businessVersion'] as const
 
+/** 只接受真实的四位公历日期，不把日期转换为用户时区或自动修正到下个月。 */
+export function isPaymentDueDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^(?!0000)[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return false
+  const parsed = Date.parse(value + 'T00:00:00Z')
+  return Number.isFinite(parsed) && new Date(parsed).toISOString().slice(0, 10) === value
+}
+
 /** 只有绑定完整且带回单的真实状态才能显示到账，未知枚举和完整账号均拒绝展示。 */
 export function validatePayment(value: PaymentView, id = value?.id): PaymentView {
   if (!value || !value.id || value.id !== id || !value.applicationId || !value.businessId || !value.legalEntityId || !value.employeeId || !value.authorizedBy
       || ![value.version, value.roundNo, value.applicationVersion, value.businessVersion].every(positive) || !known(authorizationLabels, value.status)
       || !['EMPLOYEE_ADVANCE', 'EXPENSE_REIMBURSEMENT'].includes(value.purpose) || !money(value.amount) || value.amount.value === '0.00'
-      || !mask(value.maskedPayeeAccount) || !time(value.authorizedAt) || !time(value.expiresAt) || Date.parse(value.expiresAt) <= Date.parse(value.authorizedAt)) throw new Error('付款绑定或金额未通过校验，请刷新核对。')
+      || !mask(value.maskedPayeeAccount) || !time(value.authorizedAt) || !time(value.expiresAt) || Date.parse(value.expiresAt) <= Date.parse(value.authorizedAt)
+      || value.dueDate !== null && !isPaymentDueDate(value.dueDate)) throw new Error('付款绑定或金额未通过校验，请刷新核对。')
   const request = value.request, operation = value.operation
   if (request && (!request.id || !positive(request.version) || !request.cashier || !known(paymentRequestLabels, request.status))
       || operation && (!positive(operation.version) || !known(paymentOperationLabels, operation.status) || typeof operation.disputed !== 'boolean'
@@ -127,15 +139,16 @@ function requireWindow(payment: PaymentView, now: number) { if (Date.parse(payme
 function requireQuery(payment: PaymentView) { if (payment.status !== 'EXECUTION_REGISTERED' || !payment.operation || ['QUEUED', 'CHECKING', 'SENDING', 'QUERYING'].includes(payment.operation.status)) throw new Error('原交易尚不允许此操作，请刷新状态。') }
 
 /** 金额和账户由服务端派生，财务仅提交已核对版本、期限和说明。 */
-export function financePaymentInput(view: FinancePaymentView, action: FinancePaymentAction, comment: string, validitySeconds = 900, now = Date.now()): PaymentAuthorizationInput | FinancePaymentActionInput | PayeeReviewInput {
+export function financePaymentInput(view: FinancePaymentView, action: FinancePaymentAction, comment: string, validitySeconds = 900, now = Date.now(), dueDate = ''): PaymentAuthorizationInput | FinancePaymentActionInput | PayeeReviewInput {
   validateFinancePayment(view, view); const explanation = reason(comment)
   if (!view.actions[financePaymentActionKeys[action]]) throw new Error('当前不允许此财务操作，请刷新。')
   if (action === 'AUTHORIZE' || action === 'AUTHORIZE_REVIEWED') {
+    if (!isPaymentDueDate(dueDate)) throw new Error('请明确填写本次付款到期日，格式为 YYYY-MM-DD。')
     if (!view.voucherOperationId || !positive(view.voucherVersion!) || !money(view.payable) || view.payable!.value === '0.00'
         || !Number.isSafeInteger(validitySeconds) || validitySeconds < 60 || validitySeconds > 86400) throw new Error('请核对应付金额与 1 分钟至 24 小时的授权期限。')
     const review = view.payeeReview
     if (action === 'AUTHORIZE_REVIEWED' && (!review || review.status !== 'READY' || Date.parse(review.validUntil!) <= now || Date.parse(review.checkedAt!) > now)) throw new Error('复核账户证据已过期或尚未就绪，请重新核对本人账户。')
-    return { roundNo: view.roundNo, applicationVersion: view.applicationVersion, businessVersion: view.businessVersion, voucherOperationId: view.voucherOperationId, voucherVersion: view.voucherVersion!, validitySeconds, comment: explanation,
+    return { roundNo: view.roundNo, applicationVersion: view.applicationVersion, businessVersion: view.businessVersion, voucherOperationId: view.voucherOperationId, voucherVersion: view.voucherVersion!, validitySeconds, dueDate, comment: explanation,
       ...(action === 'AUTHORIZE_REVIEWED' ? { payeeReviewId: review!.id, payeeReviewVersion: review!.version } : {}) }
   }
   const payment = view.payment; if (!payment) throw new Error('当前没有付款授权。')

@@ -14,6 +14,7 @@ import static io.agentflow.definition.DefinitionModels.*;
  */
 public final class DefinitionValidator {
     private static final int MAX_SUBPROCESS_NODE_NAME_LENGTH = 200;
+    private static final int MAX_SERVICE_NODE_NAME_LENGTH = 200;
     private static final Pattern LITERAL_ASSIGNEE_RULE =
             Pattern.compile("(?:role|user):[\\p{L}\\p{N}_][\\p{L}\\p{N}_.@-]{0,127}");
 
@@ -30,9 +31,21 @@ public final class DefinitionValidator {
     /** 图元素共享标识空间；已知流程标识时一并检查，避免部署时才发生冲突。 */
     public List<String> validate(Graph graph, FormSchema formSchema, String processKey) {
         List<String> errors = new ArrayList<>();
+        try { io.agentflow.expense.ExpenseSelfApprovalPolicy.validate(graph, formSchema); }
+        catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code()); }
+        try { io.agentflow.expense.ExpenseDuplicateApprovalPolicy.validate(graph, formSchema); }
+        catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code()); }
+        try { io.agentflow.expense.ExpenseSplitRiskPolicy.validate(graph, formSchema); }
+        catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code()); }
+        try { io.agentflow.expense.ExpensePriorApprovalPolicy.validate(graph, formSchema); }
+        catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code()); }
+        try { io.agentflow.expense.ExpenseBudgetApprovalPolicy.validate(graph, formSchema); }
+        catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code()); }
+        if (processKey != null && !DefinitionIdentifiers.valid(processKey)) errors.add("INVALID_PROCESS_KEY:" + processKey);
         if (graph.riskPolicy() != null) errors.addAll(graph.riskPolicy().validate(formSchema, graph.conditionLanguageVersion()));
         Map<String, Node> nodes = new HashMap<>();
         for (Node n : graph.nodes()) {
+            if (!DefinitionIdentifiers.valid(n.id())) errors.add("INVALID_NODE_ID:" + n.id());
             if (n.type() == NodeType.SUB_PROCESS) {
                 if (n.id().length() > FormSchema.MAX_NODE_ID_LENGTH || n.name().length() > MAX_SUBPROCESS_NODE_NAME_LENGTH) errors.add("SUBPROCESS_NODE_LIMIT_EXCEEDED:" + n.id());
                 try { SubprocessPolicy.fromProperties(n.properties()); }
@@ -44,6 +57,11 @@ public final class DefinitionValidator {
                 try { EventWaitPolicy.fromProperties(n.properties()); }
                 catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
             } else if (EventWaitPolicy.PROPERTY_KEYS.stream().anyMatch(n.properties()::containsKey)) errors.add("EVENT_REQUIRES_WAIT_NODE:" + n.id());
+            if (n.type() == NodeType.SERVICE_TASK) {
+                if (n.id().length() > FormSchema.MAX_NODE_ID_LENGTH || n.name().length() > MAX_SERVICE_NODE_NAME_LENGTH) errors.add("SERVICE_NODE_LIMIT_EXCEEDED:" + n.id());
+                try { ServiceTaskPolicy.fromProperties(n.properties()); }
+                catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
+            } else if (ServiceTaskPolicy.hasProperties(n.properties())) errors.add("SERVICE_REQUIRES_SERVICE_NODE:" + n.id());
             if (n.type() == NodeType.TIMER_WAIT) {
                 try { TimerWaitPolicy.fromProperties(n.properties()); }
                 catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code() + ":" + n.id()); }
@@ -87,10 +105,7 @@ public final class DefinitionValidator {
             if (n.type() == NodeType.COPY && (n.id().length() > 128 || n.name().length() > 200)) {
                 errors.add("COPY_NODE_LIMIT_EXCEEDED:" + n.id());
             }
-            if (n.type() == NodeType.SERVICE_TASK) {
-                errors.add("UNSUPPORTED_NODE_TYPE:" + n.id());
-            }
-            if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT || n.type() == NodeType.SUB_PROCESS) {
+            if (n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT || n.type() == NodeType.SUB_PROCESS || n.type() == NodeType.SERVICE_TASK) {
                 // Flowable 会对任务名称求值，业务标签必须保持字面量，不能成为访问 Spring Bean 的入口。
                 if (n.name().contains("${") || n.name().contains("#{")) {
                     errors.add("TASK_NAME_EXPRESSION_FORBIDDEN:" + n.id());
@@ -124,6 +139,7 @@ public final class DefinitionValidator {
         Map<String, Integer> defaultBranches = new HashMap<>();
         ConditionParser parser = new ConditionParser();
         for (Edge e : graph.edges()) {
+            if (!DefinitionIdentifiers.valid(e.id())) errors.add("INVALID_EDGE_ID:" + e.id());
             if (!edgeIds.add(e.id())) errors.add("DUPLICATE_EDGE:" + e.id());
             if (nodes.containsKey(e.id())) errors.add("NODE_EDGE_ID_CONFLICT:" + e.id());
             if (e.id().equals(processKey)) errors.add("PROCESS_KEY_CONFLICT:" + e.id());
@@ -166,7 +182,7 @@ public final class DefinitionValidator {
             if (n.type() == NodeType.END && outgoingCount != 0) errors.add("END_MUST_HAVE_NO_OUTGOING:" + n.id());
             // 并行必须显式建模，普通节点的多出线会在引擎中产生隐式并行。
             if ((n.type() == NodeType.START || n.type() == NodeType.USER_TASK || n.type() == NodeType.COPY
-                    || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT || n.type() == NodeType.SUB_PROCESS) && outgoingCount > 1) {
+                    || n.type() == NodeType.TIMER_WAIT || n.type() == NodeType.EVENT_WAIT || n.type() == NodeType.SUB_PROCESS || n.type() == NodeType.SERVICE_TASK) && outgoingCount > 1) {
                 errors.add("SINGLE_OUTGOING_REQUIRED:" + n.id());
             }
             if (n.type() != NodeType.END && !outgoing.contains(n.id())) errors.add("NODE_DEAD_END:" + n.id());
@@ -221,6 +237,9 @@ public final class DefinitionValidator {
         if (errors.isEmpty() && graph.nodes().stream().anyMatch(n -> n.type() == NodeType.EVENT_WAIT)) {
             validateWaitApprovalPaths(graph, errors, "EVENT_REQUIRES_APPROVAL_PATH");
         }
+        if (errors.isEmpty() && graph.nodes().stream().anyMatch(n -> n.type() == NodeType.SERVICE_TASK)) {
+            validateWaitApprovalPaths(graph, errors, "SERVICE_REQUIRES_APPROVAL_PATH");
+        }
         return List.copyOf(errors);
     }
 
@@ -263,7 +282,8 @@ public final class DefinitionValidator {
         for (var field : fields) {
             if (field.nodeAccess() != null) for (String nodeId : field.nodeAccess().keySet()) {
                 var node = nodes.get(nodeId);
-                if (node == null || node.type() != NodeType.USER_TASK && node.type() != NodeType.COPY && node.type() != NodeType.SUB_PROCESS) errors.add("FIELD_PERMISSION_NODE_INVALID:" + field.key() + ":" + nodeId);
+                if (node == null || node.type() != NodeType.USER_TASK && node.type() != NodeType.COPY && node.type() != NodeType.SUB_PROCESS
+                        && node.type() != NodeType.SERVICE_TASK) errors.add("FIELD_PERMISSION_NODE_INVALID:" + field.key() + ":" + nodeId);
             }
             if (field.columns() != null) validateFieldNodes(field.columns(), nodes, errors);
         }

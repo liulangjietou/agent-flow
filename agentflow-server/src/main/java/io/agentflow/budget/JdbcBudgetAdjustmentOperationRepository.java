@@ -76,6 +76,14 @@ public class JdbcBudgetAdjustmentOperationRepository {
         return jdbc.query("SELECT * FROM budget_adjustment_operation WHERE tenant_id=? AND request_id=? ORDER BY created_at DESC,id DESC LIMIT 1",
                 this::restore, tenant, requestId.toString()).stream().findFirst();
     }
+    /** 原消息的事实必须存在于同一指令的持久历史，后续原号查询不抹去之前的未知或查无。 */
+    public List<BudgetAdjustmentOperation> history(String tenant, UUID id) {
+        return jdbc.query("SELECT state_json,version FROM budget_adjustment_operation_revision WHERE tenant_id=? AND operation_id=? ORDER BY version", (row, index) -> {
+            var value = json.read(row.getString("state_json"), BudgetAdjustmentOperation.class);
+            if (!value.command().tenantId().equals(tenant) || !value.command().id().equals(id) || value.version() != row.getLong("version")) throw inconsistent();
+            return value;
+        }, tenant, id.toString());
+    }
     /** 按真实指令版本保留外部证据，后来查询不覆盖既有修订。 */
     public Optional<BudgetAdjustmentOperation> revision(String tenant, UUID id, long version) {
         return jdbc.query("SELECT state_json FROM budget_adjustment_operation_revision WHERE tenant_id=? AND operation_id=? AND version=?", (row, index) -> {

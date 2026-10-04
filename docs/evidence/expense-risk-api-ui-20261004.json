@@ -1,0 +1,151 @@
+{
+  "taskId": "A04",
+  "status": "LOCAL_API_UI_AND_REAL_FLOWABLE_SCOPE_VERIFIED_PACKAGED_RUNTIME_PENDING",
+  "recordedAt": "2026-10-04T10:45:56.291162+00:00",
+  "baseCommit": "f2de05620ae2c8e64c430a1a836eaa798a824764",
+  "sourceFiles": {
+    "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskInput.java": "dec4501bafdfb6293ddcf824849510f2f1208a1cafc103d2dc1b326b591e6dda",
+    "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskModelPort.java": "6307af66b409a6c0093acc2d937870c54bea519e911e9651fb86e329c3af632c",
+    "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskRun.java": "5b6b0f4ff2185384f46569a9c1966ba862f66a2ad1854e1b48083bb2d2af4229",
+    "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskSuggestion.java": "f5935ae2a68c5930410e4aac8ba204d7c610fb51c14be0e073c95d6b97b48f8c",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseRiskEvidence.java": "e0abb5e3b4ecd1e0c24077e8570e02eac3192cde0d3df0855116cb3b598af5fc",
+    "agentflow-domain/src/test/java/io/agentflow/agent/ExpenseRiskRunTest.java": "e52e31f33277d9eaa157a035cc71b14a17104ff8311aece72eefed97c9cab802",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseRiskEvidenceTest.java": "02cfd14a3b66ccaf01feb64fe201f835d38406615703e5f31c03b46160b744d1",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskAccess.java": "ff063565c917b0e1d9edd0e3b929da22c09248dd2a076fe6f46da3b58f874baa",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskController.java": "c4fafc9d18c4fc1f4678cc76194b306dedd9992b8b1da631e399620ec41d5308",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskService.java": "b730aba42a014055a35034fdbf7a9f60fe3bda53074069943e6dc3bf039915f2",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskSources.java": "3b56979d364c0c910fa5a623dff033a0b3c70c7c1df352aed2bfb24d3187e4b6",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskWorker.java": "1dfc933a71ccd36639984b5c721c6c6c7ff9f6fd66bbf1f521d13e1fcb477b14",
+    "agentflow-server/src/main/java/io/agentflow/agent/JdbcExpenseRiskRepository.java": "aea52759fa4cd3da431376bdd5138dfc388ca0b503f9e30f54b27ab5b81dec85",
+    "agentflow-server/src/main/java/io/agentflow/agent/OpenAiCompatibleExpenseRiskModel.java": "aebbb45d2c898e008d642ee446769e09cbfd6526ddfd51ad93909f891f20400f",
+    "agentflow-server/src/main/resources/api/openapi.json": "25aba4c0d6db68a1ba787ba8bbed81d5b54bab69d4244debae21c79cb85bfce2",
+    "agentflow-server/src/main/resources/db/migration/V115__expense_risk_runs.sql": "dfe4e45ea2ee5162144b699b162fd35101286af12246946ee479f4b6a286f59e",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskAccessTest.java": "14a9635daf4a108f8317282a48949ad28d64ab40d7cae418947611fc3143428e",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskExecutionTest.java": "851e3d6ddfb93951cff6bb1567f663161979ff692a5d9a65893733fcf87bb150",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskModelTest.java": "ab5fbb5ab79d65d106583ebdfdf13f9fdfaa4a41d421cec4a5cc5cdfaa59201b",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskPersistenceTest.java": "47478123a03d4b5615a7255958c44cc1a7030e633b0863a08ba69fa48c5320d9",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskSourcesTest.java": "82d4b0fd52197ac355e98ad0da72f5577526250e2d1ba7b345d736a05bf4499d",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "0c297accce17f99556893992c591934dd10af9420bff1cdb79be999f74390c95",
+    "agentflow-server/src/test/java/io/agentflow/approval/ExpenseRiskIntegrationTest.java": "80ece9b914f036ef9b4809be2707a611a1afeadde8887dbdd35e08852915b334",
+    "agentflow-server/src/test/java/io/agentflow/approval/ExpenseSubprocessGatewayFixture.java": "d60402b500f4e76e1185e9d73f073e274e87a7a98b52a7f89f65cb704d8b25b6",
+    "agentflow-web/scripts/check-openapi.mjs": "3cce9b4ea9f763dfd0958800761cf05202dd98e285ff4144d0d0d2a5ebbd6eb4",
+    "agentflow-web/scripts/test-requests.mjs": "9fb8e38462e440116314ab11d374006db0266d1ab2ee433276a28fa1de92c65a",
+    "agentflow-web/src/App.vue": "bed2b5db094b4cbcfb864af48388b7c104fb0d7f2a8c8fea06eb36ae46af8dd2",
+    "agentflow-web/src/api.ts": "366eac36858f3444378923a4062c835069155231d4e16ce69b166d669c56924c",
+    "agentflow-web/src/components/ExpenseDetail.vue": "09afa7f31c7b34c121b6ef70bb8a2581ccb9373aa56c2fb8191a1f5ffb8e21bd",
+    "agentflow-web/src/components/ExpenseRiskPanel.vue": "f5b9bd89a4ad58f33958e284c3588f112fb98af65e0b25ecc6e29e8371b8c8e4",
+    "agentflow-web/src/components/ExpenseRiskScope.vue": "0b89cc8a1aeb69d1dc06d6947cbda42eb8c97b6f2380129ef9d21b38f320e0ca",
+    "agentflow-web/src/expenseRisk.ts": "64fd355931684c7bc8be2675ada9ace37fb0a951c1b8eb1bdfca2a2cf3d2af8c",
+    "agentflow-web/tests/expense-risk.test.mjs": "00384d3a92c19d90fec13556f62c78ff8a21eebbbfd6470d283b74ff3270dff8"
+  },
+  "validation": {
+    "backendCasesPassed": 66,
+    "backendTestClasses": [
+      {
+        "testClass": "io.agentflow.agent.ExpenseRiskExecutionTest",
+        "passed": 31,
+        "report": "agentflow-server/target/surefire-reports/TEST-io.agentflow.agent.ExpenseRiskExecutionTest.xml",
+        "sha256": "894748c6d3f1d609e2e5d6b6be6f8c01bbd401382e13eebea4b5e96397fbfef9"
+      },
+      {
+        "testClass": "io.agentflow.agent.ExpenseRiskAccessTest",
+        "passed": 16,
+        "report": "agentflow-server/target/surefire-reports/TEST-io.agentflow.agent.ExpenseRiskAccessTest.xml",
+        "sha256": "528007bd819f70ece6ee56e75b5ddb32227f5a829dd8ee6eddda6b94935f0214"
+      },
+      {
+        "testClass": "io.agentflow.api.OpenApiContractTest",
+        "passed": 7,
+        "report": "agentflow-server/target/surefire-reports/TEST-io.agentflow.api.OpenApiContractTest.xml",
+        "sha256": "3214aee77601762a9bda1f46192f890229d77943d79e0cf60763fc967d51f358"
+      },
+      {
+        "testClass": "io.agentflow.approval.ExpenseRiskIntegrationTest",
+        "passed": 12,
+        "report": "agentflow-server/target/surefire-reports/TEST-io.agentflow.approval.ExpenseRiskIntegrationTest.xml",
+        "sha256": "7351a268565fcf1b1924056bb9e01e3f714e621912e67351e24d5586b971bae9"
+      }
+    ],
+    "frontendCasesPassed": 85,
+    "newRiskFrontendCasesPassed": 22,
+    "frontendScope": [
+      "expense-risk",
+      "precheck-explanation",
+      "expense-draft-assist",
+      "requests"
+    ],
+    "typecheckPassed": true,
+    "productionBuildPassed": true,
+    "openApi": {
+      "operations": 391,
+      "schemas": 830,
+      "requestExamples": 129
+    },
+    "existingOpenApiContractsUnchanged": true
+  },
+  "businessEvidence": [
+    "真实报销创建、预检、提交、预算确认及 Flowable 待办",
+    "逐单原轮次敏感字段权限；管理员不豁免",
+    "原登录注销与任务结束阻止发送",
+    "日历分页、租户隔离与决定权检查",
+    "去标识模型 HTTP 与原输出逐项复核",
+    "原幂等回放、版本变化不可采纳但可由当前决定人放弃",
+    "审批、费用和预算事实在人工复核后保持"
+  ],
+  "frontendEvidence": [
+    "显式单据行范围及日历选择",
+    "逐项发送确认",
+    "来源和模型文本转义",
+    "跨账号和任务迟到响应隔离",
+    "原请求字节及原幂等键恢复",
+    "账号主单原轮次恢复隔离",
+    "失权清除对照正文和未提交选择",
+    "风险操作和未提交复核接入原费用业务锁"
+  ],
+  "reproducedAndFixed": [
+    {
+      "issue": "日历尾页空游标被全局 NON_NULL 省略，与 required nullable 契约不符",
+      "fix": "在日历响应类型上明确保留空字段",
+      "failureArchive": "/fyoung/tmp/agentflow-remaining-20260928/a04-risk-calendar-null-failure"
+    },
+    {
+      "issue": "摘要缺少版本且状态未知时，两侧 undefined 比较误判匹配",
+      "fix": "状态映射前要求正整数版本",
+      "failureLog": "/fyoung/tmp/agentflow-remaining-20260928/a04-risk-ui-boundaries-red.log"
+    },
+    {
+      "issue": "来源选择期间失权只清理目录，没有清理已选对照正文和日历",
+      "fix": "失权重置范围并触发旧预览失效",
+      "failureLog": "/fyoung/tmp/agentflow-remaining-20260928/a04-risk-ui-boundaries-red.log"
+    }
+  ],
+  "fixtureCorrections": [
+    "领域位置规则返回 422，非法 JSON 字段返回 400，分别断言",
+    "合成金额字段修正为既有 Money.value"
+  ],
+  "buildCorrections": [
+    "ESM 运行时导入补齐 .js",
+    "按现有编译目标替换 Array.at"
+  ],
+  "limits": {
+    "syntheticFinanceAndModel": true,
+    "database": "H2",
+    "springHttp": "MockMvc",
+    "realFlowable": true,
+    "browserAccepted": false,
+    "postgresAccepted": false,
+    "packagedProcessRestartAccepted": false,
+    "realEnterpriseModelAccepted": false
+  },
+  "archive": {
+    "directory": "/fyoung/tmp/agentflow-remaining-20260928/a04-risk-api-ui-evidence-20261004",
+    "manifestSha256": "997de676ebf3f58073d218d4ce071f30565dc4fb36809d60c560525c420a74ed",
+    "artifacts": 49
+  },
+  "remaining": [
+    "固定安装包 HTTP、非空旧库升级和进行中进程强退恢复",
+    "独立配套恢复及原费用审批接续",
+    "已受限浏览器与 PostgreSQL 条件恢复后验收；不得绕过限制",
+    "E08 真实企业模型效果与授权接入"
+  ]
+}

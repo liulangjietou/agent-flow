@@ -47,6 +47,8 @@ public class JdbcTaskAuditAdapter implements TaskAuditPort {
         payload.put("currentStatus", operation.currentStatus());
         if (operation.membershipChange() != null) payload.put("membershipChange", operation.membershipChange());
         if (operation.proxyUse() != null) payload.put("proxyUse", operation.proxyUse());
+        if (operation.duplicateApproval() != null) payload.put("duplicateApproval", operation.duplicateApproval());
+        if (operation.budgetConfirmation() != null) payload.put("budgetConfirmation", operation.budgetConfirmation());
         jdbcTemplate.update("""
                 INSERT INTO audit_event
                 (id, tenant_id, event_id, aggregate_type, aggregate_id, aggregate_version, application_id, action, actor_id, payload_json, occurred_at)

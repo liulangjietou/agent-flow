@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "taskId": "I01",
+  "status": "PREFLIGHT_APPLICATION_VERIFIED_NO_PUBLIC_ENTRYPOINT",
+  "recordedAt": "2026-10-04T03:42:18.484318+00:00",
+  "sourceCommit": "1a1b1fcaf1f742be34a30393707b7b3a0d29611e",
+  "baselineCommit": "f27ff6465caeb643b9062592a087aff3170383b7",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "完整核对计划、显式采用及本地漂移处置、V110、具名原子应用与原组织关系规则共用；来源 HTTP、工作器、管理 API、系统检查和页面未接通。",
+  "validation": {
+    "final": {
+      "status": "PASS",
+      "recordedAt": "2026-10-04T03:40:40.483302+00:00",
+      "executed": 152,
+      "unique": 152,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "classes": {
+        "OrganizationModelsTest": 3,
+        "OrganizationSyncBatchTest": 21,
+        "OrganizationSyncDeltaTest": 26,
+        "OrganizationSyncCodecTest": 24,
+        "OrganizationSyncPersistenceTest": 23,
+        "OrganizationSyncMigrationTest": 1,
+        "OrganizationSyncApplicationTest": 35,
+        "OrganizationSyncPlanMigrationTest": 1,
+        "OrganizationIntegrationTest": 7,
+        "OrganizationApprovalIntegrationTest": 11
+      }
+    },
+    "initialSelectedGate": {
+      "exitCode": 0,
+      "uniqueCases": 47
+    },
+    "red": {
+      "status": "EXPECTED_RED",
+      "executed": 1,
+      "failures": [
+        {
+          "class": "io.agentflow.organization.OrganizationSyncApplicationTest",
+          "name": "batchDeactivationRetainsExistingHeadAndSupervisorHistoryLikeManualDeactivation",
+          "type": "java.lang.AssertionError",
+          "message": "\nExpecting empty but was: [Conflict[key=OrganizationSyncKey[kind=DEPARTMENT, externalId=child], code=ORGANIZATION_RELATION_INACTIVE, localId=5c318fe2-d9d4-4189-8e8d-17985fa0b6e1],\n    Conflict[key=OrganizationSyncKey[kind=DEPARTMENT, externalId=root], code=ORGANIZATION_RELATION_INACTIVE, localId=c209eed1-bf05-4d66-95f4-d33388f434a7],\n    Conflict[key=OrganizationSyncKey[kind=APPOINTMENT, externalId=employee-job], code=ORGANIZATION_RELATION_INACTIVE, localId=8b6754cd-ee0b-4149-ac6c-10084a5281fc]]"
+        }
+      ]
+    },
+    "rootCause": "原预检把未变的历史主管和负责人关系当成重新任命，导致整批停用被错误阻断。此前测试只覆盖新关系有效性和单笔状态，没有既有完整组织关系的整批停用。",
+    "fix": "部门和任职的最终状态检查保留；任命资格检查限定于主管或负责人关系新增、变更，保持原单笔停用的历史关系语义。",
+    "deduplication": "最终 152 来自十个明确执行测试类的实际 (classname,name)，不累计先前 47、基础 102 或 RED。",
+    "authorCheck": "Java files=1669, named types=3269, missing author tags=0, parse errors=0",
+    "stagedDiffCheck": "PASS",
+    "database": "H2"
+  },
+  "verifiedBoundaries": [
+    "预检只持久计划，不写组织或推进游标；完整前后值和具名选择可从新仓储实例恢复。",
+    "已有主体和任职要求明确采用；既有绑定、主体、法人归属和任职身份不能静默改绑。",
+    "本地修改默认阻断，明确当前修订后可采用来源；过期计划和取消后的批次拒绝应用。",
+    "最终组织关系支持乱序来源、新建负责人和主管；无效部门环、主管环、同人链、跨法人、缺失引用和重复身份阻断。",
+    "真正两个线程同时应用，一个具名决定成功；另一请求得到过期拒绝。",
+    "组织审计、映射历史、采用计划和游标四个写入故障点均使整个组织应用事务回滚；原计划可在故障解除后继续应用。",
+    "相同来源值及空变更只确认来源／映射，不制造组织修订。",
+    "整批停用保留原负责人和主管引用，以及旧计划中的活动事实；当前人员失去审批资格。",
+    "V109 到 V110 保留六张非空组织及同步表、原待处理批次和旧 Flyway 历史；新表为空且重复迁移零执行。",
+    "原组织管理与审批集成的 18 个用例通过；该回归不替代同步 HTTP 的真实原轮次接续验收。"
+  ],
+  "pending": [
+    "可信来源配置、目标变化复核、有界 HTTP 读取。",
+    "管理员排队／重试／取消编排和持久工作器。",
+    "管理 API 的鉴权、幂等、严格请求和 OpenAPI；系统检查。",
+    "管理页面、身份切换、未知请求结果恢复。",
+    "固定包升级、HTTP、进程重启、配套恢复和原审批轮次接续。",
+    "浏览器和 PostgreSQL 新范围补验；E09 企业组织源联调。"
+  ],
+  "taskClosed": false,
+  "knownOpenTaskCount": 34,
+  "sources": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/organization/OrganizationRelations.java",
+      "bytes": 4816,
+      "sha256": "cd767937699ba747950235872ed6e795e64c8d52ca93fd955e12c3f6845782c1"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/organization/OrganizationRepository.java",
+      "bytes": 3031,
+      "sha256": "49bdd86038c75b3c657f11b1540added9258ae21a06fad6e1e618e11ec8d41ae"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/organization/OrganizationSyncPlan.java",
+      "bytes": 5373,
+      "sha256": "93c6f8016f80408d139468e275f15b618ed7e871c19594a6a92d72ef2440cb98"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/JdbcOrganizationRepository.java",
+      "bytes": 10268,
+      "sha256": "79ecf372e2448143519ae44844d435155d94b95616e43be29d87fbbbfe394c8f"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/JdbcOrganizationSyncPlanRepository.java",
+      "bytes": 6563,
+      "sha256": "70c0d1021a145b69f36fb540d17333318ae4d1ae5a98368d3c4b0dd732aa39f3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/JdbcOrganizationSyncRepository.java",
+      "bytes": 18319,
+      "sha256": "20a9e983b8b02389c131bedd8754405989766d9994a688a5ed8116634292365a"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationService.java",
+      "bytes": 7498,
+      "sha256": "b665a89a9e8208b3c723dba26dec19b89a3d0e71d63be66232c5d1d8013e3de9"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationSyncApplicationService.java",
+      "bytes": 8384,
+      "sha256": "c87f90f654d92ba0020a30f2ac05e0926c70c63606ce5b4f6f589b74abc95cb9"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationSyncPlanner.java",
+      "bytes": 13512,
+      "sha256": "666d4c80913949b6a191360ccc5b241e8d45013b6115c07f4eb24a65a4b3f1b9"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/db/migration/V110__organization_sync_plans.sql",
+      "bytes": 1312,
+      "sha256": "82ba2165aabb3cc7cb166b7063687451ca0d4ab4047434375f6269589827a646"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/organization/OrganizationSyncApplicationTest.java",
+      "bytes": 27990,
+      "sha256": "966853d79336c8b0bfc6f3cf96f749987dc929fb907f37650e1dce678401d584"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/organization/OrganizationSyncPlanMigrationTest.java",
+      "bytes": 4077,
+      "sha256": "437930bcd25ef74fb9f7fd3c5f2b75e07d3f3bae5b51fa6d57cfa85685273788"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-final-reports/TEST-io.agentflow.organization.OrganizationModelsTest.xml",
+      "bytes": 10641,
+      "sha256": "63681fd88329ddc0aee8b4a9bf7c96b9947d1a441bb93890728410e7fc306695"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-final-reports/TEST-io.agentflow.organization.OrganizationSyncBatchTest.xml",
+      "bytes": 13383,
+      "sha256": "635c21dad2fa8754943655047d17e63e411871ed1767f327c676815fdfa9c832"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-final-reports/TEST-io.agentflow.organization.OrganizationSyncDeltaTest.xml",
+      "bytes": 14014,
+      "sha256": "0ae8147b64ee75f17725730ca35d2141bb9f4f5b6c489a5c3fee93675d53100d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-final-reports/TEST-io.agentflow.organization.OrganizationSyncCodecTest.xml",
+      "bytes": 46899,
+      "sha256": "2068e8ba1818eb9e7f2e5e3a68a2e614189076ae0296cce1bf4c34bd5aa5c773"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-final-reports/TEST-io.agentflow.organization.OrganizationSyncPersistenceTest.xml",
+      "bytes": 430211,
+      "sha256": "8b7b621ba875d3e8d5ba02df5b3cf621d37e159b6c040c00e896742b27275623"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-final-reports/TEST-io.agentflow.organization.OrganizationSyncMigrationTest.xml",
+      "bytes": 68299,
+      "sha256": "e850d3ad76ed755c1aad2e6f61ee3d411882240b7e5b1959e199a554b4c9fb9d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-final-reports/TEST-io.agentflow.organization.OrganizationSyncApplicationTest.xml",
+      "bytes": 637619,
+      "sha256": "150f13f9abbc922cccdd08f44a1d651bb96f49ea988ed51cfdd461afc538a0ab"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-final-reports/TEST-io.agentflow.organization.OrganizationSyncPlanMigrationTest.xml",
+      "bytes": 61330,
+      "sha256": "898a2990dfde52e72f21727347a3debfa35ab1486394eef6f5969b384a2fbf65"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-final-reports/TEST-io.agentflow.organization.OrganizationIntegrationTest.xml",
+      "bytes": 76249,
+      "sha256": "6d2753f836f243762b05cb33b055c4c656b4d96d102c5f14716a608816fba953"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-final-reports/TEST-io.agentflow.organization.OrganizationApprovalIntegrationTest.xml",
+      "bytes": 75513,
+      "sha256": "e1a5ef1621f15083f649b94a120dc2030935330d1d89f64af64874ffad8de550"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-first-reports/TEST-io.agentflow.organization.OrganizationSyncApplicationTest.xml",
+      "bytes": 518527,
+      "sha256": "93bdbb2900dd8ab4df7c207c90781a5f0a65267141244bc5270c0dd4f5a3b09e"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-first-reports/TEST-io.agentflow.organization.OrganizationIntegrationTest.xml",
+      "bytes": 76094,
+      "sha256": "375a6a574c33f57e0d36aca7a4d8f41f97fc37f94dcee862a3baf7b7bc874485"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-first-reports/TEST-io.agentflow.organization.OrganizationSyncPlanMigrationTest.xml",
+      "bytes": 61175,
+      "sha256": "67c1438111aed7e1bc31e39008a19f8095c4fdb6b7462916084be68dcfb01361"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-first-reports/TEST-io.agentflow.organization.OrganizationApprovalIntegrationTest.xml",
+      "bytes": 75357,
+      "sha256": "b8bb4a3c7424c0cdf471589b84ee5cff27b47d93dc251504882b7dc5714f73ce"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-deactivation-red-reports/TEST-io.agentflow.organization.OrganizationSyncApplicationTest.xml",
+      "bytes": 61083,
+      "sha256": "f592e4de0bf916eb06993c7dc7fcad0be345e18e28223fac6bd90774766b3fea"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-deactivation-red-reports/OrganizationSyncApplicationTest.java",
+      "bytes": 23751,
+      "sha256": "e72681d6ddbf9688855f5dca806350bdd7ec57a79e5f3a8fd1c1240f7664055f"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-deactivation-red-reports/OrganizationSyncPlanner.java",
+      "bytes": 13023,
+      "sha256": "4ae04eaa038d83d235a9268e3fb480ab70d5c6529d56cb2b976b9bef4aa5bbd4"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-first.log",
+      "bytes": 563742,
+      "sha256": "f2ffaad30224c6be58eeb45f441765e814161fab711aca258250ada770bc4889"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-deactivation-red.log",
+      "bytes": 32096,
+      "sha256": "d0ed5953ce4d1ff23fca1125e9b50aed46012d8cda3839f5af90c56ba1e8ee47"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-final.log",
+      "bytes": 1090043,
+      "sha256": "6bba8534a438143862d46d630b8de7b84718829755d1302a43d13fd7f6a8266d"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-authors-final.log",
+      "bytes": 73,
+      "sha256": "d2b8de2316154b5a28e1aac3a96bb80075f24a25fa4da117bf0eaa1442d57817"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-first-summary.json",
+      "bytes": 7900,
+      "sha256": "48042190de4d74aee229cfbe8edb437937022b2c4e24cfa534af7bc21cbde0cb"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-deactivation-red-summary.json",
+      "bytes": 818,
+      "sha256": "7e4329fcc96b842f9d25febf835e31de96bfa442bf244e9482485fabf839d466"
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/i01-application-evidence-20261004/i01-application-final-summary.json",
+      "bytes": 25859,
+      "sha256": "7ec3e424d1cebe6312bda6454b8037f5c5367666388e9448b63bb99436fe40b7"
+    }
+  ]
+}

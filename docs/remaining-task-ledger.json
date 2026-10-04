@@ -1,26 +1,56 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-03T05:37:50.342009+00:00",
+  "recordedAt": "2026-10-04T16:08:30.000540+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 37,
+    "knownOpenTaskCount": 34,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 19,
+      "LOCAL_DEVELOPMENT": 16,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 37,
+    "projectRemainingLowerBound": 34,
     "completionPercentage": null,
     "notes": [
-      "37 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "34 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
-    ]
+    ],
+    "localDeliveryBreakdown": {
+      "recordedAt": "2026-10-04T16:08:30.000540+00:00",
+      "implementationRemaining": {
+        "count": 4,
+        "taskIds": [
+          "A01",
+          "F09",
+          "F14",
+          "F15"
+        ]
+      },
+      "implementedAwaitingBrowserAndPostgresVerification": {
+        "count": 12,
+        "taskIds": [
+          "A02",
+          "A03",
+          "I01",
+          "F11",
+          "F12",
+          "F17",
+          "W01",
+          "I02",
+          "A04",
+          "F04",
+          "F16",
+          "F05"
+        ]
+      },
+      "note": "This is a breakdown of the 16 OPEN local delivery tasks, not additional tasks or new completion claims."
+    }
   },
   "requirements": [
     {
@@ -684,6 +714,14 @@
         "path": "docs/remaining-implementation-plan.md",
         "line": 54
       }
+    },
+    {
+      "id": "D07",
+      "rule": "用户已授权剩余内容按助手推荐开发，不再把已提出的推荐业务规则挂为等待确认：F04 采用提交时滚动 N×24 小时、当前有效轮次按同申请人/法人/本位币/类别聚合；F05 超容差须说明及独立追加审批；F16 财务明确填写并固定付款到期日，历史未设置单列；A04 采用当前决定权、完整明细读取、逐项确认去标识事实的专用发送边界。N、阈值、启用状态及实际企业参数不得编造。",
+      "reference": {
+        "path": "docs/expense-risk-hints.md",
+        "line": 3
+      }
     }
   ],
   "tasks": [
@@ -753,23 +791,42 @@
           ]
         }
       ],
-      "observed": "现有 ExpensePrecheckEvaluator 执行权威规则预检；现有 Agent 能力为摘要、普通草稿和票据建议，没有模型解释预检结果的专用用例。",
+      "observed": "后端与本人费用页面、明确来源选择、历史核对、人工采纳／放弃和原请求恢复已接通。前阶段 132 项 Java、118 项前端用例分别通过；固定包 V106→V107 保留 250 张旧表及 109 行，8 次启动、实际断线原键恢复、超时迟到与真实到期、排队后修改阻断通过。365 份实际响应中解释接口 274 份通过契约与页面解析核对；浏览器与 PostgreSQL 新范围补验仍待完成。",
       "references": [
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java",
+          "path": "docs/precheck-explanation.md",
           "line": 1
         },
         {
-          "path": "docs/draft-assist.md",
-          "line": 3
+          "path": "docs/evidence/precheck-explanation-backend-20261003.json",
+          "line": 1
         },
         {
-          "path": "docs/agent-execution.md",
+          "path": "docs/evidence/precheck-explanation-ui-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/precheck-explanation-runtime-20261003.json",
           "line": 1
         }
       ],
       "acceptance": "输入绑定当前预检及选定可读事实；解释带来源；过期结果不可采纳；建议不修改规则结论、金额或审批结果。",
-      "dependsOn": []
+      "dependsOn": [],
+      "freshnessFoundation": {
+        "status": "VERIFIED",
+        "implementationCommit": "3481d10b096d8bba60feb86a7a5bcf7cf8981c43",
+        "evidence": "docs/evidence/precheck-explanation-freshness-20261003.json"
+      },
+      "uiStage": {
+        "status": "VERIFIED_TASK_OPEN",
+        "implementationCommit": "8ecc84fe2549eb5c16e4b804099938bfd35ec4e3",
+        "evidence": "docs/evidence/precheck-explanation-ui-20261003.json"
+      },
+      "runtimeStage": {
+        "status": "VERIFIED_TASK_OPEN",
+        "implementationCommit": "ad3156555ce9c4b365446567a5e008f52a52269b",
+        "evidence": "docs/evidence/precheck-explanation-runtime-20261003.json"
+      }
     },
     {
       "id": "A03",
@@ -795,7 +852,7 @@
           ]
         }
       ],
-      "observed": "普通草稿入口对 businessReference 非空明确返回 AGENT_DRAFT_UNSUPPORTED。票面金额辅助填报已完成，但没有按行程生成费用行、类别和分摊建议的专用入口。",
+      "observed": "本地协议、V108 仓储、本人来源预览、六个接口及费用页面已接通。90 条前端、30 条后端集成和构建通过；固定包完成 V107→V108 非空升级、人工确认后原领域保存、排队/完成/执行中强退及独立恢复。255 表、329 行、1,997 条结构语句一致；308 份响应、53 份成功请求及 204 份助手成功响应的客户端解析通过。浏览器和 PostgreSQL 补验仍待完成，继续 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/agent/DraftAssistInputs.java",
@@ -804,10 +861,35 @@
         {
           "path": "docs/evidence/expense-invoice-fill-20261002.json",
           "line": 1
+        },
+        {
+          "path": "docs/expense-draft-assist.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-draft-assist-foundation-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-draft-assist-backend-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-draft-assist-ui-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-draft-assist-runtime-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "结构化业务建议走各自领域保存服务；报销行程、类别和分摊逐项人工确认；不由模型生成补贴标准、真实余额或批准事实；适用业务边界明确。",
-      "dependsOn": []
+      "dependsOn": [],
+      "runtimeStage": {
+        "status": "VERIFIED_BROWSER_POSTGRES_PENDING",
+        "artifactSourceCommit": "a12ea9b50be66a721c514cc848f92f9d803c8b36",
+        "evidence": "docs/evidence/expense-draft-assist-runtime-20261004.json"
+      }
     },
     {
       "id": "A04",
@@ -825,7 +907,7 @@
           ]
         }
       ],
-      "observed": "当前 ApprovalRiskPolicy 只评估本次表单白名单条件。没有费用领域同日多笔、节假日消费、连号等事实的专用模型提示与复核链路。",
+      "observed": "四类风险、逐单原轮次授权、V115 持久执行、六个公开操作及审批页面均已实现。固定包完成非空 V114 升级、原 OIDC 会话排队恢复、执行中强退不重发、原键恢复及独立配套恢复（271 表、379 行、3 原件）；167 份实际风险响应通过契约及页面解析。剩余浏览器和 PostgreSQL 补验，A04 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
@@ -834,10 +916,37 @@
         {
           "path": "docs/agent-execution.md",
           "line": 1
+        },
+        {
+          "path": "docs/expense-risk-hints.md",
+          "line": 1
         }
       ],
       "acceptance": "可解释地引用经授权的费用事实，保留提示和人工处置；不能凭模型标签自动驳回、核减或改变金额矩阵。确定性拆单路由由 F04 独立处理。",
-      "dependsOn": []
+      "dependsOn": [],
+      "progress": {
+        "recordedAt": "2026-10-04T11:04:34.056090+00:00",
+        "status": "LOCAL_PACKAGED_RUNTIME_VERIFIED_BROWSER_POSTGRES_PENDING",
+        "publicApiImplemented": true,
+        "persistenceImplemented": true,
+        "backendExecutionImplemented": true,
+        "uiImplemented": true,
+        "runtimeAccepted": true,
+        "evidence": "docs/evidence/expense-risk-api-ui-20261004.json",
+        "foundationEvidence": "docs/evidence/expense-risk-foundation-20261004.json",
+        "scopeTestsPassed": 66,
+        "persistenceCasesPassed": 25,
+        "executionCasesPassed": 31,
+        "apiBackendCasesPassed": 66,
+        "frontendCasesPassed": 85,
+        "realFlowableIntegrationCasesPassed": 12,
+        "previousBackendScopeCasesPassed": 129,
+        "runtimeAcceptanceScope": "Local fixed-package H2 and synthetic loopback OIDC/finance/model only",
+        "runtimeEvidence": "docs/evidence/expense-risk-runtime-20261004.json",
+        "browserAccepted": false,
+        "postgresqlAccepted": false,
+        "runtimeResponseCases": 167
+      }
     },
     {
       "id": "I01",
@@ -863,7 +972,7 @@
           ]
         }
       ],
-      "observed": "现有组织目录为可信管理员维护单位、人员、任职和关系；已实现 OIDC，但没有同步批次、来源映射、冲突处置及恢复入口。",
+      "observed": "同步领域、V109/V110、可信 HTTP、持久工作器、11 个管理员接口、只读诊断及完整核对页面已接通。69 个后端及 134 个前端范围用例通过。固定包 14 次启动完成非空升级、强退、人工采用、冲突、原审批接续和独立恢复（262 表、366 行、1 附件）；152 份同步响应契约、146 份成功响应及 65 份本地目录页生产解析通过。浏览器和 PostgreSQL 补验待完成，继续 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationController.java",
@@ -876,10 +985,59 @@
         {
           "path": "docs/local-organization.md",
           "line": 1
+        },
+        {
+          "path": "docs/organization-sync.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/organization-sync-foundation-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/organization-sync-application-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/organization-sync-backend-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/organization-sync-ui-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/organization-sync-runtime-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "以单一可信源映射组织事实，预检和具名应用变更、停用及重试均有审计；不隐式创建认证身份或授予系统角色；旧审批轮次依据保持。",
-      "dependsOn": []
+      "dependsOn": [],
+      "foundationStage": {
+        "status": "VERIFIED_NO_USER_ENTRYPOINT",
+        "implementationCommit": "7cbb27278549cc7073afe4c6a2fce68c2389817b",
+        "evidence": "docs/evidence/organization-sync-foundation-20261004.json"
+      },
+      "applicationStage": {
+        "status": "VERIFIED_NO_PUBLIC_ENTRYPOINT",
+        "implementationCommit": "1a1b1fcaf1f742be34a30393707b7b3a0d29611e",
+        "evidence": "docs/evidence/organization-sync-application-20261004.json"
+      },
+      "backendStage": {
+        "status": "HTTP_WORKER_ADMIN_API_VERIFIED_LOCAL_BACKEND",
+        "implementationCommit": "f1fad53377354b12463fe8c0f4357db0a82c3f8a",
+        "evidence": "docs/evidence/organization-sync-backend-20261004.json"
+      },
+      "uiStage": {
+        "status": "SYSTEM_DIAGNOSTICS_AND_REVIEW_UI_VERIFIED_LOCAL",
+        "implementationCommit": "c9b47341164a6025cb0c23e4eb8c03a08f4c146b",
+        "evidence": "docs/evidence/organization-sync-ui-20261004.json"
+      },
+      "runtimeStage": {
+        "status": "FIXED_PACKAGE_LOCAL_H2_RUNTIME_VERIFIED_BROWSER_AND_POSTGRES_PENDING",
+        "sourceCommit": "0cbe62bdcff0a00553bc13d5619b127a201e4ffc",
+        "evidence": "docs/evidence/organization-sync-runtime-20261004.json"
+      }
     },
     {
       "id": "I02",
@@ -905,7 +1063,7 @@
           ]
         }
       ],
-      "observed": "现有事件和支付 HMAC 验签解决消息完整性；未有文件签署业务用例。OFD 签章渲染也不等于电子签服务。",
+      "observed": "固定请求、回执证据、原登录授权、持久后台、公开 API 与操作页面均已接通。固定安装包通过演示模式 144 次 HTTP、两次进程强退和独立数据库/原件/结果配套恢复；共享 OIDC 模式另通过 68 次 HTTP，验证重启续发、原登录注销、人员停用和共享会话必需。实际契约与页面解析通过，回调锁等待缺陷先复现后修复，165 个 Java 范围用例通过。浏览器/PostgreSQL 待补验，真实供应商另归 E10；I02 保持 OPEN。",
       "references": [
         {
           "path": "docs/product-goal-gap-audit.md",
@@ -914,10 +1072,98 @@
         {
           "path": "docs/expense-archives.md",
           "line": 1
+        },
+        {
+          "path": "docs/electronic-signatures.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/electronic-signature-domain-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/electronic-signature-persistence-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/electronic-signature-receipt-evidence-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/electronic-signature-http-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/electronic-signature-worker-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/electronic-signature-api.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/electronic-signature-api-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/electronic-signature-ui.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/electronic-signature-ui-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/electronic-signature-runtime.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/electronic-signature-runtime-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "固定文件与签署版本、显式授权、异步状态、可验证回执、重复回调和未知结果恢复；保留原件、授权及签署结果，完成本地受控协议验收。",
-      "dependsOn": []
+      "dependsOn": [],
+      "foundationStage": {
+        "status": "DOMAIN_AND_SERIALIZATION_VERIFIED_NO_ENTRYPOINT",
+        "implementationCommit": "ec0eff523b17745b71d039cf51221f7335947fdf",
+        "evidence": "docs/evidence/electronic-signature-domain-20261004.json"
+      },
+      "persistenceStage": {
+        "status": "PERSISTENCE_AND_LOCAL_DATABASE_RECOVERY_VERIFIED_NO_PUBLIC_ENTRYPOINT",
+        "implementationCommit": "956dc61b45a1811443f83cba94fd4faf976ff0b3",
+        "evidence": "docs/evidence/electronic-signature-persistence-20261004.json"
+      },
+      "receiptEvidenceStage": {
+        "status": "TRUSTED_PROFILE_AND_PERSISTED_RAW_RECEIPT_VERIFIED_NO_HTTP_OR_PUBLIC_ENTRYPOINT",
+        "implementationCommit": "caff66d5d7b5928078b12b53ee0dc141f7cc1331",
+        "evidence": "docs/evidence/electronic-signature-receipt-evidence-20261004.json"
+      },
+      "httpStage": {
+        "status": "HTTP_FIXED_TARGET_AND_PAIRED_H2_FILE_RECOVERY_VERIFIED_NO_PUBLIC_ENTRYPOINT",
+        "implementationCommit": "70aaa2bd8dae046fe8c9a754166274a9bc555a8f",
+        "evidence": "docs/evidence/electronic-signature-http-20261004.json"
+      },
+      "workerStage": {
+        "status": "APPLICATION_AUTHORIZATION_AND_WORKER_VERIFIED_NO_PUBLIC_ENTRYPOINT",
+        "implementationCommit": "1097488bde1ed992f9774d93f12514a111ab20ec",
+        "evidence": "docs/evidence/electronic-signature-worker-20261004.json"
+      },
+      "apiStage": {
+        "status": "PUBLIC_API_AND_VERIFIED_CALLBACK_SCOPE_PASSED_UI_AND_PACKAGED_ACCEPTANCE_REMAIN",
+        "implementationCommit": "ad96a6e6acfcc61415e1dca2e13d1c57809d899d",
+        "evidence": "docs/evidence/electronic-signature-api-20261004.json"
+      },
+      "uiStage": {
+        "status": "SIGNING_UI_SCOPE_PASSED_PACKAGED_RUNTIME_BROWSER_POSTGRES_REMAIN",
+        "implementationCommit": "ca936ab2a8eda49da788a6257f6390e474f670fb",
+        "evidence": "docs/evidence/electronic-signature-ui-20261004.json"
+      },
+      "runtimeStage": {
+        "status": "FIXED_PACKAGE_LOCAL_H2_AND_SHARED_OIDC_RUNTIME_VERIFIED_BROWSER_AND_POSTGRES_PENDING",
+        "sourceCommit": "f44e21cf71daeea93ab9a1baac958c49e3c247d7",
+        "evidence": "docs/evidence/electronic-signature-runtime-20261004.json"
+      }
     },
     {
       "id": "F01",
@@ -1055,7 +1301,7 @@
       "id": "F03",
       "kind": "LOCAL_DEVELOPMENT",
       "group": "费用与财务产品",
-      "status": "OPEN",
+      "status": "COMPLETED",
       "title": "按行程自动计算定额补贴",
       "sourceRefs": [
         {
@@ -1075,21 +1321,29 @@
           ]
         }
       ],
-      "observed": "ExpenseLine 接收 quantity、日期和手填 claimedGross；DAY 单位不等于补贴规则，尚无系统计算的只读补贴行。",
+      "observed": "发布制度显式配置日额和自然日口径，页面自动重算并只读展示。保存和预检均校验权威规则及金额；实际 PostgreSQL 验证 5 类篡改、权限、幂等、换版阻断、撤回重提及旧轮次。桌面/390 像素页面和重启通过；9 张旧费用单存储字节保持，7 份新版本保留原计算。",
       "references": [
         {
-          "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseLine.java",
-          "line": 17
+          "path": "docs/expense-allowances.md",
+          "line": 1
         },
         {
-          "path": "agentflow-web/src/components/ExpenseEditor.vue",
+          "path": "docs/evidence/expense-allowances-complete-20261003.json",
           "line": 1
         }
       ],
       "acceptance": "基于固定制度与行程计算天数和金额，页面显示依据且不能手改；服务端拒绝篡改；人工调整行程后重新计算并留存版本。",
       "dependsOn": [
         "F01"
-      ]
+      ],
+      "completion": {
+        "implementationCommit": "bc4620ba10554d12e9e80d86a47587e0583ecc17",
+        "verifiedCommit": "bc4620ba10554d12e9e80d86a47587e0583ecc17",
+        "verifiedAt": "2026-10-03T07:38:33.887137+00:00",
+        "evidence": "docs/evidence/expense-allowances-complete-20261003.json",
+        "scope": "LOCAL_ACCEPTANCE_COMPLETE",
+        "authority": "日额必须由管理员显式发布，员工和城市事实来自配置的财务服务；实际运行使用本地合成来源，企业标准由 E03 验收。"
+      }
     },
     {
       "id": "F04",
@@ -1107,7 +1361,7 @@
           ]
         }
       ],
-      "observed": "现有风险规则只读当前提交字段，没有同申请人、类别、时间窗口内跨单聚合及审批层级提升。",
+      "observed": "规则、V116、提交/Flowable、原轮次授权、详情页、设计器、模板和模拟均已实现。固定包 H2 并发/升级/核减/强退/配套恢复及实际契约通过。最终独立审查的一项关闭规则异币种显示缺陷已复现修复，147 项前端范围、类型/构建和实际响应重放通过。仅浏览器及 PostgreSQL 待验收，F04 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
@@ -1119,7 +1373,15 @@
         }
       ],
       "acceptance": "窗口、阈值和启用状态显式配置；并发提交也按确定口径聚合；冻结风险及路由依据；不伪称未启用规则已经保护业务。",
-      "dependsOn": []
+      "dependsOn": [],
+      "domainFoundationEvidence": "docs/evidence/expense-split-domain-20261004.json",
+      "persistenceEvidence": "docs/evidence/expense-split-persistence-20261004.json",
+      "routingIntegrationEvidence": "docs/evidence/expense-split-routing-integration-20261004.json",
+      "readEvidence": "docs/evidence/expense-split-read-20261004.json",
+      "readUiEvidence": "docs/evidence/expense-split-read-ui-20261004.json",
+      "designSimulationEvidence": "docs/evidence/expense-split-design-simulation-20261004.json",
+      "runtimeEvidence": "docs/evidence/expense-split-runtime-20261004.json",
+      "finalReviewEvidence": "docs/evidence/expense-split-final-review-20261004.json"
     },
     {
       "id": "F05",
@@ -1137,7 +1399,7 @@
           ]
         }
       ],
-      "observed": "ExpenseRequest.ApprovedLine 能表达容差上限，但 ExpensePlan.approve 固定使用 BigDecimal.ZERO；没有按类别的模式、容差说明与额外审批配置。",
+      "observed": "三种控制模式、冻结类别来源、累计金额与独立追加审批、配置/原轮次页面及模板 v5 已完成。范围测试、固定 V117→V118 非空升级、6 次启动/753 次 HTTP、预算回执中断原号接续、275 表1340行配套恢复和一次独立审查通过；2 项展示意见已修复。浏览器与 PostgreSQL 待补验，保持 OPEN。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePlan.java",
@@ -1150,12 +1412,49 @@
         {
           "path": "docs/expense-plan.md",
           "line": 1
+        },
+        {
+          "path": "docs/expense-prior-controls.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-prior-controls-task1-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-prior-controls-task2-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-prior-controls-task3-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-prior-controls-task4-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-prior-controls-runtime-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-prior-controls-final-review-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "按已发布类别策略冻结控制模式和容差；超额说明与审批同步验证；并发占用、释放和关闭保持额度不变量。",
       "dependsOn": [
         "F01"
-      ]
+      ],
+      "progress": {
+        "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_FINAL_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
+        "recordedAt": "2026-10-04T16:08:30.000540+00:00",
+        "runtimeCommit": "2bce0eb244e4b775e88b6dd5ee39b73178f878d8",
+        "evidence": "docs/evidence/expense-prior-controls-final-review-20261004.json",
+        "packagedRuntimePending": false,
+        "finalReviewPassed": true,
+        "browserAndPostgresPending": true
+      }
     },
     {
       "id": "F06",
@@ -1330,7 +1629,7 @@
       "id": "F10",
       "kind": "LOCAL_DEVELOPMENT",
       "group": "费用与财务产品",
-      "status": "OPEN",
+      "status": "COMPLETED",
       "title": "退回/撤回保留预算的到期释放",
       "sourceRefs": [
         {
@@ -1342,19 +1641,27 @@
           ]
         }
       ],
-      "observed": "ExpenseReleaseService 明确保留退回和撤回占用，只处理驳回和作废释放；未有按已配置 N 天释放的调度。",
+      "observed": "固定期限与到期队列已完成安装包、HTTP、桌面/390 像素页面及执行中中断恢复。外部释放成功但响应未返时原号查询恢复；重提携释放凭据将预算版本从 1、2 递增至 3；真实子流程退回、明确拒绝及其他资源预留保持通过。配套恢复保留 247 张表、1,926 条记录和 2 份原件，原待办可接续。",
       "references": [
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseReleaseService.java",
-          "line": 35
+          "path": "docs/expense-submission.md",
+          "line": 1
         },
         {
-          "path": "docs/expense-submission.md",
+          "path": "docs/evidence/expense-budget-retention-complete-20261003.json",
           "line": 1
         }
       ],
       "acceptance": "显式保留期、可追溯释放队列；重提与过期释放并发不误释放新轮次；未知外部结果对账，重新提交重新预检。",
-      "dependsOn": []
+      "dependsOn": [],
+      "completion": {
+        "implementationCommit": "e987dcf705ab4f9d9fbbdd14072c53593bec6dcd",
+        "verifiedCommit": "43e95e55dcd0a5f389dafee59c2f92338d17bdf0",
+        "verifiedAt": "2026-10-03T08:47:12.167998+00:00",
+        "evidence": "docs/evidence/expense-budget-retention-complete-20261003.json",
+        "scope": "LOCAL_ACCEPTANCE_COMPLETE",
+        "authority": "3/5 天及预算回执均为显式本地合成配置；到期使用标记时间夹具，未等候真实天数；真实企业预算及目标环境验收仍为 E05/E12。"
+      }
     },
     {
       "id": "F11",
@@ -1372,15 +1679,19 @@
           ]
         }
       ],
-      "observed": "通用职责分离已过滤申请人并在无人时阻断；多级主管可显式选择，但遇到费用自审批时不会自动沿任职关系上溯并审计。",
+      "observed": "费用模板 v2、显式发布策略、轮次候选冻结、上溯审计、设计器及并行职责查询已实现。模板阶段 89 项 Java、48 项前端范围测试通过；固定包完成旧草稿和在审升级、两次强退、纸件先签收及独立恢复（253 表 662 行）。225 份响应、60 份请求契约通过；剩余浏览器与 PostgreSQL 补验。",
       "references": [
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java",
-          "line": 85
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSelfApprovalBindings.java",
+          "line": 45
         },
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationAssigneeResolver.java",
-          "line": 107
+          "path": "docs/expense-self-approval-runtime.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-self-approval-runtime-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "仅已发布费用策略启用；固定任职依据、检测环路与空上级，记录原候选和替代人及规则版本；财务职责分离仍强制。",
@@ -1402,25 +1713,61 @@
           ]
         }
       ],
-      "observed": "现有职责分离记录真实批准人以排除冲突，不实现相邻相同审批人自动通过；未有该类审计动作。",
+      "observed": "后端、两种设计器及模板/配套包 v3 已接入；设计器阶段 102 项 Java、67 项前端及异步接续 65 项范围回归通过。固定包完成 v2→v3 非空升级、旧版人工语义、并发自动审批、撤回重提、两次强退及独立恢复；253 表 789 行、1,981 条结构语句、257 份响应与 53 份请求契约通过。剩余浏览器和 PostgreSQL 补验。",
       "references": [
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java",
+          "path": "docs/expense-duplicate-approval.md",
           "line": 1
         },
         {
-          "path": "docs/approval-responsibilities.md",
+          "path": "docs/evidence/expense-duplicate-approval-ui-template-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-duplicate-approval-backend-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-duplicate-approval-event-service-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-duplicate-approval-runtime.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-duplicate-approval-runtime-20261004.json",
           "line": 1
         }
       ],
       "acceptance": "按发布版本识别相邻业务节点，记录自动动作和来源；非相邻默认不跳过；财务签收、审核、复核永不自动跳过；并发和重启不重复推进。",
-      "dependsOn": []
+      "dependsOn": [],
+      "backendStage": {
+        "status": "VERIFIED_TASK_OPEN",
+        "implementationCommit": "084b18e01811473313e6e1c2a875f7a9f89e4508",
+        "evidence": "docs/evidence/expense-duplicate-approval-backend-20261004.json"
+      },
+      "designerTemplateStage": {
+        "status": "VERIFIED_TASK_OPEN",
+        "implementationCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
+        "evidence": "docs/evidence/expense-duplicate-approval-ui-template-20261004.json"
+      },
+      "waitResumptionStage": {
+        "status": "VERIFIED_TASK_OPEN",
+        "sourceCommit": "8422723383998aa5521b6e64bbea9016322d7ed2",
+        "evidence": "docs/evidence/expense-duplicate-approval-event-service-20261004.json"
+      },
+      "runtimeStage": {
+        "status": "VERIFIED_BROWSER_POSTGRES_PENDING",
+        "artifactSourceCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
+        "evidence": "docs/evidence/expense-duplicate-approval-runtime-20261004.json"
+      }
     },
     {
       "id": "F13",
       "kind": "LOCAL_DEVELOPMENT",
       "group": "费用与财务产品",
-      "status": "OPEN",
+      "status": "COMPLETED",
       "title": "报销、事前申请和借款模板包",
       "sourceRefs": [
         {
@@ -1440,7 +1787,7 @@
           ]
         }
       ],
-      "observed": "运行入口已有三类专用业务，但 ClasspathProcessTemplateCatalog 仅有请假、用印、合同、采购付款、预算调整 5 个模板；没有这 3 个可复制模板及配套样例。",
+      "observed": "三个模板的复制、验证、模拟、发布、配套配置与专用业务办理已完成本地验收。10 个样例及免纸件变体通过 53 条业务断言；493 份实际响应和 124 份请求通过契约；桌面/390 像素页面、原件下载及独立配套恢复通过。恢复保留 245 张表、1,375 行、1 份原件，在审单继续完成付款与核销，40 条旧财务回执保持。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/template/ClasspathProcessTemplateCatalog.java",
@@ -1449,13 +1796,33 @@
         {
           "path": "docs/process-templates.md",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/financial-templates-catalog-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/financial-template-examples-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/financial-template-journey-complete-20261003.json",
+          "line": 1
         }
       ],
       "acceptance": "3 个模板可复制、验证、模拟、发布并从专用入口提交；附类别、制度、映射、签收开关和超标/核减/冲销/重复票样例；金额矩阵及财务复核阈值可配置。",
       "dependsOn": [
         "F01",
         "F02"
-      ]
+      ],
+      "completion": {
+        "implementationCommit": "766784983088cc8f2d89a1f69e5cca2fe8c29dc6",
+        "verifiedCommit": "766784983088cc8f2d89a1f69e5cca2fe8c29dc6",
+        "verifiedAt": "2026-10-03T06:41:34.641049+00:00",
+        "evidence": "docs/evidence/financial-template-journey-complete-20261003.json",
+        "scope": "LOCAL_ACCEPTANCE_COMPLETE",
+        "authority": "使用实际业务 API、人工审批和固定安装包；外部财务事实由独立本地合成服务提供，真实企业 E03–E07 联调保持待办。"
+      }
     },
     {
       "id": "F14",
@@ -1541,7 +1908,7 @@
           ]
         }
       ],
-      "observed": "CashierPaymentWorkspace.list 只接受 limit、beforeId，支付条款也没有付款到期日；选支付账户和批次逐笔检查已经存在。",
+      "observed": "法人、固定出款账户、显式付款到期日及范围/排序/分页页面已完成本地实现和一次最终审查。184 条 Java、62 条前端范围测试通过；V116→V117 保留 272 张旧表的 819 行，665 次 HTTP 和 238 次真实页面解析、两次付款强退及独立配套恢复通过。浏览器与 PostgreSQL 待补验，F16 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java",
@@ -1554,10 +1921,55 @@
         {
           "path": "docs/payment-workspace.md",
           "line": 1
+        },
+        {
+          "path": "docs/cashier-payment-filters.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/cashier-payment-filters-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/cashier-payment-filters-runtime-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/payment-due-dates.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/payment-due-dates-task1-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/payment-due-dates-task2-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/payment-due-dates-runtime-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/payment-due-dates-final-review-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "定义可信付款到期事实并接入筛选/排序；法人和实际支付账户筛选与总数、分页一致；保持逐笔复核及当前权限；不能把借款归还日当付款到期日。",
-      "dependsOn": []
+      "dependsOn": [],
+      "progress": {
+        "recordedAt": "2026-10-04T14:47:56.128406+00:00",
+        "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
+        "implementationCommit": "3848c22fc89d036758af4c001204daa380a22e0a",
+        "evidence": "docs/evidence/payment-due-dates-final-review-20261004.json",
+        "dateQuestionPending": false,
+        "packagedRuntimePending": false,
+        "browserAndPostgresPending": true,
+        "dateRuleAuthorized": true,
+        "dateImplementationPending": false,
+        "dateRuntimePending": false,
+        "finalReviewPassed": true
+      }
     },
     {
       "id": "F17",
@@ -1575,18 +1987,174 @@
           ]
         }
       ],
-      "observed": "InboxMessage.Kind 已有审批和核减事件，但没有付款结果或异常事件；PaymentOperationChanged 现有监听器用于凭证和结算，不向收件人生成消息。",
+      "observed": "18 类财务通知的来源、原记录详情与当前权限已接通。供应商应付新范围在固定包中完成三张采购单非空升级、两次强退、原授权只查询不重发及安全结束后重新授权；4 条合成 IM 受理、5 条失权抑制。独立恢复保留 253 张表、460 条记录；206 份实际响应及 47 份请求通过契约。浏览器与 PostgreSQL 补验保留，全项目条款核对仍由 V03 负责。",
       "references": [
         {
-          "path": "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java",
-          "line": 31
+          "path": "docs/payment-notifications.md",
+          "line": 1
         },
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationService.java",
-          "line": 127
+          "path": "docs/evidence/payment-notifications-employee-20261003.json",
+          "line": 1
         },
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSettlementRegistration.java",
+          "path": "docs/evidence/payment-request-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/notification/PaymentNotificationService.java",
+          "line": 1
+        },
+        {
+          "path": "docs/supplier-payment-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/supplier-payment-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/voucher-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/voucher-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/budget-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/budget-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/reversal-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/reversal-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/reversal-check-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/reversal-check-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-settlement-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-settlement-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/supplier-settlement-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/supplier-settlement-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/supplier-return-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/supplier-return-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/supplier-adjustment-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/supplier-adjustment-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-return-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-return-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/disbursement-return-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/disbursement-return-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/repayment-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/repayment-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/repayment-review-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/repayment-review-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/budget-adjustment-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/budget-adjustment-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-adjustment-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-adjustment-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/partial-expense-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/partial-expense-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/financial-notifications-runtime.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/financial-notifications-runtime-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/supplier-payable-notifications.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/supplier-payable-notifications-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/supplier-payable-notifications-runtime.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/supplier-payable-notifications-runtime-20261003.json",
           "line": 1
         }
       ],
@@ -1617,19 +2185,54 @@
           ]
         }
       ],
-      "observed": "NodeType 含 SERVICE_TASK，但 DefinitionValidator 明确拒绝，发布适配器没有该分支。抄送使用内部 serviceTask 不代表对用户开放服务任务。",
+      "observed": "可信目录、设计绑定、主子流程预检、两种设计视图及授权运行记录接口与页面已接通；62 项 Java、39 项前端范围测试、构建、OpenAPI 和固定包三轮强退恢复通过。独立 H2 与合成接收方配套恢复通过，原号只查询不重发，原流程经人工审批完成。真实浏览器和 PostgreSQL 新范围补测仍待完成。",
       "references": [
         {
-          "path": "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java",
-          "line": 90
+          "path": "agentflow-domain/src/main/java/io/agentflow/servicetask/ServiceTaskOperation.java",
+          "line": 1
         },
         {
-          "path": "agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java",
-          "line": 109
+          "path": "agentflow-domain/src/main/java/io/agentflow/definition/ServiceTaskInputs.java",
+          "line": 1
+        },
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java",
+          "line": 98
+        },
+        {
+          "path": "docs/evidence/service-task-foundation-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/service-task-backend-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/service-task-public-design-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/service-task-runtime-view-20261003.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/service-task-paired-restore-20261003.json",
+          "line": 1
         }
       ],
       "acceptance": "仅可信已声明操作可设计、验证、模拟和发布；后台调用事务外执行，结果有界且幂等，未知可恢复；不允许任意 URL、Bean 或脚本。",
-      "dependsOn": []
+      "dependsOn": [],
+      "progress": {
+        "stage": "PAIRED_H2_AND_SYNTHETIC_RECEIVER_RESTORE_VERIFIED",
+        "implementationCommit": "ef4aefcd36be0d8a9ae04cfd62b2b9fe11422d9d",
+        "evidence": "docs/evidence/service-task-public-design-20261003.json",
+        "backendEvidence": "docs/evidence/service-task-backend-20261003.json",
+        "durabilityCommit": "bb95a51ce3e89c19f2c973518d949214f8dc1366",
+        "runtimeImplementationCommit": "29863129698d7d1c93cc5392df01b4d279d9f7de",
+        "runtimeEvidence": "docs/evidence/service-task-runtime-view-20261003.json",
+        "pairedRestoreCommit": "6effa2349c60248d17921e5d57a9099af236961f",
+        "pairedRestoreEvidence": "docs/evidence/service-task-paired-restore-20261003.json"
+      }
     },
     {
       "id": "V01",
@@ -1695,7 +2298,7 @@
           ]
         }
       ],
-      "observed": "现有 256 份分阶段证据，验证对象为各自提交。最新组件范围验证不是所有待开发功能完成后的整体验收，旧部署记录也不等于当前分支已发布。",
+      "observed": "已具备分阶段验收证据；本轮修复流程/节点/连线编号字符校验缺口，106 项 Java、36 项前端范围测试及固定包 42 次 HTTP 升级检查通过，旧草稿可修正、原在审接续成功。全部本地待办尚未完成，最终固定版本整体验收及发布资料仍待完成。 另已复现并修复旧预检解释未知状态与缺失版本同时被接受的问题：两个失败用例先行，69 项前端范围测试、构建及 274 份历史实际响应重新解析通过。",
       "references": [
         {
           "path": "docs/postgres-release-gate.md",
@@ -1708,10 +2311,25 @@
         {
           "path": "README.md",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/definition-identifier-syntax-20261003.json",
+          "line": 1
         }
       ],
       "acceptance": "全部本地待办完成后，以固定提交和安装包运行适当完整 Java/Web/工具门禁、OpenAPI、非空升级/回退与原在审接续，更新运行文档和验收矩阵。",
-      "dependsOn": []
+      "dependsOn": [],
+      "identifierSyntaxSubissue": {
+        "status": "VERIFIED",
+        "implementationCommit": "1a46d5d99486604bd9557587b351afb094d1344d",
+        "evidence": "docs/evidence/definition-identifier-syntax-20261003.json"
+      },
+      "precheckResponseVersionSubissue": {
+        "status": "VERIFIED",
+        "evidence": "docs/evidence/precheck-response-version-20261004.json",
+        "frontendCases": 69,
+        "historicalResponsesRevalidated": 274
+      }
     },
     {
       "id": "V03",
@@ -2162,7 +2780,7 @@
           ]
         }
       ],
-      "observed": "origin 已配置为 https://github.com/liulangjietou/agent-flow.git；GitHub 仓库可访问且具有推送权限。当前远端尚无分支，本地开发分支尚无 PR 或 CI 结果。E15 依赖 V02 最终版本验收，仍为 OPEN。",
+      "observed": "origin 已配置且可访问，远端已有 main 与集成分支，当前没有开放 PR。本地开发分支 codex/governance-identifier-integration 尚未推送，也未完成对应最终版本 CI 验收。E15 依赖 V02 最终版本验收，仍为 OPEN。",
       "references": [
         {
           "path": "docs/remaining-implementation-plan.md",
@@ -3315,32 +3933,35 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F13"
+    "F09"
   ],
   "externalDelivery": {
     "remoteConfigured": true,
     "origin": "https://github.com/liulangjietou/agent-flow.git",
     "repository": "https://github.com/liulangjietou/agent-flow",
     "pushPermission": true,
-    "remoteBranches": [],
+    "remoteBranches": [
+      "main",
+      "vibeCodingO/merge-completed-tasks"
+    ],
     "pullRequest": null,
     "ci": null,
     "dependsOn": [
       "V02"
     ],
-    "verifiedAt": "2026-10-03T04:14:38.448896+00:00"
+    "verifiedAt": "2026-10-03T06:43:36.503599+00:00",
+    "remoteBranchHeads": {
+      "main": "fec4a87c6c785ddabf40ad2584060e264abddd2f",
+      "vibeCodingO/merge-completed-tasks": "b5a50a8f9d6411b16d2913a38325a497e6c9e97c"
+    },
+    "currentBranchPushed": false,
+    "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "F02",
-    "implementationCommit": "09d3ad33f7de17038da1539b0687a41f8463273e",
-    "verifiedCommit": "7fc7813be8dc751a35d1cfd19b93991a892f5417",
-    "completedAt": "2026-10-03T05:37:50.342009+00:00",
-    "evidence": "docs/evidence/account-mapping-complete-20261003.json"
-  },
-  "latestInProgress": {
-    "taskId": "F13",
-    "phase": "NEXT_TASK_SELECTED",
-    "taskCompleted": false,
-    "scope": "报销、事前申请和借款模板包"
+    "taskId": "F05",
+    "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_FINAL_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
+    "recordedAt": "2026-10-04T16:08:30.000540+00:00",
+    "evidence": "docs/evidence/expense-prior-controls-final-review-20261004.json",
+    "knownOpenTaskCount": 34
   }
 }

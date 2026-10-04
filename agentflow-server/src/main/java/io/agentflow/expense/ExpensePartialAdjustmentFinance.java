@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import org.springframework.context.ApplicationEventPublisher;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.*;
 import java.time.Duration;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class ExpensePartialAdjustmentFinance {
+    private final ApplicationEventPublisher events;
     private static final Duration LEASE = Duration.ofSeconds(90);
     private final ExpenseReportRepository reports;
     private final JdbcExpensePartialAdjustmentRepository adjustments;
@@ -24,7 +27,8 @@ public class ExpensePartialAdjustmentFinance {
 
     /** 网络等待在工作器中，事务服务只读取当前人员、固定目的地及持久财务事实。 */
     public ExpensePartialAdjustmentFinance(ExpenseReportRepository reports, JdbcExpensePartialAdjustmentRepository adjustments,
-            PaymentPersonnel personnel, FinanceGatewayConfiguration gateway) {
+            PaymentPersonnel personnel, FinanceGatewayConfiguration gateway, ApplicationEventPublisher events) {
+        this.events = events;
         this.reports = reports; this.adjustments = adjustments; this.personnel = personnel; this.gateway = gateway;
     }
 
@@ -33,13 +37,13 @@ public class ExpensePartialAdjustmentFinance {
     public BudgetConsumptionReductionOperation claimBudget(String tenant, UUID id, Instant at) {
         var current = locked(tenant, id); if (current == null || current.budget() == null) return null;
         var operation = current.budget(); var now = time(at);
-        if (operation.expired(now)) { adjustments.update(current.withBudget(operation.expire(now), now)); return null; }
+        if (operation.expired(now)) { saveBudget(current.withBudget(operation.expire(now), now)); return null; }
         if (operation.running() || operation.nextAttemptAt() == null || operation.nextAttemptAt().isAfter(now)) return null;
         if (operation.status() == BudgetConsumptionReductionOperation.Status.QUEUED && now.isBefore(operation.input().command().expiresAt())) {
             try { requireSendSources(current, operation.input().command().authorizedBy(), operation.input().targetDigest(), now); }
-            catch (DomainException changed) { adjustments.update(current.withBudget(operation.voidBeforeSend(now), now)); return null; }
+            catch (DomainException changed) { saveBudget(current.withBudget(operation.voidBeforeSend(now), now)); return null; }
         }
-        var claimed = operation.claim(now, LEASE); adjustments.update(current.withBudget(claimed, now));
+        var claimed = operation.claim(now, LEASE); saveBudget(current.withBudget(claimed, now));
         return claimed.running() ? claimed : null;
     }
 
@@ -48,13 +52,13 @@ public class ExpensePartialAdjustmentFinance {
     public ExpenseAccrualReductionOperation claimAccrual(String tenant, UUID id, Instant at) {
         var current = locked(tenant, id); if (current == null || current.accrual() == null) return null;
         var operation = current.accrual(); var now = time(at);
-        if (operation.expired(now)) { adjustments.update(current.withAccrual(operation.expire(now), now)); return null; }
+        if (operation.expired(now)) { saveAccrual(current.withAccrual(operation.expire(now), now)); return null; }
         if (operation.running() || operation.nextAttemptAt() == null || operation.nextAttemptAt().isAfter(now)) return null;
         if (operation.status() == ExpenseAccrualReductionOperation.Status.QUEUED && now.isBefore(operation.input().command().expiresAt())) {
             try { requireSendSources(current, operation.input().command().authorizedBy(), operation.input().targetDigest(), now); }
-            catch (DomainException changed) { adjustments.update(current.withAccrual(operation.voidBeforeSend(now), now)); return null; }
+            catch (DomainException changed) { saveAccrual(current.withAccrual(operation.voidBeforeSend(now), now)); return null; }
         }
-        var claimed = operation.claim(now, LEASE); adjustments.update(current.withAccrual(claimed, now));
+        var claimed = operation.claim(now, LEASE); saveAccrual(current.withAccrual(claimed, now));
         return claimed.running() ? claimed : null;
     }
 
@@ -62,28 +66,28 @@ public class ExpensePartialAdjustmentFinance {
     @Transactional
     public void finishBudget(BudgetConsumptionReductionOperation claimed, FinanceResult<BudgetConsumptionReductionObservation> result, Instant at) {
         var current = budgetClaim(claimed); if (current == null) return; var now = time(at);
-        adjustments.update(current.withBudget(claimed.complete(result, now), now));
+        saveBudget(current.withBudget(claimed.complete(result, now), now));
     }
 
     /** ERP 成功先独立提交，后续资源失败不得回滚它或重新外发。 */
     @Transactional
     public void finishAccrual(ExpenseAccrualReductionOperation claimed, FinanceResult<ExpenseAccrualReductionObservation> result, Instant at) {
         var current = accrualClaim(claimed); if (current == null) return; var now = time(at);
-        adjustments.update(current.withAccrual(claimed.complete(result, now), now));
+        saveAccrual(current.withAccrual(claimed.complete(result, now), now));
     }
 
     /** 可能已经写入的传输或保存异常只进入原号查询，迟到失败不覆盖已接受结果。 */
     @Transactional
     public void failBudget(BudgetConsumptionReductionOperation claimed, Instant at) {
         var current = budgetClaim(claimed); if (current == null) return; var now = time(at);
-        adjustments.update(current.withBudget(claimed.unavailable(BudgetConsumptionReductionOperation.Failure.INTERNAL_ERROR, now), now));
+        saveBudget(current.withBudget(claimed.unavailable(BudgetConsumptionReductionOperation.Failure.INTERNAL_ERROR, now), now));
     }
 
     /** ERP 异常保留原指令、最高回执和另一侧状态。 */
     @Transactional
     public void failAccrual(ExpenseAccrualReductionOperation claimed, Instant at) {
         var current = accrualClaim(claimed); if (current == null) return; var now = time(at);
-        adjustments.update(current.withAccrual(claimed.unavailable(ExpenseAccrualReductionOperation.Failure.INTERNAL_ERROR, now), now));
+        saveAccrual(current.withAccrual(claimed.unavailable(ExpenseAccrualReductionOperation.Failure.INTERNAL_ERROR, now), now));
     }
 
     /** 明确查询仅面向可能发送的命令；完成后的复核保留原资源完成并冻结后续新调整。 */
@@ -148,4 +152,11 @@ public class ExpensePartialAdjustmentFinance {
         var now = Instant.now(); return (at.isAfter(now) ? at : now).truncatedTo(ChronoUnit.MICROS);
     }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Partial adjustment or its original authorized operation changed"); }
+    private void saveBudget(ExpensePartialAdjustment value) {
+        adjustments.update(value); events.publishEvent(new ExpensePartialAdjustmentChanged.Budget(value));
+    }
+    private void saveAccrual(ExpensePartialAdjustment value) {
+        adjustments.update(value); events.publishEvent(new ExpensePartialAdjustmentChanged.Accrual(value));
+    }
+
 }

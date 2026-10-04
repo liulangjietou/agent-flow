@@ -4,8 +4,37 @@ import { pathToFileURL } from 'node:url'
 
 globalThis.localStorage = { getItem: () => 'test-token' }
 const { api, writeRequests } = await import(pathToFileURL(process.env.AGENTFLOW_TEST_API))
-const { TemplateCatalog, validateTemplateCopy } = await import(pathToFileURL(process.env.AGENTFLOW_TEST_TEMPLATES))
+const { TemplateCatalog, FinancialExamplePreview, validateTemplateCopy } = await import(pathToFileURL(process.env.AGENTFLOW_TEST_TEMPLATES))
 const copy = { key: 'tenant-leave', name: '团队请假', templateVersion: 1 }
+
+test('财务配套输入只读获取，不携带写入键或自动发布配置', async () => {
+  const sent = []
+  globalThis.fetch = async (url, init) => { sent.push({ url, ...init }); return Response.json({ key: 'employee-finance', scenarios: [] }) }
+  assert.equal((await api.financialTemplateExamples('expense/report')).key, 'employee-finance')
+  assert.equal(sent.length, 1)
+  assert.ok(sent[0].url.endsWith('/process-templates/expense%2Freport/financial-examples'))
+  assert.ok(!sent[0].method || sent[0].method === 'GET')
+  assert.equal(sent[0].headers.has('Idempotency-Key'), false)
+})
+
+test('配套样例切换模板和账号后，迟到结果不能恢复旧预览或下载', async () => {
+  const requests = []
+  const preview = new FinancialExamplePreview(key => new Promise((resolve, reject) => requests.push({ key, resolve, reject })))
+  const first = preview.load('a:admin', 'expense-report')
+  const second = preview.load('b:admin', 'advance-request')
+  requests[1].resolve({ key: 'current' }); await second
+  requests[0].resolve({ key: 'stale' }); await first
+  assert.equal(preview.value.key, 'current')
+  const failed = preview.load('b:admin', 'expense-plan')
+  assert.equal(preview.value, null)
+  requests[2].reject(new Error('unavailable')); await failed
+  assert.equal(preview.error, 'unavailable')
+  const late = preview.load('b:admin', 'expense-plan')
+  preview.clear(); requests[3].resolve({ key: 'unmounted' }); await late
+  assert.equal(preview.value, null)
+  assert.equal(preview.loading, false)
+  assert.equal(preview.error, '')
+})
 
 test('目录和草稿读取无写请求键，复制传明确版本且返回草稿不自动发布', async () => {
   writeRequests.setActor({ tenantId: 'a', userId: 'admin' })

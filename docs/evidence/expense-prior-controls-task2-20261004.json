@@ -1,0 +1,49 @@
+{
+  "status": "CONFIGURATION_AND_APPROVAL_FREEZING_VERIFIED_ROUTING_UI_RUNTIME_PENDING",
+  "tests": 131,
+  "red": {
+    "failures": 2,
+    "errors": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/f05-task2-red-confirmation.log"
+  },
+  "greenNotes": "First scope ran 131 cases with five test-only HTTP status expectation failures; corrected to existing 400/422 error contract and all 42 API cases passed. Other 89 cases unchanged and green. Initial compile interrupted for fixture import correction.",
+  "openapi": {
+    "operations": 392,
+    "schemas": 843,
+    "requestExamples": 129
+  },
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseCategoryCatalog.java": "5da4988996fcecd9adf6cd4a161d818c008e0a2425d3a4d4d91a989bd84064b9",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePlan.java": "4d52babf670b7310fd14ff001222806abb82afeb6db75ca3fe360464009298ba",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePlanRound.java": "b1c38b67e0b5bd61668eb1f40b9cab3ea8263cc254b4b35686b3deb6372f5b7d",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseConfigurationTest.java": "7908c839b5fbc930cb2d418a09dbd90c23f6e8a91727e301fe91d9b2b85e5d12",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpensePlanTest.java": "3c93c8eaeaff9f657f84538613c125a693fa9400e488a5a05f124aabb7e6083c",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseConfigurationInput.java": "d75e7d3037c7d05d4f640519d21e47cb4749361a4402c53cd14e727afc60c2c7",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanCheckEvaluator.java": "984e66c351a13f7b4897524bc3409ee0024df5d7b216aec3f21c9a8903f906bf",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanSubmissionService.java": "ef51104e6b02c8be38b52c48a3b2191523ed75bddd6fb7fa0b89db5cfc38174d",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePolicyConfiguration.java": "82917314e23ad52ee15da65b3193a61325b8d58b2ebfb68dd32e2ed94fc85b5e",
+    "agentflow-server/src/main/resources/api/openapi.json": "7dfd751ea89fadf380011f1a3c8affa347bed55397e725a92687067694214e58",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseConfigurationApiTest.java": "7c41a7ff8f7b812fd848f0ee26cd651da87f0f283b1bf2e443823700bf1506d5",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpensePlanIntegrationTest.java": "c54bb84b6d6cc5880af8adceab54bdc699048bf89c27566edec2006f39353c87",
+    "agentflow-web/scripts/check-openapi.mjs": "ae47a298580539209921601a370283f0031c7fab785b99ed8b0e8d32fc2de0fb"
+  },
+  "archiveSha256": {
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/TEST-io.agentflow.expense.ExpenseAllowancePreparationTest.xml": "312ca3c824121c5f783365195dacd22e1c4bd03adf803bff4f3f89b5d7440e66",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/TEST-io.agentflow.expense.ExpenseConfigurationApiTest.xml": "b5007b858ecf6eba7631df164018a8a6873226eb954c9bb8112cee2ce66abfa1",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/TEST-io.agentflow.expense.ExpenseConfigurationIntegrationTest.xml": "2db986966a9025ec5975878f600c7d5f6b54d468398632ced60e0d48eee42edf",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/TEST-io.agentflow.expense.ExpenseConfigurationMigrationTest.xml": "538c23455d00d8f068d3aa72084be87b774392c96b07bda2ca05f32bc83bdb55",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/TEST-io.agentflow.expense.ExpenseConfigurationTest.xml": "df988f6649f0b2cb61fada7ef84dc44a8993e1ac460801cbdec38e4deb034c87",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/TEST-io.agentflow.expense.ExpensePlanContractTest.xml": "16d0defaecc39ede4ddccb71a815c127a42119acc86e5d88dde28108be4fdfef",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/TEST-io.agentflow.expense.ExpensePlanIntegrationTest.xml": "37eaf00a2e94894459ae6c9f1c9dfa468c4328eb426d77bdf16bf2aca2983b66",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/TEST-io.agentflow.expense.ExpensePlanMigrationTest.xml": "cb7074a2b256b795fdf0f3199c07347166aa4b59b0e4a33c24811ed3b663724a",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/TEST-io.agentflow.expense.ExpensePlanTest.xml": "3993abe3b5d9f048b65d353c9fd73ff63a4c9233bd4b3cab8a92c1da3026f968",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/TEST-io.agentflow.expense.ExpensePriorControlTest.xml": "3c196ca88ee7f74f9fc56d7ae79ef3b82dd9b8926cf5cb36037e7f277a3c4448",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/TEST-io.agentflow.expense.ExpenseResourcesTest.xml": "b912dcce24c7b7b71bf1b485604006423581d51e57684f29793f50c7fe41df68",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/f05-task2-green-confirmation.log": "25e15baedf5f7279b265a75f542e3b36655528edaba2334eeb0e31e757805297",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/f05-task2-green.log": "c7de0b61fc87a00a54811969334cf83c19c3c7e8a4da3d06f11aaa350d2093ed",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/f05-task2-openapi-confirmation.log": "a55dcdeeab899b1b6b2ff5bd65756ea8bfebf7439dca03313153e31f8bf157d0",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/f05-task2-openapi.log": "a55dcdeeab899b1b6b2ff5bd65756ea8bfebf7439dca03313153e31f8bf157d0",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/f05-task2-red-confirmation.log": "5366374322e30c2d9dab676cdb10697de01b106b864454af5d31c55c237c959f",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task2-verified/f05-task2-red.log": "ee6743ae63e8c9d39de2b461c9be4c90809939dae700efcf005764e0a7557e00"
+  }
+}

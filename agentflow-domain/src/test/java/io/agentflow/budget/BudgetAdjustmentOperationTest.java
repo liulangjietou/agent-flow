@@ -1,6 +1,7 @@
 package io.agentflow.budget;
 
 import io.agentflow.common.DomainException;
+import io.agentflow.notification.BudgetAdjustmentNotice;
 import io.agentflow.finance.FinanceResult;
 import java.time.Duration;
 import java.time.Instant;
@@ -17,6 +18,24 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class BudgetAdjustmentOperationTest {
     private static final Instant START = NOW.plusSeconds(2);
     private static final Duration LEASE = Duration.ofSeconds(15);
+
+    @Test void noticesSeparateActualUncertaintyFromIntentionalQueryAndPreserveResultKinds() {
+        var queued = queue(); var running = queued.claim(START, LEASE);
+        assertThat(BudgetAdjustmentNotice.from(queued)).isEmpty(); assertThat(BudgetAdjustmentNotice.from(running)).isEmpty();
+        var unknown = running.unavailable(BudgetAdjustmentOperation.Failure.TIMEOUT, START.plusSeconds(1));
+        assertThat(BudgetAdjustmentNotice.from(unknown)).contains(BudgetAdjustmentNotice.UNKNOWN);
+        var applied = running.complete(new FinanceResult.Success<>(applied(running.command(), 1, START.plusSeconds(1))), START.plusSeconds(1));
+        assertThat(BudgetAdjustmentNotice.from(applied)).contains(BudgetAdjustmentNotice.APPLIED);
+        assertThat(BudgetAdjustmentNotice.from(applied.requestQuery(START.plusSeconds(2)))).isEmpty();
+        assertThat(BudgetAdjustmentNotice.from(queued.claim(queued.command().expiresAt(), LEASE))).contains(BudgetAdjustmentNotice.EXPIRED);
+        assertThat(BudgetAdjustmentNotice.from(queued.voidBeforeSend(START))).contains(BudgetAdjustmentNotice.VOIDED);
+    }
+    @Test void notificationKeysCannotSwapReviewOperationOrNoncanonicalIdentifiers() {
+        var id = java.util.UUID.fromString("abcdefab-abcd-abcd-abcd-abcdefabcdef");
+        for (var notice : BudgetAdjustmentNotice.values()) assertThat(BudgetAdjustmentNotice.source(notice.eventKey(id))).contains(new BudgetAdjustmentNotice.Source(notice.sourceType(), id, notice));
+        for (String key : List.of("budget:" + id + ":APPLIED", "budget-adjustment:REVIEW:" + id + ":APPLIED", "budget-adjustment:OPERATION:" + id + ":REVIEW_BLOCKED", "budget-adjustment:OPERATION:1-1-1-1-1:APPLIED", "budget-adjustment:OPERATION:" + id.toString().toUpperCase() + ":APPLIED")) assertThat(BudgetAdjustmentNotice.source(key)).isEmpty();
+        assertThat(BudgetAdjustmentNotice.source(null)).isEmpty();
+    }
 
     @Test void timeoutAndExpiredAuthorizationContinueOriginalReadOnlyRecovery() {
         var queued = queue(); var running = queued.claim(START, LEASE);

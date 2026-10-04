@@ -125,6 +125,19 @@ public class JdbcExpenseResourceAdjustmentRepository {
                     || !value.retiredAt().equals(row.getTimestamp("retired_at").toInstant())) throw inconsistent(); return value;
         }, tenant, id.toString()).stream().findFirst();
     }
+    /** 回看本次调整所有原修订，独立列约束每一条历史的来源。 */
+    public List<ExpenseResourceAdjustment> revisions(String tenant, UUID id) {
+        return jdbc.query("SELECT version,state_json FROM expense_resource_adjustment_revision WHERE tenant_id=? AND adjustment_id=? ORDER BY version",
+                (row, index) -> {
+                    var value = json.read(row.getString("state_json"), ExpenseResourceAdjustment.class);
+                    if (!value.input().basis().tenantId().equals(tenant) || !value.id().equals(id) || value.version() != row.getLong("version")) throw inconsistent(); return value;
+                }, tenant, id.toString());
+    }
+    /** 首次完成必须仍有本调整全部反向资源明细，后续复核不会重复完成资源。 */
+    public Optional<ExpenseResourceAdjustment> completion(String tenant, UUID id) {
+        var completed = revisions(tenant, id).stream().filter(value -> value.status() == ExpenseResourceAdjustment.Status.APPLIED).findFirst();
+        completed.ifPresent(this::requireResourceEffects); return completed;
+    }
     private ExpenseResourceAdjustment currentBefore(ExpenseResourceAdjustment after) {
         var before = find(after.input().basis().tenantId(), after.id()).orElseThrow(JdbcExpenseResourceAdjustmentRepository::conflict);
         if (!before.input().equals(after.input()) || !before.createdAt().equals(after.createdAt()) || before.version() + 1 != after.version()

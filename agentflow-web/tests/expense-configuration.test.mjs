@@ -8,6 +8,7 @@ const drafts = await import(process.env.AGENTFLOW_TEST_EXPENSE_CONFIGURATION_DRA
 const { ConfigurationRead } = await import(process.env.AGENTFLOW_TEST_EXPENSE_CONFIGURATION_READ)
 const { default: Manager } = await import(process.env.AGENTFLOW_TEST_EXPENSECONFIGURATIONMANAGERPANEL)
 const { default: History } = await import(process.env.AGENTFLOW_TEST_EXPENSECONFIGURATIONHISTORYPANEL)
+const { default: HistoryRendered } = await import(process.env.AGENTFLOW_TEST_EXPENSECONFIGURATIONHISTORYRENDERED)
 const { default: Rules } = await import(process.env.AGENTFLOW_TEST_EXPENSEPOLICYRULESPANEL)
 const { default: Summary } = await import(process.env.AGENTFLOW_TEST_EXPENSEPOLICYSUMMARYRENDERED)
 const { workspaceMenu } = await import(process.env.AGENTFLOW_TEST_WORKSPACE_NAVIGATION)
@@ -22,6 +23,27 @@ function definition() { return { name: '本地验收制度', rules: [{ key: 'off
 function draft(revision = 1) { return { id: id(1), tenantId: actor.tenantId, key: 'expense-standard', revision, definition: definition(), publishedVersion: 0, publishedDraftRevision: 0 } }
 function published(version = 1) { return { policyId: id(1), tenantId: actor.tenantId, key: 'expense-standard', version, draftRevision: version, categoryRevision: 1, definition: definition(), publishedBy: actor.userId, publishedAt: at, comment: '确认发布' } }
 function current(publishedNow = false) { return { categories: categories(), activeRevision: publishedNow ? 1 : 0, activePolicy: publishedNow ? published() : null } }
+
+test('定额补贴编辑保留日额与天数口径，排除混合约束且历史摘要可读', async () => {
+  const data = definition(), row = data.rules[0], panel = await mount(Rules, { definition: data, disabled: false })
+  try {
+    panel.state.allowance(row, { target: { checked: true } })
+    assert.equal(row.constraints.unitPriceLimit, null); assert.equal(row.constraints.invoiceMaxAgeDays, null)
+    row.constraints.fixedAllowance.dailyRate.value = '100.00'
+    const parsed = model.readPolicyDefinition(data)
+    assert.equal(parsed.rules[0].constraints.fixedAllowance.dailyRate.value, '100.00')
+    const normalized = clone(data); normalized.rules[0].constraints.fixedAllowance.dailyRate.value = '100'
+    assert.equal(model.policyFingerprint(data), model.policyFingerprint(normalized))
+    for (const mutate of [rule => { rule.constraints.fixedAllowance.dailyRate.value = '0' }, rule => { rule.constraints.fixedAllowance.dayCountBasis = 'WORK_DAYS' },
+      rule => { rule.constraints.fixedAllowance.dailyRate.currency = 'USD' }, rule => { rule.match.categoryCodes = [] }, rule => { rule.constraints.allowedServiceLevels = ['BUSINESS'] }]) {
+      const bad = clone(data); mutate(bad.rules[0]); assert.throws(() => model.readPolicyDefinition(bad))
+    }
+    const html = await renderToString(createSSRApp(Summary, { definition: data }))
+    assert.match(html, /100.00 \/ 天/); assert.match(html, /自然日含起止日/)
+    panel.state.effect(row, { target: { value: 'DENY' } }); assert.equal(row.constraints.fixedAllowance, null)
+    assert.equal(model.readPolicyDefinition(data).rules[0].constraints.effect, 'DENY')
+  } finally { panel.close() }
+})
 function summary(value = draft()) { return { id: value.id, key: value.key, name: value.definition.name, revision: value.revision, publishedVersion: value.publishedVersion, publishedDraftRevision: value.publishedDraftRevision, updatedBy: actor.userId, updatedAt: at } }
 function stubReads() {
   api.expenseConfiguration = async () => current()
@@ -233,4 +255,33 @@ test('只读历史正文转义输入，管理导航使用独立的财务配置�
   assert.ok(html.includes('&lt;img')); assert.ok(html.includes('&lt;script')); assert.ok(!html.includes('<script>'))
   const item = workspaceMenu.flatMap(group => group.items).find(item => item.page === 'expense-configuration')
   assert.equal(item.access, 'finance-config')
+})
+
+test('真实类别编辑器不预设容差，并精确保留输入百分比与原恢复正文', async () => {
+  stubReads(); const panel = await mount()
+  try {
+    panel.state.changePriorMode(0, { target: { value: 'TOLERANCE' } })
+    const row = panel.state.categories.categories[0]; assert.equal(row.priorControl.toleranceFraction, null)
+    panel.state.changeTolerance(0, { target: { value: '12.3456' } }); assert.equal(row.priorControl.toleranceFraction, 0.123456)
+    assert.equal(drafts.categoryInput(panel.state.categories).categories[0].priorControl.toleranceFraction, 0.123456)
+    panel.state.changeTolerance(0, { target: { value: '12.345678' } }); panel.state.categories.comment = '合成比例'
+    await panel.state.saveCategories(); assert.match(panel.state.error, /最多四位小数/)
+    panel.state.changePriorMode(0, { target: { value: 'NONE' } }); assert.deepEqual(row.priorControl, { mode: 'NONE' })
+    panel.state.changePriorMode(0, { target: { value: 'LEGACY' } }); assert.equal(Object.hasOwn(row, 'priorControl'), false)
+  } finally { panel.close() }
+})
+
+
+test('历史类别正文展示原修订的控制模式及容差，缺失控制保持历史语义', async () => {
+  api.expenseCategoryVersions = async () => ({ items: [], nextBeforeVersion: null })
+  api.expenseCategoryVersion = async () => ({ catalog: { ...categories(2), categories: [
+    ...categories().categories, { code: 'TRAVEL', name: '差旅', units: ['DAY'], active: true, priorControl: { mode: 'TOLERANCE', toleranceFraction: 0.123456 } },
+    { code: 'OTHER', name: '其他', units: ['ITEM'], active: true, priorControl: { mode: 'NONE' } }
+  ] }, updatedBy: actor.userId, updatedAt: at, comment: '保存原控制' })
+  const panel = await mount(History, { mode: 'categories' })
+  try {
+    await panel.state.open({ version: 2 })
+    const html = await renderToString(createSSRApp({ ...HistoryRendered, setup: () => panel.state }, panel.props))
+    assert.match(html, /历史硬上限/); assert.match(html, /容差 12.3456%/); assert.match(html, /事前额度：不限制额度/)
+  } finally { panel.close() }
 })

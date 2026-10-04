@@ -1,0 +1,73 @@
+{
+  "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_FINAL_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
+  "review": {
+    "agent": "/root/f05_final_review",
+    "base": "7f16db15c8c29c74f6b722e5120a71a6c200401f",
+    "head": "2bce0eb244e4b775e88b6dd5ee39b73178f878d8",
+    "critical": 0,
+    "important": 0,
+    "minor": 2,
+    "resolution": "Both display omissions fixed in one bounded frontend pass; independent review not repeated.",
+    "declinedToJudge": [
+      "Browser/PostgreSQL remain explicitly OPEN under existing restrictions.",
+      "V02/E15 remote/final gate and previous feature history are outside F05 review."
+    ]
+  },
+  "fixes": [
+    "Selector displays returned exceeded with reference/threshold labels; old absent field omitted.",
+    "Frozen plan shows exact cumulative threshold using integer cents and millionths, 0.03 × 1.5 -> 0.04; NONE explicitly reference only."
+  ],
+  "verification": {
+    "redRenderedFailures": 2,
+    "greenFrontendCases": 77,
+    "newCases": 2,
+    "f05FrontendUnique": 149,
+    "typecheckAndBuild": "PASS",
+    "largeBundleWarning": "Existing warning retained",
+    "actualFrontendResponses": {
+      "result": "PASS",
+      "originalRounds": 18,
+      "prechecks": 8,
+      "selectorPages": 9,
+      "total": 35,
+      "output": "/fyoung/tmp/agentflow-prior-parser-WVnN1E"
+    },
+    "javaOrRuntimeRerun": false,
+    "reason": "Only display code changed; archived fixed-server validation remains applicable."
+  },
+  "serverRuntimeEvidence": "docs/evidence/expense-prior-controls-runtime-20261004.json",
+  "sourceSha256": {
+    "agentflow-web/scripts/test-requests.mjs": "691d03f816602596d0b7c8d6d8bb3f295cb52547772cb819292f6dcb45fee277",
+    "agentflow-web/src/components/ExpenseFundingPicker.vue": "3160312418875653c2f37f02448a5628fc5183af48bd1b97feb2de26b88ec2c3",
+    "agentflow-web/src/components/ExpensePlanLines.vue": "e92ef5dd242cec45204a82dd03cec80686c93dc514d7d7e3eb965b0fce013467",
+    "agentflow-web/src/expensePriorControl.ts": "91275fe8d6db5c2f83c3206fa3671630fc87be7d63aa43cde9e903f5e3a6db09",
+    "agentflow-web/tests/expense-prior-controls.test.mjs": "7dac42aa5ca1845426d9dac3f960af25559e764e5762999964116bab0123709c"
+  },
+  "archiveSha256": {
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/f05-final-review.md": "3708aa143e056f3300bbdcd90f2f6afeff45cce09644149b19241df1cbc5021f",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/f05-review-display-build.log": "b1197fdca6ebfe0fc3b6c4e8ba779137010ac85d08c24c3a5f685fd2ee7958a0",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/f05-review-display-green.log": "a81e80331d841f79443e65c81f43322127776337707203784b9372eb724d3c0a",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/f05-review-display-red.log": "b02ed78214842bad8dc608438c12c0beecbda2b24111114f88fad7d473400d84",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/f05-review-frontend-parser.log": "ed001470acc4d421c1d4c3aeb0caa7db90e004c9358f9595754d5045ccde00e4",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/source/agentflow-web/scripts/test-requests.mjs": "691d03f816602596d0b7c8d6d8bb3f295cb52547772cb819292f6dcb45fee277",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/source/agentflow-web/src/components/ExpenseFundingPicker.vue": "3160312418875653c2f37f02448a5628fc5183af48bd1b97feb2de26b88ec2c3",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/source/agentflow-web/src/components/ExpensePlanLines.vue": "e92ef5dd242cec45204a82dd03cec80686c93dc514d7d7e3eb965b0fce013467",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/source/agentflow-web/src/expensePriorControl.ts": "91275fe8d6db5c2f83c3206fa3671630fc87be7d63aa43cde9e903f5e3a6db09",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/source/agentflow-web/tests/expense-prior-controls.test.mjs": "7dac42aa5ca1845426d9dac3f960af25559e764e5762999964116bab0123709c",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/web-dist/assets/index-DZ2ZKn4e.js": "ed6be2049d9a5f83cb8bfe4cd20b2af0e3144b8463e316305a76c36b3b72823a",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/web-dist/assets/index-JYXAyyvl.css": "79af4904bdabfa8e4a076df4172ac6b525e1b43dbbd26244404e78e3a75750c2",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-final-review-verified/web-dist/index.html": "ab0c1be3bc9dfb846a51e14f94c3ec26e1f506496548f751ec11dbbe32339d9a"
+  },
+  "remaining": {
+    "implementationTargets": 4,
+    "ids": [
+      "A01",
+      "F09",
+      "F14",
+      "F15"
+    ],
+    "implementedAwaitingBrowserPostgres": 12,
+    "knownOpenLowerBound": 34,
+    "fullOriginalRequirementAuditPending": true
+  }
+}

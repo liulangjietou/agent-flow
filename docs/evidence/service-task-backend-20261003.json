@@ -1,0 +1,358 @@
+{
+  "schemaVersion": 1,
+  "taskId": "W01",
+  "stage": "BACKEND_COMPONENTS_VERIFIED",
+  "taskClosed": false,
+  "recordedAt": "2026-10-03T09:56:52.039506+00:00",
+  "implementationCommit": "9c0bdda645053ca5fb728d77040718cd4f922027",
+  "branch": "codex/governance-identifier-integration",
+  "baseCommit": "6e640d6ad36c07a851ed5478dfa44292598cc5ae",
+  "migration": "V106",
+  "summary": "可信目录、原命令队列、事务外 HTTP 和原生等待推进已完成组件验证。公开设计入口仍关闭，W01 不关闭。",
+  "scope": [
+    "部署声明的不可变契约与目标，只追加安装；按租户与原版本查询",
+    "原生 receiveTask 激活与申请、轮次共用事务；领取后事务外 HTTP",
+    "原号 execute/query、回执身份与正文限制、未知状态及租约恢复",
+    "根到叶业务锁、旧领取隔离、执行令牌复用时的节点区分",
+    "暂停与停止、撤回重提、业务拒绝、原输入及原权限变化",
+    "推进、业务收尾、审计与通知原子提交；外部回执独立持久保存",
+    "V105 非空升级及重复迁移，旧表和原件记录保持"
+  ],
+  "verification": {
+    "h2": {
+      "tests": 161,
+      "suites": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "h2/summary.json",
+      "serviceTaskTests": 59,
+      "adjacentWorkflowTests": 102
+    },
+    "postgres": {
+      "tests": 18,
+      "suites": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "report": "postgres/summary.json",
+      "database": "postgres/database.json",
+      "sameScenarioOverlapWithH2": true,
+      "dedicatedContainerRemoved": true
+    },
+    "web": {
+      "auditTestsPassed": 8,
+      "productionBuildPassed": true,
+      "openapi": {
+        "passed": true,
+        "operations": 333,
+        "schemas": 671,
+        "requestExamples": 123
+      },
+      "existingBundleSizeWarning": true
+    }
+  },
+  "redGreen": [
+    {
+      "test": "equivalentStoredJsonOrderingDoesNotPreventClaimAfterRestart",
+      "red": "red/command-order.xml",
+      "rootCause": "持久输入被重新序列化后按 JSON 字节参与 CAS；等价键顺序可能不同。",
+      "fix": "保留版本 CAS，核对规范命令摘要及原目标摘要，不改写 input_json。",
+      "otherInitialErrors": "首轮另有事务代理上的测试替身配置错误，已改为配置代理背后的替身。"
+    },
+    {
+      "test": "definitionAvailabilityResaveDoesNotInvalidateOriginalWaitWhenJsonOrderChanges",
+      "red": "red/definition-order.xml",
+      "rootCause": "启停定义会重新保存原图，原始 JSON 字节摘要将纯键顺序变化误判为原定义失效。",
+      "fix": "规范结构摘要：对象键排序、保留数组顺序、类型及元素数参与长度编码。",
+      "fixture": "RED 用例先断言结构完全相等，再仅改变键顺序；未删除任何字段。"
+    }
+  ],
+  "limits": [
+    "平台应用入口通过 MockMVC，Flowable 与事务使用实际 Spring 和数据库；不是已安装独立服务的 TCP 验收。",
+    "外部协议通过真实回环 HTTP 测试服务；未验证真实企业接收方。",
+    "租约过期和退避使用明确的合成 Instant；没有改变宿主机时钟。",
+    "未完成本阶段独立进程退出、重启或配套备份恢复验收。",
+    "公开 SERVICE_TASK 仍由 DefinitionValidator 拒绝；内部测试固定定义不代表公共发布链路完成。",
+    "子流程中的服务节点、财务绑定场景、设计器、模拟和运行页面仍须后续验收。"
+  ],
+  "remaining": {
+    "knownOpenTasks": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "lowerBound": true,
+    "fullRequirementAuditComplete": false
+  },
+  "next": [
+    "可信目录只读接口及权限投影",
+    "设计预检、发布、发起、子流程依赖的完整绑定",
+    "模拟、字段映射和设计器页面",
+    "授权运行状态、固定包实际 HTTP 与浏览器验收",
+    "执行中退出、重启后原号查询和配套恢复"
+  ],
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/service-task-backend-evidence-snapshot",
+  "artifactCount": 30,
+  "artifacts": [
+    {
+      "path": "h2/agentflow-domain/TEST-io.agentflow.definition.ServiceTaskDefinitionTest.xml",
+      "sha256": "d35f38efc39b12a86e015e40358457aa0ad531dcfdc7dca30a1632b477cb2c3f",
+      "bytes": 10525
+    },
+    {
+      "path": "h2/agentflow-domain/TEST-io.agentflow.definition.ServiceTaskInputsTest.xml",
+      "sha256": "94e0aedbe4f0b67431e8e80da3ec9d63d9fbf5a9eeb049115021721f9195dff9",
+      "bytes": 10848
+    },
+    {
+      "path": "h2/agentflow-domain/TEST-io.agentflow.servicetask.ServiceTaskCommandTest.xml",
+      "sha256": "dc21ace185ca426e32e8cbf846085178898f173ab1b1d13153d3619a58c0a229",
+      "bytes": 10508
+    },
+    {
+      "path": "h2/agentflow-domain/TEST-io.agentflow.servicetask.ServiceTaskContractTest.xml",
+      "sha256": "d53e74c7c73d42a14a528cdaa478f8a0cfe3d14f4030b248d32c054ef69e33ed",
+      "bytes": 11696
+    },
+    {
+      "path": "h2/agentflow-domain/TEST-io.agentflow.servicetask.ServiceTaskOperationTest.xml",
+      "sha256": "0769e3c14c1d2af8e4c69883112ed0b6d2cc409ed66fff0bd597197bd61df167",
+      "bytes": 11442
+    },
+    {
+      "path": "h2/agentflow-server/TEST-io.agentflow.approval.EventWaitIntegrationTest.xml",
+      "sha256": "5a7b27827932d85c6d0cc5c10fce1d03f1b9f814dcf3fb6192c4ec03eafec3d7",
+      "bytes": 74859
+    },
+    {
+      "path": "h2/agentflow-server/TEST-io.agentflow.approval.InstanceControlIntegrationTest.xml",
+      "sha256": "426e1f9c6da6a15d597d5a868aebb3f086897d44ca79011192bba84e08a13593",
+      "bytes": 75056
+    },
+    {
+      "path": "h2/agentflow-server/TEST-io.agentflow.approval.SubprocessStartIntegrationTest.xml",
+      "sha256": "688ffc363cb3535269c66547f2466aba63acb906c2a1814a483742687ff00eb0",
+      "bytes": 183944
+    },
+    {
+      "path": "h2/agentflow-server/TEST-io.agentflow.approval.TimerWaitIntegrationTest.xml",
+      "sha256": "152375579f56d846d85534d3f93ed3ed3de8029cd75bcf5ce9ac32b24103ceb9",
+      "bytes": 74018
+    },
+    {
+      "path": "h2/agentflow-server/TEST-io.agentflow.definition.DefinitionAvailabilityIntegrationTest.xml",
+      "sha256": "9a43c3cc9295df54e30271f9602f58fcb3171cde9da31b0ac94721d6a4c4df0e",
+      "bytes": 74881
+    },
+    {
+      "path": "h2/agentflow-server/TEST-io.agentflow.definition.DefinitionDeploymentIntegrationTest.xml",
+      "sha256": "b646ae221e9a86c032e2ecaa77b8f6b12254aa6f5a960ca4f487255de0b9d24d",
+      "bytes": 72979
+    },
+    {
+      "path": "h2/agentflow-server/TEST-io.agentflow.definition.DefinitionPublicationIntegrationTest.xml",
+      "sha256": "2de88c0513755d184a32c4b8e5476ec90448e2c659d8673abd147f4490d36ae6",
+      "bytes": 73585
+    },
+    {
+      "path": "h2/agentflow-server/TEST-io.agentflow.servicetask.ServiceTaskGatewayTest.xml",
+      "sha256": "90c0a40a51031159ddd052b87ee820454a3fd145eaed77837bf7715d1f75f2ea",
+      "bytes": 44193
+    },
+    {
+      "path": "h2/agentflow-server/TEST-io.agentflow.servicetask.ServiceTaskMigrationTest.xml",
+      "sha256": "e6f6e6b608edec3d508cfbfafbb5888b0752cb465e1bbbd75b20914365a6bb15",
+      "bytes": 67856
+    },
+    {
+      "path": "h2/agentflow-server/TEST-io.agentflow.servicetask.ServiceTaskRuntimeIntegrationTest.xml",
+      "sha256": "7ea6d4189c5b4976c9916bc9aea72b9437fb7077407a090c2edceccee019c834",
+      "bytes": 116620
+    },
+    {
+      "path": "h2/agentflow-server/TEST-io.agentflow.servicetask.ServiceTaskSerializationTest.xml",
+      "sha256": "d1e402a0890b88cda5282e8ec7620f4b4bc98ec39586076bd4169783b5f53b22",
+      "bytes": 43616
+    },
+    {
+      "path": "h2/service-task-backend-regression.log",
+      "sha256": "02a0605e27a6f8494bfe067a750f279dc2c6fc1aee8a554662e1cb31f68f326a",
+      "bytes": 419290
+    },
+    {
+      "path": "h2/summary.json",
+      "sha256": "5e07063476b4ad01cc3edad2748257f7bb84892b15a5908eeaa8cb8d08bfef4f",
+      "bytes": 2894
+    },
+    {
+      "path": "postgres/TEST-io.agentflow.servicetask.ServiceTaskMigrationTest.xml",
+      "sha256": "0cda64fe986ce2b39e6b18fe2b6c3e3015aeb2a705717e103c6da6c4d5799d59",
+      "bytes": 66545
+    },
+    {
+      "path": "postgres/TEST-io.agentflow.servicetask.ServiceTaskRuntimeIntegrationTest.xml",
+      "sha256": "b6a0437a3e85a8d466354c41ccbf30e993e5106b22aa57c7d868e4272a402e20",
+      "bytes": 116534
+    },
+    {
+      "path": "postgres/database.json",
+      "sha256": "6e2c919c9268f5f1bfb59a78ae8113392c38a908eaa43986bd4f27faa392634f",
+      "bytes": 339
+    },
+    {
+      "path": "postgres/service-task-backend-postgres.log",
+      "sha256": "8ef97eec9c874bf76c4c07725efcfc97e27dd8b2655c53bd660a9e9a5e4a3631",
+      "bytes": 99975
+    },
+    {
+      "path": "postgres/summary.json",
+      "sha256": "e172c5ab91bcc83e683829d27683acc34e1cf654c1faeb2688b75211094c3140",
+      "bytes": 301
+    },
+    {
+      "path": "red/command-order.xml",
+      "sha256": "3283832a187b8e728f9541deda4f25b5b51b319cd1de07cae5b216ccf79ba54b",
+      "bytes": 154273
+    },
+    {
+      "path": "red/definition-order.xml",
+      "sha256": "a891cb0d0502a5edf3d268f9580e381712aaeaf893522959a8c2ba0e0823b635",
+      "bytes": 73310
+    },
+    {
+      "path": "red/service-task-backend-definition-order-red.log",
+      "sha256": "c8e5bac4ac961b4af31ad864bf063d2007cd8240c68ddd6bd1310a100eb9d0c1",
+      "bytes": 42300
+    },
+    {
+      "path": "red/service-task-backend-red.log",
+      "sha256": "206d3dfc0f119d54eb9ff08ee39bd700a13302419d569cc5197a7c26c482ca07",
+      "bytes": 123646
+    },
+    {
+      "path": "web/service-task-backend-openapi.log",
+      "sha256": "b1c4742fbca456ce383f953701214e7bbf24c09f807bd9310964efec00008f6b",
+      "bytes": 141
+    },
+    {
+      "path": "web/service-task-backend-web-build.log",
+      "sha256": "7683c749482f07b23036faa6e93f99243a67e80864eb8db3a03cad6b1bfb8678",
+      "bytes": 781
+    },
+    {
+      "path": "web/service-task-backend-web-tests.log",
+      "sha256": "f0247ec22a444193cc069be4f5ce30f607ac65117b873c5367fdba6db5da90d4",
+      "bytes": 957
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/approval/service/ApplicationAuditPort.java",
+      "sha256": "9a8cdf2121413626d46d5340342064547b0f0f13e5e9b31ae338f9a5157b6b26"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/servicetask/ServiceTaskGateway.java",
+      "sha256": "3884cd94b5273aba3b516ffbf86cb865553dabd2af95fdafa8c51df77a55f099"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/servicetask/ServiceTaskOperation.java",
+      "sha256": "8618a9972ae5ec6b07006590380ee2cc6ddf1851d00cbeaab67f640309dc5ba1"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/servicetask/ServiceTaskOperationTest.java",
+      "sha256": "2ade0b76cd777346f96a1efdb5443c2eb0154665a509956214f5cbf623232e27"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/history/HistoryQueryParameters.java",
+      "sha256": "d195784a5ad7aa46e41296b6b4c60aeddb8a5798256d59b517b627fabe58d034"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/operations/AuditSearchParameters.java",
+      "sha256": "b4e5d0c7feae18c41c6065eb581d2caecfab3e23a0fd676e9121d60fccc6ceeb"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableServiceTaskArrival.java",
+      "sha256": "012821253a7468046e3eb1294fc40aed4a537e5fb86884a6b3b080af0169d8ca"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/process/ServiceTaskWaitService.java",
+      "sha256": "4ae06d3065c97bbc0671df70f9abb5a03a076a152bacbbc33f81cce59f5648ca"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java",
+      "sha256": "2d3bb6becc5d3f0eb3971de10ddaf84ab7fe1d5a1f4b6870844a6a1e6f68e2af"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/HttpServiceTaskGateway.java",
+      "sha256": "e67b45432786abbfaa1d393d1295db6379dc6333998ead09b6c72ea9a72fedb2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/JdbcServiceTaskOperationRepository.java",
+      "sha256": "e99962a1979e45fff8f4f7687d50a59aa33d2e80691347228c68b00b4129431c"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskActivationService.java",
+      "sha256": "7ee4e4b99c0c819367e0b828f4eac459bee8e6d168bf6f42ecd74d0d6fcaaab6"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskCatalog.java",
+      "sha256": "729b46ee0c9452e590cbab413f336c805bb5e3fc82ff63988a193b14603c3a4b"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskCatalogInstaller.java",
+      "sha256": "04d21eb6f4fe5eef718d2af69f347fc2fee396fe1652c12dff23994f895fdaf6"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskDefinitionSnapshots.java",
+      "sha256": "2d20824b52336f744e94887c5b0b3fc136b2d5a9dc5d0cda9e95e75357c88716"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskGatewayConfiguration.java",
+      "sha256": "7e961b6e73bd54e5754ae1a4eded722a80ed17d18640b8017aad81032f497b78"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskOperationService.java",
+      "sha256": "e1eeb3758a20627c370c8af2cc2d6e9b7722f3a68cd9789053b42c8c37b09819"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskScheduling.java",
+      "sha256": "cccba91bb06ec7d93efc05d710b73a644a9e4c5b6463837639453a611ae3f4f8"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskWorker.java",
+      "sha256": "e7b25b7a2e712ae2c0a01e2e54135dd5355ec46755155c530a40a40c17cca9c7"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "ad2f34e24caca239b7c5f3961d1c5568d7c2908d7440cd4e784bc7047927012f"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/db/migration/V106__service_task_operations.sql",
+      "sha256": "b2329ef7596735126af57f8ec78e9603cd2377e01f030f2620755461ef642c48"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/servicetask/ServiceTaskGatewayTest.java",
+      "sha256": "1bb64bfd771b0bb4738411808b8b4159b0b57aed288b22b18f41270acba8513d"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/servicetask/ServiceTaskMigrationTest.java",
+      "sha256": "ab06b23885db8687895a41a9587b510c18a8570136156d345317119749cf3539"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/servicetask/ServiceTaskRuntimeIntegrationTest.java",
+      "sha256": "cc2b2b440622e3a4cf34fe0746a2c2004d5ddf726eec28da94a17c455b96e370"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/servicetask/ServiceTaskTestProvider.java",
+      "sha256": "eff8019b763dc526080ee6ffd9f724c4e1f23ba92064299f4575679bbc8664da"
+    },
+    {
+      "path": "agentflow-web/src/components/ApplicationHistory.vue",
+      "sha256": "e20efdc770eb418c25ad77c0a69fb51dd70d7c8893c8ef59230a92052c49e587"
+    },
+    {
+      "path": "agentflow-web/src/components/AuditSearch.vue",
+      "sha256": "80f5adf1c65fb071bead8276bbda35ba1b7da821f1de228295bbe40cbd369609"
+    }
+  ]
+}

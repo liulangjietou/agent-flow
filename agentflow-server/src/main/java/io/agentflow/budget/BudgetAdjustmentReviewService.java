@@ -8,6 +8,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,13 +23,14 @@ public class BudgetAdjustmentReviewService {
     private final JdbcBudgetAdjustmentOperationRepository operations;
     private final BudgetAdjustmentExecutionService execution;
     private final Duration lease;
+    private final ApplicationEventPublisher events;
 
     /** 原批准、具名财务和读取原件共同组成财务确认依据。 */
     public BudgetAdjustmentReviewService(ApprovedBudgetAdjustmentSources sources, JdbcBudgetAdjustmentReviewRepository reviews,
-            JdbcBudgetAdjustmentOperationRepository operations, BudgetAdjustmentExecutionService execution,
+            JdbcBudgetAdjustmentOperationRepository operations, BudgetAdjustmentExecutionService execution, ApplicationEventPublisher events,
             @Value("${agentflow.budget-adjustments.review-lease-seconds:90}") int leaseSeconds) {
         if (leaseSeconds < 15 || leaseSeconds > 300) throw new IllegalArgumentException("Budget review lease must be between 15 and 300 seconds");
-        this.sources = sources; this.reviews = reviews; this.operations = operations; this.execution = execution; this.lease = Duration.ofSeconds(leaseSeconds);
+        this.sources = sources; this.reviews = reviews; this.operations = operations; this.execution = execution; this.events = events; this.lease = Duration.ofSeconds(leaseSeconds);
     }
 
     /** 已获财务角色和原轮次字段权限的入口只能登记读取，不接受自报台账。 */
@@ -44,26 +46,26 @@ public class BudgetAdjustmentReviewService {
     public BudgetAdjustmentReview claim(String tenant, UUID id, Instant now) {
         var current = locked(tenant, id); if (current == null || !current.active()) return null; now = time(now);
         if (current.status() == BudgetAdjustmentReview.Status.RUNNING) {
-            if (!now.isBefore(current.leaseUntil())) reviews.update(current.fail(BudgetAdjustmentReview.Issue.TIMEOUT, now));
+            if (!now.isBefore(current.leaseUntil())) persist(current.fail(BudgetAdjustmentReview.Issue.TIMEOUT, now));
             return null;
         }
         if (!available(current, now)) return null;
-        var claimed = current.claim(now, lease); reviews.update(claimed); return claimed;
+        var claimed = current.claim(now, lease); persist(claimed); return claimed;
     }
 
     /** 结果保存前复核原批准和财务资格，迟到响应不能生成可授权证据。 */
     @Transactional
     public void finish(BudgetAdjustmentReview claimed, FinanceResult<BudgetLedgerPort.Snapshot> result, Instant now) {
         var current = currentClaim(claimed); if (current == null) return; now = time(now);
-        if (!now.isBefore(current.leaseUntil())) { reviews.update(current.fail(BudgetAdjustmentReview.Issue.TIMEOUT, now)); return; }
-        if (available(current, now)) reviews.update(current.complete(result, now));
+        if (!now.isBefore(current.leaseUntil())) { persist(current.fail(BudgetAdjustmentReview.Issue.TIMEOUT, now)); return; }
+        if (available(current, now)) persist(current.complete(result, now));
     }
 
     /** 执行器异常只写稳定分类，不存储外部响应或手工填补额度。 */
     @Transactional
     public void fail(BudgetAdjustmentReview claimed, Instant now) {
         var current = currentClaim(claimed); if (current == null) return; now = time(now);
-        reviews.update(current.fail(BudgetAdjustmentReview.Issue.INTERNAL_ERROR, now));
+        persist(current.fail(BudgetAdjustmentReview.Issue.INTERNAL_ERROR, now));
     }
 
     /** 同一财务在最新证据窗口内具名确认，消费和原子指令排队一起落库。 */
@@ -76,6 +78,9 @@ public class BudgetAdjustmentReviewService {
         var queued = BudgetAdjustmentOperation.queue(command, now); operations.create(queued, reviewId); return queued;
     }
 
+    private void persist(BudgetAdjustmentReview value) {
+        reviews.update(value); events.publishEvent(new BudgetAdjustmentReviewChanged(value));
+    }
     private BudgetAdjustmentReview locked(String tenant, UUID id) {
         var current = reviews.find(tenant, id).orElse(null); if (current == null) return null;
         sources.lock(current.input().source()); return reviews.find(tenant, id).orElseThrow(BudgetAdjustmentReviewService::unavailable);
@@ -86,7 +91,7 @@ public class BudgetAdjustmentReviewService {
     }
     private boolean available(BudgetAdjustmentReview current, Instant now) {
         try { requireSource(current.input().source(), current.input().requestedBy()); return true; }
-        catch (DomainException changed) { reviews.update(current.voidSource(now)); return false; }
+        catch (DomainException changed) { persist(current.voidSource(now)); return false; }
     }
     private void requireSource(ApprovedBudgetAdjustment source, String finance) {
         execution.requireNewExecution(source, finance);

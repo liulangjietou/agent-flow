@@ -100,6 +100,7 @@ public class SystemCheckService {
                         "本租户已启用本地组织目录，存储查询成功；人员、任职与审批资格需在组织管理中核对。")
                 : new Check("organization", Status.WARNING, "LOCAL_ORGANIZATION_NOT_INITIALIZED",
                         "本租户尚未启用本地组织目录；管理员可在“组织与人员”中启用并配置。")));
+        checks.add(inspect("organizationSync", () -> organizationSyncCheck(actor.tenantId())));
         checks.add(inspect("objectStorage", () -> diagnostics.attachments(actor.tenantId())
                 ? new Check("objectStorage", Status.UP, "LOCAL_ATTACHMENT_STORAGE",
                         "附件元数据可查询，持久目录访问权限正常；本项未写入文件或校验全部存量内容。当前未接入内容扫描。")
@@ -132,6 +133,19 @@ public class SystemCheckService {
             case CONFIGURED -> new Check("model", Status.WARNING, "AGENT_MODEL_CONFIGURED",
                     "模型参数校验通过，执行后台已启用；本次未调用模型，不代表连接或输出质量通过验收。");
         };
+    }
+
+    private Check organizationSyncCheck(String tenantId) {
+        var configuration = diagnostics.organizationSynchronization(tenantId);
+        String message = switch (configuration) {
+            case DISABLED -> "外部组织同步未启用；本地目录仍可独立维护。";
+            case UNCONFIGURED -> "当前租户未配置可信组织来源；没有默认来源或跨租户回退。";
+            case SOURCE_CHANGED -> "部署中的逻辑来源与本租户已注册来源不一致，新批次受阻；请核对部署配置，历史记录仍可读取。";
+            case WORKER_DISABLED -> "本租户来源配置校验通过，同步登记可查询；后台读取未启用，排队批次不会自动处理。";
+            case CONFIGURED -> "本租户来源配置校验通过，同步登记可查询，后台读取已启用；批次仍需管理员发起、预检和明确应用。";
+        };
+        return new Check("organizationSync", Status.WARNING, "ORGANIZATION_SYNC_" + configuration.name(),
+                message + "本次未连接企业来源，不代表同步结果或企业联调通过验收。");
     }
 
     private Check inspect(String id, Supplier<Check> probe) {

@@ -279,6 +279,27 @@ class FinanceGatewayClientTest {
     }
 
     @Test
+    void budgetPrecheckPreservesExplicitExternalExceptionPolicy() {
+        var request = new BudgetPrecheckPort.Request(UUID.randomUUID(), 1, 1, "alice", ENTITY, "CNY", DATE,
+                List.of(new BudgetPrecheckPort.Allocation(1, 1, "TRAVEL", new CostAllocation("IT", null, cny("100")))));
+        var evidence = new BudgetPrecheckPort.Assessment(request, "synthetic-budget", Instant.now().minusSeconds(1), Instant.now().plusSeconds(60));
+        responder.set(in -> {
+            var body = success(in, evidence);
+            ((ObjectNode) body.path("data")).putObject("exceptionPolicy").put("reference", "policy-flex-1");
+            return json.write(body);
+        });
+        var result = budgets.precheck("tenant-a", request);
+        assertThat(result).isInstanceOf(FinanceResult.Success.class);
+        assertThat(json.read(json.write(result.requireValue()), JsonNode.class).at("/exceptionPolicy/reference").asText()).isEqualTo("policy-flex-1");
+        var valid = responder.get();
+        for (String invalidReference : List.of("", " ", "x".repeat(129))) {
+            responder.set(in -> { var body = json.read(valid.apply(in), ObjectNode.class);
+                ((ObjectNode) body.at("/data/exceptionPolicy")).put("reference", invalidReference); return json.write(body); });
+            assertThat(budgets.precheck("tenant-a", request)).isEqualTo(invalid());
+        }
+    }
+
+    @Test
     void budgetFailuresKeepBusinessShortfallDistinctFromAnUnavailableService() {
         var request = new BudgetPrecheckPort.Request(UUID.randomUUID(), 1, 1, "alice", ENTITY, "CNY", DATE,
                 List.of(new BudgetPrecheckPort.Allocation(1, 1, "TRAVEL", new CostAllocation("IT", null, cny("100")))));

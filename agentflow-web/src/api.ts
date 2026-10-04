@@ -1,12 +1,23 @@
+import { readPriorRequestPage, readPriorAssessments } from './expensePriorControl.js'
+import type { ExpensePartialAdjustmentNotificationTarget } from './expensePartialAdjustmentNotification'
+export type { ExpensePartialAdjustmentNotificationTarget } from './expensePartialAdjustmentNotification'
+import type { ExpenseAdjustmentNotificationTarget } from './expenseAdjustmentNotification'
+export type { ExpenseAdjustmentNotificationTarget } from './expenseAdjustmentNotification'
+import { readServiceTaskDirectory, readServiceTaskOption, readServiceTaskVersions, type ServiceTaskDirectory, type ServiceTaskOption, type ServiceTaskVersions } from './serviceTasks.js'
 import { policyGuidanceQuery, readPolicyGuidance, type PolicyGuidanceContext } from './expensePolicyGuidance.js'
 import { readMappingCurrent, readMappingDraft, readMappingDirectory, readPublishedMapping, readMappingVersions, readMappingActivations, readMappingDraftRevision, validateMappingReceipt, validateMappingPublicationHistory, type MappingScope, type MappingDraft, type MappingCurrent, type MappingDraftInput, type MappingPublishInput } from './accountMappings.js'
 import { readExpenseCategories, readExpenseConfiguration, readPolicyDraft, readPublishedPolicy, readPolicyDirectory, readCategoryHistory, readPolicyHistory, readActivationHistory, readCategoryRevision, readPolicyDraftRevision, validateConfigurationReceipt, type CategoryInput, type PolicyDraftInput, type PolicyPublishInput, type ExpenseCategories, type ExpensePolicyDraft, type ExpenseConfigurationCurrent } from './expenseConfiguration.js'
 import type { AdvanceOffsetSuggestion } from './advanceOffsetSuggestion'
 import { readExpenseRequestCloseReceipt, type ExpenseRequestCloseInput, type ExpenseRequestCloseReceipt } from './expenseRequestClosure.js'
 import { draftAssistPath, readDraftInput, readDraftPage, readDraftDetail, validateDraftReceipt, type DraftAssistReceipt, type GenerateDraftInput, type ReviewDraftInput } from './draftAssist.js'
+import { explanationPath, readExplanationInput, readExplanationPage, readExplanationDetail, validateExplanationReceipt, type ExplanationReceipt, type ExplanationGenerate, type ExplanationReview } from './precheckExplanation.js'
+import { riskPath, readRiskInput, readRiskPage, readRiskDetail, readRiskCalendars, validateRiskReceipt, type RiskRequest, type RiskGenerate, type RiskReview, type RiskReceipt } from './expenseRisk.js'
+import { expenseAssistPath, readExpenseAssistPreview, readExpenseAssistPage, readExpenseAssistDetail, validateExpenseAssistReceipt, type ExpenseAssistRequest, type ExpenseAssistGenerate, type ExpenseAssistConfirm, type ExpenseAssistDismiss, type ExpenseAssistReceipt } from './expenseDraftAssist.js'
 import { extractionPath, readExtractionOptions, readExtractionPage, readExtractionDetail, validateExtractionReceipt, type ExtractionReceipt, type ExtractionGenerate, type ExtractionReview } from './invoiceExtraction.js'
 import { readNotificationPreferences, validateNotificationPreferencesReceipt, type NotificationPreferences, type NotificationPreferencesInput } from './notificationPreferences.js'
 import { approvalProxyPath, readApprovalProxy, readApprovalProxyPage, validateApprovalProxyReceipt, type ApprovalProxyInput, type ApprovalProxyReceipt } from './approvalProxies.js'
+import { syncPath, type SyncPlanReceipt, type SyncReceipt, type SyncSelection } from './organizationSync.js'
+import { readSyncBatches, readSyncDetail, readSyncLocalPage, readSyncOverview, readSyncPlan, readSyncPlans, readSyncTransitions, validateSyncReceipt } from './organizationSyncRead.js'
 import { readInitializationState, validateInitializationReceipt, type InitializationReceipt, type InitializationRequest } from './tenantInitialization.js'
 import { readDeliveryPage, readDeliveryDetail, readDeliveryHistory, validateDeliveryRetryReceipt, type NotificationDelivery, type NotificationDeliveryFilters, type NotificationDeliveryRetryInput } from './notificationDeliveries.js'
 import type { AdjustmentDisputeView, AdjustmentDisputeInput, AdjustmentDisputeReceipt } from './supplierAdjustmentDispute'
@@ -31,6 +42,8 @@ import { validateTimerReceipt, type TimerView, type TimerRetryInput, type TimerR
 import { validateInstanceReceipt, type InstanceControlAction, type InstanceControlInput, type InstanceControlView } from './instanceControl.js'
 import type { AuditSearchFilters, AuditSearchPage } from './auditSearch'
 import type { ApplicationSearchFilters, ApplicationSearchPage } from './applicationSearch'
+import { readServiceTaskRuntime, type ServiceTaskRuntimeView } from './serviceTaskRuntime.js'
+import { signaturePath, signatureWritePath, readSignatureOptions, readSignaturePage, readSignatureView, validateSignatureReceipt, type SignatureReceipt, type SignatureInput } from './signatures.js'
 import type { DefinitionCatalogFilters, DefinitionCatalogPage } from './definitionCatalog'
 import { workbookType, type ApplicationExportFilters } from './applicationExport.js'
 import type { AuditExportFilters } from './auditSearch'
@@ -58,7 +71,7 @@ import type { BudgetAdjustmentItem, BudgetAdjustmentDetail, BudgetAdjustmentCrea
 import type { RepaymentView, RepaymentQueryInput, RepaymentRecordInput, RepaymentActionReceipt } from './advanceRepayment'
 import type { DisbursementReturnView, DisbursementReturnQueryInput, DisbursementResolutionInput, DisbursementReturnActionReceipt } from './disbursementReturn'
 import type { RepaymentReviewView, RepaymentReviewQueryInput, RepaymentResolutionInput, RepaymentReviewActionReceipt } from './repaymentReview'
-import type { FinancePaymentView, CashierPaymentView, CashierPaymentPage, PaymentAccounts, PaymentAuthorizationInput, FinancePaymentActionInput, CashierPaymentActionInput, FinancePaymentReceipt, CashierPaymentReceipt, PayeeReviewInput, PayeeReviewReceipt, PaymentDisputeInput, PaymentDisputeReceipt } from './payments'
+import type { PaymentView, FinancePaymentView, CashierPaymentView, CashierPaymentPage, CashierPaymentFilter, CashierFilterOptions, PaymentAccounts, PaymentAuthorizationInput, FinancePaymentActionInput, CashierPaymentActionInput, FinancePaymentReceipt, CashierPaymentReceipt, PayeeReviewInput, PayeeReviewReceipt, PaymentDisputeInput, PaymentDisputeReceipt } from './payments'
 import type { VoucherActionInput, VoucherReceipt, VoucherView, VoucherDisputeInput, VoucherDisputeReceipt } from './vouchers'
 import type { VoucherReversalView, ReversalQueryInput, ReversalRecordInput, ReversalActionReceipt } from './voucherReversal'
 import type { VoucherReversalExecutionView, ReversalPrepareInput, ReversalAuthorizeInput, ReversalOperationInput, ReversalExecutionReceipt, ReversalRetirementInput, ReversalRetirementReceipt } from './voucherReversalExecution'
@@ -84,7 +97,7 @@ export function bindAuthenticationActor(actor: Actor | null) {
 
 export interface ApiError { status: number; code: string; message: string; details?: { fieldErrors?: FieldErrors; definitionErrors?: string[] } }
 /** 当前设计的模拟输入。@author owlzhangfq@gmail.com */
-export interface SimulationInput { graph: Graph; formSchema: FormSchema | null; values: Record<string, unknown> }
+export interface SimulationInput { graph: Graph; formSchema: FormSchema | null; values: Record<string, unknown>; splitRoutingAmount?: import('./expenses').Money }
 /** 仅使用设计器测试填写内容的字段权限预览。@author owlzhangfq@gmail.com */
 export interface FieldPreviewInput { formSchema: FormSchema; values: Record<string, unknown>; nodeIds: string[] }
 /** 正式读取与设计预览共用的服务端投影。@author owlzhangfq@gmail.com */
@@ -137,11 +150,18 @@ export interface DefinitionAvailabilityHistory { items: DefinitionAvailabilityCh
 export interface DefinitionAvailabilityInput { startEnabled: boolean; expectedRevision: number; reason: string }
 export interface TemplateScenario { id: string; name: string; description: string; payload: Record<string, unknown>; expectedPath: string[]; expectedFieldErrors: Record<string, string> }
 export interface TemplateCopy { definitionId: string; processKey: string; name: string; status: string; version: number; revision: number; templateVersion: number; copiedBy: string; copiedAt: string }
+export interface TemplateCompanionSummary { key: string; version: number; name: string; description: string; scenarioCount: number }
+export interface FinancialTemplateExamples {
+  schemaVersion: number; key: string; version: number; name: string; description: string; templateKeys: string[]
+  bindings: { key: string; exampleValue: string; instruction: string }[]; setupSteps: string[]
+  configuration: Record<string, unknown>
+  scenarios: { id: string; name: string; templateKey: string; content: Record<string, unknown>; steps: string[]; expected: string[]; reductions?: Record<string, unknown>[] }[]
+}
 export interface ProcessTemplate {
-  key: string; templateVersion: number; name: string; category: string; description: string; scope: string; businessType: 'FORM' | 'PROCUREMENT_PAYMENT' | 'BUDGET_ADJUSTMENT'
+  key: string; templateVersion: number; name: string; category: string; description: string; scope: string; businessType: 'FORM' | 'PROCUREMENT_PAYMENT' | 'BUDGET_ADJUSTMENT' | 'EXPENSE' | 'EXPENSE_PLAN' | 'ADVANCE_REQUEST'
   dependencies: string[]; defaultRoles: string[]; fieldDescriptions: Record<string, string>; risks: string[]; upgradePolicy: string
   notificationTexts: Record<string, string>; notificationsAvailable: boolean; graph: Graph; formSchema: FormSchema
-  scenarios: TemplateScenario[]; copies: TemplateCopy[]
+  scenarios: TemplateScenario[]; copies: TemplateCopy[]; companion?: TemplateCompanionSummary
 }
 export interface TemplateCopyInput { key: string; name: string; templateVersion: number }
 /** 自检只读快照。@author owlzhangfq@gmail.com */
@@ -209,12 +229,130 @@ export interface WorkspaceQuery { view?: 'started' | 'drafts'; q?: string; statu
 /** 消息保留发生时摘要；访问申请与任务仍需实时授权。@author owlzhangfq@gmail.com */
 export interface InboxMessage {
   id: string; applicationId: string; title: string; businessNo: string; actor: string; roundNo: number
-  kind: 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
+  kind: 'SUPPLIER_PAYABLE_RESULT' | 'SUPPLIER_PAYABLE_ATTENTION' | 'EXPENSE_PARTIAL_ADJUSTMENT_RESULT' | 'EXPENSE_PARTIAL_ADJUSTMENT_ATTENTION' | 'EXPENSE_ADJUSTMENT_RESULT' | 'EXPENSE_ADJUSTMENT_ATTENTION' | 'DISBURSEMENT_RETURN_RESULT' | 'DISBURSEMENT_RETURN_ATTENTION' | 'REPAYMENT_RESULT' | 'REPAYMENT_ATTENTION' | 'REPAYMENT_REVIEW_RESULT' | 'REPAYMENT_REVIEW_ATTENTION' | 'BUDGET_ADJUSTMENT_RESULT' | 'BUDGET_ADJUSTMENT_ATTENTION' | 'EXPENSE_RETURN_RESULT' | 'EXPENSE_RETURN_ATTENTION' | 'SUPPLIER_RETURN_RESULT' | 'SUPPLIER_RETURN_ATTENTION' | 'SUPPLIER_ADJUSTMENT_RESULT' | 'SUPPLIER_ADJUSTMENT_ATTENTION' | 'SUPPLIER_SETTLEMENT_RESULT' | 'SUPPLIER_SETTLEMENT_ATTENTION' | 'REVERSAL_RESULT' | 'REVERSAL_ATTENTION' | 'REVERSAL_CHECK_RESULT' | 'REVERSAL_CHECK_ATTENTION' | 'EXPENSE_SETTLEMENT_RESULT' | 'EXPENSE_SETTLEMENT_ATTENTION' | 'BUDGET_RESULT' | 'BUDGET_ATTENTION' | 'VOUCHER_RESULT' | 'VOUCHER_ATTENTION' | 'SUPPLIER_PAYMENT_RESULT' | 'SUPPLIER_PAYMENT_ATTENTION' | 'PAYMENT_RESULT' | 'PAYMENT_ATTENTION' | 'ADVANCE_OVERDUE' | 'TASK_ESCALATED' | 'COMMENT_MENTIONED' | 'APPLICATION_SUBMITTED' | 'TASK_PENDING' | 'APPLICATION_RETURNED' | 'APPLICATION_REJECTED' | 'APPLICATION_APPROVED' | 'APPLICATION_WITHDRAWN' | 'APPLICATION_CANCELLED' | 'TASK_TRANSFERRED' | 'TASK_DELEGATED' | 'TASK_RESOLVED' | 'TASK_OVERDUE' | 'APPLICATION_COPIED' | 'EXPENSE_ADJUSTED' | 'TASK_COUNTERSIGN_REMOVED' | 'TASK_COUNTERSIGN_COMPLETED' | 'APPLICATION_PAUSED' | 'APPLICATION_RESUMED'
   taskId?: string; nodeName?: string; createdAt: string; readAt?: string; content?: string | null
 }
 /** 个人消息列表和未读总数。@author owlzhangfq@gmail.com */
 export interface CopySnapshot { applicationId: string; businessNo: string; roundNo: number; definitionVersion: number; title: string; status: string; submittedAt: string; nodeNames: string[]; formSchema: FormSchema | null; payload: Record<string, unknown> }
 export interface InboxPage { items: InboxMessage[]; nextCursor?: string | null; unreadCount: number }
+/** 明确打开本人消息后，按当前业务权限读取原付款。 */
+export interface PaymentNotificationTarget { messageId: string; paymentId: string; view: 'APPLICATION_ROUND' | 'CASHIER_PAYMENT'; applicationId: string; roundNo: number; payment: PaymentView }
+export interface SupplierPaymentNotificationTarget { messageId: string; paymentId: string; executionRequestId: string; view: 'APPLICATION_ROUND' | 'CASHIER_PAYMENT'; applicationId: string; roundNo: number; canOpenCashier: boolean; payment: SupplierCashierView }
+export type FinancialNotificationTarget = PaymentNotificationTarget | SupplierPaymentNotificationTarget
+export interface VoucherNotificationTarget {
+  messageId: string; voucherId: string; applicationId: string; businessId: string; roundNo: number
+  kind: VoucherView['kind']; preparation: VoucherView['preparation']; operation: VoucherView['operation']; reversalBound: boolean
+}
+/** 原预算操作只读摘要；不返回命令、分摊、账户或办理许可。 */
+export interface BudgetNotificationTarget {
+  messageId: string; operationId: string; applicationId: string; reportId: string; roundNo: number; financialVersion: number
+  action: 'FREEZE' | 'ADJUST' | 'RELEASE' | 'CONSUME'; status: 'QUEUED' | 'EXECUTING' | 'UNKNOWN' | 'QUERYING' | 'APPLIED' | 'REJECTED'
+  version: number; attempts: number; updatedAt: string; observedStatus: 'PENDING' | 'NOT_FOUND' | 'APPLIED' | 'REJECTED' | null
+  issue: string | null; ledgerRevision: number | null; reference: string | null; appliedAt: string | null
+}
+/** 结算修订的最小事实，不包含办理许可或财务明细。 */
+export interface ExpenseSettlementNotificationState {
+  version: number; status: NonNullable<SettlementView['settlement']>['status']; resourcesConsumed: boolean
+  budgetOperationId: string | null; issue: string | null; updatedAt: string
+}
+/** 原结算修订与当前状态分别展示，不携带核销或重试许可。 */
+export interface ExpenseSettlementNotificationTarget {
+  messageId: string; applicationId: string; reportId: string; roundNo: number; financialVersion: number
+  funding: NonNullable<SettlementView['settlement']>['funding']; fundingConfirmedAt: string
+  notice: ExpenseSettlementNotificationState; current: ExpenseSettlementNotificationState
+}
+/** 原外部冲销核对摘要，不包含登记许可或反向分录。 */
+export interface ReversalCheckNotificationTarget {
+  messageId: string; checkId: string; operationId: string; applicationId: string; businessId: string; roundNo: number
+  kind: VoucherView['kind']; originalStatus: NonNullable<VoucherView['operation']>['status']; originalHeld: boolean
+  version: number; status: 'QUEUED' | 'RUNNING' | 'CHECKED' | 'RECORDED' | 'UNAVAILABLE' | 'VOIDED'; requestedAt: string; updatedAt: string; issue: string | null
+  observation: { status: 'UNRESOLVED' | 'VERIFIED'; revision: number; observedAt: string; validUntil: string; voucherReference: string | null; accountingDate: string | null; postedAt: string | null } | null
+  record: { id: string; recordedAt: string } | null
+}
+/** 固定原冲销准备或命令；安全结束记录与 ERP 结果分别展示。 */
+export interface ReversalNotificationTarget {
+  messageId: string; reversalId: string; operationId: string; applicationId: string; businessId: string; roundNo: number
+  kind: VoucherView['kind']; originalStatus: NonNullable<VoucherView['operation']>['status']; originalHeld: boolean
+  preparation: { id: string; version: number; status: 'QUEUED' | 'RUNNING' | 'READY' | 'AUTHORIZED' | 'UNAVAILABLE' | 'VOIDED'; requestedAt: string; updatedAt: string; accountingDate: string; issue: string | null }
+  operation: { id: string; version: number; status: 'QUEUED' | 'POSTING' | 'QUERYING' | 'UNKNOWN' | 'POSTED' | 'FAILED' | 'NOT_FOUND' | 'EXPIRED' | 'VOIDED' | 'RECONCILING'; attempts: number; highestRevision: number; updatedAt: string; expiresAt: string; observedStatus: 'PENDING' | 'POSTED' | 'FAILED' | 'NOT_FOUND' | null; issue: string | null; disputed: boolean; voucherReference: string | null; postedAt: string | null } | null
+  retirement: { id: string; retiredAt: string; basis: 'NEVER_DISPATCHED' | 'CONFIRMED_FAILED' } | null
+}
+/** 同一原结算的当前准备、ERP 结果及实际完成事实，不携带办理许可。 */
+export interface SupplierSettlementNotificationTarget {
+  messageId: string; settlementId: string; paymentId: string; requestId: string; applicationId: string; roundNo: number; accountingDate: string
+  fact: 'PREPARATION_RETRY' | 'PREPARATION_BLOCKED' | 'PREPARATION_VOIDED' | 'EXECUTION_RETRY' | 'UNKNOWN' | 'NOT_FOUND' | 'RECONCILING' | 'REJECTED' | 'VOIDED' | 'ERP_SETTLED' | 'COMPLETED' | 'RETIRED'
+  preparation: { version: number; status: 'QUEUED' | 'RUNNING' | 'READY' | 'BLOCKED' | 'VOIDED'; issue: string | null; updatedAt: string }
+  operation: { version: number; status: 'QUEUED' | 'CHECKING' | 'SETTLING' | 'UNKNOWN' | 'QUERYING' | 'SETTLED' | 'REJECTED' | 'NOT_FOUND' | 'RECONCILING' | 'VOIDED'; issue: string | null; updatedAt: string } | null
+  retirement: { basis: 'NEVER_DISPATCHED' | 'CONFIRMED_REJECTED'; retiredAt: string } | null
+  completion: { operationId: string; operationVersion: number; paymentId: string; completedAt: string } | null
+}
+/** 原供应商应付调整、ERP 结果与本地完成的只读摘要。 */
+export interface SupplierAdjustmentNotificationTarget {
+  messageId: string; adjustmentId: string; paymentId: string; requestId: string; applicationId: string; roundNo: number; accountingDate: string
+  fact: 'PREPARATION_RETRY' | 'PREPARATION_BLOCKED' | 'PREPARATION_VOIDED' | 'EXECUTION_RETRY' | 'UNKNOWN' | 'NOT_FOUND' | 'RECONCILING' | 'REJECTED' | 'VOIDED' | 'ERP_ADJUSTED' | 'COMPLETED' | 'RETIRED'
+  preparation: { version: number; status: 'QUEUED' | 'RUNNING' | 'READY' | 'BLOCKED' | 'VOIDED'; issue: string | null; updatedAt: string }
+  operation: { version: number; status: 'QUEUED' | 'CHECKING' | 'ADJUSTING' | 'UNKNOWN' | 'QUERYING' | 'ADJUSTED' | 'REJECTED' | 'NOT_FOUND' | 'RECONCILING' | 'VOIDED'; issue: string | null; updatedAt: string } | null
+  retirement: { basis: 'NEVER_DISPATCHED' | 'CONFIRMED_REJECTED'; retiredAt: string } | null
+  completion: { adjustmentId: string; adjustmentVersion: number; paymentId: string; paymentVersion: number; returnVersion: number; completedAt: string } | null
+}
+/** 原供应商回款核对与其实际登记的只读摘要。 */
+export interface SupplierReturnNotificationTarget {
+  messageId: string; checkId: string; paymentId: string; requestId: string; applicationId: string; roundNo: number
+  fact: 'UNAVAILABLE' | 'SOURCE_CHANGED' | 'UNRESOLVED' | 'RETURN_REVIEW' | 'RECORDED'
+  version: number; status: 'QUEUED' | 'RUNNING' | 'CHECKED' | 'RESOLVED' | 'UNAVAILABLE' | 'VOIDED'; requestedAt: string; updatedAt: string; issue: string | null
+  observation: { outcome: 'UNRESOLVED' | 'CONFIRMED' | 'PARTIALLY_RETURNED' | 'RETURNED'; revision: number; observedAt: string; validUntil: string } | null
+  registration: { id: string; returnVersion: number; outcome: 'CONFIRMED' | 'PARTIALLY_RETURNED' | 'RETURNED'; registeredAt: string } | null
+}
+/** 原报销退回核对与其实际登记的只读摘要。 */
+export interface ExpenseReturnNotificationTarget {
+  messageId: string; checkId: string; paymentId: string; reportId: string; applicationId: string; roundNo: number
+  fact: 'UNAVAILABLE' | 'SOURCE_CHANGED' | 'UNRESOLVED' | 'RETURN_REVIEW' | 'RECORDED'
+  version: number; status: 'QUEUED' | 'RUNNING' | 'CHECKED' | 'RESOLVED' | 'UNAVAILABLE' | 'VOIDED'; requestedAt: string; updatedAt: string; issue: string | null
+  observation: { outcome: 'UNRESOLVED' | 'CONFIRMED' | 'PARTIALLY_RETURNED' | 'RETURNED'; revision: number; observedAt: string; validUntil: string } | null
+  registration: { id: string; returnVersion: number; outcome: 'CONFIRMED' | 'PARTIALLY_RETURNED' | 'RETURNED'; registeredAt: string } | null
+}
+/** 原借款放款退回核对与其实际登记的只读摘要。 */
+export interface DisbursementReturnNotificationTarget {
+  messageId: string; checkId: string; paymentId: string; advanceId: string; applicationId: string; roundNo: number
+  fact: 'UNAVAILABLE' | 'SOURCE_CHANGED' | 'UNRESOLVED' | 'RETURN_REVIEW' | 'REVIEW_REQUIRED' | 'RESOLVED'
+  version: number; status: 'QUEUED' | 'RUNNING' | 'CHECKED' | 'RESOLVED' | 'UNAVAILABLE' | 'VOIDED'; requestedAt: string; updatedAt: string; issue: string | null
+  observation: { outcome: 'UNRESOLVED' | 'CONFIRMED' | 'PARTIALLY_RETURNED' | 'RETURNED'; revision: number; observedAt: string; validUntil: string } | null
+  resolution: { id: string; advanceVersion: number; outcome: 'CONFIRMED' | 'PARTIALLY_RETURNED' | 'RETURNED'; resolvedAt: string } | null
+}
+/** 原供应商复核与预留的只读消息摘要。 */
+export interface SupplierPayableNotificationTarget {
+  messageId: string; requestId: string; applicationId: string; roundNo: number; sourceType: 'REVIEW' | 'OPERATION'; sourceId: string
+  fact: 'REVIEW_UNAVAILABLE' | 'REVIEW_BLOCKED' | 'REVIEW_SOURCE_CHANGED' | 'REVIEW_INTERRUPTED' | 'UNKNOWN' | 'NOT_FOUND' | 'REJECTED' | 'HELD' | 'RECONCILING' | 'EXPIRED' | 'VOIDED' | 'RETIRED'
+  review: { id: string; version: number; status: keyof typeof import('./supplierFinance').reviewLabels; requestedAt: string; updatedAt: string; issue: string | null } | null
+  operation: { id: string; version: number; status: keyof typeof import('./supplierFinance').holdLabels; createdAt: string; updatedAt: string; failure: string | null; observation: SupplierPayableNotificationObservation | null; conflictingObservation: SupplierPayableNotificationObservation | null } | null
+  retirement: { operationId: string; operationVersion: number; basis: 'NEVER_DISPATCHED' | 'CONFIRMED_REJECTED'; retiredAt: string } | null
+}
+export interface SupplierPayableNotificationObservation { outcome: 'HELD' | 'REJECTED' | 'PENDING' | 'NOT_FOUND'; revision: number; observedAt: string; heldAt: string | null; rejection: string | null }
+/** 原预算调整复核与执行事实的只读摘要。 */
+export interface BudgetAdjustmentNotificationTarget {
+  messageId: string; requestId: string; applicationId: string; roundNo: number; sourceType: 'REVIEW' | 'OPERATION'; sourceId: string
+  fact: 'REVIEW_UNAVAILABLE' | 'REVIEW_BLOCKED' | 'REVIEW_SOURCE_CHANGED' | 'UNKNOWN' | 'NOT_FOUND' | 'REJECTED' | 'APPLIED' | 'RECONCILING' | 'EXPIRED' | 'VOIDED' | 'RETIRED'
+  review: { id: string; version: number; status: keyof typeof import('./budgetFinance').budgetReviewLabels; requestedAt: string; updatedAt: string; issue: string } | null
+  operation: { id: string; version: number; status: keyof typeof import('./budgetFinance').budgetOperationLabels; createdAt: string; updatedAt: string; failure: string | null; observation: BudgetAdjustmentNotificationObservation | null; conflictingObservation: BudgetAdjustmentNotificationObservation | null } | null
+  retirement: { operationId: string; operationVersion: number; basis: 'NEVER_SENT' | 'REJECTED'; retiredAt: string } | null
+}
+export interface BudgetAdjustmentNotificationObservation { outcome: 'APPLIED' | 'REJECTED' | 'PENDING' | 'NOT_FOUND'; revision: number; observedAt: string; appliedAt: string | null; rejection: string | null }
+export interface RepaymentReviewNotificationTarget {
+  messageId: string; checkId: string; paymentId: string; advanceId: string; repaymentId: string; applicationId: string; roundNo: number
+  fact: 'UNAVAILABLE' | 'SOURCE_CHANGED' | 'UNRESOLVED' | 'RETURN_REVIEW' | 'REVIEW_REQUIRED' | 'RESOLVED'
+  version: number; status: 'QUEUED' | 'RUNNING' | 'CHECKED' | 'RESOLVED' | 'UNAVAILABLE' | 'VOIDED'; requestedAt: string; updatedAt: string; issue: string | null
+  observation: { outcome: 'UNRESOLVED' | 'CONFIRMED' | 'PARTIALLY_RETURNED' | 'RETURNED'; revision: number; observedAt: string; validUntil: string } | null
+  resolution: { id: string; advanceVersion: number; outcome: 'CONFIRMED' | 'PARTIALLY_RETURNED' | 'RETURNED'; resolvedAt: string } | null
+}
+/** 原还款查询、实际登记和本次触发的复核分别保留。 */
+export interface RepaymentNotificationTarget {
+  messageId: string; checkId: string; paymentId: string; advanceId: string; applicationId: string; roundNo: number
+  fact: 'UNAVAILABLE' | 'SOURCE_CHANGED' | 'NOT_FOUND' | 'PENDING' | 'REVERSED' | 'REVIEW_REQUIRED' | 'RECORDED'
+  version: number; status: 'QUEUED' | 'RUNNING' | 'CHECKED' | 'RECORDED' | 'UNAVAILABLE' | 'VOIDED'; requestedAt: string; updatedAt: string; issue: string | null
+  reviewRepaymentId: string | null
+  observation: { outcome: 'NOT_FOUND' | 'PENDING' | 'CONFIRMED' | 'REVERSED'; revision: number; observedAt: string; validUntil: string } | null
+  record: { id: string; advanceVersion: number; recordedAt: string } | null
+}
 /** 已读筛选与稳定分页游标。@author owlzhangfq@gmail.com */
 export interface InboxQuery { read?: 'all' | 'unread'; limit?: number; cursor?: string }
 
@@ -442,13 +580,26 @@ function configurationRead<T>(path: string, signal: AbortSignal, read: (value: u
   return request(path, { signal, cache: 'no-store' }).then(value => read(value, actor))
 }
 
+/** 签署准备可能读取原件；结束等待不代表授权失败，原键保留供本人恢复。 */
+async function sendSignature(operation: WriteRequest, key: string): Promise<SignatureReceipt> {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const result = await Promise.race([request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key }, signal: controller.signal }),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject({ status: 0, code: 'REQUEST_TIMEOUT', message: '签署操作结果尚未确认，请恢复原操作。' } satisfies ApiError) }, 12_000) })])
+    return validateSignatureReceipt(result, operation.path, operation.body!)
+  } finally { clearTimeout(timer) }
+}
+
 export const writeRequests = new PendingWrites(async (operation, key) => {
+  if (signatureWritePath.test(operation.path)) return sendSignature(operation, key)
   if (operation.path === '/admin/expense-categories' || /^\/admin\/expense-policies\/[^/?]+\/(draft|publish)$/.test(operation.path)) return sendFinanceConfiguration(operation, key)
   if (/^\/admin\/account-mappings\/[^/?]+\/(draft|publish)$/.test(operation.path)) return sendFinanceConfiguration(operation, key, validateMappingOperation)
   if (/^\/expense-requests\/[^/?]+\/close$/.test(operation.path)) return sendExpenseRequestClose(operation, key)
   if (/^\/invoices\/[^/?]+\/extraction-runs(?:\/[^/?]+\/review)?$/.test(operation.path)) return sendExtraction(operation, key)
   const actor = requestActor ? { ...requestActor } : null
   const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
+  if (operation.path.startsWith(syncPath + '/')) validateSyncReceipt(result, operation.path, operation.body!)
   if (operation.path === approvalProxyPath || /^\/organization\/approval-proxies\/[^/?]+\/revoke$/.test(operation.path)) validateApprovalProxyReceipt(result, operation.path, operation.body!)
   if (operation.path === '/system/initialization') validateInitializationReceipt(result, JSON.parse(operation.body!) as InitializationRequest, actor)
   if (operation.path === '/notifications/preferences') validateNotificationPreferencesReceipt(result, JSON.parse(operation.body!) as NotificationPreferencesInput)
@@ -466,6 +617,9 @@ export const writeRequests = new PendingWrites(async (operation, key) => {
   const instance = /^\/applications\/([^/?]+)\/rounds\/([1-9][0-9]*)\/runtime\/(pause|resume|terminate)$/.exec(operation.path)
   if (instance) validateInstanceReceipt(result as InstanceControlView, decodeURIComponent(instance[1]!), Number(instance[2]), instance[3] as InstanceControlAction, JSON.parse(operation.body!) as InstanceControlInput)
   if (/^\/applications\/[^/?]+\/draft-assist-runs(?:\/[^/?]+\/review)?$/.test(operation.path)) validateDraftReceipt(result, operation.path, operation.body!)
+  if (/^\/expense-reports\/[^/?]+\/precheck-explanations(?:\/[^/?]+\/review)?$/.test(operation.path)) validateExplanationReceipt(result, operation.path, operation.body!)
+  if (/^\/expense-reports\/[^/?]+\/risk-explanations(?:\/[^/?]+\/review)?$/.test(operation.path)) validateRiskReceipt(result, operation.path, operation.body!)
+  if (/^\/expense-reports\/[^/?]+\/draft-assists(?:\/[^/?]+\/(?:confirm|dismiss))?$/.test(operation.path)) validateExpenseAssistReceipt(result, operation.path, operation.body!)
   return result
 })
 function write<T>(path: string, method: WriteRequest['method'], label: string, body?: unknown) {
@@ -502,6 +656,9 @@ export const api = {
   eventContractHistory: (key: string, version: number, beforeRevision: number | undefined, signal: AbortSignal) => request<EventContractHistory>(`/event-contracts/${encodeURIComponent(key)}/versions/${version}/history` + historyQuery({ limit: 25, beforeRevision }), { signal, cache: 'no-store' }).then(value => readEventContractHistory(value, beforeRevision)),
   publishEventContract: (key: string, input: EventPublication) => write<EventContract>(`/event-contracts/${encodeURIComponent(key)}/versions`, 'POST', '发布事件契约版本', input),
   changeEventAvailability: (key: string, version: number, input: EventAvailabilityInput) => write<EventContract>(`/event-contracts/${encodeURIComponent(key)}/versions/${version}/availability`, 'POST', input.enabled ? '恢复原事件版本' : '停用原事件版本', input),
+  serviceTaskOptions: (afterKey: string | undefined, signal: AbortSignal) => request<ServiceTaskDirectory>('/process-definitions/service-task-options' + historyQuery({ limit: 25, afterKey }), { signal, cache: 'no-store' }).then(value => readServiceTaskDirectory(value, afterKey)),
+  serviceTaskVersions: (key: string, beforeVersion: string | undefined, signal: AbortSignal) => request<ServiceTaskVersions>(`/process-definitions/service-task-options/${encodeURIComponent(key)}/versions` + historyQuery({ limit: 25, beforeVersion }), { signal, cache: 'no-store' }).then(value => readServiceTaskVersions(value, key, beforeVersion)),
+  serviceTaskOption: (key: string, version: string, signal: AbortSignal) => request<ServiceTaskOption>(`/process-definitions/service-task-options/${encodeURIComponent(key)}/versions/${encodeURIComponent(version)}`, { signal, cache: 'no-store' }).then(value => readServiceTaskOption(value, key, version)),
   eventContractOptions: (afterKey: string | undefined, signal: AbortSignal) => request<EventDirectory>('/process-definitions/event-contract-options' + historyQuery({ limit: 25, afterKey }), { signal, cache: 'no-store' }).then(value => readEventDirectory(value, afterKey)),
   eventContractOptionVersions: (key: string, beforeVersion: number | undefined, signal: AbortSignal) => request<EventVersions>(`/process-definitions/event-contract-options/${encodeURIComponent(key)}/versions` + historyQuery({ limit: 25, beforeVersion }), { signal, cache: 'no-store' }).then(value => readEventVersions(value, key, beforeVersion)),
   eventContractOption: (key: string, version: number, signal: AbortSignal) => request<EventOption>(`/process-definitions/event-contract-options/${encodeURIComponent(key)}/versions/${version}`, { signal, cache: 'no-store' }).then(value => readEventOption(value, key, version)),
@@ -558,7 +715,8 @@ export const api = {
   paymentBatches: (beforeId: string | undefined, signal: AbortSignal) => request<PaymentBatchPage>('/payment-batches' + historyQuery({ limit: 25, beforeId }), { signal, cache: 'no-store' }),
   paymentBatch: (id: string, signal: AbortSignal) => request<PaymentBatchDetail>(`/payment-batches/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
   submitPaymentBatch: (input: PaymentBatchInput) => write<PaymentBatchReceipt>('/payment-batches', 'POST', '登记批量付款', input),
-  cashierPayments: (beforeId: string | undefined, signal: AbortSignal) => request<CashierPaymentPage>('/cashier/payments' + historyQuery({ limit: 25, beforeId }), { signal, cache: 'no-store' }),
+  cashierPayments: (beforeId: string | undefined, signal: AbortSignal, filter: CashierPaymentFilter = {}) => request<CashierPaymentPage>('/cashier/payments' + historyQuery({ limit: 25, beforeId, legalEntityId: filter.legalEntityId, debitAccount: filter.debitAccount, dueFrom: filter.dueFrom, dueTo: filter.dueTo, undated: filter.undated ? 'true' : undefined, sort: filter.sort }), { signal, cache: 'no-store' }),
+  cashierPaymentFilterOptions: (legalEntityId: string | undefined, afterAccountKey: string | undefined, signal: AbortSignal) => request<CashierFilterOptions>('/cashier/payments/filter-options' + historyQuery({ limit: 25, legalEntityId, afterAccountKey }), { signal, cache: 'no-store' }),
   cashierPayment: (id: string, signal: AbortSignal) => request<CashierPaymentView>(`/cashier/payments/${encodeURIComponent(id)}`, { signal, cache: 'no-store' }),
   paymentAccounts: (id: string, signal: AbortSignal) => request<PaymentAccounts>(`/cashier/payments/${encodeURIComponent(id)}/accounts`, { signal, cache: 'no-store' }),
   cashierPaymentAction: (id: string, input: CashierPaymentActionInput) => write<CashierPaymentReceipt>(`/cashier/payments/${encodeURIComponent(id)}/actions`, 'POST', '出纳办理原付款', input),
@@ -644,7 +802,26 @@ export const api = {
   reviseExpense: (id: string, input: ExpenseRevise) => write<ExpenseDetail>(`/expense-reports/${encodeURIComponent(id)}/revise`, 'POST', '保存报销修改', input),
   expensePrecheckOptions: (id: string, signal: AbortSignal) => request<PrecheckOptions>(`/expense-reports/${encodeURIComponent(id)}/precheck-options`, { signal, cache: 'no-store' }),
   queueExpensePrecheck: (id: string, input: PrecheckInput) => write<{ id: string }>(`/expense-reports/${encodeURIComponent(id)}/precheck`, 'POST', '发起费用预检', input),
-  expensePrecheck: (id: string, jobId: string, signal: AbortSignal) => request<PrecheckView>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
+  expensePrecheck: (id: string, jobId: string, signal: AbortSignal) => request<PrecheckView>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }).then(value => { if (value.priorControls != null) readPriorAssessments(value.priorControls); return value }),
+  precheckExplanationInput: (id: string, precheckId: string, signal: AbortSignal) => request(explanationPath(id) + '/input?precheckId=' + encodeURIComponent(precheckId), { signal, cache: 'no-store' }).then(value => readExplanationInput(value, precheckId)),
+  expensePriorControl: (id: string, roundNo: number, signal: AbortSignal) => request<unknown>(`/expense-reports/${encodeURIComponent(id)}/prior-control` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  expenseSplitRouting: (id: string, roundNo: number, signal: AbortSignal) => request<unknown>(`/expense-reports/${encodeURIComponent(id)}/split-routing` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
+  expenseRiskInput: (id: string, body: RiskRequest, signal: AbortSignal) => request(riskPath(id) + '/input', { method: 'POST', body: JSON.stringify(body), signal, cache: 'no-store' }).then(value => readRiskInput(value, body.scope)),
+  expenseRiskCalendars: (id: string, roundNo: number, taskId: string, afterKey: string | undefined, signal: AbortSignal) => request(riskPath(id) + '/calendars' + historyQuery({ roundNo, taskId, afterKey }), { signal, cache: 'no-store' }).then(readRiskCalendars),
+  expenseRiskRuns: (id: string, roundNo: number, page: number, signal: AbortSignal) => request(riskPath(id) + historyQuery({ roundNo, page, pageSize: 20 }), { signal, cache: 'no-store' }).then(value => readRiskPage(value, page)),
+  expenseRiskRun: (id: string, runId: string, roundNo: number, signal: AbortSignal) => request(riskPath(id) + '/' + encodeURIComponent(runId), { signal, cache: 'no-store' }).then(value => readRiskDetail(value, runId, roundNo)),
+  generateExpenseRisk: (id: string, body: RiskGenerate) => write<RiskReceipt>(riskPath(id), 'POST', '生成费用风险解释', body),
+  reviewExpenseRisk: (id: string, runId: string, body: RiskReview) => write<RiskReceipt>(riskPath(id) + '/' + encodeURIComponent(runId) + '/review', 'POST', '记录费用风险复核', body),
+  precheckExplanationRuns: (id: string, page: number, signal: AbortSignal) => request(explanationPath(id) + '?page=' + page + '&pageSize=20', { signal, cache: 'no-store' }).then(value => readExplanationPage(value, page)),
+  precheckExplanationRun: (id: string, runId: string, signal: AbortSignal) => request(explanationPath(id) + '/' + encodeURIComponent(runId), { signal, cache: 'no-store' }).then(value => readExplanationDetail(value, runId)),
+  generatePrecheckExplanation: (id: string, body: ExplanationGenerate) => write<ExplanationReceipt>(explanationPath(id), 'POST', '生成本人预检解释', body),
+  reviewPrecheckExplanation: (id: string, runId: string, body: ExplanationReview) => write<ExplanationReceipt>(explanationPath(id) + '/' + encodeURIComponent(runId) + '/review', 'POST', '复核本人预检解释', body),
+  expenseAssistPreview: (id: string, body: ExpenseAssistRequest, signal: AbortSignal) => request(expenseAssistPath(id) + '/preview', { method: 'POST', body: JSON.stringify(body), signal, cache: 'no-store' }).then(value => readExpenseAssistPreview(value, id, body)),
+  expenseAssistRuns: (id: string, page: number, signal: AbortSignal) => request(expenseAssistPath(id) + '?page=' + page + '&pageSize=20', { signal, cache: 'no-store' }).then(value => readExpenseAssistPage(value, page)),
+  expenseAssistRun: (id: string, runId: string, signal: AbortSignal) => request(expenseAssistPath(id) + '/' + encodeURIComponent(runId), { signal, cache: 'no-store' }).then(value => readExpenseAssistDetail(value, id, runId)),
+  generateExpenseAssist: (id: string, body: ExpenseAssistGenerate) => write<ExpenseAssistReceipt>(expenseAssistPath(id), 'POST', '生成本人报销填报建议', body),
+  confirmExpenseAssist: (id: string, runId: string, body: ExpenseAssistConfirm) => write<ExpenseAssistReceipt>(expenseAssistPath(id) + '/' + encodeURIComponent(runId) + '/confirm', 'POST', '逐项确认报销填报建议', body),
+  dismissExpenseAssist: (id: string, runId: string, body: ExpenseAssistDismiss) => write<ExpenseAssistReceipt>(expenseAssistPath(id) + '/' + encodeURIComponent(runId) + '/dismiss', 'POST', '放弃报销填报建议', body),
   advanceOffsetSuggestion: (id: string, jobId: string, signal: AbortSignal) => request<AdvanceOffsetSuggestion>(`/expense-reports/${encodeURIComponent(id)}/prechecks/${encodeURIComponent(jobId)}/advance-offset-suggestion`, { signal, cache: 'no-store' }),
   submitExpense: (id: string, input: { applicationVersion: number; financialVersion: number; precheckId: string }) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/submit`, 'POST', '正式提交报销', input),
   invoices: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<InvoiceItem>>('/invoices' + historyQuery(filter), { signal, cache: 'no-store' }),
@@ -663,7 +840,7 @@ export const api = {
   invoiceVerification: (id: string, jobId: string, signal: AbortSignal) => request<InvoiceVerificationJob>(`/invoices/${encodeURIComponent(id)}/verifications/${encodeURIComponent(jobId)}`, { signal, cache: 'no-store' }),
   invoiceVerifications: (id: string, filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<InvoiceVerificationJob>>(`/invoices/${encodeURIComponent(id)}/verifications` + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseReports: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<ExpenseItem>>('/expense-reports' + historyQuery(filter), { signal, cache: 'no-store' }),
-  expenseRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<PriorRequestItem>>('/expense-requests' + historyQuery(filter), { signal, cache: 'no-store' }),
+  expenseRequests: (filter: ExpenseFilter, signal: AbortSignal) => request<unknown>('/expense-requests' + historyQuery(filter), { signal, cache: 'no-store' }).then(readPriorRequestPage),
   closeExpenseRequest: (id: string, input: ExpenseRequestCloseInput) => write<ExpenseRequestCloseReceipt>(`/expense-requests/${encodeURIComponent(id)}/close`, 'POST', '关闭事前费用额度', input),
   employeeAdvances: (filter: ExpenseFilter, signal: AbortSignal) => request<ExpensePage<AdvanceItem>>('/employee-advances' + historyQuery(filter), { signal, cache: 'no-store' }),
   expenseReport: (id: string, roundNo: number | undefined, signal: AbortSignal) => request<ExpenseDetail>(`/expense-reports/${encodeURIComponent(id)}` + historyQuery({ roundNo }), { signal, cache: 'no-store' }),
@@ -676,6 +853,12 @@ export const api = {
   copySnapshot: (applicationId: string, round: number, signal?: AbortSignal) => request<CopySnapshot>(`/copies/${applicationId}/rounds/${round}`, { signal }),
   copyAttachment: (applicationId: string, id: string, round: number, signal?: AbortSignal) => request<AttachmentMetadata>(`/copies/${applicationId}/rounds/${round}/attachments/${id}`, { signal }),
   downloadCopyAttachment: (applicationId: string, id: string, round: number, signal?: AbortSignal) => request<Blob>(`/copies/${applicationId}/rounds/${round}/attachments/${id}/content`, { signal }, 'binary'),
+  signatureOptions: (signal: AbortSignal) => configurationRead('/signatures/options', signal, readSignatureOptions),
+  signaturePage: (applicationId: string, roundNo: number, afterId: string | undefined, signal: AbortSignal) => configurationRead(signaturePath(applicationId) + historyQuery({ roundNo, afterId, limit: 25 }), signal, value => readSignaturePage(value, afterId)),
+  signatureDetail: (applicationId: string, id: string, roundNo: number, signal: AbortSignal) => configurationRead(signaturePath(applicationId) + '/' + encodeURIComponent(id), signal, (value, actor) => readSignatureView(value, id, roundNo, actor?.userId ?? '')),
+  createSignature: (applicationId: string, body: SignatureInput) => write<SignatureReceipt>(signaturePath(applicationId), 'POST', '授权签署所选原件', body),
+  cancelSignature: (applicationId: string, id: string, expectedVersion: string) => write<SignatureReceipt>(signaturePath(applicationId) + '/' + encodeURIComponent(id) + '/cancel', 'POST', '取消尚未发送的签署', { expectedVersion }),
+  downloadSignature: (applicationId: string, id: string, documentId: string, signal: AbortSignal) => request<Blob>(signaturePath(applicationId) + '/' + encodeURIComponent(id) + '/documents/' + encodeURIComponent(documentId) + '/content', { signal, cache: 'no-store' }, 'binary'),
   attachmentOptions: (signal?: AbortSignal) => request<AttachmentOptions>('/attachments/options', { signal }),
   reserveAttachment: (applicationId: string, input: AttachmentInput, key: string, signal?: AbortSignal) => request<AttachmentMetadata>(`/applications/${applicationId}/attachments`, { method: 'POST', body: JSON.stringify(input), headers: { 'Idempotency-Key': key }, signal }),
   uploadAttachment: (applicationId: string, id: string, expectedVersion: number, file: Blob, signal?: AbortSignal) => request<AttachmentMetadata>(`/applications/${applicationId}/attachments/${id}/content`, { method: 'PUT', body: file, headers: { 'Content-Type': 'application/octet-stream', 'X-Application-Version': String(expectedVersion) }, signal }),
@@ -702,6 +885,20 @@ export const api = {
   webhookDelivery: (id: string, signal: AbortSignal) => request<WebhookDetail>('/integrations/webhooks/deliveries/' + encodeURIComponent(id), { signal }),
   retryWebhook: (id: string, expectedVersion: number) => write<WebhookItem>('/integrations/webhooks/deliveries/' + encodeURIComponent(id) + '/retry', 'POST', '重新排队 Webhook 投递', { expectedVersion }),
   organizationStatus: (signal: AbortSignal) => request<{ initialized: boolean }>('/organization', { signal }),
+  organizationSyncOverview: (signal: AbortSignal) => configurationRead(syncPath, signal, readSyncOverview),
+  organizationSyncBatches: (page: number, signal: AbortSignal) => configurationRead(syncPath + '/batches' + historyQuery({ page, pageSize: 20 }), signal, value => readSyncBatches(value, page)),
+  organizationSyncBatch: (id: string, signal: AbortSignal) => configurationRead(syncPath + '/batches/' + encodeURIComponent(id), signal, value => readSyncDetail(value, id)),
+  organizationSyncTransitions: (id: string, signal: AbortSignal) => configurationRead(syncPath + '/batches/' + encodeURIComponent(id) + '/transitions', signal, readSyncTransitions),
+  organizationSyncPlans: (id: string, page: number, signal: AbortSignal) => configurationRead(syncPath + '/batches/' + encodeURIComponent(id) + '/plans' + historyQuery({ page, pageSize: 20 }), signal, value => readSyncPlans(value, page)),
+  organizationSyncPlan: (id: string, batchId: string, signal: AbortSignal) => configurationRead(syncPath + '/plans/' + encodeURIComponent(id), signal, (value, actor) => readSyncPlan(value, id, batchId, actor?.tenantId ?? '')),
+  organizationSyncOptions: (section: import('./organization').OrganizationSection, afterId: string | undefined, signal: AbortSignal) => configurationRead('/organization/'
+    + (section === 'PERSON' ? 'people' : section === 'APPOINTMENT' ? 'appointments' : 'units')
+    + historyQuery({ kind: ['PERSON', 'APPOINTMENT'].includes(section) ? undefined : section, afterId, limit: 30 }), signal, value => readSyncLocalPage(value, section)),
+  queueOrganizationSync: (body: { expectedSourceVersion: number; targetDigest: string }) => write<SyncReceipt>(syncPath + '/batches', 'POST', '读取可信组织来源', body),
+  retryOrganizationSync: (id: string, body: { expectedVersion: number; expectedSourceVersion: number; targetDigest: string }) => write<SyncReceipt>(syncPath + '/batches/' + encodeURIComponent(id) + '/retry', 'POST', '重试原组织同步批次', body),
+  cancelOrganizationSync: (id: string, body: { expectedVersion: number; comment?: string }) => write<SyncReceipt>(syncPath + '/batches/' + encodeURIComponent(id) + '/cancel', 'POST', '取消组织同步批次', body),
+  preflightOrganizationSync: (id: string, body: { expectedVersion: number; selections: SyncSelection[] }) => write<SyncPlanReceipt>(syncPath + '/batches/' + encodeURIComponent(id) + '/preflight', 'POST', '保存组织同步核对计划', body),
+  applyOrganizationSync: (id: string, body: { expectedVersion: number; planId: string; comment?: string }) => write<SyncReceipt>(syncPath + '/batches/' + encodeURIComponent(id) + '/apply', 'POST', '应用已核对的组织同步计划', body),
   approvalProxies: async (personId: string | undefined, afterId: string | undefined, signal: AbortSignal) => readApprovalProxyPage(await request(approvalProxyPath + historyQuery({ personId, afterId, limit: 30 }), { signal, cache: 'no-store' })),
   approvalProxy: async (id: string, signal: AbortSignal) => readApprovalProxy(await request(approvalProxyPath + '/' + encodeURIComponent(id), { signal, cache: 'no-store' }), id),
   createApprovalProxy: (body: ApprovalProxyInput) => write<ApprovalProxyReceipt>(approvalProxyPath, 'POST', '创建审批代理', body),
@@ -740,6 +937,7 @@ export const api = {
   initializeTenant: (input: InitializationRequest) => write<InitializationReceipt>('/system/initialization', 'POST', '初始化工作区', input),
   systemChecks: (signal: AbortSignal) => request<SystemCheckReport>('/system/checks', { signal }),
   applicationTimeline: (id: string, query: HistoryQuery = {}) => request<HistoryPage>('/applications/' + encodeURIComponent(id) + '/timeline' + historyQuery(query)),
+  serviceTaskRuntime: (id: string, round: number, afterId: string | undefined, signal: AbortSignal) => request<ServiceTaskRuntimeView>(`/applications/${encodeURIComponent(id)}/rounds/${round}/service-tasks` + historyQuery({ limit: 25, afterId }), { signal, cache: 'no-store' }).then(value => readServiceTaskRuntime(value, id, round, afterId)),
   draftAssistInput: (id: string, signal: AbortSignal) => request(draftAssistPath(id) + '/input', { signal, cache: 'no-store' }).then(readDraftInput),
   draftAssistRuns: (id: string, page: number, signal: AbortSignal) => request(draftAssistPath(id) + '?page=' + page + '&pageSize=20', { signal, cache: 'no-store' }).then(value => readDraftPage(value, page)),
   draftAssistRun: (id: string, runId: string, signal: AbortSignal) => request(draftAssistPath(id) + '/' + encodeURIComponent(runId), { signal, cache: 'no-store' }).then(value => readDraftDetail(value, runId)),
@@ -790,6 +988,24 @@ export const api = {
   },
   retryNotificationDelivery: (id: string, input: NotificationDeliveryRetryInput) => write<NotificationDelivery>('/notifications/deliveries/' + encodeURIComponent(id) + '/retry', 'POST', '恢复外部通知投递', input),
   readNotification: (id: string) => write<InboxMessage>(`/notifications/${encodeURIComponent(id)}/read`, 'POST', '标记消息已读', {}),
+  paymentNotificationTarget: (id: string, signal: AbortSignal) => request<PaymentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/payment-target`, { signal, cache: 'no-store' }),
+  supplierPaymentNotificationTarget: (id: string, signal: AbortSignal) => request<SupplierPaymentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/supplier-payment-target`, { signal, cache: 'no-store' }),
+  supplierReturnNotificationTarget: (id: string, signal?: AbortSignal) => request<SupplierReturnNotificationTarget>(`/notifications/${encodeURIComponent(id)}/supplier-return-target`, { cache: 'no-store', signal }),
+  expenseReturnNotificationTarget: (id: string, signal?: AbortSignal) => request<ExpenseReturnNotificationTarget>(`/notifications/${encodeURIComponent(id)}/expense-return-target`, { cache: 'no-store', signal }),
+  disbursementReturnNotificationTarget: (id: string, signal?: AbortSignal) => request<DisbursementReturnNotificationTarget>(`/notifications/${encodeURIComponent(id)}/disbursement-return-target`, { cache: 'no-store', signal }),
+  repaymentReviewNotificationTarget: (id: string, signal?: AbortSignal) => request<RepaymentReviewNotificationTarget>(`/notifications/${encodeURIComponent(id)}/repayment-review-target`, { cache: 'no-store', signal }),
+  budgetAdjustmentNotificationTarget: (id: string, signal?: AbortSignal) => request<BudgetAdjustmentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/budget-adjustment-target`, { cache: 'no-store', signal }),
+  supplierPayableNotificationTarget: (id: string, signal?: AbortSignal) => request<SupplierPayableNotificationTarget>(`/notifications/${encodeURIComponent(id)}/supplier-payable-target`, { cache: 'no-store', signal }),
+  expenseAdjustmentNotificationTarget: (id: string, signal?: AbortSignal) => request<ExpenseAdjustmentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/expense-adjustment-target`, { cache: 'no-store', signal }),
+  expensePartialAdjustmentNotificationTarget: (id: string, signal?: AbortSignal) => request<ExpensePartialAdjustmentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/expense-partial-adjustment-target`, { cache: 'no-store', signal }),
+  repaymentNotificationTarget: (id: string, signal?: AbortSignal) => request<RepaymentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/repayment-target`, { cache: 'no-store', signal }),
+  supplierAdjustmentNotificationTarget: (id: string, signal?: AbortSignal) => request<SupplierAdjustmentNotificationTarget>(`/notifications/${encodeURIComponent(id)}/supplier-adjustment-target`, { cache: 'no-store', signal }),
+  supplierSettlementNotificationTarget: (id: string, signal?: AbortSignal) => request<SupplierSettlementNotificationTarget>(`/notifications/${encodeURIComponent(id)}/supplier-settlement-target`, { cache: 'no-store', signal }),
+  expenseSettlementNotificationTarget: (id: string, signal: AbortSignal) => request<ExpenseSettlementNotificationTarget>(`/notifications/${encodeURIComponent(id)}/expense-settlement-target`, { signal, cache: 'no-store' }),
+  reversalCheckNotificationTarget: (id: string, signal: AbortSignal) => request<ReversalCheckNotificationTarget>(`/notifications/${encodeURIComponent(id)}/reversal-check-target`, { signal, cache: 'no-store' }),
+  reversalNotificationTarget: (id: string, signal: AbortSignal) => request<ReversalNotificationTarget>(`/notifications/${encodeURIComponent(id)}/reversal-target`, { signal, cache: 'no-store' }),
+  budgetNotificationTarget: (id: string, signal: AbortSignal) => request<BudgetNotificationTarget>(`/notifications/${encodeURIComponent(id)}/budget-target`, { signal, cache: 'no-store' }),
+  voucherNotificationTarget: (id: string, signal: AbortSignal) => request<VoucherNotificationTarget>(`/notifications/${encodeURIComponent(id)}/voucher-target`, { signal, cache: 'no-store' }),
   taskRecipients: (taskId: string, signal: AbortSignal) => request<string[]>(`/tasks/${encodeURIComponent(taskId)}/recipients`, { signal }),
   taskCountersignMembers: (taskId: string, signal: AbortSignal) => request<CountersignView>(`/tasks/${encodeURIComponent(taskId)}/countersign-members`, { signal, cache: 'no-store' }),
   changeCountersignMembers: (taskId: string, body: CountersignInput) => write<CountersignReceipt>(`/tasks/${encodeURIComponent(taskId)}/countersign-changes`, 'POST', body.action === 'ADD' ? '增加必要会签人' : '移除未决会签任务', body),
@@ -817,6 +1033,7 @@ export const api = {
   searchDefinitions: (filters: DefinitionCatalogFilters, signal: AbortSignal) => request<DefinitionCatalogPage>('/process-definitions/search?' + new URLSearchParams(Object.entries(filters).filter(([, value]) => value !== undefined && value !== '').map(([key, value]) => [key, String(value)])), { signal }),
   getDefinition: (id: string, signal?: AbortSignal) => request<Definition>(`/process-definitions/${encodeURIComponent(id)}`, { signal }),
   templates: () => request<ProcessTemplate[]>('/process-templates'),
+  financialTemplateExamples: (templateKey: string) => request<FinancialTemplateExamples>(`/process-templates/${encodeURIComponent(templateKey)}/financial-examples`),
   copyTemplate: (templateKey: string, body: TemplateCopyInput) => write<Definition>(`/process-templates/${encodeURIComponent(templateKey)}/copy`, 'POST', '复制流程模板为草稿', body),
   definition: (body: { key: string; name: string; graph: Graph; formSchema?: FormSchema | null; notificationTexts?: NotificationTexts }) => write<Definition>('/process-definitions', 'POST', '创建流程草稿', body),
   updateDefinition: (id: string, body: { name: string; graph: Graph; expectedRevision: number; formSchema?: FormSchema | null; notificationTexts?: NotificationTexts }) => write<Definition>(`/process-definitions/${encodeURIComponent(id)}`, 'PUT', '保存流程草稿', body),

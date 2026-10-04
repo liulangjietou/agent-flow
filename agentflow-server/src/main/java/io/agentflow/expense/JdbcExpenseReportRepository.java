@@ -9,6 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -54,10 +57,14 @@ public class JdbcExpenseReportRepository implements ExpenseReportRepository {
     public void update(ExpenseReport report, long expectedVersion, String actor, String operation) {
         requireAudit(actor, operation);
         if (report.version() != expectedVersion + 1) throw conflict();
+        var round = report.rounds().isEmpty() ? null : report.currentRound();
         int updated = jdbc.update("""
-                UPDATE expense_report SET version=?,state_json=?,updated_at=CURRENT_TIMESTAMP
+                UPDATE expense_report SET version=?,state_json=?,current_round_no=?,current_submitted_at=?,
+                    current_legal_entity_id=?,current_base_currency=?,updated_at=CURRENT_TIMESTAMP
                 WHERE tenant_id=? AND id=? AND application_id=? AND employee_id=? AND version=?
-                """, report.version(), json.write(report.state()), report.tenantId(), report.id().toString(),
+                """, report.version(), json.write(report.state()), round == null ? null : round.roundNo(),
+                round == null ? null : Timestamp.from(round.submittedAt().truncatedTo(ChronoUnit.MICROS)),
+                round == null ? null : round.content().legalEntityId().toString(), round == null ? null : round.baseCurrency(), report.tenantId(), report.id().toString(),
                 report.applicationId().toString(), report.employeeId(), expectedVersion);
         if (updated != 1) throw conflict();
         append(report, actor, operation);
@@ -81,13 +88,27 @@ public class JdbcExpenseReportRepository implements ExpenseReportRepository {
     }
 
     private ExpenseReport restore(ResultSet row, int index) throws SQLException {
+        return restoreCurrent(row, json);
+    }
+
+    /** 当前报销查询和跨单单条 SQL 共用投影恢复校验，防止旧轮次或空投影静默漏算。 */
+    static ExpenseReport restoreCurrent(ResultSet row, JsonUtil json) throws SQLException {
         var state = json.read(row.getString("state_json"), ExpenseReport.State.class);
         if (!state.id().toString().equals(row.getString("id")) || !state.tenantId().equals(row.getString("tenant_id"))
                 || !state.applicationId().toString().equals(row.getString("application_id"))
                 || !state.employeeId().equals(row.getString("employee_id")) || state.version() != row.getLong("version")) {
             throw new IllegalStateException("Persisted expense report binding is inconsistent");
         }
-        return ExpenseReport.restore(state);
+        var report = ExpenseReport.restore(state);
+        var round = report.rounds().isEmpty() ? null : report.currentRound();
+        var storedAt = row.getTimestamp("current_submitted_at");
+        if (!Objects.equals(round == null ? null : round.roundNo(), row.getObject("current_round_no", Integer.class))
+                || !Objects.equals(round == null ? null : round.submittedAt().truncatedTo(ChronoUnit.MICROS), storedAt == null ? null : storedAt.toInstant())
+                || !Objects.equals(round == null ? null : round.content().legalEntityId().toString(), row.getString("current_legal_entity_id"))
+                || !Objects.equals(round == null ? null : round.baseCurrency(), row.getString("current_base_currency"))) {
+            throw new IllegalStateException("Persisted expense current round projection is inconsistent");
+        }
+        return report;
     }
 
     private static void requireAudit(String actor, String operation) {

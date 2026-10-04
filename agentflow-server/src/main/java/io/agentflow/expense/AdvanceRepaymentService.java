@@ -15,6 +15,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
@@ -37,10 +38,11 @@ public class AdvanceRepaymentService {
     private final JdbcRepaymentResolutionRepository resolutions;
     private final EmployeeAdvanceRepository balances;
     private final PaymentAudit audit;
+    private final ApplicationEventPublisher events;
     /** 原放款、独立财务与不可变收款事实共同约束确认；不提供手工金额入口。 */
     public AdvanceRepaymentService(CurrentActor actors, AdvanceRepaymentSources sources, PaymentAccess access, PaymentPersonnel personnel,
-            JdbcAdvanceRepaymentCheckRepository checks, JdbcAdvanceRepaymentRepository repayments, JdbcRepaymentResolutionRepository resolutions, EmployeeAdvanceRepository balances, PaymentAudit audit) {
-        this.actors = actors; this.sources = sources; this.access = access; this.personnel = personnel; this.checks = checks; this.repayments = repayments; this.resolutions = resolutions; this.balances = balances; this.audit = audit;
+            JdbcAdvanceRepaymentCheckRepository checks, JdbcAdvanceRepaymentRepository repayments, JdbcRepaymentResolutionRepository resolutions, EmployeeAdvanceRepository balances, PaymentAudit audit, ApplicationEventPublisher events) {
+        this.actors = actors; this.sources = sources; this.access = access; this.personnel = personnel; this.checks = checks; this.repayments = repayments; this.resolutions = resolutions; this.balances = balances; this.audit = audit; this.events = events;
     }
     /** 幂等回放前复核当前原轮次完整字段、财务身份及法人任职。 */
     public void authorize(UUID advanceId) {
@@ -73,6 +75,7 @@ public class AdvanceRepaymentService {
         var repayment = new AdvanceRepayment(UUID.randomUUID(), actor.tenantId(), check.input().id(), check.receipt(), actor.userId(), now, input.comment());
         var advance = source.advance(); long version = advance.version(); advance.repay(version, repayment);
         balances.update(advance, version, actor.userId(), "REPAYMENT_RECORDED"); var recorded = check.record(repayment, now); checks.update(recorded); repayments.create(repayment, advance);
+        events.publishEvent(new AdvanceRepaymentChanged(recorded));
         var event = audit.record(source.authorization(), repayment.id(), advance.version(), "FINANCE", "ADVANCE_REPAYMENT_RECORD", check.status().name(), recorded.status().name(), input.comment(), now);
         return new ActionReceipt(advanceId, check.input().id(), recorded.version(), repayment.id(), advance.version(), event);
     }
@@ -96,19 +99,19 @@ public class AdvanceRepaymentService {
     public AdvanceRepaymentCheck claim(String tenant, UUID id, Instant at) {
         var initial = checks.find(tenant, id).orElse(null); if (initial == null || !initial.active()) return null;
         var source = sources.locked(tenant, initial.input().request().advanceId()); var current = checks.find(tenant, id).orElseThrow(); var now = time(at);
-        if (current.expired(now)) { checks.update(current.fail(AdvanceRepaymentCheck.Issue.TIMEOUT, now)); return null; }
+        if (current.expired(now)) { persistCheck(current.fail(AdvanceRepaymentCheck.Issue.TIMEOUT, now)); return null; }
         if (current.status() != AdvanceRepaymentCheck.Status.QUEUED || !available(current, source, now)) return null;
-        var claimed = current.claim(now, QUERY_LEASE); checks.update(claimed); return claimed;
+        var claimed = current.claim(now, QUERY_LEASE); persistCheck(claimed); return claimed;
     }
     /** 新凭据只进入待确认；已入账原凭据撤销或矛盾则保留原账并单独冻结。 */
     @Transactional
     public void finish(AdvanceRepaymentCheck claimed, FinanceResult<AdvanceRepaymentPort.Receipt> result, Instant at) {
         var source = sources.locked(claimed.input().tenantId(), claimed.input().request().advanceId()); var current = current(claimed); if (current == null) return; var now = time(at);
         if (!available(current, source, now)) return;
-        var completed = current.complete(result, now); checks.update(completed);
-        if (completed.receipt() == null) return;
+        var completed = current.complete(result, now);
+        if (completed.receipt() == null) { persistCheck(completed); return; }
         var request = completed.input().request(); var original = repayments.forReceipt(completed.input().tenantId(), request.legalEntityId(), request.receiptReference()).orElse(null);
-        if (original == null || !original.receipt().request().advanceId().equals(source.advance().id())) return;
+        if (original == null || !original.receipt().request().advanceId().equals(source.advance().id())) { persistCheck(completed); return; }
         var receipt = completed.receipt();
         var returned = resolutions.returned(completed.input().tenantId(), original.id()).orElse(null);
         // 全额退回才预期原收款撤销；部分退回保留原收款，欠款由独立借方分录增加。
@@ -116,21 +119,26 @@ public class AdvanceRepaymentService {
                 ? AdvanceRepaymentPort.Status.REVERSED : AdvanceRepaymentPort.Status.CONFIRMED;
         long minimumRevision = resolutions.latest(completed.input().tenantId(), original.id()).map(value -> value.receipt().current().revision()).orElse(original.receipt().revision());
         if (receipt.status() != expectedStatus || receipt.revision() < minimumRevision || !receipt.sameSettlement(original.receipt())) {
+            completed = completed.requiringReview(original.id());
             var advance = source.advance();
             if (!advance.repaymentReviews().contains(original.id())) { long version = advance.version(); advance.requireRepaymentReview(version, original.id()); balances.update(advance, version, "repayment-reconciliation", "REPAYMENT_REVIEW"); }
         }
+        persistCheck(completed);
     }
     /** 非业务异常只记录不可用，不创造未收款结论。 */
     @Transactional
     public void fail(AdvanceRepaymentCheck claimed, Instant at) {
         sources.locked(claimed.input().tenantId(), claimed.input().request().advanceId()); var current = current(claimed);
-        if (current != null) checks.update(current.fail(AdvanceRepaymentCheck.Issue.INTERNAL_ERROR, time(at)));
+        if (current != null) persistCheck(current.fail(AdvanceRepaymentCheck.Issue.INTERNAL_ERROR, time(at)));
     }
     private boolean available(AdvanceRepaymentCheck check, AdvanceRepaymentSources.Source source, Instant now) {
         try { sources.requireCheck(check, source); personnel.requireEligible(check.input().tenantId(), check.input().requestedBy(), check.input().request().legalEntityId()); return true; }
-        catch (DomainException changed) { checks.update(check.voidSource(now)); return false; }
+        catch (DomainException changed) { persistCheck(check.voidSource(now)); return false; }
     }
     private AdvanceRepaymentCheck current(AdvanceRepaymentCheck claimed) { return checks.find(claimed.input().tenantId(), claimed.input().id()).filter(value -> value.equals(claimed) && value.status() == AdvanceRepaymentCheck.Status.RUNNING).orElse(null); }
+    private void persistCheck(AdvanceRepaymentCheck value) {
+        checks.update(value); events.publishEvent(new AdvanceRepaymentChanged(value));
+    }
     private static Instant now() { return time(Instant.now()); }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed advance balance or repayment check changed"); }

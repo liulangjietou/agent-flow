@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -28,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class ExpenseResourceAdjustmentPreparationService {
+    private final ApplicationEventPublisher events;
     private static final Duration LEASE = Duration.ofSeconds(90);
     private final CurrentActor actors;
     private final ExpenseResourceAdjustmentAccess access;
@@ -41,7 +43,8 @@ public class ExpenseResourceAdjustmentPreparationService {
     /** 原财务来源、角色、任职、准备和预算写意图在应用层协调。 */
     public ExpenseResourceAdjustmentPreparationService(CurrentActor actors, ExpenseResourceAdjustmentAccess access, ExpenseReportRepository reports,
             ExpenseResourceAdjustmentSources sources, PaymentPersonnel personnel, JdbcExpenseResourceAdjustmentPreparationRepository preparations,
-            JdbcExpenseResourceAdjustmentRepository adjustments, JdbcBudgetConsumptionReversalRepository budgets, ExpenseResourceAdjustmentAudit audit) {
+            JdbcExpenseResourceAdjustmentRepository adjustments, JdbcBudgetConsumptionReversalRepository budgets, ExpenseResourceAdjustmentAudit audit, ApplicationEventPublisher events) {
+        this.events = events;
         this.actors = actors; this.access = access; this.reports = reports; this.sources = sources; this.personnel = personnel;
         this.preparations = preparations; this.adjustments = adjustments; this.budgets = budgets; this.audit = audit;
     }
@@ -65,7 +68,7 @@ public class ExpenseResourceAdjustmentPreparationService {
         if (!prepared.input().basis().reportId().equals(report) || prepared.version() != input.preparationVersion() || !prepared.input().requestedBy().equals(actor.userId())
                 || !preparations.latest(actor.tenantId(), report, actor.userId()).filter(value -> value.input().id().equals(input.preparationId())).isPresent()) throw conflict();
         requireSettlement(prepared.input().basis(), input.settlementVersion()); requireAvailable(prepared); var now = time(Instant.now()); var authorized = prepared.authorize(now);
-        preparations.update(authorized); var adjustment = ExpenseResourceAdjustment.begin(authorized.authorizedInput()); adjustments.create(adjustment, authorized.version());
+        persist(authorized); var adjustment = ExpenseResourceAdjustment.begin(authorized.authorizedInput()); adjustments.create(adjustment, authorized.version());
         var budget = BudgetConsumptionReversalOperation.queue(adjustment.input().budget(), now); budgets.create(budget);
         var event = audit.record(prepared.input().basis(), adjustment.id(), adjustment.version(), "EXPENSE_ADJUSTMENT_AUTHORIZE", input.comment(), now);
         return receipt(authorized, adjustment, budget, event);
@@ -75,27 +78,27 @@ public class ExpenseResourceAdjustmentPreparationService {
     public ExpenseResourceAdjustmentPreparation claim(String tenant, UUID id, Instant at) {
         var initial = preparations.find(tenant, id).orElse(null); if (initial == null || !initial.active()) return null;
         reports.lock(tenant, initial.input().basis().reportId()); var value = preparations.find(tenant, id).orElseThrow(); var now = time(at);
-        if (value.expired(now)) { preparations.update(value.fail("TIMEOUT", now)); return null; }
+        if (value.expired(now)) { persist(value.fail("TIMEOUT", now)); return null; }
         if (value.status() != ExpenseResourceAdjustmentPreparation.Status.QUEUED || !available(value, now)) return null;
-        var claimed = value.claim(now, LEASE); preparations.update(claimed); return claimed;
+        var claimed = value.claim(now, LEASE); persist(claimed); return claimed;
     }
     /** 完成读取时仍复核当前来源，迟到或外部非法期间不能生成可授权准备。 */
     @Transactional
     public void finish(ExpenseResourceAdjustmentPreparation claimed, FinanceResult<AccountingPeriodPort.OpenPeriod> result, Instant at) {
         var current = lockedCurrent(claimed); if (current == null) return; var now = time(at);
-        if (current.expired(now)) { preparations.update(current.fail("TIMEOUT", now)); return; }
+        if (current.expired(now)) { persist(current.fail("TIMEOUT", now)); return; }
         if (!available(current, now)) return;
         ExpenseResourceAdjustmentPreparation next;
         if (result instanceof FinanceResult.Success<AccountingPeriodPort.OpenPeriod> success) {
             try { next = current.ready(success.value(), now); }
             catch (DomainException invalid) { next = current.fail("INVALID_RESPONSE", now); }
         } else next = current.fail(failure(result), now);
-        preparations.update(next);
+        persist(next);
     }
     /** 本地异常只记录分类，不用错误正文或合成期间推进流程。 */
     @Transactional
     public void fail(ExpenseResourceAdjustmentPreparation claimed, Instant at) {
-        var current = lockedCurrent(claimed); if (current != null) preparations.update(current.fail("INTERNAL_ERROR", time(at)));
+        var current = lockedCurrent(claimed); if (current != null) persist(current.fail("INTERNAL_ERROR", time(at)));
     }
     /** 工作台与授权入口共用来源及过期规则，读取入口另执行当前字段授权。 */
     public String authorizationIssue(ExpenseResourceAdjustmentPreparation value, Instant at) {
@@ -103,12 +106,15 @@ public class ExpenseResourceAdjustmentPreparationService {
         if (!value.usable(at)) return "EXPENSE_ADJUSTMENT_PREPARATION_EXPIRED";
         try { requireAvailable(value); return null; } catch (DomainException problem) { return problem.code(); }
     }
+    private void persist(ExpenseResourceAdjustmentPreparation value) {
+        preparations.update(value); events.publishEvent(new ExpenseAdjustmentChanged.Preparation(value));
+    }
     private void requireAvailable(ExpenseResourceAdjustmentPreparation value) {
         var basis = value.input().basis(); requireNoActive(basis); sources.requireCurrent(basis);
         personnel.requireEligible(basis.tenantId(), value.input().requestedBy(), basis.legalEntityId());
     }
     private boolean available(ExpenseResourceAdjustmentPreparation value, Instant at) {
-        try { requireAvailable(value); return true; } catch (DomainException changed) { preparations.update(value.voidSource(at)); return false; }
+        try { requireAvailable(value); return true; } catch (DomainException changed) { persist(value.voidSource(at)); return false; }
     }
     private void requireNoActive(ExpenseResourceAdjustmentBasis basis) {
         if (adjustments.active(basis.tenantId(), basis.reportId()).isPresent()) throw new DomainException("EXPENSE_ADJUSTMENT_EXISTS", "Original expense already has an active adjustment");

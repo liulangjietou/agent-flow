@@ -17,6 +17,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,11 +35,12 @@ public class SupplierPaymentDisputeService {
     private final SupplierPaymentService execution;
     private final JdbcTemplate jdbc;
     private final JsonUtil json;
+    private final ApplicationEventPublisher events;
 
     /** 裁决与核销共用原轮次读取及独立财务条件，网络查询仍由原银行工作器执行。 */
     public SupplierPaymentDisputeService(CurrentActor actors, SupplierSettlementAccess access, SupplierPaymentSources sources,
-            JdbcSupplierPaymentOperationRepository payments, SupplierPaymentService execution, JdbcTemplate jdbc, JsonUtil json) {
-        this.actors = actors; this.access = access; this.sources = sources; this.payments = payments; this.execution = execution; this.jdbc = jdbc; this.json = json;
+            JdbcSupplierPaymentOperationRepository payments, SupplierPaymentService execution, JdbcTemplate jdbc, JsonUtil json, ApplicationEventPublisher events) {
+        this.actors = actors; this.access = access; this.sources = sources; this.payments = payments; this.execution = execution; this.jdbc = jdbc; this.json = json; this.events = events;
     }
 
     /** 所有写入和幂等回放先检查当前原轮次字段、法人任职及与原出纳的分离。 */
@@ -74,7 +76,7 @@ public class SupplierPaymentDisputeService {
         if (candidate == null || candidate.status() != input.outcome()) throw new DomainException("SUPPLIER_PAYMENT_DISPUTE_UNRESOLVABLE", "Displayed supplier bank terminal evidence changed");
         var decision = new SupplierPaymentDisputeResolution(UUID.randomUUID(), before.command().tenantId(), paymentId, before.version(), Math.incrementExact(before.version()),
                 candidate, actors.actor().userId(), now, input.evidenceReference().trim(), input.comment());
-        var after = payments.resolve(decision);
+        var after = payments.resolve(decision); events.publishEvent(new SupplierPaymentChanged(before, after));
         return receipt(context, after, Action.RESOLVE, decision.id(), audit(before, after, Action.RESOLVE, input.comment(), now));
     }
 

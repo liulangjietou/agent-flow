@@ -1,0 +1,515 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F17",
+  "taskStatus": "OPEN",
+  "stage": "REPAYMENT_NOTIFICATIONS_BACKEND_UI_SCOPE_VERIFIED",
+  "recordedAt": "2026-10-03T21:16:22.733236+00:00",
+  "implementationCommit": "1a06c0c1e206d96a5fa4b7b08c5b3935d489ca9e",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "原借款还款查询失败、来源失效、查无、待确认、收款撤销及明确登记通知",
+    "本次原查询触发既有还款复核的关联持久化，包括 CONFIRMED 但原件不一致的情形",
+    "按原登记编号重放被消费查询和相邻借款修订，保留旧 JSON 可读性",
+    "当前接收人、角色、法人和字段权限，登记与复核冻结的事务回滚及外发复核",
+    "实际 Vue 消息入口、只读详情、身份与迟到响应隔离、原申请轮次导航"
+  ],
+  "validation": {
+    "java": {
+      "distinctTests": 157,
+      "byClass": {
+        "io.agentflow.expense.AdvanceDisbursementReturnTest": 11,
+        "io.agentflow.expense.AdvanceRepaymentCheckTest": 6,
+        "io.agentflow.expense.AdvanceRepaymentResolutionTest": 7,
+        "io.agentflow.expense.AdvanceRepaymentReviewCheckTest": 3,
+        "io.agentflow.expense.AdvanceRepaymentTest": 8,
+        "io.agentflow.finance.AdvanceRepaymentAdjustmentPortTest": 8,
+        "io.agentflow.api.OpenApiContractTest": 7,
+        "io.agentflow.expense.AdvanceRepaymentIntegrationTest": 56,
+        "io.agentflow.expense.ExpenseSubmissionIntegrationTest": 6,
+        "io.agentflow.finance.GatewayAdvanceDisbursementReturnTest": 5,
+        "io.agentflow.finance.GatewayAdvanceRepaymentAdjustmentTest": 5,
+        "io.agentflow.finance.GatewayAdvanceRepaymentTest": 5,
+        "io.agentflow.notification.InboxIntegrationTest": 9,
+        "io.agentflow.notification.NotificationDeliveryApiIntegrationTest": 8,
+        "io.agentflow.notification.NotificationDeliveryIntegrationTest": 13
+      },
+      "byModule": {
+        "agentflow-domain": 43,
+        "agentflow-server": 114
+      },
+      "rawRuns": [
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.expense.AdvanceDisbursementReturnTest.xml",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.expense.AdvanceRepaymentCheckTest.xml",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.expense.AdvanceRepaymentResolutionTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.expense.AdvanceRepaymentReviewCheckTest.xml",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.expense.AdvanceRepaymentTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.finance.AdvanceRepaymentAdjustmentPortTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.api.OpenApiContractTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.expense.AdvanceRepaymentIntegrationTest.xml",
+          "tests": 56,
+          "failures": 0,
+          "errors": 1,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.finance.GatewayAdvanceDisbursementReturnTest.xml",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.finance.GatewayAdvanceRepaymentAdjustmentTest.xml",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.finance.GatewayAdvanceRepaymentTest.xml",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "report": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/final-notices/TEST-io.agentflow.expense.AdvanceRepaymentIntegrationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "newNotificationIntegration": 9,
+      "newDomainNotice": 3,
+      "finalFailures": 0,
+      "finalErrors": 0,
+      "finalSkipped": 0,
+      "counting": "By classname/name, final nine-case rerun supersedes initial scope results; repeated runs are not added."
+    },
+    "frontend": {
+      "tests": 183,
+      "passed": 183,
+      "failed": 0,
+      "files": 20,
+      "newNoticeTests": 10,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-web-final.log"
+    },
+    "typecheck": "PASS",
+    "productionBuild": "PASS; existing large-chunk warning retained",
+    "openapi": {
+      "result": "PASS",
+      "operations": 355,
+      "schemas": 722,
+      "requestExamples": 125
+    },
+    "authors": {
+      "javaFiles": 1597,
+      "namedTypes": 3085,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "diffCheck": "PASS"
+  },
+  "reproductions": {
+    "backend": {
+      "session": "22154",
+      "tests": 3,
+      "actualMissingNotificationFailures": 3,
+      "result": "RED: expected alice/finance, actual empty",
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-red-reports"
+    },
+    "actualInbox": {
+      "session": "83397",
+      "tests": 1,
+      "result": "RED: missing 查看借款还款 action"
+    }
+  },
+  "corrections": [
+    "查询变化和明确还款登记在持久化后发布同事务事件；正常确认查询保持安静。",
+    "原件状态仍为 CONFIRMED 但与原登记不一致时，查询保存 reviewRepaymentId 并通知真实复核要求，不根据后来余额猜测历史。",
+    "还款详情恢复原查询消费与借款相邻修订；通知失败回滚登记、复核冻结、规范资金凭据、审计和外发意向。",
+    "新前端用例初次因测试入口遗漏环境变量未能加载；补齐实际组件、解析器和 App 导航的编译映射后全部通过。",
+    "一项历史证明测试最初引用了数据库禁止的初始借款版本；改用真实存在的后续占用修订后，9 个通知用例全部重跑通过。保留原始报告，重复执行不累计。"
+  ],
+  "sourceEvidence": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/expense/AdvanceRepaymentCheck.java",
+      "sha256": "8d43acfcb8e2b7cf2b3dbec8196bdde025e86358a083dfc8747e7ad6fcce866e",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-domain/src/main/java/io/agentflow/expense/AdvanceRepaymentCheck.java"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java",
+      "sha256": "2a68fa9b9ee07f1eb04751b48ff8c78109c966219652e479d019b150088b3e0c",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/RepaymentNotice.java",
+      "sha256": "b884d8834128364d8a46337c46abb71d48545fd070845f589b3191954fb72117",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-domain/src/main/java/io/agentflow/notification/RepaymentNotice.java"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/expense/AdvanceRepaymentCheckTest.java",
+      "sha256": "8b58288fa85d1c02262b0d075c44acfa959c905f171e1faa7ad20a8464668015",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-domain/src/test/java/io/agentflow/expense/AdvanceRepaymentCheckTest.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentChanged.java",
+      "sha256": "d9b37c24f185ec3756e0151eedd2154586fab08590ad2173b4730d98e80e5c5f",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentChanged.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentService.java",
+      "sha256": "c30a7b70068d18810eec9d65b6ed062bdec3a6c01b68e15cb27aa95b0d35d9e3",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentService.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/JdbcAdvanceRepaymentRepository.java",
+      "sha256": "c253e2c1c9bf7028f4b7ce3a9eabb7429307f3faceba80a5b7dbb3541c3b3362",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/expense/JdbcAdvanceRepaymentRepository.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java",
+      "sha256": "8dfd13198368307bd208e5c8056e6907f3a1cbe5e11deb864aa2c54972c412e6",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/RepaymentNotificationAccess.java",
+      "sha256": "3f94710057c7b55407af653e88be835a66a538eec479f9d8f31ebe790dad34ad",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/notification/RepaymentNotificationAccess.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/RepaymentNotificationController.java",
+      "sha256": "5be6c0ad85f65a3c94844b16c656581a0a616fedf0bfc7d5a6576d6553a87d49",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/notification/RepaymentNotificationController.java"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/RepaymentNotificationService.java",
+      "sha256": "6d186ef22a802f7521c566fe15e335e296593b9a7e1004228df90cd3716ad3c2",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-server/src/main/java/io/agentflow/notification/RepaymentNotificationService.java"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "6814cd515838f272bf861fac081b2d3aaba0a85bb87a68ea1574b486cb275cb1",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-server/src/main/resources/api/openapi.json"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java",
+      "sha256": "f0ecb3856e4d960807774fa85c1f50d7222bbc27a85a6801f1c1d4f23a0ac03f",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/AdvanceRepaymentIntegrationTest.java",
+      "sha256": "04350702a75a1ebf8981acd5c04c383bb390a399b7113546315082e041ca997c",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-server/src/test/java/io/agentflow/expense/AdvanceRepaymentIntegrationTest.java"
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "d161af0229a6d4b541ac26a4bd01132c19c2a9cab74d3355e349b4e0cdc79d71",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-web/scripts/test-requests.mjs"
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "sha256": "5695ffe0b4951a8932acfec878e1b3c327ebfa3d8f8bbbb77f253cd350b8d717",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-web/src/App.vue"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "6031e97a1f8759c3f9eeb7512f5b963c4e51094360e3fb9869ca354d56465ebf",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-web/src/api.ts"
+    },
+    {
+      "path": "agentflow-web/src/components/NotificationInbox.vue",
+      "sha256": "2b86022c222520eb081a5ff2e1a977cc7375f9bb6d36b54b365410c9fb918904",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-web/src/components/NotificationInbox.vue"
+    },
+    {
+      "path": "agentflow-web/src/components/RepaymentNotificationDetail.vue",
+      "sha256": "3ab079a14fab810501812e5eeed2c5db058355199620d881ae243660aa67f832",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-web/src/components/RepaymentNotificationDetail.vue"
+    },
+    {
+      "path": "agentflow-web/src/notificationInbox.ts",
+      "sha256": "68b69e82ac5bc73069ec987e86e6e637b5818b2409a9d6988559553ffdd7e738",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-web/src/notificationInbox.ts"
+    },
+    {
+      "path": "agentflow-web/src/repaymentNotification.ts",
+      "sha256": "3e78dd7fbbedec3de6bbbc12f83f2f74ee8cdc95e230f168ab55e7add214970f",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-web/src/repaymentNotification.ts"
+    },
+    {
+      "path": "agentflow-web/tests/repayment-notifications.test.mjs",
+      "sha256": "950709ce6c32526a74bd92f6a6312c7081b3ce9399f0d9a30014612347c764f3",
+      "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-evidence-snapshot/source/agentflow-web/tests/repayment-notifications.test.mjs"
+    }
+  ],
+  "artifactEvidence": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.expense.AdvanceDisbursementReturnTest.xml",
+      "sha256": "56d88589e1c9375dfaef299e05f01b816c3b1fa3e5e2e7d809c17ae10a71d849",
+      "bytes": 12337
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.expense.AdvanceRepaymentCheckTest.xml",
+      "sha256": "537210c0edc60168590682d48b79642f8903b3e7f8fbfc7f2c9a7da19176e28e",
+      "bytes": 11383
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.expense.AdvanceRepaymentResolutionTest.xml",
+      "sha256": "fbe65a485b769b52ee0806bd143cc01b546920ce32ec0cc76d150f1e0b9e18d3",
+      "bytes": 11657
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.expense.AdvanceRepaymentReviewCheckTest.xml",
+      "sha256": "eba61188828dc9f84720c2b90fef8b5f506d5ef5c7a1fced8975ec8e42496440",
+      "bytes": 10965
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.expense.AdvanceRepaymentTest.xml",
+      "sha256": "ed51587414bfcfcd868697dbc8e9dd13cb285e4038c27750f5247b887ac103a7",
+      "bytes": 11721
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-domain/TEST-io.agentflow.finance.AdvanceRepaymentAdjustmentPortTest.xml",
+      "sha256": "50ed246835279f8d3a2a8c89ec92262fd8bf2e42fd7a3d00cb47a67c2f641a11",
+      "bytes": 11853
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.api.OpenApiContractTest.xml",
+      "sha256": "a50d9c7d3351ba35235c04e3c9864df1dc56929f53062563c72065c2e2592183",
+      "bytes": 74135
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.expense.AdvanceRepaymentIntegrationTest.xml",
+      "sha256": "b7afa199e59ac4bcd07e00729157f8aabdadbee4c5e2ce0d4c703e72b1a84608",
+      "bytes": 86182
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+      "sha256": "27f119b2fdea26eb248a3c983ac9450e3e40c6bdf5bd258521c43f3dc3029f48",
+      "bytes": 74250
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.finance.GatewayAdvanceDisbursementReturnTest.xml",
+      "sha256": "a0c29166eda4bda60147604a4af87a8dce4a97f149feabe315e6667c68bab5c1",
+      "bytes": 44378
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.finance.GatewayAdvanceRepaymentAdjustmentTest.xml",
+      "sha256": "4df05526d6adf970d58615e83f48d85c7d30c485dbabe506eefa192b86e67d55",
+      "bytes": 44384
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.finance.GatewayAdvanceRepaymentTest.xml",
+      "sha256": "6b3b8306bc32a5d2602f93e17f0ac3a7e05521daabc8f51e0a8a61fca865620f",
+      "bytes": 44336
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+      "sha256": "c88c16adbde29375fe1212f700381c579ba629457b09438127deee39c538d7fe",
+      "bytes": 74623
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+      "sha256": "d176b4ca043e54cbf86380c69bd2b644b673903be8d74c966f9acec2d3111d89",
+      "bytes": 74751
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/scope/agentflow-server/TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+      "sha256": "4e3a1c8193f99b2a1f85dacc483b771426691f1fcacc4daa0652f621a6b8197a",
+      "bytes": 75017
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-final-reports/final-notices/TEST-io.agentflow.expense.AdvanceRepaymentIntegrationTest.xml",
+      "sha256": "679138cccdf3907ee8088cade7229d12fb7433df8a30b85e7f68002f42b00402",
+      "bytes": 74308
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-authors-final.log",
+      "sha256": "33017e477a74f363ff9dcb4dd712a2fc1f3ae809f1c940e5c3a46ae853c3d104",
+      "bytes": 73
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-authors.log",
+      "sha256": "33017e477a74f363ff9dcb4dd712a2fc1f3ae809f1c940e5c3a46ae853c3d104",
+      "bytes": 73
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-build-final.log",
+      "sha256": "68bba116e99dd5b3d0e13b2a1efcf51da5251b604de865675b6833764162186c",
+      "bytes": 718
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-build.log",
+      "sha256": "018d29eb81400fe35edeace71396260c47d27650f9ab91e37116f181dd4436ce",
+      "bytes": 718
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-inbox-red.log",
+      "sha256": "bb5ae4769071004c2e3a3f5a15a47a72cba4884df1a2678f749b39b12c9c7928",
+      "bytes": 893
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-java-final-notices.log",
+      "sha256": "4c11a0645789385923484048f708327f46268f44b0dcfef87d5da6aeb804ea82",
+      "bytes": 42567
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-java.log",
+      "sha256": "3ed0b83b1445d5cdfbf9193944d6840337259b76f395893e244fd51884f7869e",
+      "bytes": 199473
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-openapi.log",
+      "sha256": "2ae73adbb68a171ee223aaea7ba90b27a28421edf1aaec440b7cd927de2eb80e",
+      "bytes": 71
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-red.log",
+      "sha256": "5980a60b44c8b501e40c8111d387078c169d820460437a12e751518766737486",
+      "bytes": 46313
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-typecheck.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-web-final.log",
+      "sha256": "67392e94a22ff6c488154d53983526f9d6b3dc0f7efcd7dca0ecaf2b9ffc8cb2",
+      "bytes": 17382
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-web-initial.log",
+      "sha256": "b7ce58955cd63f61c8489abb68953ae352fea28673b53f9f215efb8f5d51d7cd",
+      "bytes": 1578
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-web-label.log",
+      "sha256": "a1177bc002a7eace501d2c5d9e40b615f9582838ce13b4ce6a65da9abc1abce3",
+      "bytes": 994
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-web-retry.log",
+      "sha256": "6b3e77a8a8c91d0d6ccaae17778af3d2c697f2e5f2e60d9df7883c76af20fb8c",
+      "bytes": 994
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-web.log",
+      "sha256": "e941a698d2c28b3da25ded005c88aedfa5891964210ef66978a97b37acf1fc95",
+      "bytes": 17385
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/repayment-notifications-red-reports/TEST-io.agentflow.expense.AdvanceRepaymentIntegrationTest.xml",
+      "sha256": "d8909d7f0897656afcbc8e5dcd1aa4f18e75be37760f4ab972a152bb4e27d1fa",
+      "bytes": 75788
+    }
+  ],
+  "compatibility": {
+    "newPersistedField": "AdvanceRepaymentCheck.reviewRepaymentId",
+    "legacyDefault": null,
+    "newSqlMigration": false,
+    "verified": "旧 JSON 恢复、原查询及登记修订重放通过；缺失标识不反推旧查询的历史复核关系。"
+  },
+  "boundaries": [
+    "F17 整体仍为 OPEN；独立还款复核查询及裁决通知仍待补齐，其余已覆盖来源的异常分支继续核对。",
+    "本阶段为 H2 集成和实际 Vue 组件范围验证；固定安装包、真实浏览器、PostgreSQL 和企业真实回执尚未完成。",
+    "浏览器管理员策略限制与 PostgreSQL 镜像层 I/O 阻碍保持，不绕过受限环境。",
+    "当前分支仅本地提交；E15 依赖 V02 最终本地门禁。"
+  ],
+  "goalCounting": {
+    "knownOpen": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "sessions": {
+    "22154": "EXIT_1 backend genuine RED: three missing recipient assertions",
+    "83397": "EXIT_1 actual inbox missing 查看借款还款",
+    "27765": "EXIT_1 test runner missing new environment variables, corrected",
+    "32914": "EXIT_0 initial OpenAPI/typecheck",
+    "49590": "EXIT_0 new frontend 10",
+    "91742": "EXIT_1 scope 156 passed / 1 new test fixture constraint error; raw reports frozen",
+    "55230": "EXIT_0 OpenAPI/typecheck/build",
+    "94087": "EXIT_0 authors",
+    "2904": "EXIT_0 frontend 183",
+    "58363": "EXIT_0 scoped frontend ten after label fix",
+    "53117": "EXIT_0 final nine notification tests",
+    "22137": "EXIT_0 final frontend 183/typecheck/build",
+    "48326": "EXIT_0 final authors"
+  }
+}

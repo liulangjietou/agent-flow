@@ -39,8 +39,7 @@ public class ExpensePolicyConfiguration {
 
     /** 事前计划只使用启用后的类别目录，费用制度单独发布不改变其金额或有效性。 */
     public Long categoryRevision(String tenant) {
-        var current = service.current(tenant);
-        return current.activePolicy() == null ? null : current.categories().version();
+        return snapshot(tenant).categoryRevision();
     }
 
     /** 配置锁必须留在最终提交事务内，不能检查后释放再创建审批轮次。 */
@@ -76,6 +75,19 @@ public class ExpensePolicyConfiguration {
      * @author owlzhangfq@gmail.com
      */
     public record Snapshot(ExpenseConfigurationService.Current current, ExpensePolicySelection selection) {
+        /** 事前控制只使用已启用的平台类别，与同一快照的控制正文保持原子一致。 */
+        public Long categoryRevision() { return selection == null ? null : current.categories().version(); }
+
+        /** 未配置的类别保持历史语义，不把空值补成新规则。 */
+        public java.util.Map<String, ExpensePriorControl.Snapshot> priorControls() {
+            if (selection == null) return java.util.Map.of();
+            var controls = new HashMap<String, ExpensePriorControl.Snapshot>();
+            for (var category : current.categories().activeCategories()) if (category.priorControl() != null) {
+                controls.put(category.code(), new ExpensePriorControl.Snapshot(category.code(), current.categories().version(), category.priorControl()));
+            }
+            return java.util.Map.copyOf(controls);
+        }
+
         /** 未管理租户保留旧外部制度，已管理租户缺少类别时明确阻断。 */
         public ManagedExpensePolicy forLine(ExpenseLine line) {
             return forCategory(line.categoryCode(), line.unit());

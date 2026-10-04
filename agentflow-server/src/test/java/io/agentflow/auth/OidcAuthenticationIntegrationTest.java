@@ -85,6 +85,17 @@ class OidcAuthenticationIntegrationTest {
                 .andExpect(status().isForbidden()).andExpect(jsonPath("code").value("CSRF_INVALID"));
     }
 
+    @Test void signatureCallbackRequiresReceiptAuthenticationAndDoesNotExposeAdjacentWritePaths() throws Exception {
+        String path = io.agentflow.signature.SignatureCallbackVerifier.PATH;
+        mvc.perform(post(path).contentType("application/json").content("{}"))
+                .andExpect(status().isUnauthorized()).andExpect(jsonPath("code").value("SIGNATURE_CALLBACK_UNAUTHENTICATED"));
+        mvc.perform(get(path)).andExpect(status().isUnauthorized());
+        String operations = "/api/v1/applications/" + java.util.UUID.randomUUID() + "/signatures";
+        for (String endpoint : java.util.List.of(path + "/", path + "/retry", operations, operations + "/" + java.util.UUID.randomUUID() + "/cancel"))
+            mvc.perform(post(endpoint).contentType("application/json").content("{}"))
+                    .andExpect(status().isForbidden()).andExpect(jsonPath("code").value("CSRF_INVALID"));
+    }
+
     @Test
     void eventReceptionRequiresSignatureAndRecoveryKeepsSessionCsrfProtection() throws Exception {
         String path = io.agentflow.event.EventIngressVerifier.PATH;

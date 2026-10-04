@@ -1,0 +1,207 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F17",
+  "taskStatus": "OPEN",
+  "stage": "VOUCHER_PREPARATION_AND_OPERATION_NOTIFICATIONS_BACKEND_AND_UI",
+  "recordedAt": "2026-10-03T18:04:55.795225+00:00",
+  "implementationCommit": "b8949565afd55c297d9e20d1e9a0337e3cf70f9b",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/Volumes/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "Advance accrual, expense accrual and employee payment voucher preparation anomalies and original ERP outcomes",
+    "Immutable original preparation/operation notification identity, independent of later preparations",
+    "Original applicant/requester eligibility; existing financial field permission; PAYMENT kind original legal-entity boundary",
+    "Atomic inbox and outbound intents with current recipient checks",
+    "Protected voucher-target endpoint and actual Vue original-record detail, role-loss and late-response behavior",
+    "Preserved posting facts with explicit independent reversal binding"
+  ],
+  "validation": {
+    "java": {
+      "result": "PASS",
+      "distinctTests": 238,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "suites": [
+        {
+          "module": "agentflow-domain",
+          "path": "TEST-io.agentflow.notification.VoucherNoticeTest.xml",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": "agentflow-domain",
+          "path": "TEST-io.agentflow.finance.VoucherOperationTest.xml",
+          "tests": 15,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": "agentflow-domain",
+          "path": "TEST-io.agentflow.finance.VoucherPreparationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": "agentflow-server",
+          "path": "TEST-io.agentflow.expense.ExpenseSubmissionIntegrationTest.xml",
+          "tests": 40,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": "agentflow-server",
+          "path": "TEST-io.agentflow.expense.AdvanceRepaymentIntegrationTest.xml",
+          "tests": 38,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": "agentflow-server",
+          "path": "TEST-io.agentflow.finance.PaymentOperationIntegrationTest.xml",
+          "tests": 63,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": "agentflow-server",
+          "path": "TEST-io.agentflow.finance.VoucherOperationIntegrationTest.xml",
+          "tests": 34,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": "agentflow-server",
+          "path": "TEST-io.agentflow.notification.NotificationDeliveryIntegrationTest.xml",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": "agentflow-server",
+          "path": "TEST-io.agentflow.notification.NotificationDeliveryApiIntegrationTest.xml",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": "agentflow-server",
+          "path": "TEST-io.agentflow.notification.InboxIntegrationTest.xml",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "module": "agentflow-server",
+          "path": "TEST-io.agentflow.api.OpenApiContractTest.xml",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ],
+      "counting": "Actual testcase elements, de-duplicated by class and name; 63-case full PaymentOperationIntegrationTest includes six nested cases omitted by mixed method selectors."
+    },
+    "frontend": {
+      "result": "PASS",
+      "tests": 68,
+      "failures": 0,
+      "skipped": 0,
+      "files": [
+        "voucher-notifications.test.mjs",
+        "supplier-payment-notifications.test.mjs",
+        "payment-notifications.test.mjs",
+        "notifications.test.mjs",
+        "notification-deliveries.test.mjs",
+        "vouchers.test.mjs"
+      ],
+      "execution": "Real Vue scripts/templates using Vue renderer and actual App navigation; not browser acceptance"
+    },
+    "typecheck": "PASS",
+    "webBuild": {
+      "result": "PASS",
+      "warning": "Existing bundle size warning"
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 345,
+      "schemas": 690,
+      "requestExamples": 125
+    },
+    "authors": {
+      "result": "PASS",
+      "javaFiles": 1538,
+      "namedTypes": 2952,
+      "missing": 0,
+      "parseErrors": 0
+    }
+  },
+  "failureFirstEvidence": [
+    {
+      "log": "voucher-notifications-red.log",
+      "result": "Two failed assertions; unavailable preparation and lost posting lease produced no original participant messages."
+    },
+    {
+      "log": "voucher-notifications-matched.log",
+      "result": "One new expense-flow assertion exposed incorrectly borrowed cashier entity eligibility for ordinary accrual recipients; production condition aligned with existing voucher access, retaining PAYMENT entity scope."
+    },
+    {
+      "log": "voucher-notifications-reversal-workflow-red.log",
+      "result": "Actual approved expense, payment/archive and reversal authorization flow retained POSTED but notice detail omitted its active independent reversal binding; failed true assertion before target change."
+    },
+    {
+      "log": "voucher-notifications-reversal-web-red.log",
+      "result": "Actual inbox/detail template could not render the independent reversal binding before schema/parser/UI support."
+    }
+  ],
+  "verificationCorrections": [
+    "First synthetic reversal fixture lacked the real reversal-operation foreign key and failed before reaching the assertion; replaced with existing real reversal workflow; no production constraint bypass.",
+    "A missing Actor import in the new payment voucher delivery test was corrected before the final successful Java run.",
+    "Mixed method selectors omit six nested PaymentOperationIntegrationTest cases; a separate full 63-case run completed them. Actual testcase identities yield 238 distinct final Java cases, not the sum of repeated runs."
+  ],
+  "artifacts": {
+    "snapshot": "/fyoung/tmp/agentflow-remaining-20260928/voucher-notifications-evidence-snapshot",
+    "sourceManifest": "/fyoung/tmp/agentflow-remaining-20260928/voucher-notifications-evidence-snapshot/sources.json",
+    "sourceManifestSha256": "e9649360f34ed0b4d7bdb4affd4aa5992e6749963f2ea5b108fd118c77143695",
+    "sourceFiles": 23,
+    "artifactManifest": "/fyoung/tmp/agentflow-remaining-20260928/voucher-notifications-evidence-snapshot/artifacts.json",
+    "artifactManifestSha256": "ad5cb77511da5755f94937081430b8529cb4d640f947591d0e63003673cdced8",
+    "artifactFiles": 37,
+    "javaReports": "/fyoung/tmp/agentflow-remaining-20260928/voucher-notifications-final-reports",
+    "finalJavaLogs": [
+      "voucher-notifications-final-2.log",
+      "voucher-notifications-payment-complete.log"
+    ],
+    "webLog": "voucher-notifications-web-final.log",
+    "typecheckLog": "voucher-notifications-typecheck-final.log",
+    "buildLog": "voucher-notifications-build-final.log",
+    "authorsLog": "voucher-notifications-authors-verified.log"
+  },
+  "notVerified": [
+    "Budget, settlement, independent voucher reversal execution/preparation and related recovery exception notification producers",
+    "Whole F17 fixed-package HTTP and nonempty upgrade, restart and paired restore",
+    "Real browser and PostgreSQL acceptance for this new scope",
+    "Real enterprise ERP/bank/email/enterprise IM integrations",
+    "Push, open PR and final CI; local-first instruction retained"
+  ],
+  "taskCount": {
+    "knownOpen": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false,
+    "remainingLowerBound": 34
+  }
+}

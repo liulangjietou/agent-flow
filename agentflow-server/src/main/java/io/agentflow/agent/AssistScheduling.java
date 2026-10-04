@@ -25,7 +25,10 @@ public class AssistScheduling {
     /** 测试和运维可禁用自动轮询，已保存任务保持不变。 */
     @Bean
     @ConditionalOnProperty(name = "agentflow.assist.worker-enabled", havingValue = "true", matchIfMissing = true)
-    public Poller assistPoller(AssistWorker worker, DraftAssistWorker drafts) { return new Poller(worker, drafts); }
+    public Poller assistPoller(AssistWorker worker, DraftAssistWorker drafts, PrecheckExplanationWorker explanations,
+                              ExpenseDraftAssistWorker expenseDrafts, ExpenseRiskWorker expenseRisks) {
+        return new Poller(worker, drafts, explanations, expenseDrafts, expenseRisks);
+    }
 
     /**
      * 调度与工作用例分离，测试可直接执行持久队列而无需等待定时器。
@@ -34,9 +37,15 @@ public class AssistScheduling {
     public static final class Poller {
         private final AssistWorker worker;
         private final DraftAssistWorker drafts;
-        private Poller(AssistWorker worker, DraftAssistWorker drafts) { this.worker = worker; this.drafts = drafts; }
+        private final PrecheckExplanationWorker explanations;
+        private final ExpenseDraftAssistWorker expenseDrafts;
+        private final ExpenseRiskWorker expenseRisks;
+        private Poller(AssistWorker worker, DraftAssistWorker drafts, PrecheckExplanationWorker explanations,
+                       ExpenseDraftAssistWorker expenseDrafts, ExpenseRiskWorker expenseRisks) {
+            this.worker = worker; this.drafts = drafts; this.explanations = explanations; this.expenseDrafts = expenseDrafts; this.expenseRisks = expenseRisks;
+        }
         /** 固定延时避免同一调度线程重入。 */
         @Scheduled(fixedDelayString = "${agentflow.assist.poll-delay-ms:1000}", scheduler = "assistTaskScheduler")
-        public void poll() { worker.poll(); drafts.poll(); }
+        public void poll() { worker.poll(); drafts.poll(); explanations.poll(); expenseDrafts.poll(); expenseRisks.poll(); }
     }
 }

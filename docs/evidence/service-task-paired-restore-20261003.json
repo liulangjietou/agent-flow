@@ -1,0 +1,284 @@
+{
+  "schemaVersion": 1,
+  "taskId": "W01",
+  "stage": "PAIRED_H2_AND_SYNTHETIC_RECEIVER_RESTORE_VERIFIED",
+  "taskClosed": false,
+  "recordedAt": "2026-10-03T12:19:31.628929+00:00",
+  "implementationCommit": "6effa2349c60248d17921e5d57a9099af236961f",
+  "applicationCommit": "29863129698d7d1c93cc5392df01b4d279d9f7de",
+  "branch": "codex/governance-identifier-integration",
+  "summary": "固定安装包的独立 H2 逻辑备份与合成接收方账本配套恢复通过；原执行号只查询、不重发，原流程经人工审批完成。浏览器与 PostgreSQL 验收尚未完成。",
+  "verification": {
+    "actualPairedRestore": {
+      "directory": "/fyoung/tmp/agentflow-service-restore-dypx2j6v",
+      "jarSha256": "5c94e4361d12f091e4c4fca2bbb9eaf4099844f18bafe3c2ae4421ccdc0bd4ef",
+      "synthetic": true,
+      "result": "PASS",
+      "pendingApplicationId": "5b1a14ec-1f48-4239-b0b5-f2f3418815d1",
+      "completedApplicationId": "687b941a-4ccf-402c-bab7-ffe12dae6612",
+      "operationId": "244f9610-d4aa-4b4c-baf4-0dc79ac37e0e",
+      "allDatabaseContentsEqualBeforeStartup": true,
+      "sourceContentSha256": "66bb8182b7b4f3c202a643104ec8c9bb789c840573aef3a0366eddb5dab607cc",
+      "canonicalContentSha256": "09af7b340401860803c530bb42ecd4f65b7a93e9426d7bd74903bf99daaf5b38",
+      "receiverEffectsPreserved": 2,
+      "executeCallsAfterRestore": 0,
+      "originalNumberQueriesAfterRestore": 1,
+      "originalHumanApprovalContinued": true,
+      "originalSourceUnchanged": true,
+      "manifest": "/fyoung/tmp/agentflow-service-restore-dypx2j6v/backup/manifest.json"
+    },
+    "h2Version": "2.5.250",
+    "comparisonTests": {
+      "tests": 4,
+      "failures": 0,
+      "result": "PASS"
+    },
+    "sharedFixtureRestart": {
+      "cycles": 1,
+      "result": "PASS",
+      "executeCalls": 1,
+      "originalNumberQueries": 1
+    },
+    "originalDirectoryPreserved": true,
+    "ownedRuntimeAndReceiverListenersStopped": true,
+    "databaseComparison": {
+      "beforeApplicationStartup": true,
+      "includes": "all application, migration, engine table data, definitions and sequences",
+      "excludes": [
+        "database deployment settings",
+        "password salts"
+      ],
+      "normalization": "Only independent one-line ADD CONSTRAINT statement order is ignored; bodies and duplicate counts remain exact. All other export content retains order.",
+      "backupRetainsExcludedFields": true
+    },
+    "runtimeViewEvidence": "docs/evidence/service-task-runtime-view-20261003.json"
+  },
+  "investigation": [
+    {
+      "attempt": "/fyoung/tmp/agentflow-service-restore-tjslr_h0",
+      "result": "FAIL",
+      "cause": "Acceptance script passed H2 SCRIPT options in unsupported order; full backup existed, content export failed.",
+      "fix": "Use NOPASSWORDS before NOSETTINGS as specified by H2 grammar."
+    },
+    {
+      "attempt": "/fyoung/tmp/agentflow-service-restore-1c1fc9_8",
+      "result": "FAIL",
+      "cause": "Byte comparison reported two independent unique-constraint statements in a different order; statement content and all other export lines matched.",
+      "fix": "Normalize only independent single-line constraint order; four tests reject data, schema and constraint-content or count changes."
+    }
+  ],
+  "limits": [
+    "合成回环接收方；不是企业灾备或真实外部服务验收",
+    "本样例没有附件原件，不替代数据库与文件配套恢复验收",
+    "不是断电、RPO/RTO、生产 PostgreSQL 或真实浏览器结论"
+  ],
+  "remaining": {
+    "knownOpenTasks": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "lowerBound": true,
+    "W01": [
+      "真实浏览器交互",
+      "PostgreSQL 新公开设计与运行记录范围补测"
+    ]
+  },
+  "artifactSnapshot": "/fyoung/tmp/agentflow-remaining-20260928/service-task-paired-restore-evidence-snapshot",
+  "artifactCount": 36,
+  "artifacts": [
+    {
+      "path": "investigation/constraint-export-order.diff",
+      "size": 1336,
+      "sha256": "3f6c39b6375bfc694b3e7279f633b130beccbb087f8b68dc6c016ada8f23111a"
+    },
+    {
+      "path": "investigation/option-order-red.log",
+      "size": 1321,
+      "sha256": "d986e26dc264b0b2e02864d96b6afb5293fbf0d1c1a7a63dc73cf859b8a1ca76"
+    },
+    {
+      "path": "paired/backup/database.sql",
+      "size": 560976,
+      "sha256": "241431eefeb04b51783ac209763ff1bb65eeba7816f95f0fedb3609bf794285c"
+    },
+    {
+      "path": "paired/backup/manifest.json",
+      "size": 751,
+      "sha256": "940ed109fa9f960e193783b5b9e0184fa10086dffaf365cdb72cd9706b5524b0"
+    },
+    {
+      "path": "paired/backup/receiver.json",
+      "size": 2368,
+      "sha256": "b271b43744254e9d5ac798f3a190a9b40132041a0d340f7f336bf2c8e5170f8f"
+    },
+    {
+      "path": "paired/backup/source-runtime.yaml",
+      "size": 968,
+      "sha256": "1e7a387cf92a9e988fc70730058ee5dc35c857e63060477714f65b6556ab2f3b"
+    },
+    {
+      "path": "paired/backup.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "paired/restore.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "paired/restored/receiver.json",
+      "size": 2728,
+      "sha256": "7b3c269511fd4905dbd1cee6ccb6ce051451a2b4def86fa6fb3e52e582995795"
+    },
+    {
+      "path": "paired/restored/recovered-application.json",
+      "size": 790,
+      "sha256": "e6a1a8b968c41fb2d4c14eb830072fb9ee00f50d589ae40075d4ddfa45553865"
+    },
+    {
+      "path": "paired/restored/recovered-status.json",
+      "size": 743,
+      "sha256": "76953d0b154a26aa7f66f704e32c3881619221a66e27c5d62084bd9526d75fee"
+    },
+    {
+      "path": "paired/restored/runtime-1.log",
+      "size": 14884,
+      "sha256": "0a6951874f9c042a419a7ee2e4d19cf6f0b64ee7c85e764c6a0f7dd1da3d1406"
+    },
+    {
+      "path": "paired/restored/runtime.yaml",
+      "size": 970,
+      "sha256": "4c61a374f95424fb2f7405001ac6c8dda6961520ec183fdd73d62d7bc7c67530"
+    },
+    {
+      "path": "paired/restored-content.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "paired/restored-content.sql",
+      "size": 560864,
+      "sha256": "1cb24db0f78571d8f48088cd12860bee08690d0f22c75612cba1987f4c9b5403"
+    },
+    {
+      "path": "paired/result.json",
+      "size": 891,
+      "sha256": "1f37067856e4263ead80fd8936ec62cfb7245a3cad75f99ed67b80155d0c2c34"
+    },
+    {
+      "path": "paired/source/completed-application.json",
+      "size": 769,
+      "sha256": "e7cc36c078b37e454fa1a34e505360860af903e70b4c5bf6aaf7ecf358d446ae"
+    },
+    {
+      "path": "paired/source/pending-status.json",
+      "size": 642,
+      "sha256": "fd85c855a9ec9012c2a16771adac6d2b37b87e6807ff522ec6ab38e6b50375d4"
+    },
+    {
+      "path": "paired/source/receiver.json",
+      "size": 2368,
+      "sha256": "b271b43744254e9d5ac798f3a190a9b40132041a0d340f7f336bf2c8e5170f8f"
+    },
+    {
+      "path": "paired/source/runtime-1.log",
+      "size": 36484,
+      "sha256": "a8ec0ea4b7ecea2f6d4b81dda7113f1dde82bae994cde2a9b01a381b7a149487"
+    },
+    {
+      "path": "paired/source/runtime.yaml",
+      "size": 968,
+      "sha256": "1e7a387cf92a9e988fc70730058ee5dc35c857e63060477714f65b6556ab2f3b"
+    },
+    {
+      "path": "paired/source-content.log",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "paired/source-content.sql",
+      "size": 560864,
+      "sha256": "66bb8182b7b4f3c202a643104ec8c9bb789c840573aef3a0366eddb5dab607cc"
+    },
+    {
+      "path": "restart-fixture/receiver.json",
+      "size": 1556,
+      "sha256": "806b3aad809cc9497ac19c102ce2407d96616f9024ccda5be15d8587abaffcae"
+    },
+    {
+      "path": "restart-fixture/result.json",
+      "size": 436,
+      "sha256": "271a6a8b51f4f328400c5aa30c5a1240bf225e4f2a3055cff777d4249e432f05"
+    },
+    {
+      "path": "restart-fixture/runtime-1.log",
+      "size": 37150,
+      "sha256": "a7600cf428ab5f1d9bdd9f88a1f06b8574ba5ea6281032b2eaa1b83ecacc7c5a"
+    },
+    {
+      "path": "restart-fixture/runtime-2.log",
+      "size": 14202,
+      "sha256": "b9c79666c913bfd79a901cd838de42b9046668bfb597d4a1a1ce2e7a0d80bbbd"
+    },
+    {
+      "path": "restart-fixture/runtime-3.log",
+      "size": 14877,
+      "sha256": "8480e3da517a8b068721bfecaeb553ba745e0c6f19c91d744e3c4900295c7657"
+    },
+    {
+      "path": "restart-fixture/runtime.yaml",
+      "size": 961,
+      "sha256": "ac24a300e9f4a1f1b6c555493e528d6f89a335d9a2187d3f134b7684183070d9"
+    },
+    {
+      "path": "restart-fixture/status-after-recovery-0.json",
+      "size": 746,
+      "sha256": "c6a0f59503c4c08160d14bab73e9ee971a8d62cf1137f638986cafc7f9f1b2b8"
+    },
+    {
+      "path": "restart-fixture/status-before-crash-0.json",
+      "size": 642,
+      "sha256": "807d128422222069277170cd70dbca867a7b0fe7a0509ef81eb72a186b0881e9"
+    },
+    {
+      "path": "service-task-paired-restore-second.log",
+      "size": 966,
+      "sha256": "cbf298ca12b83373ddc05168875a53a08b221e746665944c1edbd971c9210db5"
+    },
+    {
+      "path": "service-task-paired-restore-verified.log",
+      "size": 857,
+      "sha256": "60cd22b3ad5ccdbc76cee22b012a880fa4fa471e1441cd397131d2214b711238"
+    },
+    {
+      "path": "service-task-paired-restore.log",
+      "size": 2336,
+      "sha256": "d9359a24f5e036d6ef3fdb75a6d17a21710053fba57e03a3caf4db9f43587cd6"
+    },
+    {
+      "path": "service-task-restart-shared-fixture-verified.log",
+      "size": 374,
+      "sha256": "83cd31d40526c7b99e35efe90238669b650cfa573ebee9b8e11e61513200ad25"
+    },
+    {
+      "path": "service-task-restore-comparison-tests.log",
+      "size": 539,
+      "sha256": "934b07e441dba8c622fd64981e8c85c47027cca5c83bcfb21cdf94fc2c7b5a67"
+    }
+  ],
+  "sources": [
+    {
+      "path": "scripts/check-service-task-restart.py",
+      "sha256": "afd407c06805226d70ca12b011244f462a97a1c78b572da7513b1ca00941c272"
+    },
+    {
+      "path": "scripts/check-service-task-restore.py",
+      "sha256": "5b4b56ec6ea17fc220a2c60d425fb4ff67684ae57b8e7209fe43bc58f2862b53"
+    },
+    {
+      "path": "scripts/tests/test_service_task_restore.py",
+      "sha256": "66ccfadb60364cd933396f973a58fbdc754770c9ff3d4b2779bb620225653110"
+    }
+  ]
+}

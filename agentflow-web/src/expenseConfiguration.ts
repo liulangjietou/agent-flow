@@ -1,8 +1,9 @@
-import type { Money } from './expenses'
+import { readPriorControl, type PriorControl } from './expensePriorControl.js'
+import { amountMinor, type Money, type ExpenseAllowanceRule } from './expenses.js'
 
 export type ExpenseUnit = 'ITEM' | 'DAY' | 'NIGHT' | 'KILOMETER' | 'PERSON'
 export const expenseUnits: Record<ExpenseUnit, string> = { ITEM: '项', DAY: '天', NIGHT: '晚', KILOMETER: '公里', PERSON: '人' }
-export interface ExpenseCategory { code: string; name: string; units: ExpenseUnit[]; active: boolean }
+export interface ExpenseCategory { code: string; name: string; units: ExpenseUnit[]; active: boolean; priorControl?: PriorControl | null }
 export interface ExpenseCategories { tenantId: string; version: number; categories: ExpenseCategory[] }
 export interface PolicyMatch {
   legalEntityIds: string[]; categoryCodes: string[]; cityTiers: string[]; employeeGrades: string[]
@@ -12,6 +13,7 @@ export interface PolicyConstraints {
   effect: 'ALLOW' | 'DENY'; unitPriceLimit: Money | null; limitUnit: ExpenseUnit | null
   invoiceMaxAgeDays: number | null; invoiceAgeAction: 'REJECT' | 'REQUIRE_REASON' | null
   allowedServiceLevels: string[]; priorRequestRequired: boolean
+  fixedAllowance?: ExpenseAllowanceRule | null
 }
 export interface ExpensePolicyRule { key: string; name: string; match: PolicyMatch; constraints: PolicyConstraints }
 export interface ExpensePolicyDefinition { name: string; rules: ExpensePolicyRule[] }
@@ -56,7 +58,8 @@ function selectors(value: unknown, identities = false): string[] {
 function readCategory(value: ExpenseCategory): ExpenseCategory {
   requireValue(object(value) && text(value.code, 64) && text(value.name, 128) && typeof value.active === 'boolean'
     && Array.isArray(value.units) && value.units.length > 0 && value.units.every(unit) && new Set(value.units).size === value.units.length)
-  return { code: value.code, name: value.name, units: [...value.units], active: value.active }
+  return { code: value.code, name: value.name, units: [...value.units], active: value.active,
+    ...(value.priorControl == null ? {} : { priorControl: readPriorControl(value.priorControl) }) }
 }
 
 /** 同时核对租户和精确历史版本，畸形响应不能成为可编辑的零版。 */
@@ -89,6 +92,14 @@ export function readPolicyConstraints(value: unknown, expectedCurrency: string |
     && ['REJECT', 'REQUIRE_REASON'].includes(constraints.invoiceAgeAction!))
   if (constraints.effect === 'DENY') requireValue(!constraints.unitPriceLimit && constraints.invoiceMaxAgeDays === null
     && !constraints.allowedServiceLevels.length && !constraints.priorRequestRequired)
+  if (c.fixedAllowance != null) {
+    const fixed = c.fixedAllowance
+    requireValue(object(fixed) && object(fixed.dailyRate) && fixed.dayCountBasis === 'CALENDAR_DAYS_INCLUSIVE'
+      && fixed.dailyRate.currency === expectedCurrency && currency(fixed.dailyRate.currency)
+      && amountMinor(fixed.dailyRate.value) > 0n && constraints.effect === 'ALLOW' && !constraints.unitPriceLimit
+      && constraints.invoiceMaxAgeDays === null && !constraints.allowedServiceLevels.length)
+    constraints.fixedAllowance = { dailyRate: { ...fixed.dailyRate }, dayCountBasis: fixed.dayCountBasis }
+  }
   return constraints
 }
 
@@ -104,6 +115,7 @@ export function readPolicyDefinition(value: unknown): ExpensePolicyDefinition {
     requireValue((match.fromDate === null || day(match.fromDate)) && (match.throughDate === null || day(match.throughDate))
       && (!match.fromDate || !match.throughDate || match.fromDate <= match.throughDate) && (match.currency === null || currency(match.currency)))
     const constraints = readPolicyConstraints(rule.constraints, match.currency)
+    if (constraints.fixedAllowance) requireValue(match.categoryCodes.length > 0)
     return { key: rule.key, name: rule.name, match, constraints }
   })
   requireValue(new Set(rules.map(rule => rule.key)).size === rules.length && new Set(rules.map(rule => JSON.stringify(rule.match))).size === rules.length)
@@ -192,7 +204,10 @@ function decimal(value: string) { return value.replace(/^0+(?=\d)/, '').replace(
 /** 用规范化定义比较保存回执，不把服务端金额补零或集合排序误判为内容更改。 */
 export function policyFingerprint(value: ExpensePolicyDefinition): string {
   const definition = readPolicyDefinition(value)
-  for (const rule of definition.rules) if (rule.constraints.unitPriceLimit) rule.constraints.unitPriceLimit.value = decimal(rule.constraints.unitPriceLimit.value)
+  for (const rule of definition.rules) {
+    if (rule.constraints.unitPriceLimit) rule.constraints.unitPriceLimit.value = decimal(rule.constraints.unitPriceLimit.value)
+    if (rule.constraints.fixedAllowance) rule.constraints.fixedAllowance.dailyRate.value = decimal(rule.constraints.fixedAllowance.dailyRate.value)
+  }
   return JSON.stringify(definition)
 }
 /** 原请求恢复也在清除幂等槽之前验证成功回执。 */
@@ -223,6 +238,8 @@ export function configurationError(error: unknown): string {
     EXPENSE_CATEGORY_REMOVAL_FORBIDDEN: '已有类别只能停用，不能删除或更改代码。',
     EXPENSE_POLICY_INCOMPLETE: '请先保存类别目录，并为制度添加至少一条完整规则。',
     EXPENSE_POLICY_CATEGORY_UNAVAILABLE: '制度引用了未启用的类别，请核对类别和规则后重新发布。',
+    ALLOWANCE_CATEGORY_UNIT_REQUIRED: '定额补贴引用的类别只能使用“天”单位，请调整类别后重新发布。',
+    INVALID_ALLOWANCE_RULE: '请填写大于零的每日补贴金额，并明确按自然日含起止日计算。',
     INVALID_EXPENSE_POLICY_DEFINITION: '规则条件或约束不完整，请核对币种、单位、日期和重复条件。',
     INVALID_EXPENSE_CATEGORIES: '请核对类别代码、名称和至少一个允许单位。',
     INVALID_EXPENSE_CONFIGURATION_REQUEST: '输入不完整或格式不正确，请核对后重试。'

@@ -9,6 +9,10 @@ import io.agentflow.form.FormValidationException;
 import io.agentflow.notification.NotificationTexts;
 import io.agentflow.procurement.ProcurementPaymentFormContract;
 import io.agentflow.budget.BudgetAdjustmentFormContract;
+import io.agentflow.expense.AdvanceRequestFormContract;
+import io.agentflow.expense.ExpenseFormContract;
+import io.agentflow.expense.ExpensePlanFormContract;
+import io.agentflow.expense.ExpenseProcessPolicy;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,6 +34,9 @@ public record ProcessTemplate(String key, long templateVersion, String name, Str
     private static final String FORM = "FORM";
     private static final String PROCUREMENT_PAYMENT = "PROCUREMENT_PAYMENT";
     private static final String BUDGET_ADJUSTMENT = "BUDGET_ADJUSTMENT";
+    private static final String EXPENSE = "EXPENSE";
+    private static final String EXPENSE_PLAN = "EXPENSE_PLAN";
+    private static final String ADVANCE_REQUEST = "ADVANCE_REQUEST";
 
     /** 冻结目录说明与业务图；启用通知的模板仅支持已实现的三类站内文案。 */
     public ProcessTemplate {
@@ -39,7 +46,7 @@ public record ProcessTemplate(String key, long templateVersion, String name, Str
         for (String value : new String[]{name, category, description, scope, businessType, upgradePolicy}) {
             if (value == null || value.isBlank()) throw new IllegalArgumentException("Template description is required");
         }
-        if (!java.util.Set.of(FORM, PROCUREMENT_PAYMENT, BUDGET_ADJUSTMENT).contains(businessType)) {
+        if (!java.util.Set.of(FORM, PROCUREMENT_PAYMENT, BUDGET_ADJUSTMENT, EXPENSE, EXPENSE_PLAN, ADVANCE_REQUEST).contains(businessType)) {
             throw new IllegalArgumentException("Template business type is not supported");
         }
         dependencies = List.copyOf(dependencies);
@@ -70,6 +77,13 @@ public record ProcessTemplate(String key, long templateVersion, String name, Str
         else if (ProcurementPaymentFormContract.structured(formSchema)) throw new IllegalArgumentException("Procurement template must declare its actual business type");
         if (BUDGET_ADJUSTMENT.equals(businessType)) BudgetAdjustmentFormContract.requireReview(graph, formSchema);
         else if (BudgetAdjustmentFormContract.structured(formSchema)) throw new IllegalArgumentException("Budget adjustment template must declare its actual business type");
+        // 内置报销模板同时适用于要求纸件的法人，复制后的流程仍由实际提交事实重新校验。
+        if (EXPENSE.equals(businessType)) ExpenseProcessPolicy.requireSubmittable(graph, formSchema, true);
+        else if (ExpenseFormContract.structured(formSchema)) throw new IllegalArgumentException("Expense template must declare its actual business type");
+        if (EXPENSE_PLAN.equals(businessType)) ExpensePlanFormContract.requireReview(graph, formSchema);
+        else if (ExpensePlanFormContract.structured(formSchema)) throw new IllegalArgumentException("Expense plan template must declare its actual business type");
+        if (ADVANCE_REQUEST.equals(businessType)) AdvanceRequestFormContract.requireReview(graph, formSchema);
+        else if (AdvanceRequestFormContract.structured(formSchema)) throw new IllegalArgumentException("Advance request template must declare its actual business type");
         if (scenarios.stream().map(Scenario::id).distinct().count() != scenarios.size()) {
             throw new IllegalArgumentException("Template scenario ids are duplicated: " + key);
         }
@@ -84,7 +98,8 @@ public record ProcessTemplate(String key, long templateVersion, String name, Str
                 throw new IllegalArgumentException("Template scenario field errors do not match: " + key + "/" + scenario.id());
             }
             List<String> actualPath = actualErrors.isEmpty()
-                    ? new DefinitionSimulator().simulate(graph, new EvaluationContext(scenario.payload(), formSchema.fieldTypes()))
+                    ? new DefinitionSimulator().simulateDetailed(graph, formSchema,
+                            new EvaluationContext(scenario.payload(), formSchema.fieldTypes())).path()
                     : List.of();
             if (!actualPath.equals(scenario.expectedPath())) {
                 throw new IllegalArgumentException("Template scenario path does not match: " + key + "/" + scenario.id());

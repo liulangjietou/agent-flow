@@ -62,6 +62,8 @@ import OrganizationDirectory from './components/OrganizationDirectory.vue'
 import ApprovalProxyManager from './components/ApprovalProxyManager.vue'
 import { approvalProxyDrafts, type ApprovalProxyReceipt } from './approvalProxies'
 import { organizationDrafts, type OrganizationRecord } from './organization'
+import { organizationSyncDrafts, syncPath, type SyncReceipt, type SyncPlanReceipt } from './organizationSync'
+import { rememberSignatureOperation } from './signatures'
 import { initializationDrafts } from './tenantInitialization'
 import BusinessCalendars from './components/BusinessCalendars.vue'
 import { calendarDrafts, type BusinessCalendar } from './businessCalendars'
@@ -77,11 +79,17 @@ import DefinitionResponsibilities from './components/DefinitionResponsibilities.
 import { readResponsibilities, writeResponsibilities, type ApprovalResponsibilities } from './approvalResponsibilities'
 import DefinitionDeadline from './components/DefinitionDeadline.vue'
 import DefinitionTimerWait from './components/DefinitionTimerWait.vue'
+import DefinitionServiceTask from './components/DefinitionServiceTask.vue'
+import type { ServiceTaskBinding } from './serviceTasks'
 import DefinitionEventWait from './components/DefinitionEventWait.vue'
 import DefinitionSubprocess from './components/DefinitionSubprocess.vue'
 import type { SubprocessBinding } from './subprocessDesigner'
 import type { EventBinding } from './events'
 import DefinitionExpenseStage from './components/DefinitionExpenseStage.vue'
+import DefinitionExpenseSelfApproval from './components/DefinitionExpenseSelfApproval.vue'
+import DefinitionExpenseDuplicateApproval from './components/DefinitionExpenseDuplicateApproval.vue'
+import DefinitionExpenseSplitRisk from './components/DefinitionExpenseSplitRisk.vue'
+import { writeSplitRule, writeSplitGateway, type SplitRuleFields } from './expenseSplitPolicy'
 import { assigneeLabel } from './definitionAssignees'
 import { approvalPolicyLabel, isCountersignMode } from './approvalPolicy'
 import { simulationIssue } from './definitionSimulation'
@@ -104,12 +112,15 @@ import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vu
 import EnterpriseLogoutDialog from './components/EnterpriseLogoutDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
-import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage } from './api'
+import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage, type FinancialNotificationTarget, type VoucherNotificationTarget, type BudgetNotificationTarget, type ReversalNotificationTarget, type DisbursementReturnNotificationTarget, type RepaymentReviewNotificationTarget, type ExpensePartialAdjustmentNotificationTarget, type ExpenseAdjustmentNotificationTarget, type SupplierPayableNotificationTarget, type BudgetAdjustmentNotificationTarget, type RepaymentNotificationTarget, type ExpenseReturnNotificationTarget, type SupplierReturnNotificationTarget, type SupplierAdjustmentNotificationTarget, type SupplierSettlementNotificationTarget, type ExpenseSettlementNotificationTarget, type ReversalCheckNotificationTarget } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 import { rememberDraftRun, type DraftAssistReceipt } from './draftAssist'
+import { acknowledgeExplanation, type ExplanationReceipt } from './precheckExplanation'
+import { acknowledgeRisk, type RiskReceipt } from './expenseRisk'
+import { acknowledgeExpenseAssist, type ExpenseAssistReceipt } from './expenseDraftAssist'
 import { acknowledgeExtraction, extractionDrafts, type ExtractionReceipt } from './invoiceExtraction'
 
-type NodeType = 'START' | 'COPY' | 'TIMER_WAIT' | 'EVENT_WAIT' | 'SUB_PROCESS' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
+type NodeType = 'START' | 'COPY' | 'TIMER_WAIT' | 'EVENT_WAIT' | 'SERVICE_TASK' | 'SUB_PROCESS' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
 const comparisonOpen = ref(false)
 const comparisonInput = computed(() => ({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: simulationGraph.value, formSchema: definitionFormSchema.value, notificationTexts: definitionNotificationTexts.value }))
@@ -151,8 +162,10 @@ const taskCount = ref<number | null>(null)
 const taskRefresh = ref(0)
 const taskQueueView = ref<'list' | 'board'>('list')
 const cashierKind = ref<'employee' | 'supplier' | 'batches'>('employee')
+const notificationPaymentId = ref('')
+watch(page, value => { if (value !== 'cashier') notificationPaymentId.value = '' })
 const taskQueuePanel = ref<InstanceType<typeof PendingTaskQueue> | null>(null)
-watch(actorScope, () => { taskQueueView.value = 'list'; cashierKind.value = 'employee' }, { flush: 'sync' })
+watch(actorScope, () => { taskQueueView.value = 'list'; cashierKind.value = 'employee'; notificationPaymentId.value = '' }, { flush: 'sync' })
 let workspaceRefreshGeneration = 0
 let taskCountRequest: AbortController | null = null
 let taskDetailRequest: AbortController | null = null
@@ -262,6 +275,7 @@ const palette: Array<{ type: NodeType; label: string; icon: string }> = [
   { type: 'COPY', label: '抄送', icon: '抄' },
   { type: 'TIMER_WAIT', label: '定时等待', icon: '时' },
   { type: 'EVENT_WAIT', label: '事件等待', icon: '事' },
+  { type: 'SERVICE_TASK', label: '服务任务', icon: '服' },
   { type: 'SUB_PROCESS', label: '子流程', icon: '子' },
   { type: 'EXCLUSIVE_GATEWAY', label: '条件分支', icon: '◇' },
   { type: 'PARALLEL_GATEWAY', label: '并行网关', icon: '＋' },
@@ -586,6 +600,91 @@ async function readNotification(message: InboxMessage) {
   catch (error) { notice.value = errorMessage(error) }
   finally { busy.value = false }
 }
+/** 已在消息详情核验的原付款只定位既有工作区，打开时业务接口仍复核当前权限。 */
+function openPaymentNotification(target: FinancialNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  if (target.view === 'CASHIER_PAYMENT') {
+    if (!canCashier.value) { notice.value = '当前账号没有出纳工作区权限，请重新登录后核对。'; return }
+    if ('executionRequestId' in target && !target.canOpenCashier) { notice.value = '原出纳选择已停止，请保留原记录核对。'; return }
+    notificationPaymentId.value = target.paymentId; cashierKind.value = 'executionRequestId' in target ? 'supplier' : 'employee'; page.value = 'cashier'
+  } else { recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo }
+}
+/** 原凭证详情通过权限后，仍沿原轮次打开业务申请。 */
+function openVoucherNotification(target: VoucherNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+/** 原预算消息打开固定申请轮次，业务页面仍重新核验当前权限。 */
+function openBudgetNotification(target: BudgetNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+/** 原冲销详情仅定位原申请轮次，办理仍由业务入口重新授权。 */
+function openReversalNotification(target: ReversalNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+function openReversalCheckNotification(target: ReversalCheckNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+function openExpenseSettlementNotification(target: ExpenseSettlementNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+/** 固定原采购申请轮次，办理能力由原页面再次核验。 */
+function openSupplierSettlementNotification(target: SupplierSettlementNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+/** 消息固定原应付调整轮次，不复用通知作为财务办理授权。 */
+function openSupplierAdjustmentNotification(target: SupplierAdjustmentNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+/** 回款消息回到原采购轮次，当前办理资格由原入口核对。 */
+function openSupplierReturnNotification(target: SupplierReturnNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+/** 退回消息回到原报销轮次，当前办理资格由原入口核对。 */
+function openExpenseReturnNotification(target: ExpenseReturnNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+/** 退回消息回到原借款轮次，当前办理资格由原入口核对。 */
+function openDisbursementReturnNotification(target: DisbursementReturnNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+/** 还款复核通知固定原申请轮次，后续办理重新核验。 */
+function openRepaymentReviewNotification(target: RepaymentReviewNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+/** 应付消息返回原采购轮次，原财务入口再次校验字段与任职权限。 */
+function openSupplierPayableNotification(target: SupplierPayableNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+function openBudgetAdjustmentNotification(target: BudgetAdjustmentNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+/** 报销调整通知返回原申请轮次，办理仍需独立授权。 */
+function openExpenseAdjustmentNotification(target: ExpenseAdjustmentNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+function openExpensePartialAdjustmentNotification(target: ExpensePartialAdjustmentNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
+/** 还款通知回到原申请轮次，财务操作重新校验。 */
+function openRepaymentNotification(target: RepaymentNotificationTarget) {
+  if (busy.value || writesBlocked.value) return
+  recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo
+}
 /** 旧消息按单项任务实时复核；已结束或转交的任务回到申请权限查询。 */
 async function openNotification(message: InboxMessage) {
   if (busy.value || writesBlocked.value) return
@@ -792,7 +891,13 @@ function editQuick(command: QuickCommand) {
       ? '步骤已添加，请配置节点规则；完成后保存并校验。' : '流程已更新，可通过撤销恢复。'
   } catch (error) { notice.value = errorMessage(error) }
 }
-/** 子引用与输入作为一份配置更新，撤销、保存和切换视图均使用同一快照。 */
+/** 服务引用、契约摘要与输入整体更新，两种视图及撤销共用同一快照。 */
+function patchServiceTask(id: string, value: ServiceTaskBinding) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  const node = nodes.value.find(node => node.id === id)
+  if (node?.type === 'SERVICE_TASK') node.serviceTask = { ...value, inputs: { ...value.inputs } }
+}
+/** 子引用与输入整体更新。 */
 function patchSubprocess(id: string, value: SubprocessBinding) {
   if (editorLocked.value || !canManageDefinitions.value) return
   const node = nodes.value.find(node => node.id === id)
@@ -841,6 +946,38 @@ function patchExpenseStage(id: string, value: string | undefined) {
   if (value === undefined) delete properties.expenseStage
   else properties.expenseStage = value
   node.originalProperties = properties
+}
+/** 开始节点保存整轮费用策略，两种视图与撤销复用同一份属性。 */
+function patchExpenseSelfApproval(id: string, value: string | undefined) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  const node = nodes.value.find(node => node.id === id)
+  if (node?.type !== 'START') return
+  const properties = { ...node.originalProperties }
+  if (value === undefined) delete properties.expenseSelfApproval
+  else properties.expenseSelfApproval = value
+  node.originalProperties = properties
+}
+/** 自动通过策略独立保存，依赖失效时保留原配置交由发布校验明确拒绝。 */
+function patchExpenseDuplicateApproval(id: string, value: string | undefined) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  const node = nodes.value.find(node => node.id === id)
+  if (node?.type !== 'START') return
+  const properties = { ...node.originalProperties }
+  if (value === undefined) delete properties.expenseDuplicateApproval
+  else properties.expenseDuplicateApproval = value
+  node.originalProperties = properties
+}
+/** 开始节点规则统一写入原属性，未编辑的网关保持不变。 */
+function patchExpenseSplitRule(id: string, value: SplitRuleFields) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  const node = nodes.value.find(node => node.id === id)
+  if (node?.type === 'START') node.originalProperties = writeSplitRule(node.originalProperties ?? {}, value)
+}
+/** 网关只切换金额依据；已有错误位置的标记也可以明确清除。 */
+function patchExpenseSplitGateway(id: string, value: string | undefined) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  const node = nodes.value.find(node => node.id === id)
+  if (node && (node.type === 'EXCLUSIVE_GATEWAY' || value === undefined)) node.originalProperties = writeSplitGateway(node.originalProperties ?? {}, value)
 }
 /** 两种设计视图共用期限输入，清除时保留节点其他配置。 */
 function patchQuickDeadline(id: string, deadline: DesignerDeadline | undefined) {
@@ -1070,6 +1207,10 @@ async function recoverOperation(id: string) {
         approvalProxyDrafts.acknowledge(actorScope.value, request.path, request.body!, result as ApprovalProxyReceipt)
         templateRefresh.value++
         notice.value = '已确认原代理操作，请在审批代理页面按原编号核对当前状态。'
+      } else if (request.path.startsWith(syncPath + '/')) {
+        organizationSyncDrafts.acknowledge(actorScope.value, request.path, request.body!, result as SyncReceipt | SyncPlanReceipt)
+        templateRefresh.value++
+        notice.value = '已确认原组织同步操作，请回到外部同步核对原批次和计划；后续应用仍需明确操作。'
       } else if (request.path.startsWith('/organization')) {
         if (request.body) organizationDrafts.acknowledge(actorScope.value, request.path, request.body, result as OrganizationRecord)
         templateRefresh.value++
@@ -1078,6 +1219,11 @@ async function recoverOperation(id: string) {
         if (request.body) calendarDrafts.acknowledge(actorScope.value, request.path, request.body, result as BusinessCalendar)
         templateRefresh.value++
         notice.value = '已确认原日历保存结果，旧版本保持不变。'
+      } else if (/^\/applications\/[^/?]+\/signatures(?:\/[^/?]+\/cancel)?$/.test(request.path)) {
+        const applicationId = decodeURIComponent(request.path.split('/')[2]!)
+        rememberSignatureOperation(actorScope.value, applicationId, (result as { id: string }).id, (JSON.parse(request.body!) as { roundNo?: number }).roundNo)
+        if (recordApplicationId.value === applicationId) recordRefresh.value++
+        notice.value = '原签署操作已确认，请打开电子签页核对原记录和文件保存进度。'
       } else if (/^\/applications\/[^/?]+\/draft-assist-runs(?:\/[^/?]+\/review)?$/.test(request.path)) {
         const applicationId = decodeURIComponent(request.path.split('/')[2]!)
         rememberDraftRun(actorScope.value, applicationId, (result as DraftAssistReceipt).id)
@@ -1133,6 +1279,15 @@ async function recoverOperation(id: string) {
       } else if (/^\/expense-requests\/[^/?]+\/close$/.test(request.path)) {
         notice.value = '原额度关闭结果已确认，请核对最新额度状态。'
         templateRefresh.value++
+      } else if (/^\/expense-reports\/[^/?]+\/draft-assists(?:\/[^/?]+\/(?:confirm|dismiss))?$/.test(request.path)) {
+        acknowledgeExpenseAssist(actorScope.value, request.path, result as ExpenseAssistReceipt)
+        notice.value = '原填报建议操作已确认，请查看同一条记录，再明确选择填入草稿。'
+      } else if (/^\/expense-reports\/[^/?]+\/precheck-explanations(?:\/[^/?]+\/review)?$/.test(request.path)) {
+        acknowledgeExplanation(actorScope.value, request.path, result as ExplanationReceipt)
+        notice.value = '原预检解释操作已确认，请核对同一条记录；费用金额、检查结论和审批状态保持不变。'
+      } else if (/^\/expense-reports\/[^/?]+\/risk-explanations(?:\/[^/?]+\/review)?$/.test(request.path)) {
+        acknowledgeRisk(actorScope.value, request.path, request.body!, result as RiskReceipt)
+        notice.value = '原风险复核操作已确认，请核对同一条记录。'
       } else if (request.path.startsWith('/expense-reports')) {
         if (request.body && (request.path === '/expense-reports' || request.path.endsWith('/revise'))) {
           const value = result as ExpenseDetailData
@@ -1187,7 +1342,7 @@ async function recoverOperation(id: string) {
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
   if (providerNavigation) return
-  if (writeRequests.hasUnconfirmed() || configurationDrafts.hasDrafts() || mappingDrafts.hasDrafts() || extractionDrafts.hasDrafts() || initializationDrafts.hasDrafts() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || approvalProxyDrafts.hasDrafts() || expenseDrafts.hasDrafts() || planDrafts.hasDrafts() || advanceDrafts.hasDrafts() || procurementDrafts.hasDrafts() || budgetAdjustmentDrafts.hasDrafts() || invoiceUploads.hasPending() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
+  if (writeRequests.hasUnconfirmed() || configurationDrafts.hasDrafts() || mappingDrafts.hasDrafts() || extractionDrafts.hasDrafts() || initializationDrafts.hasDrafts() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || organizationSyncDrafts.hasDrafts() || approvalProxyDrafts.hasDrafts() || expenseDrafts.hasDrafts() || planDrafts.hasDrafts() || advanceDrafts.hasDrafts() || procurementDrafts.hasDrafts() || budgetAdjustmentDrafts.hasDrafts() || invoiceUploads.hasPending() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
 }
 defaultGraph(); savedSnapshot.value = snapshot()
 /** 企业身份仅从服务端会话恢复，前端不读取或保存 OIDC 令牌。 */
@@ -1309,7 +1464,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         <IntegrationWorkspace v-else-if="page === 'webhooks' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <AuditSearch v-else-if="page === 'audit' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <ApplicationSearch v-else-if="page === 'applications'" :key="actorScope" :scope-key="actorScope" :administrator="canInspectSystem" :user-id="actor?.userId ?? ''" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
-        <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" />
+        <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" @payment-open="openPaymentNotification" @voucher-open="openVoucherNotification" @budget-open="openBudgetNotification" @reversal-open="openReversalNotification" @reversal-check-open="openReversalCheckNotification" @settlement-open="openExpenseSettlementNotification" @supplier-adjustment-open="openSupplierAdjustmentNotification" @supplier-settlement-open="openSupplierSettlementNotification" @supplier-return-open="openSupplierReturnNotification" @expense-return-open="openExpenseReturnNotification" @disbursement-return-open="openDisbursementReturnNotification" @repayment-review-open="openRepaymentReviewNotification" @expense-partial-adjustment-open="openExpensePartialAdjustmentNotification" @expense-adjustment-open="openExpenseAdjustmentNotification" @supplier-payable-open="openSupplierPayableNotification" @budget-adjustment-open="openBudgetAdjustmentNotification" @repayment-open="openRepaymentNotification" />
         <WorkspaceRecords v-else-if="['started', 'drafts', 'handled'].includes(page)" :key="actorScope + ':' + page" :scope-key="actorScope" :mode="page === 'handled' ? 'handled' : page === 'drafts' ? 'drafts' : 'started'" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
         <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openSavedDefinition" @return-designer="page = 'designer'" @import="page = 'transfer'" />
         <ApiReference v-else-if="page === 'api'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" />
@@ -1341,7 +1496,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <p v-if="conditionLanguageVersion === 1" class="field-help">此流程使用旧版条件。启用组合条件后，可配置枚举多选、括号与取反；现有条件会转换为等价表达式。<button v-if="!readonlyDefinition && canManageDefinitions" type="button" class="secondary" :disabled="editorLocked" @click="upgradeConditions">启用组合条件</button></p>
           <DefinitionRiskPolicy v-model="definitionRiskPolicy" :form-schema="definitionFormSchema" :language-version="conditionLanguageVersion" :locked="editorLocked || !canManageDefinitions" @before-change="remember" />
           <div class="designer-mode-switch" role="group" aria-label="设计模式"><button type="button" :aria-pressed="designerMode === 'quick'" @click="designerMode = 'quick'">快速步骤</button><button type="button" :aria-pressed="designerMode === 'advanced'" @click="designerMode = 'advanced'">高级画布</button><span>两种视图编辑同一流程，切换不会更改规则。</span></div>
-          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @responsibilities="patchResponsibilities" @policy="patchApprovalPolicy" @event-contract="patchEventContract" @subprocess="patchSubprocess" @deadline="patchQuickDeadline" @expense-stage="patchExpenseStage" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
+          <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @responsibilities="patchResponsibilities" @policy="patchApprovalPolicy" @service-task="patchServiceTask" @event-contract="patchEventContract" @subprocess="patchSubprocess" @deadline="patchQuickDeadline" @expense-stage="patchExpenseStage" @expense-self-approval="patchExpenseSelfApproval" @expense-duplicate-approval="patchExpenseDuplicateApproval" @expense-split-rule="patchExpenseSplitRule" @expense-split-gateway="patchExpenseSplitGateway" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
           <div v-else class="designer-layout">
             <aside class="palette"><h4>节点</h4><p>点击添加，再配置连线</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>选中节点可拖动。右侧配置审批人和下一节点；选中连线可编辑条件或删除。</p><p>支持指定账号或角色审批。发布前会检查当前身份源中是否有可审批人员。</p></div></aside>
             <div class="canvas-wrap">
@@ -1363,7 +1518,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                         <text v-if="route.text" :x="route.label.x" :y="route.label.y" class="edge-label" @click.stop="selectEdge(route.edge)">{{ route.text }}<title>{{ branchTitle(route.edge) }}</title></text>
                       </g>
                     </svg>
-                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'SUB_PROCESS' ? '子' : node.type === 'EVENT_WAIT' ? '事' : node.type === 'TIMER_WAIT' ? '时' : node.type === 'COPY' ? '抄' : node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ isCountersignMode(node.approvalMode) ? approvalPolicyLabel(node.approvalMode, node.approvalPercentage) + ' · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
+                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'SERVICE_TASK' ? '服' : node.type === 'SUB_PROCESS' ? '子' : node.type === 'EVENT_WAIT' ? '事' : node.type === 'TIMER_WAIT' ? '时' : node.type === 'COPY' ? '抄' : node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ isCountersignMode(node.approvalMode) ? approvalPolicyLabel(node.approvalMode, node.approvalPercentage) + ' · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
                   </div>
                 </div>
               </div>
@@ -1372,10 +1527,14 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
             <aside class="inspector"><fieldset :disabled="editorLocked || !canManageDefinitions">
               <template v-if="selectedNode"><div class="inspector-head"><div><p class="eyebrow">NODE PROPERTY</p><h3>{{ selectedNode.name }}</h3></div></div><label>节点名称<input v-model="selectedNode.name" @focus="remember" /></label><label>节点类型<input :value="selectedNode.type" disabled /></label><DefinitionAssignee v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.assigneeRule" :form-schema="definitionFormSchema" :approval-mode="selectedNode.approvalMode" :approval-percentage="selectedNode.approvalPercentage" @policy="(mode, percentage) => patchApprovalPolicy(selectedNode!.id, mode, percentage)" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
                 <DefinitionSubprocess v-if="selectedNode.type === 'SUB_PROCESS'" :key="selectedNode.id" :node-id="selectedNode.id" :form-schema="definitionFormSchema" :model-value="selectedNode.subprocess ?? { inputs: {} }" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchSubprocess(selectedNode.id, $event)" />
+                <DefinitionServiceTask v-if="selectedNode.type === 'SERVICE_TASK'" :key="selectedNode.id" :node-id="selectedNode.id" :form-schema="definitionFormSchema" :model-value="selectedNode.serviceTask ?? { inputs: {} }" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchServiceTask(selectedNode.id, $event)" />
                 <DefinitionEventWait v-if="selectedNode.type === 'EVENT_WAIT'" :key="selectedNode.id" :model-value="{ key: selectedNode.eventContractKey, version: selectedNode.eventContractVersion }" :scope-key="actorScope" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchEventContract(selectedNode.id, $event)" />
                 <DefinitionTimerWait v-if="selectedNode.type === 'TIMER_WAIT'" :key="selectedNode.id" v-model="selectedNode.timerDelaySeconds" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
                 <DefinitionCopyRecipient v-if="selectedNode.type === 'COPY'" :key="selectedNode.id" :model-value="selectedNode.recipientRule ?? ''" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="selectedNode.recipientRule = $event" />
-                <DefinitionResponsibilities v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" :node-id="selectedNode.id" :graph="quickGraph" :model-value="readResponsibilities(selectedNode.originalProperties ?? {})" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="value => patchResponsibilities(selectedNode!.id, value)" />
+                <DefinitionResponsibilities v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" :node-id="selectedNode.id" :graph="quickGraph" :expense-policy-enabled="nodes.some(item => item.type === 'START' && item.originalProperties?.expenseSelfApproval === 'ESCALATE_SUPERVISOR')" :model-value="readResponsibilities(selectedNode.originalProperties ?? {})" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="value => patchResponsibilities(selectedNode!.id, value)" />
+              <DefinitionExpenseSelfApproval v-if="selectedNode.type === 'START'" :model-value="selectedNode.originalProperties?.expenseSelfApproval" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchExpenseSelfApproval(selectedNode.id, $event)" />
+              <DefinitionExpenseDuplicateApproval v-if="selectedNode.type === 'START'" :model-value="selectedNode.originalProperties?.expenseDuplicateApproval" :self-approval="selectedNode.originalProperties?.expenseSelfApproval" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchExpenseDuplicateApproval(selectedNode.id, $event)" />
+              <DefinitionExpenseSplitRisk :node-id="selectedNode.id" :graph="quickGraph" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @rule="patchExpenseSplitRule" @gateway="patchExpenseSplitGateway" />
               <DefinitionExpenseStage v-if="selectedNode.type === 'USER_TASK'" :model-value="selectedNode.originalProperties?.expenseStage" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchExpenseStage(selectedNode.id, $event)" />
                 <DefinitionDeadline v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.deadline" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
                 <p v-if="selectedNode.type === 'PARALLEL_GATEWAY'" class="field-help">并行拆分会同时进入所有出线，汇合等待全部入线到达。请用并行网关成对连接，可嵌套；分支条件请另加条件网关。</p><p v-if="isExclusiveMerge(selectedNode.id)" class="field-help">条件汇合：选中的路径到达后直接继续，不等待未选中的路径。</p><div v-if="selectedNode.type === 'EXCLUSIVE_GATEWAY' && !isExclusiveMerge(selectedNode.id)" class="branch-editor"><strong>分支条件</strong><p class="field-help">例如 amount &gt; 5000。每个分支网关只有一条默认分支。</p><div v-for="edge in edges.filter(item => item.source === selectedNode?.id)" :key="edge.id" class="branch-item"><small>→ {{ nodes.find(node => node.id === edge.target)?.name }}</small><p class="field-help" :title="branchTitle(edge)">{{ branchDescription(edge) || '尚未配置条件' }}</p><div class="branch"><input v-model="edge.condition" :disabled="edge.defaultBranch" :aria-label="`分支条件 ${edge.id}`" :placeholder="edge.defaultBranch ? '默认分支无需条件' : '如 amount > 5000'" @focus="remember" /><button :class="{ default: edge.defaultBranch }" type="button" @click="toggleDefault(edge)">{{ edge.defaultBranch ? '取消默认' : '设为默认' }}</button></div></div></div>
@@ -1390,7 +1549,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <DefinitionPublication v-if="readonlyDefinition && definitionId && canManageDefinitions" :definition-id="definitionId" :scope-key="actorScope" />
           <DefinitionNotificationTexts v-model="definitionNotificationTexts" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
           <DefinitionAvailability v-if="definitionStatus === 'PUBLISHED' && definitionId && canManageDefinitions" :definition-id="definitionId" :revision="definitionRevision" :start-enabled="definitionStartEnabled" :scope-key="actorScope" :locked="busy || writesBlocked || confirmationOpen" :error="availabilityError" :refresh-version="templateRefresh" @change="changeDefinitionAvailability" @refresh="refreshDefinitionAvailability" />
-          <FormSchemaEditor v-model="definitionFormSchema" :scope-key="canManageDefinitions ? actorScope + ':' + definitionId + ':' + definitionKey : ''" :approval-nodes="nodes.filter(node => ['USER_TASK', 'COPY', 'SUB_PROCESS'].includes(node.type))" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
+          <FormSchemaEditor v-model="definitionFormSchema" :scope-key="canManageDefinitions ? actorScope + ':' + definitionId + ':' + definitionKey : ''" :approval-nodes="nodes.filter(node => ['USER_TASK', 'COPY', 'SUB_PROCESS', 'SERVICE_TASK'].includes(node.type))" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
           <section class="designer-validation" aria-label="流程校验" :aria-busy="validation.loading">
             <div class="validation-strip" :class="{ invalid: validationErrors.length || validation.error }"><span>●</span><span role="status">{{ validationMessage }}</span><button v-if="validationOpened" type="button" class="secondary" @click="clearValidation(true)">收起校验</button></div>
             <template v-if="validationOpened"><p class="validation-live-help">修改后自动重新检查。提醒不阻止发布，分支执行顺序保持不变。</p><ul v-if="validationOtherErrors.length"><li v-for="error in validationOtherErrors" :key="error">{{ simulationIssue(error).label }}<button v-if="simulationIssue(error).target" type="button" class="secondary" @click="locateDesignTarget(simulationIssue(error).target)">定位 {{ simulationIssue(error).target }}</button></li></ul>
@@ -1400,9 +1559,9 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         </section>
         <section v-else-if="page === 'cashier' && canCashier" :key="actorScope">
           <div class="cashier-kind" role="group" aria-label="付款业务"><button type="button" class="quiet" :aria-pressed="cashierKind === 'employee'" :disabled="busy || writesBlocked" @click="cashierKind = 'employee'">借款与报销</button><button type="button" class="quiet" :aria-pressed="cashierKind === 'supplier'" :disabled="busy || writesBlocked" @click="cashierKind = 'supplier'">供应商付款</button><button type="button" class="quiet" :aria-pressed="cashierKind === 'batches'" :disabled="busy || writesBlocked" @click="cashierKind = 'batches'">批量付款</button></div>
-          <CashierWorkspace v-if="cashierKind === 'employee'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
+          <CashierWorkspace v-if="cashierKind === 'employee'" :initial-payment-id="notificationPaymentId" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
           <PaymentBatchWorkspace v-else-if="cashierKind === 'batches'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
-          <SupplierCashierWorkspace v-else :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
+          <SupplierCashierWorkspace v-else :initial-payment-id="notificationPaymentId" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
         </section>
         <ExpenseWorkspace v-else :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
       </main>

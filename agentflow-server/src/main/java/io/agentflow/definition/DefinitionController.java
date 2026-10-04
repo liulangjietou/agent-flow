@@ -187,7 +187,8 @@ public class DefinitionController {
     @PostMapping("/simulate")
     public DefinitionSimulator.Result simulatePreview(@Valid @RequestBody PreviewSimulationRequest request) {
         requireProcessAdmin();
-        return service.simulatePreview(request.graph(), request.formSchema(), new DefinitionModels.EvaluationContext(request.values()));
+        return service.simulatePreview(currentActor.actor().tenantId(), request.graph(), request.formSchema(),
+                new DefinitionModels.EvaluationContext(request.values()), request.splitRoutingAmount());
     }
 
     /** 模拟已保存定义，保留已有调用契约。 */
@@ -197,7 +198,7 @@ public class DefinitionController {
         var context = request == null || request.values() == null
                 ? new DefinitionModels.EvaluationContext(java.util.Map.of())
                 : new DefinitionModels.EvaluationContext(request.values());
-        return new SimulationResponse(service.simulate(draft.tenantId(), id, context));
+        return new SimulationResponse(service.simulate(draft.tenantId(), id, context, request == null ? null : request.splitRoutingAmount()));
     }
 
     /** 将当前设计与同流程的发布版本比较，不写入草稿或部署引擎。 */
@@ -238,13 +239,13 @@ public class DefinitionController {
      * 模拟输入。
      * @author owlzhangfq@gmail.com
      */
-    public record SimulationRequest(java.util.Map<String, Object> values) { }
+    public record SimulationRequest(java.util.Map<String, Object> values, io.agentflow.finance.Money splitRoutingAmount) { }
     /**
      * 当前设计与测试数据，不接受需要加载其他租户资源的定义标识。
      * @author owlzhangfq@gmail.com
      */
     public record PreviewSimulationRequest(@NotNull Graph graph, FormSchema formSchema,
-                                           @NotNull java.util.Map<String, Object> values) { }
+                                           @NotNull java.util.Map<String, Object> values, io.agentflow.finance.Money splitRoutingAmount) { }
     /**
      * 模拟输出。
      * @author owlzhangfq@gmail.com

@@ -89,14 +89,14 @@ class DefinitionDomainTest {
     }
 
     @Test
-    void rejectsNodesThatThePublisherCannotRepresent() {
+    void serviceNodesRequireAnExplicitDeclaredBinding() {
         Graph graph = new Graph(List.of(
                 new Node("start", "开始", NodeType.START, Map.of()),
                 new Node("service", "自动处理", NodeType.SERVICE_TASK, Map.of()),
                 new Node("end", "结束", NodeType.END, Map.of())
         ), List.of(new Edge("e1", "start", "service", ""), new Edge("e2", "service", "end", "")));
 
-        assertThat(validator.validate(graph)).contains("UNSUPPORTED_NODE_TYPE:service");
+        assertThat(validator.validate(graph)).contains("INVALID_SERVICE_TASK_POLICY:service");
     }
 
     @Test

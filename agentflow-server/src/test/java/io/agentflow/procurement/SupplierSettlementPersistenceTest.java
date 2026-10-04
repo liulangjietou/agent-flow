@@ -100,16 +100,16 @@ class SupplierSettlementPersistenceTest {
             if (disabled.contains(invocation.<String>getArgument(1))) throw new DomainException("PAYMENT_ACTOR_UNAVAILABLE", "Synthetic inactive appointment");
             return null;
         }).when(personnel).requireEligible(eq(tenant), anyString(), eq(entity));
-        holdService = proxy(new SupplierPayableHoldService(approvedSources, authorizations, holds, personnel, 30));
+        holdService = proxy(new SupplierPayableHoldService(approvedSources, authorizations, holds, personnel, 30, event -> { }));
         sources = new SupplierPaymentSources(approvedSources, authorizations, holds, personnel);
         requests = new JdbcSupplierPaymentExecutionRepository(jdbc, json, holds);
         payments = new JdbcSupplierPaymentOperationRepository(jdbc, json, requests, holds, authorizations);
-        preparation = proxy(new SupplierPaymentExecutionService(sources, requests, payments, 30)); bank = proxy(new SupplierPaymentService(sources, payments, 30));
+        preparation = proxy(new SupplierPaymentExecutionService(sources, requests, payments, event -> { }, 30)); bank = proxy(new SupplierPaymentService(sources, payments, event -> { }, 30));
         intents = new JdbcSupplierSettlementPreparationRepository(jdbc, json, payments);
         settlements = new JdbcSupplierPayableSettlementRepository(jdbc, json, intents, payments, reservations);
         var settlementSources = new SupplierSettlementSources(sources, approvedSources, payments, personnel, returnGuard);
-        settlementPreparation = proxy(new SupplierSettlementPreparationService(settlementSources, intents, settlements, 30));
-        settlementExecution = proxy(new SupplierSettlementService(settlementSources, settlements, reservations, 30));
+        settlementPreparation = proxy(new SupplierSettlementPreparationService(settlementSources, intents, settlements, org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class), 30));
+        settlementExecution = proxy(new SupplierSettlementService(settlementSources, settlements, reservations, org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class), 30));
     }
 
     @Test void immutableIntentAndCommandSurviveRecreationWithExactPaidSourceAndTenantIsolation() {

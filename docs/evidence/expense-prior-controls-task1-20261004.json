@@ -1,0 +1,30 @@
+{
+  "status": "DOMAIN_VERIFIED_CONFIG_ROUTING_UI_RUNTIME_PENDING",
+  "tests": 84,
+  "red": {
+    "failures": 2,
+    "errors": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/f05-task1-red-confirmation.log"
+  },
+  "greenLog": "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/f05-task1-green.log",
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePriorControl.java": "9ff4e1d4d47f427895edbe6389fc1cf9f7c29193c6f75e4c7e88f384dd48a379",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseRequest.java": "21664dee8418ff2268fcc10339784de73b708f0a4f4db8fc5c49cbcdac218948",
+    "agentflow-domain/src/main/java/io/agentflow/expense/EmployeeAdvance.java": "2f2663e2e71c31c0c507916316b5da10e1c8561b76f08b95017c6328c5303c89",
+    "agentflow-domain/src/main/java/io/agentflow/finance/ReservedAmount.java": "52551725a1f9975b02523d0c8d3be135cdfe3fcac6820c5296372fe6b16c89b1",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpensePriorControlTest.java": "fff1b16dc2112ff6d9a12e3134457657f2b276c5fdb7d076b0e06d27b44d6670"
+  },
+  "archiveSha256": {
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/TEST-io.agentflow.expense.AdvanceDisbursementReturnTest.xml": "4ed256d4b77085c722727f61e2ef63b6a7048db08a89a1617a2fb03c4f143f9d",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/TEST-io.agentflow.expense.AdvanceRepaymentResolutionTest.xml": "5dfd5dbe88b007e92513578cfc1b9b07cb0e9f93c9b661430188bc352635fdf6",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/TEST-io.agentflow.expense.AdvanceRepaymentTest.xml": "5a17b40cc7db3c1645fa565f364c8d6c3885931cc4ebf939ef0ab54bdddd278a",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/TEST-io.agentflow.expense.ConsumptionReductionTest.xml": "30743f67790235ea63a5c63942d954890a2e7ae31dbd336c76b75f50b03c2e4e",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/TEST-io.agentflow.expense.ConsumptionReversalTest.xml": "48274c00b82e92c6fc118bd05334d57a264b79bf965238103529735e43e9d227",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/TEST-io.agentflow.expense.ExpensePriorControlTest.xml": "eda89fe0912c084a5340fe1d16ac25bc63a432f972085941ad6f6ef249016330",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/TEST-io.agentflow.expense.ExpenseResourcesTest.xml": "1300f422504a49fda7a820dda64bd64c9bf4111623d3247fa9e7f971aff832df",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/TEST-io.agentflow.expense.ExpenseSubmissionResourcesTest.xml": "ed88553e36182255c9a6a9cbcf5a87739dfd4e230ec908b5cd10d33645368222",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/f05-task1-green.log": "042dd8659baaef6cea72121c738f04f01dd8175ff51149769beb4b55222583ef",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/f05-task1-red-confirmation.log": "60c730a02ae7919e2be3e20677e6d5771adce3885f8028d47663da3008380897",
+    "/fyoung/tmp/agentflow-remaining-20260928/f05-task1-verified/f05-task1-red.log": "3542d77b2807d780d77192fe2511ecc49539ff8dc4711ade628abd8b99eddbdd"
+  }
+}

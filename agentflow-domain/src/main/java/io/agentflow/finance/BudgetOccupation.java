@@ -18,13 +18,13 @@ public record BudgetOccupation(String tenantId, UUID reportId, String employeeId
                 || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}") || version < 1 || status == null
                 || (status == Status.UNFUNDED) != (confirmed == null)
                 || confirmed != null && (!reportId.equals(confirmed.position().reportId()) || !employeeId.equals(confirmed.position().employeeId()))
-                || (status == Status.RELEASED || status == Status.CONSUMED) && pendingOperationId != null) throw invalid();
+                || status == Status.CONSUMED && pendingOperationId != null) throw invalid();
     }
 
     /** 首次冻结和事务内 outbox 登记一起创建，尚未获得预算成功事实。 */
     public static BudgetOccupation begin(BudgetOperation.Input input) {
         var command = input.command();
-        if (command.action() != BudgetCommand.Action.FREEZE) throw conflict();
+        if (command.action() != BudgetCommand.Action.FREEZE || command.expected() != null) throw conflict();
         return new BudgetOccupation(command.tenantId(), command.position().reportId(), command.position().employeeId(), input.targetDigest(),
                 1, Status.UNFUNDED, null, command.id());
     }
@@ -35,8 +35,12 @@ public record BudgetOccupation(String tenantId, UUID reportId, String employeeId
         if (pendingOperationId != null) throw new DomainException("BUDGET_OPERATION_PENDING", "Previous budget operation must be reconciled first");
         requireCommand(command);
         if (!targetDigest.equals(input.targetDigest())) throw new DomainException("BUDGET_TARGET_CHANGED", "Budget ledger belongs to a different gateway target");
-        if (status == Status.RELEASED || status == Status.CONSUMED) throw new DomainException("BUDGET_FINALIZED", "Budget ledger has been finalized");
-        if (command.action() == BudgetCommand.Action.ADJUST) {
+        if (status == Status.CONSUMED) throw new DomainException("BUDGET_FINALIZED", "Consumed budget cannot be reopened");
+        if (status == Status.RELEASED) {
+            var previous = confirmed.position(); var next = command.position();
+            // 释放后只允许新的审批轮次重新冻结，旧轮次不得借重新冻结恢复已经结束的占用。
+            if (next.roundNo() <= previous.roundNo() || next.financialVersion() <= previous.financialVersion()) throw conflict();
+        } else if (command.action() == BudgetCommand.Action.ADJUST) {
             var previous = confirmed.position(); var next = command.position();
             // 拒绝的重提不改变最后确认的预算轮次，后续合法轮次可能跨过不止一轮。
             if (next.financialVersion() <= previous.financialVersion() || next.roundNo() < previous.roundNo()) throw conflict();
@@ -70,13 +74,13 @@ public record BudgetOccupation(String tenantId, UUID reportId, String employeeId
     private void requireCommand(BudgetCommand command) {
         if (!tenantId.equals(command.tenantId()) || !reportId.equals(command.position().reportId()) || !employeeId.equals(command.position().employeeId())
                 || !Objects.equals(command.expected(), confirmed == null ? null : confirmed.expected())
-                || (status == Status.UNFUNDED) != (command.action() == BudgetCommand.Action.FREEZE)) throw conflict();
+                || (status == Status.UNFUNDED || status == Status.RELEASED) != (command.action() == BudgetCommand.Action.FREEZE)) throw conflict();
     }
     private static DomainException invalid() { return new DomainException("INVALID_BUDGET_OCCUPATION", "Budget occupation identity or confirmed state is invalid"); }
     private static DomainException conflict() { return new DomainException("BUDGET_LEDGER_CONFLICT", "Budget command does not match the current confirmed ledger"); }
 
     /**
-     * 未冻结、已冻结和两个最终状态，执行中由 pendingOperationId 表示。
+     * 已释放允许新轮次沿原凭据重新冻结；已核销保持终态，执行中由 pendingOperationId 表示。
      * @author owlzhangfq@gmail.com
      */
     public enum Status { UNFUNDED, FROZEN, RELEASED, CONSUMED }

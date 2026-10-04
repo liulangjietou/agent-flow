@@ -40,17 +40,20 @@ public class ExpensePrecheckService {
     private final JdbcExpensePrecheckRepository jobs;
     private final ExpensePrecheckResources resources;
     private final ExpensePolicyConfiguration policyConfiguration;
+    private final ExpensePrecheckObservations observations;
     private final int timeoutSeconds;
 
     /** 身份检查不复用管理员读取权限，所有外部事实由独立执行器获取。 */
     public ExpensePrecheckService(CurrentActor actors, ExpenseReportRepository reports, ApprovalApplicationFacade applications,
             ApplicationRepository applicationRepository, OrganizationInitiatorDirectory initiators, FinanceGatewayConfiguration configuration,
             JdbcExpensePrecheckRepository jobs, ExpensePrecheckResources resources, ExpensePolicyConfiguration policyConfiguration,
+            ExpensePrecheckObservations observations,
             @Value("${agentflow.expenses.precheck-timeout-seconds:300}") int timeoutSeconds) {
         if (timeoutSeconds < 15 || timeoutSeconds > 900) throw new IllegalArgumentException("Expense precheck timeout must be between 15 and 900 seconds");
         this.actors = actors; this.reports = reports; this.applications = applications; this.applicationRepository = applicationRepository;
         this.initiators = initiators; this.configuration = configuration; this.jobs = jobs; this.resources = resources; this.timeoutSeconds = timeoutSeconds;
         this.policyConfiguration = policyConfiguration;
+        this.observations = observations;
     }
 
     /** 返回实际目标和双版本，不把配置可用解释为费用已经通过。 */
@@ -90,7 +93,8 @@ public class ExpensePrecheckService {
         String unavailable = job.status() == Status.READY ? readyFailure(job, report, Instant.now()) : "PRECHECK_NOT_READY";
         return new View(summary(job), unavailable == null, unavailable, job.input().initiator(), job.input().accountingDate(),
                 evidence == null ? null : evidence.rateDate(), evidence == null ? null : evidence.validUntil(),
-                evidence == null ? null : ExpenseResponse.FinancialRound.from(evidence.preview()), job.result() == null ? List.of() : job.result().findings());
+                evidence == null ? null : ExpenseResponse.FinancialRound.from(evidence.preview()), job.result() == null ? List.of() : job.result().findings(),
+                evidence == null ? null : evidence.priorControls());
     }
 
     /** 历史分页只列轻量状态，不在一页内复制多份完整费用明细。 */
@@ -155,6 +159,17 @@ public class ExpensePrecheckService {
         return resources.current(report, job.result().evidence()) ? null : "RESOURCES_CHANGED";
     }
 
+    /** 解释只能绑定当前检查；业务失败可解释，但不能借此取得正式提交资格。 */
+    public String explanationFailure(ExpensePrecheckJob job, ExpenseReport report, Instant now) {
+        if (!job.input().tenantId().equals(report.tenantId()) || !job.input().reportId().equals(report.id())) return "CONTEXT_CHANGED";
+        if (job.active()) return "PRECHECK_NOT_FINISHED";
+        if (jobs.latestAttempt(report.tenantId(), report.id()) != job.input().attempt()) return "PRECHECK_SUPERSEDED";
+        String failure = contextFailure(job); if (failure != null) return failure;
+        failure = observations.failure(report, job.result().observation(), now);
+        if (failure != null) return failure;
+        return job.status() == Status.READY ? readyFailure(job, report, now) : null;
+    }
+
     private String contextFailure(ExpensePrecheckJob job) {
         var input = job.input(); var destination = configuration.destination(input.tenantId()).orElse(null);
         if (destination == null) return "NOT_CONFIGURED";
@@ -204,7 +219,8 @@ public class ExpensePrecheckService {
      * @author owlzhangfq@gmail.com
      */
     public record View(Summary job, boolean usable, String unavailableCode, InitiatorContext initiator, LocalDate accountingDate,
-            LocalDate rateDate, Instant validUntil, ExpenseResponse.FinancialRound preview, List<Finding> findings) { }
+            LocalDate rateDate, Instant validUntil, ExpenseResponse.FinancialRound preview, List<Finding> findings,
+            List<ExpensePriorControlAssessment> priorControls) { }
     /**
      * 下一页游标只能用于本人当前单据。
      * @author owlzhangfq@gmail.com

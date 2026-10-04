@@ -1,0 +1,898 @@
+{
+  "schemaVersion": 1,
+  "taskId": "A03",
+  "status": "FRONTEND_VERIFIED_FIXED_PACKAGE_RUNTIME_PENDING",
+  "recordedAt": "2026-10-04T02:39:53.936045+00:00",
+  "sourceCommit": "4800ba67ae15aff6ebcef34846999002d5a25637",
+  "backendSourceCommit": "8bc8608b81b1256043e91fb65f8cd4f2498312ac",
+  "baselineCommit": "1f6a71bd48a11b359fd2f58c21cc1816e622897b",
+  "branch": "codex/governance-identifier-integration",
+  "scope": "ExpenseEditor applicant-only itinerary/catalog preview, explicit send consent, granular review, explicit unsaved append, typed source/digest validation and recovery of original operations. Existing expense save and allowance calculation remain authoritative.",
+  "validation": {
+    "frontend": {
+      "result": "PASS",
+      "exitCode": 0,
+      "executedTests": 90,
+      "uniqueNames": 90,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "testFiles": [
+        "expense-draft-assist.test.mjs",
+        "precheck-explanation.test.mjs",
+        "expense-invoice-fill.test.mjs",
+        "expense-origination.test.mjs",
+        "draft-assist.test.mjs"
+      ],
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/a03-ui-final-tests.log"
+    },
+    "javaIntegration": {
+      "result": "PASS",
+      "exitCode": 0,
+      "uniqueTestCases": 30,
+      "report": "/fyoung/tmp/agentflow-remaining-20260928/a03-ui-backed-java-reports/TEST-io.agentflow.expense.ExpenseDraftAssistIntegrationTest.xml",
+      "observationDirectory": "/fyoung/tmp/agentflow-remaining-20260928/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/a03-ui-backed-java.log"
+    },
+    "actualOpenApiContract": {
+      "result": "PASS",
+      "directory": "/fyoung/tmp/agentflow-remaining-20260928/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde",
+      "responses": 108,
+      "successfulRequests": 61,
+      "operations": [
+        "previewExpenseDraftAssist",
+        "generateExpenseDraftAssist",
+        "confirmExpenseDraftAssist",
+        "expenseDraftAssistRun",
+        "dismissExpenseDraftAssist",
+        "expenseDraftAssistRuns"
+      ],
+      "httpStatuses": [
+        200,
+        202,
+        400,
+        403,
+        404,
+        409,
+        422
+      ],
+      "observedRunStatuses": [
+        "COMPLETED",
+        "CONFIRMED",
+        "DISMISSED",
+        "QUEUED"
+      ],
+      "sourceSnapshots": 39
+    },
+    "actualClientContract": {
+      "result": "PASS",
+      "successfulResponses": 72,
+      "differentPageSizeRejected": 2,
+      "operations": [
+        "confirm",
+        "detail",
+        "dismiss",
+        "list",
+        "preview",
+        "queue"
+      ],
+      "source": "/fyoung/tmp/agentflow-remaining-20260928/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde"
+    },
+    "build": {
+      "result": "PASS",
+      "exitCode": 0,
+      "typecheck": "PASS",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/a03-ui-final-build.log",
+      "warning": "Vite reports an existing large application chunk above 500 kB; production bundle generated successfully."
+    },
+    "authors": "Java files=1650, named types=3231, missing author tags=0, parse errors=0",
+    "executionScope": "Vue setup and actual compiled parent/child templates, SSR rendering, MockMvc application responses, real loopback synthetic finance/model HTTP. No real browser, fixed-package server process, restart, restore or PostgreSQL acceptance is claimed."
+  },
+  "behavioralRedAndFix": [
+    {
+      "case": "实际父模板在两个助手之间传递互斥锁，避免同时处理同一份费用草稿",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/a03-ui-mutual-lock-red.log",
+      "redCounts": {
+        "tests": 15,
+        "passed": 14,
+        "failed": 1
+      },
+      "rootCause": "Parent action lock was not passed to the explanation child while expense draft input was dirty.",
+      "coverageGap": "Existing tests checked parent setup lock rather than actual template child props.",
+      "fix": "Pass draft lock to the explanation panel; aggregate the two assistants for editor save/close/submit guards."
+    },
+    {
+      "case": "记录人工确认前检查剩余行数，超出容量不能产生不可填入的确认",
+      "redLog": "/fyoung/tmp/agentflow-remaining-20260928/a03-ui-capacity-red.log",
+      "redCounts": {
+        "tests": 18,
+        "passed": 17,
+        "failed": 1
+      },
+      "rootCause": "The 200-line limit was checked at fill time but not before recording an irreversible review choice.",
+      "coverageGap": "Pure fill-limit test did not execute the earlier confirmation action.",
+      "fix": "Check remaining capacity in confirmation method and button, with a prompt to reduce selection."
+    }
+  ],
+  "fixtureRepairs": [
+    "First SSR fixture retained an expiry timer after rendering. The owned test child was terminated; that run is not counted as PASS. SSR test timers now retain callbacks but do not hold the Node process open.",
+    "Initial parent-render test looked for a name on an intentionally stubbed child. It now follows the actual setup component identity inside a render function, and then reproduced the product lock failure.",
+    "Original backend observations used pageSize=1, which this web client must reject because it requests 20. Added the exact pageSize=20 integration query; client still rejects both mismatched original pages."
+  ],
+  "verifiedBoundaries": [
+    "Every send requires a current preview and explicit consent; any edited source or directory invalidates preview and consent.",
+    "Only original proposal selections are confirmed; itinerary is explicit and category/allocation are independent.",
+    "Confirm and fill are separate; fill re-reads authorized original record and does not run from recovery or refresh.",
+    "Existing lines, amounts, invoices, budget facts, approval facts and allowance basis are not overwritten by generated suggestions.",
+    "New rows have blank gross and allocation amounts; manual completion saves through the existing double-version request without submission.",
+    "Unknown writes preserve exact request bytes and idempotency keys; malformed success cannot clear a pending operation.",
+    "Identity changes, timeout and revoked access suppress late/private responses and do not apply old selections.",
+    "Source JSON, SHA-256, catalog projection, reference binding and percentage sum are validated before display/use.",
+    "Microsecond historical confirmation is compared without truncating source expiry to milliseconds.",
+    "Dirty source/review state locks competing editor actions and the other assistant; duplicate fill events cannot append to already dirty content."
+  ],
+  "pending": [
+    "Fixed server package and browser asset identity, isolated H2 HTTP expense-save journey.",
+    "Process restarts retaining original run/lease without model retransmission, and matched database/synthetic-peer restore.",
+    "Real browser and PostgreSQL acceptance remain environment-blocked; enterprise model quality belongs to E08."
+  ],
+  "remainingTasks": {
+    "open": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "inventoryComplete": false
+  },
+  "sourceFiles": [
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseDraftAssistIntegrationTest.java",
+      "sha256": "d2ca5ecd7f968eda648f2f010c5186fd31cbae4682d397ca3e9a876104119191",
+      "bytes": 31439
+    },
+    {
+      "path": "agentflow-web/scripts/test-requests.mjs",
+      "sha256": "bbf20d012044d53d39b1123ee54c100664c1685d35be50fd93af80195c0a6172",
+      "bytes": 92530
+    },
+    {
+      "path": "agentflow-web/src/App.vue",
+      "sha256": "ce7d74718ef6dfabf6bc43f21850faf1b1ecc7f3b2f39b8461439f5144b00c3a",
+      "bytes": 145491
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "62d6408ae7339bc5c63c70cc426d80d9be70580ddd25beee94e591d384a200f0",
+      "bytes": 137179
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseDraftAssistPanel.vue",
+      "sha256": "a12ecf9d9f8456d19cb56740fea11e6aa708abb065c09c89778ab5049b3f06f6",
+      "bytes": 25526
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseEditor.vue",
+      "sha256": "2c3f92d37b5f0101eed3e22acb19906396e20bcf6433737abfaa18aa88ea04e9",
+      "bytes": 20194
+    },
+    {
+      "path": "agentflow-web/src/expenseDraftAssist.ts",
+      "sha256": "79d69fb722c99b1e6b411472845b0f02e669ac67c22b3acb4fe6297429cbf878",
+      "bytes": 22553
+    },
+    {
+      "path": "agentflow-web/tests/expense-draft-assist.test.mjs",
+      "sha256": "bee3085a804b9d4d91d45fabb952c4145e687c9e58cc01d96cb8fd1bddac0813",
+      "bytes": 26645
+    }
+  ],
+  "evidenceSnapshot": {
+    "root": "/fyoung/tmp/agentflow-remaining-20260928/expense-draft-assist-ui-evidence-snapshot",
+    "files": [
+      {
+        "path": "source/agentflow-server/src/test/java/io/agentflow/expense/ExpenseDraftAssistIntegrationTest.java",
+        "sha256": "d2ca5ecd7f968eda648f2f010c5186fd31cbae4682d397ca3e9a876104119191",
+        "bytes": 31439
+      },
+      {
+        "path": "source/agentflow-web/scripts/test-requests.mjs",
+        "sha256": "bbf20d012044d53d39b1123ee54c100664c1685d35be50fd93af80195c0a6172",
+        "bytes": 92530
+      },
+      {
+        "path": "source/agentflow-web/src/App.vue",
+        "sha256": "ce7d74718ef6dfabf6bc43f21850faf1b1ecc7f3b2f39b8461439f5144b00c3a",
+        "bytes": 145491
+      },
+      {
+        "path": "source/agentflow-web/src/api.ts",
+        "sha256": "62d6408ae7339bc5c63c70cc426d80d9be70580ddd25beee94e591d384a200f0",
+        "bytes": 137179
+      },
+      {
+        "path": "source/agentflow-web/src/components/ExpenseDraftAssistPanel.vue",
+        "sha256": "a12ecf9d9f8456d19cb56740fea11e6aa708abb065c09c89778ab5049b3f06f6",
+        "bytes": 25526
+      },
+      {
+        "path": "source/agentflow-web/src/components/ExpenseEditor.vue",
+        "sha256": "2c3f92d37b5f0101eed3e22acb19906396e20bcf6433737abfaa18aa88ea04e9",
+        "bytes": 20194
+      },
+      {
+        "path": "source/agentflow-web/src/expenseDraftAssist.ts",
+        "sha256": "79d69fb722c99b1e6b411472845b0f02e669ac67c22b3acb4fe6297429cbf878",
+        "bytes": 22553
+      },
+      {
+        "path": "source/agentflow-web/tests/expense-draft-assist.test.mjs",
+        "sha256": "bee3085a804b9d4d91d45fabb952c4145e687c9e58cc01d96cb8fd1bddac0813",
+        "bytes": 26645
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0001.json",
+        "sha256": "fb9f4c11747b5215f6b5d1ce78c02b2be067ed8b40aceb2acecba6820ce44fe7",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0002.json",
+        "sha256": "63260ac7dbc6793adf4b710dfd09549c0dd8a3272025e54a628dcb3f207e0536",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0003.json",
+        "sha256": "c190f7d50812b7d1c03801e18887483c75e1d91c8537c41897c236bc0bdd3423",
+        "bytes": 356
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0004.json",
+        "sha256": "c190f7d50812b7d1c03801e18887483c75e1d91c8537c41897c236bc0bdd3423",
+        "bytes": 356
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0005.json",
+        "sha256": "7cf2bce90b86a1c425c976d34bd196f5ae4a99dfa80df97c1544a4ba6386b893",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0006.json",
+        "sha256": "fde9f65066be6edbf4accc9a99597021bad013d214d0686a9fd2462fe62c7105",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0007.json",
+        "sha256": "9df91b1fc060a8b96a5297a89987ebd03f45bcd046c4cb1ef54ba93ab35b2f8c",
+        "bytes": 2265
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0008.json",
+        "sha256": "af60af28ccd3a34b598be50f02c9e0f97d126ae4c6d38d2f12cec56ce13b8950",
+        "bytes": 568
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0009.json",
+        "sha256": "a149d74c4886ed2e116d5df994b90998696cf151de55ebc833749c3ca82bfd7f",
+        "bytes": 212
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0010.json",
+        "sha256": "4d134bfbe364b3220419634e2ac9c13abdd749724f4a43e2a80487ecfea77bb3",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0011.json",
+        "sha256": "b39ea69c95e0ed6a6234fbf13fd7308def6fa7c8d939f2fdc32b4eff37946a63",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0012.json",
+        "sha256": "ff107511d33b42bf657ceefe9cfde3f333780ffb4256ee0d8f1b0644609c6644",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0013.json",
+        "sha256": "9cc375bd5f97bd47af1182d097076ec2590902f2fc2fd4afbb6dbd2d73a3d869",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0014.json",
+        "sha256": "106c453df706f03afa28c07ce60dae4df797bbf51bfcd165e5d8e2a66b720efd",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0015.json",
+        "sha256": "d08c50d6d0a33a18385a9c565454971e980acd0bff9a9818d96b4fa62c1f79b1",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0016.json",
+        "sha256": "b75f43c9ecb15ccfff3b9100ca40f53354c57c793cf164f6fbed5f7f72dbc450",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0017.json",
+        "sha256": "1f0aa546df70d73d064b62f2030e055d5e18f3cf1eff3cf191884bf4e339c656",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0018.json",
+        "sha256": "958d4484195dabe32174b7fbcc5ae454285d4551df6c6ec6fc7a395ef4ba10bb",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0019.json",
+        "sha256": "169eb68641ef4f5d13fd7d6324e19abd7d02be7a7c23760f90499162712ab807",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0020.json",
+        "sha256": "8372b6cae291c09e33a45ec586fcc2118c19c75fbfcd3b4512316d37bbe44298",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0021.json",
+        "sha256": "54f6243482bcddbd3fb0d49a1e86ed32bbab7cda17324184b365535c2ff685c0",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0022.json",
+        "sha256": "b9ada71285a3e6c3060ac873d0fa8ef94667a2a4f00d4ff985cea43f9fbcd0a3",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0023.json",
+        "sha256": "119fbc53d1c996af27a2927cfe457dda37702a399820489f11bfa19b97e23ed2",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0024.json",
+        "sha256": "fd30fe4d9f5a243eb9e11e8d97ce77ad6bfeaee57498ff04764c622aad52725c",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0025.json",
+        "sha256": "71b7cf271534bbe8ac90e4ebdd81f8a4fe9ced5992d83c059b689628a4773fd0",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0026.json",
+        "sha256": "b935704c34e3381b6892f3cf1ad8c62efd09d98f668747d0d1098e08b8251414",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0027.json",
+        "sha256": "bf5538f10cf633707741f7563b9c8fb8fb4d0600eca0f12b16db95b03191998c",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0028.json",
+        "sha256": "868fe44d5f2f4fb0e68cf0ca6d871a0b1378cf9541e0326107862edd94915049",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0029.json",
+        "sha256": "a9bd3aafe7b7936d010c605d8410033d29a75cf393d4abcd6c0c5e5ece0ea785",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0030.json",
+        "sha256": "c8c9fac446e38bad496a5c4c8ff7a261ebf9a330fb6e0939b82714882e9b7162",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0031.json",
+        "sha256": "2099f7cf394d429ca47b7636eb750c494c95ed75ce3e1c71e67ec94c356a11e5",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0032.json",
+        "sha256": "4352cbb1590b797842ec4af1a1f19857529b223e9c7afa5f5d032e1d7ee75e56",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0033.json",
+        "sha256": "ee12e34c226bb1fa06c897e9f8292c47ba827749e9dec3f49d493f1c86304b30",
+        "bytes": 778
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0034.json",
+        "sha256": "3766d0abdb18468a548ac6dd924e90f0e3df51093c9fddec35279c186eb28d87",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0035.json",
+        "sha256": "71ddc28e771085a3b63b38a9cfb9b535931a478d54ba5b38b643852708d2a741",
+        "bytes": 808
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0036.json",
+        "sha256": "e99086014f2313954fbb5721724e6dda1a23b07de659ab405b82888b1dec7fdd",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0037.json",
+        "sha256": "03824f9695a21c5348068bce6f27001d3c023ea9730b550a64f1f0f6e240aeae",
+        "bytes": 808
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0038.json",
+        "sha256": "3870d2d3646a2e8e224f2c4bece5ce64633269b3f23fa804cc1a21c529867fc0",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0039.json",
+        "sha256": "a21efa67b30e4f7f2bf4d1683ae422505ec87aca7f910eeee908aedae1b81d36",
+        "bytes": 818
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0040.json",
+        "sha256": "861cbc54aa4b14fd3b27802cbca9679d54137194d53b78a7aa5de749d0bc0711",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0041.json",
+        "sha256": "76358f8941553921a6ec11cd6d9f1b7c7f63440a9f9667900551f7b058732bc1",
+        "bytes": 806
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0042.json",
+        "sha256": "01303857d73f983c87e71d6523bf3a778d27f4af71ccb10d963c701866be66f2",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0043.json",
+        "sha256": "ca698dc79118f1e2820f4c48a56cba5667cace4ddc2ea1bab7edd765c8ca2e47",
+        "bytes": 808
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0044.json",
+        "sha256": "933d68bf28d3659bbc81e4fec645cf6d7e973d5d62808a848c3e47eeccfc0288",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0045.json",
+        "sha256": "3b7981dd39a85afea5cdb95e13b3ed9bb3fb8695cc0c73149d75bf393b024462",
+        "bytes": 794
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0046.json",
+        "sha256": "6d164c3c0283eea0599137cf58388f97a41094c28f1b90b28a77ffb744eb618c",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0047.json",
+        "sha256": "505a6a8fb18fc22889c518b9c134f545f6726e80d5be6d74d8d8b0e70878ef29",
+        "bytes": 808
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0048.json",
+        "sha256": "b38a146cd6f15c366c96d7ab978623e7be18c6e8754ac5797c3a53156d5c068d",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0049.json",
+        "sha256": "a03bbf2975c4d2472fcf5c586b18dbfc7178ee55d8eeaa21ed317f2828de9aa3",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0050.json",
+        "sha256": "bf3df754026e942455a94e3944cece4916da1ea5826942e6aa79a78e5632d13d",
+        "bytes": 2681
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0051.json",
+        "sha256": "de603aa398cf998c8583ae4ed61ff7afb1699adb7c7d84cb54eedfedcd1fe323",
+        "bytes": 545
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0052.json",
+        "sha256": "7a5715e3a6b44e89f116328905507d6cfe524f4be83d893aea91616a7f187cd4",
+        "bytes": 212
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0053.json",
+        "sha256": "d59af109a72ae2d60356ed09b52dfadeb04952f1697738dd0b66eea13c92940e",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0054.json",
+        "sha256": "6d96cc526267d1c66c3373c0072e2d199587637e62b15890126f029a36f4279f",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0055.json",
+        "sha256": "c0c757e56728c2a9957b31db9ac562b775d9a994e6c107573374bbb70a0872a9",
+        "bytes": 2681
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0056.json",
+        "sha256": "2297bda9fe7c0a558683c4e3dd4bbc1796dca9277d433fc20b8dba27cc4dbbc1",
+        "bytes": 545
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0057.json",
+        "sha256": "27a69222b3d7c903ed23bd2eeeb9fd1a915d488673e6b86b657d6268111d4210",
+        "bytes": 212
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0058.json",
+        "sha256": "c082fde4d813a84677ce07c1b3dd6ce70b9c1f3ec8141dc22e6d4d046597c898",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0059.json",
+        "sha256": "d0c3a08c787fc7b1cad13776341d1cded0603448ac1dcfc7ddb03a8e6bb3a5be",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0060.json",
+        "sha256": "969cc75f6385a24c29dcab591e94954639aa247a76da6cbb95aa8305218e639d",
+        "bytes": 2681
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0061.json",
+        "sha256": "0e9d42ea0c38e0df3fb39b11aa105b0fc2384f773690e6aaaf343a35c0ef9f30",
+        "bytes": 545
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0062.json",
+        "sha256": "66d1938291c6ef2980595dc1e12045d70b7ceb6270c8ecbae73084296c2fc21f",
+        "bytes": 212
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0063.json",
+        "sha256": "171a6ef77ef476a5c19fe3ed552952d9ebe850f21e44a817195c3cdbd2d4dc54",
+        "bytes": 600
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0064.json",
+        "sha256": "0b7f45dc57f13ebc9e081c9fbebb77f3a7d2076c213b9f8e489236c10774444b",
+        "bytes": 600
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0065.json",
+        "sha256": "576304f5194b72d1beeddac28645b47544da03793929a8f3bc98232497481c69",
+        "bytes": 600
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0066.json",
+        "sha256": "91250fc31296a4b2af7380629af09368bb9e9c859c46c3756335aa1fc55c2856",
+        "bytes": 290
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0067.json",
+        "sha256": "dc73528db7b60542642a5bd6abed0fc3b21f9baa786e3554fa6d70dc2233450f",
+        "bytes": 290
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0068.json",
+        "sha256": "d74deab5f28333b046f0084fd9339d50a069fcfe89b368d3ab4cf7beb9aaabb6",
+        "bytes": 296
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0069.json",
+        "sha256": "0a9245f504d2dd7d3c585501075459941009e0e1f002d449cabf70c5a33e01a4",
+        "bytes": 294
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0070.json",
+        "sha256": "3b3af23e2d32b81df8a888d714fa8ebc0e54de136011e6aebfd4524040653349",
+        "bytes": 296
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0071.json",
+        "sha256": "e77f81f3259fd37b42e2abadde536c62cf74552f70fec3a5686a9a05a6a6e9d4",
+        "bytes": 606
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0072.json",
+        "sha256": "fba153a59ddbcab9fdb3dc52d39b7005adf6e70319af357baab8f52bce0eef95",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0073.json",
+        "sha256": "fca00e241c95a5d7a6c755bd5d4375eb3e570c8d5e8d3543b59e0fee081da1be",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0074.json",
+        "sha256": "e92d4f7b76f6320e99a025d0dc21206579ae8c0583706f6e6f3b6a5103720933",
+        "bytes": 2667
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0075.json",
+        "sha256": "b1827bf60bda96f0f3b2ed9d47778e24e89e3e39874c996da7cafe16c3c10f3a",
+        "bytes": 555
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0076.json",
+        "sha256": "854e52edd4a13b0d513d38a466c17d1e6662a977b05ee4d922ac9809dffd2cf3",
+        "bytes": 212
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0077.json",
+        "sha256": "170e1c3d8d1940fb41e0d8403dd972cd6ac0c70ab0d0664fec90945636957f36",
+        "bytes": 2749
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0078.json",
+        "sha256": "43baec7c266ed62a99a3e44d58a0e1159cec08f4f67fd6dee23c76e17ec1559d",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0079.json",
+        "sha256": "7eb1c56b2d4bb44cf32717f18b2b2582fb28191c19beae1290daeafd5820df67",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0080.json",
+        "sha256": "1e0114f717c9ea2b9c436e77ca229fabb94821350cdffdc1746564f67ef3ad2b",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0081.json",
+        "sha256": "1615d88833373df36ecc58c3e6dbe4e7f5fb04f91e52e92239f5a4044459a6e0",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0082.json",
+        "sha256": "5748ca937c261bdeb6121c0c0a3c9eaabae9ccddcb4edac14a2a6edce11b48ec",
+        "bytes": 584
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0083.json",
+        "sha256": "038e2b57f8611ff313a8d6af2a96131cc54d1aa0dde1304a56342fc55facf6dc",
+        "bytes": 268
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0084.json",
+        "sha256": "d266ff32e43bf326b42aaed6279f27cf82bfd1f94e164f617ccafd17d483a01f",
+        "bytes": 342
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0085.json",
+        "sha256": "b1c86b55686c9a9dd748e71c8e0faf3ba105f6ced55cb3bd72992b7303f87eee",
+        "bytes": 786
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0086.json",
+        "sha256": "f9fccc83d4a4fab6811b9980374bf151b07ef7e8ebc76cfef6c92d475942718f",
+        "bytes": 584
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0087.json",
+        "sha256": "a435a81d6e6f110e8846832ed8ec3c456beb4bd81657cd793073299f3ae59d70",
+        "bytes": 268
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0088.json",
+        "sha256": "d3eb89810f60a4dfe2e2dc6c1de7e519125a1399cd0edc7a9c093d9a3cae8bd4",
+        "bytes": 342
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0089.json",
+        "sha256": "e2fb66507b100c50be70c1737525264e0417a67f19c8f8c7d1629cdaaab8d9f6",
+        "bytes": 786
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0090.json",
+        "sha256": "08c3a2d6c7ad38e8089d2c0353270beb38a33bbfabed7b37ff3efe63ca002cd6",
+        "bytes": 342
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0091.json",
+        "sha256": "cc0c3140957df5ece28bda2aec2d4adcfde7a294adf12649ffe12c3bc2dfc5c4",
+        "bytes": 342
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0092.json",
+        "sha256": "a578fa4979690f934c01829b9e79d0084a6ca0d85f77477756b2b04c541cf50f",
+        "bytes": 808
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0093.json",
+        "sha256": "d3466ab8d10cc4c678892a7bc52722474fcc0c0f5a25e4e1f8e834181d42b65e",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0094.json",
+        "sha256": "95e4c723ba03fd630121bf7ddbd24c1ddeb79cfe62bcae82b36165c8c8d8ac7e",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0095.json",
+        "sha256": "7de5247d7f962b196a9467e530976816a214d2f9b4a6e2f5f8604ff7af5723d7",
+        "bytes": 2647
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0096.json",
+        "sha256": "1da38fb27e2f7adb8a02dd6071b01dd2ef7453735fd5b5bcc51f65803f0de53c",
+        "bytes": 327
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0097.json",
+        "sha256": "d5141f4c039edaaec09d3ff14526b477e3062c2bb8f43c408d0d73170971848e",
+        "bytes": 2789
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0098.json",
+        "sha256": "75c27f4a3a682cc1e1cf8376f3eb19f46cd8c79522556a5b364139ccf7026cc4",
+        "bytes": 2370
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0099.json",
+        "sha256": "e782d68610bb6db83fc8907b4b3df955ebfe9f34c9cb19ec21cb03d7f9c405e1",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0100.json",
+        "sha256": "e782d68610bb6db83fc8907b4b3df955ebfe9f34c9cb19ec21cb03d7f9c405e1",
+        "bytes": 661
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0101.json",
+        "sha256": "a37f2f139e5852f2089088f1a39df21cfefadda42093265ef6822faf461e54d3",
+        "bytes": 809
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0102.json",
+        "sha256": "4e52d7f67d705a51a67feb66cc28ff374215bec9a8733e2fee960206bff8c596",
+        "bytes": 2667
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0103.json",
+        "sha256": "e56e3aea6fe55620740efe5e15705991ae7397e64f9e66ed8412c5cc7e437097",
+        "bytes": 356
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0104.json",
+        "sha256": "e56e3aea6fe55620740efe5e15705991ae7397e64f9e66ed8412c5cc7e437097",
+        "bytes": 356
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0105.json",
+        "sha256": "b43621a3ce83ad8ff23956836f11e467360c152438c80597b440e4fe31422672",
+        "bytes": 2838
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0106.json",
+        "sha256": "4f369aed101e00644d7fa3f1c920c03232ae159ca5842bd224c53d16d144e3ca",
+        "bytes": 291
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0107.json",
+        "sha256": "e0a869b82fba3cd0c90572d14d6800df3c74a7447a77580b17e7e7e66d8e6ad2",
+        "bytes": 130
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/0108.json",
+        "sha256": "47ff46acbde145382f1c8ed1df49ed106f96411be9c82c0cdaae504ed1d01973",
+        "bytes": 293
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/contract-result.json",
+        "sha256": "368c55d8b2f15bf21cbf2e70927c2406f2bcd90efdfcea9fd3f0b9b5bd72bd22",
+        "bytes": 614
+      },
+      {
+        "path": "validation/a03-backend-observations-dd20cd75-3ea7-43bb-8f8a-9c74b975cfde/manifest.json",
+        "sha256": "f73c1a3de8888eb7c6a29a645b6b12b1ffa866ffa71f45d8da92aaa69d5e05e5",
+        "bytes": 177
+      },
+      {
+        "path": "validation/a03-ui-actual-response-contract.json",
+        "sha256": "34e30efc4bced026871b4c0ab612f1ae3fab37834f201c0a37d7b58cc76a3400",
+        "bytes": 310
+      },
+      {
+        "path": "validation/a03-ui-actual-response-red.log",
+        "sha256": "e1ad3f3cdcc635dca51a9d0b37a69c46f141e4bd287a64d698592b238a900d90",
+        "bytes": 2463
+      },
+      {
+        "path": "validation/a03-ui-authors.log",
+        "sha256": "02dc75bfed00c78a34583847aa7eaba4e045edde7278b853fee7684b86b69d47",
+        "bytes": 73
+      },
+      {
+        "path": "validation/a03-ui-backed-java-reports/TEST-io.agentflow.expense.ExpenseDraftAssistIntegrationTest.xml",
+        "sha256": "00a4db203d67943c2d6fff7c98fda8e3fcb502c3e3cd524ba8b6090e61aa56dc",
+        "bytes": 77810
+      },
+      {
+        "path": "validation/a03-ui-backed-java-summary.json",
+        "sha256": "0246d3feb6844af0f9d452eb49b5a2b78d858f8a596b0473b36be69a6a0f01b1",
+        "bytes": 420
+      },
+      {
+        "path": "validation/a03-ui-backed-java.log",
+        "sha256": "be13120f1a5379c20f43896456259cfe3f5ba7d31e3359932bcc1c5e08990a6f",
+        "bytes": 42394
+      },
+      {
+        "path": "validation/a03-ui-capacity-red-source/agentflow-web/src/components/ExpenseDraftAssistPanel.vue",
+        "sha256": "712bc3de5a8ee25811624b79c23596645abf98d46529c4699e8d7963f8050329",
+        "bytes": 25227
+      },
+      {
+        "path": "validation/a03-ui-capacity-red-source/agentflow-web/tests/expense-draft-assist.test.mjs",
+        "sha256": "bee3085a804b9d4d91d45fabb952c4145e687c9e58cc01d96cb8fd1bddac0813",
+        "bytes": 26645
+      },
+      {
+        "path": "validation/a03-ui-capacity-red.log",
+        "sha256": "488395d076ea391024dee7840ca1f47070ed11357d2d4299e9b2ac496da7e4aa",
+        "bytes": 2603
+      },
+      {
+        "path": "validation/a03-ui-final-build.log",
+        "sha256": "d32ed127525fb84b7a7df035caa2b40b5ffe68a6b8cd4ee35fd422aaf618e61c",
+        "bytes": 718
+      },
+      {
+        "path": "validation/a03-ui-final-tests-summary.json",
+        "sha256": "61c1b177dc9054162a9c20795b8eaf3ce4a598e46afe55bc6fc65b8085d471e7",
+        "bytes": 8647
+      },
+      {
+        "path": "validation/a03-ui-final-tests.log",
+        "sha256": "a8dbc92151c746fc9d6126214cd04691946975769f501cb898b5d07c02ad805c",
+        "bytes": 9231
+      },
+      {
+        "path": "validation/a03-ui-first-tests.log",
+        "sha256": "48868c2615b3a5f0158fb461c6550b3cd7a0e7e0b722d122ee1e43175b0cd7bc",
+        "bytes": 1857
+      },
+      {
+        "path": "validation/a03-ui-lock-red.log",
+        "sha256": "b0d63ec494cf15b7b7a83d4a4092b7e3a123fcb12d91b438493b348b0ec0cf7c",
+        "bytes": 2383
+      },
+      {
+        "path": "validation/a03-ui-matched-tests.log",
+        "sha256": "e90d1fdea84a2a60f0e2904c4bb13fdb6e05d4ea65c2cdddab987d06768572cd",
+        "bytes": 10079
+      },
+      {
+        "path": "validation/a03-ui-mutual-lock-red-source/agentflow-web/scripts/test-requests.mjs",
+        "sha256": "bbf20d012044d53d39b1123ee54c100664c1685d35be50fd93af80195c0a6172",
+        "bytes": 92530
+      },
+      {
+        "path": "validation/a03-ui-mutual-lock-red-source/agentflow-web/src/components/ExpenseEditor.vue",
+        "sha256": "852bebd237e62263791468f1e0629bfb385524764a352d69427f7e85ae2aea96",
+        "bytes": 20383
+      },
+      {
+        "path": "validation/a03-ui-mutual-lock-red-source/agentflow-web/tests/expense-draft-assist.test.mjs",
+        "sha256": "65d9216c6a14d0fa20713a61af2056ec99e3e457abb0367ae0cc355ac9cd049b",
+        "bytes": 21892
+      },
+      {
+        "path": "validation/a03-ui-mutual-lock-red.log",
+        "sha256": "ee433d3af2537b4d0dd2429456522298dd70582c98e9809e58a94470bd7ec342",
+        "bytes": 2545
+      },
+      {
+        "path": "validation/check-a03-backend-observations.mjs",
+        "sha256": "5dafc8a35ea6de56c260d47ed45d1f2dd69f9458f26f35075dbe9d44750fd0b5",
+        "bytes": 5332
+      },
+      {
+        "path": "web-dist/assets/index-BACWrUtE.js",
+        "sha256": "b049e879897d2bfae225192c59c10157dddb06448c37a5b6b3e0b52cfd05ab77",
+        "bytes": 1918716
+      },
+      {
+        "path": "web-dist/assets/index-BxidcA2J.css",
+        "sha256": "4bcd97d5b722d251d4f38785404a4cda38c6f2e74e700862e8c9e4e6bde323b4",
+        "bytes": 409781
+      },
+      {
+        "path": "web-dist/index.html",
+        "sha256": "03d748c138c8d16adaf2aa2d5cf111d0f46dca4a13e4698e948de763fc88d215",
+        "bytes": 420
+      }
+    ]
+  }
+}

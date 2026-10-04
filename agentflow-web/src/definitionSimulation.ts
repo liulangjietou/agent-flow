@@ -49,7 +49,10 @@ export class SimulationPreview {
         const failure = error as ApiError
         this.error = timedOut ? '模拟请求超时，请重新运行。' : failure.code === 'INVALID_DEFINITION'
           ? '请先修正流程配置，再运行模拟。' : failure.code === 'NO_BRANCH_MATCHED'
-          ? '没有匹配的路径，请调整测试数据或配置默认分支。' : failure.message ?? '模拟失败，请重试。'
+          ? '没有匹配的路径，请调整测试数据或配置默认分支。' : failure.code === 'EXPENSE_SPLIT_SIMULATION_REQUIRED'
+          ? '已启用跨单规则，请明确填写合成路由金额。' : failure.code === 'EXPENSE_SPLIT_SIMULATION_INVALID'
+          ? '合成金额须与规则和本单测试币种一致，且不能低于本单金额。' : failure.code === 'EXPENSE_SPLIT_SIMULATION_UNEXPECTED'
+          ? '当前规则未启用，请清除合成金额后重新运行。' : failure.message ?? '模拟失败，请重试。'
         this.fieldErrors = failure.details?.fieldErrors ?? {}
         this.definitionErrors = failure.details?.definitionErrors ?? []
       }
@@ -73,6 +76,23 @@ export function parseSimulationValues(raw: string): Record<string, unknown> {
 }
 
 const ruleLabels: Record<string, string> = {
+  EXPENSE_SPLIT_RISK_POLICY_INVALID: '跨单规则须明确配置有效状态、完整窗口、阈值和本位币；关闭时可清空全部参数',
+  EXPENSE_SPLIT_RISK_REQUIRES_EXPENSE_FORM: '跨单规则需要完整的结构化费用表单',
+  EXPENSE_SPLIT_ROUTING_REQUIRED: '启用跨单规则至少需要一个指定业务条件网关',
+  EXPENSE_SPLIT_ROUTING_INVALID: '冻结跨单金额只能由明确标记的条件网关使用',
+  EXPENSE_SPLIT_ROUTING_AMOUNT_REQUIRED: '指定业务网关至少一条出线条件须引用 amount',
+  EXPENSE_SPLIT_ROUTING_AFTER_FINANCE: '财务审核与复核之后的网关必须使用本单金额',
+  INVALID_SERVICE_TASK_POLICY: '请明确选择操作版本并配置字段映射；服务节点不接受地址、脚本或执行表达式',
+  SERVICE_TASK_CONTRACT_UNAVAILABLE: '原操作暂不可用或契约不一致，请核对原版本后再发布或发起',
+  SERVICE_TASK_CONTRACT_MISMATCH: '节点所选版本与契约不一致，请明确重新选择',
+  SERVICE_TASK_INPUT_UNKNOWN: '输入映射引用了不存在的表单字段或服务参数',
+  SERVICE_TASK_INPUT_TYPE_MISMATCH: '来源字段类型须与服务参数一致',
+  SERVICE_TASK_INPUT_NOT_READABLE: '服务节点对来源字段须有只读权限；隐藏或脱敏字段不能外发',
+  SERVICE_TASK_INPUT_SENSITIVITY_LOSS: '此参数未声明敏感性，不能接收受限制字段',
+  SERVICE_TASK_REQUIRED_INPUT_MISSING: '请为服务任务的每个必填参数选择来源字段',
+  INVALID_SERVICE_TASK_INPUTS: '映射值不符合参数类型、必填或大小限制，请检查测试数据或申请表单',
+  SERVICE_REQUIRES_SERVICE_NODE: '仅服务任务节点可以配置操作引用和参数映射',
+  SERVICE_REQUIRES_APPROVAL_PATH: '每条完成路径仍须有人工审批依据，服务结果不能代替审批',
   SUBPROCESS_REFERENCE_REQUIRED: '请选择子流程的明确发布版本',
   SUBPROCESS_REFERENCE_INVALID: '子流程须引用准确标识和有效发布版本，不能使用最新版本或表达式',
   SUBPROCESS_INPUT_MAPPING_INVALID: '子流程输入只能映射已声明的字段标识，最多 50 项',
@@ -104,6 +124,9 @@ const ruleLabels: Record<string, string> = {
   BRANCH_COVERAGE_GAP: '数字条件存在未覆盖输入，发布前请补齐条件或设置默认分支',
   CONDITION_MEMBERSHIP_REQUIRES_SCHEMA: '属于判断需要绑定包含单选字段的表单',
   DUPLICATE_NODE: '节点标识重复', DUPLICATE_EDGE: '连线标识重复', EDGE_NODE_NOT_FOUND: '连线引用了不存在的节点',
+  INVALID_NODE_ID: '节点标识不合法，请使用如 review_1 的编号，不能以数字开头或包含空白、冒号、斜杠',
+  INVALID_EDGE_ID: '连线标识不合法，请使用如 route_1 的编号，不能以数字开头或包含空白、冒号、斜杠',
+  INVALID_PROCESS_KEY: '流程标识不合法，请使用如 expense_1 的编号，不能以数字开头或包含空白、冒号、斜杠',
   NODE_EDGE_ID_CONFLICT: '连线与节点标识重复，请在高级画布删除该连线后重新连接',
   PROCESS_KEY_CONFLICT: '流程标识与节点或连线标识重复，请更换流程标识',
   START_COUNT_MUST_BE_ONE: '流程必须只有一个开始节点', END_REQUIRED: '流程缺少结束节点',

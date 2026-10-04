@@ -1,3 +1,4 @@
+import { readServiceTaskBinding, writeServiceTaskBinding, type ServiceTaskBinding } from './serviceTasks.js'
 import type { GraphNode } from './api'
 import { readSubprocessBinding, writeSubprocessBinding, type SubprocessBinding } from './subprocessDesigner.js'
 
@@ -27,6 +28,7 @@ export interface DesignerNode {
   timerDelaySeconds?: string
   eventContractKey?: string
   eventContractVersion?: string
+  serviceTask?: ServiceTaskBinding
   subprocess?: SubprocessBinding
   deadline?: DesignerDeadline
   originalProperties?: Record<string, string>
@@ -49,6 +51,7 @@ export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
       approvalMode: node.properties.approvalMode ?? 'SINGLE', approvalPercentage: node.properties.approvalPercentage,
       timerDelaySeconds: node.properties.timerDelaySeconds,
       eventContractKey: node.properties.eventContractKey, eventContractVersion: node.properties.eventContractVersion,
+      serviceTask: readServiceTaskBinding(node.properties),
       subprocess: readSubprocessBinding(node.properties),
       originalProperties: { ...node.properties }, loadedPosition: { x, y } }
   })
@@ -57,7 +60,7 @@ export function loadDesignerNodes(nodes: GraphNode[]): DesignerNode[] {
 /** 将画布节点转换为发布、保存、校验、模拟和比较共用的配置快照。 */
 export function serializeDesignerNodes(nodes: DesignerNode[]): GraphNode[] {
   return nodes.map(node => {
-    const properties = node.type === 'SUB_PROCESS' ? writeSubprocessBinding(node.originalProperties ?? {}, node.subprocess) : { ...node.originalProperties }
+    const properties = node.type === 'SUB_PROCESS' ? writeSubprocessBinding(node.originalProperties ?? {}, node.subprocess) : node.type === 'SERVICE_TASK' ? writeServiceTaskBinding(node.originalProperties ?? {}, node.serviceTask) : { ...node.originalProperties }
     if (node.type === 'EVENT_WAIT') {
       for (const key of ['eventContractKey', 'eventContractVersion'] as const) {
         if (node[key] !== undefined) properties[key] = node[key]

@@ -1,0 +1,667 @@
+{
+  "key": "expense-report",
+  "templateVersion": 5,
+  "name": "员工费用报销",
+  "category": "财务",
+  "description": "员工本币费用报销，包含自审批上溯、相邻同人业务审批自动通过、可配置跨单拆分风险、制度例外、原件签收、逐行核减和独立财务复核。 超出事前累计容差时，增加独立额度例外审批。",
+  "scope": "员工本币费用报销，包含自审批上溯、相邻同人业务审批自动通过、可配置跨单拆分风险、制度例外、原件签收、逐行核减和独立财务复核。",
+  "businessType": "EXPENSE",
+  "dependencies": [
+    "维护申请人本次任职及直属主管；本次任职和各节点候选随提交轮次固定。业务候选包含申请人时上溯一级，无有效主管则阻断提交。",
+    "启用相邻同人业务审批自动通过；核对候选和实际办理人。非相邻重复、多人候选、多人会签及多个不同审批前驱的汇合保留人工办理。",
+    "跨单拆分风险在本模板中明确关闭。启用前须按企业制度明确滚动天数、同类费用阈值及本位币，并逐个确认业务金额网关；模拟时单独填写合成路由金额。",
+    "事前额度控制来自批准计划冻结的类别修订；累计超过容差时逐行说明，由独立额度例外节点审批，不能由制度超标节点或相邻同人自动通过替代。",
+    "复制后把部门负责人、分管负责人及财务占位角色绑定到本租户实际人员或岗位；按企业制度调整金额条件后校验、模拟和发布。",
+    "配置申请人可用的法人、币种及财务目录；正式提交必须通过该业务专用预检。",
+    "先发布适用的费用类别；使用费用制度的报销还需发布匹配的制度版本，示例标准不能替代企业制度。",
+    "办理凭证和付款前，配置有效的法人币种科目映射及财务连接，ERP 和资金服务分别确认过账与到账。",
+    "财务签收、审核和复核需绑定具有财务角色及当期法人任职的人员，并与申请人及本单业务审批人分离。",
+    "签收要求由法人目录的 paperReceiptRequired 控制；启用纸件要求时必须在签收节点确认原件，关闭时该节点仍保留人工单据检查。"
+  ],
+  "defaultRoles": [
+    "EXPENSE_DEPARTMENT_HEAD",
+    "EXPENSE_EXECUTIVE",
+    "EXPENSE_POLICY_OWNER",
+    "EXPENSE_RECEIPT",
+    "FINANCE",
+    "EXPENSE_FINANCE_RECHECK",
+    "EXPENSE_PRIOR_REVIEW"
+  ],
+  "fieldDescriptions": {
+    "expenseDetails": "专用业务页面维护完整单据，所有模板人工节点可原样读取此敏感组；管理员没有额外读取权限。",
+    "amount": "本单金额由服务端冻结费用派生；5,000 和 50,000 为可调整的业务示例阈值。明确启用跨单规则后，指定业务网关改用本轮冻结路由金额，表单金额保持本单口径。财务核减后 10,000 元复核条件读取最新本单核定金额。",
+    "currency": "由本次任职法人、费用目录及权威汇率共同确认，不由普通表单填写。",
+    "overPolicy": "由本轮原费用制度判定派生，核减不会删除原超标事实，也不能由申请人改成 false。",
+    "priorRequestOverTolerance": "服务端根据同一批准行的净核销与全部占用派生，超容差走独立额度例外审批；财务核减不删除原判断。"
+  },
+  "risks": [
+    "5,000、50,000 与财务复核 10,000 元均为本币示例阈值，复制后由租户按制度配置。",
+    "默认关闭跨单拆分风险，不补造企业窗口或阈值。启用后只有明确标记的业务网关使用本轮冻结依据；财务审核后的复核仍使用本单核定金额。",
+    "场景仅验证派生字段与审批路径；正式单据必须从专用入口创建、预检和提交，不能使用通用表单绕过业务依据。",
+    "业务候选包含申请人时，按本次任职上溯直属主管并保留原候选及版本审计；财务节点始终排除申请人及本单实际业务审批人。",
+    "相邻同人业务审批按实际路径自动通过，并记录来源任务、实际人员及规则版本；财务签收、审核和复核始终人工办理。",
+    "本版本未包含按项目分摊自动会签或柔性预算超支分支。需要这些规则的业务应待相应能力验收后启用。",
+    "签收、审核与复核保留独立人工任务；节点可核减不等于可以扩大原申请金额或修改原制度事实。",
+    "审批通过不等于实际付款或归档；完整凭证、付款、预算核销及发票占用按各自受控链路继续办理。",
+    "原发布流程和在审轮次保持原定义；使用容差模式且超阈值时，必须选用有独立额度例外节点的流程版本。"
+  ],
+  "upgradePolicy": "复制后成为租户独立草稿；目录升级不覆盖既有定义、已发布版本、任职快照或单据轮次。",
+  "notificationTexts": {
+    "SUBMITTED": "员工费用报销已提交，请等待审批。",
+    "RETURNED": "员工费用报销已退回，请按审批意见补正并重新预检。",
+    "APPROVED": "员工费用报销已批准，实际凭证和付款结果请查看后续财务办理记录。"
+  },
+  "notificationsAvailable": true,
+  "graph": {
+    "nodes": [
+      {
+        "id": "start",
+        "name": "开始",
+        "type": "START",
+        "properties": {
+          "expenseSelfApproval": "ESCALATE_SUPERVISOR",
+          "x": "40",
+          "y": "150",
+          "expenseDuplicateApproval": "AUTO_PASS_ADJACENT",
+          "expenseSplitRisk": "DISABLED"
+        }
+      },
+      {
+        "id": "supervisor",
+        "name": "本次任职直属主管",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "260",
+          "y": "150",
+          "assigneeRule": "role:ORG_SUPERVISOR_1"
+        }
+      },
+      {
+        "id": "amountGate",
+        "name": "金额矩阵：5,000 元",
+        "type": "EXCLUSIVE_GATEWAY",
+        "properties": {
+          "x": "500",
+          "y": "150",
+          "expenseSplitRouting": "AGGREGATE_AMOUNT"
+        }
+      },
+      {
+        "id": "department",
+        "name": "部门负责人",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "740",
+          "y": "330",
+          "assigneeRule": "role:EXPENSE_DEPARTMENT_HEAD"
+        }
+      },
+      {
+        "id": "executiveGate",
+        "name": "金额矩阵：50,000 元",
+        "type": "EXCLUSIVE_GATEWAY",
+        "properties": {
+          "x": "980",
+          "y": "330",
+          "expenseSplitRouting": "AGGREGATE_AMOUNT"
+        }
+      },
+      {
+        "id": "executive",
+        "name": "分管负责人",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "1220",
+          "y": "490",
+          "assigneeRule": "role:EXPENSE_EXECUTIVE"
+        }
+      },
+      {
+        "id": "policyGate",
+        "name": "费用制度例外",
+        "type": "EXCLUSIVE_GATEWAY",
+        "properties": {
+          "x": "1220",
+          "y": "150"
+        }
+      },
+      {
+        "id": "policy",
+        "name": "费用归口例外审批",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "1460",
+          "y": "330",
+          "assigneeRule": "role:EXPENSE_POLICY_OWNER"
+        }
+      },
+      {
+        "id": "receipt",
+        "name": "单据检查与原件签收",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "2180",
+          "y": "150",
+          "assigneeRule": "role:EXPENSE_RECEIPT",
+          "expenseStage": "RECEIPT"
+        }
+      },
+      {
+        "id": "finance",
+        "name": "财务审核与核减",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "2420",
+          "y": "150",
+          "assigneeRule": "role:FINANCE",
+          "expenseStage": "FINANCE_REVIEW"
+        }
+      },
+      {
+        "id": "recheckGate",
+        "name": "财务复核：10,000 元",
+        "type": "EXCLUSIVE_GATEWAY",
+        "properties": {
+          "x": "2660",
+          "y": "150"
+        }
+      },
+      {
+        "id": "recheck",
+        "name": "财务负责人复核",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "2900",
+          "y": "330",
+          "assigneeRule": "role:EXPENSE_FINANCE_RECHECK",
+          "expenseStage": "FINANCE_RECHECK"
+        }
+      },
+      {
+        "id": "end",
+        "name": "结束",
+        "type": "END",
+        "properties": {
+          "x": "3140",
+          "y": "150"
+        }
+      },
+      {
+        "id": "priorGate",
+        "name": "事前累计容差",
+        "type": "EXCLUSIVE_GATEWAY",
+        "properties": {
+          "x": "1700",
+          "y": "150"
+        }
+      },
+      {
+        "id": "priorReview",
+        "name": "事前额度例外审批",
+        "type": "USER_TASK",
+        "properties": {
+          "x": "1940",
+          "y": "330",
+          "assigneeRule": "role:EXPENSE_PRIOR_REVIEW",
+          "expenseStage": "PRIOR_REQUEST_REVIEW"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "start_supervisor",
+        "source": "start",
+        "target": "supervisor",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "supervisor_amountGate",
+        "source": "supervisor",
+        "target": "amountGate",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "amountGate_department",
+        "source": "amountGate",
+        "target": "department",
+        "condition": "amount > 5000",
+        "defaultBranch": false
+      },
+      {
+        "id": "amountGate_policyGate",
+        "source": "amountGate",
+        "target": "policyGate",
+        "condition": "",
+        "defaultBranch": true
+      },
+      {
+        "id": "department_executiveGate",
+        "source": "department",
+        "target": "executiveGate",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "executiveGate_executive",
+        "source": "executiveGate",
+        "target": "executive",
+        "condition": "amount > 50000",
+        "defaultBranch": false
+      },
+      {
+        "id": "executiveGate_policyGate",
+        "source": "executiveGate",
+        "target": "policyGate",
+        "condition": "",
+        "defaultBranch": true
+      },
+      {
+        "id": "executive_policyGate",
+        "source": "executive",
+        "target": "policyGate",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "policyGate_policy",
+        "source": "policyGate",
+        "target": "policy",
+        "condition": "overPolicy == true",
+        "defaultBranch": false
+      },
+      {
+        "id": "policyGate_priorGate",
+        "source": "policyGate",
+        "target": "priorGate",
+        "condition": "",
+        "defaultBranch": true
+      },
+      {
+        "id": "policy_priorGate",
+        "source": "policy",
+        "target": "priorGate",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "receipt_finance",
+        "source": "receipt",
+        "target": "finance",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "finance_recheckGate",
+        "source": "finance",
+        "target": "recheckGate",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "recheckGate_recheck",
+        "source": "recheckGate",
+        "target": "recheck",
+        "condition": "amount > 10000",
+        "defaultBranch": false
+      },
+      {
+        "id": "recheckGate_end",
+        "source": "recheckGate",
+        "target": "end",
+        "condition": "",
+        "defaultBranch": true
+      },
+      {
+        "id": "recheck_end",
+        "source": "recheck",
+        "target": "end",
+        "condition": "",
+        "defaultBranch": false
+      },
+      {
+        "id": "priorGate_priorReview",
+        "source": "priorGate",
+        "target": "priorReview",
+        "condition": "priorRequestOverTolerance == true",
+        "defaultBranch": false
+      },
+      {
+        "id": "priorGate_receipt",
+        "source": "priorGate",
+        "target": "receipt",
+        "condition": "",
+        "defaultBranch": true
+      },
+      {
+        "id": "priorReview_receipt",
+        "source": "priorReview",
+        "target": "receipt",
+        "condition": "",
+        "defaultBranch": false
+      }
+    ]
+  },
+  "formSchema": {
+    "schemaVersion": 2,
+    "fields": [
+      {
+        "key": "expenseDetails",
+        "label": "员工费用报销明细",
+        "type": "TEXT",
+        "required": true,
+        "sensitive": true,
+        "nodeAccess": {
+          "supervisor": "READ_ONLY",
+          "department": "READ_ONLY",
+          "executive": "READ_ONLY",
+          "policy": "READ_ONLY",
+          "receipt": "READ_ONLY",
+          "finance": "READ_ONLY",
+          "recheck": "READ_ONLY",
+          "priorReview": "READ_ONLY"
+        }
+      },
+      {
+        "key": "amount",
+        "label": "核定本币总额",
+        "type": "NUMBER",
+        "required": true,
+        "minimum": "0.00"
+      },
+      {
+        "key": "currency",
+        "label": "本位币",
+        "type": "TEXT",
+        "required": true
+      },
+      {
+        "key": "overPolicy",
+        "label": "费用制度要求例外审批",
+        "type": "BOOLEAN",
+        "required": true
+      },
+      {
+        "key": "priorRequestOverTolerance",
+        "label": "事前累计超过容差",
+        "type": "BOOLEAN",
+        "required": true
+      }
+    ]
+  },
+  "scenarios": [
+    {
+      "id": "small",
+      "name": "普通金额",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "80.00",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "policyGate",
+        "priorGate",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "first-boundary",
+      "name": "第一档上界",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "5000.00",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "policyGate",
+        "priorGate",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "department",
+      "name": "进入部门审批",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "5000.01",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "department",
+        "executiveGate",
+        "policyGate",
+        "priorGate",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "upper-boundary",
+      "name": "第二档上界",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "50000.00",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "department",
+        "executiveGate",
+        "policyGate",
+        "priorGate",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "recheck",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "executive",
+      "name": "进入分管审批",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "50000.01",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "department",
+        "executiveGate",
+        "executive",
+        "policyGate",
+        "priorGate",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "recheck",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "recheck-boundary",
+      "name": "复核阈值上界",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "10000.00",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "department",
+        "executiveGate",
+        "policyGate",
+        "priorGate",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "recheck",
+      "name": "进入财务复核",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "10000.01",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "department",
+        "executiveGate",
+        "policyGate",
+        "priorGate",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "recheck",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "over-policy",
+      "name": "制度例外审批",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "80.00",
+        "currency": "CNY",
+        "overPolicy": true,
+        "priorRequestOverTolerance": false
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "policyGate",
+        "policy",
+        "priorGate",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "zero-approved",
+      "name": "零核定金额模拟",
+      "description": "仅模拟核减后的零核定金额；不代表可直接提交零申报，也不重放已完成的业务审批。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "0.00",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "policyGate",
+        "priorGate",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    },
+    {
+      "id": "negative",
+      "name": "拒绝负核定金额",
+      "description": "仅验证模板条件与派生字段，不产生业务额度、原件确认或财务副作用。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "-0.01",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": false
+      },
+      "expectedPath": [],
+      "expectedFieldErrors": {
+        "amount": "BELOW_MINIMUM"
+      }
+    },
+    {
+      "id": "prior-over-tolerance",
+      "name": "事前累计超过容差",
+      "description": "同一批准行的累计用量超过原阈值，必须独立额度例外审批；不能由普通制度例外替代。",
+      "payload": {
+        "expenseDetails": "员工费用报销依据见专用业务明细",
+        "amount": "80.00",
+        "currency": "CNY",
+        "overPolicy": false,
+        "priorRequestOverTolerance": true
+      },
+      "expectedPath": [
+        "start",
+        "supervisor",
+        "amountGate",
+        "policyGate",
+        "priorGate",
+        "priorReview",
+        "receipt",
+        "finance",
+        "recheckGate",
+        "end"
+      ],
+      "expectedFieldErrors": {}
+    }
+  ]
+}

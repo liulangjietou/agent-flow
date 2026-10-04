@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import io.agentflow.form.FormSchemaJsonDeserializer;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,7 @@ import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.ResourceLoader;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,15 +36,42 @@ class ClasspathProcessTemplateCatalogTest {
     @Test
     void loadsDeliveredTemplatesAndVerifiesEveryScenario() {
         var catalog = new ClasspathProcessTemplateCatalog(resources, json);
-        assertThat(catalog.list()).extracting(ProcessTemplate::key).containsExactly("leave-request", "seal-application", "contract-review", "procurement-payment", "budget-adjustment");
-        assertThat(catalog.list().stream().mapToInt(template -> template.scenarios().size()).sum()).isEqualTo(21);
+        assertThat(catalog.list()).extracting(ProcessTemplate::key).containsExactly("leave-request", "seal-application", "contract-review", "procurement-payment", "budget-adjustment",
+                "expense-report", "expense-plan", "advance-request");
+        assertThat(catalog.list().stream().mapToInt(template -> template.scenarios().size()).sum()).isEqualTo(44);
         catalog.list().forEach(ProcessTemplate::verifyScenarios);
         assertThatThrownBy(catalog.list()::clear).isInstanceOf(UnsupportedOperationException.class);
     }
 
+    @Test
+    void expenseTemplateRequiresExplicitNewSourceVersionWithSplitRiskDisabledAndNoInventedParameters() {
+        var catalog = new ClasspathProcessTemplateCatalog(resources, json);
+        var expense = catalog.get("expense-report");
+        assertThat(expense.templateVersion()).isEqualTo(5);
+        assertThat(io.agentflow.expense.ExpenseFormContract.hasPriorControl(expense.formSchema())).isTrue();
+        assertThat(io.agentflow.expense.ExpenseProcessPolicy.stage(expense.graph().node("priorReview"))).isEqualTo(io.agentflow.expense.ExpenseProcessPolicy.Stage.PRIOR_REQUEST_REVIEW);
+        assertThat(io.agentflow.expense.ExpenseSelfApprovalPolicy.enabled(expense.graph())).isTrue();
+        assertThat(io.agentflow.expense.ExpenseDuplicateApprovalPolicy.enabled(expense.graph())).isTrue();
+        var split = io.agentflow.expense.ExpenseSplitRiskPolicy.from(expense.graph());
+        assertThat(split.mode()).isEqualTo(io.agentflow.expense.ExpenseSplitRiskPolicy.Mode.DISABLED);
+        assertThat(split.rule()).isNull();
+        assertThat(split.gatewayIds()).containsExactlyInAnyOrder("amountGate", "executiveGate");
+        assertThat(expense.graph().node("recheckGate").properties()).doesNotContainKey("expenseSplitRouting");
+        for (long oldVersion : List.of(1L, 2L, 3L, 4L)) {
+            assertThatThrownBy(() -> catalog.requireVersion("expense-report", oldVersion)).isInstanceOf(DomainException.class)
+                    .satisfies(error -> assertThat(((DomainException) error).code()).isEqualTo("TEMPLATE_VERSION_CONFLICT"));
+        }
+        assertThat(catalog.requireVersion("expense-report", 5)).isSameAs(expense);
+        assertThat(catalog.get("expense-plan").templateVersion()).isEqualTo(1);
+        assertThat(catalog.get("advance-request").templateVersion()).isEqualTo(1);
+    }
+
     @ParameterizedTest
     @CsvSource({"procurement-payment,business-type", "procurement-payment,masked", "procurement-payment,missing-sensitive",
-            "budget-adjustment,business-type", "budget-adjustment,masked", "budget-adjustment,missing-sensitive"})
+            "budget-adjustment,business-type", "budget-adjustment,masked", "budget-adjustment,missing-sensitive",
+            "expense-report,business-type", "expense-report,masked", "expense-report,missing-sensitive",
+            "expense-plan,business-type", "expense-plan,masked", "expense-plan,missing-sensitive",
+            "advance-request,business-type", "advance-request,masked", "advance-request,missing-sensitive"})
     void structuredTemplateCannotMislabelItsBusinessOrHideEvidenceFromApprovers(String templateKey, String corruption) throws Exception {
         String location = "classpath:process-templates/" + templateKey + ".json";
         ObjectNode template;
@@ -57,6 +86,26 @@ class ClasspathProcessTemplateCatalogTest {
         when(replaced.getResource(anyString())).thenAnswer(call -> location.equals(call.getArgument(0))
                 ? new ByteArrayResource(json.write(template).getBytes(StandardCharsets.UTF_8)) : resources.getResource(call.getArgument(0)));
         assertThatThrownBy(() -> new ClasspathProcessTemplateCatalog(replaced, json)).isInstanceOf(IllegalStateException.class).hasMessageContaining(location);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"receipt,EXPENSE_RECEIPT_PATH_REQUIRED", "finance,EXPENSE_FINANCE_PATH_REQUIRED"})
+    void expenseTemplateRequiresReceiptAndFinanceOnEveryCompletionPath(String nodeId, String expectedCode) throws Exception {
+        String location = "classpath:process-templates/expense-report.json";
+        ObjectNode template;
+        try (var input = resources.getResource(location).getInputStream()) {
+            template = json.read(new String(input.readAllBytes(), StandardCharsets.UTF_8), ObjectNode.class);
+        }
+        for (var node : template.path("graph").path("nodes")) {
+            if (nodeId.equals(node.path("id").asText())) ((ObjectNode) node.path("properties")).put("expenseStage", "BUSINESS");
+        }
+        ResourceLoader replaced = mock(ResourceLoader.class);
+        when(replaced.getResource(anyString())).thenAnswer(call -> location.equals(call.getArgument(0))
+                ? new ByteArrayResource(json.write(template).getBytes(StandardCharsets.UTF_8)) : resources.getResource(call.getArgument(0)));
+        assertThatThrownBy(() -> new ClasspathProcessTemplateCatalog(replaced, json))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining(location)
+                .hasCauseInstanceOf(DomainException.class)
+                .satisfies(error -> assertThat(((DomainException) error.getCause()).code()).isEqualTo(expectedCode));
     }
 
     @Test

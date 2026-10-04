@@ -15,7 +15,14 @@ import java.util.UUID;
  */
 public record ExpensePrecheckEvidence(String catalogVersion, FinanceCatalog.LegalEntity legalEntity, LocalDate rateDate,
         BudgetPrecheckPort.Assessment budget, ExpenseRound preview, List<ResourceVersion> resources,
-        List<InvoiceReceipt> invoices, Instant validUntil, ExpensePolicySelection policySelection) {
+        List<InvoiceReceipt> invoices, Instant validUntil, ExpensePolicySelection policySelection,
+        List<ExpensePriorControlAssessment> priorControls) {
+    /** 旧预检没有累计控制依据；保留缺字段，提交新模式时须重新检查。 */
+    public ExpensePrecheckEvidence(String catalogVersion, FinanceCatalog.LegalEntity legalEntity, LocalDate rateDate,
+            BudgetPrecheckPort.Assessment budget, ExpenseRound preview, List<ResourceVersion> resources,
+            List<InvoiceReceipt> invoices, Instant validUntil, ExpensePolicySelection policySelection) {
+        this(catalogVersion, legalEntity, rateDate, budget, preview, resources, invoices, validUntil, policySelection, null);
+    }
     /** 原外部制度证据保持可读取，但启用平台版本后必须重新预检。 */
     public ExpensePrecheckEvidence(String catalogVersion, FinanceCatalog.LegalEntity legalEntity, LocalDate rateDate,
             BudgetPrecheckPort.Assessment budget, ExpenseRound preview, List<ResourceVersion> resources,
@@ -33,6 +40,16 @@ public record ExpensePrecheckEvidence(String catalogVersion, FinanceCatalog.Lega
                 || invoices.stream().map(InvoiceReceipt::invoiceId).distinct().count() != invoices.size()) throw invalid();
         if (preview.originalLines().stream().anyMatch(line -> !Objects.equals(policySelection,
                 line.assessment().policy().managedPolicy() == null ? null : line.assessment().policy().managedPolicy().selection()))) throw invalid();
+        if (priorControls != null) {
+            priorControls = List.copyOf(priorControls);
+            if (priorControls.stream().map(ExpensePriorControlAssessment::lineNo).distinct().count() != priorControls.size()) throw invalid();
+            for (var control : priorControls) {
+                var original = preview.content().lines().stream().filter(line -> line.lineNo() == control.lineNo()).findFirst().orElseThrow(ExpensePrecheckEvidence::invalid);
+                if (original.priorRequest() == null || !original.priorRequest().requestId().equals(control.requestId())
+                        || original.priorRequest().lineNo() != control.source().lineNo()
+                        || !resources.contains(new ResourceVersion(ResourceKind.PRIOR_REQUEST, control.requestId(), control.requestVersion()))) throw invalid();
+            }
+        }
     }
 
     private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PRECHECK", "Expense precheck evidence is inconsistent"); }

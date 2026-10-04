@@ -69,19 +69,11 @@ public class VoucherWorkspace {
                 && (payment ? paymentSourceMatches(operation) : operation.input().command().binding().applicationVersion() == application.version()
                     && operation.input().command().binding().businessVersion() == context.businessVersion());
         return new View(applicationId, application.businessReference().type(), application.businessReference().id(), context.roundNo(), application.version(), context.businessVersion(),
-                preparation == null ? null : new Preparation(preparation.input().id(), preparation.status(), preparation.input().attempt(), preparation.createdAt(), preparation.completedAt(), preparation.result() == null ? null : preparation.result().code()),
-                operation == null ? null : operation(operation), new Actions(prepare, query, resend), kind, disputes.view(context, operation, Instant.now()), mappingEvidence(preparation, operation));
+                Preparation.of(preparation), Operation.of(operation), new Actions(prepare, query, resend), kind, disputes.view(context, operation, Instant.now()), mappingEvidence(preparation, operation));
     }
     private boolean paymentSourceMatches(VoucherOperation operation) {
         try { return sources.derive(sources.reference(operation.input().command())).matches(operation.input().command()); }
         catch (DomainException changed) { return false; }
-    }
-    private static Operation operation(VoucherOperation operation) {
-        var command = operation.input().command(); var observation = operation.observation();
-        String issue = operation.failure() != null ? operation.failure().name() : observation != null && observation.failure() != null ? observation.failure().name() : null;
-        return new Operation(command.id(), operation.version(), command.kind(), operation.status(), operation.attempts(), command.accountingDate(),
-                operation.updatedAt(), command.expiresAt(), observation == null ? null : observation.status(), observation == null ? null : observation.voucherReference(),
-                observation == null ? null : observation.postedAt(), operation.conflictingObservation() != null, issue);
     }
     /** 已登记命令优先于准备记录；只读原始绑定，不能用当前发布配置推断历史。 */
     private static MappingEvidence mappingEvidence(VoucherPreparation preparation, VoucherOperation operation) {
@@ -121,14 +113,28 @@ public class VoucherWorkspace {
      * @author owlzhangfq@gmail.com
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Preparation(UUID id, VoucherPreparation.Status status, long attempt, Instant createdAt, Instant completedAt, String issue) { }
+    public record Preparation(UUID id, VoucherPreparation.Status status, long attempt, Instant createdAt, Instant completedAt, String issue) {
+        /** 工作区与原消息复用同一只读摘要，不引入准备目标或完整会计依据。 */
+        public static Preparation of(VoucherPreparation value) {
+            return value == null ? null : new Preparation(value.input().id(), value.status(), value.input().attempt(), value.createdAt(), value.completedAt(), value.result() == null ? null : value.result().code());
+        }
+    }
     /**
      * 冲突时保留旧凭证信息并明确不可用状态，不展示未经确认的新凭证号。
      * @author owlzhangfq@gmail.com
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
     public record Operation(UUID id, long version, VoucherCommand.Kind kind, VoucherOperation.Status status, int attempts, LocalDate accountingDate,
-                            Instant updatedAt, Instant sendExpiresAt, VoucherObservation.Status observedStatus, String voucherReference, Instant postedAt, boolean disputed, String issue) { }
+                            Instant updatedAt, Instant sendExpiresAt, VoucherObservation.Status observedStatus, String voucherReference, Instant postedAt, boolean disputed, String issue) {
+        /** 仅已通过读取权限的调用方使用；发生冲突时保留先前已确认的凭证事实。 */
+        public static Operation of(VoucherOperation value) {
+            if (value == null) return null;
+            var command = value.input().command(); var observation = value.observation();
+            String issue = value.failure() != null ? value.failure().name() : observation != null && observation.failure() != null ? observation.failure().name() : null;
+            return new Operation(command.id(), value.version(), command.kind(), value.status(), value.attempts(), command.accountingDate(), value.updatedAt(), command.expiresAt(),
+                    observation == null ? null : observation.status(), observation == null ? null : observation.voucherReference(), observation == null ? null : observation.postedAt(), value.conflictingObservation() != null, issue);
+        }
+    }
     /**
      * 操作提示不作为写入授权，服务端每次重新判断。
      * @author owlzhangfq@gmail.com

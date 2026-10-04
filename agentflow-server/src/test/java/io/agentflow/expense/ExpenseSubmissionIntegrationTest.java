@@ -7,16 +7,26 @@ import com.sun.net.httpserver.HttpServer;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.repository.ApplicationRepository;
+import io.agentflow.approval.process.EventWaitService;
+import io.agentflow.approval.process.FlowableExpenseDuplicateTrace;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionApplicationService;
+import io.agentflow.event.EventContractService;
 import io.agentflow.finance.*;
 import io.agentflow.form.FieldVisibility;
 import io.agentflow.form.FormSchema;
 import io.agentflow.organization.OrganizationService;
 import io.agentflow.organization.OrganizationUnit;
+import io.agentflow.servicetask.JdbcServiceTaskOperationRepository;
+import io.agentflow.servicetask.ServiceTaskCatalog;
+import io.agentflow.servicetask.ServiceTaskGateway;
+import io.agentflow.servicetask.ServiceTaskGatewayConfiguration;
+import io.agentflow.servicetask.ServiceTaskOperation;
+import io.agentflow.servicetask.ServiceTaskOperationService;
+import io.agentflow.servicetask.ServiceTaskTestProvider;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.junit.jupiter.api.*;
@@ -55,7 +65,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * 发布定义、认证 HTTP、实际引擎、资源台账与合成财务 HTTP 联合验证正式提交及审批控制。
  * @author owlzhangfq@gmail.com
  */
-@SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true",
+@SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true", "agentflow.timers.enabled=false",
+        "agentflow.service-tasks.worker-enabled=false",
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.reversal-worker-enabled=false", "agentflow.vouchers.reversal-execution-worker-enabled=false",
         "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false", "agentflow.payments.payee-review-worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.expenses.payment-return-worker-enabled=false",
@@ -81,6 +92,14 @@ class ExpenseSubmissionIntegrationTest {
     private boolean afterFinanceTask;
     private boolean reductionRoute;
     private boolean hideBusinessDetails;
+    private boolean selfApprovalEscalation;
+    private Graph expenseTemplateGraph;
+    private FormSchema expenseTemplateSchema;
+    private String lineGross = "100";
+    private String selfApprovalBusinessRule;
+    private String selfApprovalBusinessMode;
+    private boolean parallelExpenseReviews;
+    private String expenseReceiptRule;
     private BudgetObservation.Status budgetStatus = BudgetObservation.Status.APPLIED;
     private BudgetObservation.Rejection budgetRejection = BudgetObservation.Rejection.BUDGET_INSUFFICIENT;
     private int writes;
@@ -134,6 +153,14 @@ class ExpenseSubmissionIntegrationTest {
     }
     @Autowired MockMvc mvc;
     @Autowired JsonUtil json;
+    @Autowired io.agentflow.notification.VoucherNotificationAccess voucherNotificationAccess;
+    @Autowired io.agentflow.notification.ExpenseReturnNotificationAccess expenseReturnNotificationAccess;
+    @Autowired io.agentflow.notification.BudgetNotificationAccess budgetNotificationAccess;
+    @Autowired io.agentflow.notification.ReversalNotificationAccess reversalNotificationAccess;
+    @Autowired io.agentflow.notification.ReversalCheckNotificationAccess reversalCheckNotificationAccess;
+    @Autowired io.agentflow.notification.NotificationPreferencesService notificationPreferences;
+    @Autowired io.agentflow.notification.NotificationDeliveryService notificationDeliveries;
+    @Autowired io.agentflow.notification.JdbcNotificationDeliveryStore notificationDeliveryStore;
     @Autowired AuthService auth;
     @Autowired CurrentActor actors;
     @Autowired JdbcTemplate jdbc;
@@ -150,6 +177,8 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired ExpenseSettlementWorker settlementWorker;
     @Autowired ExpenseSettlementService settlementService;
     @Autowired ExpenseSettlementRegistration settlementRegistration;
+    @Autowired org.springframework.context.ApplicationEventPublisher applicationEvents;
+    @Autowired io.agentflow.notification.ExpenseSettlementNotificationAccess settlementNotificationAccess;
     @Autowired PaymentOperationService paymentExecution;
     @Autowired ApprovedVoucherSources voucherSources;
     @Autowired JdbcVoucherPreparationRepository voucherPreparations;
@@ -241,8 +270,579 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired ExpenseResourceAdjustmentWorker resourceWorker;
     @Autowired io.agentflow.organization.ApprovalProxyService approvalProxies;
     @Autowired io.agentflow.definition.DefinitionDraftRepository definitionRecords;
+    @Autowired io.agentflow.organization.OrganizationRepository organizationRecords;
+    @MockitoSpyBean io.agentflow.approval.process.JdbcTaskAuditAdapter taskAudit;
+    @Autowired io.agentflow.approval.process.TimerWaitService timerWaits;
+    @Autowired org.flowable.engine.ManagementService timerJobs;
+    @Autowired EventContractService eventContracts;
+    @Autowired EventWaitService eventWaits;
+    @Autowired ServiceTaskGatewayConfiguration serviceConfiguration;
+    @Autowired ServiceTaskCatalog serviceCatalog;
+    @Autowired ServiceTaskOperationService serviceOperations;
+    @Autowired ServiceTaskGateway serviceGateway;
+    @Autowired JdbcServiceTaskOperationRepository serviceRecords;
 
     private final List<EmployeeAdvance> fifoFixtures = new ArrayList<>();
+
+    @Test
+    void adjacentExpenseApprovalPassesAcrossActualTemplateAmountGateWithAuditedSource() throws Exception {
+        duplicateExpenseTemplate(true);
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        var source = task(report); long before = app(report).version();
+        assertThat(source.getTaskDefinitionKey()).isEqualTo("supervisor");
+
+        ok(act(report, "manager", "APPROVE"), 200);
+
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+        assertThat(app(report).version()).isEqualTo(before + 2);
+        var events = jdbc.queryForList("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE'",
+                String.class, report.applicationId().toString());
+        assertThat(events).hasSize(1);
+        var event = json.read(events.get(0), JsonNode.class);
+        assertThat(event.path("actor").asText()).isEqualTo("system:expense-duplicate-approval");
+        assertThat(event.path("nodeId").asText()).isEqualTo("department");
+        assertThat(event.at("/duplicateApproval/sourceTaskIds").toString()).contains(source.getId());
+        assertThat(event.at("/duplicateApproval/subject").asText()).isEqualTo("manager");
+        assertThat(event.at("/duplicateApproval/ruleVersion").asInt()).isEqualTo(1);
+        assertThat(ok(read("/api/v1/applications/" + report.applicationId() + "/audit?action=AUTO_PASSED_DUPLICATE", "alice"), 200).path("items")).hasSize(1);
+        long advanced = app(report).version();
+        assertThat(send("/api/v1/tasks/" + source.getId() + "/actions", "manager",
+                Map.of("action", "APPROVE", "expectedVersion", before)).getStatus()).isNotEqualTo(200);
+        assertThat(app(report).version()).isEqualTo(advanced);
+        ok(send(path(report) + "/tasks/" + task(report).getId() + "/receive", "finance", receiveInput(report)), 200);
+        ok(act(report, "finance", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("finance");
+    }
+
+    @Test
+    void adjacentExpenseApprovalKeepsPublishedTemplateWithoutExplicitPolicyManual() throws Exception {
+        duplicateExpenseTemplate(false);
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("department");
+    }
+
+    @Test
+    void adjacentExpenseApprovalUsesActualTransferredActorInsteadOfOriginalCandidate() throws Exception {
+        duplicateExpenseTemplate(true); person("bob", true);
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        ok(send("/api/v1/tasks/" + task(report).getId() + "/actions", "manager",
+                Map.of("action", "TRANSFER", "targetUser", "bob", "expectedVersion", app(report).version())), 200);
+        ok(act(report, "bob", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("department");
+    }
+
+    @Test
+    void adjacentExpenseApprovalSupportsDeduplicatedSingleMemberCountersign() throws Exception {
+        duplicateExpenseTemplate(true);
+        configureTemplateDepartment(Map.of("approvalMode", "ALL"));
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+    }
+
+    @Test
+    void adjacentExpenseApprovalLeavesMultipleEffectiveCandidatesManual() throws Exception {
+        duplicateExpenseTemplate(true);
+        var selected = organizationRecords.appointment("demo", appointment).orElseThrow();
+        organization.createAppointment(admin, person("bob", true), selected.departmentId(), selected.positionId(), true);
+        configureTemplateDepartment(Map.of("assigneeRule", "role:ORG_UNIT_" + selected.departmentId()));
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("department");
+    }
+
+    @Test
+    void adjacentExpenseApprovalAuditFailureRollsBackHumanAndAutomaticTaskTogether() throws Exception {
+        duplicateExpenseTemplate(true);
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        var source = task(report); long version = app(report).version();
+        doThrow(new IllegalStateException("Synthetic automatic approval audit failure")).when(taskAudit)
+                .record(argThat(operation -> operation.action().equals("AUTO_PASSED_DUPLICATE")));
+        assertThatThrownBy(() -> act(report, "manager", "APPROVE"))
+                .hasRootCauseInstanceOf(IllegalStateException.class)
+                .hasStackTraceContaining("Synthetic automatic approval audit failure");
+        assertThat(app(report).version()).isEqualTo(version);
+        assertThat(task(report).getId()).isEqualTo(source.getId());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action IN ('APPROVE','AUTO_PASSED_DUPLICATE')",
+                Integer.class, report.applicationId().toString())).isZero();
+    }
+
+    @Test
+    void adjacentExpenseApprovalUsesActualProxyActorAndKeepsDifferentNextApproverManual() throws Exception {
+        duplicateExpenseTemplate(true);
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        var application = app(report);
+        var scope = definitionRecords.findPublished("demo", application.processKey(), application.definitionVersion()).orElseThrow();
+        var proxy = approvalProxies.create(admin, scope.id(), manager, person("bob", true), Instant.now(),
+                Instant.now().plusSeconds(3600), "业务节点代理实际人员验证");
+        var source = task(report);
+        ok(send("/api/v1/tasks/" + source.getId() + "/actions", "bob",
+                Map.of("action", "APPROVE", "proxyId", proxy.id(), "expectedVersion", application.version())), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("department");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE'",
+                Integer.class, report.applicationId().toString())).isZero();
+        var audit = json.read(jdbc.queryForObject("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='APPROVE'",
+                String.class, report.applicationId().toString()), JsonNode.class);
+        assertThat(audit.path("actor").asText()).isEqualTo("bob");
+        assertThat(audit.at("/proxyUse/proxyId").asText()).isEqualTo(proxy.id().toString());
+    }
+
+    @Test
+    void adjacentExpenseApprovalResumesOriginalTraceAfterNativeTimerWait() throws Exception {
+        duplicateExpenseTemplate(true);
+        var nodes = new ArrayList<>(expenseTemplateGraph.nodes());
+        nodes.add(new Node("duplicateWait", "审批后等待", NodeType.TIMER_WAIT, Map.of("timerDelaySeconds", "60")));
+        var edges = new ArrayList<>(expenseTemplateGraph.edges());
+        var original = edges.stream().filter(edge -> edge.source().equals("supervisor")).findFirst().orElseThrow();
+        edges.replaceAll(edge -> edge.id().equals(original.id()) ? new Edge(edge.id(), "supervisor", "duplicateWait", "") : edge);
+        edges.add(new Edge("duplicateWaitExit", "duplicateWait", original.target(), ""));
+        expenseTemplateGraph = new Graph(nodes, edges, expenseTemplateGraph.conditionLanguageVersion());
+        var report = fixture(false).report(); submit(report); budgetWorker.poll(); var source = task(report);
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(tasks(report)).isEmpty();
+        var job = timerJobs.createTimerJobQuery().processInstanceId(source.getProcessInstanceId()).singleResult();
+        assertThat(job).isNotNull(); long waitingVersion = app(report).version();
+        assertThat(timerWaits.advance(job.getId(), job.getDuedate().toInstant().minusMillis(1))).isFalse();
+        assertThat(timerWaits.advance(job.getId(), job.getDuedate().toInstant())).isTrue();
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+        assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+        assertThat(timerWaits.advance(job.getId(), job.getDuedate().toInstant())).isFalse();
+        var audit = json.read(jdbc.queryForObject("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE'",
+                String.class, report.applicationId().toString()), JsonNode.class);
+        assertThat(audit.at("/duplicateApproval/sourceTaskIds").toString()).contains(source.getId());
+    }
+
+    @Test
+    void adjacentExpenseApprovalKeepsBusinessAfterDifferentParallelPredecessorsManual() throws Exception {
+        duplicateExpenseTemplate(true);
+        var nodes = new ArrayList<>(expenseTemplateGraph.nodes());
+        nodes.addAll(List.of(new Node("duplicateFork", "并行业务", NodeType.PARALLEL_GATEWAY, Map.of()),
+                new Node("duplicateMerge", "金额路径汇合", NodeType.EXCLUSIVE_GATEWAY, Map.of()),
+                new Node("duplicateJoin", "业务汇合", NodeType.PARALLEL_GATEWAY, Map.of()),
+                new Node("parallelReview", "并行业务复核", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager)),
+                new Node("joinedBusiness", "汇合后业务确认", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager))));
+        var edges = new ArrayList<>(expenseTemplateGraph.edges());
+        edges.replaceAll(edge -> edge.source().equals("supervisor") ? new Edge(edge.id(), "supervisor", "duplicateFork", "")
+                : edge.target().equals("policyGate") ? new Edge(edge.id(), edge.source(), "duplicateMerge", edge.condition(), edge.defaultBranch()) : edge);
+        edges.addAll(List.of(new Edge("duplicateBranchA", "duplicateFork", "amountGate", ""),
+                new Edge("duplicateBranchB", "duplicateFork", "parallelReview", ""),
+                new Edge("duplicateMergeExit", "duplicateMerge", "duplicateJoin", ""),
+                new Edge("duplicateBranchBJoin", "parallelReview", "duplicateJoin", ""),
+                new Edge("duplicateJoinExit", "duplicateJoin", "joinedBusiness", ""),
+                new Edge("duplicateJoinApprovalExit", "joinedBusiness", "policyGate", "")));
+        expenseTemplateGraph = new Graph(nodes, edges, expenseTemplateGraph.conditionLanguageVersion());
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("joinedBusiness");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE'",
+                Integer.class, report.applicationId().toString())).isEqualTo(2);
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+    }
+
+    @Test
+    void adjacentExpenseApprovalConcurrentSourceRequestsAdvanceTheLongerChainOnlyOnce() throws Exception {
+        duplicateExpenseTemplate(true); lineGross = "60000";
+        var report = fixture(false).report(); submit(report); budgetWorker.poll();
+        var source = task(report); long version = app(report).version();
+        var barrier = new java.util.concurrent.CyclicBarrier(2);
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Callable<Integer> approve = () -> {
+                barrier.await(10, java.util.concurrent.TimeUnit.SECONDS);
+                return send("/api/v1/tasks/" + source.getId() + "/actions", "manager",
+                        Map.of("action", "APPROVE", "expectedVersion", version)).getStatus();
+            };
+            var first = pool.submit(approve); var second = pool.submit(approve);
+            var statuses = List.of(first.get(30, java.util.concurrent.TimeUnit.SECONDS), second.get(30, java.util.concurrent.TimeUnit.SECONDS));
+            assertThat(statuses.stream().filter(status -> status == 200)).hasSize(1);
+            assertThat(statuses.stream().filter(status -> status != 200)).allMatch(status -> status == 404 || status == 409);
+        } finally { pool.shutdownNow(); }
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+        assertThat(app(report).version()).isEqualTo(version + 3);
+        var audit = jdbc.queryForList("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE' ORDER BY occurred_at,id",
+                String.class, report.applicationId().toString()).stream().map(raw -> json.read(raw, JsonNode.class)).toList();
+        assertThat(audit).hasSize(2);
+        assertThat(audit.stream().map(value -> value.path("nodeId").asText())).containsExactly("department", "executive");
+        assertThat(audit.get(0).at("/duplicateApproval/sourceNodeId").asText()).isEqualTo("supervisor");
+        assertThat(audit.get(1).at("/duplicateApproval/sourceNodeId").asText()).isEqualTo("department");
+    }
+
+    @Test
+    void adjacentExpenseApprovalEventWaitRollsBackAuditAndRetriesTheOriginalHumanTrace() throws Exception {
+        duplicateExpenseTemplate(true);
+        String contractKey = "duplicate-accepted-" + UUID.randomUUID();
+        eventContracts.publish(admin, contractKey, 0, "审批后验收事件", "erp", "GoodsAccepted", "合成事件接续验收");
+        addTemplateWaitAfterSupervisor(new Node("duplicateEvent", "审批后等待事件", NodeType.EVENT_WAIT,
+                Map.of("eventContractKey", contractKey, "eventContractVersion", "1")));
+        var report = fixture(false).report(); submit(report); budgetWorker.poll(); var source = task(report);
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(tasks(report)).isEmpty();
+        var subscription = runtime.createEventSubscriptionQuery().processInstanceId(source.getProcessInstanceId()).eventType("message").singleResult();
+        assertThat(subscription).isNotNull();
+        long waitingVersion = app(report).version();
+        var originalTrace = runtime.getVariable(source.getProcessInstanceId(), FlowableExpenseDuplicateTrace.VARIABLE);
+        var command = new EventWaitService.Command("demo", "erp", "GoodsAccepted", 1, UUID.randomUUID().toString(),
+                report.applicationId(), app(report).roundNo(), subscription.getId(), contractKey, 1);
+        var wrongVersion = new EventWaitService.Command(command.tenantId(), command.sourceKey(), command.eventType(),
+                command.envelopeVersion(), command.eventId(), command.applicationId(), command.roundNo(), command.waitId(), command.contractKey(), 2);
+        assertThat(eventWaits.advance(wrongVersion)).isEqualTo(EventWaitService.Outcome.MISMATCH);
+        assertThat(app(report).version()).isEqualTo(waitingVersion);
+
+        failDuplicateApprovalAudit();
+        try {
+            assertThatThrownBy(() -> eventWaits.advance(command)).isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Synthetic duplicate approval audit failure");
+        } finally { doCallRealMethod().when(taskAudit).record(any()); }
+        assertThat(runtime.createEventSubscriptionQuery().id(subscription.getId()).singleResult()).isNotNull();
+        assertThat(runtime.getVariable(source.getProcessInstanceId(), FlowableExpenseDuplicateTrace.VARIABLE)).isEqualTo(originalTrace);
+        assertThat(tasks(report)).isEmpty();
+        assertThat(app(report).version()).isEqualTo(waitingVersion);
+        assertThat(duplicateWaitAuditCount(report, "EVENT_RECEIVED")).isZero();
+        assertThat(duplicateWaitAuditCount(report, ExpenseDuplicateApprovalPolicy.ACTION)).isZero();
+
+        assertThat(eventWaits.advance(command)).isEqualTo(EventWaitService.Outcome.ADVANCED);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+        assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+        assertThat(eventWaits.advance(command)).isEqualTo(EventWaitService.Outcome.STALE);
+        assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+        assertThat(duplicateWaitAuditCount(report, "EVENT_RECEIVED")).isEqualTo(1);
+        assertOriginalDuplicateSource(report, source);
+    }
+
+    @Test
+    void adjacentExpenseApprovalServiceWaitRetainsRemoteReceiptWhenAutomaticAuditRollsBack() throws Exception {
+        boolean previouslyEnabled = serviceConfiguration.isEnabled();
+        var previousTenants = serviceConfiguration.getTenants();
+        try (var provider = new ServiceTaskTestProvider(json)) {
+            var declaration = provider.declaration("duplicate.receipt." + UUID.randomUUID());
+            serviceConfiguration.setEnabled(true);
+            serviceConfiguration.setTenants(Map.of("demo", List.of(declaration))); serviceCatalog.install();
+            var contract = serviceConfiguration.find("demo", declaration.getKey(), 1).orElseThrow().contract();
+            duplicateExpenseTemplate(true);
+            addTemplateWaitAfterSupervisor(new Node("duplicateService", "审批后登记服务", NodeType.SERVICE_TASK,
+                    Map.of("serviceOperationKey", contract.key(), "serviceOperationVersion", "1",
+                            "serviceContractDigest", contract.digest(), "serviceInput.memo", "currency")));
+            var report = fixture(false).report(); submit(report); budgetWorker.poll(); var source = task(report);
+            ok(act(report, "manager", "APPROVE"), 200);
+            assertThat(tasks(report)).isEmpty(); long waitingVersion = app(report).version();
+            var originalTrace = runtime.getVariable(source.getProcessInstanceId(), FlowableExpenseDuplicateTrace.VARIABLE);
+            var operationId = UUID.fromString(jdbc.queryForObject(
+                    "SELECT id FROM service_task_operation WHERE tenant_id='demo' AND application_id=? AND node_id='duplicateService'",
+                    String.class, report.applicationId().toString()));
+            var claimed = serviceOperations.claim("demo", operationId, Instant.now());
+            assertThat(claimed).isNotNull();
+            assertThat(claimed.input().command().inputs()).isEqualTo(Map.of("memo", "CNY"));
+            serviceOperations.finish(claimed, serviceGateway.execute(claimed.input()), Instant.now());
+            var confirmed = serviceRecords.find("demo", operationId).orElseThrow();
+            assertThat(confirmed.operation().status()).isEqualTo(ServiceTaskOperation.Status.APPLIED);
+            assertThat(confirmed.progress()).isEqualTo(JdbcServiceTaskOperationRepository.Progress.PENDING);
+            assertThat(provider.effectCount()).isEqualTo(1);
+
+            failDuplicateApprovalAudit();
+            try {
+                assertThatThrownBy(() -> serviceOperations.claim("demo", operationId, Instant.now()))
+                        .isInstanceOf(IllegalStateException.class).hasMessage("Synthetic duplicate approval audit failure");
+            } finally { doCallRealMethod().when(taskAudit).record(any()); }
+            assertThat(serviceRecords.find("demo", operationId).orElseThrow()).isEqualTo(confirmed);
+            assertThat(runtime.createExecutionQuery().executionId(claimed.input().command().binding().executionId())
+                    .singleResult().getActivityId()).isEqualTo("duplicateService");
+            assertThat(runtime.getVariable(source.getProcessInstanceId(), FlowableExpenseDuplicateTrace.VARIABLE)).isEqualTo(originalTrace);
+            assertThat(tasks(report)).isEmpty();
+            assertThat(app(report).version()).isEqualTo(waitingVersion);
+            assertThat(duplicateWaitAuditCount(report, "SERVICE_TASK_COMPLETED")).isZero();
+            assertThat(duplicateWaitAuditCount(report, ExpenseDuplicateApprovalPolicy.ACTION)).isZero();
+
+            assertThat(serviceOperations.claim("demo", operationId, Instant.now())).isNull();
+            assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+            assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+            assertThat(serviceRecords.find("demo", operationId).orElseThrow().progress()).isEqualTo(JdbcServiceTaskOperationRepository.Progress.ADVANCED);
+            assertThat(serviceOperations.claim("demo", operationId, Instant.now())).isNull();
+            assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+            assertThat(provider.effectCount()).isEqualTo(1);
+            assertThat(duplicateWaitAuditCount(report, "SERVICE_TASK_COMPLETED")).isEqualTo(1);
+            assertOriginalDuplicateSource(report, source);
+        } finally {
+            serviceConfiguration.setEnabled(previouslyEnabled); serviceConfiguration.setTenants(previousTenants);
+        }
+    }
+
+    private void addTemplateWaitAfterSupervisor(Node wait) {
+        var nodes = new ArrayList<>(expenseTemplateGraph.nodes()); nodes.add(wait);
+        var edges = new ArrayList<>(expenseTemplateGraph.edges());
+        var original = edges.stream().filter(edge -> edge.source().equals("supervisor")).findFirst().orElseThrow();
+        edges.replaceAll(edge -> edge.id().equals(original.id())
+                ? new Edge(edge.id(), edge.source(), wait.id(), edge.condition(), edge.defaultBranch()) : edge);
+        edges.add(new Edge(wait.id() + "Exit", wait.id(), original.target(), ""));
+        expenseTemplateGraph = new Graph(nodes, edges, expenseTemplateGraph.conditionLanguageVersion(), expenseTemplateGraph.riskPolicy());
+    }
+
+    private void failDuplicateApprovalAudit() {
+        // 先写入真实审计再抛错，验证审计记录、原生任务和申请版本会一起回滚。
+        doAnswer(call -> { call.callRealMethod(); throw new IllegalStateException("Synthetic duplicate approval audit failure"); })
+                .when(taskAudit).record(argThat(operation -> operation.action().equals(ExpenseDuplicateApprovalPolicy.ACTION)));
+    }
+
+    private int duplicateWaitAuditCount(ExpenseReport report, String action) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action=?",
+                Integer.class, report.applicationId().toString(), action);
+    }
+
+    private void assertOriginalDuplicateSource(ExpenseReport report, Task source) {
+        assertThat(duplicateWaitAuditCount(report, "APPROVE")).isEqualTo(1);
+        var events = jdbc.queryForList("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE'",
+                String.class, report.applicationId().toString());
+        assertThat(events).hasSize(1);
+        var audit = json.read(events.get(0), JsonNode.class);
+        assertThat(audit.path("actor").asText()).isEqualTo("system:expense-duplicate-approval");
+        assertThat(audit.path("nodeId").asText()).isEqualTo("department");
+        assertThat(audit.at("/duplicateApproval/sourceNodeId").asText()).isEqualTo(source.getTaskDefinitionKey());
+        assertThat(audit.at("/duplicateApproval/sourceTaskIds").toString()).isEqualTo(json.write(List.of(source.getId())));
+        assertThat(audit.at("/duplicateApproval/subject").asText()).isEqualTo("manager");
+        assertThat(audit.at("/duplicateApproval/ruleVersion").asInt()).isEqualTo(1);
+    }
+
+    private void configureTemplateDepartment(Map<String, String> changes) {
+        expenseTemplateGraph = new Graph(expenseTemplateGraph.nodes().stream().map(node -> {
+            if (!node.id().equals("department")) return node;
+            var properties = new HashMap<>(node.properties()); properties.putAll(changes);
+            return new Node(node.id(), node.name(), node.type(), properties);
+        }).toList(), expenseTemplateGraph.edges(), expenseTemplateGraph.conditionLanguageVersion(), expenseTemplateGraph.riskPolicy());
+    }
+
+    private void duplicateExpenseTemplate(boolean enabled) throws Exception {
+        selfApprovingAppointment(true); lineGross = "6000";
+        try (var stream = getClass().getResourceAsStream("/process-templates/expense-report.json")) {
+            var template = json.read(new String(stream.readAllBytes(), StandardCharsets.UTF_8), JsonNode.class);
+            var graph = json.read(template.path("graph").toString(), Graph.class);
+            expenseTemplateSchema = json.read(template.path("formSchema").toString(), FormSchema.class);
+            expenseTemplateGraph = new Graph(graph.nodes().stream().map(node -> {
+                var properties = new HashMap<>(node.properties());
+                if (node.type() == NodeType.START) {
+                    if (enabled) properties.put("expenseDuplicateApproval", "AUTO_PASS_ADJACENT");
+                    else properties.remove("expenseDuplicateApproval");
+                }
+                if (node.type() == NodeType.USER_TASK && !node.id().equals("supervisor")) {
+                    properties.put("assigneeRule", properties.containsKey("expenseStage") ? "role:ORG_PERSON_" + finance
+                            : io.agentflow.organization.LocalOrganizationDirectory.DEPARTMENT_HEAD_RULE);
+                }
+                return new Node(node.id(), node.name(), node.type(), properties);
+            }).toList(), graph.edges(), graph.conditionLanguageVersion(), graph.riskPolicy());
+        }
+    }
+
+    @Test
+    void expenseSelfApprovalUsesSupervisorOfSelectedAppointment() throws Exception {
+        var selected = selfApprovingAppointment(true);
+        var otherDepartment = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "另一兼任部门", entity, null, true);
+        var other = organization.createAppointment(admin, selected.personId(), otherDepartment.id(), selected.positionId(), true);
+        var otherSuperior = organization.createAppointment(admin, finance, otherDepartment.id(), selected.positionId(), true);
+        organization.setSupervisor(admin, other.id(), otherSuperior.id(), other.revision());
+        var report = fixture(false).report();
+
+        submit(report);
+
+        assertThat(tasks.getIdentityLinksForTask(task(report).getId())).extracting(link -> link.getUserId())
+                .contains("manager").doesNotContain("alice");
+        assertThat(act(report, "alice", "APPROVE").getStatus()).isEqualTo(403);
+        for (String action : List.of("TRANSFER", "DELEGATE")) {
+            assertCode(send("/api/v1/tasks/" + task(report).getId() + "/actions", "manager",
+                    Map.of("action", action, "targetUser", "alice", "expectedVersion", app(report).version())), "APPROVAL_RESPONSIBILITY_CONFLICT");
+        }
+        var audit = selfApprovalAudit(report);
+        assertThat(audit.path("initiator").path("appointmentId").asText()).isEqualTo(appointment.toString());
+        assertThat(audit.path("definitionVersion").asLong()).isEqualTo(app(report).definitionVersion());
+        assertThat(audit.path("ruleVersion").asInt()).isEqualTo(1);
+        assertThat(audit.at("/selection/originalSubjects").toString()).isEqualTo("[\"alice\"]");
+        assertThat(audit.at("/selection/escalation/replacementSubject").asText()).isEqualTo("manager");
+        var history = ok(read("/api/v1/applications/" + report.applicationId() + "/audit?action=SELF_APPROVAL_ESCALATED", "alice"), 200);
+        assertThat(history.path("items")).hasSize(1);
+        assertThat(history.path("items").get(0).path("nodeId").asText()).isEqualTo("business");
+        assertThat(history.path("items").get(0).path("definitionVersion").asLong()).isEqualTo(app(report).definitionVersion());
+        var search = ok(read("/api/v1/operations/audit?action=SELF_APPROVAL_ESCALATED&applicationId=" + report.applicationId(), "admin"), 200);
+        assertThat(search.path("items")).hasSize(1);
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+        assertThat(selfApprovalAudit(report)).isEqualTo(audit);
+    }
+
+    @Test
+    void expenseSelfApprovalWithoutSuperiorRollsBackSubmissionAndFinancialState() throws Exception {
+        selfApprovingAppointment(false); var report = fixture(false).report();
+        UUID checked = precheck(report); var application = app(report); var financial = current(report).state();
+        assertCode(send(path(report) + "/submit", "alice", submitInput(report, checked)), "APPROVER_NOT_FOUND");
+        assertThat(app(report).version()).isEqualTo(application.version());
+        assertThat(app(report).status()).isEqualTo(ApplicationStatus.DRAFT);
+        assertThat(current(report).state()).isEqualTo(financial);
+        assertThat(tasks(report)).isEmpty(); assertThat(controls.find("demo", report.id(), 1)).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='SELF_APPROVAL_ESCALATED'",
+                Integer.class, report.applicationId().toString())).isZero();
+        assertThat(writes).isZero();
+    }
+
+    @Test
+    void expenseSelfApprovalRejectsCyclicOrInactiveSelectedSuperior() throws Exception {
+        var selected = selfApprovingAppointment(true); var report = fixture(false).report(); UUID checked = precheck(report);
+        var superior = organizationRecords.appointment("demo", selected.supervisorAppointmentId()).orElseThrow();
+        // 模拟已损坏的历史关系；正常组织写入口本身已禁止环路。
+        jdbc.update("UPDATE organization_appointment SET supervisor_appointment_id=? WHERE tenant_id='demo' AND id=?",
+                appointment.toString(), appointment.toString());
+        assertCode(send(path(report) + "/submit", "alice", submitInput(report, checked)), "APPROVER_NOT_FOUND");
+        jdbc.update("UPDATE organization_appointment SET supervisor_appointment_id=? WHERE tenant_id='demo' AND id=?",
+                superior.id().toString(), appointment.toString());
+        organization.updateAppointment(admin, superior.id(), false, superior.revision());
+        // 组织变化要求重新预检，失效上级仍必须在正式提交中阻断。
+        checked = precheck(report);
+        assertCode(send(path(report) + "/submit", "alice", submitInput(report, checked)), "APPROVER_NOT_FOUND");
+        assertThat(tasks(report)).isEmpty();
+    }
+
+    @Test
+    void expenseSelfApprovalDeduplicatesSupervisorBeforeCountersignDenominator() throws Exception {
+        var selected = selfApprovingAppointment(true);
+        selfApprovalBusinessRule = "role:ORG_UNIT_" + selected.departmentId(); selfApprovalBusinessMode = "ALL";
+        var report = fixture(false).report(); submit(report);
+        assertThat(tasks(report)).hasSize(1); assertThat(task(report).getAssignee()).isEqualTo("manager");
+        assertThat(tasks.getVariable(task(report).getId(), "nrOfInstances")).isEqualTo(1);
+        assertThat(selfApprovalAudit(report).at("/selection/originalSubjects").toString()).isEqualTo("[\"alice\",\"manager\"]");
+        assertThat(selfApprovalAudit(report).path("effectiveCandidates").toString()).isEqualTo("[\"manager\"]");
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+    }
+
+    @Test
+    void expenseSelfApprovalNeverEscalatesOrSkipsFinancialConflict() throws Exception {
+        var selected = selfApprovingAppointment(true); finance = selected.personId();
+        var selfFinance = fixture(false).report(); UUID checked = precheck(selfFinance);
+        assertCode(send(path(selfFinance) + "/submit", "alice", submitInput(selfFinance, checked)), "APPROVAL_RESPONSIBILITY_NO_MEMBERS");
+        assertThat(tasks(selfFinance)).isEmpty();
+        finance = manager; var conflict = fixture(false).report(); submit(conflict);
+        var originalTask = task(conflict).getId(); long version = app(conflict).version();
+        assertCode(act(conflict, "manager", "APPROVE"), "APPROVAL_RESPONSIBILITY_NO_MEMBERS");
+        assertThat(task(conflict).getId()).isEqualTo(originalTask); assertThat(app(conflict).version()).isEqualTo(version);
+        assertThat(controls.find("demo", conflict.id(), 1).orElseThrow().receipt()).isNull();
+    }
+
+    @Test
+    void expenseSelfApprovalKeepsFutureNodeAndHistoryAfterOrganizationChanges() throws Exception {
+        var selected = selfApprovingAppointment(true); afterFinanceTask = true;
+        var report = fixture(false).report(); submit(report); var firstAudit = selfApprovalAudit(report);
+        var nextPerson = organization.createPerson(admin, "future-superior-" + UUID.randomUUID(), "新主管", true, true);
+        var next = organization.createAppointment(admin, nextPerson.id(), selected.departmentId(), selected.positionId(), true);
+        organization.setSupervisor(admin, selected.id(), next.id(), selected.revision());
+        budgetWorker.poll(); ok(act(report, "manager", "APPROVE"), 200);
+        ok(send(path(report) + "/tasks/" + task(report).getId() + "/receive", "finance", receiveInput(report)), 200);
+        ok(act(report, "finance", "APPROVE"), 200); ok(act(report, "finance", "APPROVE"), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("afterFinance");
+        assertThat(tasks.getIdentityLinksForTask(task(report).getId())).extracting(link -> link.getUserId()).containsExactly("manager");
+        var firstRound = selfApprovalAudits(report); assertThat(firstRound).hasSize(2).contains(firstAudit);
+        assertThat(firstRound).allSatisfy(audit -> {
+            assertThat(audit.path("roundNo").asInt()).isEqualTo(1);
+            assertThat(audit.at("/selection/escalation/replacementSubject").asText()).isEqualTo("manager");
+        });
+    }
+
+    @Test
+    void expenseSelfApprovalReevaluatesOnlyNewRoundAndRetainsOriginalEvidence() throws Exception {
+        var selected = selfApprovingAppointment(true); var report = fixture(false).report(); submit(report);
+        var firstAudit = selfApprovalAudit(report); budgetWorker.poll();
+        ok(send(path(report) + "/withdraw", "alice", lifecycleInput(report)), 200);
+        var nextPerson = organization.createPerson(admin, "next-round-superior-" + UUID.randomUUID(), "重提主管", true, true);
+        var next = organization.createAppointment(admin, nextPerson.id(), selected.departmentId(), selected.positionId(), true);
+        organization.setSupervisor(admin, selected.id(), next.id(), selected.revision());
+        submit(current(report));
+        assertThat(tasks.getIdentityLinksForTask(task(report).getId())).extracting(link -> link.getUserId()).containsExactly(nextPerson.subject());
+        assertThat(selfApprovalAudits(report)).hasSize(2).contains(firstAudit);
+        var newAudit = selfApprovalAudits(report).stream().filter(audit -> audit.path("roundNo").asInt() == 2).findFirst().orElseThrow();
+        assertThat(newAudit.at("/selection/escalation/replacementSubject").asText()).isEqualTo(nextPerson.subject());
+    }
+
+    @Test
+    void expenseSelfApprovalRechecksFinancialDutiesAfterParallelCandidateActivation() throws Exception {
+        var selected = selfApprovingAppointment(true); parallelExpenseReviews = true; paperRequired = false;
+        organization.createAppointment(admin, finance, selected.departmentId(), selected.positionId(), true);
+        expenseReceiptRule = "role:ORG_UNIT_" + selected.departmentId();
+        var report = fixture(false).report(); submit(report);
+        var business = tasks(report).stream().filter(task -> task.getTaskDefinitionKey().equals("business")).findFirst().orElseThrow();
+        var receipt = tasks(report).stream().filter(task -> task.getTaskDefinitionKey().equals("receipt")).findFirst().orElseThrow();
+        assertThat(tasks.getIdentityLinksForTask(receipt.getId())).extracting(link -> link.getUserId()).contains("manager", "finance");
+        ok(send("/api/v1/tasks/" + business.getId() + "/actions", "manager", Map.of("action", "APPROVE", "expectedVersion", app(report).version())), 200);
+        var queue = ok(read("/api/v1/workspace/tasks?processKey=" + app(report).processKey(), "manager"), 200);
+        assertThat(queue.path("items")).isEmpty(); assertThat(queue.path("total").asLong()).isZero();
+        assertThat(ok(read("/api/v1/tasks", "manager"), 200).findValuesAsText("taskId")).doesNotContain(receipt.getId());
+        var nextDraft = ok(send("/api/v1/expense-reports", "alice", Map.of("businessNo", "SYNTHETIC-" + UUID.randomUUID(),
+                "processKey", app(report).processKey(), "definitionVersion", app(report).definitionVersion(), "content", report.content())), 201);
+        UUID nextId = UUID.fromString(nextDraft.path("id").asText()); created.add(nextId);
+        var nextReport = reports.find("demo", nextId).orElseThrow(); submit(nextReport);
+        var firstPage = ok(read("/api/v1/workspace/tasks?processKey=" + app(report).processKey() + "&limit=1", "manager"), 200);
+        assertThat(firstPage.path("items")).hasSize(1); assertThat(firstPage.path("total").asLong()).isEqualTo(2);
+        assertThat(firstPage.path("items").findValuesAsText("taskId")).doesNotContain(receipt.getId());
+        assertThat(firstPage.path("nextCursor").asText()).isNotBlank();
+        var secondPage = ok(read("/api/v1/workspace/tasks?processKey=" + app(report).processKey()
+                + "&limit=1&cursor=" + firstPage.path("nextCursor").asText(), "manager"), 200);
+        assertThat(secondPage.path("items")).hasSize(1); assertThat(secondPage.path("total").asLong()).isEqualTo(2);
+        assertThat(secondPage.path("items").findValuesAsText("taskId"))
+                .doesNotContain(receipt.getId()).doesNotContainAnyElementsOf(firstPage.path("items").findValuesAsText("taskId"));
+        assertThat(secondPage.path("nextCursor").isTextual()).isFalse();
+        assertThat(send("/api/v1/tasks/" + receipt.getId() + "/actions", "manager",
+                Map.of("action", "APPROVE", "expectedVersion", app(report).version())).getStatus()).isEqualTo(403);
+        ok(send("/api/v1/tasks/" + receipt.getId() + "/actions", "finance",
+                Map.of("action", "APPROVE", "expectedVersion", app(report).version())), 200);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("finance");
+    }
+
+    @Test
+    void expenseSelfApprovalReceiptSignerCannotThenApproveParallelBusinessTask() throws Exception {
+        var selected = selfApprovingAppointment(true); parallelExpenseReviews = true;
+        var financeAppointment = organization.createAppointment(admin, finance, selected.departmentId(), selected.positionId(), true);
+        organization.setSupervisor(admin, selected.id(), financeAppointment.id(), selected.revision());
+        var report = fixture(false).report(); submit(report);
+        var business = tasks(report).stream().filter(task -> task.getTaskDefinitionKey().equals("business")).findFirst().orElseThrow();
+        var receipt = tasks(report).stream().filter(task -> task.getTaskDefinitionKey().equals("receipt")).findFirst().orElseThrow();
+        assertThat(tasks.getIdentityLinksForTask(business.getId())).extracting(link -> link.getUserId()).contains("finance");
+        ok(send(path(report) + "/tasks/" + receipt.getId() + "/receive", "finance", receiveInput(report)), 200);
+        var recorded = controls.find("demo", report.id(), 1).orElseThrow().receipt();
+        assertThat(recorded.receivedBy()).isEqualTo("finance");
+        assertThat(send("/api/v1/tasks/" + business.getId() + "/actions", "finance",
+                Map.of("action", "APPROVE", "expectedVersion", app(report).version())).getStatus()).isEqualTo(403);
+        var queue = ok(read("/api/v1/workspace/tasks?processKey=" + app(report).processKey(), "finance"), 200);
+        assertThat(queue.path("total").asLong()).isEqualTo(1);
+        assertThat(queue.path("items").findValuesAsText("taskId")).containsExactly(receipt.getId());
+        assertThat(tasks.createTaskQuery().taskId(business.getId()).count()).isEqualTo(1);
+        assertThat(controls.find("demo", report.id(), 1).orElseThrow().receipt()).isEqualTo(recorded);
+    }
+
+    private io.agentflow.organization.OrganizationAppointment selfApprovingAppointment(boolean withSuperior) {
+        selfApprovalEscalation = true;
+        var selected = organizationRecords.appointment("demo", appointment).orElseThrow();
+        var applicant = organizationRecords.person("demo", selected.personId()).orElseThrow();
+        organization.updatePerson(admin, applicant.id(), applicant.displayName(), true, true, applicant.revision());
+        if (withSuperior) {
+            var superior = organization.createAppointment(admin, manager, selected.departmentId(), selected.positionId(), true);
+            organization.setSupervisor(admin, appointment, superior.id(), selected.revision());
+        }
+        var department = organizationRecords.unit("demo", selected.departmentId()).orElseThrow();
+        organization.setDepartmentHead(admin, department.id(), appointment, department.revision());
+        return organizationRecords.appointment("demo", appointment).orElseThrow();
+    }
+
+    private JsonNode selfApprovalAudit(ExpenseReport report) {
+        var stored = selfApprovalAudits(report); assertThat(stored).hasSize(1); return stored.get(0);
+    }
+
+    private List<JsonNode> selfApprovalAudits(ExpenseReport report) {
+        return jdbc.queryForList("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='SELF_APPROVAL_ESCALATED'",
+                String.class, report.applicationId().toString()).stream().map(value -> json.read(value, JsonNode.class)).toList();
+    }
+
+    private Map<String, String> selfApprovalBusinessProperties() {
+        var values = new HashMap<String, String>(); values.put("excludeApplicant", "true");
+        values.put("assigneeRule", selfApprovalBusinessRule == null
+                ? io.agentflow.organization.LocalOrganizationDirectory.DEPARTMENT_HEAD_RULE : selfApprovalBusinessRule);
+        if (selfApprovalBusinessMode != null) values.put("approvalMode", selfApprovalBusinessMode);
+        return Map.copyOf(values);
+    }
 
     @BeforeEach void setup() {
         ACTIVE.set(this); configuration.setEnabled(true);
@@ -255,6 +855,10 @@ class ExpenseSubmissionIntegrationTest {
     }
     @AfterEach void clear() {
         actors.clear(); budgetStatus = BudgetObservation.Status.APPLIED;
+        if (selfApprovalEscalation) {
+            var applicant = organizationRecords.personBySubject("demo", "alice").orElseThrow();
+            organization.updatePerson(admin, applicant.id(), applicant.displayName(), true, false, applicant.revision());
+        }
         for (var advance : fifoFixtures) {
             jdbc.update("DELETE FROM finance_amount_use WHERE tenant_id=? AND resource_type='ADVANCE' AND resource_id=?", advance.tenantId(), advance.id().toString());
             jdbc.update("DELETE FROM employee_advance_order WHERE tenant_id=? AND advance_id=?", advance.tenantId(), advance.id().toString());
@@ -733,6 +1337,55 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     @Test
+    void budgetNotificationsRetainOriginalCommandAndActualReducerUnderCurrentFieldPermissions() throws Exception {
+        var report = fixture(true).report(); enterFinance(report);
+        var freeze = operations.latest("demo", report.id()).orElseThrow();
+        String freezeKey = "budget:" + freeze.input().command().id() + ":APPLIED";
+        String freezeMessage = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", String.class, freezeKey);
+        var receipt = ok(send(reductionPath(report), "finance", reductionInput(report, "25", "1")), 200);
+        UUID operationId = UUID.fromString(receipt.path("budgetOperationId").asText());
+        budgetStatus = BudgetObservation.Status.REJECTED; budgetRejection = BudgetObservation.Rejection.LEDGER_VERSION_CONFLICT; budgetWorker.poll();
+        String key = "budget:" + operationId + ":REJECTED";
+        var freezeDetail = ok(read("/api/v1/notifications/" + freezeMessage + "/budget-target", "alice"), 200);
+        assertThat(freezeDetail.path("financialVersion").asLong()).isEqualTo(freeze.input().command().position().financialVersion());
+        assertThat(freezeDetail.path("operationId").asText()).isEqualTo(freeze.input().command().id().toString());
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class, freezeKey)).containsExactly("alice");
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class, key))
+                .containsExactlyInAnyOrder("alice", "finance");
+        UUID messageId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='finance'", String.class, key));
+        String noticePath = "/api/v1/notifications/" + messageId + "/budget-target";
+        var response = read(noticePath, "finance"); var original = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(original.path("operationId").asText()).isEqualTo(operationId.toString());
+        assertThat(original.path("financialVersion").asLong()).isEqualTo(current(report).version());
+        assertThat(original.path("issue").asText()).isEqualTo("LEDGER_VERSION_CONFLICT");
+        assertThat(original.toString()).doesNotContain("allocations", "commandDigest", "targetDigest", "account", "actions");
+        for (String role : List.of("EMPLOYEE", "ADMIN")) {
+            actors.set(new Actor("demo", "finance", Set.of(role)));
+            try { assertThatThrownBy(() -> budgetNotificationAccess.target(messageId)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                    error -> assertThat(error.code()).isEqualTo("FORBIDDEN")); }
+            finally { actors.clear(); }
+        }
+        for (String user : List.of("alice", "bob", "admin", "manager")) assertThat(read(noticePath, user).getStatus()).isEqualTo(404);
+        assertThat(read(noticePath + "?roundNo=2", "finance").getStatus()).isEqualTo(400);
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "budget:" + operationId + ":UNKNOWN", messageId.toString());
+        try { assertThat(read(noticePath, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", key, messageId.toString()); }
+        jdbc.update("UPDATE notification_inbox SET round_no=2 WHERE id=?", messageId.toString());
+        try { assertThat(read(noticePath, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET round_no=1 WHERE id=?", messageId.toString()); }
+        var command = operations.find("demo", operationId).orElseThrow().input();
+        var next = new org.springframework.transaction.support.TransactionTemplate(transactionManager).execute(transaction ->
+                budgetExecution.reserve("demo", report.id(), current(report).version(), command.command().position().accountingDate(), command.targetDigest(), Instant.now()));
+        budgetStatus = BudgetObservation.Status.APPLIED; budgetWorker.poll();
+        assertThat(operations.find("demo", next.input().command().id()).orElseThrow().status()).isEqualTo(BudgetOperation.Status.APPLIED);
+        assertThat(ok(read(noticePath, "finance"), 200)).isEqualTo(original);
+        jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='finance'");
+        try { assertThat(read(noticePath, "finance").getStatus()).isIn(403, 404); }
+        finally { jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject='finance'"); }
+    }
+
+    @Test
     void financialReductionAdjustsReservationsRoutesAndBudgetWithoutReplacingTheSubmission() throws Exception {
         reductionRoute = true; var fixture = fixture(true); var report = fixture.report(); enterFinance(report);
         var before = current(report); var original = rounds.findByRound("demo", report.applicationId(), 1).orElseThrow();
@@ -785,6 +1438,8 @@ class ExpenseSubmissionIntegrationTest {
         var versions = resourceVersions(report); settlementWorker.poll(); budgetWorker.poll();
         var settled = settlements.find("demo", report.id()).orElseThrow(); assertThat(settled.status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
         assertThat(settled.input().voucherOperationId()).isNull(); assertThat(settled.input().payment()).isNull();
+        assertThat(settlementNoticeRecipients(report, settled.version())).contains("alice");
+        assertThat(ok(read(settlementNoticePath(report, settled.version(), "alice"), "alice"), 200).path("funding").asText()).isEqualTo("ZERO_AMOUNT");
         assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isZero();
         pollArchive(); var archive = archives.find("demo", report.id(), 1).orElseThrow().archive();
         assertThat(archive).isNotNull(); assertThat(archive.manifest().vouchers()).isEmpty();
@@ -818,6 +1473,19 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(read(path + "?roundNo=2", "finance").getStatus()).isEqualTo(404);
         configuration.setEnabled(false); voucherPreparationWorker.poll(); configuration.setEnabled(true);
         var blocked = ok(read(path, "finance"), 200); assertThat(blocked.at("/preparation/issue").asText()).isEqualTo("NOT_CONFIGURED");
+        String noticeKey = "voucher:" + blocked.at("/preparation/id").asText() + ":PREPARATION_UNAVAILABLE";
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class, noticeKey))
+                .containsExactlyInAnyOrder("alice", "finance");
+        String noticeId = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='finance'", String.class, noticeKey);
+        String noticePath = "/api/v1/notifications/" + noticeId + "/voucher-target";
+        assertThat(ok(read(noticePath, "finance"), 200).at("/preparation/issue").asText()).isEqualTo("NOT_CONFIGURED");
+        for (String role : List.of("EMPLOYEE", "ADMIN")) {
+            actors.set(new Actor("demo", "finance", Set.of(role)));
+            try { assertThatThrownBy(() -> voucherNotificationAccess.target(UUID.fromString(noticeId))).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                    error -> assertThat(error.code()).isEqualTo("FORBIDDEN")); }
+            finally { actors.clear(); }
+        }
+        for (String user : List.of("alice", "admin", "bob")) assertThat(read(noticePath, user).getStatus()).isEqualTo(404);
         assertThat(blocked.at("/actions/prepare").asBoolean()).isTrue();
         var input = voucherInput(report, "PREPARE", null); String key = UUID.randomUUID().toString();
         for (String user : List.of("alice", "manager", "admin")) assertThat(send(path + "/actions", user, input).getStatus()).isEqualTo(403);
@@ -835,6 +1503,9 @@ class ExpenseSubmissionIntegrationTest {
         for (String field : List.of("observedStatus", "voucherReference", "postedAt", "issue")) assertThat(queued.path("operation").has(field)).isTrue();
         assertThat(queued.at("/operation/status").asText()).isEqualTo("QUEUED"); assertThat(queued.at("/actions/query").asBoolean()).isFalse();
         voucherWorker.poll(); var posted = ok(read(path, "finance"), 200); assertThat(posted.at("/operation/status").asText()).isEqualTo("POSTED");
+        var oldNotice = ok(read(noticePath, "finance"), 200);
+        assertThat(oldNotice.at("/preparation/id").asText()).isEqualTo(blocked.at("/preparation/id").asText());
+        assertThat(oldNotice.path("operation").isNull()).isTrue();
         assertThat(posted.at("/mapping/source").asText()).isEqualTo("ERP_MANAGED");
         assertThat(posted.at("/mapping/mappingId").isNull()).isTrue();
         assertThat(posted.at("/mapping/erpSourceVersion").asText()).isNotBlank();
@@ -871,6 +1542,116 @@ class ExpenseSubmissionIntegrationTest {
         voucherMode = "POSTED"; voucherWorker.poll(); assertThat(ok(read(path, "finance"), 200).at("/operation/status").asText()).isEqualTo("POSTED");
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM voucher_operation WHERE tenant_id='demo' AND business_id=?", Integer.class, report.id().toString())).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='VOUCHER_RESEND_ORIGINAL'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+    }
+
+    @Test
+    void paymentRequestNotificationKeepsUnsentOriginalExpenseAndCurrentParticipantAccess() throws Exception {
+        hideBusinessDetails = true;
+        var report = paymentReport(); UUID original = authorizePayment(report);
+        var staleSelection = new HashMap<>(cashierInput("EXECUTE", 1, null)); staleSelection.put("debitAccountVersion", "outdated");
+        ok(send("/api/v1/cashier/payments/" + original + "/actions", "cashier", staleSelection), 202); paymentRequestWorker.poll();
+        assertThat(paymentRequests.forAuthorization("demo", original).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.BLOCKED);
+        assertThat(paymentOperations.find("demo", original)).isEmpty();
+        var messages = jdbc.queryForList("SELECT id,recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_ATTENTION'",
+                report.applicationId().toString());
+        assertThat(messages).extracting(row -> row.get("recipient_id")).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        String financePath = null;
+        for (var message : messages) {
+            String user = message.get("recipient_id").toString(), path = "/api/v1/notifications/" + message.get("id") + "/payment-target";
+            var view = ok(read(path, user), 200);
+            assertThat(view.path("paymentId").asText()).isEqualTo(original.toString());
+            assertThat(view.at("/payment/operation").isNull()).isTrue();
+            assertThat(view.at("/payment/request/status").asText()).isEqualTo("BLOCKED");
+            assertThat(view.path("view").asText()).isEqualTo(user.equals("cashier") ? "CASHIER_PAYMENT" : "APPLICATION_ROUND");
+            assertThat(view.toString()).doesNotContain("debitReference", "accountDigest", "synthetic-private-account");
+            for (String stranger : List.of("admin", "bob", "manager")) assertThat(read(path, stranger).getStatus()).isEqualTo(404);
+            if (user.equals("finance")) financePath = path;
+        }
+        ok(send("/api/v1/payments/" + original + "/finance-actions", "finance", Map.of("action", "VOID", "authorizationVersion", 1,
+                "comment", "账户检查未通过，停止原授权")), 202);
+        UUID replacement = authorizePayment(report);
+        var history = ok(read(financePath, "finance"), 200);
+        assertThat(history.path("paymentId").asText()).isEqualTo(original.toString()).isNotEqualTo(replacement.toString());
+        assertThat(history.at("/payment/status").asText()).isEqualTo("VOIDED");
+        assertThat(history.at("/payment/operation").isNull()).isTrue(); assertThat(paymentWrites).isZero();
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(read(financePath, "finance").getStatus()).isIn(403, 404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }
+    }
+
+    @Test
+    void paymentNotificationKeepsOriginalFailedExpenseAfterReplacementAndRechecksCurrentAccess() throws Exception {
+        hideBusinessDetails = true;
+        var report = paymentReport(); UUID original = authorizePayment(report);
+        ok(send("/api/v1/cashier/payments/" + original + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202);
+        paymentRequestWorker.poll(); paymentMode = "FAILED"; paymentWorker.poll();
+        var failed = paymentOperations.find("demo", original).orElseThrow();
+        var messages = jdbc.queryForList("SELECT id,recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_RESULT'",
+                report.applicationId().toString());
+        assertThat(messages).extracting(row -> row.get("recipient_id")).containsExactlyInAnyOrder("alice", "finance", "cashier");
+        String financePath = null;
+        for (var message : messages) {
+            String user = message.get("recipient_id").toString();
+            String path = "/api/v1/notifications/" + message.get("id") + "/payment-target";
+            var response = read(path, user); var view = ok(response, 200);
+            assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+            assertThat(view.path("paymentId").asText()).isEqualTo(original.toString());
+            assertThat(view.at("/payment/purpose").asText()).isEqualTo("EXPENSE_REIMBURSEMENT");
+            assertThat(view.at("/payment/operation/status").asText()).isEqualTo("FAILED");
+            assertThat(view.path("view").asText()).isEqualTo(user.equals("cashier") ? "CASHIER_PAYMENT" : "APPLICATION_ROUND");
+            assertThat(view.toString()).doesNotContain("commandDigest", "targetDigest", "accountDigest", "synthetic-private-account");
+            for (String stranger : List.of("admin", "bob", "manager")) assertThat(read(path, stranger).getStatus()).isEqualTo(404);
+            if (user.equals("finance")) financePath = path;
+        }
+        ok(send("/api/v1/payments/" + original + "/finance-actions", "finance", Map.of("action", "RETIRE", "authorizationVersion", 2,
+                "operationVersion", failed.version(), "comment", "核实原失败交易后结束授权")), 202);
+        UUID replacement = authorizePayment(report);
+        assertThat(ok(read(paymentPath(report), "finance"), 200).at("/payment/id").asText()).isEqualTo(replacement.toString());
+        var history = ok(read(financePath, "finance"), 200);
+        assertThat(history.path("paymentId").asText()).isEqualTo(original.toString());
+        assertThat(history.at("/payment/status").asText()).isEqualTo("RETIRED");
+        assertThat(history.at("/payment/operation/status").asText()).isEqualTo("FAILED");
+        assertThat(paymentWrites).isEqualTo(1); assertThat(paymentOperations.find("demo", replacement)).isEmpty();
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try { assertThat(read(financePath, "finance").getStatus()).isIn(403, 404); }
+        finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }
+    }
+
+    @Test
+    void paymentDueDateIsFrozenAcrossExecutionAndVisibleToAuthorizedReaders() throws Exception {
+        var report = paymentReport(); String path = paymentPath(report); var input = new HashMap<>(authorizationInput(report));
+        input.put("dueDate", "2026-10-01"); String key = UUID.randomUUID().toString();
+        var first = send(path + "/authorizations", "finance", key, input); var receipt = ok(first, 202);
+        UUID id = UUID.fromString(receipt.path("authorizationId").asText()); String cashierPath = "/api/v1/cashier/payments/" + id;
+        for (String user : List.of("alice", "finance")) assertThat(ok(read(path, user), 200).at("/payment/dueDate").asText()).isEqualTo("2026-10-01");
+        assertThat(ok(read(cashierPath, "cashier"), 200).at("/payment/dueDate").asText()).isEqualTo("2026-10-01");
+        assertThat(jdbc.queryForObject("SELECT due_date FROM payment_authorization WHERE id=?", LocalDate.class, id.toString())).isEqualTo(LocalDate.of(2026, 10, 1));
+        String decision = jdbc.queryForObject("SELECT decision_json FROM payment_authorization WHERE id=?", String.class, id.toString());
+        assertThat(send(path + "/authorizations", "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+        var changed = new HashMap<>(input); changed.put("dueDate", "2026-10-02");
+        assertThat(send(path + "/authorizations", "finance", key, changed).getStatus()).isEqualTo(409);
+        ok(send(cashierPath + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202);
+        paymentRequestWorker.poll(); paymentWorker.poll();
+        assertThat(ok(read(cashierPath, "cashier"), 200).at("/payment/dueDate").asText()).isEqualTo("2026-10-01");
+        assertThat(jdbc.queryForObject("SELECT decision_json FROM payment_authorization WHERE id=?", String.class, id.toString())).isEqualTo(decision);
+        assertThat(json.write(paymentOperations.find("demo", id).orElseThrow().input().command())).doesNotContain("dueDate");
+        assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test
+    void paymentDueDateMissingOrMalformedCannotCreateNewAuthorization() throws Exception {
+        var report = paymentReport(); String path = paymentPath(report) + "/authorizations";
+        var absent = new HashMap<>(authorizationInput(report)); absent.remove("dueDate");
+        assertThat(send(path, "finance", absent).getStatus()).isEqualTo(422);
+        var missing = new HashMap<>(absent); missing.put("dueDate", null);
+        assertThat(send(path, "finance", missing).getStatus()).isEqualTo(422);
+        for (String date : List.of("2026-02-30", "2026-2-01", "10000-01-01", "2026-10-01T00:00:00Z", "0000-01-01", " 2026-10-01", "2026-10-01 ", "")) {
+            var malformed = new HashMap<>(absent); malformed.put("dueDate", date);
+            assertThat(send(path, "finance", malformed).getStatus()).isIn(400, 422);
+        }
+        assertThat(paymentAuthorizations.latest("demo", report.applicationId(), 1)).isEmpty();
     }
 
     @Test
@@ -1464,6 +2245,131 @@ class ExpenseSubmissionIntegrationTest {
         return entries;
     }
 
+    @Test void expenseReturnNotificationUnavailableQueryKeepsItsOwnOutcomeAfterRetry() throws Exception {
+        var report = archiveReadyExpense(); var queued = queueExpenseReturn(report);
+        assertThat(expenseReturnNoticeRecipients(queued, "UNAVAILABLE")).isEmpty();
+        var claimed = expenseReturns.claim("demo", queued.input().id(), Instant.now()); expenseReturns.fail(claimed, Instant.now());
+        assertThat(expenseReturnNoticeRecipients(queued, "UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
+        var oldPath = expenseReturnNoticePath(queued, "UNAVAILABLE", "alice");
+        var fresh = queryExpenseReturn(report); assertThat(fresh.receipt().status()).isEqualTo(ExpensePaymentReturnPort.Status.CONFIRMED);
+        var response = read(oldPath, "alice"); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        var detail = ok(response, 200); assertThat(detail.path("checkId").asText()).isEqualTo(queued.input().id().toString());
+        assertThat(detail.path("status").asText()).isEqualTo("UNAVAILABLE"); assertThat(detail.path("observation").isNull()).isTrue();
+        assertThat(detail.path("registration").isNull()).isTrue(); assertThat(expenseReturnNoticeRecipients(fresh, "RECORDED")).isEmpty();
+    }
+
+    @Test void expenseReturnNotificationCandidateDoesNotClaimFundsWereRegistered() throws Exception {
+        var report = archiveReadyExpense(); var resources = resourceVersions(report);
+        expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED; expenseReturnRows = List.of(expenseReturnItem(report, "notice-candidate", "20"));
+        var checked = queryExpenseReturn(report);
+        assertThat(expenseReturnNoticeRecipients(checked, "RETURN_REVIEW")).containsExactlyInAnyOrder("alice", "finance");
+        var detail = ok(read(expenseReturnNoticePath(checked, "RETURN_REVIEW", "finance"), "finance"), 200);
+        assertThat(detail.path("fact").asText()).isEqualTo("RETURN_REVIEW"); assertThat(detail.path("status").asText()).isEqualTo("CHECKED");
+        assertThat(detail.at("/observation/outcome").asText()).isEqualTo("PARTIALLY_RETURNED"); assertThat(detail.path("registration").isNull()).isTrue();
+        assertThat(expenseReturnLedgers.find("demo", report.id()).orElseThrow().entries()).isEmpty(); assertThat(resourceVersions(report)).isEqualTo(resources);
+        assertThat(detail.toString()).doesNotContain("amount", "accountDigest", "payableAccountCode", "canRegister", "evidenceReference");
+    }
+
+    @Test void expenseReturnNotificationRegistrationUsesOriginalCheckAndDeduplicatesHttpReplay() throws Exception {
+        var report = archiveReadyExpense(); var resources = resourceVersions(report);
+        expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED; expenseReturnRows = List.of(expenseReturnItem(report, "notice-register", "20"));
+        var checked = queryExpenseReturn(report); var input = expenseReturnInput(report, checked); var key = UUID.randomUUID().toString();
+        var action = ok(send(path(report) + "/payment-return/registrations", "finance", key, input), 202);
+        assertThat(ok(send(path(report) + "/payment-return/registrations", "finance", key, input), 202)).isEqualTo(action);
+        assertThat(expenseReturnNoticeRecipients(checked, "RECORDED")).containsExactlyInAnyOrder("alice", "finance");
+        for (String fact : List.of("RETURN_REVIEW", "RECORDED")) {
+            var detail = ok(read(expenseReturnNoticePath(checked, fact, "alice"), "alice"), 200);
+            assertThat(detail.path("checkId").asText()).isEqualTo(checked.input().id().toString()); assertThat(detail.path("status").asText()).isEqualTo("RESOLVED");
+            assertThat(detail.at("/registration/id")).isEqualTo(action.path("registrationId"));
+            assertThat(detail.at("/registration/returnVersion")).isEqualTo(action.path("returnVersion"));
+        }
+        var oldPath = expenseReturnNoticePath(checked, "RECORDED", "alice"); var old = ok(read(oldPath, "alice"), 200);
+        expenseReturnRevision++; expenseReturnRows = List.of(expenseReturnRows.get(0), expenseReturnItem(report, "notice-later", "10"));
+        registerExpenseReturn(report, queryExpenseReturn(report));
+        assertThat(ok(read(oldPath, "alice"), 200)).isEqualTo(old);
+        var originalId = UUID.fromString(action.path("registrationId").asText());
+        assertThat(expenseReturnRegistrations.find("foreign", originalId)).isEmpty();
+        var version = action.path("returnVersion").asLong();
+        jdbc.update("UPDATE expense_payment_return_registration SET return_version=? WHERE tenant_id='demo' AND id=?", version - 1, originalId.toString());
+        try { assertThatThrownBy(() -> expenseReturnRegistrations.find("demo", originalId)).isInstanceOf(io.agentflow.common.DomainException.class); }
+        finally { jdbc.update("UPDATE expense_payment_return_registration SET return_version=? WHERE tenant_id='demo' AND id=?", version, originalId.toString()); }
+        assertThat(resourceVersions(report)).isEqualTo(resources); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void expenseReturnNotificationRechecksRecipientRoleFieldsTenantAndOriginalFact() throws Exception {
+        hideBusinessDetails = true; var report = archiveReadyExpense(); expenseReturnStatus = ExpensePaymentReturnPort.Status.UNRESOLVED;
+        var checked = queryExpenseReturn(report); var own = expenseReturnNoticePath(checked, "UNRESOLVED", "finance");
+        var messageId = UUID.fromString(own.split("/")[4]);
+        assertThat(ok(read(own, "finance"), 200).path("registration").isNull()).isTrue();
+        for (String actor : List.of("admin", "cashier", "bob", "alice")) assertThat(read(own, actor).getStatus()).isIn(403, 404);
+        assertThat(read(own + "?roundNo=1", "finance").getStatus()).isEqualTo(400);
+        actors.set(new Actor("demo", "finance", Set.of("ADMIN")));
+        try { assertThatThrownBy(() -> expenseReturnNotificationAccess.target(messageId)).isInstanceOf(io.agentflow.common.DomainException.class); }
+        finally { actors.clear(); }
+        actors.set(new Actor("foreign", "finance", Set.of("FINANCE", "APPROVER")));
+        try { assertThatThrownBy(() -> expenseReturnNotificationAccess.target(messageId)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                failure -> assertThat(failure.code()).isEqualTo("NOT_FOUND")); } finally { actors.clear(); }
+        String event = "expense-return:" + checked.input().id() + ":UNRESOLVED";
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "expense-return:" + checked.input().id() + ":RETURN_REVIEW", messageId.toString());
+        try { assertThat(read(own, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", event, messageId.toString()); }
+        tx().executeWithoutResult(status -> applicationEvents.publishEvent(new ExpensePaymentReturnChanged(checked)));
+        assertThat(expenseReturnNoticeRecipients(checked, "UNRESOLVED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(jdbc.queryForObject("SELECT read_at FROM notification_inbox WHERE id=?", java.sql.Timestamp.class, messageId.toString())).isNull();
+    }
+
+    @Test void expenseReturnNotificationSourceRevocationStopsQueryAndExcludesInactiveFinance() throws Exception {
+        var report = archiveReadyExpense(); var queued = queueExpenseReturn(report);
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try {
+            expenseReturnWorker.poll(); assertThat(expenseReturnChecks.find("demo", queued.input().id()).orElseThrow().status()).isEqualTo(ExpensePaymentReturnCheck.Status.VOIDED);
+            assertThat(expenseReturnNoticeRecipients(queued, "SOURCE_CHANGED")).containsExactly("alice");
+            assertThat(ok(read(expenseReturnNoticePath(queued, "SOURCE_CHANGED", "alice"), "alice"), 200).path("fact").asText()).isEqualTo("SOURCE_CHANGED");
+        } finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }
+    }
+
+    @Test void expenseReturnNotificationFailureRollsBackFundsAndDispatchThenRevokedAppointmentSuppressesDelivery() throws Exception {
+        var report = archiveReadyExpense(); expenseReturnStatus = ExpensePaymentReturnPort.Status.PARTIALLY_RETURNED;
+        expenseReturnRows = List.of(expenseReturnItem(report, "notice-atomic", "20")); var checked = queryExpenseReturn(report);
+        var before = expenseReturnLedgers.find("demo", report.id()).orElseThrow(); var settlement = settlements.find("demo", report.id()).orElseThrow();
+        var financeActor = new Actor("demo", "finance", Set.of("FINANCE", "APPROVER")); var applicant = new Actor("demo", "alice", Set.of("EMPLOYEE"));
+        var financePreference = notificationPreferences.get(financeActor); var applicantPreference = notificationPreferences.get(applicant);
+        notificationPreferences.revise(financeActor, financePreference.version(), true, false); notificationPreferences.revise(applicant, applicantPreference.version(), true, false);
+        String event = "expense-return:" + checked.input().id() + ":RECORDED";
+        try {
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT expense_return_notice_failure CHECK (NOT (event_key='" + event + "' AND recipient_id='finance'))");
+            try { assertThatThrownBy(() -> registerExpenseReturn(report, checked)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT expense_return_notice_failure"); }
+            assertThat(expenseReturnLedgers.find("demo", report.id())).contains(before); assertThat(settlements.find("demo", report.id())).contains(settlement);
+            assertThat(expenseReturnChecks.find("demo", checked.input().id())).contains(checked); assertThat(expenseReturnRegistrations.history("demo", report.id())).isEmpty();
+            assertThat(expenseReturnNoticeRecipients(checked, "RECORDED")).isEmpty();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_receipt_credit WHERE tenant_id='demo' AND business_id=?", Integer.class, report.id().toString())).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='EXPENSE_PAYMENT_RETURN_REGISTER'", Integer.class, report.applicationId().toString())).isZero();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox i ON i.id=d.inbox_id WHERE i.event_key=?", Integer.class, event)).isZero();
+            registerExpenseReturn(report, checked); var path = expenseReturnNoticePath(checked, "RECORDED", "finance");
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, path.split("/")[4]));
+            var appointments = jdbc.queryForList("SELECT id FROM organization_appointment WHERE tenant_id='demo' AND person_id=? AND active=TRUE", String.class, finance.toString());
+            for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            try {
+                assertThat(read(path, "finance").getStatus()).isEqualTo(404); assertThat(notificationDeliveries.claim(deliveryId, Instant.now())).isNull();
+                assertThat(notificationDeliveryStore.find(deliveryId).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+            } finally { for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id); }
+        } finally {
+            notificationPreferences.revise(financeActor, notificationPreferences.get(financeActor).version(), financePreference.emailEnabled(), financePreference.enterpriseImEnabled());
+            notificationPreferences.revise(applicant, notificationPreferences.get(applicant).version(), applicantPreference.emailEnabled(), applicantPreference.enterpriseImEnabled());
+        }
+    }
+
+    private List<String> expenseReturnNoticeRecipients(ExpensePaymentReturnCheck check, String fact) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? ORDER BY recipient_id", String.class,
+                "expense-return:" + check.input().id() + ":" + fact);
+    }
+    private String expenseReturnNoticePath(ExpensePaymentReturnCheck check, String fact, String recipient) {
+        return "/api/v1/notifications/" + jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id=?", String.class,
+                "expense-return:" + check.input().id() + ":" + fact, recipient) + "/expense-return-target";
+    }
+
     @Test void expensePaymentReturnCumulativelyRegistersBankFundsAndPreservesConsumedResourcesAndArchive() throws Exception {
         var report = archiveReadyExpense(); pollArchive(); var archive = archives.find("demo", report.id(), 1).orElseThrow();
         var bytes = archiveDownload(report, "finance"); var resources = resourceVersions(report); var original = settlements.find("demo", report.id()).orElseThrow();
@@ -1496,6 +2402,8 @@ class ExpenseSubmissionIntegrationTest {
     @Test void expensePaymentReturnUnknownEvidenceNeedsExplicitFreshConfirmationBeforeSettlementResumes() throws Exception {
         var report = archiveReadyExpense(); var original = settlements.find("demo", report.id()).orElseThrow(); var resources = resourceVersions(report);
         expenseReturnStatus = ExpensePaymentReturnPort.Status.UNRESOLVED; var unresolved = queryExpenseReturn(report);
+        var held = settlements.find("demo", report.id()).orElseThrow(); var oldNotice = settlementNoticePath(report, held.version(), "alice");
+        assertThat(settlementNoticeRecipients(report, held.version())).containsExactlyInAnyOrder("alice", "finance");
         assertThat(asFinance(() -> expenseReturns.registrationIssue(expenseReturnSources.find("demo", report.id()), expenseReturnLedgers.find("demo", report.id()).orElseThrow(), unresolved, Instant.now())))
                 .isEqualTo("EXPENSE_PAYMENT_RETURN_EVIDENCE_UNAVAILABLE");
         assertThatThrownBy(() -> settlementSources.requireCurrent(settlements.find("demo", report.id()).orElseThrow(), current(report)))
@@ -1503,7 +2411,13 @@ class ExpenseSubmissionIntegrationTest {
         expenseReturnRevision++; expenseReturnStatus = ExpensePaymentReturnPort.Status.CONFIRMED; var confirmed = queryExpenseReturn(report);
         assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
         registerExpenseReturn(report, confirmed);
+        assertThat(expenseReturnNoticeRecipients(confirmed, "RECORDED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(ok(read(expenseReturnNoticePath(unresolved, "UNRESOLVED", "alice"), "alice"), 200).path("registration").isNull()).isTrue();
+        assertThat(ok(read(expenseReturnNoticePath(confirmed, "RECORDED", "alice"), "alice"), 200).at("/registration/outcome").asText()).isEqualTo("CONFIRMED");
         var recovered = settlements.find("demo", report.id()).orElseThrow(); assertThat(recovered.status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        assertThat(settlementNoticeRecipients(report, recovered.version())).containsExactlyInAnyOrder("alice", "finance");
+        var detail = ok(read(oldNotice, "alice"), 200); assertThat(detail.at("/notice/status").asText()).isEqualTo("REVIEW_REQUIRED");
+        assertThat(detail.at("/current/status").asText()).isEqualTo("SETTLED");
         assertThat(recovered.input()).isEqualTo(original.input()); assertThat(recovered.budgetOperationId()).isEqualTo(original.budgetOperationId()); assertThat(resourceVersions(report)).isEqualTo(resources);
         assertThat(expenseReturnLedgers.find("demo", report.id()).orElseThrow().reviewRequired()).isFalse();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_receipt_credit WHERE tenant_id='demo' AND business_id=?", Integer.class, report.id().toString())).isZero();
@@ -1551,6 +2465,7 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(expenseReturnChecks.find("demo", claimed.input().id()).orElseThrow().issue()).isEqualTo(ExpensePaymentReturnCheck.Issue.TIMEOUT);
         expenseReturns.finish(claimed, new FinanceResult.Success<>(expenseReturnReceipt(claimed.input().request())), claimed.leaseUntil().plusSeconds(1));
         assertThat(expenseReturnChecks.find("demo", claimed.input().id()).orElseThrow().issue()).isEqualTo(ExpensePaymentReturnCheck.Issue.TIMEOUT);
+        assertThat(expenseReturnNoticeRecipients(queued, "UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
         var person = organizationRepository.person("demo", finance).orElseThrow(); var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
         try { assertThatThrownBy(() -> queueExpenseReturn(report)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class, failure -> assertThat(failure.code()).isEqualTo("FORBIDDEN")); }
         finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }
@@ -1994,6 +2909,273 @@ class ExpenseSubmissionIntegrationTest {
         paymentMode = "SUCCEEDED"; var other = paymentReport(false); var wrong = new ExpenseResourceAdjustmentActionService.OperationInput(1, app(other).version(), current(other).version(),
                 input.adjustmentId(), input.adjustmentVersion(), input.budgetVersion(), ExpenseResourceAdjustmentActionService.Action.QUERY, "跨单请求不得修改原调整");
         assertThat(send(path(other) + "/resource-adjustment/actions", "finance", wrong).getStatus()).isEqualTo(409);
+    }
+
+    @Test void partialNotificationPreparationFailureKeepsExactSide() throws Exception {
+        var initial = persistedPartialIntent(); var preparation = registerPartialPreparation(initial, ExpensePartialAdjustmentPreparation.Side.ACCRUAL);
+        var claimed = partialPreparing.claim("demo", preparation.input().id(), adjustmentTime()); partialPreparing.fail(claimed, adjustmentTime());
+        assertPartialNoticeRecipients(initial.id(), "PREPARATION", preparation.input().id(), "PREPARATION_UNAVAILABLE");
+        var path = partialNoticePath(initial.id(), "PREPARATION", preparation.input().id(), "PREPARATION_UNAVAILABLE", "finance");
+        var response = read(path, "finance"); var detail = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(detail.path("preparation").path("side").asText()).isEqualTo("ACCRUAL");
+        assertThat(detail.path("budget").isNull()).isTrue(); assertThat(detail.path("adjustment").isNull()).isTrue();
+        assertThat(detail.toString()).doesNotContain("amount", "targetDigest", "evidenceReference", "authorizedBy", "actions");
+        for (var other : List.of("alice", "cashier", "admin")) assertThat(read(path, other).getStatus()).isEqualTo(404);
+        assertThat(read(path + "?adjustmentId=" + initial.id(), "finance").getStatus()).isEqualTo(400);
+
+    }
+
+    @Test void partialNotificationUnknownSidesRemainIndependent() throws Exception {
+        var queued = queuedPartialAdjustment(partialAdjustment()); invalidPartialBudget = true; invalidPartialAccrual = true; partialWorker.poll();
+        assertPartialNoticeRecipients(queued.id(), "BUDGET", queued.budget().input().command().id(), "BUDGET_UNKNOWN");
+        assertPartialNoticeRecipients(queued.id(), "ACCRUAL", queued.accrual().input().command().id(), "ACCRUAL_UNKNOWN");
+        var unknown = partialAdjustments.find("demo", queued.id()).orElseThrow(); assertThat(unknown.completion()).isNull();
+        tx().executeWithoutResult(status -> applicationEvents.publishEvent(new ExpensePartialAdjustmentChanged.Budget(unknown)));
+        assertPartialNoticeRecipients(queued.id(), "BUDGET", queued.budget().input().command().id(), "BUDGET_UNKNOWN");
+        invalidPartialBudget = false; invalidPartialAccrual = false;
+        var budgetQuery = tx().execute(status -> partialFinance.queryBudget("demo", queued.id(), unknown.version(), adjustmentTime()));
+        tx().executeWithoutResult(status -> partialFinance.queryAccrual("demo", queued.id(), budgetQuery.version(), adjustmentTime())); partialWorker.poll();
+        var detail = ok(read(partialNoticePath(queued.id(), "BUDGET", queued.budget().input().command().id(), "BUDGET_UNKNOWN", "alice"), "alice"), 200);
+        assertThat(detail.path("fact").asText()).isEqualTo("BUDGET_UNKNOWN"); assertThat(detail.path("budget").path("status").asText()).isEqualTo("APPLIED");
+        assertThat(detail.path("completion").isNull()).isFalse(); assertThat(partialBudgetWrites).isEqualTo(1); assertThat(partialAccrualWrites).isEqualTo(1);
+    }
+
+    @Test void partialNotificationResourcesRequireActualCompletion() throws Exception {
+        var ready = readyPartialAdjustment(partialAdjustment()); partialAdjustmentExecution.apply(partialCandidate(ready));
+        assertPartialNoticeRecipients(ready.id(), "ADJUSTMENT", ready.id(), "COMPLETED");
+        var completed = partialAdjustments.find("demo", ready.id()).orElseThrow();
+        tx().executeWithoutResult(status -> applicationEvents.publishEvent(new ExpensePartialAdjustmentChanged.Resources(completed)));
+        assertPartialNoticeRecipients(ready.id(), "ADJUSTMENT", ready.id(), "COMPLETED");
+        var detail = ok(read(partialNoticePath(ready.id(), "ADJUSTMENT", ready.id(), "COMPLETED", "alice"), "alice"), 200);
+        assertThat(detail.path("completion").path("budgetVersion").asLong()).isEqualTo(completed.completion().budgetVersion());
+
+    }
+
+    @Test void partialNotificationRetirementUsesItsActualRecord() throws Exception {
+        var queued = queuedPartialAdjustment(partialAdjustment()); var report = reports.find("demo", queued.input().basis().reportId()).orElseThrow();
+        ok(send(path(report) + "/partial-adjustments/retirements", "finance", partialRetireInput(report, queued)), 202);
+        assertPartialNoticeRecipients(queued.id(), "ADJUSTMENT", queued.id(), "RETIRED");
+        var detail = ok(read(partialNoticePath(queued.id(), "ADJUSTMENT", queued.id(), "RETIRED", "finance"), "finance"), 200);
+        assertThat(detail.path("retirement").isNull()).isFalse(); assertThat(detail.path("completion").isNull()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE event_key LIKE ?", Integer.class,
+                "expense-partial-adjustment:" + queued.id() + ":%:BUDGET_VOIDED")).isZero();
+
+    }
+
+    @Test void partialNotificationDisputeKeepsNamedDecision() throws Exception {
+        var before = partialDisputed(completedPartialForDispute(), true); var report = reports.find("demo", before.input().basis().reportId()).orElseThrow();
+        ok(send(path(report) + "/partial-adjustments/disputes", "finance", partialDisputeInput(report, before, "BUDGET", "APPLIED")), 202);
+        var current = partialAdjustments.find("demo", before.id()).orElseThrow(); var decision = partialDisputes.recorded(current).get(0);
+        assertPartialNoticeRecipients(current.id(), "DISPUTE", decision.id(), "DISPUTE_RESOLVED");
+        var detail = ok(read(partialNoticePath(current.id(), "DISPUTE", decision.id(), "DISPUTE_RESOLVED", "finance"), "finance"), 200);
+        assertThat(detail.path("resolution").path("operationId").asText()).isEqualTo(decision.operationId().toString());
+        assertThat(detail.path("completion").isNull()).isFalse();
+
+    }
+
+    @Test void partialNotificationRejectsFabricatedSideFactAndTime() throws Exception {
+        var queued = queuedPartialAdjustment(partialAdjustment()); invalidPartialBudget = true; partialWorker.poll();
+        var op = queued.budget().input().command().id(); var path = partialNoticePath(queued.id(), "BUDGET", op, "BUDGET_UNKNOWN", "finance");
+        var id = path.split("/")[4]; var key = partialNoticeKey(queued.id(), "BUDGET", op, "BUDGET_UNKNOWN");
+        for (var fake : List.of(partialNoticeKey(queued.id(), "ACCRUAL", op, "BUDGET_UNKNOWN"), partialNoticeKey(queued.id(), "BUDGET", UUID.randomUUID(), "BUDGET_UNKNOWN"), partialNoticeKey(queued.id(), "BUDGET", op, "BUDGET_RECONCILING"))) {
+            jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", fake, id);
+            try { assertThat(read(path, "finance").getStatus()).isEqualTo(404); } finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", key, id); }
+        }
+        var time = jdbc.queryForObject("SELECT created_at FROM notification_inbox WHERE id=?", java.sql.Timestamp.class, id);
+        jdbc.update("UPDATE notification_inbox SET created_at=? WHERE id=?", java.sql.Timestamp.from(time.toInstant().plusSeconds(1)), id);
+        try { assertThat(read(path, "finance").getStatus()).isEqualTo(404); } finally { jdbc.update("UPDATE notification_inbox SET created_at=? WHERE id=?", time, id); }
+        assertThat(read(path, "finance").getStatus()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT read_at FROM notification_inbox WHERE id=?", java.sql.Timestamp.class, id)).isNull();
+    }
+
+    @Test void partialNotificationBlockedResourcesDoNotEraseSuccess() throws Exception {
+        var ready = readyPartialAdjustment(partialAdjustment()); partialAdjustmentExecution.block(partialCandidate(ready), "CONCURRENCY_CONFLICT");
+        assertPartialNoticeRecipients(ready.id(), "ADJUSTMENT", ready.id(), "RESOURCES_BLOCKED");
+        var detail = ok(read(partialNoticePath(ready.id(), "ADJUSTMENT", ready.id(), "RESOURCES_BLOCKED", "finance"), "finance"), 200);
+        assertThat(detail.path("budget").path("status").asText()).isEqualTo("APPLIED"); assertThat(detail.path("accrual").path("status").asText()).isEqualTo("POSTED");
+        assertThat(detail.path("completion").isNull()).isTrue();
+    }
+
+    @Test void partialNotificationRollbackAndRevokedDeliveryRemainAtomic() throws Exception {
+        var ready = readyPartialAdjustment(partialAdjustment()); var report = reports.find("demo", ready.input().basis().reportId()).orElseThrow(); var before = resourceVersions(report);
+        var actor = new Actor("demo", "finance", Set.of("FINANCE", "APPROVER")); var preference = notificationPreferences.get(actor);
+        notificationPreferences.revise(actor, preference.version(), true, false); var key = partialNoticeKey(ready.id(), "ADJUSTMENT", ready.id(), "COMPLETED");
+        try {
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT partial_notice_failure CHECK (NOT (event_key='" + key + "' AND recipient_id='finance'))");
+            try { assertThatThrownBy(() -> partialAdjustmentExecution.apply(partialCandidate(ready))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT partial_notice_failure"); }
+            assertThat(resourceVersions(report)).isEqualTo(before); assertThat(partialAdjustments.find("demo", ready.id())).contains(ready);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE event_key=?", Integer.class, key)).isZero();
+            partialAdjustmentExecution.apply(partialCandidate(ready)); var path = partialNoticePath(ready.id(), "ADJUSTMENT", ready.id(), "COMPLETED", "finance");
+            var delivery = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, path.split("/")[4]));
+            var appointments = jdbc.queryForList("SELECT id FROM organization_appointment WHERE tenant_id='demo' AND person_id=? AND active=TRUE", String.class, finance.toString());
+            for (var id : appointments) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            try {
+                assertThat(read(path, "finance").getStatus()).isEqualTo(404); assertThat(notificationDeliveries.claim(delivery, Instant.now())).isNull();
+                assertThat(notificationDeliveryStore.find(delivery).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+            } finally { for (var id : appointments) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id); }
+        } finally { notificationPreferences.revise(actor, notificationPreferences.get(actor).version(), preference.emailEnabled(), preference.enterpriseImEnabled()); }
+    }
+
+    private String partialNoticeKey(UUID id, String source, UUID sourceId, String fact) {
+        return "expense-partial-adjustment:" + id + ":" + source + ":" + sourceId + ":" + fact;
+    }
+    private void assertPartialNoticeRecipients(UUID id, String source, UUID sourceId, String fact) {
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class,
+                partialNoticeKey(id, source, sourceId, fact))).containsExactlyInAnyOrder("alice", "finance");
+    }
+    private String partialNoticePath(UUID id, String source, UUID sourceId, String fact, String recipient) {
+        var message = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id=?", String.class,
+                partialNoticeKey(id, source, sourceId, fact), recipient);
+        return "/api/v1/notifications/" + message + "/expense-partial-adjustment-target";
+    }
+
+    @Test void expenseAdjustmentNotificationPreparationFailureKeepsOriginalSource() throws Exception {
+        var report = resourceAdjustmentReport();
+        var receipt = asFinance(() -> resourcePreparing.prepare(report.id(), resourcePreparationInput(report)));
+        var claimed = resourcePreparing.claim("demo", receipt.preparationId(), adjustmentTime());
+        resourcePreparing.fail(claimed, adjustmentTime());
+        assertExpenseAdjustmentRecipients(receipt.preparationId(), "PREPARATION_UNAVAILABLE");
+        assertThat(resourceAdjustments.active("demo", report.id())).isEmpty();
+        String path = expenseAdjustmentNoticePath(receipt.preparationId(), "PREPARATION_UNAVAILABLE", "finance");
+        var response = read(path, "finance"); var detail = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(detail.path("adjustmentId").asText()).isEqualTo(receipt.preparationId().toString());
+        assertThat(detail.path("budget").isNull()).isTrue(); assertThat(detail.path("adjustment").isNull()).isTrue();
+        assertThat(detail.toString()).doesNotContain("targetDigest", "evidenceReference", "ledgerRevision", "amount", "authorizedBy", "actions");
+        for (String other : List.of("alice", "cashier", "admin")) assertThat(read(path, other).getStatus()).isEqualTo(404);
+        assertThat(read(path + "?reportId=" + report.id(), "finance").getStatus()).isEqualTo(400);
+    }
+
+    @Test void expenseAdjustmentNotificationUnknownBudgetDoesNotClaimResourceCompletion() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report);
+        asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        invalidBudgetReversalResponse = true; resourceWorker.poll();
+        assertExpenseAdjustmentRecipients(prepared.input().id(), "BUDGET_UNKNOWN");
+        assertThat(resourceAdjustments.active("demo", report.id()).orElseThrow().resourcesReversed()).isFalse();
+        assertThat(expenseAdjustmentNoticeCount(prepared.input().id(), "COMPLETED")).isZero();
+        var original = budgetReversals.find("demo", prepared.input().id()).orElseThrow();
+        tx().executeWithoutResult(status -> applicationEvents.publishEvent(new ExpenseAdjustmentChanged.Budget(original)));
+        assertExpenseAdjustmentRecipients(prepared.input().id(), "BUDGET_UNKNOWN");
+        invalidBudgetReversalResponse = false;
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.QUERY))); resourceWorker.poll();
+        var detail = ok(read(expenseAdjustmentNoticePath(prepared.input().id(), "BUDGET_UNKNOWN", "alice"), "alice"), 200);
+        assertThat(detail.path("fact").asText()).isEqualTo("BUDGET_UNKNOWN");
+        assertThat(detail.path("budget").path("status").asText()).isEqualTo("APPLIED");
+        assertThat(detail.path("completion").isNull()).isFalse(); assertThat(budgetReversalWrites).isEqualTo(1);
+    }
+
+    @Test void expenseAdjustmentNotificationCompletionRequiresActualResourceWrites() throws Exception {
+        var report = resourceAdjustmentReport(); var ready = readyResourceExecution(report);
+        assertThat(expenseAdjustmentNoticeCount(ready.id(), "COMPLETED")).isZero();
+        resourceAdjustmentExecution.apply(resourceCandidate(ready));
+        assertExpenseAdjustmentRecipients(ready.id(), "COMPLETED");
+        var versions = resourceVersions(report); resourceAdjustmentExecution.apply(resourceCandidate(ready));
+        assertExpenseAdjustmentRecipients(ready.id(), "COMPLETED"); assertThat(resourceVersions(report)).isEqualTo(versions);
+    }
+
+    @Test void expenseAdjustmentNotificationRetirementIsSeparateFromUnsentBudgetVoid() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report);
+        asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        asFinance(() -> resourceActions.retire(report.id(), resourceRetirementInput(report)));
+        assertExpenseAdjustmentRecipients(prepared.input().id(), "RETIRED");
+        assertThat(expenseAdjustmentNoticeCount(prepared.input().id(), "BUDGET_VOIDED")).isZero();
+        assertThat(expenseAdjustmentNoticeCount(prepared.input().id(), "COMPLETED")).isZero();
+        assertThat(budgetReversalWrites).isZero();
+        var next = prepareResourceWorkflow(report); assertThat(next.input().id()).isNotEqualTo(prepared.input().id());
+        var original = ok(read(expenseAdjustmentNoticePath(prepared.input().id(), "RETIRED", "finance"), "finance"), 200);
+        assertThat(original.path("adjustmentId").asText()).isEqualTo(prepared.input().id().toString());
+        assertThat(original.path("retirement").isNull()).isFalse(); assertThat(original.path("completion").isNull()).isTrue();
+    }
+
+    @Test void expenseAdjustmentNotificationBudgetAndBlockedResourcesAreDistinctFacts() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report);
+        asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        var claimed = resourceBudgetExecution.claim("demo", prepared.input().id(), adjustmentTime()); var command = claimed.input().command(); var at = adjustmentTime();
+        var observation = new BudgetConsumptionReversalObservation(command.id(), command.digest(), BudgetConsumptionReversalObservation.Status.APPLIED, at,
+                command.consumed().ledgerRevision() + 1, "synthetic-budget-reversal-" + command.id(), command.period().periodReference(), command.period().request().accountingDate(), at, null);
+        budgetReversalCommands.put(command.id(), command); budgetReversalAppliedAt.put(command.id(), at);
+        resourceBudgetExecution.finish(claimed, new FinanceResult.Success<>(observation), at);
+        assertExpenseAdjustmentRecipients(prepared.input().id(), "BUDGET_APPLIED");
+        assertThat(expenseAdjustmentNoticeCount(prepared.input().id(), "COMPLETED")).isZero();
+        var ready = resourceAdjustments.find("demo", prepared.input().id()).orElseThrow();
+        resourceAdjustmentExecution.block(resourceCandidate(ready), "RESOURCE_CHANGED");
+        assertExpenseAdjustmentRecipients(ready.id(), "RESOURCES_BLOCKED");
+        var detail = ok(read(expenseAdjustmentNoticePath(ready.id(), "BUDGET_APPLIED", "alice"), "alice"), 200);
+        assertThat(detail.path("budget").path("status").asText()).isEqualTo("APPLIED");
+        assertThat(detail.path("adjustment").path("resourcesReversed").asBoolean()).isFalse(); assertThat(detail.path("completion").isNull()).isTrue();
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.RETRY_RESOURCES))); resourceWorker.poll();
+        assertExpenseAdjustmentRecipients(ready.id(), "COMPLETED");
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.QUERY))); resourceWorker.poll();
+        assertThat(expenseAdjustmentNoticeCount(ready.id(), "RESOURCES_BLOCKED")).isEqualTo(2);
+        asFinance(() -> resourceActions.act(report.id(), resourceActionInput(report, ExpenseResourceAdjustmentActionService.Action.CONFIRM_COMPLETED)));
+        assertExpenseAdjustmentRecipients(ready.id(), "COMPLETED");
+    }
+
+    @Test void expenseAdjustmentNotificationRejectsFabricatedFactsAndMessageTimes() throws Exception {
+        var report = resourceAdjustmentReport(); var prepared = prepareResourceWorkflow(report);
+        asFinance(() -> resourcePreparing.authorize(report.id(), resourceAuthorizationInput(report, prepared)));
+        invalidBudgetReversalResponse = true; resourceWorker.poll();
+        String path = expenseAdjustmentNoticePath(prepared.input().id(), "BUDGET_UNKNOWN", "finance"); String id = path.split("/")[4];
+        String key = "expense-adjustment:" + prepared.input().id() + ":BUDGET_UNKNOWN";
+        var created = jdbc.queryForObject("SELECT created_at FROM notification_inbox WHERE id=?", java.sql.Timestamp.class, id);
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "expense-adjustment:" + prepared.input().id() + ":BUDGET_RECONCILING", id);
+        try { assertThat(read(path, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", key, id); }
+        jdbc.update("UPDATE notification_inbox SET created_at=? WHERE id=?", java.sql.Timestamp.from(created.toInstant().plusSeconds(1)), id);
+        try { assertThat(read(path, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET created_at=? WHERE id=?", created, id); }
+        assertThat(read(path, "finance").getStatus()).isEqualTo(200);
+        assertThat(jdbc.queryForObject("SELECT read_at FROM notification_inbox WHERE id=?", java.sql.Timestamp.class, id)).isNull();
+    }
+
+    @Test void expenseAdjustmentNotificationRevokedPreparationExcludesInactiveFinance() throws Exception {
+        var report = resourceAdjustmentReport(); var receipt = asFinance(() -> resourcePreparing.prepare(report.id(), resourcePreparationInput(report)));
+        var person = organizationRepository.person("demo", finance).orElseThrow();
+        var inactive = organization.updatePerson(admin, finance, person.displayName(), false, person.approvalEligible(), person.revision());
+        try {
+            resourceWorker.poll();
+            assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE event_key=?", String.class,
+                    "expense-adjustment:" + receipt.preparationId() + ":PREPARATION_VOIDED")).containsExactly("alice");
+            assertThat(read(expenseAdjustmentNoticePath(receipt.preparationId(), "PREPARATION_VOIDED", "alice"), "alice").getStatus()).isEqualTo(200);
+        } finally { organization.updatePerson(admin, finance, person.displayName(), true, person.approvalEligible(), inactive.revision()); }
+    }
+
+    @Test void expenseAdjustmentNotificationFailureRollsBackResourcesAndSuppressesRevokedDelivery() throws Exception {
+        var report = resourceAdjustmentReport(); var ready = readyResourceExecution(report); var before = resourceVersions(report);
+        var actor = new Actor("demo", "finance", Set.of("FINANCE", "APPROVER")); var preference = notificationPreferences.get(actor);
+        notificationPreferences.revise(actor, preference.version(), true, false); String key = "expense-adjustment:" + ready.id() + ":COMPLETED";
+        try {
+            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT expense_adjustment_notice_failure CHECK (NOT (event_key='" + key + "' AND recipient_id='finance'))");
+            try { assertThatThrownBy(() -> resourceAdjustmentExecution.apply(resourceCandidate(ready))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class); }
+            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT expense_adjustment_notice_failure"); }
+            assertThat(resourceVersions(report)).isEqualTo(before); assertThat(resourceAdjustments.find("demo", ready.id())).contains(ready);
+            assertThat(expenseAdjustmentNoticeCount(ready.id(), "COMPLETED")).isZero();
+            resourceAdjustmentExecution.apply(resourceCandidate(ready));
+            var path = expenseAdjustmentNoticePath(ready.id(), "COMPLETED", "finance");
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, path.split("/")[4]));
+            var appointments = jdbc.queryForList("SELECT id FROM organization_appointment WHERE tenant_id='demo' AND person_id=? AND active=TRUE", String.class, finance.toString());
+            for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            try {
+                assertThat(read(path, "finance").getStatus()).isEqualTo(404); assertThat(notificationDeliveries.claim(deliveryId, Instant.now())).isNull();
+                assertThat(notificationDeliveryStore.find(deliveryId).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+            } finally { for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id); }
+        } finally { notificationPreferences.revise(actor, notificationPreferences.get(actor).version(), preference.emailEnabled(), preference.enterpriseImEnabled()); }
+    }
+
+    private String expenseAdjustmentNoticePath(UUID adjustmentId, String fact, String recipient) {
+        String id = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id=?", String.class,
+                "expense-adjustment:" + adjustmentId + ":" + fact, recipient);
+        return "/api/v1/notifications/" + id + "/expense-adjustment-target";
+    }
+    private void assertExpenseAdjustmentRecipients(UUID id, String fact) {
+        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class,
+                "expense-adjustment:" + id + ":" + fact)).containsExactlyInAnyOrder("alice", "finance");
+    }
+    private int expenseAdjustmentNoticeCount(UUID id, String fact) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", Integer.class,
+                "expense-adjustment:" + id + ":" + fact);
     }
 
     private ExpenseResourceAdjustmentPreparationService.PrepareInput resourcePreparationInput(ExpenseReport report) {
@@ -3497,6 +4679,13 @@ class ExpenseSubmissionIntegrationTest {
         var resolved = partialAdjustments.find("demo", queued.id()).orElseThrow(); assertThat(resolved.completion()).isNull();
         var preparation = registerPartialPreparation(resolved, ExpensePartialAdjustmentPreparation.Side.BUDGET); partialWorker.poll();
         var authorized = authorizePartialPreparation(resolved, partialPreparations.find("demo", preparation.input().id()).orElseThrow());
+        var originalNotice = ok(read(partialNoticePath(queued.id(), "BUDGET", budgetCommand.id(), "BUDGET_REJECTED", "finance"), "finance"), 200);
+        assertThat(originalNotice.path("sourceId").asText()).isEqualTo(budgetCommand.id().toString());
+        assertThat(originalNotice.path("budget").path("id").asText()).isEqualTo(budgetCommand.id().toString());
+        assertThat(originalNotice.path("adjustment").path("version").asLong()).isEqualTo(resolved.version());
+        var budgetDecision = partialDisputes.recorded(resolved).stream().filter(d -> d.side() == ExpensePartialAdjustmentPreparation.Side.BUDGET).findFirst().orElseThrow();
+        var originalDecision = ok(read(partialNoticePath(queued.id(), "DISPUTE", budgetDecision.id(), "DISPUTE_RESOLVED", "finance"), "finance"), 200);
+        assertThat(originalDecision.path("budget").path("id").asText()).isEqualTo(budgetCommand.id().toString());
         var view = ok(read(endpoint, "finance"), 200).path("adjustments").get(0).path("budget");
         assertThat(view.path("id").asText()).isEqualTo(preparation.input().id().toString());
         assertThat(view.path("latestResolution").path("operationId").asText()).isEqualTo(budgetCommand.id().toString());
@@ -3758,6 +4947,99 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(1);
     }
 
+    @Test void expenseSettlementCompletionNotifiesAfterActualBudgetConsumption() throws Exception {
+        var report = paidExpense(); var queued = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(settlementNoticeRecipients(report, queued.version())).isEmpty();
+        settlementWorker.poll(); var pending = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(settlementNoticeRecipients(report, pending.version())).isEmpty();
+        budgetWorker.poll(); var settled = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(settled.status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
+        assertThat(settlementNoticeRecipients(report, settled.version())).containsExactlyInAnyOrder("alice", "finance");
+        settlementWorker.poll(); budgetWorker.poll();
+        assertThat(settlementNoticeRecipients(report, settled.version())).containsExactlyInAnyOrder("alice", "finance");
+    }
+
+    @Test void expenseSettlementBlockedResourcesNotifyWithoutErasingPaymentSuccess() throws Exception {
+        var report = paidExpense(); var id = current(report).currentRound().advanceOffsets().get(0).advanceId();
+        var advance = advances.find("demo", id).orElseThrow(); long version = advance.version();
+        advance.requirePaymentReview(version); advances.update(advance, version, "fixture", "PAYMENT_REVIEW");
+        var before = resourceVersions(report); settlementWorker.poll(); var blocked = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(blocked.status()).isEqualTo(ExpenseSettlement.Status.BLOCKED);
+        assertThat(settlementNoticeRecipients(report, blocked.version())).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(resourceVersions(report)).isEqualTo(before);
+        assertThat(paymentOperations.find("demo", blocked.input().payment().operationId()).orElseThrow().settleable()).isTrue();
+    }
+
+    private List<String> settlementNoticeRecipients(ExpenseReport report, long version) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND event_key LIKE ? ORDER BY recipient_id", String.class,
+                report.applicationId().toString(), "expense-settlement:" + report.id() + ":" + version + ":%");
+    }
+
+    private String settlementNoticePath(ExpenseReport report, long version, String recipient) {
+        return "/api/v1/notifications/" + jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND recipient_id=? AND event_key LIKE ?", String.class,
+                recipient, "expense-settlement:" + report.id() + ":" + version + ":%") + "/expense-settlement-target";
+    }
+
+    @Test void expenseSettlementOldMessageKeepsRejectedRevisionAfterRetryAndRechecksPermissions() throws Exception {
+        var report = paidExpense(); settlementWorker.poll(); budgetStatus = BudgetObservation.Status.REJECTED;
+        budgetRejection = BudgetObservation.Rejection.ACCOUNTING_PERIOD_CLOSED; budgetWorker.poll();
+        var rejected = settlements.find("demo", report.id()).orElseThrow(); var oldPath = settlementNoticePath(report, rejected.version(), "alice");
+        budgetStatus = BudgetObservation.Status.APPLIED;
+        tx().executeWithoutResult(status -> settlementService.retry("demo", report.id(), rejected.version())); settlementWorker.poll(); budgetWorker.poll();
+        var settled = settlements.find("demo", report.id()).orElseThrow(); var resources = resourceVersions(report);
+        var response = read(oldPath, "alice"); var target = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(target.at("/notice/status").asText()).isEqualTo("BUDGET_REJECTED"); assertThat(target.at("/notice/version").asLong()).isEqualTo(rejected.version());
+        assertThat(target.at("/current/status").asText()).isEqualTo("SETTLED"); assertThat(target.at("/current/version").asLong()).isEqualTo(settled.version());
+        assertThat(target.at("/notice/budgetOperationId").asText()).isNotEqualTo(target.at("/current/budgetOperationId").asText());
+        assertThat(target.toString()).doesNotContain("amount", "account", "receiptReference", "commandDigest", "canRetry");
+        for (String actor : List.of("admin", "cashier", "bob")) assertThat(read(oldPath, actor).getStatus()).isIn(403, 404);
+        assertThat(read(oldPath + "?roundNo=1", "alice").getStatus()).isEqualTo(400);
+        assertThat(read(settlementNoticePath(report, settled.version(), "finance"), "finance").getStatus()).isEqualTo(200);
+        UUID financeNotice = UUID.fromString(settlementNoticePath(report, settled.version(), "finance").split("/")[4]);
+        actors.set(new Actor("demo", "finance", Set.of("ADMIN")));
+        try { assertThatThrownBy(() -> settlementNotificationAccess.target(financeNotice)).isInstanceOf(io.agentflow.common.DomainException.class); }
+        finally { actors.clear(); }
+        actors.set(new Actor("foreign", "finance", Set.of("FINANCE", "APPROVER")));
+        try { assertThatThrownBy(() -> settlementNotificationAccess.target(financeNotice)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                failure -> assertThat(failure.code()).isEqualTo("NOT_FOUND")); } finally { actors.clear(); }
+        String id = oldPath.split("/")[4]; String event = jdbc.queryForObject("SELECT event_key FROM notification_inbox WHERE id=?", String.class, id);
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", event.replace(":BUDGET_REJECTED", ":REVIEW_REQUIRED"), id);
+        try { assertThat(read(oldPath, "alice").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", event, id); }
+        tx().executeWithoutResult(status -> applicationEvents.publishEvent(new ExpenseSettlementChanged(rejected, settled)));
+        assertThat(settlementNoticeRecipients(report, settled.version())).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(resourceVersions(report)).isEqualTo(resources); assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test void expenseSettlementNotificationAndDispatchRollbackAndCurrentEntityRevocationAreAtomic() throws Exception {
+        var report = paidExpense(); var queued = settlements.find("demo", report.id()).orElseThrow();
+        var candidate = new JdbcExpenseSettlementRepository.Candidate("demo", report.id(), queued.version());
+        var actor = new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE")); var preference = notificationPreferences.get(actor);
+        notificationPreferences.revise(actor, preference.version(), true, false);
+        try {
+            assertThatThrownBy(() -> tx().execute(status -> {
+                settlementService.block(candidate, "INVOICE_VERIFICATION_REQUIRED");
+                assertThat(settlementNoticeRecipients(report, queued.version() + 1)).containsExactlyInAnyOrder("alice", "finance");
+                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox i ON i.id=d.inbox_id WHERE i.event_key LIKE ? AND i.recipient_id='finance'", Integer.class,
+                        "expense-settlement:" + report.id() + ":%" )).isEqualTo(1);
+                throw new IllegalStateException("Synthetic settlement notification rollback");
+            })).hasMessageContaining("Synthetic settlement notification rollback");
+            assertThat(settlements.find("demo", report.id())).contains(queued); assertThat(settlementNoticeRecipients(report, queued.version() + 1)).isEmpty();
+            settlementService.block(candidate, "INVOICE_VERIFICATION_REQUIRED");
+            String path = settlementNoticePath(report, queued.version() + 1, "finance"); String messageId = path.split("/")[4];
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, messageId));
+            var appointments = jdbc.queryForList("SELECT id FROM organization_appointment WHERE tenant_id='demo' AND person_id=? AND active=TRUE", String.class, finance.toString());
+            for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            try {
+                assertThat(organizationRepository.person("demo", finance).orElseThrow().active()).isTrue();
+                assertThat(read(path, "finance").getStatus()).isEqualTo(404);
+                assertThat(notificationDeliveries.claim(deliveryId, Instant.now())).isNull();
+                assertThat(notificationDeliveryStore.find(deliveryId).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+            } finally { for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id); }
+        } finally { notificationPreferences.revise(actor, notificationPreferences.get(actor).version(), preference.emailEnabled(), preference.enterpriseImEnabled()); }
+    }
+
     @Test void budgetConsumeRejectionRetriesOnlyBudgetAndKeepsConsumedResources() throws Exception {
         var report = paidExpense(); settlementWorker.poll(); var versions = resourceVersions(report);
         var first = settlements.find("demo", report.id()).orElseThrow().budgetOperationId();
@@ -3825,6 +5107,8 @@ class ExpenseSubmissionIntegrationTest {
         var queued = settlements.find("demo", report.id()).orElseThrow(); assertThat(queued.input().payment()).isNull(); assertThat(queued.input().payable()).isEqualTo(money("0"));
         settlementWorker.poll(); budgetWorker.poll(); assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
         assertThat(advances.find("demo", fixture.advance()).orElseThrow().balance().consumed()).isEqualTo(money("100"));
+        var settled = settlements.find("demo", report.id()).orElseThrow();
+        assertThat(ok(read(settlementNoticePath(report, settled.version(), "alice"), "alice"), 200).path("funding").asText()).isEqualTo("FULL_OFFSET");
         assertThat(paymentAuthorizations.latest("demo", report.applicationId(), 1)).isEmpty(); assertThat(paymentWrites).isZero();
         pollArchive(); var archive = archives.find("demo", report.id(), 1).orElseThrow().archive();
         assertThat(archive).isNotNull(); assertThat(archive.manifest().vouchers()).extracting(ExpenseArchive.Voucher::kind).containsExactly(VoucherCommand.Kind.EXPENSE_ACCRUAL);
@@ -4172,6 +5456,135 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(ok(read(path(report) + "/archive", "finance"), 200).path("issue").isNull()).isTrue(); assertThat(paymentWrites).isEqualTo(1);
     }
 
+    @Test void externalReversalCheckFailureNotifiesOriginalApplicantAndVerifier() throws Exception {
+        var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL);
+        var queued = ok(send(reversalPath(original) + "/checks", "finance", reversalQueryInput(report, original)), 202);
+        var id = UUID.fromString(queued.path("checkId").asText()); var claimed = voucherReversals.claim("demo", id, Instant.now());
+        voucherReversals.fail(claimed, Instant.now());
+        assertThat(voucherReversalChecks.find("demo", id).orElseThrow().status()).isEqualTo(VoucherReversalCheck.Status.UNAVAILABLE);
+        assertThat(reversalCheckNoticeRecipients(id, "UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(voucherReversalRecords.forOperation("demo", original.input().command().id())).isEmpty();
+        assertThat(voucherOperations.find("demo", original.input().command().id())).contains(original); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void externalReversalRecordNotifiesOnceAfterExplicitOriginalAcceptance() throws Exception {
+        var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); var check = checkedReversal(report, original);
+        assertThat(reversalCheckNoticeRecipients(check.input().id(), "RECORDED")).isEmpty();
+        var input = reversalRecordInput(report, original, check); var key = UUID.randomUUID().toString(); var route = reversalPath(original) + "/records";
+        var first = ok(send(route, "finance", key, input), 202); assertThat(ok(send(route, "finance", key, input), 202)).isEqualTo(first);
+        assertThat(reversalCheckNoticeRecipients(check.input().id(), "RECORDED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(voucherOperations.find("demo", original.input().command().id())).contains(original); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void externalReversalMessagesKeepOldCheckAfterNewRegistrationAndEnforceCurrentPermissions() throws Exception {
+        var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL);
+        var queued = ok(send(reversalPath(original) + "/checks", "finance", reversalQueryInput(report, original)), 202);
+        UUID id = UUID.fromString(queued.path("checkId").asText()); var claimed = voucherReversals.claim("demo", id, Instant.now()); voucherReversals.fail(claimed, Instant.now());
+        String path = reversalCheckNoticePath(id, "UNAVAILABLE", "finance"); var response = read(path, "finance"); var previous = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); assertThat(previous.path("checkId").asText()).isEqualTo(id.toString());
+        assertThat(previous.path("observation").isNull()).isTrue(); assertThat(previous.path("record").isNull()).isTrue();
+        assertThat(previous.toString()).doesNotContain("commandDigest", "targetDigest", "evidenceReference", "entries", "accountReference", "actions");
+        var next = checkedReversal(report, original); ok(send(reversalPath(original) + "/records", "finance", reversalRecordInput(report, original, next)), 202);
+        assertThat(ok(read(path, "finance"), 200)).isEqualTo(previous);
+        assertThat(ok(read(reversalCheckNoticePath(next.input().id(), "RECORDED", "alice"), "alice"), 200).at("/record/id").asText())
+                .isEqualTo(voucherReversalRecords.forOperation("demo", original.input().command().id()).orElseThrow().id().toString());
+        assertThat(read(path + "?checkId=" + next.input().id(), "finance").getStatus()).isEqualTo(400);
+        for (String user : List.of("alice", "admin", "manager", "cashier")) assertThat(read(path, user).getStatus()).isEqualTo(404);
+        UUID messageId = UUID.fromString(path.split("/")[4]);
+        for (String role : List.of("ADMIN", "EMPLOYEE")) {
+            actors.set(new Actor("demo", "finance", Set.of(role)));
+            try { assertThatThrownBy(() -> reversalCheckNotificationAccess.target(messageId)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                    error -> assertThat(error.code()).isEqualTo("FORBIDDEN")); } finally { actors.clear(); }
+        }
+        actors.set(new Actor("foreign", "finance", Set.of("ADMIN", "FINANCE", "APPROVER")));
+        try { assertThatThrownBy(() -> reversalCheckNotificationAccess.target(messageId)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                error -> assertThat(error.code()).isEqualTo("NOT_FOUND")); } finally { actors.clear(); }
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "reversal-check:" + id + ":UNRESOLVED", messageId.toString());
+        try { assertThat(read(path, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "reversal-check:" + id + ":UNAVAILABLE", messageId.toString()); }
+    }
+
+    @Test void unresolvedExternalReversalIsAnObservationWithoutPostingOrRegistration() throws Exception {
+        var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL);
+        var queued = ok(send(reversalPath(original) + "/checks", "finance", reversalQueryInput(report, original)), 202);
+        UUID id = UUID.fromString(queued.path("checkId").asText()); var claimed = voucherReversals.claim("demo", id, Instant.now()); var now = Instant.now();
+        var unresolved = new VoucherReversalPort.Receipt(claimed.input().request(), VoucherReversalPort.Status.UNRESOLVED, 1, now, now.plusSeconds(60), null, null);
+        voucherReversals.finish(claimed, new FinanceResult.Success<>(unresolved), now.plusMillis(1));
+        assertThat(reversalCheckNoticeRecipients(id, "UNRESOLVED")).containsExactlyInAnyOrder("alice", "finance");
+        var value = ok(read(reversalCheckNoticePath(id, "UNRESOLVED", "alice"), "alice"), 200);
+        assertThat(value.at("/observation/status").asText()).isEqualTo("UNRESOLVED"); assertThat(value.at("/observation/voucherReference").isNull()).isTrue();
+        assertThat(value.path("record").isNull()).isTrue(); assertThat(value.path("originalStatus").asText()).isEqualTo("REVERSED");
+        assertThat(voucherReversalRecords.forOperation("demo", original.input().command().id())).isEmpty(); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void externalReversalRegistrationAndOutboundIntentRollBackTogetherAndRecheckCurrentEntity() throws Exception {
+        var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); var check = checkedReversal(report, original);
+        var actor = new Actor("demo", "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE")); var preference = notificationPreferences.get(actor);
+        notificationPreferences.revise(actor, preference.version(), true, false);
+        var input = json.read(json.write(reversalRecordInput(report, original, check)), VoucherReversalService.RecordInput.class);
+        String eventKey = "reversal-check:" + check.input().id() + ":RECORDED";
+        try {
+            actors.set(actor);
+            try { assertThatThrownBy(() -> tx().execute(status -> {
+                voucherReversals.record(report.applicationId(), original.input().command().id(), input);
+                assertThat(reversalCheckNoticeRecipients(check.input().id(), "RECORDED")).containsExactlyInAnyOrder("alice", "finance");
+                assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox i ON i.id=d.inbox_id WHERE i.event_key=? AND i.recipient_id='finance'", Integer.class, eventKey)).isEqualTo(1);
+                throw new IllegalStateException("Synthetic external reversal notification rollback"); })).hasMessageContaining("Synthetic external reversal notification rollback");
+            } finally { actors.clear(); }
+            assertThat(voucherReversalChecks.find("demo", check.input().id())).contains(check); assertThat(voucherReversalRecords.forOperation("demo", original.input().command().id())).isEmpty();
+            assertThat(reversalCheckNoticeRecipients(check.input().id(), "RECORDED")).isEmpty();
+            ok(send(reversalPath(original) + "/records", "finance", input), 202);
+            String messageId = reversalCheckNoticePath(check.input().id(), "RECORDED", "finance").split("/")[4];
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, messageId));
+            assertThat(reversalCheckNotificationAccess.deliveryAllowed(notificationDeliveryStore.find(deliveryId).orElseThrow())).isTrue();
+            var appointments = jdbc.queryForList("SELECT id FROM organization_appointment WHERE tenant_id='demo' AND person_id=? AND active=TRUE", String.class, finance.toString());
+            for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            try {
+                assertThat(organizationRepository.person("demo", finance).orElseThrow().active()).isTrue();
+                assertThat(read(reversalCheckNoticePath(check.input().id(), "RECORDED", "finance"), "finance").getStatus()).isEqualTo(404);
+                assertThat(notificationDeliveries.claim(deliveryId, Instant.now())).isNull();
+                assertThat(notificationDeliveryStore.find(deliveryId).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+            } finally { for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id); }
+        } finally { notificationPreferences.revise(actor, notificationPreferences.get(actor).version(), preference.emailEnabled(), preference.enterpriseImEnabled()); }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(longs = {123, 789})
+    void externalReversalRegistrationPreservesNanosecondEvidenceAndStillNotifies(long nanos) throws Exception {
+        var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL);
+        var queued = ok(send(reversalPath(original) + "/checks", "finance", reversalQueryInput(report, original)), 202);
+        UUID id = UUID.fromString(queued.path("checkId").asText()); var claimed = voucherReversals.claim("demo", id, Instant.now());
+        var proof = reversalReceipt(claimed, 1, original.input().command().id().toString());
+        var precise = new VoucherReversalPort.Receipt(proof.request(), proof.status(), proof.revision(), proof.observedAt().plusNanos(nanos), proof.validUntil(), proof.current(), proof.reversal());
+        voucherReversals.finish(claimed, new FinanceResult.Success<>(precise), precise.observedAt().plus(1, java.time.temporal.ChronoUnit.MICROS));
+        var checked = voucherReversalChecks.find("demo", id).orElseThrow(); assertThat(checked.status()).isEqualTo(VoucherReversalCheck.Status.CHECKED);
+        ok(send(reversalPath(original) + "/records", "finance", reversalRecordInput(report, original, checked)), 202);
+        assertThat(voucherReversalRecords.forOperation("demo", original.input().command().id()).orElseThrow().receipt()).isEqualTo(precise);
+        assertThat(reversalCheckNoticeRecipients(id, "RECORDED")).containsExactlyInAnyOrder("alice", "finance");
+        var detail = ok(read(reversalCheckNoticePath(id, "RECORDED", "alice"), "alice"), 200);
+        assertThat(Instant.parse(detail.at("/observation/observedAt").asText())).isEqualTo(precise.observedAt());
+        String operationId = original.input().command().id().toString();
+        var indexedAt = precise.observedAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        assertThat(jdbc.queryForObject("SELECT observed_at FROM voucher_reversal_record WHERE tenant_id='demo' AND operation_id=?", java.sql.Timestamp.class, operationId).toInstant()).isEqualTo(indexedAt);
+        try {
+            // 模拟旧版本直接绑定纳秒时间后的数据库舍入，完整原始证据仍须可读。
+            jdbc.update("UPDATE voucher_reversal_record SET observed_at=? WHERE tenant_id='demo' AND operation_id=?", java.sql.Timestamp.from(precise.observedAt()), operationId);
+            assertThat(voucherReversalRecords.forOperation("demo", original.input().command().id()).orElseThrow().receipt()).isEqualTo(precise);
+            jdbc.update("UPDATE voucher_reversal_record SET observed_at=? WHERE tenant_id='demo' AND operation_id=?", java.sql.Timestamp.from(indexedAt.plus(2, java.time.temporal.ChronoUnit.MICROS)), operationId);
+            assertThatThrownBy(() -> voucherReversalRecords.forOperation("demo", original.input().command().id()))
+                    .isInstanceOf(IllegalStateException.class).hasMessage("Persisted voucher reversal record identity is inconsistent");
+        } finally { jdbc.update("UPDATE voucher_reversal_record SET observed_at=? WHERE tenant_id='demo' AND operation_id=?", java.sql.Timestamp.from(indexedAt), operationId); }
+    }
+
+    private String reversalCheckNoticePath(UUID id, String fact, String recipient) {
+        return "/api/v1/notifications/" + jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id=?", String.class,
+                "reversal-check:" + id + ":" + fact, recipient) + "/reversal-check-target";
+    }
+
+    private List<String> reversalCheckNoticeRecipients(UUID id, String fact) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? ORDER BY recipient_id", String.class,
+                "reversal-check:" + id + ":" + fact);
+    }
+
     @Test void independentReversalCannotBeErasedByLaterPostedDecision() throws Exception {
         var report = paidExpense(); settlementWorker.poll(); budgetWorker.poll();
         var operation = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); var check = checkedReversal(report, operation);
@@ -4204,6 +5617,9 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(voucherReversalRecords.forOperation("foreign", originalInput.command().id())).isEmpty();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='VOUCHER_REVERSAL_RECORD'", Integer.class, report.applicationId().toString())).isEqualTo(1);
         assertThat(paymentWrites).isEqualTo(1);
+        var notice = ok(read(reversalCheckNoticePath(check.input().id(), "RECORDED", "alice"), "alice"), 200);
+        assertThat(notice.path("kind").asText()).isEqualTo(kind.name()); assertThat(notice.at("/observation/voucherReference").asText()).startsWith("reverse-voucher-");
+        assertThat(notice.at("/record/id").asText()).isEqualTo(voucherReversalRecords.forOperation("demo", operation.input().command().id()).orElseThrow().id().toString());
     }
 
     @Test void voucherReversalRequiresCurrentVersionsAuthorityAndOriginalBindingEvenOnReplay() throws Exception {
@@ -4270,6 +5686,7 @@ class ExpenseSubmissionIntegrationTest {
         var claimed = voucherReversals.claim("demo", id, Instant.now()); var result = new FinanceResult.Success<>(reversalReceipt(claimed, 2, operation.input().command().id().toString()));
         assertThat(voucherReversals.claim("demo", id, claimed.leaseUntil())).isNull(); voucherReversals.finish(claimed, result, claimed.leaseUntil());
         assertThat(voucherReversalChecks.find("demo", id).orElseThrow().issue()).isEqualTo(VoucherReversalCheck.Issue.TIMEOUT);
+        assertThat(reversalCheckNoticeRecipients(id, "UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
         assertThat(voucherReversalRecords.forOperation("demo", operation.input().command().id())).isEmpty();
     }
 
@@ -4299,10 +5716,12 @@ class ExpenseSubmissionIntegrationTest {
         try { voucherReversals.finish(claimed, new FinanceResult.Success<>(proof), Instant.now()); }
         finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
         assertThat(voucherReversalChecks.find("demo", claimed.input().id()).orElseThrow().status()).isEqualTo(VoucherReversalCheck.Status.VOIDED);
+        assertThat(reversalCheckNoticeRecipients(claimed.input().id(), "SOURCE_CHANGED")).containsExactly("alice");
         queued = ok(send(reversalPath(operation) + "/checks", "finance", reversalQueryInput(report, operation)), 202);
         var second = voucherReversals.claim("demo", UUID.fromString(queued.path("checkId").asText()), Instant.now()); var secondProof = reversalReceipt(second, 2, operation.input().command().id().toString());
         correctedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL); voucherReversals.finish(second, new FinanceResult.Success<>(secondProof), Instant.now());
         assertThat(voucherReversalChecks.find("demo", second.input().id()).orElseThrow().status()).isEqualTo(VoucherReversalCheck.Status.VOIDED);
+        assertThat(reversalCheckNoticeRecipients(second.input().id(), "SOURCE_CHANGED")).containsExactlyInAnyOrder("alice", "finance");
         assertThat(voucherReversalRecords.forOperation("demo", operation.input().command().id())).isEmpty();
     }
 
@@ -4390,16 +5809,169 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(settlements.find("demo", report.id()).orElseThrow().issue()).isEqualTo("EXPENSE_VOUCHER_REVIEW"); assertThat(resourceVersions(report)).isEqualTo(versions);
     }
 
+    @Test void reversalPreparationFailureNotifiesOriginalParticipantsWithoutClaimingErpPosting() throws Exception {
+        var report = paidExpense(); var original = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+        var queued = asFinance(() -> reversalPreparing.prepare(report.applicationId(), original.input().command().id(), executionPreparation(report, original)));
+        var claimed = reversalPreparing.claim("demo", queued.preparationId(), Instant.now()); reversalPreparing.fail(claimed, Instant.now());
+        assertThat(reversalPreparations.find("demo", queued.preparationId()).orElseThrow().status()).isEqualTo(VoucherReversalPreparation.Status.UNAVAILABLE);
+        assertThat(reversalNoticeRecipients(queued.preparationId(), "PREPARATION_UNAVAILABLE")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(reversalOperations.find("demo", queued.preparationId())).isEmpty(); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void abandonedReversalExecutionNotifiesUnknownOnceWhileKeepingOriginalHeld() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var receipt = authorizeExecution(report, prepared);
+        var claimed = reversalExecution.claim("demo", receipt.reversalId(), Instant.now());
+        assertThat(reversalExecution.claim("demo", receipt.reversalId(), claimed.leaseUntil())).isNull();
+        assertThat(reversalOperations.find("demo", receipt.reversalId()).orElseThrow().failure()).isEqualTo(VoucherReversalOperation.Failure.LEASE_EXPIRED);
+        assertThat(reversalNoticeRecipients(receipt.reversalId(), "UNKNOWN")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(voucherOperations.find("demo", receipt.operationId()).orElseThrow().reversalId()).isEqualTo(receipt.reversalId());
+        var unknown = reversalOperations.find("demo", receipt.reversalId()).orElseThrow();
+        var query = reversalExecution.claim("demo", receipt.reversalId(), unknown.nextAttemptAt());
+        reversalExecution.fail(query, VoucherReversalOperation.Failure.CONNECTION, query.updatedAt().plusMillis(1));
+        assertThat(reversalNoticeRecipients(receipt.reversalId(), "UNKNOWN")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(reversalWrites).isZero();
+    }
+
+    @Test void originalReversalNoticeKeepsFailedPreparationAndRechecksCurrentFieldAndEntityPermissions() throws Exception {
+        var report = paidExpense(); var original = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+        var queued = asFinance(() -> reversalPreparing.prepare(report.applicationId(), original.input().command().id(), executionPreparation(report, original)));
+        var claimed = reversalPreparing.claim("demo", queued.preparationId(), Instant.now()); reversalPreparing.fail(claimed, Instant.now());
+        String path = reversalNoticePath(queued.preparationId(), "PREPARATION_UNAVAILABLE", "finance");
+        var response = read(path, "finance"); var previous = ok(response, 200);
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store"); assertThat(previous.path("operation").isNull()).isTrue();
+        assertThat(previous.path("originalHeld").asBoolean()).isFalse(); assertThat(previous.path("retirement").isNull()).isTrue();
+        assertThat(previous.toString()).doesNotContain("commandDigest", "targetDigest", "accountReference", "entries", "evidenceReference", "actions");
+        var next = prepareExecution(report); assertThat(next.input().id()).isNotEqualTo(queued.preparationId());
+        assertThat(ok(read(path, "finance"), 200)).isEqualTo(previous);
+        assertThat(read(path + "?roundNo=2", "finance").getStatus()).isEqualTo(400);
+        for (String user : List.of("alice", "admin", "manager", "cashier")) assertThat(read(path, user).getStatus()).isEqualTo(404);
+        UUID messageId = UUID.fromString(path.split("/")[4]);
+        for (String role : List.of("ADMIN", "EMPLOYEE")) {
+            actors.set(new Actor("demo", "finance", Set.of(role)));
+            try { assertThatThrownBy(() -> reversalNotificationAccess.target(messageId)).isInstanceOfSatisfying(io.agentflow.common.DomainException.class,
+                    error -> assertThat(error.code()).isEqualTo("FORBIDDEN")); } finally { actors.clear(); }
+        }
+        jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "reversal:" + queued.preparationId() + ":POSTED", messageId.toString());
+        try { assertThat(read(path, "finance").getStatus()).isEqualTo(404); }
+        finally { jdbc.update("UPDATE notification_inbox SET event_key=? WHERE id=?", "reversal:" + queued.preparationId() + ":PREPARATION_UNAVAILABLE", messageId.toString()); }
+        var appointments = jdbc.queryForList("SELECT id FROM organization_appointment WHERE tenant_id='demo' AND person_id=? AND active=TRUE", String.class, finance.toString());
+        for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+        try { assertThat(organizationRepository.person("demo", finance).orElseThrow().active()).isTrue(); assertThat(read(path, "finance").getStatus()).isEqualTo(404); }
+        finally { for (String id : appointments) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id); }
+    }
+
+    @Test void reversalNoticesAndDispatchIntentsRollBackTogetherAndSendingRechecksOriginalRound() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var authorized = authorizeExecution(report, prepared);
+        var actor = new Actor("demo", "finance", Set.of("FINANCE")); var preference = notificationPreferences.get(actor);
+        notificationPreferences.revise(actor, preference.version(), true, false);
+        try {
+            var claimed = reversalExecution.claim("demo", authorized.reversalId(), Instant.now());
+            assertThatThrownBy(() -> tx().execute(status -> { reversalExecution.fail(claimed, VoucherReversalOperation.Failure.CONNECTION, Instant.now());
+                assertThat(reversalNoticeRecipients(authorized.reversalId(), "UNKNOWN")).containsExactlyInAnyOrder("alice", "finance");
+                throw new IllegalStateException("Synthetic reversal notification rollback"); })).hasMessageContaining("Synthetic reversal notification rollback");
+            assertThat(reversalOperations.find("demo", authorized.reversalId())).contains(claimed);
+            assertThat(reversalNoticeRecipients(authorized.reversalId(), "UNKNOWN")).isEmpty();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox i ON i.id=d.inbox_id WHERE i.event_key=?", Integer.class,
+                    "reversal:" + authorized.reversalId() + ":UNKNOWN")).isZero();
+            reversalExecution.fail(claimed, VoucherReversalOperation.Failure.CONNECTION, Instant.now());
+            String messageId = reversalNoticePath(authorized.reversalId(), "UNKNOWN", "finance").split("/")[4];
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE inbox_id=? AND channel='EMAIL'", String.class, messageId));
+            assertThat(organizationRepository.person("demo", finance).orElseThrow().active()).isTrue();
+            assertThat(reversalNotificationAccess.deliveryAllowed(notificationDeliveryStore.find(deliveryId).orElseThrow())).isTrue();
+            jdbc.update("UPDATE notification_inbox SET round_no=2 WHERE id=?", messageId);
+            try {
+                assertThat(notificationDeliveries.claim(deliveryId, Instant.now())).isNull();
+                assertThat(notificationDeliveryStore.find(deliveryId).orElseThrow().progress().errorCode().name()).isEqualTo("MESSAGE_UNAVAILABLE");
+            } finally { jdbc.update("UPDATE notification_inbox SET round_no=1 WHERE id=?", messageId); }
+        } finally { notificationPreferences.revise(actor, notificationPreferences.get(actor).version(), preference.emailEnabled(), preference.enterpriseImEnabled()); }
+    }
+
+    @Test void pendingReversalIsQuietAndConflictingOriginalQueryHasItsOwnNotice() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var authorized = authorizeExecution(report, prepared);
+        var sending = reversalExecution.claim("demo", authorized.reversalId(), Instant.now()); var now = Instant.now();
+        var pending = new VoucherReversalObservation(authorized.reversalId(), prepared.command().digest(), VoucherReversalObservation.Status.PENDING, 1, now, "ERP-ACCEPTED", null, null);
+        reversalExecution.finish(sending, new FinanceResult.Success<>(pending), now.plusMillis(1));
+        assertThat(reversalNoticeRecipients(authorized.reversalId(), "UNKNOWN")).isEmpty();
+        var accepted = reversalOperations.find("demo", authorized.reversalId()).orElseThrow();
+        var query = reversalExecution.claim("demo", authorized.reversalId(), accepted.nextAttemptAt());
+        var at = query.updatedAt().plusMillis(1);
+        reversalExecution.finish(query, new FinanceResult.Success<>(new VoucherReversalObservation(authorized.reversalId(), prepared.command().digest(), VoucherReversalObservation.Status.NOT_FOUND, 0, at, null, null, null)), at);
+        assertThat(reversalNoticeRecipients(authorized.reversalId(), "RECONCILING")).containsExactlyInAnyOrder("alice", "finance");
+        var detail = ok(read(reversalNoticePath(authorized.reversalId(), "RECONCILING", "alice"), "alice"), 200);
+        assertThat(detail.at("/operation/disputed").asBoolean()).isTrue(); assertThat(detail.at("/operation/observedStatus").asText()).isEqualTo("PENDING");
+        assertThat(reversalWrites).isZero();
+    }
+
+    @Test void expiredUnsentReversalNotifiesWithoutImplyingPostingOrSafeRetirement() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var authorized = authorizeExecution(report, prepared);
+        assertThat(reversalExecution.claim("demo", authorized.reversalId(), prepared.command().expiresAt())).isNull();
+        assertThat(reversalNoticeRecipients(authorized.reversalId(), "EXPIRED")).containsExactlyInAnyOrder("alice", "finance");
+        var detail = ok(read(reversalNoticePath(authorized.reversalId(), "EXPIRED", "alice"), "alice"), 200);
+        assertThat(detail.at("/operation/attempts").asInt()).isZero(); assertThat(detail.at("/operation/status").asText()).isEqualTo("EXPIRED");
+        assertThat(detail.path("retirement").isNull()).isTrue(); assertThat(detail.path("originalHeld").asBoolean()).isTrue(); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void reversalPreparationInvalidationNotifiesOnlyStillEligibleOriginalParticipants() throws Exception {
+        var report = paidExpense(); var original = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+        var queued = asFinance(() -> reversalPreparing.prepare(report.applicationId(), original.input().command().id(), executionPreparation(report, original)));
+        jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='finance'");
+        try { assertThat(reversalPreparing.claim("demo", queued.preparationId(), Instant.now())).isNull(); }
+        finally { jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject='finance'"); }
+        assertThat(reversalNoticeRecipients(queued.preparationId(), "PREPARATION_VOIDED")).containsExactly("alice");
+        var detail = ok(read(reversalNoticePath(queued.preparationId(), "PREPARATION_VOIDED", "alice"), "alice"), 200);
+        assertThat(detail.at("/preparation/status").asText()).isEqualTo("VOIDED"); assertThat(detail.path("operation").isNull()).isTrue();
+        assertThat(detail.path("originalHeld").asBoolean()).isFalse(); assertThat(reversalWrites).isZero();
+    }
+
+    @Test void anotherReversalRetirementOperatorReceivesOnlyTheirActualRetirementFact() throws Exception {
+        var report = paidExpense(); var prepared = prepareExecution(report); var authorized = authorizeExecution(report, prepared);
+        var claimed = reversalExecution.claim("demo", authorized.reversalId(), Instant.now()); var now = Instant.now();
+        reversalExecution.finish(claimed, new FinanceResult.Success<>(new VoucherReversalObservation(authorized.reversalId(), prepared.command().digest(),
+                VoucherReversalObservation.Status.FAILED, 1, now, "REJECTED-BEFORE-POSTING", null, VoucherReversalObservation.Rejection.ACCOUNTING_PERIOD_CLOSED)), now.plusMillis(1));
+        var failed = reversalOperations.find("demo", authorized.reversalId()).orElseThrow(); var original = refreshRetirementOriginal(authorized.operationId());
+        var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "合成独立结束部门", entity, null, true);
+        var position = organization.createUnit(admin, OrganizationUnit.Kind.POSITION, "合成独立结束岗位", entity, null, true);
+        organization.createAppointment(admin, manager, department.id(), position.id(), true);
+        actors.set(new Actor("demo", "manager", Set.of("EMPLOYEE", "APPROVER", "FINANCE")));
+        try { reversalRetirement.retire(report.applicationId(), authorized.operationId(), retirementInput(report, original, failed)); }
+        finally { actors.clear(); }
+        assertThat(reversalNoticeRecipients(authorized.reversalId(), "FAILED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(reversalNoticeRecipients(authorized.reversalId(), "RETIRED")).containsExactlyInAnyOrder("alice", "finance", "manager");
+        var id = UUID.fromString(reversalNoticePath(authorized.reversalId(), "RETIRED", "manager").split("/")[4]);
+        actors.set(new Actor("demo", "manager", Set.of("EMPLOYEE", "APPROVER", "FINANCE")));
+        try { assertThat(reversalNotificationAccess.target(id).retirement().basis()).isEqualTo(VoucherReversalOperation.RetirementBasis.CONFIRMED_FAILED); }
+        finally { actors.clear(); }
+    }
+
+    private String reversalNoticePath(UUID id, String fact, String recipient) {
+        String messageId = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id=?", String.class,
+                "reversal:" + id + ":" + fact, recipient);
+        return "/api/v1/notifications/" + messageId + "/reversal-target";
+    }
+
+    private List<String> reversalNoticeRecipients(UUID id, String fact) {
+        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? ORDER BY recipient_id", String.class,
+                "reversal:" + id + ":" + fact);
+    }
+
     @Test void reversalExecutionRequiresExplicitAuthorizationFreezesOriginalAndPreservesConsumedResources() throws Exception {
         var report = archiveReadyExpense(); var versions = resourceVersions(report); var paymentCount = paymentWrites;
         var prepared = prepareExecution(report); var source = prepared.input().source().command();
         assertThat(reversalWrites).isZero(); assertThat(voucherOperations.find("demo", source.id()).orElseThrow().usablePosted()).isTrue();
         var receipt = authorizeExecution(report, prepared); var held = voucherOperations.find("demo", source.id()).orElseThrow();
         assertThat(held.reversalId()).isEqualTo(prepared.input().id()); assertThat(held.usablePosted()).isFalse();
+        String messageId = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", String.class,
+                "voucher:" + source.id() + ":POSTED");
+        var notice = ok(read("/api/v1/notifications/" + messageId + "/voucher-target", "alice"), 200);
+        assertThat(notice.at("/operation/status").asText()).isEqualTo("POSTED");
+        assertThat(notice.path("reversalBound").asBoolean()).isTrue();
         assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
         assertThat(reversalWrites).isZero(); reversalExecutionWorker.poll();
         var operation = reversalOperations.find("demo", receipt.reversalId()).orElseThrow();
         assertThat(operation.status()).isEqualTo(VoucherReversalOperation.Status.POSTED); assertThat(reversalWrites).isEqualTo(1);
+        assertThat(reversalNoticeRecipients(receipt.reversalId(), "POSTED")).containsExactlyInAnyOrder("alice", "finance");
+        var reversalNotice = ok(read(reversalNoticePath(receipt.reversalId(), "POSTED", "alice"), "alice"), 200);
+        assertThat(reversalNotice.at("/operation/voucherReference").asText()).isEqualTo(operation.observation().posting().reversal().voucherReference());
         voucherWorker.poll(); assertThat(voucherOperations.find("demo", source.id()).orElseThrow().status()).isEqualTo(VoucherOperation.Status.REVERSED);
         assertThat(voucherOperations.find("demo", source.id()).orElseThrow().reversalId()).isEqualTo(prepared.input().id());
         assertThat(resourceVersions(report)).isEqualTo(versions); assertThat(paymentWrites).isEqualTo(paymentCount);
@@ -4432,6 +6004,7 @@ class ExpenseSubmissionIntegrationTest {
         try { reversalExecutionWorker.poll(); assertThat(reversalOperations.find("demo", prepared.input().id()).orElseThrow().status()).isEqualTo(VoucherReversalOperation.Status.VOIDED); assertThat(reversalWrites).isZero(); }
         finally { organization.updatePerson(admin, finance, person.displayName(), person.active(), person.approvalEligible(), inactive.revision()); }
         assertThat(voucherOperations.find("demo", prepared.input().source().command().id()).orElseThrow().usablePosted()).isFalse();
+        assertThat(reversalNoticeRecipients(prepared.input().id(), "SOURCE_CHANGED")).containsExactly("alice");
     }
 
     @Test void reversalExecutionOnlyOneConcurrentAuthorizationAndClaimCanSucceed() throws Exception {
@@ -4538,6 +6111,8 @@ class ExpenseSubmissionIntegrationTest {
         // 保留外部观察的纳秒，模拟后台读取结果后才以微秒时钟完成本地动作。
         reversalExecution.finish(reading, new FinanceResult.Success<>(new VoucherReversalObservation(receipt.reversalId(), prepared.command().digest(), VoucherReversalObservation.Status.NOT_FOUND, 0, at, null, null, null)), at.plus(1, java.time.temporal.ChronoUnit.MICROS));
         var notFound = ok(read(route, "finance"), 200); assertThat(notFound.at("/operation/canResendOriginal").asBoolean()).isTrue();
+        assertThat(reversalNoticeRecipients(receipt.reversalId(), "NOT_FOUND")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(reversalWrites).isZero();
         var resend = new VoucherReversalPreparationService.OperationInput(1, app(report).version(), current(report).version(), original.version(), receipt.reversalId(), notFound.at("/operation/version").asLong(), VoucherReversalPreparationService.Action.RESEND_ORIGINAL, "查无受理后明确按原编号重发");
         assertThat(send(route + "/actions", "cashier", resend).getStatus()).isIn(403, 404);
         var resent = ok(send(route + "/actions", "finance", resend), 202); assertThat(resent.path("reversalId").asText()).isEqualTo(receipt.reversalId().toString());
@@ -4560,9 +6135,17 @@ class ExpenseSubmissionIntegrationTest {
         assertThatThrownBy(() -> tx().execute(status -> reversalExecution.query("demo", authorized.reversalId(), stopped.version(), Instant.now()))).isInstanceOf(io.agentflow.common.DomainException.class);
         assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.SETTLED);
         assertThat(resourceVersions(report)).isEqualTo(resources); assertThat(reversalWrites).isZero(); assertThat(paymentWrites).isEqualTo(1);
+        assertThat(reversalNoticeRecipients(authorized.reversalId(), "RETIRED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(reversalNoticeRecipients(authorized.reversalId(), "SOURCE_CHANGED")).isEmpty();
+        var noticePath = reversalNoticePath(authorized.reversalId(), "RETIRED", "finance");
+        var ended = ok(read(noticePath, "finance"), 200); assertThat(ended.path("originalHeld").asBoolean()).isFalse();
+        assertThat(ended.at("/retirement/id").asText()).isEqualTo(receipt.retirementId().toString());
         var next = prepareExecution(report); assertThat(next.input().id()).isNotEqualTo(authorized.reversalId());
         authorizeExecution(report, next); assertThat(reversalOperations.forOriginal("demo", id).orElseThrow().input().command().id()).isEqualTo(next.input().id());
         assertThat(reversalOperations.retirements("demo", id)).hasSize(1); assertThat(reversalWrites).isZero();
+        var historical = ok(read(noticePath, "finance"), 200); assertThat(historical.path("reversalId").asText()).isEqualTo(authorized.reversalId().toString());
+        assertThat(historical.path("operation")).isEqualTo(ended.path("operation")); assertThat(historical.path("retirement")).isEqualTo(ended.path("retirement"));
+        assertThat(historical.path("originalHeld").asBoolean()).isTrue();
     }
 
     @Test void reversalRetirementPreservesConfirmedFailureAndIndependentPaymentDispute() throws Exception {
@@ -4580,6 +6163,11 @@ class ExpenseSubmissionIntegrationTest {
         var original = refreshRetirementOriginal(authorized.operationId()); correctedExpensePayment(report);
         var receipt = asFinance(() -> reversalRetirement.retire(report.applicationId(), authorized.operationId(), retirementInput(report, original, failed)));
         assertThat(receipt.basis()).isEqualTo(VoucherReversalOperation.RetirementBasis.CONFIRMED_FAILED);
+        assertThat(reversalNoticeRecipients(authorized.reversalId(), "FAILED")).containsExactlyInAnyOrder("alice", "finance");
+        assertThat(reversalNoticeRecipients(authorized.reversalId(), "RETIRED")).containsExactlyInAnyOrder("alice", "finance");
+        var notice = ok(read(reversalNoticePath(authorized.reversalId(), "FAILED", "alice"), "alice"), 200);
+        assertThat(notice.at("/operation/issue").asText()).isEqualTo("ACCOUNTING_PERIOD_CLOSED");
+        assertThat(notice.at("/retirement/basis").asText()).isEqualTo("CONFIRMED_FAILED");
         assertThat(reversalOperations.find("demo", authorized.reversalId())).contains(failed);
         assertThat(settlements.find("demo", report.id()).orElseThrow().status()).isEqualTo(ExpenseSettlement.Status.REVIEW_REQUIRED);
         assertThat(resourceVersions(report)).isEqualTo(resources); assertThat(reversalWrites).isZero();
@@ -4594,6 +6182,7 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(voucherOperations.find("demo", authorized.operationId())).contains(original); assertThat(reversalOperations.find("demo", authorized.reversalId())).contains(reversal);
         assertThat(reversalOperations.retirements("demo", authorized.operationId())).isEmpty(); assertThat(settlements.find("demo", report.id())).contains(settlement);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='VOUCHER_REVERSAL_RETIRED'", Integer.class, report.applicationId().toString())).isZero();
+        assertThat(reversalNoticeRecipients(authorized.reversalId(), "RETIRED")).isEmpty();
     }
 
     @Test void reversalRetirementCannotRaceSendingOrReleaseUnknownCommand() throws Exception {
@@ -4806,7 +6395,10 @@ class ExpenseSubmissionIntegrationTest {
         var raw = json.read(json.write(prechecks.find("demo", checked).orElseThrow()), com.fasterxml.jackson.databind.node.ObjectNode.class);
         Instant expires = prechecks.find("demo", checked).orElseThrow().completedAt().plusMillis(1);
         ((com.fasterxml.jackson.databind.node.ObjectNode) raw.path("result").path("evidence")).put("validUntil", expires.toString());
-        jdbc.update("UPDATE expense_precheck_job SET state_json=? WHERE tenant_id='demo' AND id=?", json.write(raw), checked.toString());
+        // 合成缩短权威期限时同步缩短解释期限，保持夹具可还原后再验证业务过期保护。
+        ((com.fasterxml.jackson.databind.node.ObjectNode) raw.path("result").path("observation")).put("validUntil", expires.toString());
+        var expired = json.read(json.write(raw), ExpensePrecheckJob.class);
+        jdbc.update("UPDATE expense_precheck_job SET state_json=? WHERE tenant_id='demo' AND id=?", json.write(expired), checked.toString());
         if (!Instant.now().isAfter(expires)) Thread.sleep(2);
         assertCode(read(endpoint, "alice"), "FACTS_EXPIRED");
         checked = precheck(current(report)); advance.requirePaymentReview(1); advances.update(advance, 1, "fixture", "PAYMENT_REVIEW");
@@ -4853,15 +6445,24 @@ class ExpenseSubmissionIntegrationTest {
         return new Fixture(reports.find("demo", id).orElseThrow(), invoice, priorId, advanceId);
     }
     private DefinitionDraft definition() {
-        var nodes = new ArrayList<>(List.of(new Node("start", "开始", NodeType.START, Map.of()),
-                new Node("business", "业务审批", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager)),
-                new Node("receipt", "原件签收", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + finance, "expenseStage", "RECEIPT")),
+        if (expenseTemplateGraph != null) {
+            var draft = definitions.create("demo", "expense-template-" + UUID.randomUUID(), "费用模板重复审批验收",
+                    expenseTemplateGraph, expenseTemplateSchema, null);
+            return definitions.publish(admin, draft.id(), draft.revision(), "合成验收");
+        }
+        var nodes = new ArrayList<>(List.of(new Node("start", "开始", NodeType.START,
+                selfApprovalEscalation ? Map.of("expenseSelfApproval", "ESCALATE_SUPERVISOR") : Map.of()),
+                new Node("business", "业务审批", NodeType.USER_TASK, selfApprovalEscalation
+                        ? selfApprovalBusinessProperties()
+                        : Map.of("assigneeRule", "role:ORG_PERSON_" + manager)),
+                new Node("receipt", "原件签收", NodeType.USER_TASK, Map.of("assigneeRule", expenseReceiptRule == null ? "role:ORG_PERSON_" + finance : expenseReceiptRule, "expenseStage", "RECEIPT")),
                 new Node("finance", "财务审核", NodeType.USER_TASK, financeStage ? Map.of("assigneeRule", "role:ORG_PERSON_" + finance, "expenseStage", "FINANCE_REVIEW") : Map.of("assigneeRule", "role:ORG_PERSON_" + finance)),
                 new Node("end", "结束", NodeType.END, Map.of())));
         var edges = new ArrayList<>(List.of(new Edge("a", "start", "business", "", false), new Edge("b", "business", "receipt", "", false),
                 new Edge("c", "receipt", "finance", "", false), new Edge("d", "finance", reductionRoute ? "amountGate" : afterFinanceTask ? "afterFinance" : "end", "", false)));
         if (afterFinanceTask || reductionRoute) {
-            nodes.add(new Node("afterFinance", "财务后续业务", NodeType.USER_TASK, Map.of("assigneeRule", "role:ORG_PERSON_" + manager)));
+            nodes.add(new Node("afterFinance", "财务后续业务", NodeType.USER_TASK,
+                    selfApprovalEscalation ? selfApprovalBusinessProperties() : Map.of("assigneeRule", "role:ORG_PERSON_" + manager)));
             edges.add(new Edge("e", "afterFinance", "end", "", false));
         }
         if (reductionRoute) {
@@ -4869,9 +6470,28 @@ class ExpenseSubmissionIntegrationTest {
             edges.add(new Edge("low", "amountGate", "end", "amount <= 50", false));
             edges.add(new Edge("high", "amountGate", "afterFinance", "amount > 50", false));
         }
+        if (parallelExpenseReviews) {
+            nodes.add(new Node("fork", "并行复核", NodeType.PARALLEL_GATEWAY, Map.of()));
+            nodes.add(new Node("join", "复核汇合", NodeType.PARALLEL_GATEWAY, Map.of()));
+            edges.clear();
+            edges.addAll(List.of(new Edge("a", "start", "fork", "", false), new Edge("b", "fork", "business", "", false),
+                    new Edge("c", "fork", "receipt", "", false), new Edge("d", "business", "join", "", false),
+                    new Edge("e", "receipt", "join", "", false), new Edge("f", "join", "finance", "", false),
+                    new Edge("g", "finance", "end", "", false)));
+            if (paperRequired) {
+                // 纸件制度要求共同必经签收；分支中的提前签收不能替代整单必经控制。
+                nodes.add(new Node("receiptCheck", "共同签收复核", NodeType.USER_TASK,
+                        Map.of("assigneeRule", "role:ORG_PERSON_" + finance, "expenseStage", "RECEIPT")));
+                edges.replaceAll(edge -> edge.id().equals("f") ? new Edge("f", "join", "receiptCheck", "", false) : edge);
+                edges.add(new Edge("h", "receiptCheck", "finance", "", false));
+            }
+        }
         var graph = new Graph(nodes, edges);
+        var detailAccess = new HashMap<>(Map.of("business", hideBusinessDetails ? FieldVisibility.HIDDEN : FieldVisibility.READ_ONLY,
+                "receipt", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY));
+        if (parallelExpenseReviews && paperRequired) detailAccess.put("receiptCheck", FieldVisibility.READ_ONLY);
         var schema = new FormSchema(2, List.of(new FormSchema.Field("expenseDetails", "费用明细", FormSchema.FieldType.TEXT, true, null,
-                null, null, null, null, null, null, true, Map.of("business", hideBusinessDetails ? FieldVisibility.HIDDEN : FieldVisibility.READ_ONLY, "receipt", FieldVisibility.READ_ONLY, "finance", FieldVisibility.READ_ONLY)),
+                null, null, null, null, null, null, true, detailAccess),
                 new FormSchema.Field("amount", "本币金额", FormSchema.FieldType.NUMBER, true, null, null, null, null, null),
                 new FormSchema.Field("currency", "本位币", FormSchema.FieldType.TEXT, true, null, null, null, null, null),
                 new FormSchema.Field("overPolicy", "超标", FormSchema.FieldType.BOOLEAN, true, null, null, null, null, null)));
@@ -4883,9 +6503,9 @@ class ExpenseSubmissionIntegrationTest {
         return found.isEmpty() ? organization.createPerson(admin, user, "测试" + user, true, approver).id() : UUID.fromString(found.get(0));
     }
     private ExpenseLine line(UUID invoice, UUID prior) {
-        return new ExpenseLine(1, "OFFICE", LocalDate.now(), null, "SH", BigDecimal.ONE, ExpenseLine.Unit.ITEM, money("100"), money("6"),
+        return new ExpenseLine(1, "OFFICE", LocalDate.now(), null, "SH", BigDecimal.ONE, ExpenseLine.Unit.ITEM, money(lineGross), money("6"),
                 invoice == null ? List.of() : List.of(invoice), prior == null ? null : new ExpenseLine.PriorRequestLine(prior, 1),
-                List.of(new CostAllocation("IT", null, money("100"))), "合成办公费", null);
+                List.of(new CostAllocation("IT", null, money(lineGross))), "合成办公费", null);
     }
     private UUID original() throws Exception {
         byte[] bytes = invoiceOriginalFormat == InvoiceOriginal.Format.XML ? syntheticXmlOriginal()
@@ -4937,7 +6557,7 @@ class ExpenseSubmissionIntegrationTest {
     private Map<String, Object> authorizationInput(ExpenseReport report) {
         var voucher = voucherOperations.forRound("demo", report.applicationId(), app(report).roundNo(), VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
         return Map.of("roundNo", app(report).roundNo(), "applicationVersion", app(report).version(), "businessVersion", current(report).version(),
-                "voucherOperationId", voucher.input().command().id(), "voucherVersion", voucher.version(), "validitySeconds", 900, "comment", "合成财务付款授权");
+                "voucherOperationId", voucher.input().command().id(), "voucherVersion", voucher.version(), "validitySeconds", 900, "dueDate", "2026-10-01", "comment", "合成财务付款授权");
     }
     private UUID authorizePayment(ExpenseReport report) throws Exception {
         return UUID.fromString(ok(send(paymentPath(report) + "/authorizations", "finance", authorizationInput(report)), 202).path("authorizationId").asText());
@@ -5051,7 +6671,7 @@ class ExpenseSubmissionIntegrationTest {
             }
             case "exchange-rate" -> new ExpenseExchangeRate("CNY", "CNY", BigDecimal.ONE, "synthetic", LocalDate.parse(data.path("rateDate").asText()));
             case "invoice-verification" -> verificationUnavailable ? Map.of("unavailableFixture", true) : new Invoice.VerifiedFacts(new InvoiceKey(InvoiceKey.Type.DIGITAL, null, invoiceNumber), entity, money("100"), money("6"), LocalDate.now(), data.path("originalDigest").asText(), "synthetic-verification", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
-            case "expense-policy" -> new ExpensePolicyPort.Assessment(new ExpensePolicySnapshot(UUID.randomUUID(), 1, money("100"), money("100"), ExpensePolicySnapshot.Decision.WITHIN_LIMIT, "synthetic-tax", "synthetic-policy"), money("6"), false, Instant.now().plusSeconds(600));
+            case "expense-policy" -> new ExpensePolicyPort.Assessment(new ExpensePolicySnapshot(UUID.randomUUID(), 1, money(lineGross), money(lineGross), ExpensePolicySnapshot.Decision.WITHIN_LIMIT, "synthetic-tax", "synthetic-policy"), money("6"), false, Instant.now().plusSeconds(600));
             case "budget-precheck" -> new BudgetPrecheckPort.Assessment(json.read(data.toString(), BudgetPrecheckPort.Request.class), "synthetic-precheck", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600));
             case "accounting-period" -> {
                 var request = json.read(data.toString(), AccountingPeriodPort.Request.class); var date = request.accountingDate(); var at = Instant.now();

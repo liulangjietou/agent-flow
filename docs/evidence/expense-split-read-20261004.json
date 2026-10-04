@@ -1,0 +1,116 @@
+{
+  "recordedAt": "2026-10-04T12:28:08.367428+00:00",
+  "task": "F04",
+  "scope": "ORIGINAL_ROUND_READ_API_AND_FIELD_PERMISSIONS",
+  "taskRemainsOpen": true,
+  "baselineCommit": "3619b7dbcaba1a8ad1544c64d6a4a82bbf276417",
+  "red": {
+    "tests": 13,
+    "failures": 10,
+    "errors": 3,
+    "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-read-red",
+    "interpretation": "10 assertion failures confirm absent read API. Two test fixture errors used an incorrect revision-table name, corrected to expense_report_revision. One error parsed an empty missing-route 404 body. These three errors are not counted as permission failures."
+  },
+  "green": {
+    "tests": 47,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "reports": [
+      {
+        "className": "ExpenseSplitRoutingReadIntegrationTest",
+        "tests": 14,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "49c47eba7611197f80413814568e61eb298feeb91170b80a4f36294e6b76014d"
+      },
+      {
+        "className": "OpenApiContractTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "bfa853cf8daaee19099eec7b9929a4202bb51a46acf9340b6a8312ab75a2ee03"
+      },
+      {
+        "className": "FieldPermissionsIntegrationTest",
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "5261c535bf25c84db437ecdad21a7ec45bd22eebf89813cb89b21360b2e3c81e"
+      },
+      {
+        "className": "ExpenseDraftIntegrationTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "a7efcbe9e0d5c4c0f9ef2af62cb9add6dbe15c3f2afbb10287f3c25ac8b9ad8e"
+      },
+      {
+        "className": "ExpenseRiskIntegrationTest",
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "a892ced2ca377e1379b5b3904cf826319f8a31eddb631d368bb9e266bc9d1c89"
+      }
+    ],
+    "logs": [
+      "/fyoung/tmp/agentflow-remaining-20260928/f04-read-green.log",
+      "/fyoung/tmp/agentflow-remaining-20260928/f04-read-regression.log"
+    ]
+  },
+  "responseContract": {
+    "scope": "SPRING_MVC_RESPONSE_CONTRACT_NOT_BROWSER",
+    "responses": 40,
+    "statuses": {
+      "200": 21,
+      "400": 11,
+      "403": 3,
+      "404": 5
+    },
+    "states": [
+      "CLEAR",
+      "DISABLED",
+      "NOT_RECORDED",
+      "RESTRICTED",
+      "SPLIT_SUSPECTED",
+      "UNCONFIGURED"
+    ],
+    "invalidChecks": 17,
+    "contractSha256": "8926dde2e4f5d1d878b2d3b434f2007b390bad22d0c43a50140a7575e60931f0"
+  },
+  "staticOpenApi": {
+    "operations": 392,
+    "schemas": 839,
+    "requestExamples": 129,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/f04-openapi-static.log"
+  },
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSplitRoutingController.java": "5b39fe34a1f5be3a462e6549cdc48fe328faa8a2a8b6fd6a9094e4f7ec6616dc",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSplitRoutingQueries.java": "004b7b5cfc77e8156d14e00915e8bfe641a76b695a36aa94c3b1893c021a0c4a",
+    "agentflow-server/src/test/java/io/agentflow/approval/ExpenseSplitRoutingReadIntegrationTest.java": "d02ef65f5c3669c9a931ed05a6722369def8f828650a6cbf4d1d3b72bd9adccb",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "c1f0b57d97e50e71ca4113e222152997b931b86cf901829f01912a3daf6e88fe",
+    "agentflow-server/src/main/resources/api/openapi.json": "8926dde2e4f5d1d878b2d3b434f2007b390bad22d0c43a50140a7575e60931f0"
+  },
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-read-verified",
+  "manifestSha256": "ca26f862691c7af5de810a1072cc5272a5df460f89d9ae8dd2dbe564cb894d65",
+  "verified": [
+    "all six read states are distinct; missing old evidence cannot be presented as clear",
+    "primary authorization before snapshot lookup; comparison authorization uses each original round schema and process participation",
+    "hidden, masked or invisible comparison yields only RESTRICTED and null details, hiding actual risk outcome and all source facts",
+    "ADMIN with primary access cannot bypass comparison-sensitive fields; unauthenticated and cross-tenant reads denied",
+    "later readable comparison round does not authorize its hidden original round; withdrawal triggers fresh permission checks",
+    "old/resubmitted primary rounds retain separate immutable bindings",
+    "strict canonical positive roundNo; missing, duplicate, unknown and authority parameters rejected",
+    "successful reads are no-store; eight business tables unchanged across reads; source amounts and financial versions match stored evidence"
+  ],
+  "pending": [
+    "designers, portable template and detail panel",
+    "fixed-package upgrade/restart/paired restore acceptance",
+    "browser and PostgreSQL acceptance"
+  ]
+}

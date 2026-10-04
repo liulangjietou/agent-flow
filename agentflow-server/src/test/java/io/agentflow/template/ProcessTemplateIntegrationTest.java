@@ -6,6 +6,7 @@ import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionApplicationService;
+import io.agentflow.definition.DefinitionModels.Edge;
 import io.agentflow.definition.DefinitionModels.Graph;
 import io.agentflow.definition.DefinitionModels.Node;
 import io.agentflow.form.FormSchema;
@@ -71,9 +72,65 @@ class ProcessTemplateIntegrationTest {
         mvc.perform(get("/api/v1/process-templates")
                         .header("Authorization", "Bearer " + auth.login("demo", "admin", "demo").token()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(5))
+                .andExpect(jsonPath("$.length()").value(8))
                 .andExpect(jsonPath("$[0].templateVersion").value(2))
                 .andExpect(jsonPath("$[0].copies").isArray());
+    }
+
+    @Test
+    void financialExamplesRequireProcessAdministrationAndNeverCreateTenantResources() throws Exception {
+        var before = jdbc.queryForObject("SELECT COUNT(*) FROM approval_definition", Long.class);
+        var applications = jdbc.queryForObject("SELECT COUNT(*) FROM approval_application", Long.class);
+        for (String key : List.of("expense-report", "expense-plan", "advance-request")) {
+            mvc.perform(get("/api/v1/process-templates/" + key + "/financial-examples").header("Authorization", token("admin")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.key").value("employee-finance"))
+                    .andExpect(jsonPath("$.scenarios.length()").value(10));
+            mvc.perform(get("/api/v1/process-templates/" + key + "/financial-examples").header("Authorization", token("finance")))
+                    .andExpect(status().isForbidden());
+            assertThat(template(key, token("admin")).path("companion").path("scenarioCount").asInt()).isEqualTo(10);
+        }
+        mvc.perform(get("/api/v1/process-templates/leave-request/financial-examples").header("Authorization", token("admin")))
+                .andExpect(status().isNotFound());
+        assertThat(template("leave-request", token("admin")).has("companion")).isFalse();
+        mvc.perform(get("/api/v1/process-templates/expense-report/financial-examples"))
+                .andExpect(status().isUnauthorized());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_definition", Long.class)).isEqualTo(before);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_application", Long.class)).isEqualTo(applications);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"expense-report", "expense-plan", "advance-request"})
+    void financialTemplatesCopyTheirStructuredFieldsAndSimulateConfiguredAmountBoundaries(String templateKey) throws Exception {
+        String admin = token("admin");
+        var original = catalog.get(templateKey);
+        JsonNode draft = tree(copy(templateKey, admin, uniqueKey(), json.write(Map.of(
+                "key", uniqueKey(), "name", "财务模板独立副本", "templateVersion", original.templateVersion()))));
+        assertThat(draft.path("status").asText()).isEqualTo("DRAFT");
+        assertThat(draft.path("formSchema")).isEqualTo(json.read(json.write(original.formSchema()), JsonNode.class));
+        assertThat(draft.path("graph")).isEqualTo(json.read(json.write(original.graph()), JsonNode.class));
+        assertThat(findCopy(template(templateKey, admin), draft.path("id").asText()).path("templateVersion").asLong())
+                .isEqualTo(original.templateVersion());
+        String definitionUrl = "/api/v1/process-definitions/" + draft.path("id").asText();
+        for (var scenario : original.scenarios()) {
+            var simulation = send(definitionUrl + "/simulate", admin, json.write(Map.of("values", scenario.payload())));
+            if (scenario.expectedFieldErrors().isEmpty()) {
+                assertThat(simulation.getStatus()).isEqualTo(200);
+                assertThat(tree(simulation).path("path")).isEqualTo(json.read(json.write(scenario.expectedPath()), JsonNode.class));
+            } else {
+                assertThat(simulation.getStatus()).isEqualTo(422);
+                assertThat(tree(simulation).path("details").path("fieldErrors"))
+                        .isEqualTo(json.read(json.write(scenario.expectedFieldErrors()), JsonNode.class));
+            }
+        }
+        Graph configured = new Graph(original.graph().nodes(), original.graph().edges().stream().map(edge ->
+                edge.id().equals("amountGate_department")
+                        ? new Edge(edge.id(), edge.source(), edge.target(), "amount > 6000", edge.defaultBranch()) : edge).toList());
+        definitions.update("demo", UUID.fromString(draft.path("id").asText()), "已调整金额矩阵", configured, original.formSchema(), 0);
+        var boundary = original.scenarios().stream().filter(scenario -> scenario.id().equals("department")).findFirst().orElseThrow();
+        var simulation = send(definitionUrl + "/simulate", admin, json.write(Map.of("values", boundary.payload())));
+        assertThat(simulation.getStatus()).isEqualTo(200);
+        assertThat(tree(simulation).path("path").toString()).doesNotContain("department", "executiveGate");
+        assertThat(catalog.get(templateKey).graph()).isEqualTo(original.graph());
     }
 
     @Test

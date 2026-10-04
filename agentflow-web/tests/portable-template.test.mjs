@@ -293,6 +293,15 @@ test('期限日历缺失允许待配置草稿，但不能放行同时存在的�
   assert.deepEqual(review.value.notificationTexts, value.notificationTexts)
 })
 
+test('模板预检的非法图元素标识阻止导入，并保留原文件供修正', async () => {
+  const value = source(); value.graph.edges[0].id = '0'
+  const review = new PortableTemplateReview(async () => ({ errors: ['INVALID_EDGE_ID:0'] }))
+  await review.read(file(serializePortableTemplate(value))); await review.check('new-process')
+  assert.equal(review.canImport, false)
+  assert.deepEqual(review.errors, ['INVALID_EDGE_ID:0'])
+  assert.deepEqual(review.value.graph, value.graph)
+})
+
 test('字段敏感标记和节点权限完整往返，错误权限或字符串布尔值拒绝导入', () => {
   const value = source(); value.formSchema.fields[0].sensitive = true; value.formSchema.fields[0].nodeAccess = { review: 'MASKED' }
   assert.deepEqual(parsePortableTemplate(serializePortableTemplate(value)).formSchema, value.formSchema)

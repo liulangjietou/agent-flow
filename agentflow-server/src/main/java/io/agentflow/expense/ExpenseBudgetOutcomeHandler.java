@@ -25,11 +25,13 @@ public class ExpenseBudgetOutcomeHandler {
     private final ExpenseReportRepository reports;
     private final JdbcExpenseSubmissionControlRepository controls;
     private final ExpenseReleaseService releases;
+    private final ExpenseBudgetReviewService reviews;
 
     /** 事件同步处理并加入原事务，不能在确认落库后丢失必要的业务动作。 */
     public ExpenseBudgetOutcomeHandler(ApplicationRepository applications, ApprovalApplicationFacade lifecycle,
-            ExpenseReportRepository reports, JdbcExpenseSubmissionControlRepository controls, ExpenseReleaseService releases) {
+            ExpenseReportRepository reports, JdbcExpenseSubmissionControlRepository controls, ExpenseReleaseService releases, ExpenseBudgetReviewService reviews) {
         this.applications = applications; this.lifecycle = lifecycle; this.reports = reports; this.controls = controls; this.releases = releases;
+        this.reviews = reviews;
     }
 
     /** 对账恢复和直接结果走同一分支；老轮次结果不能退回已重提的新轮次。 */
@@ -39,6 +41,7 @@ public class ExpenseBudgetOutcomeHandler {
         var operation = event.operation(); var command = operation.input().command(); var position = command.position();
         var report = reports.find(command.tenantId(), position.reportId()).orElseThrow();
         var application = applications.findById(command.tenantId(), report.applicationId()).orElseThrow();
+        var review = reviews.completed(operation);
         if (application.status() == ApplicationStatus.REJECTED || application.status() == ApplicationStatus.CANCELLED) {
             // 释放本身被外部明确拒绝时保留结果供处理，不自动生成无限的新释放命令。
             if (command.action() == BudgetCommand.Action.FREEZE || command.action() == BudgetCommand.Action.ADJUST) {
@@ -47,7 +50,9 @@ public class ExpenseBudgetOutcomeHandler {
             return;
         }
         if (operation.status() == BudgetOperation.Status.REJECTED
-                && operation.observation().rejection() == BudgetObservation.Rejection.BUDGET_INSUFFICIENT
+                && (operation.observation().rejection() == BudgetObservation.Rejection.BUDGET_INSUFFICIENT
+                    || review!=null && review.status()==ExpenseBudgetReview.Status.REJECTED
+                        && (review.approval()!=null || operation.observation().rejection()==BudgetObservation.Rejection.BUDGET_EXCEPTION_REQUIRED))
                 && application.status() == ApplicationStatus.IN_APPROVAL && application.roundNo() == position.roundNo()
                 && report.version() == position.financialVersion()
                 && controls.find(command.tenantId(), report.id(), position.roundNo()).isPresent()) {

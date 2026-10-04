@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "taskId": "F17",
+  "taskStatus": "OPEN",
+  "stage": "SUPPLIER_RETURN_NOTIFICATIONS_BACKEND_UI_SCOPE_VERIFIED",
+  "recordedAt": "2026-10-03T20:09:56.624854+00:00",
+  "implementationCommit": "48a5aad1d9bef329e2b195c9aa804a6a3f6334c3",
+  "branch": "codex/governance-identifier-integration",
+  "worktree": "/fyoung/tmp/agentflow-governance-identifier-integration",
+  "scope": [
+    "原银行查询不可用、来源变化、未核清及真实退回原件驱动同事务最小通知",
+    "正常排队和未见资金退回的成功查询不发送异常提示；实际登记另有独立结果",
+    "登记消息严格定位本次查询实际消费的决定；后续查询与累计回款不能替换旧事实",
+    "原银行首次成功修订、原采购轮次和实际核对财务相互校验；当前人员、法人及敏感字段权限复核",
+    "真实 Vue 消息入口、只读详情、原轮次导航，以及失权、身份切换、超时和卸载后的旧数据清除",
+    "入款候选、财务明确登记、ERP 应付调整和本地账务完成分别表达"
+  ],
+  "validation": {
+    "java": {
+      "distinctTests": 225,
+      "byClass": {
+        "io.agentflow.procurement.SupplierPaymentReturnAccountingTest": 9,
+        "io.agentflow.procurement.SupplierPaymentReturnTest": 13,
+        "io.agentflow.procurement.SupplierReturnNoticeTest": 4,
+        "io.agentflow.api.OpenApiContractTest": 7,
+        "io.agentflow.notification.InboxIntegrationTest": 9,
+        "io.agentflow.notification.NotificationDeliveryApiIntegrationTest": 8,
+        "io.agentflow.notification.NotificationDeliveryIntegrationTest": 13,
+        "io.agentflow.procurement.SupplierAdjustmentPersistenceTest": 47,
+        "io.agentflow.procurement.SupplierFinanceWorkflowTest": 77,
+        "io.agentflow.procurement.SupplierPaymentPersistenceTest": 38
+      },
+      "byModule": {
+        "agentflow-domain": 26,
+        "agentflow-server": 199
+      },
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "result": "PASS",
+      "reports": "/fyoung/tmp/agentflow-remaining-20260928/supplier-return-notifications-final-reports"
+    },
+    "web": {
+      "result": "PASS",
+      "tests": 138,
+      "files": 14,
+      "newNotificationTests": 10,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-return-notifications-web.log",
+      "finalTargetedRepeat": {
+        "tests": 10,
+        "result": "PASS",
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-return-notifications-web-final.log",
+        "reason": "调整 TypeScript 条件检查顺序后重跑同组十项用例；不重复计数。"
+      }
+    },
+    "typecheck": {
+      "result": "PASS",
+      "session": "76700",
+      "command": "node node_modules/vue-tsc/bin/vue-tsc.js --noEmit"
+    },
+    "build": {
+      "result": "PASS",
+      "session": "76700",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-return-notifications-build-final.log",
+      "note": "Vite 提示部分压缩块超过 500 kB，构建退出码为 0。"
+    },
+    "openapi": {
+      "result": "PASS",
+      "operations": 351,
+      "schemas": 708,
+      "requestExamples": 125
+    },
+    "authors": {
+      "javaFiles": 1576,
+      "namedTypes": 3031,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "diffCheck": "PASS"
+  },
+  "reproductions": {
+    "backend": {
+      "result": "EXPECTED_RED",
+      "tests": 3,
+      "reason": "原回款候选、实际登记和失败查询均未通知原申请人及核对财务，实际消息为空。",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-return-notifications-red.log",
+      "report": "/fyoung/tmp/agentflow-remaining-20260928/supplier-return-notifications-red-report.xml"
+    },
+    "web": {
+      "result": "EXPECTED_RED",
+      "tests": 1,
+      "reason": "真实消息中心没有查看供应商回款入口。",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-return-notifications-web-red.log"
+    },
+    "microsecondExpiry": {
+      "result": "EXPECTED_RED",
+      "tests": 1,
+      "reason": "实际到期前数百微秒已登记的历史记录，被浏览器毫秒精度错误拒绝。",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/supplier-return-notifications-web-micros-red.log"
+    }
+  },
+  "corrections": [
+    "浏览器无法保留完整微秒精度；历史登记时间与到期时间落在同毫秒时，依赖后端已保存的登记证明。实际登记仍由后端严格检查到期时间，只读页面不授予登记许可。",
+    "首次类型检查出现 TS2367：先比较登记结果后，TypeScript 已排除 UNRESOLVED。调整条件顺序保留运行时校验，最终类型检查与构建通过。编译错误不作为业务失败复现。"
+  ],
+  "sourceEvidence": {
+    "files": 22,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/supplier-return-notifications-evidence-snapshot/sources.json",
+    "verifiedAgainstCommit": "48a5aad1d9bef329e2b195c9aa804a6a3f6334c3"
+  },
+  "artifactEvidence": {
+    "files": 24,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/supplier-return-notifications-evidence-snapshot/artifacts.json"
+  },
+  "boundaries": [
+    "本地 Java/H2、实际 Vue 组件与构建通过；没有宣称本阶段固定安装包、真实浏览器或 PostgreSQL 验收完成。",
+    "真实企业通知、银行及 ERP 联调和远端 PR/CI 仍分别验收。",
+    "未重试管理员策略阻断的浏览器或镜像层 I/O 阻断的 PostgreSQL；未推送或创建 PR。",
+    "F17 的供应商应付调整等其他独立财务恢复来源及完整固定包验收仍待完成。"
+  ],
+  "goalCounting": {
+    "knownOpen": 34,
+    "localDevelopment": 16,
+    "localVerification": 3,
+    "externalAcceptance": 15,
+    "completeInventory": false
+  },
+  "sessions": {
+    "4821": "EXIT_1_EXPECTED_BACKEND_RED",
+    "31157": "EXIT_1_EXPECTED_WEB_RED",
+    "44037": "EXIT_0_WEB_9",
+    "28205": "EXIT_1_EXPECTED_MICROSECOND_RED",
+    "78170": "EXIT_0_JAVA_225",
+    "3548": "EXIT_0_WEB_138",
+    "90465": "EXIT_2_TS2367_FIXED",
+    "57588": "EXIT_0_OPENAPI",
+    "86788": "EXIT_0_AUTHORS",
+    "76700": "EXIT_0_TYPECHECK_BUILD",
+    "47026": "EXIT_0_FINAL_WEB_10"
+  }
+}

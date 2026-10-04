@@ -40,6 +40,7 @@ public class DefinitionInitiatorRequirements {
         private Traversal(String tenant) { this.tenant = tenant; }
 
         private boolean required(Graph graph, int depth, Set<Reference> ancestors) {
+            if (io.agentflow.expense.ExpenseSelfApprovalPolicy.enabled(graph)) return true;
             if (graph.nodes().stream().anyMatch(node -> LocalOrganizationDirectory.isContextualRule(node.properties().get("assigneeRule"))
                     || LocalOrganizationDirectory.isContextualRule(node.properties().get("recipientRule"))
                     || LocalOrganizationDirectory.isContextualRule(node.properties().get(TaskEscalationPolicy.RECIPIENT_RULE)))) return true;

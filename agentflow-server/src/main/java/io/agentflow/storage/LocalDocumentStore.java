@@ -17,6 +17,7 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Optional;
 
 /**
  * 审批附件与个人发票共用的不可变文件存储，只处理字节身份；业务归属与授权由各自用例负责。
@@ -107,6 +108,12 @@ public class LocalDocumentStore {
         catch (DomainException failure) {
             throw new DomainException("FILE_INTEGRITY_FAILED", "Stored attachment is missing or differs from its fingerprint");
         }
+    }
+
+    /** 恢复收集只在明确不存在时补取；无法判断、损坏或软链接仍按既有完整性契约拒绝读取。 */
+    public Optional<byte[]> readIfPresent(Content file) {
+        if (Files.notExists(path(file), LinkOption.NOFOLLOW_LINKS)) return Optional.empty();
+        return Optional.of(read(file));
     }
 
     /** 只清理本次未发布的临时文件，已发布内容没有删除入口。 */

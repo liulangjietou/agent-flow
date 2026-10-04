@@ -10,8 +10,98 @@ const ajv = new Ajv2020({ strict: false, allErrors: true })
 addFormats(ajv)
 ajv.addFormat('binary', true)
 ajv.addSchema({ $id: 'agentflow', components: spec.components })
+// 事前控制由类别配置明确选择；旧类别保持缺字段，容差不能缺失或伪装成文本。
+const priorControlSchema = { $ref: '#/components/schemas/ExpensePriorControl' }
+for (const control of [{ mode: 'STRICT' }, { mode: 'NONE' }, { mode: 'TOLERANCE', toleranceFraction: 0 },
+  { mode: 'TOLERANCE', toleranceFraction: 0.125 }, { mode: 'TOLERANCE', toleranceFraction: 1 }]) validate(priorControlSchema, control)
+for (const control of [{ mode: 'UNKNOWN' }, { mode: 'TOLERANCE' }, { mode: 'STRICT', toleranceFraction: 0 },
+  { mode: 'TOLERANCE', toleranceFraction: '0.1' }, { mode: 'TOLERANCE', toleranceFraction: 1.01 }, { mode: 'NONE', approved: true }]) {
+  assert.equal(validator(priorControlSchema)(control), false)
+}
+// 新额度证据只能来自原轮次；历史未知与已记录保持不同的空值语义。
+const priorViewSchema = { $ref: '#/components/schemas/ExpensePriorControlView' }
+const priorIdentity = { reportId: randomUUID(), applicationId: randomUUID(), roundNo: 1 }
+const priorMoney = { value: '100.00', currency: 'CNY' }
+const priorSource = { lineNo: 1, approvedAmount: priorMoney, toleranceFraction: 0.1, policyReference: 'synthetic',
+  control: { categoryCode: 'OFFICE', categoryRevision: 1, control: { mode: 'TOLERANCE', toleranceFraction: 0.1 } } }
+const priorAssessment = { lineNo: 1, requestId: randomUUID(), requestVersion: 1, source: priorSource,
+  threshold: priorMoney, consumed: priorMoney, otherReserved: priorMoney, roundReserved: priorMoney,
+  lineAmount: priorMoney, totalExposure: priorMoney, exceeded: priorMoney }
+const priorDetails = { ...priorIdentity, tenantId: 'demo', applicationVersion: 2, financialVersion: 2,
+  definitionId: randomUUID(), definitionVersion: 1, submittedAt: '2026-10-04T00:00:00Z', assessments: [priorAssessment] }
+validate(priorViewSchema, { ...priorIdentity, status: 'NOT_RECORDED', requiresApproval: null, details: null })
+validate(priorViewSchema, { ...priorIdentity, status: 'RECORDED', requiresApproval: true, details: priorDetails })
+for (const value of [
+  { ...priorIdentity, status: 'NOT_RECORDED', requiresApproval: false, details: null },
+  { ...priorIdentity, status: 'RECORDED', requiresApproval: false, details: null },
+  { ...priorIdentity, status: 'RECORDED', requiresApproval: false, details: { ...priorDetails, assessments: [{ ...priorAssessment, otherReports: ['private'] }] } }
+]) assert.equal(validator(priorViewSchema)(value), false)
 // 历史页明确序列化 null，不能与其他列表的省略语义混淆。
 validate({ $ref: '#/components/schemas/HistoryPage' }, { items: [], nextCursor: null })
+// 实际日历入口把缺省或 null 备注规范为空串；输入契约不能误用严格的响应结构。
+const calendarRules = { zoneId: 'UTC', weeklyHours: { MONDAY: [{ start: '09:00', end: '18:00' }] }, overrides: [{ date: '2026-10-04', periods: [] }] }
+for (const note of [undefined, null, '', '休息']) {
+  const rules = structuredClone(calendarRules)
+  if (note !== undefined) rules.overrides[0].note = note
+  validate({ $ref: '#/components/schemas/CreateCalendarRequest' }, { key: 'calendar_contract', name: '日历契约', rules })
+  validate({ $ref: '#/components/schemas/UpdateCalendarRequest' }, { expectedRevision: 1, name: '日历契约', rules })
+  validate({ $ref: '#/components/schemas/InitializationCalendarChoice' }, { source: 'CREATE', key: 'calendar_contract', name: '日历契约', rules })
+}
+for (const note of [7, 'x'.repeat(201)]) {
+  const rules = structuredClone(calendarRules); rules.overrides[0].note = note
+  assert.equal(validator({ $ref: '#/components/schemas/CreateCalendarRequest' })({ key: 'calendar_contract', name: '日历契约', rules }), false)
+}
+assert.equal(validator({ $ref: '#/components/schemas/CalendarOverride' })(calendarRules.overrides[0]), false)
+validate({ $ref: '#/components/schemas/CalendarOverride' }, { ...calendarRules.overrides[0], note: '' })
+// 解释来源必须带内容摘要，人工复核不能夹带财务或审批写入字段。
+validate({ $ref: '#/components/schemas/AssistReference' }, { sourceId: 'precheck:finding[0]', contentDigest: 'a'.repeat(64) })
+const explanationReview = { expectedRunVersion: 3, action: 'ADOPT', selectedIssueIds: ['precheck:finding[0]'] }
+validate({ $ref: '#/components/schemas/ReviewPrecheckExplanationRequest' }, explanationReview)
+assert.equal(validator({ $ref: '#/components/schemas/ReviewPrecheckExplanationRequest' })({ ...explanationReview, approved: true }), false)
+assert.equal(validator({ $ref: '#/components/schemas/ReviewPrecheckExplanationRequest' })({ ...explanationReview, selectedIssueIds: ['precheck:finding[0]', 'precheck:finding[0]'] }), false)
+// 风险来源范围的每层对象都封闭，调用者不能夹带租户、身份或金额事实。
+const riskDocument = { reportId: randomUUID(), roundNo: 1, lineNos: [1] }
+const riskInput = { taskId: 'current-task', scope: { documents: [riskDocument], calendarId: null } }
+const riskInputSchema = { $ref: '#/components/schemas/ExpenseRiskInputRequest' }
+validate(riskInputSchema, riskInput)
+for (const value of [
+  { ...riskInput, tenantId: 'other' },
+  { ...riskInput, scope: { ...riskInput.scope, requestedBy: 'admin' } },
+  { ...riskInput, scope: { documents: [{ ...riskDocument, amount: 999 }] } },
+  { ...riskInput, scope: { documents: [{ ...riskDocument, lineNos: [1, 1] }] } },
+  { ...riskInput, scope: { documents: [{ ...riskDocument, lineNos: [201] }] } }
+]) assert.equal(validator(riskInputSchema)(value), false)
+const riskReview = { expectedRunVersion: 3, action: 'ADOPT', selectedConcernIds: ['expense:risk[1]'] }
+validate({ $ref: '#/components/schemas/ReviewExpenseRiskRequest' }, riskReview)
+assert.equal(validator({ $ref: '#/components/schemas/ReviewExpenseRiskRequest' })({ ...riskReview, approvedAmount: 0 }), false)
+validate({ $ref: '#/components/schemas/ExpenseRiskInputOptions' }, { enabled: false, unavailableCode: 'NO_RISK_OBSERVATIONS',
+  inputDigest: null, targetDigest: null, providerId: null, model: null, destination: null, concerns: [], sources: [] })
+// 服务目录末页的空游标会被服务器省略；版本必须保持文本。
+validate({ $ref: '#/components/schemas/ServiceTaskDirectory' }, { items: [] })
+validate({ $ref: '#/components/schemas/ServiceTaskVersionPage' }, { items: [] })
+assert.equal(validator({ $ref: '#/components/schemas/ServiceTaskVersionPage' })({ items: [], nextBeforeVersion: 2 }), false)
+// 运行状态使用明确白名单，空页不强制游标，命令原文不能混入响应。
+const serviceRuntime = { applicationId: '00000000-0000-0000-0000-000000000001', applicationVersion: 2, roundNo: 1, roundStatus: 'IN_APPROVAL', items: [] }
+validate({ $ref: '#/components/schemas/ServiceTaskRuntimeView' }, serviceRuntime)
+assert.equal(validator({ $ref: '#/components/schemas/ServiceTaskRuntimeView' })({ ...serviceRuntime, inputs: { secret: 'not-public' } }), false)
+// 签署版本在页面保持文本，权限过滤后的空页仍可能有下一游标。
+const signatureReceipt = { id: '00000000-0000-0000-0000-000000000001', version: '9007199254740993', status: 'PENDING' }
+validate({ $ref: '#/components/schemas/SignatureReceipt' }, signatureReceipt)
+validate({ $ref: '#/components/schemas/SignaturePage' }, { items: [], nextAfterId: signatureReceipt.id })
+assert.equal(validator({ $ref: '#/components/schemas/SignatureReceipt' })({ ...signatureReceipt, version: 2 }), false)
+assert.equal(validator({ $ref: '#/components/schemas/SignatureReceipt' })({ ...signatureReceipt, providerAccount: 'private' }), false)
+validate({ $ref: '#/components/schemas/SignatureCancelInput' }, { expectedVersion: '1' })
+assert.equal(validator({ $ref: '#/components/schemas/SignatureCancelInput' })({ expectedVersion: 1 }), false)
+// 出纳总数属于同条件结果；账户选项只公开内部筛选键及历史脱敏展示。
+validate({ $ref: '#/components/schemas/CashierPaymentPage' }, { items: [], nextBeforeId: null, totalCount: 0 })
+assert.equal(validator({ $ref: '#/components/schemas/CashierPaymentPage' })({ items: [], nextBeforeId: null }), false)
+assert.equal(validator({ $ref: '#/components/schemas/CashierPaymentPage' })({ items: [], nextBeforeId: null, totalCount: -1 }), false)
+const cashierAccount = { key: 'a'.repeat(64), legalEntityId: signatureReceipt.id, currency: 'CNY', displayName: '基本户', maskedAccount: '****5678' }
+validate({ $ref: '#/components/schemas/CashierPaymentAccountOption' }, cashierAccount)
+assert.equal(validator({ $ref: '#/components/schemas/CashierPaymentAccountOption' })({ ...cashierAccount, reference: 'private-account' }), false)
+assert.equal(validator({ $ref: '#/components/schemas/CashierPaymentAccountOption' })({ ...cashierAccount, maskedAccount: '1234567890123456' }), false)
+validate({ $ref: '#/components/schemas/CashierPaymentFilterOptions' }, { legalEntities: [], accounts: [], nextAfterAccountKey: null })
+assert.deepEqual(spec.paths['/api/v1/cashier/payments'].get.parameters.map(parameter => parameter.name), ['limit', 'beforeId', 'legalEntityId', 'debitAccount', 'dueFrom', 'dueTo', 'undated', 'sort'])
 // 组织启用后动态规则尚未解析本轮任职；静态目录仍须具有实际可用成员。
 const assigneeSchema = { $ref: '#/components/schemas/AssigneeOption' }
 validate(assigneeSchema, { rule: 'role:ORG_SUPERVISOR_1', label: '本次任职一级主管', memberCount: 0, contextual: true })
@@ -33,7 +123,10 @@ for (const methods of Object.values(spec.paths)) for (const operation of Object.
   const body = operation.requestBody?.content['application/json']
   if (body?.example !== undefined) { validate(body.schema, body.example); examples++ }
   assert.equal(Boolean(operation.parameters?.find(p => p.name === 'Idempotency-Key')?.required), operation['x-idempotency'])
-  for (const response of Object.values(operation.responses)) for (const media of Object.values(response.content ?? {})) validator(media.schema)
+  for (const response of Object.values(operation.responses)) for (const media of Object.values(response.content ?? {})) {
+    validator(media.schema)
+    if (media.example !== undefined) validate(media.schema, media.example)
+  }
 }
 console.log(JSON.stringify({ result: 'PASS', operations: ids.size, schemas: Object.keys(spec.components.schemas).length, requestExamples: examples }))
 // 写入型验收只在明确指定独立本机演示入口时运行，保留所有验收数据。
