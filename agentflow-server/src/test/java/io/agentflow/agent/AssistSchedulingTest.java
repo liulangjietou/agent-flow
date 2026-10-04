@@ -15,6 +15,26 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AssistSchedulingTest {
     @Test
+    void enabledPollerActuallySchedulesExpenseDraftWork() {
+        var summaries = org.mockito.Mockito.mock(AssistWorker.class);
+        var ordinaryDrafts = org.mockito.Mockito.mock(DraftAssistWorker.class);
+        var explanations = org.mockito.Mockito.mock(PrecheckExplanationWorker.class);
+        var expenseDrafts = org.mockito.Mockito.mock(ExpenseDraftAssistWorker.class);
+        new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, AssistScheduling.class)
+                .withConfiguration(AutoConfigurations.of(TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
+                .withBean(AssistWorker.class, () -> summaries).withBean(DraftAssistWorker.class, () -> ordinaryDrafts)
+                .withBean(PrecheckExplanationWorker.class, () -> explanations).withBean(ExpenseDraftAssistWorker.class, () -> expenseDrafts)
+                .withPropertyValues("agentflow.assist.enabled=true", "agentflow.assist.poll-delay-ms=10")
+                .run(context -> {
+                    assertThat(context).hasBean("assistPoller");
+                    org.mockito.Mockito.verify(expenseDrafts, org.mockito.Mockito.timeout(5000).atLeastOnce()).poll();
+                    org.mockito.Mockito.verify(summaries, org.mockito.Mockito.atLeastOnce()).poll();
+                    org.mockito.Mockito.verify(ordinaryDrafts, org.mockito.Mockito.atLeastOnce()).poll();
+                    org.mockito.Mockito.verify(explanations, org.mockito.Mockito.atLeastOnce()).poll();
+                });
+    }
+
+    @Test
     void enabledModelRetainsAnIndependentDefaultScheduler() {
         new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, AssistScheduling.class)
                 .withConfiguration(AutoConfigurations.of(TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))

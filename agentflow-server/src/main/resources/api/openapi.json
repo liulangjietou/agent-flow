@@ -47846,6 +47846,991 @@
           }
         ]
       }
+    },
+    "/api/v1/expense-reports/{id}/draft-assists": {
+      "get": {
+        "operationId": "expenseDraftAssistRuns",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "查询本人报销填报建议历史",
+        "description": "仅返回本人当前单据的轻量索引；不提供其他单据内容或数量。",
+        "x-access": "同租户原申请人；管理员身份本身不授予权限",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原检查失效、双版本或运行版本冲突、已有活动运行、或已确认模型目的地变化",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseDraftAssistPage"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "包含申请关联信息，禁止缓存。"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "description": "从0开始的页号",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "description": "单页条数",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "generateExpenseDraftAssist",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "确认发送报销填报建议来源",
+        "description": "须先预览并明确同意实际来源与模型目的地。事务外重新读取本人目录，使用原有效期重建精确内容，双摘要匹配后入队；成功幂等回放不重新读目录或调用模型。",
+        "x-access": "同租户原申请人；管理员身份本身不授予权限",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原检查失效、双版本或运行版本冲突、已有活动运行、或已确认模型目的地变化",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "模型未启用或配置不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseDraftAssistReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateExpenseDraftAssistRequest"
+              },
+              "example": {
+                "input": {
+                  "applicationVersion": 1,
+                  "financialVersion": 1,
+                  "brief": "请按行程整理住宿，全部归研发调研项目",
+                  "itinerary": [
+                    {
+                      "id": 1,
+                      "startsOn": "2026-10-01",
+                      "endsOn": "2026-10-03",
+                      "cityCode": "SH",
+                      "purpose": "项目现场调研"
+                    }
+                  ],
+                  "catalog": {
+                    "categoryCodes": [
+                      "HOTEL"
+                    ],
+                    "costCenterCodes": [
+                      "IT"
+                    ],
+                    "projectCodes": [
+                      "P01"
+                    ]
+                  }
+                },
+                "validUntil": "2030-01-01T00:00:00Z",
+                "targetDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "consentDigest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expense-reports/{id}/draft-assists/preview": {
+      "post": {
+        "operationId": "previewExpenseDraftAssist",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "预览本人报销填报助手发送内容",
+        "description": "只读预览：校验本人及申请/财务双版本，在事务外获取真实目录并返回实际来源、有效期、模型目的地及摘要。不调用模型、不入队、不创建费用行。",
+        "x-access": "同租户原申请人；管理员身份本身不授予权限",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原检查失效、双版本或运行版本冲突、已有活动运行、或已确认模型目的地变化",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "模型未启用或配置不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseDraftAssistPreview"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "包含申请关联信息，禁止缓存。"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseDraftAssistInputRequest"
+              },
+              "example": {
+                "applicationVersion": 1,
+                "financialVersion": 1,
+                "brief": "请按行程整理住宿，全部归研发调研项目",
+                "itinerary": [
+                  {
+                    "id": 1,
+                    "startsOn": "2026-10-01",
+                    "endsOn": "2026-10-03",
+                    "cityCode": "SH",
+                    "purpose": "项目现场调研"
+                  }
+                ],
+                "catalog": {
+                  "categoryCodes": [
+                    "HOTEL"
+                  ],
+                  "costCenterCodes": [
+                    "IT"
+                  ],
+                  "projectCodes": [
+                    "P01"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expense-reports/{id}/draft-assists/{runId}": {
+      "get": {
+        "operationId": "expenseDraftAssistRun",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "读取本人报销填报建议",
+        "description": "保留原来源、完整建议和人工选择。canConfirm 是当前本地时效提示；确认命令仍会重新读取目录并校验当前权限。",
+        "x-access": "同租户原申请人；管理员身份本身不授予权限",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原检查失效、双版本或运行版本冲突、已有活动运行、或已确认模型目的地变化",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseDraftAssistDetail"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "包含申请关联信息，禁止缓存。"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "description": "绑定本报销单的填报建议运行标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/expense-reports/{id}/draft-assists/{runId}/confirm": {
+      "post": {
+        "operationId": "confirmExpenseDraftAssist",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "逐项确认报销填报建议",
+        "description": "只记录所选行程、类别及分摊字段组。确认前重新取得本人目录，原双版本和来源仍须有效；CONFIRMED 不代表费用已保存，金额与补贴仍走原报销保存服务。",
+        "x-access": "同租户原申请人；管理员身份本身不授予权限",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原检查失效、双版本或运行版本冲突、已有活动运行、或已确认模型目的地变化",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseDraftAssistReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "模型未启用或配置不可用",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "description": "绑定本报销单的填报建议运行标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmExpenseDraftAssistRequest"
+              },
+              "example": {
+                "expectedRunVersion": 3,
+                "applicationVersion": 1,
+                "financialVersion": 1,
+                "selected": [
+                  {
+                    "proposalId": "line1",
+                    "parts": [
+                      "ITINERARY",
+                      "CATEGORY"
+                    ]
+                  }
+                ],
+                "comment": "分摊另行核对"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/expense-reports/{id}/draft-assists/{runId}/dismiss": {
+      "post": {
+        "operationId": "dismissExpenseDraftAssist",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "放弃原报销填报建议",
+        "description": "可放弃已失效或不再适用的原建议；保留原模型结果，不读取外部目录，不调用模型，也不修改费用。",
+        "x-access": "同租户原申请人；管理员身份本身不授予权限",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原检查失效、双版本或运行版本冲突、已有活动运行、或已确认模型目的地变化",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseDraftAssistReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "description": "绑定本报销单的填报建议运行标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissExpenseDraftAssistRequest"
+              },
+              "example": {
+                "expectedRunVersion": 3,
+                "comment": "补充行程后重新生成"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -85253,6 +86238,842 @@
             "format": "date-time"
           }
         }
+      },
+      "ExpenseDraftAssistLeg": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "startsOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "endsOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "cityCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
+        },
+        "required": [
+          "id",
+          "startsOn",
+          "endsOn",
+          "cityCode",
+          "purpose"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistCatalogSelection": {
+        "type": "object",
+        "properties": {
+          "categoryCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "minItems": 1,
+            "maxItems": 50,
+            "uniqueItems": true
+          },
+          "costCenterCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "minItems": 1,
+            "maxItems": 50,
+            "uniqueItems": true
+          },
+          "projectCodes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "minItems": 0,
+            "maxItems": 50,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "categoryCodes",
+          "costCenterCodes",
+          "projectCodes"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistInputRequest": {
+        "type": "object",
+        "properties": {
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "brief": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8000
+          },
+          "itinerary": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseDraftAssistLeg"
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "catalog": {
+            "$ref": "#/components/schemas/ExpenseDraftAssistCatalogSelection"
+          }
+        },
+        "required": [
+          "applicationVersion",
+          "financialVersion",
+          "brief",
+          "itinerary",
+          "catalog"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistChoice": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistOptions": {
+        "type": "object",
+        "properties": {
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FinanceCategory"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "costCenters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseDraftAssistChoice"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseDraftAssistChoice"
+            },
+            "minItems": 0,
+            "maxItems": 50
+          },
+          "cities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseDraftAssistChoice"
+            },
+            "minItems": 1,
+            "maxItems": 20
+          }
+        },
+        "required": [
+          "categories",
+          "costCenters",
+          "projects",
+          "cities"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistInput": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "legalEntityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reportType": {
+            "type": "string",
+            "enum": [
+              "TRAVEL",
+              "DAILY",
+              "ENTERTAINMENT",
+              "TRAINING",
+              "OTHER"
+            ]
+          },
+          "catalogVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "financeTargetDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "itinerary": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseDraftAssistLeg"
+            },
+            "minItems": 1,
+            "maxItems": 20
+          },
+          "options": {
+            "$ref": "#/components/schemas/ExpenseDraftAssistOptions"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistSource"
+            },
+            "minItems": 3,
+            "maxItems": 22
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "applicationVersion",
+          "financialVersion",
+          "legalEntityId",
+          "reportType",
+          "catalogVersion",
+          "validUntil",
+          "financeTargetDigest",
+          "itinerary",
+          "options",
+          "sources"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistPreview": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "$ref": "#/components/schemas/ExpenseDraftAssistInput"
+          },
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1
+          },
+          "targetDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "consentDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "input",
+          "providerId",
+          "model",
+          "destination",
+          "targetDigest",
+          "consentDigest"
+        ],
+        "additionalProperties": false
+      },
+      "GenerateExpenseDraftAssistRequest": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "$ref": "#/components/schemas/ExpenseDraftAssistInputRequest"
+          },
+          "validUntil": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "targetDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "consentDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "input",
+          "validUntil",
+          "targetDigest",
+          "consentDigest"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistSelection": {
+        "type": "object",
+        "properties": {
+          "proposalId": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "ITINERARY",
+                "CATEGORY",
+                "ALLOCATION"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 3,
+            "contains": {
+              "const": "ITINERARY"
+            }
+          }
+        },
+        "required": [
+          "proposalId",
+          "parts"
+        ],
+        "additionalProperties": false
+      },
+      "ConfirmExpenseDraftAssistRequest": {
+        "type": "object",
+        "properties": {
+          "expectedRunVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "selected": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseDraftAssistSelection"
+            },
+            "minItems": 1,
+            "maxItems": 50,
+            "uniqueItems": true
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "expectedRunVersion",
+          "applicationVersion",
+          "financialVersion",
+          "selected"
+        ],
+        "additionalProperties": false
+      },
+      "DismissExpenseDraftAssistRequest": {
+        "type": "object",
+        "properties": {
+          "expectedRunVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "expectedRunVersion"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistAllocation": {
+        "type": "object",
+        "properties": {
+          "costCenter": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "projectCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "percent": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 100,
+            "multipleOf": 0.01
+          }
+        },
+        "required": [
+          "costCenter",
+          "percent"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistLine": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,63}$"
+          },
+          "itineraryId": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          },
+          "categoryCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "ITEM",
+              "DAY",
+              "NIGHT",
+              "KILOMETER",
+              "PERSON"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "allocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseDraftAssistAllocation"
+            },
+            "minItems": 1,
+            "maxItems": 50
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssistReference"
+            },
+            "minItems": 2,
+            "maxItems": 64,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "id",
+          "itineraryId",
+          "categoryCode",
+          "unit",
+          "description",
+          "allocations",
+          "evidence"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistSuggestion": {
+        "type": "object",
+        "properties": {
+          "providerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "modelVersion": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "promptVersion": {
+            "type": "string",
+            "const": "expense-draft-assist-v1"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseDraftAssistLine"
+            },
+            "minItems": 0,
+            "maxItems": 50
+          }
+        },
+        "required": [
+          "providerId",
+          "modelVersion",
+          "promptVersion",
+          "lines"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistReview": {
+        "type": "object",
+        "properties": {
+          "actor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "selected": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseDraftAssistSelection"
+            },
+            "minItems": 0,
+            "maxItems": 50,
+            "uniqueItems": true
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "actor",
+          "at",
+          "selected"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistReceipt": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "CONFIRMED",
+              "DISMISSED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "CONFIRMED",
+              "DISMISSED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "applicationVersion",
+          "financialVersion",
+          "status",
+          "version",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseDraftAssistSummary"
+            },
+            "minItems": 0,
+            "maxItems": 50
+          },
+          "total": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "pageSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseDraftAssistDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "input": {
+            "$ref": "#/components/schemas/ExpenseDraftAssistInput"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "QUEUED",
+              "RUNNING",
+              "COMPLETED",
+              "FAILED",
+              "CONFIRMED",
+              "DISMISSED"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "completedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseDraftAssistSuggestion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "MODEL_UNAVAILABLE",
+                  "MODEL_TIMEOUT",
+                  "INVALID_MODEL_OUTPUT",
+                  "INPUT_UNAVAILABLE"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseDraftAssistReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "canConfirm": {
+            "type": "boolean"
+          },
+          "unavailableCode": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "input",
+          "status",
+          "version",
+          "createdAt",
+          "startedAt",
+          "completedAt",
+          "suggestion",
+          "failure",
+          "review",
+          "canConfirm",
+          "unavailableCode"
+        ],
+        "additionalProperties": false
       }
     }
   }

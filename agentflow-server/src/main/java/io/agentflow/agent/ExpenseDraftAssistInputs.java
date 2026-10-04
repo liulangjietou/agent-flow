@@ -4,13 +4,13 @@ import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.expense.ExpenseContent;
 import io.agentflow.expense.ExpenseReport;
 import io.agentflow.finance.FinanceCatalog;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -52,7 +52,7 @@ public class ExpenseDraftAssistInputs {
         var sources = new ArrayList<AssistModelPort.Source>();
         sources.add(source(ExpenseDraftAssistInput.BRIEF, "本次填报要求", brief));
         sources.add(source(ExpenseDraftAssistInput.CATALOG, "本次选择的财务目录",
-                Map.of("reportType", report.content().type(), "catalogVersion", catalog.sourceVersion(), "options", options)));
+                new CatalogSource(report.content().type(), catalog.sourceVersion(), options)));
         itinerary.forEach(leg -> sources.add(source(leg.sourceId(), "行程 " + leg.id(), leg)));
         if (json.write(sources).getBytes(StandardCharsets.UTF_8).length > ExpenseDraftAssistInput.MAX_INPUT_BYTES) throw invalid();
         return new ExpenseDraftAssistInput(report.id(), application.id(), application.version(), report.version(), entity.id(),
@@ -90,4 +90,10 @@ public class ExpenseDraftAssistInputs {
             projectCodes = identifiers(projectCodes, true);
         }
     }
+
+    /**
+     * 来源字段顺序固定，预览与排队重建时不受 Map 迭代顺序影响。
+     * @author owlzhangfq@gmail.com
+     */
+    private record CatalogSource(ExpenseContent.Type reportType, String catalogVersion, ExpenseDraftAssistInput.Options options) { }
 }
