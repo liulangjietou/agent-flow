@@ -1,0 +1,230 @@
+{
+  "taskId": "F04",
+  "recordedAt": "2026-10-04T13:54:30.180529+00:00",
+  "status": "LOCAL_RUNTIME_VERIFIED_FINAL_REVIEW_PENDING",
+  "runtimeSourceCommit": "5daf2838a942676c70e67fa57b718b875a4109bf",
+  "runtime": {
+    "status": "PASSED",
+    "startedAt": "2026-10-04T13:47:00.417797+00:00",
+    "beforeSha256": "c1d06add3e855e04c89f2a8bf91006a91e4c0b40bf3b43a10c2b3e4fcce05036",
+    "afterSha256": "305c9d365da67149c273ce7b2bf53fe4a8898d0b365068a46c485862f5694c88",
+    "database": "H2",
+    "identity": "loopback OIDC with JDBC sessions",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "oldTables": 271,
+        "oldReports": 3,
+        "changedOldTables": [
+          "flyway_schema_history"
+        ],
+        "addedTables": [
+          "EXPENSE_SPLIT_ROUTING",
+          "EXPENSE_SPLIT_ROUTING_SOURCE"
+        ],
+        "originalFiles": 3
+      },
+      {
+        "name": "concurrent-submit-version-binding-and-crash",
+        "routes": [
+          "receipt",
+          "higher"
+        ],
+        "routingAmount": "8300.00",
+        "sources": 4,
+        "replayedSubmissions": 2,
+        "newDefinitionVersion": 2
+      },
+      {
+        "name": "withdraw-return-resubmit",
+        "rounds": 3,
+        "oldEvidenceUnchanged": true,
+        "ownOldRoundCounted": false
+      },
+      {
+        "name": "reduction-receipt-crash-and-financial-route",
+        "frozenRoutingAmount": "8300.00",
+        "approvedOwnAmount": "3000.00",
+        "newBudgetCommandAfterRestart": false,
+        "financialRecheckEntered": false
+      },
+      {
+        "name": "six-read-states-original-permissions-and-rollback",
+        "states": [
+          "NOT_RECORDED",
+          "UNCONFIGURED",
+          "DISABLED",
+          "CLEAR",
+          "SPLIT_SUSPECTED",
+          "RESTRICTED"
+        ],
+        "failedSubmission": "976abbf5-c58a-43fe-a745-ebb9716ee8f4",
+        "rollbackCode": "EXPENSE_SPLIT_CURRENCY_MISMATCH"
+      },
+      {
+        "name": "paired-restore-and-original-approval",
+        "tables": 273,
+        "rows": 1140,
+        "originalFiles": 3,
+        "routingRows": 10,
+        "sourceRows": 32,
+        "originalDatabaseUnchanged": true
+      }
+    ],
+    "finishedAt": "2026-10-04T13:49:25.366624+00:00",
+    "httpRecords": 709,
+    "distinctBudgetCommands": 13,
+    "modelCalls": 0,
+    "ownedProcessesStopped": true
+  },
+  "contract": {
+    "status": "PASSED",
+    "counts": {
+      "responses": 706,
+      "successfulRequests": 78,
+      "splitResponses": 28,
+      "parsedViews": 23,
+      "repeatedFrozenViews": 11,
+      "deniedReads": 5
+    },
+    "operations": [
+      "expenseSplitRouting"
+    ],
+    "states": [
+      "CLEAR",
+      "DISABLED",
+      "NOT_RECORDED",
+      "RESTRICTED",
+      "SPLIT_SUSPECTED",
+      "UNCONFIGURED"
+    ],
+    "statuses": [
+      200,
+      400,
+      403,
+      404
+    ],
+    "openApiSha256": "415b5ec2bbe02f7825103e89001cf790e29ffe2558092d9ad291176b4ee06fa7",
+    "compiledSources": [
+      {
+        "path": "agentflow-web/src/expenseSplitRouting.ts",
+        "sha256": "08feba535ca057d190195cef0669f81b32034cb1ab8ee6ac4430ad1c82b3408d"
+      },
+      {
+        "path": "agentflow-web/src/expenses.ts",
+        "sha256": "2c2bb4abfd86c3a11cd1ce925059e4c5aedb664c0a86c257e88a358a0f26d9ec"
+      }
+    ],
+    "compiledDirectory": "/fyoung/tmp/agentflow-split-contract-8A4pEL",
+    "recordFiles": [
+      {
+        "path": "original/http-records.json",
+        "sha256": "6d7e4f551ca2df79deefd9f9b209584b2f75d117c3278efe81d9b9ac28c0bcf7"
+      },
+      {
+        "path": "restored/http-records.json",
+        "sha256": "3d57edf93990dd9c4e7ba02baf005f38432919a4a9c336c4740b8c479716f23a"
+      }
+    ],
+    "scope": "Actual fixed-package HTTP contracts and frontend parsers; no interactive browser or PostgreSQL verification."
+  },
+  "rawDirectory": "/fyoung/tmp/agentflow-remaining-20260928/f04-runtime-fourth",
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-runtime-verified",
+  "scope": "固定包 H2/OIDC/真实 HTTP/Flowable、前端真实解析器；不是浏览器、PostgreSQL 或真实企业联调。",
+  "calendarContractFix": {
+    "cause": "输入和响应复用了 CalendarOverride，服务端允许备注省略或 null 并规范为空串，契约却要求必填字符串。",
+    "previousTestsMissed": "既有示例 overrides 为空；Spring 契约只比较请求记录顶层字段，未覆盖嵌套缺省备注。",
+    "red": "/fyoung/tmp/agentflow-remaining-20260928/f04-calendar-contract-red.log",
+    "green": "/fyoung/tmp/agentflow-remaining-20260928/f04-calendar-contract-final.log",
+    "javaRuntimeBehaviorChanged": false,
+    "repackagedArtifactPending": false,
+    "repackagedArtifact": {
+      "previousJar": "/fyoung/tmp/agentflow-remaining-20260928/split-routing-server-5daf2838.jar",
+      "previousSha256": "305c9d365da67149c273ce7b2bf53fe4a8898d0b365068a46c485862f5694c88",
+      "newJar": "/fyoung/tmp/agentflow-remaining-20260928/split-routing-server-v116-contract-fixed.jar",
+      "newSha256": "fca262b6becfb7ada3ec0d4da2cc85084c4477724bd2ed3275ad35deeff85bb2",
+      "comparedEntries": 3396,
+      "changedEntries": [
+        "BOOT-INF/classes/api/openapi.json"
+      ],
+      "allOtherUnpackedEntriesIdentical": true,
+      "scope": "Raw JAR entry bytes; project JARs recursively unpacked to exclude ZIP timestamp-only differences."
+    },
+    "javaScope": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "scopeReason": "Only the static OpenAPI input schema changed; the complete fixed-package runtime used byte-identical classes and other resources. No second full business replay for an unchanged implementation."
+  },
+  "failureHistory": [
+    {
+      "directory": "/fyoung/tmp/agentflow-remaining-20260928/f04-runtime-first",
+      "classification": "HARNESS_WRONG_REDUCTION_ACTOR",
+      "evidenceSha256": "c211df40a7d9450a0ffcc0b47bfab600ea1501b4ff4d738d2f2f9de5cd7611f8",
+      "failure": "AssertionError(('POST', '/expense-reports/fee751a4-39d4-466b-b149-c0c051be4e77/tasks/84ef16ed-bff5-11f1-9b0a-925a9011635b/reduce', 403, {'traceId': '18c95108-4413-44b7-8ce2-42a6fec44b6c', 'message': 'Required role is missing', 'path': '/api/v1/expense-reports/fee751a4-39d4-466b-b149-c0c051be4e77/tasks/84ef16ed-bff5-11f1-9b0a-925a9011635b/reduce', 'code': 'FORBIDDEN'}))"
+    },
+    {
+      "directory": "/fyoung/tmp/agentflow-remaining-20260928/f04-runtime-second",
+      "classification": "HARNESS_TIMEOUT_SHORTER_THAN_90_SECOND_LEASE",
+      "evidenceSha256": "9b81b5fa3f14bbe978908b5674760c511f45996b4f5e2f62e088b6e75a244e5c",
+      "failure": "AssertionError(\"Existing operation did not reach expected state: {'reportId': '5b1faf09-44c3-4286-8b57-f86b51e30289', 'applicationId': '3d7d4123-1439-4a53-8c4b-e6ad7e714897', 'applicationVersion': 7, 'financialVersion': 3, 'roundNo': 1, 'canWithdraw': False, 'canCancel': False, 'paper': {'roundNo': 1, 'required': False, 'received': False}, 'budget': {'ledgerStatus': 'FROZEN', 'confirmedCurrent': False, 'operationId': '852f9deb-e739-42d6-9dd7-461c93bc8a4c', 'operationStatus': 'EXECUTING'}}\")"
+    },
+    {
+      "directory": "/fyoung/tmp/agentflow-remaining-20260928/f04-runtime-third",
+      "classification": "LOOPBACK_RATE_CONNECTION_UNAVAILABLE_FAIL_CLOSED",
+      "evidenceSha256": "dc652d63d91d28001fb514052e7054879f062bef2398c4544db88085faf362ac",
+      "failure": "AssertionError({'job': {'id': '715bf030-244b-4956-8710-ba568da468bd', 'version': 3, 'status': 'UNAVAILABLE', 'applicationVersion': 1, 'financialVersion': 1, 'attempt': 1, 'createdAt': '2026-10-04T13:18:33.620Z', 'startedAt': '2026-10-04T13:18:33.623Z', 'completedAt': '2026-10-04T13:18:33.653Z'}, 'usable': False, 'unavailableCode': 'PRECHECK_NOT_READY', 'initiator': {'appointmentId': '735582a2-4f2d-43ce-86e3-f0d76d09180c', 'personId': '717ecfb5-8357-4d92-9b53-10f160159075', 'subject': 'alice', 'directoryRevision': 10, 'legalEntityId': 'c938eaf2-7b8c-432d-bfc4-96a4aeed22ae', 'legalEntityName': '风险验收法人', 'departmentId': '899dbf0e-46bb-48b3-b3fb-40f7d34e14d2', 'departmentName': '风险验收部门', 'positionId': '3493acf5-862d-4736-9da9-b2bc8c3586c7', 'positionName': '风险验收岗位'}, 'accountingDate': '2026-10-04', 'findings': [{'stage': 'RATE', 'lineNo': 1, 'nature': 'UNAVAILABLE', 'code': 'CONNECTION'}]})"
+    }
+  ],
+  "sourceSha256": {
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "agentflow-web/scripts/check-expense-split-routing-runtime.mjs": "27c1b6f5d9f6fa87042778fac34971e04362d09683def8519edef48f700b01d6",
+    "agentflow-web/scripts/check-openapi.mjs": "d89440784de01f48577c1e08d57426bdf671b39b8479ea094b72d7a7d704413e",
+    "agentflow-server/src/main/resources/api/openapi.json": "415b5ec2bbe02f7825103e89001cf790e29ffe2558092d9ad291176b4ee06fa7",
+    "agentflow-web/src/expenseSplitRouting.ts": "08feba535ca057d190195cef0669f81b32034cb1ab8ee6ac4430ad1c82b3408d",
+    "agentflow-web/src/expenses.ts": "2c2bb4abfd86c3a11cd1ce925059e4c5aedb664c0a86c257e88a358a0f26d9ec"
+  },
+  "evidenceSha256": {
+    "f04-runtime-fourth/backup/attachments/36b6deb7-b703-4d91-8f5a-848ac7429fa7.bin": "4c0633cebfb9f98dae99431bbaf4047be812255e4c7908bec3365d9c4075dea7",
+    "f04-runtime-fourth/backup/attachments/67b425db-5498-4d78-b265-81bfa80fe2b2.bin": "e8d0ac2fc60428be7bb0b47697abf2fddc80e4971218fad15dd104a13d549c17",
+    "f04-runtime-fourth/backup/attachments/92ee7227-7a60-4e45-a140-d23532508b99.bin": "05f5b98ab26575a90d531eda3e38d033ba16206cc24b5356abd040f6e12562eb",
+    "f04-runtime-fourth/backup/data/agentflow.mv.db": "17bbc63980bdc59d1eaabe06a912a703e9cce7c900ea8175f5193f83e6e3a422",
+    "f04-runtime-fourth/backup/manifest.json": "7ee3302e3c219774b3a0c839902fcee6dbd59f19b92e334002dce27620aa2d3b",
+    "f04-runtime-fourth/backup/synthetic-peer-state.json": "a248759c2d18650c267d4e237317ceb92bcde7effb15c03153b65018182d6aac",
+    "f04-runtime-fourth/contract-verification.json": "b86c04954060499af722c44e07b7783b49f9c004d3af50e0028bee8dee87dc2f",
+    "f04-runtime-fourth/evidence.json": "e2572ffce2dd408c1514dcd860e9f521b1a6699907654599283d6908ce38b4e9",
+    "f04-runtime-fourth/original/after-upgrade-columns.tsv": "b2b90aeff7731560432d0f690d27ea2ee6723c4f77ae18733f22c99e95d718fb",
+    "f04-runtime-fourth/original/after-upgrade-metadata.tsv": "fd1ac5fe032f4babf3ced5ab2b98176fad7a91a0cdf824b9b98768cbea3d39be",
+    "f04-runtime-fourth/original/after-upgrade-schema.sql": "9f39ce04fbff498bef1596ba262941e3b336488fea18f045c24d21d60671f7da",
+    "f04-runtime-fourth/original/after-upgrade-tables.tsv": "89957a401786ca3f919d848fdbc4f875e64f59b55ffca53c41d041fc3a5d2532",
+    "f04-runtime-fourth/original/after-upgrade.json": "cc5ddd606d27d55ff722cf15ab132ca5c260c6d4fd54d6331fc19014bf3e4ad9",
+    "f04-runtime-fourth/original/before-restore-columns.tsv": "b2b90aeff7731560432d0f690d27ea2ee6723c4f77ae18733f22c99e95d718fb",
+    "f04-runtime-fourth/original/before-restore-metadata.tsv": "fd1ac5fe032f4babf3ced5ab2b98176fad7a91a0cdf824b9b98768cbea3d39be",
+    "f04-runtime-fourth/original/before-restore-schema.sql": "f94d6e4cd52c34bb99a9ecf810e8ebe7cb8705656ab1edf6c26fe52ae5afd4a1",
+    "f04-runtime-fourth/original/before-restore-snapshot.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "f04-runtime-fourth/original/before-restore-tables.tsv": "22c9fb82a2244de3cbc17812fe5e2eace5dc216ab87d259d9170b4fbc876529e",
+    "f04-runtime-fourth/original/before-restore.json": "c33639522d27086011ba9e8ec109f7e0b775acf04a48ff94bc341ebd145219a9",
+    "f04-runtime-fourth/original/before-upgrade-columns.tsv": "09256d47b491ed8ce492f8f02b8f10e7c3ac3d1a9d530bb588bbf97609dba47d",
+    "f04-runtime-fourth/original/before-upgrade-metadata.tsv": "87f91c32e149fde2df20757df699f89b5bb470100946fe83a7b6abf99a72c43a",
+    "f04-runtime-fourth/original/before-upgrade-schema.sql": "88aa3768ca206c419ac65522e52ead56dd430d8e71bb505be9af8fa0a54adb82",
+    "f04-runtime-fourth/original/before-upgrade-tables.tsv": "2203ae6b29bbf74f33c5e1a18c17487c6dad66800a51a7ff21bbce3168633e4d",
+    "f04-runtime-fourth/original/before-upgrade.json": "83d1ef8e315830ff239b3a6a8acf0a92940435208c15bce632513285a5d1e7cf",
+    "f04-runtime-fourth/original/http-records.json": "6d7e4f551ca2df79deefd9f9b209584b2f75d117c3278efe81d9b9ac28c0bcf7",
+    "f04-runtime-fourth/restored/http-records.json": "3d57edf93990dd9c4e7ba02baf005f38432919a4a9c336c4740b8c479716f23a",
+    "f04-runtime-fourth/restored/restored-before-start-columns.tsv": "b2b90aeff7731560432d0f690d27ea2ee6723c4f77ae18733f22c99e95d718fb",
+    "f04-runtime-fourth/restored/restored-before-start-metadata.tsv": "fd1ac5fe032f4babf3ced5ab2b98176fad7a91a0cdf824b9b98768cbea3d39be",
+    "f04-runtime-fourth/restored/restored-before-start-schema.sql": "f94d6e4cd52c34bb99a9ecf810e8ebe7cb8705656ab1edf6c26fe52ae5afd4a1",
+    "f04-runtime-fourth/restored/restored-before-start-snapshot.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "f04-runtime-fourth/restored/restored-before-start-tables.tsv": "22c9fb82a2244de3cbc17812fe5e2eace5dc216ab87d259d9170b4fbc876529e",
+    "f04-runtime-fourth/restored/restored-before-start.json": "c33639522d27086011ba9e8ec109f7e0b775acf04a48ff94bc341ebd145219a9"
+  },
+  "finalReview": "PENDING",
+  "browserVerified": false,
+  "postgresqlVerified": false,
+  "openTaskCount": 34,
+  "remoteDelivery": "NOT_PUSHED_V02_E15_PENDING"
+}

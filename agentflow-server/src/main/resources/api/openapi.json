@@ -60280,7 +60280,7 @@
             "maxLength": 128
           },
           "rules": {
-            "$ref": "#/components/schemas/CalendarRules"
+            "$ref": "#/components/schemas/CalendarRulesInput"
           }
         },
         "required": [
@@ -60299,7 +60299,7 @@
             "maxLength": 128
           },
           "rules": {
-            "$ref": "#/components/schemas/CalendarRules"
+            "$ref": "#/components/schemas/CalendarRulesInput"
           },
           "expectedRevision": {
             "type": "integer",
@@ -81474,7 +81474,7 @@
           "rules": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/CalendarRules"
+                "$ref": "#/components/schemas/CalendarRulesInput"
               },
               {
                 "type": "null"
@@ -81507,7 +81507,7 @@
                 "maxLength": 128
               },
               "rules": {
-                "$ref": "#/components/schemas/CalendarRules"
+                "$ref": "#/components/schemas/CalendarRulesInput"
               }
             },
             "required": [
@@ -93892,6 +93892,78 @@
             }
           }
         ]
+      },
+      "CalendarOverrideInput": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "periods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarPeriod"
+            },
+            "maxItems": 8
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200,
+            "description": "可省略或为 null；保存后规范为空字符串。"
+          }
+        },
+        "required": [
+          "date",
+          "periods"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarRulesInput": {
+        "type": "object",
+        "properties": {
+          "zoneId": {
+            "type": "string",
+            "description": "Java ZoneId 支持的 IANA 时区，例如 Asia/Shanghai；必填，无隐式系统时区。"
+          },
+          "weeklyHours": {
+            "type": "object",
+            "propertyNames": {
+              "enum": [
+                "MONDAY",
+                "TUESDAY",
+                "WEDNESDAY",
+                "THURSDAY",
+                "FRIDAY",
+                "SATURDAY",
+                "SUNDAY"
+              ]
+            },
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/CalendarPeriod"
+              },
+              "maxItems": 8
+            }
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarOverrideInput"
+            },
+            "maxItems": 500
+          }
+        },
+        "required": [
+          "zoneId",
+          "weeklyHours",
+          "overrides"
+        ],
+        "additionalProperties": false
       }
     }
   }

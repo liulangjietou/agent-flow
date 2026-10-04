@@ -12,6 +12,21 @@ ajv.addFormat('binary', true)
 ajv.addSchema({ $id: 'agentflow', components: spec.components })
 // 历史页明确序列化 null，不能与其他列表的省略语义混淆。
 validate({ $ref: '#/components/schemas/HistoryPage' }, { items: [], nextCursor: null })
+// 实际日历入口把缺省或 null 备注规范为空串；输入契约不能误用严格的响应结构。
+const calendarRules = { zoneId: 'UTC', weeklyHours: { MONDAY: [{ start: '09:00', end: '18:00' }] }, overrides: [{ date: '2026-10-04', periods: [] }] }
+for (const note of [undefined, null, '', '休息']) {
+  const rules = structuredClone(calendarRules)
+  if (note !== undefined) rules.overrides[0].note = note
+  validate({ $ref: '#/components/schemas/CreateCalendarRequest' }, { key: 'calendar_contract', name: '日历契约', rules })
+  validate({ $ref: '#/components/schemas/UpdateCalendarRequest' }, { expectedRevision: 1, name: '日历契约', rules })
+  validate({ $ref: '#/components/schemas/InitializationCalendarChoice' }, { source: 'CREATE', key: 'calendar_contract', name: '日历契约', rules })
+}
+for (const note of [7, 'x'.repeat(201)]) {
+  const rules = structuredClone(calendarRules); rules.overrides[0].note = note
+  assert.equal(validator({ $ref: '#/components/schemas/CreateCalendarRequest' })({ key: 'calendar_contract', name: '日历契约', rules }), false)
+}
+assert.equal(validator({ $ref: '#/components/schemas/CalendarOverride' })(calendarRules.overrides[0]), false)
+validate({ $ref: '#/components/schemas/CalendarOverride' }, { ...calendarRules.overrides[0], note: '' })
 // 解释来源必须带内容摘要，人工复核不能夹带财务或审批写入字段。
 validate({ $ref: '#/components/schemas/AssistReference' }, { sourceId: 'precheck:finding[0]', contentDigest: 'a'.repeat(64) })
 const explanationReview = { expectedRunVersion: 3, action: 'ADOPT', selectedIssueIds: ['precheck:finding[0]'] }

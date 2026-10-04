@@ -1361,7 +1361,7 @@
           ]
         }
       ],
-      "observed": "规则、V116 依据、提交及 Flowable 路由、原轮次权限查询、只读详情、两种设计器、便携模板和合成金额模拟均已接通。模板及配套样例升至 v4，跨单默认明确关闭。设计/模拟阶段 118 项 Java、146 项前端、27 份实际响应契约通过；阶段数不累加。固定包及浏览器/PostgreSQL 验收仍待完成，F04 保持 OPEN。",
+      "observed": "规则、V116、提交/Flowable、权限查询、详情页、两种设计器、便携模板和合成金额模拟已实现。固定包 H2 并发、升级、核减、强退与配套恢复通过；273 张表、1140 行、3 份原件保持，706 份响应和 78 份请求契约、23 次实际页面解析通过。最终独立审查、浏览器及 PostgreSQL 仍待完成，F04 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
@@ -3898,9 +3898,9 @@
   },
   "latestProgress": {
     "taskId": "F04",
-    "status": "READ_UI_VERIFIED_DESIGNER_AND_RUNTIME_PENDING",
-    "recordedAt": "2026-10-04T12:41:22.883950+00:00",
-    "evidence": "docs/evidence/expense-split-read-ui-20261004.json",
+    "status": "FIXED_PACKAGE_RUNTIME_VERIFIED_FINAL_REVIEW_PENDING",
+    "recordedAt": "2026-10-04T13:52:33.235103+00:00",
+    "evidence": "docs/evidence/expense-split-runtime-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
