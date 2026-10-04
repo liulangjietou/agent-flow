@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T16:08:30.000540+00:00",
+  "recordedAt": "2026-10-04T19:50:48.593966+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -22,17 +22,16 @@
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
     ],
     "localDeliveryBreakdown": {
-      "recordedAt": "2026-10-04T18:06:44.548127+00:00",
+      "recordedAt": "2026-10-04T19:50:48.593966+00:00",
       "implementationRemaining": {
-        "count": 3,
+        "count": 2,
         "taskIds": [
           "A01",
-          "F14",
           "F15"
         ]
       },
       "implementedAwaitingBrowserAndPostgresVerification": {
-        "count": 13,
+        "count": 14,
         "taskIds": [
           "A02",
           "A03",
@@ -46,7 +45,8 @@
           "F04",
           "F16",
           "F05",
-          "F09"
+          "F09",
+          "F14"
         ]
       },
       "note": "This is a breakdown of the 16 OPEN local delivery tasks, not additional tasks or new completion claims."
@@ -1854,19 +1854,29 @@
           ]
         }
       ],
-      "observed": "FinanceCatalog.Project 只有法人、代码、名称；ExpenseFormContract 仅有明细入口、金额、币种、超标四类字段，未有项目负责人来源和按所有项目生成的会签。",
+      "observed": "可信项目目录、原轮次项目负责人冻结、必经 ALL、资格与主管上溯、固定成员守卫、敏感查询、页面和模板 v7 已实现。一次最终审查发现合法长节点名读取限制，先复现后修复；32 项 Java、10 项页面回归及构建通过。修正固定包完成 V119→V120 升级、5 次启动245次 HTTP及278表1084行配套恢复，13份实际依据保留130字符原节点名。浏览器与 PostgreSQL 待补验，保持 OPEN。",
       "references": [
         {
-          "path": "agentflow-domain/src/main/java/io/agentflow/finance/FinanceCatalog.java",
-          "line": 80
+          "path": "docs/expense-project-approvals.md",
+          "line": 1
         },
         {
-          "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseFormContract.java",
-          "line": 17
+          "path": "docs/evidence/expense-project-approvals-final-review-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "由可信项目目录解析每个实际分摊项目负责人并冻结；去重不丢项目责任；空匹配阻断；多项目必须全部完成且不能绕过字段权限。",
-      "dependsOn": []
+      "dependsOn": [],
+      "progress": {
+        "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_FINAL_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
+        "recordedAt": "2026-10-04T19:50:48.593966+00:00",
+        "runtimeCommit": "17892790ff1e65f6581dec13339872788158a73a",
+        "evidence": "docs/evidence/expense-project-approvals-final-review-20261004.json",
+        "packagedRuntimePending": false,
+        "finalReviewPassed": true,
+        "reviewFindingFixed": true,
+        "browserAndPostgresPending": true
+      }
     },
     {
       "id": "F15",
@@ -3947,7 +3957,8 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F14"
+    "F15",
+    "A01"
   ],
   "externalDelivery": {
     "remoteConfigured": true,
@@ -3972,17 +3983,17 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "F09",
+    "taskId": "F14",
     "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_FINAL_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
-    "recordedAt": "2026-10-04T18:06:44.548127+00:00",
-    "evidence": "docs/evidence/expense-budget-exceptions-final-review-20261004.json",
+    "recordedAt": "2026-10-04T19:50:48.593966+00:00",
+    "evidence": "docs/evidence/expense-project-approvals-final-review-20261004.json",
     "knownOpenTaskCount": 34
   },
   "localMainIntegration": {
-    "verifiedThroughCommit": "eab64cd5edafe6dbb21862a211afed53c1ebcd47",
-    "mergeCommit": "45d0e51af0c735b6f250312d0af474023e62dbc9",
+    "verifiedThroughCommit": "17892790ff1e65f6581dec13339872788158a73a",
+    "mergeCommit": "17892790ff1e65f6581dec13339872788158a73a",
     "originMainFetchedAtMerge": "2ac75649c026501460a59464d80f9a48ddf6ecd7",
     "remotePush": false,
-    "note": "Completed development merged locally at user request; remote delivery remains E15 after V02."
+    "note": "Completed F14 code including the final review fix fast-forwarded into local main at user request; remote delivery remains E15 after V02."
   }
 }

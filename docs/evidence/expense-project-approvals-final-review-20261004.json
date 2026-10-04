@@ -1,0 +1,228 @@
+{
+  "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_FINAL_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
+  "verifiedSourceCommit": "17892790ff1e65f6581dec13339872788158a73a",
+  "review": {
+    "base": "da7287ea426cf452463103cfaa9c545e3bdc6d44",
+    "head": "7f4c885ccd24d44b6e160e6e819bbb160361afd8",
+    "critical": 0,
+    "important": 1,
+    "minor": 0,
+    "unresolved": 0,
+    "report": "/fyoung/tmp/agentflow-remaining-20260928/f14-final-review.md",
+    "resolution": "Remove the unilateral 128-character node-name read limit; preserve nonblank/type and catalog limits. One failing regression is now green; actual publication, approval, crash recovery and restore retain the 130-character name."
+  },
+  "javaTests": {
+    "io.agentflow.expense.ExpenseProjectApprovalPolicyTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.approval.ExpenseProjectApprovalIntegrationTest": {
+      "tests": 27,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "webTests": 10,
+  "openapi": {
+    "result": "PASS",
+    "operations": 395,
+    "schemas": 858,
+    "requestExamples": 129
+  },
+  "typecheck": "PASS",
+  "productionBuild": "PASS",
+  "runtime": {
+    "status": "PASSED",
+    "startedAt": "2026-10-04T19:48:36.435455+00:00",
+    "beforeSha256": "e5978f9fe03dd8ff37416e42f9baf61a9103853703920860038adc6d3f21629e",
+    "afterSha256": "cf7b8815deda4fd4c42de938a9322d94e7b70bf9289bfaeebebda2c01b73a331",
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-v119-upgrade",
+        "oldTables": 277,
+        "oldRows": 356,
+        "changedOldTables": [
+          "flyway_schema_history"
+        ],
+        "addedTables": [
+          "EXPENSE_PROJECT_APPROVAL"
+        ]
+      },
+      {
+        "name": "legacy-missing-owner-and-no-project",
+        "oldSubmitReplay": true,
+        "missingOwnerBlocked": true,
+        "unsafeDefinitionBlocked": true,
+        "noProjectNodeSkipped": true
+      },
+      {
+        "name": "all-responsibilities-frozen-crash-replay-and-zero-reduction",
+        "projects": 2,
+        "distinctApprovers": 2,
+        "originalSupervisorPreserved": true,
+        "sourceChangeIgnored": true,
+        "eligibilityRevocationBlocked": true,
+        "completedBeforeCrash": 1,
+        "originalKeysReplayed": true,
+        "secondApprovalStillRequired": true,
+        "reductionKeptOriginalEvidence": true
+      },
+      {
+        "name": "same-owner-and-three-rounds",
+        "projectsPerRound": 2,
+        "sameOwnerVotes": 1,
+        "rounds": 3,
+        "originalSourcesPreserved": true,
+        "stoppedBudgetRetained": true
+      },
+      {
+        "name": "sensitive-read-and-independent-paired-restore",
+        "tables": 278,
+        "rows": 1084,
+        "schemaStatements": 2215,
+        "originalDatabaseUnchanged": true,
+        "attachments": 3,
+        "pendingNativeTaskPreserved": true,
+        "originalApprovedVotePreserved": true
+      }
+    ],
+    "finishedAt": "2026-10-04T19:49:30.106826+00:00",
+    "httpRecords": 245,
+    "providerCalls": 62,
+    "distinctBudgetCommands": 9,
+    "boots": 5,
+    "ownedProcessesStopped": true
+  },
+  "httpContracts": {
+    "result": "PASS",
+    "responses": 242,
+    "requests": 75,
+    "beforeResponses": 56,
+    "binaryResponses": 3
+  },
+  "frontendActualResponses": {
+    "result": "PASS",
+    "counts": {
+      "parsedViews": 17,
+      "deniedReads": 4,
+      "precheckSources": 7,
+      "parsedMembershipViews": 7
+    },
+    "states": [
+      "NOT_RECORDED",
+      "NO_PROJECT",
+      "RECORDED"
+    ],
+    "rounds": [
+      1,
+      2,
+      3
+    ],
+    "sourceSha256": "e037b1549bbe67e661dd73b02edc0ee1bc60ef57b11dcf568f1c77130313b0c9",
+    "membershipSourceSha256": "b22d0b9fc1d10b36877eebdc4d89828d7425018e5b2057f982fa6e5f0aeb17ea",
+    "contractSha256": "b0a93068fbc2d55cef3ddc50f43ccfb62327173b4df2b6f9992cdd7cc46d841f",
+    "output": "/fyoung/tmp/agentflow-project-parser-Edy8c1"
+  },
+  "longNodeNameActualViews": 13,
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java": "397c50631ebc40f0dbe5995724edde7c0f8648851aa5f3836e752dae37fbccaa",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseFormContract.java": "97ebd3fe4a113d1f26d32d85b4fee93f03369b69c0a3bfa095492c2c50121727",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpensePrecheckEvidence.java": "77f60baeb14e3dcbe70706f2e672ab8fa66e6f1234cf17835dee46ef0733e30e",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseProcessPolicy.java": "b9ff0b05ad18beaca54838452c5deb30984e33227f03f83f7af20b8b99db7e48",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseProjectApprovalPolicy.java": "5d344643950e779efdbf16ac4eacbc13f6ee7916db7725e7d54942f6c53d0a8e",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseProjectApprovalSnapshot.java": "bf7ba858eb6b8b6efd2e71c5d1328b8cfa5431b48c47042c110afa832d559a80",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseProjectOwners.java": "6a4e3757af7fdeec85f5bbc07844472ab976a8ee743c2d9b151fc15b7b3f2be1",
+    "agentflow-domain/src/main/java/io/agentflow/finance/FinanceCatalog.java": "4046be06ef2a025839a0c1e1653c129ab39d4754f8afb3a6c6e46c2903d46196",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseProjectApprovalPolicyTest.java": "87785a332f5ab944cd83492b9bac89197aeaef50641ec01507aa6b54ae0d807e",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseProjectOwnersTest.java": "09ac74e0b5125072ab42085b14700803d057fb4e90987dfd6d2d583c8f9cb81a",
+    "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java": "0538fad57846675dae3783c41cd263b4d1d1c90830becd324919de0fd42cc7d9",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/CountersignMembershipService.java": "62d9d17bc6c125d683f8e0dac14c847593ada00b8171e999169fe9a777d33bfd",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalResponsibilities.java": "ab1ab2833998da0d5616f282326221225521aa83fb2aeded7ace619e0e973458",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskAuthorization.java": "f353479aa5f0e5b0f572b8ca75189a2775f16ab7b3b1aa3d9206f1d914efb6fa",
+    "agentflow-server/src/main/java/io/agentflow/definition/DefinitionReferenceInspector.java": "f3b9465d30e68222899f359a31780c5ceebc6a61fcf8af29b0b26d586d7daa7e",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java": "b92106cb9d6bd7d76c105de491995b733cd8dd0c65c640f7a47a2d89f838d5c2",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckService.java": "13d91d1b30c151932dcd20e8e41065529dd3f7de202bf22c35c728a07c4c46bb",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseProjectApprovalBindings.java": "f441e9f3f573c0c08eab651f2e315945fa1515711bb51d35ec4ec2beb9e77ef7",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseProjectApprovalController.java": "2fd28a69a28b8b9795db6705e095e2b6ac3c80b322c54128554b958e2599c04e",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseProjectApprovalQuery.java": "d8299a8f16ac975e68af3efdb90b04b0d104ae2ccb279f9c60531eca2536b026",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseReductionService.java": "b5dd85efd7c6a15d45fae36477f7fd3289bca7a1b8e84f7a8be451e68a1587ff",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSelfApprovalBindings.java": "d3a4259ef7fd720703a17d279d43372db91f4aa4e25b683aa03f53fab2b81194",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSplitRoutingBindings.java": "2e02496285cd8937e957faae9edddac70177f6ed965804c4106d62156eacdf04",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSubmissionService.java": "58cabea0ed9967dedfb5ed8f0ca2a6e0713a6d46a92593bd8ebda3c653e52fde",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseProjectApprovalRepository.java": "c07c3f7d486d98ef8d38a40f92402644b0c51ad34dda6fc20a707b25c9b665f3",
+    "agentflow-server/src/main/java/io/agentflow/finance/FinanceGatewayClient.java": "1ee1965ba093380a82bf00888b19e55a6229fd082d6c450f97adeb23b0fdf781",
+    "agentflow-server/src/main/resources/api/openapi.json": "b0a93068fbc2d55cef3ddc50f43ccfb62327173b4df2b6f9992cdd7cc46d841f",
+    "agentflow-server/src/main/resources/db/migration/V120__expense_project_approval.sql": "12acdc217ed6de6209d5ff8f3db78d4165463d878a3350cb16b9ca46bba59fe2",
+    "agentflow-server/src/main/resources/process-template-examples/employee-finance.json": "ee1fdfd3d333d5c39e67fd479500f6cd65a5ca5adf951d545a2a4d5e8553604c",
+    "agentflow-server/src/main/resources/process-templates/expense-report.json": "abc973b36cc1b2d6af341bb920d2f25e4ea8d6e9a18620e6026074ec3b1abcb1",
+    "agentflow-server/src/test/java/io/agentflow/approval/ExpenseProjectApprovalIntegrationTest.java": "aca39ad2158e225be46f8f4b10d4aa5e15c5a363243b6746cfbb055fa39db421",
+    "agentflow-server/src/test/java/io/agentflow/approval/ExpenseSubprocessGatewayFixture.java": "12c577cd287e4427f2184c32eb46b3b4738e4242b54f4d4024c51e480e9fdbfa",
+    "agentflow-server/src/test/java/io/agentflow/auth/OidcTestProvider.java": "d0bc33ab2d51ca5622edc7bde153ea71f8cb597c9f74ab56912b8522f3b4027b",
+    "agentflow-server/src/test/java/io/agentflow/definition/ExpenseSplitSimulationIntegrationTest.java": "9b2972e8b22b0f5088e3f5c1503c578eae9dfcc501820f3882e9387b67e6c963",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseProjectApprovalMigrationTest.java": "7e1cf765a8647d23a1c0f9b785e94b5a68f257e6f797d417abf13ea7559f1a2a",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseProjectApprovalPersistenceTest.java": "909323bcdc7048527e394c8c27e105542e05f7a429c109ce2aa6b63f7d6b0f23",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseProjectOwnersJsonTest.java": "1949ae5213bfb69bd9ff2da89f451f17ee4f8bddfbd70ee68c97e0a7188f31c4",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java": "07b7f8c7e69c7cbf8722a2dbe0cc0a3a3988288044da4439e637c16c76787eac",
+    "agentflow-server/src/test/java/io/agentflow/finance/FinanceGatewayClientTest.java": "140aab0d2bb94012270357bbbf076c3599c03bfd61d87ed2224f8098dc7b8428",
+    "agentflow-server/src/test/java/io/agentflow/template/ClasspathFinancialTemplateExamplesTest.java": "808f97743c426aab49d67dfb0ce5310f3db068d22d5c9c181213214c09ac52ae",
+    "agentflow-server/src/test/java/io/agentflow/template/ClasspathProcessTemplateCatalogTest.java": "fd83a31627363ef8c2d824e2806c6f7306f01deee98a0c20d552411c7fa75214",
+    "agentflow-server/src/test/java/io/agentflow/template/ProcessTemplateIntegrationTest.java": "1c3e451859251f6e615bd452e1ee788bf7704d4fd3a20eb49f1861bdae229151",
+    "agentflow-web/scripts/check-expense-prior-contracts.mjs": "90ba0e495ef60a7ccce4258b1be7db8f145c6329bf398ede253afee009afc349",
+    "agentflow-web/scripts/check-expense-project-responses.mjs": "465e1d14b0999bf6dde64be518609bbdb8015a1b6281d4f94aa11ab2756e10c6",
+    "agentflow-web/scripts/test-requests.mjs": "80e446e0e7f97edf9a9bfb3869181f8388944c405d9e52d9cff9e1ec935c5f99",
+    "agentflow-web/src/api.ts": "88aa153816b7432191e2357b69e3fa1a55249a8746e4c91ef2890e64d7c9a261",
+    "agentflow-web/src/components/CountersignMembers.vue": "cdb69fe54a501fdfc9e754d24af75374e9ca89a037ec43aef9ba36ace29510b3",
+    "agentflow-web/src/components/DefinitionAssignee.vue": "7176eb56b6b7095e969c93b23489ec9040585494e4aa633651e50de6ad2790c5",
+    "agentflow-web/src/components/DefinitionExpenseStage.vue": "8c3eb3d3d92f0f4dd363d85f07a2caa9fd63dd8985c75fcb6e005ebf27a38554",
+    "agentflow-web/src/components/ExpenseDetail.vue": "dceade6f155282ba8ed58967052c15371a556f7f6e5a609934e28a961a34f61c",
+    "agentflow-web/src/components/ExpenseProjectApprovalPanel.vue": "78bd3abcb278373eabae3149a3ebb07a5d620d55531f4295141a16cc1bad0ba5",
+    "agentflow-web/src/components/ExpenseProjectOwners.vue": "40c0e2429363300af1689037b1128c5981f87095cd2687e7397652b45df63c49",
+    "agentflow-web/src/components/ExpenseSubmission.vue": "c2f77bec37affc4de5519ab200667adb4ac1d6fe8d83c1370d672019553d1c0a",
+    "agentflow-web/src/countersignMembership.ts": "b22d0b9fc1d10b36877eebdc4d89828d7425018e5b2057f982fa6e5f0aeb17ea",
+    "agentflow-web/src/definitionAssignees.ts": "b19ae156d6b640e9a1f726f5f5de80bc5bfbb4c925855bbd70f37722e9f4a1a6",
+    "agentflow-web/src/expenseDraft.ts": "fa0e159f56b3e9e69fe3ac5c3d07b8be1f1c3b38d4df9e4af2328709028029e0",
+    "agentflow-web/src/expenseProjectApproval.ts": "e037b1549bbe67e661dd73b02edc0ee1bc60ef57b11dcf568f1c77130313b0c9",
+    "agentflow-web/src/expenses.ts": "2d087960caf4794021f2ed4db88330e6d24106ff41bbc4bf2a46d50e09078fea",
+    "agentflow-web/tests/countersign-membership.test.mjs": "ac2c991dba61590b4e56d32ffa0cc4afac9891c6ed1d195f501345bab871c194",
+    "agentflow-web/tests/definition-assignees.test.mjs": "0a9cf091790c4a5a9c2a3ce214d510a6c8be2981260d7d88e233e86941426912",
+    "agentflow-web/tests/expense-prior-controls.test.mjs": "a94c9e239b8dbf8aed7a623905f071e3cf9b28fbf31f96ec4bf75ba3bf095953",
+    "agentflow-web/tests/expense-project-approvals.test.mjs": "1b17bf454fa8ca8b9376d7d30e97df1f77744041fd5a9df5d0b06a7cde7eeae4",
+    "scripts/check-expense-prior-controls.py": "b4cc7d61a5cba38c8b47549374bfe400250884b854431c25e36e0445745e9e58",
+    "scripts/check-expense-project-approvals.py": "38dab6d80eb4881ac55391f54a08f1e5d314e73421d0aae2a67a3ec03f214491",
+    "scripts/check-expense-risk.py": "ad68a1f7b3547d39238692b4f7d23d79ce050b604c272a2a00e794f6898b13cd",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7",
+    "scripts/fixtures/ExpenseRiskOidcFixture.java": "db99b9c03daf81b92282bde8947f5eeeadc46559b8c758822e5a357a648a3264",
+    "scripts/payment-due-dates-support/CompareH2Schema.java": "4e92f585f39d6ce6a43bd400a31216179e8b7f15f5f676abd80b5fb7b12a0a3b"
+  },
+  "fixedArtifactSha256": {
+    "/fyoung/tmp/agentflow-remaining-20260928/budget-exceptions-server-eab64cd5.jar": "e5978f9fe03dd8ff37416e42f9baf61a9103853703920860038adc6d3f21629e",
+    "/fyoung/tmp/agentflow-remaining-20260928/project-approvals-server-final.jar": "cf7b8815deda4fd4c42de938a9322d94e7b70bf9289bfaeebebda2c01b73a331"
+  },
+  "precedingRuntimeEvidence": "docs/evidence/expense-project-approvals-runtime-20261004.json",
+  "precedingArchiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/f14-task5-verified/manifest.json",
+    "sha256": "d41ff96ec8cf0a284834ed2ec6c7c42eaa83ca0a7170d567722fad88867dc605",
+    "files": 154
+  },
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/f14-final-verified/manifest.json",
+    "sha256": "dbe9c8c5b92ebbbeac2b5f8804e93a4fd71a2010bc5835c4ac98cac64e68bf84",
+    "files": 161
+  },
+  "boundaries": {
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "realEnterpriseProjectDirectoryVerified": false,
+    "remotePushOrPr": false,
+    "existingRuntimePidPreserved": 87821,
+    "finalReviewPending": false
+  }
+}
