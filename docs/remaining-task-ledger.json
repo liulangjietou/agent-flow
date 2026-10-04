@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T08:24:30.761343+00:00",
+  "recordedAt": "2026-10-04T08:39:16.303510+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1828,7 +1828,7 @@
           ]
         }
       ],
-      "observed": "法人和已固定出款账户筛选、同条件总数、分页游标权限及 V114 派生索引已实现，85 条 Java 与 80 条前端用例、类型、构建和契约检查通过；固定包财务运行及升级恢复尚未验收，付款到期日来源规则待答复，F16 保持 OPEN。",
+      "observed": "法人和已固定出款账户筛选已完成范围测试、固定包 H2 财务 HTTP、非空 V113→V114 升级、付款中断接续、独立恢复及真实 Vue 模板/API 联调。付款到期日来源规则待答复；浏览器与 PostgreSQL 验收仍待环境。F16 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/finance/CashierPaymentWorkspace.java",
@@ -1849,17 +1849,22 @@
         {
           "path": "docs/evidence/cashier-payment-filters-20261004.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/cashier-payment-filters-runtime-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "定义可信付款到期事实并接入筛选/排序；法人和实际支付账户筛选与总数、分页一致；保持逐笔复核及当前权限；不能把借款归还日当付款到期日。",
       "dependsOn": [],
       "progress": {
-        "recordedAt": "2026-10-04T08:24:30.761343+00:00",
-        "status": "LEGAL_ENTITY_AND_ACCOUNT_SCOPE_GATES_PASSED_PACKAGED_RUNTIME_AND_DATE_RULE_PENDING",
-        "baseCommit": "d0b3121c70b3e754198532318e2d94956152e739",
-        "evidence": "docs/evidence/cashier-payment-filters-20261004.json",
+        "recordedAt": "2026-10-04T08:39:16.303510+00:00",
+        "status": "LEGAL_ENTITY_AND_ACCOUNT_FIXED_PACKAGE_H2_AND_COMPONENT_HTTP_VERIFIED_DATE_RULE_PENDING",
+        "implementationCommit": "94631d3d9dbcd5a38128a315de7fe8a223d8bc3b",
+        "evidence": "docs/evidence/cashier-payment-filters-runtime-20261004.json",
         "dateQuestionPending": true,
-        "packagedRuntimePending": true
+        "packagedRuntimePending": false,
+        "browserAndPostgresPending": true
       }
     },
     {
@@ -3818,7 +3823,7 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F16"
+    "A04"
   ],
   "externalDelivery": {
     "remoteConfigured": true,
@@ -3844,10 +3849,10 @@
   },
   "latestProgress": {
     "taskId": "F16",
-    "status": "LEGAL_ENTITY_AND_ACCOUNT_SCOPE_GATES_PASSED_PACKAGED_RUNTIME_AND_DATE_RULE_PENDING",
-    "recordedAt": "2026-10-04T08:24:30.761343+00:00",
-    "baseCommit": "d0b3121c70b3e754198532318e2d94956152e739",
-    "evidence": "docs/evidence/cashier-payment-filters-20261004.json",
+    "status": "LEGAL_ENTITY_AND_ACCOUNT_FIXED_PACKAGE_H2_AND_COMPONENT_HTTP_VERIFIED_DATE_RULE_PENDING",
+    "recordedAt": "2026-10-04T08:39:16.303510+00:00",
+    "sourceCommit": "94631d3d9dbcd5a38128a315de7fe8a223d8bc3b",
+    "evidence": "docs/evidence/cashier-payment-filters-runtime-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
