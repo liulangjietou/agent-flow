@@ -398,6 +398,47 @@ class ExpensePlanIntegrationTest {
         assertThat(restored).isEqualTo(evidence);
     }
 
+    @Test void priorControlFreezesWithCategoryRevisionAndApprovalDoesNotUseLaterConfiguration() throws Exception {
+        configureCategories(true);
+        var categories = json.read("""
+                [{"code":"TRAVEL","name":"容差差旅","units":["ITEM"],"active":true,
+                  "priorControl":{"mode":"TOLERANCE","toleranceFraction":0.1}},
+                 {"code":"OTHER","name":"其他","units":["ITEM"],"active":true}]
+                """, new com.fasterxml.jackson.core.type.TypeReference<List<ExpenseCategoryCatalog.Category>>() { });
+        expenseConfiguration.saveCategories(admin, 1, categories, "明确容差控制");
+        UUID id = create(); UUID checked = ready(id); var preview = check(checked).result().evidence().preview();
+        assertThat(json.read(json.write(preview), JsonNode.class).at("/lines/0/priorControl/control/mode").asText()).isEqualTo("TOLERANCE");
+        ok(send(path(id) + "/submit", "alice", submission(id, checked)), 200);
+        expenseConfiguration.saveCategories(admin, 2, managedCategories(false), "以后申请停用，已提交审批保留控制");
+        ok(act(id, "APPROVE"), 200); ok(act(id, "APPROVE"), 200);
+        var credit = requests.find("demo", id).orElseThrow();
+        assertThat(credit.balance(7).limit()).isEqualTo(money("781", "CNY"));
+        assertThat(credit.balance(7).hardLimit()).isFalse();
+        assertThat(credit.approvedLines().get(0).control().categoryRevision()).isEqualTo(2L);
+        assertThat(current(id).currentRound().lines()).isEqualTo(preview.lines());
+        String before = json.write(credit.state());
+        assertThat(json.write(requests.find("demo", id).orElseThrow().state())).isEqualTo(before);
+    }
+
+    @Test void changingOnlyTheControlInvalidatesAReadyPlanAndTheNextCheckUsesTheNewMode() throws Exception {
+        configureCategories(true); UUID id = create(); UUID old = ready(id);
+        var categories = new java.util.ArrayList<>(managedCategories(true));
+        var original = categories.get(0);
+        categories.set(0, new ExpenseCategoryCatalog.Category(original.code(), original.name(), original.units(), true,
+                new ExpensePriorControl(ExpensePriorControl.Mode.NONE, null)));
+        expenseConfiguration.saveCategories(admin, 1, categories, "只调整事前控制模式");
+        code(send(path(id) + "/submit", "alice", submission(id, old)), "EXPENSE_CATEGORY_CONFIGURATION_CHANGED");
+        assertThat(current(id).rounds()).isEmpty(); assertThat(requests.find("demo", id)).isEmpty();
+        UUID checked = ready(id);
+        ok(send(path(id) + "/submit", "alice", submission(id, checked)), 200);
+        ok(act(id, "APPROVE"), 200); ok(act(id, "APPROVE"), 200);
+        var credit = requests.find("demo", id).orElseThrow();
+        assertThat(credit.approvedLines().get(0).control().control().mode()).isEqualTo(ExpensePriorControl.Mode.NONE);
+        assertThat(credit.balance(7).limit()).isEqualTo(money("710", "CNY"));
+        credit.reserve(1, 7, new ExpenseUse(UUID.randomUUID(), 1, 1), money("900", "CNY"));
+        assertThat(credit.balance(7).reserved()).isEqualTo(money("900", "CNY"));
+    }
+
     private String configureCategories(boolean travelActive) {
         expenseConfiguration.saveCategories(admin, 0, managedCategories(travelActive), "合成类别目录");
         String key = "plan-policy-" + UUID.randomUUID();

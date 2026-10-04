@@ -50,7 +50,9 @@ public record ExpenseCategoryCatalog(String tenantId, long version, List<Categor
      * 类别代码为稳定业务身份，名称用于展示，允许单位按配置顺序保留。
      * @author owlzhangfq@gmail.com
      */
-    public record Category(String code, String name, List<ExpenseLine.Unit> units, boolean active) {
+    public record Category(String code, String name, List<ExpenseLine.Unit> units, boolean active, ExpensePriorControl priorControl) {
+        /** 旧类别缺少事前配置时保留原硬限制，不追加默认配置属性。 */
+        public Category(String code, String name, List<ExpenseLine.Unit> units, boolean active) { this(code, name, units, active, null); }
         /** 单位必须明确且唯一，不把空集合解释为任意单位。 */
         public Category {
             text(code, 64); text(name, 128);

@@ -10,6 +10,14 @@ const ajv = new Ajv2020({ strict: false, allErrors: true })
 addFormats(ajv)
 ajv.addFormat('binary', true)
 ajv.addSchema({ $id: 'agentflow', components: spec.components })
+// 事前控制由类别配置明确选择；旧类别保持缺字段，容差不能缺失或伪装成文本。
+const priorControlSchema = { $ref: '#/components/schemas/ExpensePriorControl' }
+for (const control of [{ mode: 'STRICT' }, { mode: 'NONE' }, { mode: 'TOLERANCE', toleranceFraction: 0 },
+  { mode: 'TOLERANCE', toleranceFraction: 0.125 }, { mode: 'TOLERANCE', toleranceFraction: 1 }]) validate(priorControlSchema, control)
+for (const control of [{ mode: 'UNKNOWN' }, { mode: 'TOLERANCE' }, { mode: 'STRICT', toleranceFraction: 0 },
+  { mode: 'TOLERANCE', toleranceFraction: '0.1' }, { mode: 'TOLERANCE', toleranceFraction: 1.01 }, { mode: 'NONE', approved: true }]) {
+  assert.equal(validator(priorControlSchema)(control), false)
+}
 // 历史页明确序列化 null，不能与其他列表的省略语义混淆。
 validate({ $ref: '#/components/schemas/HistoryPage' }, { items: [], nextCursor: null })
 // 实际日历入口把缺省或 null 备注规范为空串；输入契约不能误用严格的响应结构。

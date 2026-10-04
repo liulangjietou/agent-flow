@@ -65659,6 +65659,9 @@
             },
             "minItems": 1,
             "maxItems": 50
+          },
+          "priorControl": {
+            "$ref": "#/components/schemas/ExpensePriorControlSnapshot"
           }
         },
         "required": [
@@ -83215,6 +83218,9 @@
           },
           "active": {
             "type": "boolean"
+          },
+          "priorControl": {
+            "$ref": "#/components/schemas/ExpensePriorControl"
           }
         },
         "required": [
@@ -94031,6 +94037,84 @@
           "zoneId",
           "weeklyHours",
           "overrides"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePriorControl": {
+        "type": "object",
+        "description": "类别明确选择的事前控制；旧缺字段记录保留原硬上限。容差是追加审批阈值，非硬授权。",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "STRICT",
+              "TOLERANCE",
+              "NONE"
+            ]
+          },
+          "toleranceFraction": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1,
+            "description": "0–1 的精确比例，业务边界最多接受六位小数。"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "TOLERANCE"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "toleranceFraction"
+              ],
+              "properties": {
+                "toleranceFraction": {
+                  "type": "number"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "toleranceFraction": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ExpensePriorControlSnapshot": {
+        "type": "object",
+        "properties": {
+          "categoryCode": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "categoryRevision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "control": {
+            "$ref": "#/components/schemas/ExpensePriorControl"
+          }
+        },
+        "required": [
+          "categoryCode",
+          "categoryRevision",
+          "control"
         ],
         "additionalProperties": false
       }

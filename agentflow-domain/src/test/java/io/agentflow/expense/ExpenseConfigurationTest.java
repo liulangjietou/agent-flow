@@ -18,6 +18,21 @@ import static org.assertj.core.api.Assertions.*;
 class ExpenseConfigurationTest {
     private static final Instant NOW = Instant.parse("2026-10-03T00:00:00Z");
 
+    @Test void changingOnlyPriorControlCreatesARevisionWithoutRewritingLegacyCategories() {
+        var old = new ExpenseCategoryCatalog("demo", 1, List.of(category("hotel", "住宿", true)));
+        var none = new ExpenseCategoryCatalog.Category("hotel", "住宿", List.of(ExpenseLine.Unit.NIGHT), true,
+                new ExpensePriorControl(ExpensePriorControl.Mode.NONE, null));
+        var next = old.revise(1, List.of(none));
+        assertThat(next.version()).isEqualTo(2);
+        assertThat(next.categories().get(0).priorControl().mode()).isEqualTo(ExpensePriorControl.Mode.NONE);
+        assertThat(old.categories().get(0).priorControl()).isNull();
+        var json = new io.agentflow.common.JsonUtil(new com.fasterxml.jackson.databind.ObjectMapper()
+                .setSerializationInclusion(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL));
+        var oldJson = json.write(old);
+        assertThat(json.write(json.read(oldJson, ExpenseCategoryCatalog.class))).isEqualTo(oldJson).doesNotContain("priorControl");
+        assertThat(json.read(json.write(next), ExpenseCategoryCatalog.class)).isEqualTo(next);
+    }
+
     @Test void categoryIdentitySurvivesDisableRenameAndReenable() {
         var empty = new ExpenseCategoryCatalog("demo", 0, List.of());
         var first = empty.revise(0, List.of(category("hotel", "住宿", true)));

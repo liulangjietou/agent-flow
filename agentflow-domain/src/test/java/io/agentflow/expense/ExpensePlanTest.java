@@ -23,6 +23,38 @@ class ExpensePlanTest {
     private static final Instant NOW = Instant.parse("2026-09-28T01:00:00Z");
     private static final LocalDate DATE = LocalDate.parse("2026-09-28");
 
+    @Test void approvedCreditKeepsEveryExplicitModeAndOriginalCategorySource() {
+        for (var mode : ExpensePriorControl.Mode.values()) {
+            var control = new ExpensePriorControl(mode, mode == ExpensePriorControl.Mode.TOLERANCE ? new BigDecimal("0.125") : null);
+            var source = new ExpensePriorControl.Snapshot("TRAVEL", 2, control);
+            var plan = plan(content(List.of(line(1, "100", "CNY"), line(2, "50", "CNY"))));
+            var controls = new java.util.HashMap<>(Map.of("TRAVEL", source));
+            plan.freeze(1, 1, catalog(), rates(), initiator(ENTITY, "alice"), NOW, 2L, controls); controls.clear();
+            var restored = ExpensePlan.restore(plan.state());
+            assertThat(restored.currentRound().lines()).allSatisfy(frozen -> assertThat(frozen.priorControl()).isEqualTo(source));
+            var approved = restored.approvedRequest(1);
+            assertThat(approved.approvedLines()).allSatisfy(value -> assertThat(value.control()).isEqualTo(source));
+            assertThat(approved.balance(1).hardLimit()).isEqualTo(mode == ExpensePriorControl.Mode.STRICT);
+            assertThat(approved.balance(1).limit()).isEqualTo(money(mode == ExpensePriorControl.Mode.TOLERANCE ? "112.50" : "100", "CNY"));
+        }
+    }
+
+    @Test void frozenControlsCannotClaimAnotherCategoryOrRevision() {
+        var control = new ExpensePriorControl(ExpensePriorControl.Mode.NONE, null);
+        for (var source : List.of(new ExpensePriorControl.Snapshot("OTHER", 2, control), new ExpensePriorControl.Snapshot("TRAVEL", 3, control))) {
+            var plan = plan(content(List.of(line(1, "100", "CNY"))));
+            fails("INVALID_EXPENSE_PLAN_ROUND", () -> plan.freeze(1, 1, catalog(), rates(), initiator(ENTITY, "alice"), NOW, 2L, Map.of("TRAVEL", source)));
+            assertThat(plan.rounds()).isEmpty();
+        }
+        var plan = plan(content(List.of(line(1, "100", "CNY"), line(2, "50", "CNY")))); freeze(plan);
+        var first = plan.currentRound().lines().get(0); var second = plan.currentRound().lines().get(1);
+        var changed = new ExpensePlanRound.FrozenLine(second.original(), second.rate(), second.amount(), second.allocations(),
+                new ExpensePriorControl.Snapshot("TRAVEL", 2, control));
+        var round = plan.currentRound();
+        fails("INVALID_EXPENSE_PLAN_ROUND", () -> new ExpensePlanRound(round.roundNo(), round.submittedPlanVersion(), round.submittedBy(),
+                round.submittedAt(), round.content(), round.legalEntity(), round.catalogVersion(), List.of(first, changed), 2L));
+    }
+
     @Test void emptyDraftCannotGenerateCreditOrBeSubmitted() {
         var plan = plan(content(List.of()));
         fails("EXPENSE_PLAN_NOT_SUBMITTED", () -> plan.approvedRequest(1));

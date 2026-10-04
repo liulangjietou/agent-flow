@@ -50,8 +50,11 @@ public class ExpensePlanSubmissionService {
                 .orElseThrow(() -> new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published expense plan process not found"));
         definition.requireStartEnabled(); ExpensePlanFormContract.requireReview(definition.graph(), application.formSchema());
         var evidence = checked.result().evidence(); Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        var priorControls = evidence.preview().lines().stream().filter(line -> line.priorControl() != null)
+                .collect(java.util.stream.Collectors.toMap(line -> line.priorControl().categoryCode(), ExpensePlanRound.FrozenLine::priorControl,
+                        (first, second) -> first));
         plan.freeze(input.planVersion(), application.nextSubmissionRound(), evidence.catalog(), evidence.rates(), checked.input().initiator(), now,
-                evidence.preview().managedCategoryRevision());
+                evidence.preview().managedCategoryRevision(), priorControls);
         plans.update(plan, input.planVersion(), actor.userId(), "SUBMIT");
         application = applications.reviseBusiness(application.id(), application.version(), plan.content().title(),
                 ExpensePlanFormContract.submittedPayload(plan.currentRound()), application.businessReference());

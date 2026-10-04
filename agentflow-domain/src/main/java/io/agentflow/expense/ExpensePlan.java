@@ -51,6 +51,13 @@ public final class ExpensePlan {
     /** 全部主数据与汇率校验通过后一次性追加轮次，并保留实际使用的类别修订。 */
     public void freeze(long expectedVersion, int roundNo, FinanceCatalog catalog, Map<String, ExpenseExchangeRate> rates,
                        InitiatorContext initiator, Instant now, Long managedCategoryRevision) {
+        freeze(expectedVersion, roundNo, catalog, rates, initiator, now, managedCategoryRevision, Map.of());
+    }
+
+    /** 同一类别修订的完整控制随本轮金额冻结，正式提交只能使用预检保存的原依据。 */
+    public void freeze(long expectedVersion, int roundNo, FinanceCatalog catalog, Map<String, ExpenseExchangeRate> rates,
+                       InitiatorContext initiator, Instant now, Long managedCategoryRevision,
+                       Map<String, ExpensePriorControl.Snapshot> priorControls) {
         requireVersion(expectedVersion);
         if (roundNo != rounds.size() + 1 || now == null || !rounds.isEmpty() && now.isBefore(rounds.get(rounds.size() - 1).submittedAt())) throw invalid();
         if (CollectionUtils.isEmpty(content.lines())) throw new DomainException("EXPENSE_PLAN_LINES_REQUIRED", "At least one planned expense line is required");
@@ -66,7 +73,7 @@ public final class ExpensePlan {
             var rate = rates == null ? null : rates.get(line.amount().currency());
             if (rate == null || !entity.baseCurrency().equals(rate.toCurrency())) throw new DomainException("EXPENSE_PLAN_RATE_REQUIRED", "Each planned currency requires a rate to the legal entity base currency");
             var amount = rate.convert(line.amount());
-            frozen.add(new ExpensePlanRound.FrozenLine(line, rate, amount, CostAllocation.apportion(line.allocations(), amount)));
+            frozen.add(new ExpensePlanRound.FrozenLine(line, rate, amount, CostAllocation.apportion(line.allocations(), amount), priorControls.get(line.categoryCode())));
         }
         var round = new ExpensePlanRound(roundNo, version, employeeId, now, content, entity, catalog.sourceVersion(), frozen, managedCategoryRevision);
         var changed = new ArrayList<>(rounds); changed.add(round); rounds = List.copyOf(changed); version++;
@@ -77,7 +84,8 @@ public final class ExpensePlan {
         var round = currentRound();
         if (round.roundNo() != approvedRound || version != round.submittedPlanVersion() + 1 || !content.equals(round.content())) throw invalid();
         String source = "APPROVAL:" + applicationId + ":" + approvedRound;
-        var approved = round.lines().stream().map(line -> new ExpenseRequest.ApprovedLine(line.original().lineNo(), line.amount(), BigDecimal.ZERO, source)).toList();
+        var approved = round.lines().stream().map(line -> new ExpenseRequest.ApprovedLine(line.original().lineNo(), line.amount(),
+                line.priorControl() == null ? BigDecimal.ZERO : line.priorControl().control().referenceFraction(), source, line.priorControl())).toList();
         return new ExpenseRequest(id, tenantId, applicationId, round.legalEntity().id(), employeeId, approved);
     }
 
