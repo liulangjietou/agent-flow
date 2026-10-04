@@ -62,6 +62,7 @@ import OrganizationDirectory from './components/OrganizationDirectory.vue'
 import ApprovalProxyManager from './components/ApprovalProxyManager.vue'
 import { approvalProxyDrafts, type ApprovalProxyReceipt } from './approvalProxies'
 import { organizationDrafts, type OrganizationRecord } from './organization'
+import { organizationSyncDrafts, syncPath, type SyncReceipt, type SyncPlanReceipt } from './organizationSync'
 import { initializationDrafts } from './tenantInitialization'
 import BusinessCalendars from './components/BusinessCalendars.vue'
 import { calendarDrafts, type BusinessCalendar } from './businessCalendars'
@@ -1190,6 +1191,10 @@ async function recoverOperation(id: string) {
         approvalProxyDrafts.acknowledge(actorScope.value, request.path, request.body!, result as ApprovalProxyReceipt)
         templateRefresh.value++
         notice.value = '已确认原代理操作，请在审批代理页面按原编号核对当前状态。'
+      } else if (request.path.startsWith(syncPath + '/')) {
+        organizationSyncDrafts.acknowledge(actorScope.value, request.path, request.body!, result as SyncReceipt | SyncPlanReceipt)
+        templateRefresh.value++
+        notice.value = '已确认原组织同步操作，请回到外部同步核对原批次和计划；后续应用仍需明确操作。'
       } else if (request.path.startsWith('/organization')) {
         if (request.body) organizationDrafts.acknowledge(actorScope.value, request.path, request.body, result as OrganizationRecord)
         templateRefresh.value++
@@ -1313,7 +1318,7 @@ async function recoverOperation(id: string) {
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
   if (providerNavigation) return
-  if (writeRequests.hasUnconfirmed() || configurationDrafts.hasDrafts() || mappingDrafts.hasDrafts() || extractionDrafts.hasDrafts() || initializationDrafts.hasDrafts() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || approvalProxyDrafts.hasDrafts() || expenseDrafts.hasDrafts() || planDrafts.hasDrafts() || advanceDrafts.hasDrafts() || procurementDrafts.hasDrafts() || budgetAdjustmentDrafts.hasDrafts() || invoiceUploads.hasPending() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
+  if (writeRequests.hasUnconfirmed() || configurationDrafts.hasDrafts() || mappingDrafts.hasDrafts() || extractionDrafts.hasDrafts() || initializationDrafts.hasDrafts() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || organizationSyncDrafts.hasDrafts() || approvalProxyDrafts.hasDrafts() || expenseDrafts.hasDrafts() || planDrafts.hasDrafts() || advanceDrafts.hasDrafts() || procurementDrafts.hasDrafts() || budgetAdjustmentDrafts.hasDrafts() || invoiceUploads.hasPending() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
 }
 defaultGraph(); savedSnapshot.value = snapshot()
 /** 企业身份仅从服务端会话恢复，前端不读取或保存 OIDC 令牌。 */

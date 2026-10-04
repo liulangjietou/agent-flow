@@ -6,6 +6,8 @@ import io.agentflow.notification.NotificationChannel;
 import io.agentflow.template.ClasspathProcessTemplateCatalog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 import java.time.Duration;
 import java.util.List;
@@ -29,6 +31,22 @@ class SystemCheckServiceTest {
     void disabledAdapters() {
         when(diagnostics.notifications(anyString())).thenReturn(new SystemDiagnostics.NotificationConfiguration(false, Set.of()));
         when(diagnostics.modelConfiguration()).thenReturn(SystemDiagnostics.ModelConfiguration.DISABLED);
+        when(diagnostics.organizationSynchronization(anyString())).thenReturn(SystemDiagnostics.SynchronizationConfiguration.DISABLED);
+    }
+
+    @ParameterizedTest @EnumSource(SystemDiagnostics.SynchronizationConfiguration.class)
+    void synchronizationConfigurationIsNeverReportedAsAnAcceptedEnterpriseConnection(SystemDiagnostics.SynchronizationConfiguration configuration) {
+        when(catalog.list()).thenReturn(List.of());
+        when(diagnostics.organizationSynchronization(admin.tenantId())).thenReturn(configuration);
+        var service = new SystemCheckService(diagnostics, catalog, true);
+        try {
+            assertThat(service.check(admin).checks()).filteredOn(check -> check.id().equals("organizationSync")).singleElement().satisfies(check -> {
+                assertThat(check.code()).isEqualTo("ORGANIZATION_SYNC_" + configuration.name());
+                assertThat(check.status()).isEqualTo(SystemCheckService.Status.WARNING);
+                assertThat(check.message()).contains("未连接企业来源", "不代表同步结果");
+            });
+            verify(diagnostics).organizationSynchronization(admin.tenantId());
+        } finally { service.close(); }
     }
 
     @Test
@@ -108,6 +126,7 @@ class SystemCheckServiceTest {
     void redactsFailureAndContinuesOtherChecksInTheActorsTenant() {
         doThrow(new IllegalStateException("jdbc:secret-host password=secret-value")).when(diagnostics).database();
         doThrow(new IllegalStateException("organization secret-value")).when(diagnostics).organization(admin.tenantId());
+        doThrow(new IllegalStateException("organization source=https://private-source.invalid token=secret-value")).when(diagnostics).organizationSynchronization(admin.tenantId());
         when(diagnostics.migrations()).thenReturn("8");
         when(catalog.list()).thenReturn(List.of());
         var service = new SystemCheckService(diagnostics, catalog, false);
@@ -116,7 +135,9 @@ class SystemCheckServiceTest {
             assertThat(report.checks().get(0).status()).isEqualTo(SystemCheckService.Status.DOWN);
             assertThat(report.checks().get(1).status()).isEqualTo(SystemCheckService.Status.UP);
             assertThat(report.checks().get(2).status()).isEqualTo(SystemCheckService.Status.UP);
-            assertThat(report.toString()).doesNotContain("secret-host", "secret-value");
+            assertThat(report.toString()).doesNotContain("secret-host", "secret-value", "private-source");
+            assertThat(report.checks()).filteredOn(check -> check.id().equals("organizationSync")).singleElement()
+                    .satisfies(check -> assertThat(check.status()).isEqualTo(SystemCheckService.Status.DOWN));
             assertThat(report.checks().get(4).code()).isEqualTo("AUTH_PROVIDER_NOT_CONFIGURED");
             assertThat(report.checks()).filteredOn(check -> check.id().equals("organization"))
                     .singleElement().satisfies(check -> {

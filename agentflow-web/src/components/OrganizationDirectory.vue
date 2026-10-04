@@ -1,19 +1,22 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api, type ApiError } from '../api'
+import OrganizationSynchronization from './OrganizationSynchronization.vue'
+import { organizationSyncDrafts } from '../organizationSync'
 import { emptyOrganizationDraft, organizationDirty, organizationDrafts, organizationForm, organizationLabels, organizationPath, organizationPayload,
   type OrganizationSection, type OrganizationRecord, type OrganizationUnit, type OrganizationPerson, type OrganizationChange } from '../organization'
 
 const READ_TIMEOUT_MS = 12_000
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean }>()
 const draft = ref(organizationDrafts.get(props.scopeKey) ?? emptyOrganizationDraft())
+const view = ref<'local' | 'sync'>('local'), syncBusy = ref(false)
 const initialized = ref(false), loading = ref(false), saving = ref(false), denied = ref(false), error = ref(''), message = ref('')
 const rows = ref<OrganizationRecord[]>([]), nextId = ref<string | undefined>(), history = ref<OrganizationChange[]>([]), before = ref<number | undefined>()
 const showHistory = ref(false), initializeConfirmed = ref(false)
 const options = reactive<Record<string, { items: OrganizationRecord[]; next?: string }>>({ LEGAL_ENTITY: { items: [] }, DEPARTMENT: { items: [] }, POSITION: { items: [] }, PERSON: { items: [] }, APPOINTMENT: { items: [] } })
 let generation = 0, controller: AbortController | null = null, active = true
 const dirty = computed(() => organizationDirty(draft.value))
-const locked = computed(() => props.locked || saving.value || loading.value || denied.value)
+const locked = computed(() => props.locked || saving.value || loading.value || denied.value || syncBusy.value)
 const section = computed(() => draft.value.section)
 const form = computed(() => draft.value.form)
 const relationshipMode = computed(() => draft.value.mode === 'relationship')
@@ -106,7 +109,14 @@ async function loadHistory(more = false) {
   finally { clearTimeout(timer); if (active && version === generation) loading.value = false }
 }
 watch(draft, value => organizationDrafts.put(props.scopeKey, value), { deep: true, flush: 'sync' })
-watch(() => props.scopeKey, () => { controller?.abort(); generation++; initialized.value = false; rows.value = []; history.value = []; Object.values(options).forEach(value => { value.items = []; value.next = undefined }); draft.value = organizationDrafts.get(props.scopeKey) ?? emptyOrganizationDraft(); void load() }, { immediate: true })
+watch(() => props.scopeKey, () => {
+  controller?.abort(); generation++; initialized.value = false; rows.value = []; history.value = []
+  Object.values(options).forEach(value => { value.items = []; value.next = undefined })
+  draft.value = organizationDrafts.get(props.scopeKey) ?? emptyOrganizationDraft()
+  // 未保存本地草稿必须仍能编辑，优先于上次浏览的同步批次。
+  view.value = organizationDirty(draft.value) ? 'local' : organizationSyncDrafts.get(props.scopeKey).batchId ? 'sync' : 'local'
+  void load()
+}, { immediate: true })
 watch(() => props.refreshVersion, () => { draft.value = organizationDrafts.get(props.scopeKey) ?? draft.value; void load() })
 onUnmounted(() => { active = false; generation++; controller?.abort() })
 </script>
@@ -114,6 +124,9 @@ onUnmounted(() => { active = false; generation++; controller?.abort() })
 <template>
   <section class="content organization" aria-label="组织与人员管理">
     <div class="page-heading"><div><p class="eyebrow">ORGANIZATION</p><h2>组织与人员</h2><p>维护企业组织、稳定身份与任职，让流程选到实际处理人。</p></div><button class="secondary" :disabled="locked" @click="load()">刷新目录</button></div>
+    <nav class="organization-tabs" aria-label="组织维护方式"><button :aria-pressed="view === 'local'" :disabled="locked || dirty" @click="view = 'local'">本地维护</button><button :aria-pressed="view === 'sync'" :disabled="locked || dirty" @click="view = 'sync'">外部组织同步</button></nav>
+    <OrganizationSynchronization v-if="view === 'sync'" :scope-key="scopeKey" :refresh-version="refreshVersion" :access-denied="denied" :locked="props.locked || saving || dirty || denied" @busy="syncBusy = $event" @applied="load()" />
+    <template v-else>
     <p v-if="error" class="organization-error" role="alert">{{ error }}</p>
     <p v-if="message" role="status">{{ message }}</p>
     <p v-if="loading" role="status">正在读取组织目录…</p>
@@ -156,6 +169,7 @@ onUnmounted(() => { active = false; generation++; controller?.abort() })
         </div>
         <section v-if="showHistory" class="panel organization-history"><div class="organization-toolbar"><h3>组织变更记录</h3><button class="secondary" @click="showHistory = false">收起记录</button></div><details v-for="change in history" :key="change.revision"><summary>目录修订 {{ change.revision }} · {{ organizationLabels[change.kind as OrganizationSection] ?? change.kind }} · {{ change.actor }} · {{ new Date(change.occurredAt).toLocaleString('zh-CN') }}</summary><pre>{{ change.snapshotJson }}</pre></details><p v-if="!history.length">暂无变更记录。</p><button v-if="before" class="secondary" :disabled="locked" @click="loadHistory(true)">更早记录</button></section>
       </template>
+    </template>
     </template>
   </section>
 </template>

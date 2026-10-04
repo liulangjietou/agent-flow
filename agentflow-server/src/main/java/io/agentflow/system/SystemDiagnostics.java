@@ -4,6 +4,7 @@ import io.agentflow.attachment.LocalAttachmentStore;
 import io.agentflow.agent.AssistConfiguration;
 import io.agentflow.notification.NotificationChannel;
 import io.agentflow.notification.NotificationDestinations;
+import io.agentflow.organization.OrganizationSyncConfiguration;
 import org.flywaydb.core.Flyway;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RepositoryService;
@@ -32,13 +33,14 @@ public class SystemDiagnostics {
     private final LocalAttachmentStore attachments;
     private final AssistConfiguration assist;
     private final NotificationDestinations destinations;
+    private final OrganizationSyncConfiguration organizationSync;
     private final boolean assistWorkerEnabled;
     private final boolean notificationWorkerEnabled;
 
     /** 复用运行时依赖，避免诊断独立连接与真实应用配置不一致。 */
     public SystemDiagnostics(DataSource dataSource, Flyway flyway, RepositoryService repository,
                              RuntimeService runtime, TaskService tasks, HistoryService history, LocalAttachmentStore attachments,
-                             AssistConfiguration assist, NotificationDestinations destinations,
+                             AssistConfiguration assist, NotificationDestinations destinations, OrganizationSyncConfiguration organizationSync,
                              @Value("${agentflow.assist.worker-enabled:true}") boolean assistWorkerEnabled,
                              @Value("${agentflow.notifications.delivery-worker-enabled:false}") boolean notificationWorkerEnabled) {
         this.dataSource = dataSource;
@@ -50,6 +52,7 @@ public class SystemDiagnostics {
         this.attachments = attachments;
         this.assist = assist;
         this.destinations = destinations;
+        this.organizationSync = organizationSync;
         this.assistWorkerEnabled = assistWorkerEnabled;
         this.notificationWorkerEnabled = notificationWorkerEnabled;
     }
@@ -117,6 +120,24 @@ public class SystemDiagnostics {
         }
     }
 
+    /** 核对本租户可信来源与已登记身份，不注册来源、读取人员正文或发送网络请求。 */
+    public SynchronizationConfiguration organizationSynchronization(String tenantId) {
+        if (!organizationSync.isEnabled()) return SynchronizationConfiguration.DISABLED;
+        var target = organizationSync.destination(tenantId);
+        if (target.isEmpty()) return SynchronizationConfiguration.UNCONFIGURED;
+        try (var connection = dataSource.getConnection();
+             var statement = connection.prepareStatement("SELECT source_key FROM organization_sync_source WHERE tenant_id=?")) {
+            statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+            statement.setString(1, tenantId);
+            try (var result = statement.executeQuery()) {
+                if (result.next() && !result.getString("source_key").equals(target.get().sourceKey())) return SynchronizationConfiguration.SOURCE_CHANGED;
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Organization synchronization storage probe failed", exception);
+        }
+        return organizationSync.isWorkerEnabled() ? SynchronizationConfiguration.CONFIGURED : SynchronizationConfiguration.WORKER_DISABLED;
+    }
+
     /** 查询附件元数据表和已配置目录的访问权限，不读取内容、写探针文件或声称完成扫描。 */
     public boolean attachments(String tenantId) {
         if (!attachments.enabled()) return false;
@@ -158,4 +179,9 @@ public class SystemDiagnostics {
      * @author owlzhangfq@gmail.com
      */
     public enum ModelConfiguration { DISABLED, WORKER_DISABLED, CONFIGURED }
+
+    /** 配置和登记检查不代表来源连接、批次读取或人工应用已经成功。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum SynchronizationConfiguration { DISABLED, UNCONFIGURED, SOURCE_CHANGED, WORKER_DISABLED, CONFIGURED }
 }

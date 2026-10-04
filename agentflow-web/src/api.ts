@@ -14,6 +14,8 @@ import { expenseAssistPath, readExpenseAssistPreview, readExpenseAssistPage, rea
 import { extractionPath, readExtractionOptions, readExtractionPage, readExtractionDetail, validateExtractionReceipt, type ExtractionReceipt, type ExtractionGenerate, type ExtractionReview } from './invoiceExtraction.js'
 import { readNotificationPreferences, validateNotificationPreferencesReceipt, type NotificationPreferences, type NotificationPreferencesInput } from './notificationPreferences.js'
 import { approvalProxyPath, readApprovalProxy, readApprovalProxyPage, validateApprovalProxyReceipt, type ApprovalProxyInput, type ApprovalProxyReceipt } from './approvalProxies.js'
+import { syncPath, type SyncPlanReceipt, type SyncReceipt, type SyncSelection } from './organizationSync.js'
+import { readSyncBatches, readSyncDetail, readSyncLocalPage, readSyncOverview, readSyncPlan, readSyncPlans, readSyncTransitions, validateSyncReceipt } from './organizationSyncRead.js'
 import { readInitializationState, validateInitializationReceipt, type InitializationReceipt, type InitializationRequest } from './tenantInitialization.js'
 import { readDeliveryPage, readDeliveryDetail, readDeliveryHistory, validateDeliveryRetryReceipt, type NotificationDelivery, type NotificationDeliveryFilters, type NotificationDeliveryRetryInput } from './notificationDeliveries.js'
 import type { AdjustmentDisputeView, AdjustmentDisputeInput, AdjustmentDisputeReceipt } from './supplierAdjustmentDispute'
@@ -582,6 +584,7 @@ export const writeRequests = new PendingWrites(async (operation, key) => {
   if (/^\/invoices\/[^/?]+\/extraction-runs(?:\/[^/?]+\/review)?$/.test(operation.path)) return sendExtraction(operation, key)
   const actor = requestActor ? { ...requestActor } : null
   const result = await request(operation.path, { method: operation.method, body: operation.body, headers: { 'Idempotency-Key': key } })
+  if (operation.path.startsWith(syncPath + '/')) validateSyncReceipt(result, operation.path, operation.body!)
   if (operation.path === approvalProxyPath || /^\/organization\/approval-proxies\/[^/?]+\/revoke$/.test(operation.path)) validateApprovalProxyReceipt(result, operation.path, operation.body!)
   if (operation.path === '/system/initialization') validateInitializationReceipt(result, JSON.parse(operation.body!) as InitializationRequest, actor)
   if (operation.path === '/notifications/preferences') validateNotificationPreferencesReceipt(result, JSON.parse(operation.body!) as NotificationPreferencesInput)
@@ -851,6 +854,20 @@ export const api = {
   webhookDelivery: (id: string, signal: AbortSignal) => request<WebhookDetail>('/integrations/webhooks/deliveries/' + encodeURIComponent(id), { signal }),
   retryWebhook: (id: string, expectedVersion: number) => write<WebhookItem>('/integrations/webhooks/deliveries/' + encodeURIComponent(id) + '/retry', 'POST', '重新排队 Webhook 投递', { expectedVersion }),
   organizationStatus: (signal: AbortSignal) => request<{ initialized: boolean }>('/organization', { signal }),
+  organizationSyncOverview: (signal: AbortSignal) => configurationRead(syncPath, signal, readSyncOverview),
+  organizationSyncBatches: (page: number, signal: AbortSignal) => configurationRead(syncPath + '/batches' + historyQuery({ page, pageSize: 20 }), signal, value => readSyncBatches(value, page)),
+  organizationSyncBatch: (id: string, signal: AbortSignal) => configurationRead(syncPath + '/batches/' + encodeURIComponent(id), signal, value => readSyncDetail(value, id)),
+  organizationSyncTransitions: (id: string, signal: AbortSignal) => configurationRead(syncPath + '/batches/' + encodeURIComponent(id) + '/transitions', signal, readSyncTransitions),
+  organizationSyncPlans: (id: string, page: number, signal: AbortSignal) => configurationRead(syncPath + '/batches/' + encodeURIComponent(id) + '/plans' + historyQuery({ page, pageSize: 20 }), signal, value => readSyncPlans(value, page)),
+  organizationSyncPlan: (id: string, batchId: string, signal: AbortSignal) => configurationRead(syncPath + '/plans/' + encodeURIComponent(id), signal, (value, actor) => readSyncPlan(value, id, batchId, actor?.tenantId ?? '')),
+  organizationSyncOptions: (section: import('./organization').OrganizationSection, afterId: string | undefined, signal: AbortSignal) => configurationRead('/organization/'
+    + (section === 'PERSON' ? 'people' : section === 'APPOINTMENT' ? 'appointments' : 'units')
+    + historyQuery({ kind: ['PERSON', 'APPOINTMENT'].includes(section) ? undefined : section, afterId, limit: 30 }), signal, value => readSyncLocalPage(value, section)),
+  queueOrganizationSync: (body: { expectedSourceVersion: number; targetDigest: string }) => write<SyncReceipt>(syncPath + '/batches', 'POST', '读取可信组织来源', body),
+  retryOrganizationSync: (id: string, body: { expectedVersion: number; expectedSourceVersion: number; targetDigest: string }) => write<SyncReceipt>(syncPath + '/batches/' + encodeURIComponent(id) + '/retry', 'POST', '重试原组织同步批次', body),
+  cancelOrganizationSync: (id: string, body: { expectedVersion: number; comment?: string }) => write<SyncReceipt>(syncPath + '/batches/' + encodeURIComponent(id) + '/cancel', 'POST', '取消组织同步批次', body),
+  preflightOrganizationSync: (id: string, body: { expectedVersion: number; selections: SyncSelection[] }) => write<SyncPlanReceipt>(syncPath + '/batches/' + encodeURIComponent(id) + '/preflight', 'POST', '保存组织同步核对计划', body),
+  applyOrganizationSync: (id: string, body: { expectedVersion: number; planId: string; comment?: string }) => write<SyncReceipt>(syncPath + '/batches/' + encodeURIComponent(id) + '/apply', 'POST', '应用已核对的组织同步计划', body),
   approvalProxies: async (personId: string | undefined, afterId: string | undefined, signal: AbortSignal) => readApprovalProxyPage(await request(approvalProxyPath + historyQuery({ personId, afterId, limit: 30 }), { signal, cache: 'no-store' })),
   approvalProxy: async (id: string, signal: AbortSignal) => readApprovalProxy(await request(approvalProxyPath + '/' + encodeURIComponent(id), { signal, cache: 'no-store' }), id),
   createApprovalProxy: (body: ApprovalProxyInput) => write<ApprovalProxyReceipt>(approvalProxyPath, 'POST', '创建审批代理', body),
