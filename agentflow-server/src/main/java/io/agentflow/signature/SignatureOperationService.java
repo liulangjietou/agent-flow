@@ -127,7 +127,9 @@ public class SignatureOperationService {
         var initial = operations.find(request.tenantId(), request.id()).orElseThrow(SignatureOperationService::notFound); lockApplication(initial);
         var current = operations.lock(request.tenantId(), request.id()).orElseThrow(SignatureOperationService::notFound);
         if (!current.input().equals(callback.input())) throw new DomainException("SIGNATURE_RECEIPT_CONFLICT", "Signature callback original input changed");
-        var accepted = current.receiveCallback(callback.verified().receipt(), now);
+        // 接收时间可能早于等待锁期间已提交的状态；锁内生效时间不倒退，原验真时间仍保留在证据中。
+        var appliedAt = now.isBefore(current.updatedAt()) ? current.updatedAt() : now;
+        var accepted = current.receiveCallback(callback.verified().receipt(), appliedAt);
         if (!accepted.equals(current)) save(accepted, SignatureAudit.Action.SIGNATURE_CALLBACK);
         if (accepted(accepted, callback.verified().receipt())) evidence.append(accepted, callback.verified().evidence());
     }

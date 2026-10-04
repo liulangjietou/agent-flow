@@ -247,6 +247,36 @@ class SignatureWorkerIntegrationTest {
         } finally { executor.shutdownNow(); }
     }
 
+    @Test void duplicateCallbackThatWaitedBehindLaterReceiptRemainsIdempotent() {
+        queue(); service.claim("tenant-a", provider.input.request().id(), provider.clock.now);
+        var callback = new SignatureCallbackVerifier.Callback(provider.input, provider.proof());
+        var later = provider.clock.now.plusSeconds(1);
+        service.receiveCallback(callback, later); var accepted = stored();
+        // 请求先取时间、后等数据库锁：较早的请求允许在较晚请求提交后才进入临界区。
+        service.receiveCallback(callback, provider.clock.now);
+        assertThat(stored()).isEqualTo(accepted);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM signature_receipt_evidence", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE action='SIGNATURE_CALLBACK'", Integer.class)).isEqualTo(1);
+    }
+
+    @Test void newerCallbackWaitingBehindWorkerKeepsMonotonicStateAndOriginalEvidenceTime() {
+        queue(); var claim = service.claim("tenant-a", provider.input.request().id(), provider.clock.now);
+        byte[] raw = body(provider.profile, provider.input, provider.receipt(SignatureReceipt.Status.PENDING));
+        var pending = provider.verifier.verify(provider.input, provider.profile, raw, sign(provider.key, raw), provider.clock.now);
+        var later = provider.clock.now.plusSeconds(1);
+        service.finish(claim, new SignatureGateway.Observed(pending), later);
+        var callback = new SignatureCallbackVerifier.Callback(provider.input, provider.proof());
+        service.receiveCallback(callback, provider.clock.now);
+        var accepted = stored();
+        assertThat(accepted.status()).isEqualTo(SignatureOperation.Status.COLLECTING);
+        assertThat(accepted.updatedAt()).isEqualTo(later);
+        assertThat(evidence.forReceipt(accepted).evidence().verifiedAt()).isEqualTo(provider.clock.now);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM signature_receipt_evidence", Integer.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM signature_result_file", Integer.class)).isEqualTo(2);
+        service.finish(claim, new SignatureGateway.Unavailable(SignatureOperation.Failure.TIMEOUT), later.plusSeconds(1));
+        assertThat(stored()).isEqualTo(accepted);
+    }
+
     private void queue() {
         var queued = SignatureOperation.queue(provider.input, NOW);
         tx.executeWithoutResult(ignored -> { operations.create(queued); logins.insert(queued, reference); });
