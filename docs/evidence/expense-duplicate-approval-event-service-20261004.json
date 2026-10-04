@@ -1,0 +1,108 @@
+{
+  "taskId": "F12",
+  "status": "EVENT_SERVICE_WAIT_RESUMPTION_VERIFIED_TASK_OPEN",
+  "recordedAt": "2026-10-04T01:14:35.401126+00:00",
+  "sourceCommit": "8422723383998aa5521b6e64bbea9016322d7ed2",
+  "baseCommit": "c3590cf86105512e70eddff57aeebc5dc9905d21",
+  "productionChanged": false,
+  "backendCommit": "084b18e01811473313e6e1c2a875f7a9f89e4508",
+  "designerTemplateCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
+  "callChain": {
+    "callers": [
+      "EventWaitService.advance",
+      "ServiceTaskOperationService.claim -> ServiceTaskWaitService.advance"
+    ],
+    "downstream": "ApprovalCompletionService.persistProgress -> ExpenseDuplicateApprovalProgress -> native task completion, application persistence and task audit in the same transaction",
+    "serviceReceiptBoundary": "ServiceTaskOperationService.finish commits the confirmed remote receipt before the separate local workflow advancement transaction."
+  },
+  "coverageGap": "Existing F12 tests covered human and timer progression. Existing event/service tests did not enable the expense duplicate policy, so the combined rollback and source-trace boundary lacked evidence.",
+  "verification": {
+    "java": {
+      "status": "PASS",
+      "sessionId": 98094,
+      "exitCode": 0,
+      "uniqueCases": 65,
+      "classes": {
+        "io.agentflow.expense.ExpenseDuplicateApprovalPolicyTest": 7,
+        "io.agentflow.expense.ExpenseSelfApprovalPolicyTest": 4,
+        "io.agentflow.approval.EventWaitIntegrationTest": 15,
+        "io.agentflow.expense.ExpenseSubmissionIntegrationTest": 22,
+        "io.agentflow.servicetask.ServiceTaskRuntimeIntegrationTest": 17
+      },
+      "newCases": [
+        "adjacentExpenseApprovalEventWaitRollsBackAuditAndRetriesTheOriginalHumanTrace",
+        "adjacentExpenseApprovalServiceWaitRetainsRemoteReceiptWhenAutomaticAuditRollsBack"
+      ],
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "authors": {
+      "sessionId": 27289,
+      "exitCode": 0,
+      "javaFiles": 1634,
+      "namedTypes": 3184,
+      "missingAuthorTags": 0,
+      "parseErrors": 0
+    },
+    "diffCheck": "PASS"
+  },
+  "scenarios": [
+    "Published actual expense template with an event wait after supervisor: mismatched contract version does not advance, real automatic audit is written then deliberately failed, native subscription/application version/trace/audit all roll back, retry advances once to financial receipt, repeat is STALE.",
+    "Published actual expense template with a service task after supervisor: only explicitly mapped CNY reaches the loopback HTTP provider, confirmed APPLIED receipt survives automatic-audit rollback, original native wait and application/trace remain unchanged, local retry advances once without repeating the remote effect.",
+    "Both scenarios retain exactly one human APPROVE and one automatic approval whose proof identifies the original supervisor task, actual manager subject and rule version 1; financial receipt stays manual."
+  ],
+  "redRequired": false,
+  "redRationale": "Added verification of existing production behavior; both new scenarios passed on their first execution, and no production fix was made.",
+  "testFixtureChange": "The existing real loopback ServiceTaskTestProvider is shared with the expense suite; its constructor/declaration and read-only effect count are public only in test source.",
+  "fixedArtifact": {
+    "sourceCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
+    "recordedAt": "2026-10-04T01:03:37.637526+00:00",
+    "server": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-server-25fc140.jar",
+      "bytes": 79676180,
+      "sha256": "197f9d738440a1d197e57c79c95d2ef19fe8da6ab9903624b082729c5ab0d0b1"
+    },
+    "web": {
+      "directory": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-web-25fc140",
+      "files": [
+        {
+          "path": "assets/index-C-XRaavZ.css",
+          "bytes": 407361,
+          "sha256": "d40e1f5724b886bb28b20a18804e5d4b1179567f5cb8ef0eb141a2162a312b28"
+        },
+        {
+          "path": "assets/index-PWB8zP6D.js",
+          "bytes": 1885957,
+          "sha256": "db254966f908161980d758d09c9dde833101f43855368af16814c3a6b32def28"
+        },
+        {
+          "path": "index.html",
+          "bytes": 420,
+          "sha256": "7bb85c0312aa6d1bc7c63eb4f9f39b09898ebea59df40f48439cfbb328804723"
+        }
+      ]
+    },
+    "templateVersion": 3,
+    "companionVersion": 3,
+    "runtimeExecuted": false
+  },
+  "remaining": [
+    "Actual fixed-package nonempty v2-to-v3 upgrade, concurrent replay, forced restarts and independent restoration",
+    "Browser and PostgreSQL scope acceptance"
+  ],
+  "inventory": {
+    "knownOpenTaskCount": 34,
+    "completeInventory": false
+  },
+  "evidenceSnapshot": {
+    "directory": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-event-service-evidence",
+    "fileCount": 17,
+    "manifest": "/fyoung/tmp/agentflow-remaining-20260928/expense-duplicate-approval-event-service-evidence/manifest.json"
+  },
+  "delivery": {
+    "localOnly": true,
+    "pushed": false,
+    "pullRequestCreated": false
+  }
+}

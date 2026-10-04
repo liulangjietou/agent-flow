@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T01:04:06.254143+00:00",
+  "recordedAt": "2026-10-04T01:14:35.401126+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1441,7 +1441,7 @@
           ]
         }
       ],
-      "observed": "后端、两种设计器、便携配置、差异展示及费用模板/配套包 v3 已接入。设计器与模板阶段 102 项 Java、67 项前端、类型/契约/构建检查通过；原生代理、定时接续、并行汇合和并发连续自动审批通过。固定包已保存，事件/服务等待专项、实际升级与强退恢复、浏览器及 PostgreSQL 验收仍待完成。",
+      "observed": "后端、两种设计器、便携配置、差异展示及费用模板/配套包 v3 已接入。设计器与模板阶段 102 项 Java、67 项前端、类型/契约/构建检查通过；原生代理、定时接续、并行汇合和并发连续自动审批通过。事件/服务接续新增 2 项组合场景，65 项范围回归通过，审计回滚与服务效果不重复已验证。固定包已保存，实际升级与强退恢复、浏览器及 PostgreSQL 验收仍待完成。",
       "references": [
         {
           "path": "docs/expense-duplicate-approval.md",
@@ -1453,6 +1453,10 @@
         },
         {
           "path": "docs/evidence/expense-duplicate-approval-backend-20261004.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/expense-duplicate-approval-event-service-20261004.json",
           "line": 1
         }
       ],
@@ -1467,6 +1471,11 @@
         "status": "VERIFIED_TASK_OPEN",
         "implementationCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
         "evidence": "docs/evidence/expense-duplicate-approval-ui-template-20261004.json"
+      },
+      "waitResumptionStage": {
+        "status": "VERIFIED_TASK_OPEN",
+        "sourceCommit": "8422723383998aa5521b6e64bbea9016322d7ed2",
+        "evidence": "docs/evidence/expense-duplicate-approval-event-service-20261004.json"
       }
     },
     {
@@ -3616,10 +3625,10 @@
   },
   "latestProgress": {
     "taskId": "F12",
-    "status": "DESIGNER_TEMPLATE_AND_NATIVE_SCENARIOS_VERIFIED_TASK_OPEN",
-    "recordedAt": "2026-10-04T01:04:06.254143+00:00",
-    "sourceCommit": "25fc140770fa366b02a92f691f0d324d2883bf60",
-    "evidence": "docs/evidence/expense-duplicate-approval-ui-template-20261004.json",
+    "status": "EVENT_SERVICE_WAIT_RESUMPTION_VERIFIED_TASK_OPEN",
+    "recordedAt": "2026-10-04T01:14:35.401126+00:00",
+    "sourceCommit": "8422723383998aa5521b6e64bbea9016322d7ed2",
+    "evidence": "docs/evidence/expense-duplicate-approval-event-service-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
