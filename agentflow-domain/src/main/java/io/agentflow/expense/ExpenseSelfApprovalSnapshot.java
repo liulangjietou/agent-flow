@@ -24,9 +24,9 @@ public record ExpenseSelfApprovalSnapshot(String tenantId, UUID applicationId, i
 
     /** 业务与财务责任双向互斥，兼容并行激活及财务之后的业务节点。 */
     public List<String> conflictingNodes(String nodeId) {
-        boolean business = node(nodeId).stage() == ExpenseProcessPolicy.Stage.BUSINESS;
+        boolean business = node(nodeId).stage().businessApproval();
         return nodes.entrySet().stream().filter(entry ->
-                (entry.getValue().stage() == ExpenseProcessPolicy.Stage.BUSINESS) != business)
+                entry.getValue().stage().businessApproval() != business)
                 .map(Map.Entry::getKey).sorted().toList();
     }
 

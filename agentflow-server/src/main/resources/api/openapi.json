@@ -52578,6 +52578,112 @@
           }
         ]
       }
+    },
+    "/api/v1/expense-reports/{id}/prior-control": {
+      "get": {
+        "operationId": "expensePriorControl",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "读取原报销轮次的事前额度依据",
+        "description": "按当前主体和原审批轮次校验完整敏感明细，管理员不豁免；依据仅含共享来源的累计金额，不含其他报销单身份或明细。NOT_RECORDED 表示旧轮次未保存依据，不能解释为检查通过。只接受一个规范正整数 roundNo，拒绝重复和其他查询参数。",
+        "x-access": "同租户原轮次完整费用明细权限",
+        "x-idempotency": false,
+        "responses": {
+          "400": {
+            "description": "轮次参数不规范或包含不支持的查询字段",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpensePriorControlView"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                },
+                "description": "包含审批关联信息，禁止缓存。"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": true,
+            "description": "主单原提交轮次",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -64678,6 +64784,21 @@
             "items": {
               "$ref": "#/components/schemas/ExpensePrecheckFinding"
             }
+          },
+          "priorControls": {
+            "anyOf": [
+              {
+                "type": "array",
+                "maxItems": 200,
+                "items": {
+                  "$ref": "#/components/schemas/ExpensePriorControlAssessment"
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "原累计用量的预检依据；旧预检可能缺失，正式提交在资源锁内再次校验。"
           }
         },
         "required": [
@@ -65438,6 +65559,7 @@
             "type": "string",
             "enum": [
               "BUSINESS",
+              "PRIOR_REQUEST_REVIEW",
               "RECEIPT",
               "FINANCE_REVIEW",
               "FINANCE_RECHECK"
@@ -94117,6 +94239,233 @@
           "control"
         ],
         "additionalProperties": false
+      },
+      "ExpensePriorApprovedLine": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "approvedAmount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "toleranceFraction": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "policyReference": {
+            "type": "string"
+          },
+          "control": {
+            "$ref": "#/components/schemas/ExpensePriorControlSnapshot"
+          }
+        },
+        "required": [
+          "lineNo",
+          "approvedAmount",
+          "toleranceFraction",
+          "policyReference"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePriorControlAssessment": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "requestVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "source": {
+            "$ref": "#/components/schemas/ExpensePriorApprovedLine"
+          },
+          "threshold": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "consumed": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "otherReserved": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "roundReserved": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "lineAmount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "totalExposure": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "exceeded": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "lineNo",
+          "requestId",
+          "requestVersion",
+          "source",
+          "threshold",
+          "consumed",
+          "otherReserved",
+          "roundReserved",
+          "lineAmount",
+          "totalExposure",
+          "exceeded"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePriorSubmissionSnapshot": {
+        "type": "object",
+        "properties": {
+          "tenantId": {
+            "type": "string"
+          },
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "minimum": 2
+          },
+          "definitionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "definitionVersion": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "assessments": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "$ref": "#/components/schemas/ExpensePriorControlAssessment"
+            }
+          }
+        },
+        "required": [
+          "tenantId",
+          "reportId",
+          "applicationId",
+          "applicationVersion",
+          "roundNo",
+          "financialVersion",
+          "definitionId",
+          "definitionVersion",
+          "submittedAt",
+          "assessments"
+        ],
+        "additionalProperties": false
+      },
+      "ExpensePriorControlView": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "NOT_RECORDED",
+              "RECORDED"
+            ]
+          },
+          "requiresApproval": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "details": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpensePriorSubmissionSnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "roundNo",
+          "status",
+          "requiresApproval",
+          "details"
+        ],
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": {
+                  "const": "NOT_RECORDED"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "details": {
+                  "type": "null"
+                },
+                "requiresApproval": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "details": {
+                  "$ref": "#/components/schemas/ExpensePriorSubmissionSnapshot"
+                },
+                "requiresApproval": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }

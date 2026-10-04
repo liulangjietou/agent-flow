@@ -124,7 +124,8 @@ public class ExpensePrecheckEvaluator {
         if (!findings.isEmpty()) return new Result(null, findings);
         try { report.freeze(input.financialVersion(), input.roundNo(), entity.baseCurrency(), account.snapshot(), assessments, input.employeeId(), Instant.now()); }
         catch (DomainException invalid) { throw rejected(Stage.INPUT, null, invalid.code()); }
-        try { resources.requireClaimsAvailable(input.tenantId(), new ExpenseSubmissionResources().plan(report, loaded, Instant.now())); }
+        ExpenseSubmissionResources.Plan resourcePlan;
+        try { resourcePlan = new ExpenseSubmissionResources().plan(report, loaded, Instant.now()); resources.requireClaimsAvailable(input.tenantId(), resourcePlan); }
         catch (DomainException invalid) { throw rejected(Stage.RESOURCES, null, invalid.code()); }
         ensureLive(job);
         var budget = value(budgets.precheck(input.tenantId(), BudgetPrecheckPort.Request.from(report, input.accountingDate())), Stage.BUDGET, null);
@@ -132,7 +133,7 @@ public class ExpensePrecheckEvaluator {
         ensureLive(job);
         if (!capture.validUntil().isAfter(Instant.now())) throw unavailable(Stage.CONTEXT, "FACTS_EXPIRED");
         return new Result(new ExpensePrecheckEvidence(catalog.sourceVersion(), entity, rateDate, budget, report.currentRound(),
-                ExpensePrecheckResources.versions(loaded), invoiceEvidence, capture.validUntil(), selectedPolicy.selection()), List.of());
+                ExpensePrecheckResources.versions(loaded), invoiceEvidence, capture.validUntil(), selectedPolicy.selection(), resourcePlan.priorControls()), List.of());
     }
 
     private List<ExpensePolicyPort.InvoiceEvidence> invoiceFacts(ExpensePrecheckJob job, ExpenseLine line,

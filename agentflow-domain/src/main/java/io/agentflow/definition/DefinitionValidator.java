@@ -37,6 +37,8 @@ public final class DefinitionValidator {
         catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code()); }
         try { io.agentflow.expense.ExpenseSplitRiskPolicy.validate(graph, formSchema); }
         catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code()); }
+        try { io.agentflow.expense.ExpensePriorApprovalPolicy.validate(graph, formSchema); }
+        catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code()); }
         if (processKey != null && !DefinitionIdentifiers.valid(processKey)) errors.add("INVALID_PROCESS_KEY:" + processKey);
         if (graph.riskPolicy() != null) errors.addAll(graph.riskPolicy().validate(formSchema, graph.conditionLanguageVersion()));
         Map<String, Node> nodes = new HashMap<>();

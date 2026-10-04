@@ -65,7 +65,7 @@ public class ExpenseApprovalService {
         if (!structured(application)) return;
         var context = context(application, task);
         var stage = context.control().stage(task.getTaskDefinitionKey());
-        if (stage != ExpenseProcessPolicy.Stage.BUSINESS) requirePaper(context);
+        if (!stage.businessApproval()) requirePaper(context);
         if (stage.finance()) requireBudget(context);
     }
 

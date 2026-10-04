@@ -38,7 +38,8 @@ public final class ExpenseSubmissionResources {
         var invoices = invoiceChanges(prepared, previous, desiredInvoices, resources, at);
         var requests = priorChanges(prepared, previous, desiredRequests, resources);
         var advances = advanceChanges(prepared, previous, resources);
-        return new Plan(invoices, requests, advances);
+        var after = new HashMap<>(resources.requests()); requests.forEach(change -> after.put(change.after().id(), change.after()));
+        return new Plan(invoices, requests, advances, ExpensePriorControlAssessment.evaluate(prepared.id(), next, resources.requests(), after));
     }
 
     /** 驳回或作废只释放上一轮实际预留，不读取补正后尚未提交的资源引用。 */
@@ -180,9 +181,14 @@ public final class ExpenseSubmissionResources {
      * 按顺序保存每个中间财务版本，而不是丢掉多行预留的审计版本。
      * @author owlzhangfq@gmail.com
      */
-    public record Plan(List<InvoiceChange> invoices, List<PriorChange> requests, List<AdvanceChange> advances) {
+    public record Plan(List<InvoiceChange> invoices, List<PriorChange> requests, List<AdvanceChange> advances,
+                       List<ExpensePriorControlAssessment> priorControls) {
+        /** 释放、结算和历史调用不重写原轮次的提交控制事实。 */
+        public Plan(List<InvoiceChange> invoices, List<PriorChange> requests, List<AdvanceChange> advances) {
+            this(invoices, requests, advances, List.of());
+        }
         /** 计划只有全部计算成功后才返回，应用服务仍需复核输入版本及当前授权。 */
-        public Plan { invoices = List.copyOf(invoices); requests = List.copyOf(requests); advances = List.copyOf(advances); }
+        public Plan { invoices = List.copyOf(invoices); requests = List.copyOf(requests); advances = List.copyOf(advances); priorControls = List.copyOf(priorControls); }
     }
     /**
      * 单次发票版本转换及其明确业务目的。

@@ -18,6 +18,24 @@ for (const control of [{ mode: 'UNKNOWN' }, { mode: 'TOLERANCE' }, { mode: 'STRI
   { mode: 'TOLERANCE', toleranceFraction: '0.1' }, { mode: 'TOLERANCE', toleranceFraction: 1.01 }, { mode: 'NONE', approved: true }]) {
   assert.equal(validator(priorControlSchema)(control), false)
 }
+// 新额度证据只能来自原轮次；历史未知与已记录保持不同的空值语义。
+const priorViewSchema = { $ref: '#/components/schemas/ExpensePriorControlView' }
+const priorIdentity = { reportId: randomUUID(), applicationId: randomUUID(), roundNo: 1 }
+const priorMoney = { value: '100.00', currency: 'CNY' }
+const priorSource = { lineNo: 1, approvedAmount: priorMoney, toleranceFraction: 0.1, policyReference: 'synthetic',
+  control: { categoryCode: 'OFFICE', categoryRevision: 1, control: { mode: 'TOLERANCE', toleranceFraction: 0.1 } } }
+const priorAssessment = { lineNo: 1, requestId: randomUUID(), requestVersion: 1, source: priorSource,
+  threshold: priorMoney, consumed: priorMoney, otherReserved: priorMoney, roundReserved: priorMoney,
+  lineAmount: priorMoney, totalExposure: priorMoney, exceeded: priorMoney }
+const priorDetails = { ...priorIdentity, tenantId: 'demo', applicationVersion: 2, financialVersion: 2,
+  definitionId: randomUUID(), definitionVersion: 1, submittedAt: '2026-10-04T00:00:00Z', assessments: [priorAssessment] }
+validate(priorViewSchema, { ...priorIdentity, status: 'NOT_RECORDED', requiresApproval: null, details: null })
+validate(priorViewSchema, { ...priorIdentity, status: 'RECORDED', requiresApproval: true, details: priorDetails })
+for (const value of [
+  { ...priorIdentity, status: 'NOT_RECORDED', requiresApproval: false, details: null },
+  { ...priorIdentity, status: 'RECORDED', requiresApproval: false, details: null },
+  { ...priorIdentity, status: 'RECORDED', requiresApproval: false, details: { ...priorDetails, assessments: [{ ...priorAssessment, otherReports: ['private'] }] } }
+]) assert.equal(validator(priorViewSchema)(value), false)
 // 历史页明确序列化 null，不能与其他列表的省略语义混淆。
 validate({ $ref: '#/components/schemas/HistoryPage' }, { items: [], nextCursor: null })
 // 实际日历入口把缺省或 null 备注规范为空串；输入契约不能误用严格的响应结构。

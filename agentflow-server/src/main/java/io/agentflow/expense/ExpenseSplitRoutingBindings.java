@@ -29,10 +29,13 @@ public class ExpenseSplitRoutingBindings {
     private final JdbcExpenseSplitRoutingRepository routing;
     private final ApplicationRepository applications;
     private final ExpenseReportRepository reports;
+    private final JdbcExpensePriorControlRepository priorControls;
 
     /** 原申请和财务修订只从可信仓储取得，不接受浏览器提交冻结依据。 */
-    public ExpenseSplitRoutingBindings(JdbcExpenseSplitRoutingRepository routing, ApplicationRepository applications, ExpenseReportRepository reports) {
+    public ExpenseSplitRoutingBindings(JdbcExpenseSplitRoutingRepository routing, ApplicationRepository applications, ExpenseReportRepository reports,
+            JdbcExpensePriorControlRepository priorControls) {
         this.routing = routing; this.applications = applications; this.reports = reports;
+        this.priorControls = priorControls;
     }
 
     /** 已配置定义必须具有同事务准备记录；原来未配置的普通或费用定义继续使用旧引擎语义。 */
@@ -51,7 +54,7 @@ public class ExpenseSplitRoutingBindings {
                 || !snapshot.processKey().equals(definition.key()) || !snapshot.configuration().equals(configuration)
                 || !definition.tenantId().equals(command.tenantId()) || !definition.key().equals(command.processKey())
                 || definition.version() != command.definitionVersion()
-                || !ExpenseFormContract.submittedPayload(report.currentRound()).equals(command.payload())) throw invalid();
+                || !ExpenseFormContract.submittedPayload(report.currentRound(), priorControls.routingFlag(report, definition.formSchema())).equals(command.payload())) throw invalid();
         return snapshot;
     }
 

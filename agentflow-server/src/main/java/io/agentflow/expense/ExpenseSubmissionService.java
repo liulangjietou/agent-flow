@@ -32,17 +32,20 @@ public class ExpenseSubmissionService {
     private final BudgetOperationService budgets;
     private final ExpensePolicyConfiguration policyConfiguration;
     private final ExpenseSplitRoutingService splitRouting;
+    private final JdbcExpensePriorControlRepository priorControls;
 
     /** 外部调用由持久执行器承担，提交事务只使用仍然有效的已确认事实。 */
     public ExpenseSubmissionService(CurrentActor actors, ExpenseReportRepository reports, ApprovalApplicationFacade applications,
             DefinitionDraftRepository definitions, JdbcExpensePrecheckRepository prechecks, ExpensePrecheckService validation,
             ExpensePrecheckResources resources, ExpenseResourceChanges changes, JdbcExpenseSubmissionControlRepository controls,
-            BudgetOperationService budgets, ExpensePolicyConfiguration policyConfiguration, ExpenseSplitRoutingService splitRouting) {
+            BudgetOperationService budgets, ExpensePolicyConfiguration policyConfiguration, ExpenseSplitRoutingService splitRouting,
+            JdbcExpensePriorControlRepository priorControls) {
         this.actors = actors; this.reports = reports; this.applications = applications; this.definitions = definitions;
         this.prechecks = prechecks; this.validation = validation; this.resources = resources; this.changes = changes;
         this.controls = controls; this.budgets = budgets;
         this.policyConfiguration = policyConfiguration;
         this.splitRouting = splitRouting;
+        this.priorControls = priorControls;
     }
 
     /** 申请人只提交双版本与预检编号；金额、任职、纸件要求和预算输入全部从服务端事实派生。 */
@@ -70,10 +73,18 @@ public class ExpenseSubmissionService {
         var assessments = preview.originalLines().stream().collect(Collectors.toMap(value -> value.original().lineNo(), ExpenseRound.FrozenLine::assessment));
         report.freeze(input.financialVersion(), application.nextSubmissionRound(), preview.baseCurrency(), preview.account(), assessments, actor.userId(), now);
         var plan = new ExpenseSubmissionResources().plan(report, loaded, now);
+        if (evidence.priorControls() == null ? plan.priorControls().stream().anyMatch(value -> value.source().control() != null)
+                : !evidence.priorControls().equals(plan.priorControls())) {
+            throw new DomainException("RESOURCES_CHANGED", "Prior control evidence changed after precheck");
+        }
+        boolean overTolerance = plan.priorControls().stream().anyMatch(ExpensePriorControlAssessment::requiresApproval);
+        ExpensePriorApprovalPolicy.require(definition.graph(), application.formSchema(), overTolerance);
         resources.requireClaimsAvailable(actor.tenantId(), plan); changes.persist(plan, actor.userId());
         reports.update(report, input.financialVersion(), actor.userId(), "SUBMIT");
         application = applications.reviseBusiness(application.id(), application.version(), report.content().title(),
-                ExpenseFormContract.submittedPayload(report.currentRound()), application.businessReference());
+                ExpenseFormContract.submittedPayload(report.currentRound(), ExpenseFormContract.hasPriorControl(application.formSchema()) ? overTolerance : null), application.businessReference());
+        priorControls.save(new ExpensePriorControlSnapshot(actor.tenantId(), id, application.id(), application.version(), report.currentRound().roundNo(),
+                report.version(), definition.id(), definition.version(), now, plan.priorControls()), plan);
         splitRouting.prepare(report, application, definition, now);
         application = applications.submitBusiness(application.id(), application.version(), checked.input().initiator().appointmentId(), application.businessReference());
         var control = ExpenseSubmissionControl.submitted(new ExpenseSubmissionControl.Input(actor.tenantId(), id, application.id(), actor.userId(),

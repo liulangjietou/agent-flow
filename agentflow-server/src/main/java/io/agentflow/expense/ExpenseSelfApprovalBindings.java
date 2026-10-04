@@ -59,12 +59,12 @@ public class ExpenseSelfApprovalBindings {
             var stage = ExpenseProcessPolicy.stage(node);
             var candidates = original;
             ExpenseSelfApprovalSnapshot.Escalation replacement = null;
-            if (original.contains(application.createdBy()) && stage == ExpenseProcessPolicy.Stage.BUSINESS) {
+            if (original.contains(application.createdBy()) && stage.businessApproval()) {
                 if (escalation == null) escalation = superior(command);
                 replacement = escalation;
                 String superior = escalation.replacementSubject();
                 candidates = original.stream().map(subject -> subject.equals(application.createdBy()) ? superior : subject).distinct().sorted().toList();
-            } else if (stage != ExpenseProcessPolicy.Stage.BUSINESS) {
+            } else if (!stage.businessApproval()) {
                 // 财务节点只排除冲突人员，绝不能借自审批策略改派主管或自动通过。
                 candidates = original.stream().filter(subject -> !subject.equals(application.createdBy())).toList();
             }

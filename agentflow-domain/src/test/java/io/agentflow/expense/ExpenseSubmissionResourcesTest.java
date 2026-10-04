@@ -23,6 +23,65 @@ class ExpenseSubmissionResourcesTest {
     private static final LocalDate DATE = LocalDate.of(2026, 9, 28);
     private final ExpenseSubmissionResources planner = new ExpenseSubmissionResources();
 
+    @Test void aggregateToleranceNeedsAnExplanationEvenWhenEachCurrentLineIsBelowTheThreshold() {
+        var prior = controlledRequest("DAILY", ExpensePriorControl.Mode.TOLERANCE);
+        prior.reserve(1, 1, new ExpenseUse(UUID.randomUUID(), 1, 1), money("50"));
+        var report = frozen(List.of(line(1, "40", List.of(), prior.id()), line(2, "30", List.of(), prior.id())), List.of());
+        var input = resources(List.of(), List.of(prior), List.of());
+        fails("PRIOR_REQUEST_EXCEPTION_REASON_REQUIRED", () -> planner.plan(report, input, NOW));
+        assertThat(prior.balance(1).reserved()).isEqualTo(money("50"));
+    }
+
+    @Test void newControlCannotBeBorrowedFromAnotherExpenseCategory() {
+        var prior = controlledRequest("OTHER", ExpensePriorControl.Mode.NONE);
+        var report = frozen(List.of(line(1, "40", List.of(), prior.id())), List.of());
+        fails("PRIOR_REQUEST_CATEGORY_MISMATCH", () -> planner.plan(report, resources(List.of(), List.of(prior), List.of()), NOW));
+    }
+
+    @Test void cumulativeEvidenceIncludesConsumedAndOtherReservationsOnceForEveryCurrentLine() {
+        var prior = controlledRequest("DAILY", ExpensePriorControl.Mode.TOLERANCE);
+        var consumedUse = new ExpenseUse(UUID.randomUUID(), 1, 1);
+        prior.reserve(prior.version(), 1, consumedUse, money("20")); prior.consume(prior.version(), 1, consumedUse);
+        prior.reserve(prior.version(), 1, new ExpenseUse(UUID.randomUUID(), 1, 1), money("30"));
+        var report = frozen(List.of(explained(line(1, "40", List.of(), prior.id())), explained(line(2, "30", List.of(), prior.id()))), List.of());
+        var input = resources(List.of(), List.of(prior), List.of()); var plan = planner.plan(report, input, NOW);
+        assertThat(plan.priorControls()).hasSize(2).allSatisfy(value -> {
+            assertThat(value.consumed()).isEqualTo(money("20")); assertThat(value.otherReserved()).isEqualTo(money("30"));
+            assertThat(value.roundReserved()).isEqualTo(money("70")); assertThat(value.totalExposure()).isEqualTo(money("120"));
+            assertThat(value.exceeded()).isEqualTo(money("10")); assertThat(value.requiresApproval()).isTrue();
+            assertThat(value.requestVersion()).isEqualTo(prior.version());
+        });
+        assertThat(plan.priorControls()).extracting(ExpensePriorControlAssessment::lineAmount).containsExactly(money("40"), money("30"));
+        assertThat(ExpensePriorControlAssessment.evaluate(report.id(), report.currentRound(), input.requests(), applied(input, plan).requests())).isEqualTo(plan.priorControls());
+        assertThat(ExpenseFormContract.submittedPayload(report.currentRound())).doesNotContainKey(ExpenseFormContract.PRIOR_OVER_TOLERANCE);
+        assertThat(ExpenseFormContract.submittedPayload(report.currentRound(), true)).containsEntry(ExpenseFormContract.PRIOR_OVER_TOLERANCE, true);
+    }
+
+    @Test void uncappedEvidenceRetainsExcessWithoutAnExplanationAndResubmissionReplacesOwnReservations() {
+        var prior = controlledRequest("DAILY", ExpensePriorControl.Mode.NONE);
+        var report = frozen(List.of(line(1, "140", List.of(), prior.id()), line(2, "60", List.of(), prior.id())), List.of());
+        var input = resources(List.of(), List.of(prior), List.of()); var original = planner.plan(report, input, NOW);
+        assertThat(original.priorControls()).allSatisfy(value -> { assertThat(value.requiresApproval()).isFalse(); assertThat(value.exceeded()).isEqualTo(money("100")); });
+        var next = corrected(report, List.of(line(1, "90", List.of(), prior.id())), List.of());
+        var revised = planner.plan(next, applied(input, original), NOW.plusSeconds(20));
+        assertThat(revised.priorControls()).singleElement().satisfies(value -> {
+            assertThat(value.roundReserved()).isEqualTo(money("90")); assertThat(value.otherReserved()).isEqualTo(money("0"));
+            assertThat(value.totalExposure()).isEqualTo(money("90")); assertThat(value.exceeded()).isEqualTo(money("0"));
+        });
+    }
+
+    private ExpenseLine explained(ExpenseLine source) {
+        return new ExpenseLine(source.lineNo(), source.categoryCode(), source.incurredOn(), source.endedOn(), source.cityCode(), source.quantity(), source.unit(),
+                source.claimedGross(), source.claimedTax(), source.invoiceIds(), source.priorRequest(), source.allocations(), source.description(), "合成共享额度说明");
+    }
+
+    private ExpenseRequest controlledRequest(String category, ExpensePriorControl.Mode mode) {
+        var control = new ExpensePriorControl(mode, mode == ExpensePriorControl.Mode.TOLERANCE ? new BigDecimal("0.1") : null);
+        return new ExpenseRequest(UUID.randomUUID(), "demo", UUID.randomUUID(), ENTITY, "alice", List.of(
+                new ExpenseRequest.ApprovedLine(1, money("100"), control.referenceFraction(), "synthetic-control",
+                        new ExpensePriorControl.Snapshot(category, 1, control))));
+    }
+
     @Test
     void firstSubmissionProducesReservationsWithoutChangingAnyInputResource() {
         var invoice = invoice(UUID.randomUUID(), "12345678901234567890"); var request = request("100"); var advance = advance("80");
