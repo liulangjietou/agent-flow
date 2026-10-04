@@ -52,6 +52,15 @@ export function priorControlLabel(control?: PriorControl | null): string {
   const checked = readPriorControl(control)
   return checked.mode === 'TOLERANCE' ? `容差 ${Number((Number(checked.toleranceFraction) * 100).toFixed(4))}% · 超过阈值需说明和独立审批` : priorControlModes[checked.mode]
 }
+/** 冻结计划按整数分计算累计阈值，不把分以下尾数四舍五入到更高额度。 */
+export function priorThresholdLabel(amount: Money, control?: PriorControl): string {
+  const checked = control ? readPriorControl(control) : null
+  if (checked?.mode === 'NONE') return `参考金额 ${moneyLabel(amount)}，额度不设上限`
+  const ratio = checked?.mode === 'TOLERANCE' ? fraction(checked.toleranceFraction) : 0n
+  const cents = amountMinor(amount.value) * (SCALE + ratio) / SCALE
+  const whole = (cents / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  return `累计控制阈值 ${amount.currency} ${whole}.${(cents % 100n).toString().padStart(2, '0')}`
+}
 /** NONE 的余额只供参考，不能显示成允许报销的剩余上限。 */
 export function priorBalanceLabel(line: PriorRequestItem['lines'][number]): string {
   const mode = line.control?.control.mode

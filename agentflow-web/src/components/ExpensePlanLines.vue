@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { moneyLabel } from '../expenses'
-import { priorControlLabel } from '../expensePriorControl'
+import { priorControlLabel, priorThresholdLabel } from '../expensePriorControl'
 import type { PlanContent, PlanRound } from '../expensePlan'
 defineProps<{ content: PlanContent; financial?: PlanRound | null }>()
 </script>
@@ -15,6 +15,7 @@ defineProps<{ content: PlanContent; financial?: PlanRound | null }>()
         <h5>原币成本分摊</h5><ul><li v-for="allocation in line.allocations" :key="JSON.stringify([allocation.costCenter, allocation.projectCode])">{{ allocation.costCenter }}<template v-if="allocation.projectCode"> / {{ allocation.projectCode }}</template> · {{ moneyLabel(allocation.amount) }}</li></ul>
         <template v-for="frozen in financial?.lines.filter(value => value.original.lineNo === line.lineNo) ?? []" :key="frozen.original.lineNo">
           <p>本轮事前控制：{{ priorControlLabel(frozen.priorControl?.control) }}<template v-if="frozen.priorControl"> · {{ frozen.priorControl.categoryCode }} · 类别修订 {{ frozen.priorControl.categoryRevision }}</template></p>
+          <p>{{ priorThresholdLabel(frozen.amount, frozen.priorControl?.control) }}</p>
           <p>本轮折算金额 <strong>{{ moneyLabel(frozen.amount) }}</strong></p><p>汇率 {{ frozen.rate.fromCurrency }} → {{ frozen.rate.toCurrency }}：{{ frozen.rate.rate }} · {{ frozen.rate.rateDate }} · {{ frozen.rate.source }}</p>
           <h5>本位币成本分摊</h5><ul><li v-for="allocation in frozen.allocations" :key="JSON.stringify([allocation.costCenter, allocation.projectCode])">{{ allocation.costCenter }}<template v-if="allocation.projectCode"> / {{ allocation.projectCode }}</template> · {{ moneyLabel(allocation.amount) }}</li></ul>
         </template>

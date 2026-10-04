@@ -34,6 +34,8 @@ const { default: Panel } = await import(process.env.AGENTFLOW_TEST_EXPENSEPRIORC
 const { default: Facts } = await import(process.env.AGENTFLOW_TEST_EXPENSEPRIORCONTROLFACTSRENDERED)
 const { default: Stage } = await import(process.env.AGENTFLOW_TEST_DEFINITIONEXPENSESTAGERENDERED)
 const { default: Picker } = await import(process.env.AGENTFLOW_TEST_EXPENSEFUNDINGPICKERPANEL)
+const { default: PickerRendered } = await import(process.env.AGENTFLOW_TEST_EXPENSEFUNDINGPICKERRENDERED)
+const { default: PlanLines } = await import(process.env.AGENTFLOW_TEST_EXPENSEPLANLINESRENDERED)
 const originals = { ...api }, clone = value => JSON.parse(JSON.stringify(value))
 const id = n => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const money = value => ({ value, currency: 'CNY' })
@@ -115,4 +117,29 @@ test('选择器按冻结类别和币种过滤，宽松模式也不能跨类别�
     panel.state.addPrior(id(3), 1); assert.deepEqual(content.lines[0].priorRequest, { requestId: id(3), lineNo: 1 })
     line.approved.currency = 'USD'; assert.equal(panel.state.canSelectPrior(resource, line), false)
   } finally { panel.close() }
+})
+
+
+test('额度选择器明确显示零参考余额之外已经超出的金额', async () => {
+  const content = { legalEntityId: id(5), lines: [{ lineNo: 1, categoryCode: 'OFFICE', priorRequest: null }], advanceOffsets: [] }
+  const panel = mount(Picker, { modelValue: content, scopeKey: 'alice', baseCurrency: 'CNY', locked: false })
+  try {
+    await settle(); panel.state.kind = 'requests'; await settle(); panel.state.open = true; panel.state.lineNo = 1
+    panel.state.requests.items = [{ id: id(3), legalEntityId: id(5), closed: false, lines: [{ lineNo: 1, approved: money('80.00'),
+      available: money('0.00'), exceeded: money('12.00'), control: { categoryCode: 'OFFICE', categoryRevision: 1, control: { mode: 'NONE' } } }] }]
+    const html = await renderToString(createSSRApp({ ...PickerRendered, setup: () => panel.state }, panel.props))
+    assert.match(html, /参考余额 CNY 0.00/); assert.match(html, /超出参考金额 CNY 12.00/)
+  } finally { panel.close() }
+})
+
+test('计划冻结阈值向下取整到分，严格与无上限模式保留明确语义', async () => {
+  const original = { lineNo: 1, categoryCode: 'OFFICE', plannedOn: '2026-10-04', cityCode: 'SH', amount: money('0.03'), allocations: [], description: '合成计划' }
+  for (const [control, expected] of [[{ mode: 'TOLERANCE', toleranceFraction: 0.5 }, /累计控制阈值 CNY 0.04/],
+    [{ mode: 'STRICT' }, /累计控制阈值 CNY 0.03/], [{ mode: 'NONE' }, /参考金额 CNY 0.03，额度不设上限/]]) {
+    const financial = { managedCategoryRevision: 1, lines: [{ original, amount: money('0.03'), allocations: [],
+      rate: { fromCurrency: 'CNY', toCurrency: 'CNY', rate: 1, rateDate: '2026-10-04', source: 'synthetic' },
+      priorControl: { categoryCode: 'OFFICE', categoryRevision: 1, control } }] }
+    const html = await renderToString(createSSRApp(PlanLines, { content: { lines: [original] }, financial }))
+    assert.match(html, expected)
+  }
 })
