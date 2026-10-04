@@ -37,7 +37,8 @@ public final class ExpenseRequest {
                 || approvedLines.stream().map(ApprovedLine::lineNo).distinct().count() != approvedLines.size()) throw invalid();
         this.tenantId = tenantId; this.employeeId = employeeId; this.approvedLines = List.copyOf(approvedLines);
         var initial = new LinkedHashMap<Integer, ReservedAmount>();
-        for (var line : approvedLines) initial.put(line.lineNo(), ReservedAmount.available(line.limit()));
+        for (var line : approvedLines) initial.put(line.lineNo(), line.hardLimit()
+                ? ReservedAmount.available(line.limit()) : ReservedAmount.availableWithoutCeiling(line.limit()));
         balances = Map.copyOf(initial);
     }
 
@@ -99,7 +100,8 @@ public final class ExpenseRequest {
         if (state.version() < 1 || !state.balances().keySet().equals(result.balances.keySet())) throw invalid();
         for (var line : result.approvedLines) {
             var balance = state.balances().get(line.lineNo());
-            if (balance == null || !balance.limit().equals(line.limit()) || java.util.stream.Stream.concat(balance.reservations().stream(), balance.consumptions().stream())
+            if (balance == null || !balance.limit().equals(line.limit()) || balance.hardLimit() != line.hardLimit()
+                    || java.util.stream.Stream.concat(balance.reservations().stream(), balance.consumptions().stream())
                     .anyMatch(item -> item.use().lineNo() < 1)) throw invalid();
         }
         result.balances = state.balances(); result.closed = state.closed(); result.version = state.version(); return result;
@@ -128,16 +130,24 @@ public final class ExpenseRequest {
     }
 
     /**
-     * 容差是明确发布的额度授权，零表示严格控制；不把示例百分比写成默认值。
+     * 旧容差仍是硬授权；新模式的完整来源随批准行冻结，不按比例反推模式。
      * @author owlzhangfq@gmail.com
      */
-    public record ApprovedLine(int lineNo, Money approvedAmount, BigDecimal toleranceFraction, String policyReference) {
+    public record ApprovedLine(int lineNo, Money approvedAmount, BigDecimal toleranceFraction, String policyReference,
+                               ExpensePriorControl.Snapshot control) {
         /** 非负容差最多百分之百，允许额度始终向下取整到分，不能越过授权边界。 */
         public ApprovedLine {
             if (lineNo < 1 || lineNo > ExpenseContent.MAX_LINES || approvedAmount == null || approvedAmount.value().signum() <= 0
                     || toleranceFraction == null || toleranceFraction.signum() < 0 || toleranceFraction.compareTo(BigDecimal.ONE) > 0
-                    || toleranceFraction.stripTrailingZeros().scale() > 6 || StringUtils.isBlank(policyReference) || policyReference.length() > 128) throw invalid();
+                    || toleranceFraction.stripTrailingZeros().scale() > 6 || StringUtils.isBlank(policyReference) || policyReference.length() > 128
+                    || control != null && toleranceFraction.compareTo(control.control().referenceFraction()) != 0) throw invalid();
         }
+        /** 没有新控制依据的旧行继续原硬上限，不能自动升级为宽松模式。 */
+        public ApprovedLine(int lineNo, Money approvedAmount, BigDecimal toleranceFraction, String policyReference) {
+            this(lineNo, approvedAmount, toleranceFraction, policyReference, null);
+        }
+        /** 旧额度和明确 STRICT 均限制累计金额，新宽松控制保留完整用量供后续审批。 */
+        public boolean hardLimit() { return control == null || control.control().hardLimit(); }
         /** 只在形成批准额度时计算，后续预留不重复扩大容差。 */
         public Money limit() { return new Money(approvedAmount.value().multiply(BigDecimal.ONE.add(toleranceFraction)).setScale(Money.SCALE, RoundingMode.DOWN), approvedAmount.currency()); }
     }

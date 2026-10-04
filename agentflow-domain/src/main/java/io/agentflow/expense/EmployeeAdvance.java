@@ -203,7 +203,7 @@ public final class EmployeeAdvance {
 
     /** 恢复同一笔实际放款与额度账本，预留不能改写外部放款引用。 */
     public static EmployeeAdvance restore(State state) {
-        if (state.version() < 1 || state.balance() == null) throw new DomainException("INVALID_ADVANCE", "Persisted advance balance is invalid");
+        if (state.version() < 1 || state.balance() == null || !state.balance().hardLimit()) throw new DomainException("INVALID_ADVANCE", "Persisted advance balance is invalid");
         var result = new EmployeeAdvance(state.id(), state.tenantId(), state.legalEntityId(), state.employeeId(), state.balance().limit(),
                 state.paymentReference(), state.paidOn(), state.dueOn());
         if (java.util.stream.Stream.concat(state.balance().reservations().stream(), state.balance().consumptions().stream())

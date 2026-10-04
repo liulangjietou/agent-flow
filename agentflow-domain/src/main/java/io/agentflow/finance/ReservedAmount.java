@@ -14,8 +14,8 @@ import java.util.UUID;
  * @author owlzhangfq@gmail.com
  */
 public record ReservedAmount(Money limit, List<Reservation> consumptions, List<Reservation> reservations,
-                             List<ConsumptionReversal> reversals, List<ConsumptionReduction> reductions) {
-    /** 核销与全部预留不得超过批准额度，任何一笔都必须有唯一轮次归属。 */
+                             List<ConsumptionReversal> reversals, List<ConsumptionReduction> reductions, Ceiling ceiling) {
+    /** 硬上限限制累计用量；参考账本保留超出额，任何一笔都必须有唯一轮次归属。 */
     public ReservedAmount {
         if (limit == null || consumptions == null || reservations == null) throw invalid();
         var all = new ArrayList<>(consumptions); all.addAll(reservations);
@@ -33,7 +33,7 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
         for (var reservation : all) used = used.plus(reservation.amount());
         for (var reversal : reversals) used = used.minus(reversal.amount());
         for (var reduction : reductions) used = used.minus(reduction.amount());
-        if (used.compareTo(limit) > 0) throw insufficient();
+        if (ceiling != Ceiling.REFERENCE_ONLY && used.compareTo(limit) > 0) throw insufficient();
         consumptions = List.copyOf(consumptions); reservations = List.copyOf(reservations);
     }
 
@@ -47,8 +47,22 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
         this(limit, consumptions, reservations, reversals, List.of());
     }
 
+    /** 历史快照及调用方保持硬上限，不增写原 JSON 没有的模式属性。 */
+    public ReservedAmount(Money limit, List<Reservation> consumptions, List<Reservation> reservations,
+                          List<ConsumptionReversal> reversals, List<ConsumptionReduction> reductions) {
+        this(limit, consumptions, reservations, reversals, reductions, null);
+    }
+
     /** 创建已批准但尚未预留或核销的额度。 */
     public static ReservedAmount available(Money limit) { return new ReservedAmount(limit, List.of(), List.of()); }
+
+    /** 事前宽松控制记录全部实际用量，参考金额不充当资金硬上限。 */
+    public static ReservedAmount availableWithoutCeiling(Money reference) {
+        return new ReservedAmount(reference, List.of(), List.of(), List.of(), List.of(), Ceiling.REFERENCE_ONLY);
+    }
+
+    /** 缺少新字段的历史记录仍严格限制额度。 */
+    public boolean hardLimit() { return ceiling != Ceiling.REFERENCE_ONLY; }
 
     /** 当前净核销扣除独立冲回，原核销逐笔保留，旧轮次仍不能重新占用。 */
     public Money consumed() { return grossConsumed().minus(reversed()).minus(reduced()); }
@@ -65,9 +79,16 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
     /** 汇总实际预留，不向资金选择器暴露其他使用单据的身份。 */
     public Money reserved() { return reservations.stream().map(Reservation::amount).reduce(Money.zero(limit.currency()), Money::plus); }
 
-    /** 当前可用额严格扣除所有仍然有效的预留。 */
+    /** 参考剩余额度最低为零；是否仍可新增由所属聚合的控制模式决定。 */
     public Money available() {
-        return limit.minus(consumed()).minus(reserved());
+        var used = consumed().plus(reserved());
+        return used.compareTo(limit) >= 0 ? Money.zero(limit.currency()) : limit.minus(used);
+    }
+
+    /** 当前净核销及全部预留超过参考金额的真实差额。 */
+    public Money exceeded() {
+        var used = consumed().plus(reserved());
+        return used.compareTo(limit) > 0 ? used.minus(limit) : Money.zero(limit.currency());
     }
 
     /** 查询某一完整轮次归属已经预留的金额。 */
@@ -94,7 +115,7 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
     /** 同一调整只能减少同一原核销一次，累计和时间顺序由账本恢复不变量共同校验。 */
     public ReservedAmount reduceConsumption(ExpenseUse use, Money amount, UUID adjustmentId, Instant at) {
         var updated = new ArrayList<>(reductions); updated.add(new ConsumptionReduction(adjustmentId, use, amount, at));
-        return new ReservedAmount(limit, consumptions, reservations, reversals, updated);
+        return new ReservedAmount(limit, consumptions, reservations, reversals, updated, ceiling);
     }
 
     /** 独立调整完整冲回一笔原核销，不删除历史，也不改动其他报销的预留。 */
@@ -105,7 +126,7 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
             throw new DomainException("CONSUMPTION_REVERSAL_CONFLICT", "An unreversed original consumption is required");
         }
         var updated = new ArrayList<>(reversals); updated.add(new ConsumptionReversal(adjustmentId, use, amount, at));
-        return new ReservedAmount(limit, consumptions, reservations, updated, reductions);
+        return new ReservedAmount(limit, consumptions, reservations, updated, reductions, ceiling);
     }
 
     /** 设置该归属的精确预留额；为零时释放，其余归属不受影响。 */
@@ -117,7 +138,7 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
         }
         var updated = new ArrayList<>(reservations.stream().filter(item -> !item.use().equals(use)).toList());
         if (amount.value().signum() > 0) updated.add(new Reservation(use, amount));
-        return new ReservedAmount(limit, consumptions, updated, reversals, reductions);
+        return new ReservedAmount(limit, consumptions, updated, reversals, reductions, ceiling);
     }
 
     /** 重提时原子迁移原轮次归属并调整金额，超额失败时原账本保持不变。 */
@@ -133,7 +154,7 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
         Money amount = reservedFor(use);
         if (amount.value().signum() == 0) throw new DomainException("RESERVATION_NOT_FOUND", "No active reservation exists for this expense round");
         var settled = new ArrayList<>(consumptions); settled.add(new Reservation(use, amount));
-        return new ReservedAmount(limit, settled, reservations.stream().filter(item -> !item.use().equals(use)).toList(), reversals, reductions);
+        return new ReservedAmount(limit, settled, reservations.stream().filter(item -> !item.use().equals(use)).toList(), reversals, reductions, ceiling);
     }
 
     private static void requireReductions(List<Reservation> consumed, List<ConsumptionReversal> reversals, List<ConsumptionReduction> reductions) {
@@ -151,6 +172,12 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
 
     private static DomainException invalid() { return new DomainException("INVALID_RESERVATION", "Reservation identity or amount is invalid"); }
     private static DomainException insufficient() { return new DomainException("INSUFFICIENT_FINANCIAL_BALANCE", "Reserved and consumed amounts exceed the available limit"); }
+
+    /**
+     * HARD 与历史空值均限制余额；REFERENCE_ONLY 仅用于业务明确允许超额的事前计划。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum Ceiling { HARD, REFERENCE_ONLY }
 
     /**
      * 一笔正金额预留，取消以移除该项表示，不保存无意义的零预留。
