@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T03:42:18.484318+00:00",
+  "recordedAt": "2026-10-04T04:39:03.885538+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -907,7 +907,7 @@
           ]
         }
       ],
-      "observed": "已完成 V109/V110 基础、预检与原子应用，并接通可信来源 HTTP、持久工作器及 11 个管理接口。最新范围 145 个唯一用例通过，112 个实际接口响应通过契约验证。系统检查、页面及固定包完整验收尚待完成，继续 OPEN。",
+      "observed": "V109/V110、可信来源 HTTP、持久工作器及 11 个管理员接口已有后端证据。本轮接通只读诊断和完整核对页面：69 个后端范围用例、134 个前端用例、79 个真实成功响应的生产客户端解析以及类型检查和构建通过。固定包运行验收、浏览器及 PostgreSQL 新范围尚待完成，继续 OPEN。",
       "references": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationController.java",
@@ -936,6 +936,10 @@
         {
           "path": "docs/evidence/organization-sync-backend-20261004.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/organization-sync-ui-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "以单一可信源映射组织事实，预检和具名应用变更、停用及重试均有审计；不隐式创建认证身份或授予系统角色；旧审批轮次依据保持。",
@@ -954,6 +958,11 @@
         "status": "HTTP_WORKER_ADMIN_API_VERIFIED_LOCAL_BACKEND",
         "implementationCommit": "f1fad53377354b12463fe8c0f4357db0a82c3f8a",
         "evidence": "docs/evidence/organization-sync-backend-20261004.json"
+      },
+      "uiStage": {
+        "status": "SYSTEM_DIAGNOSTICS_AND_REVIEW_UI_VERIFIED_LOCAL",
+        "implementationCommit": "c9b47341164a6025cb0c23e4eb8c03a08f4c146b",
+        "evidence": "docs/evidence/organization-sync-ui-20261004.json"
       }
     },
     {
@@ -3693,10 +3702,10 @@
   },
   "latestProgress": {
     "taskId": "I01",
-    "status": "HTTP_WORKER_ADMIN_API_VERIFIED_LOCAL_BACKEND",
-    "recordedAt": "2026-10-04T04:08:48.550852+00:00",
-    "sourceCommit": "f1fad53377354b12463fe8c0f4357db0a82c3f8a",
-    "evidence": "docs/evidence/organization-sync-backend-20261004.json",
+    "status": "SYSTEM_DIAGNOSTICS_AND_REVIEW_UI_VERIFIED_LOCAL",
+    "recordedAt": "2026-10-04T04:39:03.885538+00:00",
+    "sourceCommit": "c9b47341164a6025cb0c23e4eb8c03a08f4c146b",
+    "evidence": "docs/evidence/organization-sync-ui-20261004.json",
     "knownOpenTaskCount": 34
   }
 }
