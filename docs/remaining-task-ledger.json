@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T11:33:36.916874+00:00",
+  "recordedAt": "2026-10-04T11:55:54.445723+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1361,7 +1361,7 @@
           ]
         }
       ],
-      "observed": "显式启用配置、网关发布校验和纯领域聚合已实现，65 项相关领域回归通过；当前有效轮次查询、不可变依据、提交事务、运行路由及页面仍待接通。F04 保持 OPEN。",
+      "observed": "显式配置、业务网关发布校验、领域聚合、V116 当前轮次投影和不可变依据仓储已实现。358 项相关回归通过，补充实际入库的未配置/关闭断言后 13 项存储范围通过，数量不相加。原提交事务、实际网关路由、权限接口和页面仍待接通；F04 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
@@ -1374,7 +1374,8 @@
       ],
       "acceptance": "窗口、阈值和启用状态显式配置；并发提交也按确定口径聚合；冻结风险及路由依据；不伪称未启用规则已经保护业务。",
       "dependsOn": [],
-      "domainFoundationEvidence": "docs/evidence/expense-split-domain-20261004.json"
+      "domainFoundationEvidence": "docs/evidence/expense-split-domain-20261004.json",
+      "persistenceEvidence": "docs/evidence/expense-split-persistence-20261004.json"
     },
     {
       "id": "F05",

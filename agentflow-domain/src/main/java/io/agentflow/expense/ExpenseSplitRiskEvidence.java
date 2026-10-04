@@ -120,6 +120,16 @@ public final class ExpenseSplitRiskEvidence {
             for (var line : lines) if (line == null || !numbers.add(line.lineNo()) || !scope.currency().equals(line.approvedGross().currency())) throw invalid();
             lines = lines.stream().sorted(Comparator.comparingInt(Line::lineNo)).toList();
         }
+
+        /** 当前查询和历史修订恢复共用相同映射，类别来自原冻结行，金额来自当前核定行。 */
+        public static Document from(ExpenseReport report, long applicationVersion, ApplicationStatus status) {
+            var round = report.requireFrozenRound();
+            var categories = new TreeMap<Integer, String>();
+            for (var line : round.originalLines()) categories.put(line.original().lineNo(), line.original().categoryCode());
+            return new Document(report.id(), report.applicationId(), applicationVersion, report.version(), round.roundNo(),
+                    new Scope(report.tenantId(), report.employeeId(), round.content().legalEntityId(), round.baseCurrency()), round.submittedAt(), status,
+                    round.approvedLines().stream().map(line -> new Line(line.lineNo(), categories.get(line.lineNo()), line.gross())).toList());
+        }
     }
 
     /**

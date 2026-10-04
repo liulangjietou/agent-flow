@@ -1,0 +1,106 @@
+{
+  "recordedAt": "2026-10-04T11:55:54.443095+00:00",
+  "task": "F04",
+  "scope": "DOMAIN_AND_PERSISTENCE_ONLY",
+  "taskRemainsOpen": true,
+  "baselineCommit": "78e2498861d15c52affeb3218228f562eb0050c0",
+  "red": {
+    "tests": 13,
+    "failures": 10,
+    "errors": 0,
+    "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-persistence-red",
+    "initialMissingMigration": "/fyoung/tmp/agentflow-remaining-20260928/f04-migration-red",
+    "initialCompileError": "/fyoung/tmp/agentflow-remaining-20260928/f04-persistence-initial-compile.log"
+  },
+  "green": {
+    "tests": 358,
+    "failures": 0,
+    "errors": 0,
+    "reports": [
+      {
+        "class": "ExpenseSplitRiskEvidenceTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "ba749188beed06dd8704810c467c50f441526e12eb4a8f579c54ef858a34dd54"
+      },
+      {
+        "class": "ExpenseSplitRiskPolicyTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "1c3e77eeacfc15bf5c20a52d9132044041e3eb2d1b031a4a551c95cef8fa2679"
+      },
+      {
+        "class": "ExpenseReportTest",
+        "tests": 17,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "0e3cf0f921760371df71066c16c7c77f63b768bc26dc3b7d7e861a6a189ae9a9"
+      },
+      {
+        "class": "ExpenseSplitRoutingPersistenceTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "ce519f9a09c9307eafd387e514d16c29fb0f3c37bd2cddd70539b03203214fe6"
+      },
+      {
+        "class": "ExpenseDraftIntegrationTest",
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "d0691a66d1f5db539c72b46fce63ec642681fe2293e2809f99cb0e76bab939df"
+      },
+      {
+        "class": "ExpenseSubmissionIntegrationTest",
+        "tests": 296,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "8dbb7f0d78bca769ca4cbac1dad387f6bda09b9c92c7dcd1c089314351365a69"
+      }
+    ],
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/f04-persistence-green.log",
+    "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-persistence-green"
+  },
+  "additionalStoredModeAssertions": {
+    "tests": 13,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "countsAreNotAdditive": true,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/f04-persistence-modes-green.log",
+    "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-persistence-modes-green",
+    "reportSha256": "50709c2726174d4fb2e7da2dc0847cd11bc797c88c331828b0d13431ccecb4c9"
+  },
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseSplitRiskEvidence.java": "9b549e77e1631f1ee9fe41206a6874b5fc13eef66a77a35c15d434543361406f",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseSplitRoutingSnapshot.java": "b5c8bb178755751c2adb75ddb67d2cebe0fbfedbcf87224ee23fed0bf6734884",
+    "agentflow-server/src/main/java/db/migration/V116__Expense_split_routing.java": "35673b0a9614428a4eb3ddbb48b1df884bf7efd6a0b26f19d64fdda2c339ab6c",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseReportRepository.java": "3821e8c9d35cbecc4518675f8232e5f59a6615ece10877450c3ee64205264c19",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseSplitRoutingRepository.java": "c08553aae7f4127a9323648a046c8217a2bc19b430e48a51390ca09b2e09fada",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSplitRoutingPersistenceTest.java": "ad68fed5d4176ced6ec88b17822ece82b5b9bfdee85e135dea340f7f89d0145a"
+  },
+  "verified": [
+    "nonempty V115 to V116 preserves all legacy expense, financial revision, application and submission-round columns",
+    "current frozen round projection survives returned draft edits and advances on resubmission",
+    "same-scope effective sources use current approved financial amounts and exact window",
+    "999 comparison reports plus primary accepted; 1000 comparisons rejected without truncation; unrelated categories ignored",
+    "missing active projection fails instead of disappearing from risk calculation",
+    "original revision and definition binding, source original-round foreign keys, duplicate rejection, immutable reads after source reduction and withdrawal",
+    "mandatory transaction, downstream failure rolls back parent and source rows",
+    "UNCONFIGURED and DISABLED stored distinctly with no comparison rows; recalculated assessment rejects changed amount"
+  ],
+  "pending": [
+    "submission transaction and Flowable gateway integration",
+    "authorized read API, designers and template",
+    "fixed-package upgrade/restart/paired-restore acceptance",
+    "browser and PostgreSQL acceptance"
+  ]
+}

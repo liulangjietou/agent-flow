@@ -62,15 +62,15 @@
 - Test: `agentflow-server/src/test/java/io/agentflow/expense/ExpenseSplitRoutingPersistenceTest.java`
 
 **Interfaces:**
-- 仓储 `candidates(String tenantId, String employeeId, UUID legalEntityId, String currency, UUID excludedReport, Instant from, Instant through): List<Document>`。
+- 仓储 `candidates(String tenantId, String employeeId, UUID legalEntityId, String currency, UUID excludedReport, Instant from, Instant through, Set<String> categories): List<Document>`。
 - `ExpenseSplitRoutingSnapshot` 绑定主单、预期提交轮次、财务版本、已发布定义及版本、配置与 Task 1 的 `Assessment`；未配置/关闭状态明确保存，旧轮次无记录不补造已检查结论。
 - 仓储 `save(ExpenseSplitRoutingSnapshot): void`、`find(String tenantId, UUID reportId, int roundNo): Optional<ExpenseSplitRoutingSnapshot>`、`findByApplication(String tenantId, UUID applicationId, int roundNo): Optional<ExpenseSplitRoutingSnapshot>`。
 
-- [ ] 实际 Flyway/H2 建立有草稿、在审、核减及退回轮次的非空 V115 数据；记录旧列正文。
-- [ ] 先验证缺少当前轮次投影与依据存储的失败，再新增 V116；迁移只填新列，不重写 `state_json`。
-- [ ] 同一仓储写入维护并恢复校验 `current_round_no/current_submitted_at/current_legal_entity_id/current_base_currency`；创建查询所需索引。
-- [ ] 来源查询只取当前 IN_APPROVAL/APPROVED，过滤本单、窗口和同组；1,001 个参与来源不可静默截断。
-- [ ] 验证旧列不变、错配版本/租户被拒、原依据不可覆盖、事务回滚、核减更新查询投影和来源事实；预期范围全部通过后本地提交。
+- [x] 实际 Flyway/H2 建立有草稿、在审、核减及退回轮次的非空 V115 数据；记录旧列正文。
+- [x] 先验证缺少当前轮次投影与依据存储的失败，再新增 V116；迁移只填新列，不重写 `state_json`。
+- [x] 同一仓储写入维护并恢复校验 `current_round_no/current_submitted_at/current_legal_entity_id/current_base_currency`；创建查询所需索引。
+- [x] 来源查询只取当前 IN_APPROVAL/APPROVED，过滤本单、窗口和同组；1,001 个参与来源不可静默截断。
+- [x] 验证旧列不变、错配版本/租户被拒、原依据不可覆盖、事务回滚、核减更新查询投影和来源事实；预期范围全部通过后本地提交。
 
 ### Task 3: 提交事务与业务网关接通
 
@@ -148,3 +148,5 @@
 - 决定：沿用现有租户配置锁；代码实际已有这一串行点，不新增全局锁，也不对对照报销加锁。
 - 决定：业务网关显式标记；共用 `amount` 的财务复核不允许读取跨单合计。
 - 决定：实施过程中若具体存储/API 类型与已核对链路不符，记录最小修订及原因；不得通过缩小原需求来取得测试通过。
+
+- Task 2 接口补充：候选查询传入主单正额类别，以单条 SQL 流式读取当前窗口并只保留参与单据；1,000 张上限含主单，无关类别不占用名额。已发布定义版本沿用系统 long 类型。
