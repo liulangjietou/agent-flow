@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T06:13:36.358404+00:00",
+  "recordedAt": "2026-10-04T06:40:12.617656+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1028,7 +1028,7 @@
           ]
         }
       ],
-      "observed": "固定请求、状态、仓储、可信配置及原始回执证据已实现；固定目标 HTTP 原件提交、原号查询和真实结果文件保存通过。188 个唯一 Java 范围用例通过。实际 HTTP 与 H2／文件配套恢复中提交 1 次、查询 1 次、下载 2 次，2 份原件不变，2 份独立结果保存并完成。当前权限编排、后台、回调、接口和页面仍待接通，继续 OPEN。",
+      "observed": "固定请求、状态、仓储、可信配置、回执证据和 HTTP 文件传输已实现；本轮接通原登录与字段权限编排、持久后台领取、回执同事务保存及结果收集。240 个唯一 Java 范围用例通过，真实工作器在回包丢失且权限撤销后仍按原号查询，提交 1 次、查询 1 次、下载 2 次。非空 V112→V113 保留 221 张旧表。公开接口、回调、页面、安装包及浏览器/PostgreSQL 验收仍待完成，继续 OPEN。",
       "references": [
         {
           "path": "docs/product-goal-gap-audit.md",
@@ -1057,6 +1057,10 @@
         {
           "path": "docs/evidence/electronic-signature-http-20261004.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/electronic-signature-worker-20261004.json",
+          "line": 1
         }
       ],
       "acceptance": "固定文件与签署版本、显式授权、异步状态、可验证回执、重复回调和未知结果恢复；保留原件、授权及签署结果，完成本地受控协议验收。",
@@ -1080,6 +1084,11 @@
         "status": "HTTP_FIXED_TARGET_AND_PAIRED_H2_FILE_RECOVERY_VERIFIED_NO_PUBLIC_ENTRYPOINT",
         "implementationCommit": "70aaa2bd8dae046fe8c9a754166274a9bc555a8f",
         "evidence": "docs/evidence/electronic-signature-http-20261004.json"
+      },
+      "workerStage": {
+        "status": "APPLICATION_AUTHORIZATION_AND_WORKER_VERIFIED_NO_PUBLIC_ENTRYPOINT",
+        "implementationCommit": "1097488bde1ed992f9774d93f12514a111ab20ec",
+        "evidence": "docs/evidence/electronic-signature-worker-20261004.json"
       }
     },
     {
@@ -3780,11 +3789,11 @@
   },
   "latestProgress": {
     "taskId": "I02",
-    "status": "HTTP_FIXED_TARGET_AND_PAIRED_H2_FILE_RECOVERY_VERIFIED_NO_PUBLIC_ENTRYPOINT",
-    "recordedAt": "2026-10-04T06:13:36.358404+00:00",
-    "sourceCommit": "70aaa2bd8dae046fe8c9a754166274a9bc555a8f",
-    "evidence": "docs/evidence/electronic-signature-http-20261004.json",
+    "status": "APPLICATION_AUTHORIZATION_AND_WORKER_VERIFIED_NO_PUBLIC_ENTRYPOINT",
+    "recordedAt": "2026-10-04T06:40:12.617656+00:00",
+    "sourceCommit": "1097488bde1ed992f9774d93f12514a111ab20ec",
+    "evidence": "docs/evidence/electronic-signature-worker-20261004.json",
     "knownOpenTaskCount": 34,
-    "implementationCommit": "70aaa2bd8dae046fe8c9a754166274a9bc555a8f"
+    "implementationCommit": "1097488bde1ed992f9774d93f12514a111ab20ec"
   }
 }
