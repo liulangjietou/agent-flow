@@ -4,6 +4,7 @@ import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -13,6 +14,8 @@ import java.util.UUID;
 public record PaymentAuthorization(Terms terms, Decision decision, long version, Status status, Instant updatedAt,
                                    Execution execution, Withdrawal withdrawal, Retirement retirement) {
     public static final Duration MAX_VALIDITY = Duration.ofHours(24);
+    public static final LocalDate MIN_DUE_DATE = LocalDate.of(1, 1, 1);
+    public static final LocalDate MAX_DUE_DATE = LocalDate.of(9999, 12, 31);
 
     /** 恢复快照时核对授权与已登记命令一致，不能把已登记执行恢复成可二次执行。 */
     public PaymentAuthorization {
@@ -45,8 +48,13 @@ public record PaymentAuthorization(Terms terms, Decision decision, long version,
         this(terms, decision, version, status, updatedAt, execution, withdrawal, null);
     }
 
-    /** 金额、轮次、目标和凭证引用均从已保存的实际过账派生，财务只能决定是否授权及期限。 */
+    /** 兼容未记录到期日的历史授权，新业务入口必须显式提供日期。 */
     public static PaymentAuthorization issue(UUID id, VoucherOperation voucher, EmployeeAccountSnapshot payee, String authorizer, Instant now, Instant expiresAt) {
+        return issue(id, voucher, payee, authorizer, now, expiresAt, null);
+    }
+
+    /** 金额和凭证引用从实际过账派生，到期日只固定人工决定，不改变资金命令和执行窗。 */
+    public static PaymentAuthorization issue(UUID id, VoucherOperation voucher, EmployeeAccountSnapshot payee, String authorizer, Instant now, Instant expiresAt, LocalDate dueDate) {
         if (voucher == null || !voucher.usablePosted() || now == null || voucher.updatedAt().isAfter(now)) throw changedVoucher();
         var source = voucher.input().command(); var binding = source.binding();
         if (source.kind() == VoucherCommand.Kind.PAYMENT || payee == null || !payee.employeeId().equals(source.employeeId()) || !payee.legalEntityId().equals(source.legalEntityId())) throw changedVoucher();
@@ -55,7 +63,7 @@ public record PaymentAuthorization(Terms terms, Decision decision, long version,
         var terms = new Terms(id, source.tenantId(), source.kind() == VoucherCommand.Kind.EMPLOYEE_ADVANCE ? PaymentCommand.Purpose.EMPLOYEE_ADVANCE : PaymentCommand.Purpose.EXPENSE_REIMBURSEMENT,
                 new PaymentCommand.Binding(binding.businessId(), binding.applicationId(), binding.roundNo(), binding.applicationVersion(), binding.businessVersion()),
                 amount, payee, source.id(), source.digest(), voucher.highestRevision(), voucher.observation().voucherReference(), voucher.input().targetDigest());
-        return new PaymentAuthorization(terms, new Decision(authorizer, now, expiresAt), 1, Status.AUTHORIZED, now, null, null);
+        return new PaymentAuthorization(terms, new Decision(authorizer, now, expiresAt, dueDate), 1, Status.AUTHORIZED, now, null, null);
     }
 
     /** 只从该出纳的当前目录选账户；原收款账户已变化或证据过期时不能固定付款命令。 */
@@ -168,11 +176,14 @@ public record PaymentAuthorization(Terms terms, Decision decision, long version,
      * 短期人工授权不自动续期；应用配置可进一步缩短，最多二十四小时。
      * @author owlzhangfq@gmail.com
      */
-    public record Decision(String authorizedBy, Instant authorizedAt, Instant expiresAt) {
+    public record Decision(String authorizedBy, Instant authorizedAt, Instant expiresAt, LocalDate dueDate) {
+        /** 历史快照没有付款到期日，不能用迁移日补造财务决定。 */
+        public Decision(String authorizedBy, Instant authorizedAt, Instant expiresAt) { this(authorizedBy, authorizedAt, expiresAt, null); }
         /** 到期为排他边界，恢复不能延长原授权。 */
         public Decision {
             if (invalidText(authorizedBy) || authorizedAt == null || expiresAt == null || !expiresAt.isAfter(authorizedAt)
-                    || Duration.between(authorizedAt, expiresAt).compareTo(MAX_VALIDITY) > 0) throw invalid();
+                    || Duration.between(authorizedAt, expiresAt).compareTo(MAX_VALIDITY) > 0
+                    || dueDate != null && (dueDate.isBefore(MIN_DUE_DATE) || dueDate.isAfter(MAX_DUE_DATE))) throw invalid();
         }
     }
 

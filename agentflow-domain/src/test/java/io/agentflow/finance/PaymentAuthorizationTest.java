@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -19,6 +20,30 @@ class PaymentAuthorizationTest {
     private static final Instant NOW = BASE.plusSeconds(2);
     private final VoucherOperation posted = posted(VoucherCommandTest.advanceCommand());
     private final EmployeeAccountSnapshot payee = new EmployeeAccountSnapshot(posted.input().command().legalEntityId(), "alice", "payee-1", "****1234", "a".repeat(64), "v1");
+
+    @Test
+    void dueDateIsAnImmutableDecisionAndCannotChangeCommandDigestOrExecutionWindow() {
+        UUID id = UUID.randomUUID(); var expiry = NOW.plusSeconds(60);
+        var legacy = PaymentAuthorization.issue(id, posted, payee, "finance", NOW, expiry);
+        var dated = PaymentAuthorization.issue(id, posted, payee, "finance", NOW, expiry, LocalDate.of(2026, 10, 1));
+        var directory = directory("cashier", expiry); var account = currentPayee(expiry);
+        var oldExecution = execute(legacy, "cashier", directory, account, posted, NOW);
+        var newExecution = execute(dated, "cashier", directory, account, posted, NOW);
+        assertThat(newExecution.execution().command()).isEqualTo(oldExecution.execution().command());
+        assertThat(newExecution.execution().command().digest()).isEqualTo(oldExecution.execution().command().digest());
+        assertThat(newExecution.decision()).isSameAs(dated.decision());
+        assertThat(dated.voidBeforeExecution("finance", "复核原授权", NOW).decision()).isSameAs(dated.decision());
+        assertThat(dated.expire(expiry).decision()).isSameAs(dated.decision());
+        assertThatThrownBy(() -> execute(dated, "cashier", directory("cashier", expiry.plusSeconds(60)), currentPayee(expiry.plusSeconds(60)), posted, expiry))
+                .isInstanceOf(DomainException.class).hasMessage("Payment authorization is outside its execution window");
+        for (var date : List.of(PaymentAuthorization.MIN_DUE_DATE, LocalDate.of(2020, 2, 29), PaymentAuthorization.MAX_DUE_DATE)) {
+            assertThat(new PaymentAuthorization.Decision("finance", NOW, expiry, date).dueDate()).isEqualTo(date);
+        }
+        for (var date : List.of(LocalDate.of(0, 1, 1), LocalDate.of(10000, 1, 1))) {
+            assertThatThrownBy(() -> new PaymentAuthorization.Decision("finance", NOW, expiry, date)).isInstanceOf(DomainException.class);
+        }
+        assertThat(legacy.decision().dueDate()).isNull();
+    }
 
     @Test
     void derivesAdvanceAndNetExpenseAmountsFromPostedVoucherWithoutTreatingZeroPayableAsPayment() {

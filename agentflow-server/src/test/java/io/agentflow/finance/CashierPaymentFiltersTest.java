@@ -138,10 +138,12 @@ class CashierPaymentFiltersTest {
         var flyway = Flyway.configure().dataSource(f.source).target("114").load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
         assertThat(f.jdbc.queryForList("SELECT " + columns + " FROM payment_authorization ORDER BY id")).isEqualTo(before);
         assertThat(f.jdbc.queryForList("SELECT * FROM payment_authorization_revision ORDER BY authorization_id,version")).isEqualTo(revisions);
-        assertThat(f.authorizations.find(f.tenant, selected.terms().id())).contains(selected); assertThat(f.authorizations.find(f.tenant, fresh.terms().id())).contains(fresh);
         assertThat(f.jdbc.queryForObject("SELECT debit_account_key FROM payment_authorization WHERE tenant_id=? AND id=?", String.class, f.tenant, selected.terms().id().toString())).isEqualTo(CashierPaymentAccountKey.of(selected));
         assertThat(f.jdbc.queryForObject("SELECT debit_account_key FROM payment_authorization WHERE tenant_id=? AND id=?", String.class, f.tenant, corrupt.terms().id().toString())).isNull();
         assertThat(flyway.migrate().migrationsExecuted).isZero(); assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
+        // V114 的旧列断言完成后再升到当前结构，新仓储不运行在旧表结构上。
+        Flyway.configure().dataSource(f.source).load().migrate();
+        assertThat(f.authorizations.find(f.tenant, selected.terms().id())).contains(selected); assertThat(f.authorizations.find(f.tenant, fresh.terms().id())).contains(fresh);
     }
 
     private static void assertCode(Runnable action, String code) {
@@ -200,7 +202,7 @@ class CashierPaymentFiltersTest {
             var posted = claimed.complete(new FinanceResult.Success<>(new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.POSTED, 1L, NOW,
                     "posting-1", "voucher-1", period.periodReference(), date, amount, amount, NOW, null)), NOW);
             var initial = PaymentAuthorization.issue(UUID.randomUUID(), posted, new EmployeeAccountSnapshot(entity, "alice", "payee-1", "****1234", "c".repeat(64), "v1"), "finance", authorized, authorized.plusSeconds(3600));
-            tx.executeWithoutResult(ignored -> { vouchers.create(queued); vouchers.update(claimed); vouchers.update(posted); authorizations.create(initial); });
+            tx.executeWithoutResult(ignored -> { vouchers.create(queued); vouchers.update(claimed); vouchers.update(posted); createAuthorization(initial); });
             if (reference == null) return initial;
             var directory = new PaymentAccountsPort.Directory(new PaymentAccountsPort.Request(entity, currency, "cashier"), accountVersion, authorized, authorized.plusSeconds(60),
                     List.of(new PaymentAccountsPort.DebitAccount(reference, "合成账户 " + accountVersion, "****5678", currency, accountVersion)));
@@ -212,6 +214,18 @@ class CashierPaymentFiltersTest {
                     jdbc.update("INSERT INTO payment_authorization_revision(tenant_id,authorization_id,version,state_json) VALUES(?,?,2,?)", tenant, initial.terms().id().toString(), JSON.write(executed));
                 }
             }); return executed;
+        }
+        private void createAuthorization(PaymentAuthorization value) {
+            if (!legacy) { authorizations.create(value); return; }
+            var terms = value.terms(); var binding = terms.binding(); var decision = value.decision();
+            jdbc.update("""
+                    INSERT INTO payment_authorization(tenant_id,id,business_type,business_id,application_id,round_no,application_version,business_version,
+                    purpose,voucher_operation_id,voucher_kind,terms_json,decision_json,state_json,version,status,active_business_id,authorized_at,expires_at,updated_at,legal_entity_id)
+                    VALUES(?,?,'ADVANCE_REQUEST',?,?,1,5,3,'EMPLOYEE_ADVANCE',?,'EMPLOYEE_ADVANCE',?,?,?,1,'AUTHORIZED',?,?,?,?,?)
+                    """, tenant, terms.id().toString(), binding.businessId().toString(), binding.applicationId().toString(), terms.voucherOperationId().toString(),
+                    JSON.write(terms), JSON.write(decision), JSON.write(value), binding.businessId().toString(), Timestamp.from(decision.authorizedAt()),
+                    Timestamp.from(decision.expiresAt()), Timestamp.from(value.updatedAt()), terms.payee().legalEntityId().toString());
+            jdbc.update("INSERT INTO payment_authorization_revision(tenant_id,authorization_id,version,state_json) VALUES(?,?,1,?)", tenant, terms.id().toString(), JSON.write(value));
         }
     }
 }

@@ -22604,7 +22604,8 @@
                 "voucherOperationId": "a1b2c3d4-1234-4234-8234-123456789abc",
                 "voucherVersion": 3,
                 "validitySeconds": 900,
-                "comment": "已核对本轮金额及已过账凭证。"
+                "comment": "已核对本轮金额及已过账凭证。",
+                "dueDate": "2026-10-01"
               }
             }
           }
@@ -67571,7 +67572,8 @@
           "executedBy",
           "request",
           "operation",
-          "retirement"
+          "retirement",
+          "dueDate"
         ],
         "properties": {
           "id": {
@@ -67682,6 +67684,19 @@
                 "type": "null"
               }
             ]
+          },
+          "dueDate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date",
+                "pattern": "^(?!0000)[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "本次授权固定的付款到期日；null 表示历史未设置。"
           }
         }
       },
@@ -67887,6 +67902,12 @@
                 "type": "null"
               }
             ]
+          },
+          "dueDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?!0000)[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+            "description": "新授权必须显式填写付款到期日；历史已保存回执的原键、原正文重放可省略，省略字段不能创建新授权。到期日不延长授权执行窗口。"
           }
         },
         "allOf": [

@@ -1620,6 +1620,41 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     @Test
+    void paymentDueDateIsFrozenAcrossExecutionAndVisibleToAuthorizedReaders() throws Exception {
+        var report = paymentReport(); String path = paymentPath(report); var input = new HashMap<>(authorizationInput(report));
+        input.put("dueDate", "2026-10-01"); String key = UUID.randomUUID().toString();
+        var first = send(path + "/authorizations", "finance", key, input); var receipt = ok(first, 202);
+        UUID id = UUID.fromString(receipt.path("authorizationId").asText()); String cashierPath = "/api/v1/cashier/payments/" + id;
+        for (String user : List.of("alice", "finance")) assertThat(ok(read(path, user), 200).at("/payment/dueDate").asText()).isEqualTo("2026-10-01");
+        assertThat(ok(read(cashierPath, "cashier"), 200).at("/payment/dueDate").asText()).isEqualTo("2026-10-01");
+        assertThat(jdbc.queryForObject("SELECT due_date FROM payment_authorization WHERE id=?", LocalDate.class, id.toString())).isEqualTo(LocalDate.of(2026, 10, 1));
+        String decision = jdbc.queryForObject("SELECT decision_json FROM payment_authorization WHERE id=?", String.class, id.toString());
+        assertThat(send(path + "/authorizations", "finance", key, input).getContentAsString()).isEqualTo(first.getContentAsString());
+        var changed = new HashMap<>(input); changed.put("dueDate", "2026-10-02");
+        assertThat(send(path + "/authorizations", "finance", key, changed).getStatus()).isEqualTo(409);
+        ok(send(cashierPath + "/actions", "cashier", cashierInput("EXECUTE", 1, null)), 202);
+        paymentRequestWorker.poll(); paymentWorker.poll();
+        assertThat(ok(read(cashierPath, "cashier"), 200).at("/payment/dueDate").asText()).isEqualTo("2026-10-01");
+        assertThat(jdbc.queryForObject("SELECT decision_json FROM payment_authorization WHERE id=?", String.class, id.toString())).isEqualTo(decision);
+        assertThat(json.write(paymentOperations.find("demo", id).orElseThrow().input().command())).doesNotContain("dueDate");
+        assertThat(paymentWrites).isEqualTo(1);
+    }
+
+    @Test
+    void paymentDueDateMissingOrMalformedCannotCreateNewAuthorization() throws Exception {
+        var report = paymentReport(); String path = paymentPath(report) + "/authorizations";
+        var absent = new HashMap<>(authorizationInput(report)); absent.remove("dueDate");
+        assertThat(send(path, "finance", absent).getStatus()).isEqualTo(422);
+        var missing = new HashMap<>(absent); missing.put("dueDate", null);
+        assertThat(send(path, "finance", missing).getStatus()).isEqualTo(422);
+        for (String date : List.of("2026-02-30", "2026-2-01", "10000-01-01", "2026-10-01T00:00:00Z", "0000-01-01", " 2026-10-01", "2026-10-01 ", "")) {
+            var malformed = new HashMap<>(absent); malformed.put("dueDate", date);
+            assertThat(send(path, "finance", malformed).getStatus()).isIn(400, 422);
+        }
+        assertThat(paymentAuthorizations.latest("demo", report.applicationId(), 1)).isEmpty();
+    }
+
+    @Test
     void paymentApiSeparatesFinanceCashierAndApplicantThroughRealApprovalAndBankQueue() throws Exception {
         var report = paymentReport(); String path = paymentPath(report); var input = authorizationInput(report);
         var initial = ok(read(path, "finance"), 200); assertThat(initial.at("/actions/authorize").asBoolean()).isTrue();
@@ -6522,7 +6557,7 @@ class ExpenseSubmissionIntegrationTest {
     private Map<String, Object> authorizationInput(ExpenseReport report) {
         var voucher = voucherOperations.forRound("demo", report.applicationId(), app(report).roundNo(), VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
         return Map.of("roundNo", app(report).roundNo(), "applicationVersion", app(report).version(), "businessVersion", current(report).version(),
-                "voucherOperationId", voucher.input().command().id(), "voucherVersion", voucher.version(), "validitySeconds", 900, "comment", "合成财务付款授权");
+                "voucherOperationId", voucher.input().command().id(), "voucherVersion", voucher.version(), "validitySeconds", 900, "dueDate", "2026-10-01", "comment", "合成财务付款授权");
     }
     private UUID authorizePayment(ExpenseReport report) throws Exception {
         return UUID.fromString(ok(send(paymentPath(report) + "/authorizations", "finance", authorizationInput(report)), 202).path("authorizationId").asText());
