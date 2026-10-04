@@ -97,6 +97,61 @@ class FinanceGatewayClientTest {
     }
 
     @Test
+    void projectOwnerComesFromTheAuthenticatedCatalogAndSurvivesJsonRoundTrip() {
+        responder.set(request -> {
+            var body = success(request, catalog("alice", Instant.now().plusSeconds(60)));
+            ((ObjectNode) body.path("data")).putArray("projects").addObject()
+                    .put("legalEntityId", ENTITY.toString()).put("code", "PROJECT-A")
+                    .put("name", "合成测试项目").put("ownerSubject", "manager");
+            return json.write(body);
+        });
+        var result = master.catalog("tenant-a", "alice").requireValue();
+        var restored = json.read(json.write(result), FinanceCatalog.class);
+        assertThat(json.read(json.write(restored), JsonNode.class).at("/projects/0/ownerSubject").asText()).isEqualTo("manager");
+        assertThat(received.get().at("/data/employeeId").asText()).isEqualTo("alice");
+        assertThat(authorization.get()).isEqualTo("Bearer tenant-a-test-token");
+    }
+
+    @Test
+    void historicalProjectWithoutAnOwnerRetainsItsOriginalJsonShape() {
+        responder.set(request -> {
+            var body = success(request, catalog("alice", Instant.now().plusSeconds(60)));
+            ((ObjectNode) body.path("data")).putArray("projects").addObject()
+                    .put("legalEntityId", ENTITY.toString()).put("code", "PROJECT-A").put("name", "合成测试项目");
+            return json.write(body);
+        });
+        var result = master.catalog("tenant-a", "alice").requireValue();
+        assertThat(json.read(json.write(result), JsonNode.class).at("/projects/0"))
+                .isEqualTo(json.read("{\"legalEntityId\":\"" + ENTITY + "\",\"code\":\"PROJECT-A\",\"name\":\"合成测试项目\"}", JsonNode.class));
+    }
+
+    @Test
+    void catalogRejectsMalformedOwnerSubjectsForeignLegalEntitiesAndDuplicateProjects() {
+        List<Consumer<ObjectNode>> corruptions = List.of(
+                project -> project.put("ownerSubject", ""), project -> project.put("ownerSubject", " "),
+                project -> project.put("ownerSubject", "x".repeat(129)), project -> project.put("ownerSubject", 12),
+                project -> project.put("ownerSubject", 12.5),
+                project -> project.put("ownerSubject", true), project -> project.put("legalEntityId", UUID.randomUUID().toString()));
+        for (var corrupt : corruptions) {
+            responder.set(request -> {
+                var body = success(request, catalog("alice", Instant.now().plusSeconds(60)));
+                var project = ((ObjectNode) body.path("data")).putArray("projects").addObject()
+                        .put("legalEntityId", ENTITY.toString()).put("code", "PROJECT-A").put("name", "合成测试项目").put("ownerSubject", "manager");
+                corrupt.accept(project); return json.write(body);
+            });
+            assertThat(master.catalog("tenant-a", "alice")).isEqualTo(invalid());
+        }
+        responder.set(request -> {
+            var body = success(request, catalog("alice", Instant.now().plusSeconds(60)));
+            var projects = ((ObjectNode) body.path("data")).putArray("projects");
+            var project = projects.addObject().put("legalEntityId", ENTITY.toString()).put("code", "PROJECT-A")
+                    .put("name", "合成测试项目").put("ownerSubject", "manager");
+            projects.add(project.deepCopy()); return json.write(body);
+        });
+        assertThat(master.catalog("tenant-a", "alice")).isEqualTo(invalid());
+    }
+
+    @Test
     void noExternalCallsRunInsideDatabaseTransactionsOrWhenDisabled() {
         config.setEnabled(false);
         assertThat(master.catalog("tenant-a", "alice")).isEqualTo(unavailable(FinanceResult.Failure.NOT_CONFIGURED));

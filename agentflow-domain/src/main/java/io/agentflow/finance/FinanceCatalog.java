@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseLine;
 import org.apache.commons.lang3.StringUtils;
@@ -77,9 +78,15 @@ public record FinanceCatalog(String employeeId, String sourceVersion, Instant va
      * 项目属于明确法人。
      * @author owlzhangfq@gmail.com
      */
-    public record Project(UUID legalEntityId, String code, String name) {
-        /** 项目代码独立于展示名称。 */
-        public Project { if (legalEntityId == null) throw invalid(); text(code, 128); text(name, 128); }
+    public record Project(UUID legalEntityId, String code, String name,
+                          @JsonInclude(JsonInclude.Include.NON_NULL) String ownerSubject) {
+        /** 旧目录没有负责人，不补造责任，也不改变其 JSON 字节形状。 */
+        public Project(UUID legalEntityId, String code, String name) { this(legalEntityId, code, name, null); }
+        /** 项目代码独立于展示名称，负责人使用来源系统的稳定主体。 */
+        public Project {
+            if (legalEntityId == null) throw invalid(); text(code, 128); text(name, 128);
+            if (ownerSubject != null) text(ownerSubject, 128);
+        }
     }
     /**
      * 城市代码用于费用标准匹配，名称只用于展示。

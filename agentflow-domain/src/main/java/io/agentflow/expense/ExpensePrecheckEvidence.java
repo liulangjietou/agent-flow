@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.BudgetPrecheckPort;
 import io.agentflow.finance.FinanceCatalog;
@@ -16,7 +17,15 @@ import java.util.UUID;
 public record ExpensePrecheckEvidence(String catalogVersion, FinanceCatalog.LegalEntity legalEntity, LocalDate rateDate,
         BudgetPrecheckPort.Assessment budget, ExpenseRound preview, List<ResourceVersion> resources,
         List<InvoiceReceipt> invoices, Instant validUntil, ExpensePolicySelection policySelection,
-        List<ExpensePriorControlAssessment> priorControls) {
+        List<ExpensePriorControlAssessment> priorControls,
+        @JsonInclude(JsonInclude.Include.NON_NULL) ExpenseProjectOwners projectOwners) {
+    /** 历史预检未记录项目责任，不能将缺字段解释为空项目或已审批。 */
+    public ExpensePrecheckEvidence(String catalogVersion, FinanceCatalog.LegalEntity legalEntity, LocalDate rateDate,
+            BudgetPrecheckPort.Assessment budget, ExpenseRound preview, List<ResourceVersion> resources,
+            List<InvoiceReceipt> invoices, Instant validUntil, ExpensePolicySelection policySelection,
+            List<ExpensePriorControlAssessment> priorControls) {
+        this(catalogVersion, legalEntity, rateDate, budget, preview, resources, invoices, validUntil, policySelection, priorControls, null);
+    }
     /** 旧预检没有累计控制依据；保留缺字段，提交新模式时须重新检查。 */
     public ExpensePrecheckEvidence(String catalogVersion, FinanceCatalog.LegalEntity legalEntity, LocalDate rateDate,
             BudgetPrecheckPort.Assessment budget, ExpenseRound preview, List<ResourceVersion> resources,
@@ -40,6 +49,7 @@ public record ExpensePrecheckEvidence(String catalogVersion, FinanceCatalog.Lega
                 || invoices.stream().map(InvoiceReceipt::invoiceId).distinct().count() != invoices.size()) throw invalid();
         if (preview.originalLines().stream().anyMatch(line -> !Objects.equals(policySelection,
                 line.assessment().policy().managedPolicy() == null ? null : line.assessment().policy().managedPolicy().selection()))) throw invalid();
+        if (projectOwners != null && !projectOwners.matches(catalogVersion, preview.content())) throw invalid();
         if (priorControls != null) {
             priorControls = List.copyOf(priorControls);
             if (priorControls.stream().map(ExpensePriorControlAssessment::lineNo).distinct().count() != priorControls.size()) throw invalid();

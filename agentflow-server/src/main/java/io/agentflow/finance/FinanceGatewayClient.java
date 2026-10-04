@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.CoercionAction;
+import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
+import com.fasterxml.jackson.databind.type.LogicalType;
 import io.agentflow.common.JsonUtil;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
@@ -47,10 +50,15 @@ public class FinanceGatewayClient {
     public FinanceGatewayClient(FinanceGatewayConfiguration configuration, ObjectMapper mapper) {
         this.configuration = configuration;
         // 信封先读 JSON 树再映射领域类型；中间树也必须精确保留数量、汇率等十进制事实。
-        this.json = new JsonUtil(mapper.copy().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
+        var strict = mapper.copy().enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES,
                         DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, DeserializationFeature.FAIL_ON_NUMBERS_FOR_ENUMS,
                         DeserializationFeature.FAIL_ON_TRAILING_TOKENS, DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
-                .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION).disable(MapperFeature.ALLOW_COERCION_OF_SCALARS));
+                .enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION).disable(MapperFeature.ALLOW_COERCION_OF_SCALARS);
+        // Jackson 的标量开关不禁止数字转文本；主体及来源标识必须保留财务协议的字符串类型。
+        for (var shape : List.of(CoercionInputShape.Integer, CoercionInputShape.Float, CoercionInputShape.Boolean)) {
+            strict.coercionConfigFor(LogicalType.Textual).setCoercion(shape, CoercionAction.Fail);
+        }
+        this.json = new JsonUtil(strict);
     }
 
     /** 业务适配器核对结果与请求一致性，基础传输只认固定操作及封闭结果类型。 */
