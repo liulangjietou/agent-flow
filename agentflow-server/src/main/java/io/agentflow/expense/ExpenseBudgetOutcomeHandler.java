@@ -49,15 +49,22 @@ public class ExpenseBudgetOutcomeHandler {
             }
             return;
         }
-        if (operation.status() == BudgetOperation.Status.REJECTED
-                && (operation.observation().rejection() == BudgetObservation.Rejection.BUDGET_INSUFFICIENT
-                    || review!=null && review.status()==ExpenseBudgetReview.Status.REJECTED
-                        && (review.approval()!=null || operation.observation().rejection()==BudgetObservation.Rejection.BUDGET_EXCEPTION_REQUIRED))
+        if (requiresReturn(operation, review)
                 && application.status() == ApplicationStatus.IN_APPROVAL && application.roundNo() == position.roundNo()
                 && report.version() == position.financialVersion()
                 && controls.find(command.tenantId(), report.id(), position.roundNo()).isPresent()) {
             lifecycle.returnBusiness(command.tenantId(), application.id(), application.version(),
                     new BusinessReference(BusinessReference.Type.EXPENSE, report.id()), SYSTEM_ACTOR, "预算余额不足，请调整费用后重新预检提交。");
         }
+    }
+
+    private boolean requiresReturn(BudgetOperation operation, ExpenseBudgetReview review) {
+        if (operation.status() != BudgetOperation.Status.REJECTED) return false;
+        if (operation.observation().rejection() == BudgetObservation.Rejection.BUDGET_INSUFFICIENT) return true;
+        if (operation.observation().rejection() == BudgetObservation.Rejection.BUDGET_EXCEPTION_REQUIRED) {
+            // 只有原提交的有效例外可以等待人工；核减等后续操作不能重新打开本轮预算审批。
+            return review == null || review.status() != ExpenseBudgetReview.Status.REVIEW_REQUIRED;
+        }
+        return review != null && review.status() == ExpenseBudgetReview.Status.REJECTED && review.approval() != null;
     }
 }

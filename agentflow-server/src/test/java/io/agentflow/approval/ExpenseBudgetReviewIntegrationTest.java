@@ -206,6 +206,43 @@ class ExpenseBudgetReviewIntegrationTest {
         assertThat(GATEWAY.commands()).hasSize(2);
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void financialReductionSoftRefusalReturnsWithoutReopeningBudgetApproval(boolean authorizedFirst) throws Exception {
+        GATEWAY.exceptionPolicy("policy-flex-1");
+        if (authorizedFirst) GATEWAY.budgetStatus(BudgetObservation.Status.REJECTED);
+        var report = draft(definition(true, false)); submit(report); approve(report, "manager");
+        if (authorizedFirst) {
+            approve(report, "manager"); GATEWAY.budgetStatus(BudgetObservation.Status.APPLIED); budgets(report);
+        }
+        send(path(report)+"/tasks/"+task(report).getId()+"/receive", "finance", lifecycle(report), 200);
+        approve(report, "finance"); assertThat(task(report).getTaskDefinitionKey()).isEqualTo("finance");
+        var original = reviews.find("demo", report.id(), 1).orElseThrow();
+        var frozen = occupations.find("demo", report.id()).orElseThrow().confirmed();
+        int commandsBefore = GATEWAY.commands().size();
+        var reduced = send(path(report)+"/tasks/"+task(report).getId()+"/reduce", "finance",
+                Map.of("applicationVersion", application(report).version(), "financialVersion", current(report).version(),
+                        "lines", List.of(Map.of("lineNo", 1, "approvedGross", "50", "approvedTax", "3")),
+                        "reasonCode", "INELIGIBLE_COST", "comment", "合成后续调整拒绝"), 200);
+        UUID adjustmentId = UUID.fromString(reduced.path("budgetOperationId").asText());
+        var adjustment = operations.find("demo", adjustmentId).orElseThrow();
+        assertThat(adjustment.input().command().action()).isEqualTo(io.agentflow.finance.BudgetCommand.Action.ADJUST);
+        assertThat(adjustment.input().command().exceptionApproval()).isNull();
+        GATEWAY.budgetStatus(BudgetObservation.Status.REJECTED); budgets(report); reviewWorker.poll();
+        assertThat(operations.find("demo", adjustmentId).orElseThrow().observation().rejection())
+                .isEqualTo(BudgetObservation.Rejection.BUDGET_EXCEPTION_REQUIRED);
+        assertThat(application(report).status()).isEqualTo(ApplicationStatus.RETURNED);
+        assertThat(task(report)).isNull();
+        var closed = reviews.find("demo", report.id(), 1).orElseThrow();
+        assertThat(closed.closure()).isEqualTo(ExpenseBudgetReview.Closure.RETURNED);
+        assertThat(closed.input()).isEqualTo(original.input());
+        assertThat(closed.approval()).isEqualTo(original.approval());
+        assertThat(closed.authorizedOperationId()).isEqualTo(original.authorizedOperationId());
+        assertThat(occupations.find("demo", report.id()).orElseThrow().confirmed()).isEqualTo(frozen);
+        assertThat(occupations.find("demo", report.id()).orElseThrow().pendingOperationId()).isNull();
+        assertThat(GATEWAY.commands()).hasSize(commandsBefore+1);
+    }
+
     @Test void failedAuthorizationPersistenceRollsBackTaskAuditAndBudgetRegistrationTogether() throws Exception {
         GATEWAY.exceptionPolicy("policy-flex-1"); GATEWAY.budgetStatus(BudgetObservation.Status.REJECTED);
         var report = draft(definition(true, false)); submit(report); approve(report, "manager");

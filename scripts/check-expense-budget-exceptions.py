@@ -270,6 +270,37 @@ def run(args):
         assert len(original_commands(sources, refused)) == 2
         evidence["checks"].append({"name": "three-rounds-and-refused-authorization", "rounds": 3, "originalFactsPreserved": True, "refusedCommands": 2})
 
+        for authorized_first in (False, True):
+            reduced = new_report(runtime, fixture, definition, modes, original="SOFT" if authorized_first else "APPLIED", flexible=True)
+            submit(runtime, fixture, reduced)
+            reviewed(runtime, reduced, "REVIEW_REQUIRED" if authorized_first else "CONFIRMED")
+            split.action(runtime, reduced)
+            if authorized_first:
+                split.action(runtime, reduced); reviewed(runtime, reduced, "CONFIRMED")
+            prior.assert_task(runtime, reduced, definition, "receipt", "finance")
+            split.action(runtime, reduced, "finance")
+            current_task = prior.assert_task(runtime, reduced, definition, "finance", "finance")
+            before_review, before_commands = view(runtime, reduced), original_commands(sources, reduced)
+            current = split.detail(runtime, reduced)
+            modes[reduced["id"]]["original"] = "SOFT"
+            adjustment = runtime.call("POST", "/expense-reports/" + reduced["id"] + "/tasks/" + current_task["taskId"] + "/reduce",
+                {**{key: current[key] for key in ("applicationVersion", "financialVersion")},
+                 "lines": [{"lineNo": 1, "approvedGross": "50", "approvedTax": "0"}],
+                 "reasonCode": "INELIGIBLE_COST", "comment": "合成核减后柔性预算拒绝"}, "finance")
+            wait_for(lambda: split.detail(runtime, reduced), lambda value: value["applicationStatus"] == "RETURNED", 40)
+            closed = view(runtime, reduced)
+            assert closed["details"]["closure"] == "RETURNED"
+            for key in ("originalOperationId", "authorizedOperationId", "decision", "automaticPass"):
+                assert closed["details"][key] == before_review["details"][key]
+            commands = original_commands(sources, reduced)
+            assert len(commands) == len(before_commands) + 1 and all(commands[key] == value for key, value in before_commands.items())
+            command = commands[adjustment["budgetOperationId"]]
+            assert command["command"]["action"] == "ADJUST" and not command["command"].get("exceptionApproval")
+            assert command["observation"]["rejection"] == "BUDGET_EXCEPTION_REQUIRED"
+        evidence["checks"].append({"name": "financial-reduction-soft-refusal", "originallyAuthorizedCases": 1,
+            "originallyAutomaticCases": 1, "returnedForCorrection": True, "originalCommandsPreserved": True, "noAdditionalAuthorization": True})
+        risk.stage("REDUCTION_SOFT_REFUSAL_VERIFIED")
+
         crash = new_report(runtime, fixture, definition, modes, original="SOFT", flexible=True)
         submit(runtime, fixture, crash); reviewed(runtime, crash, "REVIEW_REQUIRED"); split.action(runtime, crash)
         current = prior.assert_task(runtime, crash, definition, "budgetReview", "manager")
