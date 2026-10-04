@@ -106,6 +106,31 @@ public class ExpenseRiskAccess {
         readable(actor, reportId, roundNo);
     }
 
+    /** 当前决定人可显式选择租户日历；目录只给定位摘要，不授予日历管理权限。 */
+    @Transactional(readOnly = true)
+    public CalendarOptions calendarOptions(Actor actor, UUID reportId, int roundNo, String taskId, String afterKey) {
+        var value = readable(actor, reportId, roundNo);
+        decisions.requireDecision(value.application(), taskId, actor);
+        if (value.application().roundNo() != roundNo) throw changed();
+        final int pageSize = 30;
+        var rows = calendars.list(actor.tenantId(), afterKey, pageSize);
+        var items = rows.stream().limit(pageSize).map(row -> new CalendarOption(row.id(), row.key(), row.name(), row.zoneId(), row.revision())).toList();
+        return new CalendarOptions(items, rows.size() > pageSize ? items.get(items.size() - 1).key() : null);
+    }
+
+    /**
+     * 风险计算可选日历摘要，不包含维护人或完整规则。
+     * @author owlzhangfq@gmail.com
+     */
+    public record CalendarOption(UUID id, String key, String name, String zoneId, long revision) { }
+
+    /**
+     * 业务键稳定分页；未加载的日历不能被自动选中。
+     * @author owlzhangfq@gmail.com
+     */
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
+    public record CalendarOptions(List<CalendarOption> items, String nextAfterKey) { }
+
     /** 放弃旧解释也须拥有原主单当前决定权，不能用历史参与资格写入复核轨迹。 */
     @Transactional(readOnly = true)
     public void requireDecision(Actor actor, ExpenseRiskInput.Document primary, String taskId) {

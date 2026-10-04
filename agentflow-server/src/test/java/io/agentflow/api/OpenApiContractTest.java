@@ -87,6 +87,19 @@ class OpenApiContractTest {
         JsonNode spec = document();
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
+                java.util.Map.entry("ExpenseRiskDocumentRequest", io.agentflow.agent.ExpenseRiskController.DocumentRequest.class),
+                java.util.Map.entry("ExpenseRiskCalendar", io.agentflow.agent.ExpenseRiskAccess.CalendarOption.class),
+                java.util.Map.entry("ExpenseRiskCalendars", io.agentflow.agent.ExpenseRiskAccess.CalendarOptions.class),
+                java.util.Map.entry("ExpenseRiskScope", io.agentflow.agent.ExpenseRiskController.ScopeRequest.class),
+                java.util.Map.entry("ExpenseRiskConcern", io.agentflow.agent.ExpenseRiskInput.Concern.class),
+                java.util.Map.entry("ExpenseRiskInputOptions", io.agentflow.agent.ExpenseRiskService.InputOptions.class),
+                java.util.Map.entry("ExpenseRiskReceipt", io.agentflow.agent.ExpenseRiskService.Receipt.class),
+                java.util.Map.entry("ExpenseRiskSummary", io.agentflow.agent.JdbcExpenseRiskRepository.Summary.class),
+                java.util.Map.entry("ExpenseRiskPage", io.agentflow.agent.JdbcExpenseRiskRepository.Page.class),
+                java.util.Map.entry("ExpenseRiskDetail", io.agentflow.agent.ExpenseRiskService.Detail.class),
+                java.util.Map.entry("ExpenseRiskItem", io.agentflow.agent.ExpenseRiskSuggestion.Item.class),
+                java.util.Map.entry("ExpenseRiskSuggestion", io.agentflow.agent.ExpenseRiskSuggestion.class),
+                java.util.Map.entry("ExpenseRiskReview", io.agentflow.agent.ExpenseRiskRun.Review.class),
                 java.util.Map.entry("SignatureOptions", io.agentflow.signature.SignaturePublicService.Options.class),
                 java.util.Map.entry("SignatureProfileOption", io.agentflow.signature.SignaturePublicService.ProfileOption.class),
                 java.util.Map.entry("SignatureReceipt", io.agentflow.signature.SignaturePublicService.Receipt.class),

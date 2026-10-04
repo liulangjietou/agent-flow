@@ -244,7 +244,7 @@ class ExpenseRiskExecutionTest {
 
     @Test void staleSourcesPreventAdoptionButCurrentAuthorizedReviewerCanDismiss() {
         var receipt = queue(); worker.poll(); changeCatalog("snapshot"); var detail = service.get(PRIMARY, receipt.id());
-        assertThat(detail.adoptable()).isFalse(); assertThat(detail.unavailableCode()).isEqualTo("AGENT_INPUT_CHANGED");
+        assertThat(detail.reviewable()).isTrue(); assertThat(detail.adoptable()).isFalse(); assertThat(detail.unavailableCode()).isEqualTo("AGENT_INPUT_CHANGED");
         error("AGENT_INPUT_CHANGED", () -> service.review(PRIMARY, receipt.id(), 3, AssistExecutionService.ReviewAction.ADOPT, List.of(CONCERN), null));
         assertThat(loaded(receipt).state().status()).isEqualTo(ExpenseRiskRun.Status.COMPLETED);
         assertThat(service.review(PRIMARY, receipt.id(), 3, AssistExecutionService.ReviewAction.DISMISS, List.of(), "来源已更新").status()).isEqualTo(ExpenseRiskRun.Status.DISMISSED);
@@ -257,6 +257,7 @@ class ExpenseRiskExecutionTest {
         error("FORBIDDEN", () -> service.review(PRIMARY, receipt.id(), 3, AssistExecutionService.ReviewAction.DISMISS, List.of(), null));
         doNothing().when(accessTarget).requireReadable(any(), any());
         doThrow(new DomainException("FORBIDDEN", "Task decision ended")).when(accessTarget).requireDecision(any(), any(), anyString());
+        assertThat(service.get(PRIMARY, receipt.id()).reviewable()).isFalse();
         error("FORBIDDEN", () -> service.review(PRIMARY, receipt.id(), 3, AssistExecutionService.ReviewAction.DISMISS, List.of(), null));
         assertThat(versions(receipt)).containsExactly(1L, 2L, 3L);
     }
@@ -269,8 +270,11 @@ class ExpenseRiskExecutionTest {
     }
 
     @Test void listAndReplayAuthorizationUseOriginalPrimaryRoundAndWrongReportCannotReadRun() {
-        var receipt = queue(); service.authorize(PRIMARY, 1); assertThat(service.list(PRIMARY, 1, 0, 10).total()).isEqualTo(1);
+        var receipt = queue(); service.authorizeSelection(PRIMARY, selection); assertThat(service.list(PRIMARY, 1, 0, 10).total()).isEqualTo(1);
         verify(accessTarget, times(2)).requirePrimaryReadable(REQUESTER, PRIMARY, 1);
+        verify(accessTarget).requirePrimaryReadable(REQUESTER, COMPARISON, 1);
+        service.authorizeRun(PRIMARY, receipt.id()); verify(accessTarget).requireReadable(REQUESTER, loaded(receipt).context().input());
+        error("INVALID_AGENT_INPUT", () -> service.authorizeSelection(COMPARISON, selection));
         error("NOT_FOUND", () -> service.get(COMPARISON, receipt.id()));
         actors.set(new Actor("foreign", REQUESTER.userId(), Set.of("ADMIN"))); error("NOT_FOUND", () -> service.get(PRIMARY, receipt.id()));
     }

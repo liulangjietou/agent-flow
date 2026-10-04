@@ -18,6 +18,23 @@ const explanationReview = { expectedRunVersion: 3, action: 'ADOPT', selectedIssu
 validate({ $ref: '#/components/schemas/ReviewPrecheckExplanationRequest' }, explanationReview)
 assert.equal(validator({ $ref: '#/components/schemas/ReviewPrecheckExplanationRequest' })({ ...explanationReview, approved: true }), false)
 assert.equal(validator({ $ref: '#/components/schemas/ReviewPrecheckExplanationRequest' })({ ...explanationReview, selectedIssueIds: ['precheck:finding[0]', 'precheck:finding[0]'] }), false)
+// 风险来源范围的每层对象都封闭，调用者不能夹带租户、身份或金额事实。
+const riskDocument = { reportId: randomUUID(), roundNo: 1, lineNos: [1] }
+const riskInput = { taskId: 'current-task', scope: { documents: [riskDocument], calendarId: null } }
+const riskInputSchema = { $ref: '#/components/schemas/ExpenseRiskInputRequest' }
+validate(riskInputSchema, riskInput)
+for (const value of [
+  { ...riskInput, tenantId: 'other' },
+  { ...riskInput, scope: { ...riskInput.scope, requestedBy: 'admin' } },
+  { ...riskInput, scope: { documents: [{ ...riskDocument, amount: 999 }] } },
+  { ...riskInput, scope: { documents: [{ ...riskDocument, lineNos: [1, 1] }] } },
+  { ...riskInput, scope: { documents: [{ ...riskDocument, lineNos: [201] }] } }
+]) assert.equal(validator(riskInputSchema)(value), false)
+const riskReview = { expectedRunVersion: 3, action: 'ADOPT', selectedConcernIds: ['expense:risk[1]'] }
+validate({ $ref: '#/components/schemas/ReviewExpenseRiskRequest' }, riskReview)
+assert.equal(validator({ $ref: '#/components/schemas/ReviewExpenseRiskRequest' })({ ...riskReview, approvedAmount: 0 }), false)
+validate({ $ref: '#/components/schemas/ExpenseRiskInputOptions' }, { enabled: false, unavailableCode: 'NO_RISK_OBSERVATIONS',
+  inputDigest: null, targetDigest: null, providerId: null, model: null, destination: null, concerns: [], sources: [] })
 // 服务目录末页的空游标会被服务器省略；版本必须保持文本。
 validate({ $ref: '#/components/schemas/ServiceTaskDirectory' }, { items: [] })
 validate({ $ref: '#/components/schemas/ServiceTaskVersionPage' }, { items: [] })

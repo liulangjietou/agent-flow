@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T10:11:05.994537+00:00",
+  "recordedAt": "2026-10-04T10:45:56.291162+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -907,7 +907,7 @@
           ]
         }
       ],
-      "observed": "已接通四类局部证据、逐单原轮次来源授权、严格模型端口、V115 持久队列、原登录发送前复核、事务外执行和人工复核服务。后端范围 129 项去重用例已通过；公开 API、页面和真实业务运行验收待完成，A04 保持 OPEN。",
+      "observed": "已实现四类证据、逐单原轮次授权、V115 持久执行、六个公开操作及审批复核页面。真实 Flowable/API 范围 66 项、前端范围 85 项、构建和 OpenAPI 通过。固定包升级、强退恢复及浏览器/PostgreSQL 验收待完成，A04 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
@@ -925,18 +925,22 @@
       "acceptance": "可解释地引用经授权的费用事实，保留提示和人工处置；不能凭模型标签自动驳回、核减或改变金额矩阵。确定性拆单路由由 F04 独立处理。",
       "dependsOn": [],
       "progress": {
-        "recordedAt": "2026-10-04T10:11:05.994537+00:00",
-        "status": "LOCAL_PERSISTENCE_AND_EXECUTION_VERIFIED_PUBLIC_API_UI_RUNTIME_PENDING",
-        "publicApiImplemented": false,
+        "recordedAt": "2026-10-04T10:45:56.291162+00:00",
+        "status": "LOCAL_API_UI_AND_REAL_FLOWABLE_SCOPE_VERIFIED_PACKAGED_RUNTIME_PENDING",
+        "publicApiImplemented": true,
         "persistenceImplemented": true,
         "backendExecutionImplemented": true,
-        "uiImplemented": false,
+        "uiImplemented": true,
         "runtimeAccepted": false,
-        "evidence": "docs/evidence/expense-risk-execution-20261004.json",
+        "evidence": "docs/evidence/expense-risk-api-ui-20261004.json",
         "foundationEvidence": "docs/evidence/expense-risk-foundation-20261004.json",
-        "scopeTestsPassed": 129,
+        "scopeTestsPassed": 66,
         "persistenceCasesPassed": 25,
-        "executionCasesPassed": 31
+        "executionCasesPassed": 31,
+        "apiBackendCasesPassed": 66,
+        "frontendCasesPassed": 85,
+        "realFlowableIntegrationCasesPassed": 12,
+        "previousBackendScopeCasesPassed": 129
       }
     },
     {
@@ -3877,9 +3881,9 @@
   },
   "latestProgress": {
     "taskId": "A04",
-    "status": "LOCAL_PERSISTENCE_AND_EXECUTION_VERIFIED_PUBLIC_API_UI_RUNTIME_PENDING",
-    "recordedAt": "2026-10-04T10:11:05.994537+00:00",
-    "evidence": "docs/evidence/expense-risk-execution-20261004.json",
+    "status": "LOCAL_API_UI_AND_REAL_FLOWABLE_SCOPE_VERIFIED_PACKAGED_RUNTIME_PENDING",
+    "recordedAt": "2026-10-04T10:45:56.291162+00:00",
+    "evidence": "docs/evidence/expense-risk-api-ui-20261004.json",
     "knownOpenTaskCount": 34
   }
 }

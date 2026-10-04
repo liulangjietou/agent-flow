@@ -42,6 +42,11 @@ public class ExpenseRiskService {
         this.runs = runs; this.authentication = authentication; this.configuration = configuration; this.json = json;
     }
 
+    /** 选择日历仍由来源边界检查当前主单的决定权与完整明细读取资格。 */
+    public ExpenseRiskAccess.CalendarOptions calendarOptions(UUID reportId, int roundNo, String taskId, String afterKey) {
+        return access.calendarOptions(actors.actor(), reportId, roundNo, taskId, afterKey);
+    }
+
     /** 预览绑定操作者、任务、原版本与完整目录；公开投影不包含登录引用或原始本地上下文。 */
     @Transactional(readOnly = true)
     public InputOptions input(UUID reportId, String taskId, ExpenseRiskAccess.Selection selection) {
@@ -75,9 +80,19 @@ public class ExpenseRiskService {
         runs.create(run, login); return receipt(run);
     }
 
-    /** 幂等回执及轻量索引也必须重新检查主单原轮次的字段权限。 */
+    /** 排队回执重放仍须逐单可读，但不重新要求已经结束的决定任务存在。 */
     @Transactional(readOnly = true)
-    public void authorize(UUID reportId, int roundNo) { access.requirePrimaryReadable(actors.actor(), reportId, roundNo); }
+    public void authorizeSelection(UUID reportId, ExpenseRiskAccess.Selection selection) {
+        if (!selection.documents().get(0).reportId().equals(reportId)) throw new DomainException("INVALID_AGENT_INPUT", "Primary expense must be first in the selection");
+        var actor = actors.actor();
+        for (var document : selection.documents()) access.requirePrimaryReadable(actor, document.reportId(), document.roundNo());
+    }
+
+    /** 复核回执只含状态，回放仍重新检查运行的每份原始来源，不能借主单权限绕过对照单。 */
+    @Transactional(readOnly = true)
+    public void authorizeRun(UUID reportId, UUID runId) {
+        var actor = actors.actor(); access.requireReadable(actor, requireRun(actor.tenantId(), reportId, runId).run().context().input());
+    }
 
     /** 主单历史按原轮次分页；不在列表中泄露对照单或模型正文。 */
     @Transactional(readOnly = true)
@@ -91,10 +106,12 @@ public class ExpenseRiskService {
     public Detail get(UUID reportId, UUID runId) {
         var actor = actors.actor(); var run = requireRun(actor.tenantId(), reportId, runId).run();
         var context = run.context(); var state = run.state(); access.requireReadable(actor, context.input());
-        String unavailable = state.status() == ExpenseRiskRun.Status.COMPLETED ? reviewFailure(actor, context) : "AGENT_RUN_NOT_REVIEWABLE";
+        String unavailable = state.status() == ExpenseRiskRun.Status.COMPLETED ? decisionFailure(actor, context) : "AGENT_RUN_NOT_REVIEWABLE";
+        boolean reviewable = unavailable == null;
+        if (reviewable) unavailable = reviewFailure(actor, context);
         return new Detail(context.id(), context.taskId(), context.input().documents().get(0).roundNo(), state.status(), state.version(),
                 context.createdAt(), state.startedAt(), state.completedAt(), context.input().concerns(), context.input().sources(),
-                state.suggestion(), state.failure(), state.review(), unavailable == null, unavailable);
+                state.suggestion(), state.failure(), state.review(), reviewable, unavailable == null, unavailable);
     }
 
     /** 当前审批人可复核他人生成的解释；登录发送授权不冒充永久复核资格。 */
@@ -174,6 +191,10 @@ public class ExpenseRiskService {
         try { return context.input().equals(currentInput(actor, context, Instant.now())) ? null : "AGENT_INPUT_CHANGED"; }
         catch (DomainException unavailable) { return unavailable.code(); }
     }
+    private String decisionFailure(Actor actor, ExpenseRiskRun.Context context) {
+        try { access.requireDecision(actor, context.input().documents().get(0), context.taskId()); return null; }
+        catch (DomainException unavailable) { return unavailable.code(); }
+    }
     private JdbcExpenseRiskRepository.Entry requireRun(String tenant, UUID reportId, UUID id) {
         return runs.find(tenant, id).filter(entry -> entry.run().context().input().documents().get(0).reportId().equals(reportId)).orElseThrow(ExpenseRiskService::notFound);
     }
@@ -222,5 +243,5 @@ public class ExpenseRiskService {
     public record Detail(UUID id, String taskId, int roundNo, ExpenseRiskRun.Status status, long version, Instant createdAt,
                          Instant startedAt, Instant completedAt, List<ExpenseRiskInput.Concern> concerns, List<AssistModelPort.Source> sources,
                          ExpenseRiskSuggestion suggestion, AssistRun.Failure failure, ExpenseRiskRun.Review review,
-                         boolean adoptable, String unavailableCode) { }
+                         boolean reviewable, boolean adoptable, String unavailableCode) { }
 }

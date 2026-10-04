@@ -114,6 +114,7 @@ import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Act
 import type { PendingWrite } from './pendingWrites.js'
 import { rememberDraftRun, type DraftAssistReceipt } from './draftAssist'
 import { acknowledgeExplanation, type ExplanationReceipt } from './precheckExplanation'
+import { acknowledgeRisk, type RiskReceipt } from './expenseRisk'
 import { acknowledgeExpenseAssist, type ExpenseAssistReceipt } from './expenseDraftAssist'
 import { acknowledgeExtraction, extractionDrafts, type ExtractionReceipt } from './invoiceExtraction'
 
@@ -1270,6 +1271,9 @@ async function recoverOperation(id: string) {
       } else if (/^\/expense-reports\/[^/?]+\/precheck-explanations(?:\/[^/?]+\/review)?$/.test(request.path)) {
         acknowledgeExplanation(actorScope.value, request.path, result as ExplanationReceipt)
         notice.value = '原预检解释操作已确认，请核对同一条记录；费用金额、检查结论和审批状态保持不变。'
+      } else if (/^\/expense-reports\/[^/?]+\/risk-explanations(?:\/[^/?]+\/review)?$/.test(request.path)) {
+        acknowledgeRisk(actorScope.value, request.path, request.body!, result as RiskReceipt)
+        notice.value = '原风险复核操作已确认，请核对同一条记录。'
       } else if (request.path.startsWith('/expense-reports')) {
         if (request.body && (request.path === '/expense-reports' || request.path.endsWith('/revise'))) {
           const value = result as ExpenseDetailData
