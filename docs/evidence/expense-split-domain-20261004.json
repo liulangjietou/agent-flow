@@ -1,0 +1,123 @@
+{
+  "recordedAt": "2026-10-04T11:33:36.915123+00:00",
+  "task": "F04",
+  "scope": "DOMAIN_FOUNDATION_ONLY",
+  "taskRemainsOpen": true,
+  "baselineCommit": "322861302e1c42e4456d9892d5e9ffe7cf440575",
+  "behavioralRed": {
+    "policy": {
+      "tests": 8,
+      "failures": 7,
+      "errors": 0,
+      "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-policy-red"
+    },
+    "amountEvidence": {
+      "tests": 13,
+      "failures": 13,
+      "errors": 0,
+      "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-evidence-red"
+    }
+  },
+  "green": {
+    "tests": 65,
+    "failures": 0,
+    "errors": 0,
+    "reports": [
+      {
+        "class": "ExpenseSplitRiskEvidenceTest",
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "aac06eb27b0f16b6a050ff722f5186f257ccf0f5414ab783dbe1dca0c6f3fe3b"
+      },
+      {
+        "class": "ExpenseSplitRiskPolicyTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "ad67055c3eaa6dd279ee08b38763507a031b0000ae5b059cd01a9cf0549c6664"
+      },
+      {
+        "class": "ExpenseSelfApprovalPolicyTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "3cc4c5197097e08108d8c3270ab0b5321b72633bb2b8a4c0555c65e3df951648"
+      },
+      {
+        "class": "ExpenseDuplicateApprovalPolicyTest",
+        "tests": 7,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "c8f0bd80eba77500b55bccdaf2ae5ec2ea1af041a9881e89b41cb47aaba7de30"
+      },
+      {
+        "class": "DefinitionDomainTest",
+        "tests": 9,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "c63e46625c8fe964b93394bf2a0c80f34295412b788f982530da8b9b342d7622"
+      },
+      {
+        "class": "DefinitionPublicationTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "404ddf2f11c9392939a2fef1b489158e4e985b2e5a8d00769cea43913f347a71"
+      },
+      {
+        "class": "SubprocessDefinitionValidationTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "64f7c43fb84a0cba5c8351247e209123aca2ac46ac9dd172fb2c0aff632e50ed"
+      },
+      {
+        "class": "ServiceTaskDefinitionTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "1dbbe732aa93d04f03190f438af42f684768bb750e789be3b78333ae2df6e423"
+      },
+      {
+        "class": "EventDefinitionTest",
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "abdb2578359e1cf9c83baa51471308b3ccf5e4f58ff2a8f038c976aaceb28077"
+      },
+      {
+        "class": "TimerDefinitionTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "sha256": "387195d3e77ca0c81bd442b2e62027752c1e136ee071350e807be1c72e4ea11a"
+      }
+    ],
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/f04-domain-green.log",
+    "archive": "/fyoung/tmp/agentflow-remaining-20260928/f04-domain-green"
+  },
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java": "f7bae48c2bb79057f83c3b0c1860ce1cba4c6d62a67fa776226cdefa00a91b44",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseSplitRiskPolicy.java": "ca54ec3335e35d818c5d31ecbcb2af209545624745bedcfcda1dec58173c7203",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseSplitRiskEvidence.java": "e7e2ee161bed673a207d21454e463277bd5ee6dd91c44e6bcf2fc2e86e0f5571",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseSplitRiskPolicyTest.java": "682b7cf207c7ae31a16eb9bde4a91aebf6246f1effa6e74d01a2c63eb881a268",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseSplitRiskEvidenceTest.java": "474cde3e280442191f4d941aac863fb4f627b27b11ce255457b435e49a9ba671"
+  },
+  "pending": [
+    "persistent current-round projection and immutable evidence",
+    "transaction and Flowable binding",
+    "permission-protected API and designers",
+    "fixed-package runtime, browser and PostgreSQL acceptance"
+  ]
+}
