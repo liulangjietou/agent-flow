@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 明确的本机合成服务：原号只产生一次效果，能模拟效果发生后回执丢失和真实原号查询。
  * @author owlzhangfq@gmail.com
  */
-final class ServiceTaskTestProvider implements AutoCloseable {
+public final class ServiceTaskTestProvider implements AutoCloseable {
     final Map<UUID, ServiceTaskCommand> commands = new ConcurrentHashMap<>();
     final Map<UUID, ServiceTaskObservation> observations = new ConcurrentHashMap<>();
     final List<Call> calls = new CopyOnWriteArrayList<>();
@@ -34,19 +34,23 @@ final class ServiceTaskTestProvider implements AutoCloseable {
     private final java.util.concurrent.ExecutorService executor = Executors.newCachedThreadPool();
     private final JsonUtil json;
 
-    ServiceTaskTestProvider(JsonUtil json) throws IOException {
+    /** 启动独立本机端点，供服务任务和费用审批的真实 HTTP 集成场景复用。 */
+    public ServiceTaskTestProvider(JsonUtil json) throws IOException {
         this.json = json;
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", this::handle); server.setExecutor(executor); server.start();
     }
 
-    ServiceTaskGatewayConfiguration.Operation declaration(String key) {
+    /** 生成绑定当前端点的可信操作声明，不向流程图暴露地址和凭据。 */
+    public ServiceTaskGatewayConfiguration.Operation declaration(String key) {
         var value = new ServiceTaskGatewayConfiguration.Operation();
         value.setKey(key); value.setVersion(1); value.setName("登记合成凭据");
         value.setParameters(List.of(new ServiceTaskContract.Parameter("memo", ServiceTaskContract.Type.TEXT, true, true)));
         value.setEndpoint(endpoint()); value.setToken("synthetic-service-token"); return value;
     }
     String endpoint() { return "http://127.0.0.1:" + server.getAddress().getPort() + "/"; }
+
+    public int effectCount() { return effects.get(); }
 
     private void handle(HttpExchange exchange) throws IOException {
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);

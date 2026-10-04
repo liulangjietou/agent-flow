@@ -7,16 +7,26 @@ import com.sun.net.httpserver.HttpServer;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.repository.ApplicationRepository;
+import io.agentflow.approval.process.EventWaitService;
+import io.agentflow.approval.process.FlowableExpenseDuplicateTrace;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionApplicationService;
+import io.agentflow.event.EventContractService;
 import io.agentflow.finance.*;
 import io.agentflow.form.FieldVisibility;
 import io.agentflow.form.FormSchema;
 import io.agentflow.organization.OrganizationService;
 import io.agentflow.organization.OrganizationUnit;
+import io.agentflow.servicetask.JdbcServiceTaskOperationRepository;
+import io.agentflow.servicetask.ServiceTaskCatalog;
+import io.agentflow.servicetask.ServiceTaskGateway;
+import io.agentflow.servicetask.ServiceTaskGatewayConfiguration;
+import io.agentflow.servicetask.ServiceTaskOperation;
+import io.agentflow.servicetask.ServiceTaskOperationService;
+import io.agentflow.servicetask.ServiceTaskTestProvider;
 import org.flowable.engine.TaskService;
 import org.flowable.task.api.Task;
 import org.junit.jupiter.api.*;
@@ -56,6 +66,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true", "agentflow.timers.enabled=false",
+        "agentflow.service-tasks.worker-enabled=false",
         "agentflow.vouchers.preparation-worker-enabled=false", "agentflow.vouchers.worker-enabled=false", "agentflow.vouchers.reversal-worker-enabled=false", "agentflow.vouchers.reversal-execution-worker-enabled=false",
         "agentflow.payments.worker-enabled=false", "agentflow.payments.request-worker-enabled=false", "agentflow.payments.payee-review-worker-enabled=false",
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false", "agentflow.expenses.payment-return-worker-enabled=false",
@@ -263,6 +274,13 @@ class ExpenseSubmissionIntegrationTest {
     @MockitoSpyBean io.agentflow.approval.process.JdbcTaskAuditAdapter taskAudit;
     @Autowired io.agentflow.approval.process.TimerWaitService timerWaits;
     @Autowired org.flowable.engine.ManagementService timerJobs;
+    @Autowired EventContractService eventContracts;
+    @Autowired EventWaitService eventWaits;
+    @Autowired ServiceTaskGatewayConfiguration serviceConfiguration;
+    @Autowired ServiceTaskCatalog serviceCatalog;
+    @Autowired ServiceTaskOperationService serviceOperations;
+    @Autowired ServiceTaskGateway serviceGateway;
+    @Autowired JdbcServiceTaskOperationRepository serviceRecords;
 
     private final List<EmployeeAdvance> fifoFixtures = new ArrayList<>();
 
@@ -449,6 +467,140 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(audit.stream().map(value -> value.path("nodeId").asText())).containsExactly("department", "executive");
         assertThat(audit.get(0).at("/duplicateApproval/sourceNodeId").asText()).isEqualTo("supervisor");
         assertThat(audit.get(1).at("/duplicateApproval/sourceNodeId").asText()).isEqualTo("department");
+    }
+
+    @Test
+    void adjacentExpenseApprovalEventWaitRollsBackAuditAndRetriesTheOriginalHumanTrace() throws Exception {
+        duplicateExpenseTemplate(true);
+        String contractKey = "duplicate-accepted-" + UUID.randomUUID();
+        eventContracts.publish(admin, contractKey, 0, "审批后验收事件", "erp", "GoodsAccepted", "合成事件接续验收");
+        addTemplateWaitAfterSupervisor(new Node("duplicateEvent", "审批后等待事件", NodeType.EVENT_WAIT,
+                Map.of("eventContractKey", contractKey, "eventContractVersion", "1")));
+        var report = fixture(false).report(); submit(report); budgetWorker.poll(); var source = task(report);
+        ok(act(report, "manager", "APPROVE"), 200);
+        assertThat(tasks(report)).isEmpty();
+        var subscription = runtime.createEventSubscriptionQuery().processInstanceId(source.getProcessInstanceId()).eventType("message").singleResult();
+        assertThat(subscription).isNotNull();
+        long waitingVersion = app(report).version();
+        var originalTrace = runtime.getVariable(source.getProcessInstanceId(), FlowableExpenseDuplicateTrace.VARIABLE);
+        var command = new EventWaitService.Command("demo", "erp", "GoodsAccepted", 1, UUID.randomUUID().toString(),
+                report.applicationId(), app(report).roundNo(), subscription.getId(), contractKey, 1);
+        var wrongVersion = new EventWaitService.Command(command.tenantId(), command.sourceKey(), command.eventType(),
+                command.envelopeVersion(), command.eventId(), command.applicationId(), command.roundNo(), command.waitId(), command.contractKey(), 2);
+        assertThat(eventWaits.advance(wrongVersion)).isEqualTo(EventWaitService.Outcome.MISMATCH);
+        assertThat(app(report).version()).isEqualTo(waitingVersion);
+
+        failDuplicateApprovalAudit();
+        try {
+            assertThatThrownBy(() -> eventWaits.advance(command)).isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Synthetic duplicate approval audit failure");
+        } finally { doCallRealMethod().when(taskAudit).record(any()); }
+        assertThat(runtime.createEventSubscriptionQuery().id(subscription.getId()).singleResult()).isNotNull();
+        assertThat(runtime.getVariable(source.getProcessInstanceId(), FlowableExpenseDuplicateTrace.VARIABLE)).isEqualTo(originalTrace);
+        assertThat(tasks(report)).isEmpty();
+        assertThat(app(report).version()).isEqualTo(waitingVersion);
+        assertThat(duplicateWaitAuditCount(report, "EVENT_RECEIVED")).isZero();
+        assertThat(duplicateWaitAuditCount(report, ExpenseDuplicateApprovalPolicy.ACTION)).isZero();
+
+        assertThat(eventWaits.advance(command)).isEqualTo(EventWaitService.Outcome.ADVANCED);
+        assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+        assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+        assertThat(eventWaits.advance(command)).isEqualTo(EventWaitService.Outcome.STALE);
+        assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+        assertThat(duplicateWaitAuditCount(report, "EVENT_RECEIVED")).isEqualTo(1);
+        assertOriginalDuplicateSource(report, source);
+    }
+
+    @Test
+    void adjacentExpenseApprovalServiceWaitRetainsRemoteReceiptWhenAutomaticAuditRollsBack() throws Exception {
+        boolean previouslyEnabled = serviceConfiguration.isEnabled();
+        var previousTenants = serviceConfiguration.getTenants();
+        try (var provider = new ServiceTaskTestProvider(json)) {
+            var declaration = provider.declaration("duplicate.receipt." + UUID.randomUUID());
+            serviceConfiguration.setEnabled(true);
+            serviceConfiguration.setTenants(Map.of("demo", List.of(declaration))); serviceCatalog.install();
+            var contract = serviceConfiguration.find("demo", declaration.getKey(), 1).orElseThrow().contract();
+            duplicateExpenseTemplate(true);
+            addTemplateWaitAfterSupervisor(new Node("duplicateService", "审批后登记服务", NodeType.SERVICE_TASK,
+                    Map.of("serviceOperationKey", contract.key(), "serviceOperationVersion", "1",
+                            "serviceContractDigest", contract.digest(), "serviceInput.memo", "currency")));
+            var report = fixture(false).report(); submit(report); budgetWorker.poll(); var source = task(report);
+            ok(act(report, "manager", "APPROVE"), 200);
+            assertThat(tasks(report)).isEmpty(); long waitingVersion = app(report).version();
+            var originalTrace = runtime.getVariable(source.getProcessInstanceId(), FlowableExpenseDuplicateTrace.VARIABLE);
+            var operationId = UUID.fromString(jdbc.queryForObject(
+                    "SELECT id FROM service_task_operation WHERE tenant_id='demo' AND application_id=? AND node_id='duplicateService'",
+                    String.class, report.applicationId().toString()));
+            var claimed = serviceOperations.claim("demo", operationId, Instant.now());
+            assertThat(claimed).isNotNull();
+            assertThat(claimed.input().command().inputs()).isEqualTo(Map.of("memo", "CNY"));
+            serviceOperations.finish(claimed, serviceGateway.execute(claimed.input()), Instant.now());
+            var confirmed = serviceRecords.find("demo", operationId).orElseThrow();
+            assertThat(confirmed.operation().status()).isEqualTo(ServiceTaskOperation.Status.APPLIED);
+            assertThat(confirmed.progress()).isEqualTo(JdbcServiceTaskOperationRepository.Progress.PENDING);
+            assertThat(provider.effectCount()).isEqualTo(1);
+
+            failDuplicateApprovalAudit();
+            try {
+                assertThatThrownBy(() -> serviceOperations.claim("demo", operationId, Instant.now()))
+                        .isInstanceOf(IllegalStateException.class).hasMessage("Synthetic duplicate approval audit failure");
+            } finally { doCallRealMethod().when(taskAudit).record(any()); }
+            assertThat(serviceRecords.find("demo", operationId).orElseThrow()).isEqualTo(confirmed);
+            assertThat(runtime.createExecutionQuery().executionId(claimed.input().command().binding().executionId())
+                    .singleResult().getActivityId()).isEqualTo("duplicateService");
+            assertThat(runtime.getVariable(source.getProcessInstanceId(), FlowableExpenseDuplicateTrace.VARIABLE)).isEqualTo(originalTrace);
+            assertThat(tasks(report)).isEmpty();
+            assertThat(app(report).version()).isEqualTo(waitingVersion);
+            assertThat(duplicateWaitAuditCount(report, "SERVICE_TASK_COMPLETED")).isZero();
+            assertThat(duplicateWaitAuditCount(report, ExpenseDuplicateApprovalPolicy.ACTION)).isZero();
+
+            assertThat(serviceOperations.claim("demo", operationId, Instant.now())).isNull();
+            assertThat(task(report).getTaskDefinitionKey()).isEqualTo("receipt");
+            assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+            assertThat(serviceRecords.find("demo", operationId).orElseThrow().progress()).isEqualTo(JdbcServiceTaskOperationRepository.Progress.ADVANCED);
+            assertThat(serviceOperations.claim("demo", operationId, Instant.now())).isNull();
+            assertThat(app(report).version()).isEqualTo(waitingVersion + 2);
+            assertThat(provider.effectCount()).isEqualTo(1);
+            assertThat(duplicateWaitAuditCount(report, "SERVICE_TASK_COMPLETED")).isEqualTo(1);
+            assertOriginalDuplicateSource(report, source);
+        } finally {
+            serviceConfiguration.setEnabled(previouslyEnabled); serviceConfiguration.setTenants(previousTenants);
+        }
+    }
+
+    private void addTemplateWaitAfterSupervisor(Node wait) {
+        var nodes = new ArrayList<>(expenseTemplateGraph.nodes()); nodes.add(wait);
+        var edges = new ArrayList<>(expenseTemplateGraph.edges());
+        var original = edges.stream().filter(edge -> edge.source().equals("supervisor")).findFirst().orElseThrow();
+        edges.replaceAll(edge -> edge.id().equals(original.id())
+                ? new Edge(edge.id(), edge.source(), wait.id(), edge.condition(), edge.defaultBranch()) : edge);
+        edges.add(new Edge(wait.id() + "Exit", wait.id(), original.target(), ""));
+        expenseTemplateGraph = new Graph(nodes, edges, expenseTemplateGraph.conditionLanguageVersion(), expenseTemplateGraph.riskPolicy());
+    }
+
+    private void failDuplicateApprovalAudit() {
+        // 先写入真实审计再抛错，验证审计记录、原生任务和申请版本会一起回滚。
+        doAnswer(call -> { call.callRealMethod(); throw new IllegalStateException("Synthetic duplicate approval audit failure"); })
+                .when(taskAudit).record(argThat(operation -> operation.action().equals(ExpenseDuplicateApprovalPolicy.ACTION)));
+    }
+
+    private int duplicateWaitAuditCount(ExpenseReport report, String action) {
+        return jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action=?",
+                Integer.class, report.applicationId().toString(), action);
+    }
+
+    private void assertOriginalDuplicateSource(ExpenseReport report, Task source) {
+        assertThat(duplicateWaitAuditCount(report, "APPROVE")).isEqualTo(1);
+        var events = jdbc.queryForList("SELECT payload_json FROM audit_event WHERE tenant_id='demo' AND application_id=? AND action='AUTO_PASSED_DUPLICATE'",
+                String.class, report.applicationId().toString());
+        assertThat(events).hasSize(1);
+        var audit = json.read(events.get(0), JsonNode.class);
+        assertThat(audit.path("actor").asText()).isEqualTo("system:expense-duplicate-approval");
+        assertThat(audit.path("nodeId").asText()).isEqualTo("department");
+        assertThat(audit.at("/duplicateApproval/sourceNodeId").asText()).isEqualTo(source.getTaskDefinitionKey());
+        assertThat(audit.at("/duplicateApproval/sourceTaskIds").toString()).isEqualTo(json.write(List.of(source.getId())));
+        assertThat(audit.at("/duplicateApproval/subject").asText()).isEqualTo("manager");
+        assertThat(audit.at("/duplicateApproval/ruleVersion").asInt()).isEqualTo(1);
     }
 
     private void configureTemplateDepartment(Map<String, String> changes) {
