@@ -44,12 +44,12 @@
 - Create: `agentflow-domain/src/main/java/io/agentflow/expense/ExpenseBudgetReview.java`
 - Create: `agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseBudgetReviewRepository.java`
 - Create: `agentflow-server/src/main/resources/db/migration/V119__expense_budget_review.sql`
-- Modify: `ExpensePrecheckEvidence` / `ExpenseSubmissionService` / `BudgetOperationService` 的原提交绑定
+- 原提交绑定由仓储复核现有 `ExpensePrecheckEvidence`、正式控制与预算操作；`ExpenseSubmissionService` / `BudgetOperationService` 的实际接线随 Task 3 必经节点守卫一起完成。
 - Test: 聚合状态/恢复及 JDBC 约束、投影和原操作身份集成
 
-- [ ] 先证明待结果、无需例外、人工待办、授权后外部待确认等状态不可混淆。
-- [ ] 冻结外部政策、正式提交预算号及原轮次；所有状态改变由聚合决定，存储复核来源。
-- [ ] 旧轮次不补造记录；唯一与外键约束、并发版本及事务回滚通过后本地提交。
+- [x] 先证明待结果、无需例外、人工待办、授权后外部待确认等状态不可混淆。
+- [x] 冻结外部政策、正式提交预算号及原轮次；所有状态改变由聚合决定，存储复核来源。
+- [x] 旧轮次不补造记录；唯一与外键约束、并发版本及事务回滚通过后本地提交。
 
 ### Task 3: 实际节点、预算结果与原键恢复
 
@@ -61,7 +61,7 @@
 - Test: 新 `ExpenseBudgetReviewIntegrationTest`，复用已有真实流程和预算夹具；相关预算、审批、子流程范围测试
 
 - [ ] 先复现柔性拒绝自动退回、预算未确认可误审批、以及独立节点与恢复缺失。
-- [ ] 全路径必经单人预算节点；真实冻结才自动推进并审计，柔性拒绝才开放人工审批。
+- [ ] 提交事务创建本轮控制并绑定原预算号；全路径必经单人预算节点；真实冻结才自动推进并审计，柔性拒绝才开放人工审批。
 - [ ] 人工批准原子登记一次带原凭据的新预算命令；未知只查原号，拒绝不循环。
 - [ ] 刚性/旧定义、核减后拒绝、撤回退回重提、敏感权限/代理、子流程暂停和事务失败回归通过后本地提交。
 
