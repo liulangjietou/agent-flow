@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T11:55:54.445723+00:00",
+  "recordedAt": "2026-10-04T13:04:17.891681+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -1361,7 +1361,7 @@
           ]
         }
       ],
-      "observed": "规则、V116 依据、提交事务与 Flowable 路由、原轮次权限查询及只读详情面板已接通。356 项路由、47 项查询、53 项前端范围分别通过，阶段数不累加；21 份后端成功响应通过页面解析。两种设计器、模板和模拟、固定包及浏览器/PostgreSQL 验收仍待完成；F04 保持 OPEN。",
+      "observed": "规则、V116 依据、提交及 Flowable 路由、原轮次权限查询、只读详情、两种设计器、便携模板和合成金额模拟均已接通。模板及配套样例升至 v4，跨单默认明确关闭。设计/模拟阶段 118 项 Java、146 项前端、27 份实际响应契约通过；阶段数不累加。固定包及浏览器/PostgreSQL 验收仍待完成，F04 保持 OPEN。",
       "references": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/definition/ApprovalRiskPolicy.java",
@@ -1378,7 +1378,8 @@
       "persistenceEvidence": "docs/evidence/expense-split-persistence-20261004.json",
       "routingIntegrationEvidence": "docs/evidence/expense-split-routing-integration-20261004.json",
       "readEvidence": "docs/evidence/expense-split-read-20261004.json",
-      "readUiEvidence": "docs/evidence/expense-split-read-ui-20261004.json"
+      "readUiEvidence": "docs/evidence/expense-split-read-ui-20261004.json",
+      "designSimulationEvidence": "docs/evidence/expense-split-design-simulation-20261004.json"
     },
     {
       "id": "F05",

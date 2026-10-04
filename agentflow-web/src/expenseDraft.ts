@@ -40,7 +40,7 @@ export const precheckIssues: Record<string, string> = {
 }
 
 /** 完整费用字段契约与后端一致，选错通用流程时不创建不适用的草稿。 */
-export function expenseDefinition(definition: Definition | null): boolean {
+export function expenseDefinition(definition: Pick<Definition, 'formSchema'> | null): boolean {
   const fields = definition?.formSchema?.fields
   const types: Record<string, string> = { expenseDetails: 'TEXT', amount: 'NUMBER', currency: 'TEXT', overPolicy: 'BOOLEAN' }
   return !!fields && fields.length === 4 && new Set(fields.map(field => field.key)).size === 4

@@ -96,7 +96,7 @@ export function bindAuthenticationActor(actor: Actor | null) {
 
 export interface ApiError { status: number; code: string; message: string; details?: { fieldErrors?: FieldErrors; definitionErrors?: string[] } }
 /** 当前设计的模拟输入。@author owlzhangfq@gmail.com */
-export interface SimulationInput { graph: Graph; formSchema: FormSchema | null; values: Record<string, unknown> }
+export interface SimulationInput { graph: Graph; formSchema: FormSchema | null; values: Record<string, unknown>; splitRoutingAmount?: import('./expenses').Money }
 /** 仅使用设计器测试填写内容的字段权限预览。@author owlzhangfq@gmail.com */
 export interface FieldPreviewInput { formSchema: FormSchema; values: Record<string, unknown>; nodeIds: string[] }
 /** 正式读取与设计预览共用的服务端投影。@author owlzhangfq@gmail.com */

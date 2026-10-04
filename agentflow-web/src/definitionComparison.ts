@@ -67,6 +67,11 @@ const labels: Record<string, string> = {
   approvalPercentage: '通过比例（%）', 'properties.approvalPercentage': '通过比例（%）',
   expenseSelfApproval: '费用自审批处理', 'properties.expenseSelfApproval': '费用自审批处理',
   expenseDuplicateApproval: '相邻重复审批', 'properties.expenseDuplicateApproval': '相邻重复审批',
+  expenseSplitRisk: '跨单拆分风险规则', 'properties.expenseSplitRisk': '跨单拆分风险规则',
+  expenseSplitWindowDays: '跨单滚动窗口（天）', 'properties.expenseSplitWindowDays': '跨单滚动窗口（天）',
+  expenseSplitThreshold: '同类费用风险阈值', 'properties.expenseSplitThreshold': '同类费用风险阈值',
+  expenseSplitCurrency: '跨单规则本位币', 'properties.expenseSplitCurrency': '跨单规则本位币',
+  expenseSplitRouting: '网关金额依据', 'properties.expenseSplitRouting': '网关金额依据',
   expenseStage: '费用审批职责', 'properties.expenseStage': '费用审批职责',
   excludeApplicant: '禁止申请人办理', 'properties.excludeApplicant': '禁止申请人办理',
   differentApproverFrom: '排除前序步骤批准人', 'properties.differentApproverFrom': '排除前序步骤批准人',
@@ -93,6 +98,8 @@ export function comparisonValue(value: unknown, property = ''): string {
   if (typeof value === 'string') {
     if (property.endsWith('expenseSelfApproval')) return value === 'ESCALATE_SUPERVISOR' ? '申请人转本次任职的直属主管' : '待修正：' + value
     if (property.endsWith('expenseDuplicateApproval')) return value === 'AUTO_PASS_ADJACENT' ? '自动通过相邻同人业务审批' : '待修正：' + value
+    if (property.endsWith('expenseSplitRisk')) return value === 'ENABLED' ? '启用跨单规则' : value === 'DISABLED' ? '关闭跨单规则' : '待修正：' + value
+    if (property.endsWith('expenseSplitRouting')) return value === 'AGGREGATE_AMOUNT' ? '使用冻结跨单路由金额' : '待修正：' + value
     if (property.endsWith('excludeApplicant')) return value === 'true' ? '启用' : value === 'false' ? '关闭' : '待修正：' + value
     if (property.endsWith('differentApproverFrom')) return value.split(',').join('、')
     if (property.endsWith('approvalMode')) return approvalPolicyLabel(value)

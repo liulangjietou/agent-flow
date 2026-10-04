@@ -77,7 +77,7 @@ function process(value: unknown, version: 1 | 2): PortableProcess {
       ? Object.keys(n.properties).filter(key => key.startsWith('serviceInput.') && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key.slice('serviceInput.'.length))) : []
     if (serviceInputs.length > 16) throw new Error('服务任务最多映射 16 个参数。')
     if (inputs.length > 50) throw new Error('子流程最多映射 50 个输入字段。')
-    const properties = object(n.properties, n.type === 'SERVICE_TASK' ? ['x', 'y', 'serviceOperationKey', 'serviceOperationVersion', 'serviceContractDigest', ...serviceInputs] : ['x', 'y', 'assigneeRule', 'recipientRule', 'approvalMode', 'approvalPercentage', 'excludeApplicant', 'differentApproverFrom', 'expenseStage', 'expenseSelfApproval', 'expenseDuplicateApproval', 'timerDelaySeconds', 'eventContractKey', 'eventContractVersion',
+    const properties = object(n.properties, n.type === 'SERVICE_TASK' ? ['x', 'y', 'serviceOperationKey', 'serviceOperationVersion', 'serviceContractDigest', ...serviceInputs] : ['x', 'y', 'assigneeRule', 'recipientRule', 'approvalMode', 'approvalPercentage', 'excludeApplicant', 'differentApproverFrom', 'expenseStage', 'expenseSelfApproval', 'expenseDuplicateApproval', 'expenseSplitRisk', 'expenseSplitWindowDays', 'expenseSplitThreshold', 'expenseSplitCurrency', 'expenseSplitRouting', 'timerDelaySeconds', 'eventContractKey', 'eventContractVersion',
       'deadlineCalendarId', 'deadlineCalendarRevision', 'deadlineWorkingMinutes', 'escalationWorkingMinutes', 'escalationRecipientRule', ...(n.type === 'SUB_PROCESS' ? ['subprocessKey', 'subprocessVersion', ...inputs] : [])], [], '节点配置')
     for (const [key, value] of Object.entries(properties)) {
       text(value, `节点配置 ${key}`, key === 'differentApproverFrom' ? MAX_RESPONSIBILITY_REFERENCE_TEXT : 256)

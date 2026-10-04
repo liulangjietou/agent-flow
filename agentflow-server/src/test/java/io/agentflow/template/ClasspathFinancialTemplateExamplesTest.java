@@ -29,8 +29,9 @@ class ClasspathFinancialTemplateExamplesTest {
     @Test
     void relatedTemplatesShareAValidatedPackWithoutSharingMutableDocuments() {
         var pack = examples.get("expense-report");
-        assertThat(pack.path("version").asInt()).isEqualTo(3);
+        assertThat(pack.path("version").asInt()).isEqualTo(4);
         assertThat(pack.path("setupSteps").toString()).contains("相邻同人业务审批自动通过", "来源任务和规则版本审计");
+        assertThat(pack.path("setupSteps").toString()).contains("跨单拆分风险默认关闭", "合成路由金额");
         assertThat(pack.path("scenarios")).hasSize(10);
         assertThat(examples.summary("expense-plan")).isEqualTo(examples.summary("advance-request"));
         assertThat(examples.summary("expense-plan").scenarioCount()).isEqualTo(10);

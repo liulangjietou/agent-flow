@@ -4398,7 +4398,7 @@
           "流程设计"
         ],
         "summary": "模拟当前设计",
-        "description": "只读。返回真实领域求值的节点路径、连线与分支依据，不保存测试数据。",
+        "description": "只读。返回真实领域求值的节点路径、连线与分支依据，不保存测试数据。 启用跨单规则时须单独传入 splitRoutingAmount 合成金额；其他网关及财务判断继续使用 values.amount。",
         "x-access": "ADMIN 或 PROCESS_ADMIN",
         "x-idempotency": false,
         "responses": {
@@ -4679,7 +4679,7 @@
           "流程设计"
         ],
         "summary": "模拟已保存版本",
-        "description": "只读兼容入口，只返回 path；省略正文时使用空测试数据。按定义读取权限授权。",
+        "description": "只读兼容入口，只返回 path；省略正文时使用空测试数据。按定义读取权限授权。 启用跨单规则时须单独传入 splitRoutingAmount 合成金额；其他网关及财务判断继续使用 values.amount。",
         "x-access": "当前已登录账号",
         "x-idempotency": false,
         "responses": {
@@ -57675,6 +57675,17 @@
             "type": "object",
             "additionalProperties": true,
             "description": "由绑定版本的表单定义约束。NUMBER 使用规范十进制字符串，BOOLEAN 使用 JSON 布尔值；缺失与显式 null 表示未填写。"
+          },
+          "splitRoutingAmount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "仅模拟使用的明确合成路由金额；规则启用时必填，须与规则及本单测试币种一致且不低于本单金额。只影响指定业务网关，不查询业务、不写入费用或冻结依据；规则未启用时须省略或为 null。"
           }
         },
         "required": [
@@ -57696,6 +57707,17 @@
                 "type": "null"
               }
             ]
+          },
+          "splitRoutingAmount": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "仅模拟使用的明确合成路由金额；规则启用时必填，须与规则及本单测试币种一致且不低于本单金额。只影响指定业务网关，不查询业务、不写入费用或冻结依据；规则未启用时须省略或为 null。"
           }
         }
       },

@@ -44,17 +44,22 @@ class ClasspathProcessTemplateCatalogTest {
     }
 
     @Test
-    void expenseTemplateRequiresExplicitNewSourceVersionForDuplicateApproval() {
+    void expenseTemplateRequiresExplicitNewSourceVersionWithSplitRiskDisabledAndNoInventedParameters() {
         var catalog = new ClasspathProcessTemplateCatalog(resources, json);
         var expense = catalog.get("expense-report");
-        assertThat(expense.templateVersion()).isEqualTo(3);
+        assertThat(expense.templateVersion()).isEqualTo(4);
         assertThat(io.agentflow.expense.ExpenseSelfApprovalPolicy.enabled(expense.graph())).isTrue();
         assertThat(io.agentflow.expense.ExpenseDuplicateApprovalPolicy.enabled(expense.graph())).isTrue();
-        for (long oldVersion : List.of(1L, 2L)) {
+        var split = io.agentflow.expense.ExpenseSplitRiskPolicy.from(expense.graph());
+        assertThat(split.mode()).isEqualTo(io.agentflow.expense.ExpenseSplitRiskPolicy.Mode.DISABLED);
+        assertThat(split.rule()).isNull();
+        assertThat(split.gatewayIds()).containsExactlyInAnyOrder("amountGate", "executiveGate");
+        assertThat(expense.graph().node("recheckGate").properties()).doesNotContainKey("expenseSplitRouting");
+        for (long oldVersion : List.of(1L, 2L, 3L)) {
             assertThatThrownBy(() -> catalog.requireVersion("expense-report", oldVersion)).isInstanceOf(DomainException.class)
                     .satisfies(error -> assertThat(((DomainException) error).code()).isEqualTo("TEMPLATE_VERSION_CONFLICT"));
         }
-        assertThat(catalog.requireVersion("expense-report", 3)).isSameAs(expense);
+        assertThat(catalog.requireVersion("expense-report", 4)).isSameAs(expense);
         assertThat(catalog.get("expense-plan").templateVersion()).isEqualTo(1);
         assertThat(catalog.get("advance-request").templateVersion()).isEqualTo(1);
     }

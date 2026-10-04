@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { api, type Graph, type SimulationResult } from '../api'
 import type { FormSchema } from '../formSchema'
 import { SimulationPreview, parseSimulationValues, simulationIssue } from '../definitionSimulation'
+import { readSplitRule, SPLIT_GATEWAY } from '../expenseSplitPolicy'
+import { amountMinor, type Money } from '../expenses'
 import FormFields from './FormFields.vue'
 
 const props = defineProps<{ graph: Graph; formSchema: FormSchema | null; scopeKey: string; locked: boolean }>()
@@ -11,6 +13,9 @@ const preview = reactive(new SimulationPreview(api.simulateDesign))
 const values = ref<Record<string, unknown>>({})
 const rawValues = ref('{}')
 const inputError = ref('')
+const splitRoutingAmount = ref('')
+const splitRule = computed(() => readSplitRule(props.graph.nodes.find(node => node.type === 'START')?.properties ?? {}))
+const splitEnabled = computed(() => splitRule.value.mode === 'ENABLED')
 const nodeName = (id: string) => props.graph.nodes.find(node => node.id === id)?.name ?? id
 const duplicateApproval = computed(() => props.graph.nodes.some(node => node.type === 'START' && node.properties.expenseDuplicateApproval === 'AUTO_PASS_ADJACENT'))
 const issues = computed(() => preview.definitionErrors.map(simulationIssue))
@@ -25,10 +30,21 @@ async function run() {
     try { payload = parseSimulationValues(rawValues.value) }
     catch (error) { inputError.value = (error as Error).message; return }
   }
-  await preview.run({ graph: props.graph, formSchema: props.formSchema, values: payload })
+  let synthetic: Money | undefined
+  try {
+    if (!['', 'ENABLED', 'DISABLED'].includes(splitRule.value.mode)) throw new Error('跨单规则状态未知，请先明确修正规则。')
+    if (splitEnabled.value) {
+      if (!splitRoutingAmount.value) throw new Error('请明确填写本次模拟的合成路由金额。')
+      if (!/^[A-Z]{3}$/.test(splitRule.value.currency) || payload.currency !== splitRule.value.currency) throw new Error('本单测试币种须与跨单规则本位币一致。')
+      if (amountMinor(splitRoutingAmount.value) < amountMinor(payload.amount as string)) throw new Error('合成路由金额不能低于本单测试金额。')
+      synthetic = { value: splitRoutingAmount.value, currency: splitRule.value.currency }
+    }
+  } catch (error) { inputError.value = (error as Error).message; return }
+  await preview.run({ graph: props.graph, formSchema: props.formSchema, values: payload, ...(synthetic ? { splitRoutingAmount: synthetic } : {}) })
 }
-watch([() => props.scopeKey, () => props.formSchema], () => { values.value = {}; rawValues.value = '{}'; clearResult() }, { deep: true, flush: 'sync' })
-watch([() => props.graph, () => props.locked, values, rawValues], clearResult, { deep: true, flush: 'sync' })
+watch([() => props.scopeKey, () => props.formSchema], () => { values.value = {}; rawValues.value = '{}'; splitRoutingAmount.value = ''; clearResult() }, { deep: true, flush: 'sync' })
+watch(() => props.graph, () => { splitRoutingAmount.value = ''; clearResult() }, { deep: true, flush: 'sync' })
+watch([() => props.locked, values, rawValues, splitRoutingAmount], clearResult, { deep: true, flush: 'sync' })
 watch(() => preview.result, value => emit('result', value), { flush: 'sync' })
 onBeforeUnmount(() => { preview.clear(); emit('result', null) })
 </script>
@@ -38,11 +54,11 @@ onBeforeUnmount(() => { preview.clear(); emit('result', null) })
     <div class="simulation-heading"><div><p class="eyebrow">DESIGN / SIMULATION</p><h3 id="simulation-title">模拟运行</h3><p>按当前画布和表单试算，包括未保存的修改。仅填写测试数据，不会创建申请或执行审批。</p></div><button class="quiet" aria-label="关闭模拟面板" @click="emit('close')">×</button></div>
     <p v-if="duplicateApproval" class="simulation-help">模拟展示经过的节点，包含可能自动通过的业务节点。实际办理时才根据本轮候选、实际审批人和职责分离判断相邻重复审批，不以模拟路径代替批准事实。</p>
     <div class="simulation-layout">
-      <form class="simulation-input" @submit.prevent="run"><h4>测试数据</h4><FormFields v-if="formSchema" v-model="values" :schema="formSchema" :errors="preview.fieldErrors" :disabled="locked" /><template v-else><label for="simulation-json">此流程尚未绑定表单，请输入字段值</label><textarea id="simulation-json" v-model="rawValues" :disabled="locked" rows="6" spellcheck="false" placeholder='{"amount":"6000"}' /><p class="simulation-help">使用 JSON 对象；小数和大整数请写成字符串以保留精度，例如 {"amount":"6000.50"}。</p></template><p v-if="inputError" role="alert" class="inline-error">{{ inputError }}</p><button class="primary" :disabled="locked || preview.loading">{{ preview.loading ? '正在试算…' : '运行模拟' }}</button></form>
+      <form class="simulation-input" @submit.prevent="run"><h4>测试数据</h4><FormFields v-if="formSchema" v-model="values" :schema="formSchema" :errors="preview.fieldErrors" :disabled="locked" /><template v-else><label for="simulation-json">此流程尚未绑定表单，请输入字段值</label><textarea id="simulation-json" v-model="rawValues" :disabled="locked" rows="6" spellcheck="false" placeholder='{"amount":"6000"}' /><p class="simulation-help">使用 JSON 对象；小数和大整数请写成字符串以保留精度，例如 {"amount":"6000.50"}。</p></template><template v-if="splitEnabled"><label for="simulation-split-amount">合成路由金额（{{ splitRule.currency || '尚未配置本位币' }}）</label><input id="simulation-split-amount" v-model="splitRoutingAmount" inputmode="decimal" :disabled="locked" /><p class="simulation-help">此值由本次测试明确填写，不会查询现有报销单，也不生成冻结依据。只有已标记的业务网关使用合成值；其他网关及财务复核使用本单金额。</p></template><p v-if="inputError" role="alert" class="inline-error">{{ inputError }}</p><button class="primary" :disabled="locked || preview.loading">{{ preview.loading ? '正在试算…' : '运行模拟' }}</button></form>
       <div class="simulation-output" aria-live="polite" :aria-busy="preview.loading">
         <div v-if="preview.loading" class="simulation-empty"><strong>正在计算路径</strong><p>修改设计或测试数据会取消本次结果。</p></div>
         <template v-else-if="preview.error"><strong class="inline-error">{{ preview.error }}</strong><ul v-if="issues.length" class="simulation-errors"><li v-for="(issue,index) in issues" :key="index"><button v-if="canLocate(issue.target)" type="button" @click="emit('locate',issue.target)">{{ issue.label }} · 定位 ↗</button><span v-else>{{ issue.label }}</span></li></ul><p class="simulation-help">修正后可重新运行，当前未生成模拟路径。</p></template>
-        <template v-else-if="preview.result"><div class="simulation-result-heading"><h4>本次模拟路径</h4><button class="quiet" type="button" @click="clearResult">清除结果</button></div><ol class="simulation-path"><li v-for="(id,index) in preview.result.path" :key="id"><button type="button" @click="emit('locate',id)"><span>{{ index + 1 }}</span>{{ nodeName(id) }}<small>定位 ↗</small></button></li></ol><p class="simulation-help">画布已高亮经过的节点和连线。编号为模拟遍历顺序，不代表并行任务实际完成的先后；汇合后才继续后续节点。会签节点仅展示经过的路径，不模拟多人表决。服务任务只核对原契约与映射值，不发起外部调用。审批人是否存在和组织权限仍须另行校验。</p><div v-for="decision in preview.result.decisions" :key="decision.nodeId" class="simulation-decision"><h4>{{ nodeName(decision.nodeId) }} · 分支依据</h4><div v-for="branch in decision.branches" :key="branch.edgeId" class="simulation-branch" :class="{ chosen: branch.edgeId === decision.selectedEdgeId }"><button type="button" @click="emit('locate',branch.edgeId)">→ {{ nodeName(branch.targetNodeId) }}</button><code>{{ branch.condition || '默认分支' }}</code><span>{{ outcomes[branch.outcome] }}</span></div></div><p v-if="!preview.result.decisions.length" class="simulation-help">此路径未经过条件网关。</p></template>
+        <template v-else-if="preview.result"><div class="simulation-result-heading"><h4>本次模拟路径</h4><button class="quiet" type="button" @click="clearResult">清除结果</button></div><ol class="simulation-path"><li v-for="(id,index) in preview.result.path" :key="id"><button type="button" @click="emit('locate',id)"><span>{{ index + 1 }}</span>{{ nodeName(id) }}<small>定位 ↗</small></button></li></ol><p class="simulation-help">画布已高亮经过的节点和连线。编号为模拟遍历顺序，不代表并行任务实际完成的先后；汇合后才继续后续节点。会签节点仅展示经过的路径，不模拟多人表决。服务任务只核对原契约与映射值，不发起外部调用。审批人是否存在和组织权限仍须另行校验。</p><div v-for="decision in preview.result.decisions" :key="decision.nodeId" class="simulation-decision"><h4>{{ nodeName(decision.nodeId) }} · 分支依据</h4><p v-if="splitEnabled" class="simulation-help">金额依据：{{ graph.nodes.find(node => node.id === decision.nodeId)?.properties.expenseSplitRouting === SPLIT_GATEWAY ? `合成路由金额 ${splitRule.currency} ${splitRoutingAmount}` : '本单金额' }}</p><div v-for="branch in decision.branches" :key="branch.edgeId" class="simulation-branch" :class="{ chosen: branch.edgeId === decision.selectedEdgeId }"><button type="button" @click="emit('locate',branch.edgeId)">→ {{ nodeName(branch.targetNodeId) }}</button><code>{{ branch.condition || '默认分支' }}</code><span>{{ outcomes[branch.outcome] }}</span></div></div><p v-if="!preview.result.decisions.length" class="simulation-help">此路径未经过条件网关。</p></template>
         <div v-else class="simulation-empty"><strong>先填写一组测试数据</strong><p>运行后查看节点路径、分支条件与选择依据。设计或数据改变时，旧结果会立即清除。</p></div>
       </div>
     </div>

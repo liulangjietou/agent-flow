@@ -192,8 +192,13 @@ public class DefinitionApplicationService {
 
     /** 使用同一套受限条件求值器模拟流程路径，不接触流程引擎。 */
     public List<String> simulate(String tenantId, UUID id, DefinitionModels.EvaluationContext context) {
+        return simulate(tenantId, id, context, null);
+    }
+
+    /** 已保存版本同样要求明确的合成金额，不从现有业务中补造模拟依据。 */
+    public List<String> simulate(String tenantId, UUID id, DefinitionModels.EvaluationContext context, io.agentflow.finance.Money splitRoutingAmount) {
         DefinitionDraft draft = get(tenantId, id);
-        return simulatePreview(tenantId, draft.graph(), draft.formSchema(), context).path();
+        return simulatePreview(tenantId, draft.graph(), draft.formSchema(), context, splitRoutingAmount).path();
     }
 
     /** 试算当前设计快照，不读取或修改持久化草稿，也不启动实例。 */
@@ -203,7 +208,13 @@ public class DefinitionApplicationService {
 
     /** 公开模拟同时核对服务任务的原契约、字段权限和本次输入，整个过程不创建队列或访问远端。 */
     public DefinitionSimulator.Result simulatePreview(String tenantId, Graph graph, FormSchema formSchema, DefinitionModels.EvaluationContext context) {
-        var result = simulatePreview(graph, formSchema, context);
+        return simulatePreview(tenantId, graph, formSchema, context, null);
+    }
+
+    /** 合成金额只交给路由模拟，服务契约仍校验本单原始表单输入。 */
+    public DefinitionSimulator.Result simulatePreview(String tenantId, Graph graph, FormSchema formSchema,
+                                                       DefinitionModels.EvaluationContext context, io.agentflow.finance.Money splitRoutingAmount) {
+        var result = simulator.simulateDetailed(graph, formSchema, context, splitRoutingAmount);
         serviceTasks.requireReady(tenantId, graph, formSchema, context.values());
         return result;
     }
