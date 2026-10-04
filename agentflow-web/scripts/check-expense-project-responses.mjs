@@ -19,19 +19,32 @@ const check = ajv.compile(JSON.parse(JSON.stringify(operation.responses['200'].c
   .replaceAll('"#/components/', '"agentflow#/components/')))
 const root = fileURLToPath(new URL('../', import.meta.url)), output = mkdtempSync('/fyoung/tmp/agentflow-project-parser-')
 const source = readFileSync(resolve(root, 'src/expenseProjectApproval.ts'), 'utf8')
+const membershipSource = readFileSync(resolve(root, 'src/countersignMembership.ts'), 'utf8')
 writeFileSync(resolve(output, 'package.json'), '{"type":"module"}')
 writeFileSync(resolve(output, 'expenseProjectApproval.js'), ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
 }).outputText)
 const ui = await import(pathToFileURL(resolve(output, 'expenseProjectApproval.js')).href)
+writeFileSync(resolve(output, 'countersignMembership.js'), ts.transpileModule(membershipSource, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }
+}).outputText)
+const membershipUi = await import(pathToFileURL(resolve(output, 'countersignMembership.js')).href)
 const records = inputs.flatMap(input => JSON.parse(readFileSync(input, 'utf8'))), applications = new Map()
 for (const record of records) {
   if ((record.status ?? 200) < 300 && record.path.startsWith('/api/v1/expense-reports') && record.response?.id && record.response?.applicationId)
     applications.set(record.response.id, record.response.applicationId)
 }
-const counts = { parsedViews: 0, deniedReads: 0, precheckSources: 0 }, states = new Set(), rounds = new Set()
+const counts = { parsedViews: 0, deniedReads: 0, precheckSources: 0, parsedMembershipViews: 0 }, states = new Set(), rounds = new Set(), tasks = new Map()
 for (const record of records) {
   const url = new URL(record.path, 'http://127.0.0.1'), match = url.pathname.match(/^\/api\/v1\/expense-reports\/([^/]+)\/project-approval$/)
+  if (record.status === 200 && url.pathname === '/api/v1/tasks') {
+    for (const task of record.response) tasks.set(`${record.boot}:${record.actor}:${task.taskId}`, task)
+  }
+  if (record.status === 200 && url.pathname.endsWith('/countersign-members')) {
+    const task = tasks.get(`${record.boot}:${record.actor}:${record.response.taskId}`)
+    assert.ok(task, 'Missing original task read for countersign view')
+    membershipUi.validateCountersignView(record.response, task); counts.parsedMembershipViews++
+  }
   if (match) {
     if ((record.status ?? 200) !== 200) { counts.deniedReads++; continue }
     const applicationId = record.applicationId ?? applications.get(match[1])
@@ -51,4 +64,5 @@ for (const record of records) {
 assert.deepEqual([...states].sort(), ['NOT_RECORDED', 'NO_PROJECT', 'RECORDED'])
 assert.ok([1, 2, 3].every(round => rounds.has(round)), 'Capture all three original submission rounds')
 console.log(JSON.stringify({ result: 'PASS', counts, states: [...states].sort(), rounds: [...rounds].sort(),
-  sourceSha256: createHash('sha256').update(source).digest('hex'), contractSha256: createHash('sha256').update(specSource).digest('hex'), output }))
+  sourceSha256: createHash('sha256').update(source).digest('hex'), membershipSourceSha256: createHash('sha256').update(membershipSource).digest('hex'),
+  contractSha256: createHash('sha256').update(specSource).digest('hex'), output }))

@@ -16,7 +16,8 @@ import java.util.Map;
 public final class ExpenseRiskOidcFixture {
     /** 启动真实 PKCE、签名和 JWKS 夹具，原会话可跨应用进程恢复。 */
     public static void main(String[] args) throws Exception {
-        if (args.length != 1 || !args[0].startsWith("/fyoung/tmp/")) {
+        if (args.length < 1 || args.length > 2 || !args[0].startsWith("/fyoung/tmp/")
+                || args.length == 2 && !"bob-approver".equals(args[1])) {
             throw new IllegalArgumentException("Expected owned temporary metadata path");
         }
         var json = new JsonUtil(new com.fasterxml.jackson.databind.ObjectMapper());
@@ -24,7 +25,7 @@ public final class ExpenseRiskOidcFixture {
         var control = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         var roles = Map.of("admin", List.of("admins", "designers"), "alice", List.of("staff"),
                 "manager", List.of("staff", "reviewers"), "finance", List.of("staff", "reviewers", "accountants"),
-                "bob", List.of("staff"));
+                "bob", args.length == 2 ? List.of("staff", "reviewers") : List.of("staff"));
         control.createContext("/actor", exchange -> {
             try {
                 String query = exchange.getRequestURI().getRawQuery();

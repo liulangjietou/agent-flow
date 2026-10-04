@@ -46,7 +46,7 @@ def stage(name, **facts):
 class IdentityProvider:
     """编译现有合成身份夹具；不接触外部 IdP、现有应用进程或真实凭据。"""
 
-    def __init__(self, java, directory, jar):
+    def __init__(self, java, directory, jar, bob_approver=False):
         self.process = None
         libraries, classes = directory / "libraries", directory / "classes"
         libraries.mkdir(); classes.mkdir()
@@ -70,7 +70,7 @@ class IdentityProvider:
         metadata = directory / "idp.json"
         with (directory / "idp.log").open("x") as log:
             self.process = subprocess.Popen([java, "-Djava.io.tmpdir=/fyoung/tmp", "-cp", classpath,
-                "io.agentflow.auth.ExpenseRiskOidcFixture", str(metadata)], stdout=log, stderr=subprocess.STDOUT)
+                "io.agentflow.auth.ExpenseRiskOidcFixture", str(metadata), *(["bob-approver"] if bob_approver else [])], stdout=log, stderr=subprocess.STDOUT)
         try:
             wait_for(lambda: (self.process.poll(), metadata.exists()), lambda item: item == (None, True), 35)
         except BaseException:
