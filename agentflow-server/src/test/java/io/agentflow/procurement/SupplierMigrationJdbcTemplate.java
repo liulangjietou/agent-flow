@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.RowMapper;
 /**
  * 旧版本迁移夹具保留当时的队列 SQL；仅去掉 V126 新增的诊断字段，不能提前修改待升级表。
  * 当前版本业务测试使用普通 JdbcTemplate，V126 升级另由固定包旧库验收。
+ * @author owlzhangfq@gmail.com
  */
 final class SupplierMigrationJdbcTemplate extends JdbcTemplate {
     private static final Set<String> TABLES = Set.of(

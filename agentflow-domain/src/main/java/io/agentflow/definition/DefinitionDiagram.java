@@ -5,7 +5,10 @@ import java.util.List;
 
 import static io.agentflow.definition.DefinitionModels.*;
 
-/** 定义快照的图形边界；与当前画布尺寸一致，不参与审批行为。 */
+/**
+ * 定义快照的图形边界；与当前画布尺寸一致，不参与审批行为。
+ * @author owlzhangfq@gmail.com
+ */
 public final class DefinitionDiagram {
     public static final double MAX_COORDINATE = 1_000_000;
     public static final int MAX_WAYPOINTS = 32;
@@ -50,6 +53,9 @@ public final class DefinitionDiagram {
         return value != null && Double.isFinite(value) && value >= 0 && value <= MAX_COORDINATE;
     }
 
-    /** 未缩放的逻辑外框，不包含视口或鼠标位置。 */
+    /**
+     * 未缩放的逻辑外框，不包含视口或鼠标位置。
+     * @author owlzhangfq@gmail.com
+     */
     public record Bounds(double x, double y, double width, double height) { }
 }

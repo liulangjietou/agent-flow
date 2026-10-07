@@ -1,0 +1,214 @@
+{
+  "recordedAt": "2026-10-07T19:49:54.172030+00:00",
+  "taskId": "V02",
+  "status": "LOCAL_AUTOMATED_GATE_PASSED_EXTERNAL_GATES_OPEN",
+  "sourceBaseCommit": "600f52e67ef7a1d59a0af64149917911a734ca69",
+  "changedSourceHashes": {
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionDiagram.java": "9d8dc791a760da3816cb50787257125fb7d987ea03c39ee33f6d139f7f5b9350",
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionModels.java": "95f016f0075891a88bd7335d766d91fe5aa249b6720c4f19b7649d06e65453f6",
+    "agentflow-domain/src/test/java/io/agentflow/definition/DefinitionDiagramTest.java": "ec85f06e284d8169724b012999aba9ad8a4e33768c5884a1e6692c5cd1f349f0",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdArchive.java": "0e2f223e87357b022e7dd2b90c626c2d80537ef073fbdc9e8e2fa76caa64ed4b",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdDocument.java": "e2b4a2c0f79f6bab0d57b88a15b5ebcce28b99a2b11d511ea8df4d87f0b76c03",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdRenderer.java": "8bb4589deff5fb7e2b74d42454b921401bc9de73d4db64009f84049db132be12",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdSeal.java": "12542dbfd1fb9e2885782b2e45e08867238f1237220893d32402c20d026df487",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdSignatures.java": "af72a415436e5c36a0f147e5561fdb92615aa85efa228780d61ed6026f781940",
+    "agentflow-server/src/main/java/io/agentflow/definition/BpmnDiagramWriter.java": "7810e8295697d3d66548ef317cc8e3a40b22abf83b2462180237a05de804b415",
+    "agentflow-server/src/main/java/io/agentflow/integration/JdbcWebhookStore.java": "ab6da11a0775339e01b890f9a4082a54fb97d1704b08459ccca34a8a17e8e921",
+    "agentflow-server/src/main/java/io/agentflow/notification/JdbcNotificationDeliveryStore.java": "ffaf784d2cbadc4583f1b0d94b5bdad7d3dfa5195b5979176fce1a092ed528b3",
+    "agentflow-server/src/main/java/io/agentflow/observability/DiagnosticContext.java": "26255ece77471a52f24a73d7deeee2efb7ae83f4c110d26e1ebedb7e71f801d5",
+    "agentflow-server/src/main/java/io/agentflow/observability/RequestTrace.java": "5b81ef2fd09a4c9d0ee83717819201a55fdfb17d3ac1b7486be006c2a2bb8f2e",
+    "agentflow-server/src/main/java/io/agentflow/observability/RequestTraceFilter.java": "7419a562a12bafffca6c08e48856e3f2e0f0f86bc5edcf257ac5c150be26b574",
+    "agentflow-server/src/main/java/io/agentflow/system/SystemCheckService.java": "0d0677f6fe1db9b5d6d9376ef9bb1db9afbb47d8063fa131b171ef5bda290fe5",
+    "agentflow-server/src/test/java/io/agentflow/agent/AgentBusinessTraceTest.java": "3ebea5e7875e970243f64294d04be0636cc253d87a4e48442e34d74a415e8587",
+    "agentflow-server/src/test/java/io/agentflow/agent/AgentWorkerTraceTest.java": "c742e976066719037570182b1029e8410f416687443512d3a71b88ec44fb623b",
+    "agentflow-server/src/test/java/io/agentflow/api/RequestTraceIntegrationTest.java": "16d42072f34ce5238b75390800de1b5b34cc70974980f062b0a840ae6af2adfc",
+    "agentflow-server/src/test/java/io/agentflow/approval/ApplicationResubmissionIntegrationTest.java": "02bfdf6916fbc9739168634ef09a3180b093c591deab7e9181f6edf1ef401124",
+    "agentflow-server/src/test/java/io/agentflow/definition/BpmnDiagramWriterTest.java": "7c1527f502e95b4b5f6243d1eaa159102bf73766452c88f63f1432cf2cf16422",
+    "agentflow-server/src/test/java/io/agentflow/definition/DefinitionDiagramIntegrationTest.java": "c1bb14ebf7545edb57b21f8b1dc517f62a07feab0f1ffe188387a918a014c451",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseArchiveTraceTest.java": "d70725e045e21b8f3611975dc0a2140d21aaef4da10445f4cbccd38c9e4cd718",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseFinancialReportingMigrationTest.java": "4f184b8036075c32573b93ed010722c46319a1feed1afae28694959181d44fd2",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseProjectApprovalMigrationTest.java": "540f45e2a4117e1691d33152f0b181cfb85136b049ecf8481c7272d0bd8d397a",
+    "agentflow-server/src/test/java/io/agentflow/finance/CashierPaymentFiltersTest.java": "3700893fd43af22d04cc1bbd2ac3c312df775d28937e1c3bfcab02b44e81eadd",
+    "agentflow-server/src/test/java/io/agentflow/finance/FinanceBusinessTraceTest.java": "e76bfa2f841beba63ae29930dc221ceb1a9e0d1eee67c027169786bafddde89b",
+    "agentflow-server/src/test/java/io/agentflow/finance/FinanceWorkerTraceTest.java": "cd5b8c41767ae930cde69cd0fbc5306b30e81b0db42d91cbffa4829c1ed1dace",
+    "agentflow-server/src/test/java/io/agentflow/integration/WebhookBusinessTraceTest.java": "74e44523696608aa941ce53a4949bfa35abaa1bf473396a076e235952aea0bf9",
+    "agentflow-server/src/test/java/io/agentflow/integration/WebhookWorkerTraceTest.java": "97c681066f46d7daab1ad871a52d357ee29abba653e4f4e8f153df68186fadbd",
+    "agentflow-server/src/test/java/io/agentflow/observability/ApprovalBusinessTraceIntegrationTest.java": "24c18f63b76b4862aa7b557134179aafe6730feac2cdb364df0c1fa694708d8e",
+    "agentflow-server/src/test/java/io/agentflow/observability/DiagnosticContextTest.java": "42d33d1732c80b97cc19d1c55ce8db49dc3249f08c62dc5a01814559ceb16ba4",
+    "agentflow-server/src/test/java/io/agentflow/observability/DirectSchedulerBusinessTraceTest.java": "a1105ff182ce68ca732b789dbcb3fe509baa8bddff9f4e8d1ebd02bd8ffadd03",
+    "agentflow-server/src/test/java/io/agentflow/observability/DirectSchedulerTraceTest.java": "0d8c418a78b4d5281e24fb95a514ca825a7fe0802aa9e108408c2d8c8ef3ddf0",
+    "agentflow-server/src/test/java/io/agentflow/observability/ExpenseRecoveryBusinessTraceTest.java": "2080b4d06f4c75d02d88310e4f37a45fd5a34586727d29a691079a4e60f93434",
+    "agentflow-server/src/test/java/io/agentflow/observability/ExpenseRecoveryWorkerTraceTest.java": "383a546cac0314c2c8818dfc3023802f251e40061f1253117886907d6d242d50",
+    "agentflow-server/src/test/java/io/agentflow/observability/FinancialReviewBusinessTraceTest.java": "376b577dd9dcb8df4d2db99d5b0a24d067c86a6dfe3911728c0642e47cc070d7",
+    "agentflow-server/src/test/java/io/agentflow/observability/FinancialReviewWorkerTraceTest.java": "46d487f878c1aeb31f488985049ae0d2437e577737782be722b750795c742899",
+    "agentflow-server/src/test/java/io/agentflow/observability/IntegrationBusinessTraceTest.java": "66a5925754b0c5f40c378c0a7dbcd3e05d84b4508c03a7a7fd5b487edcd48b0f",
+    "agentflow-server/src/test/java/io/agentflow/observability/IntegrationWorkerTraceTest.java": "66e61bc54506125155e0f4a7a5575a19f1b9789b55d7d314eaf6829eebce9208",
+    "agentflow-server/src/test/java/io/agentflow/observability/SupplierBusinessTraceTest.java": "690c9d1e12b1aa1798a37d628f91adfe6b9560e553a9f053b2375d3027fb7310",
+    "agentflow-server/src/test/java/io/agentflow/observability/SupplierWorkerTraceTest.java": "fc01b2743d7e11fb8f8149033df50a611c9fe452b9f5139bccb03d4531d3fc70",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierMigrationJdbcTemplate.java": "368b8456509b5efe8f02e4330d0d5c2442e63455e4a2a04bcba33df9d633adfd",
+    "agentflow-web/tests/expense-draft-assist.test.mjs": "0566f24d309894350e12f1e27eb294d12312e69409e1b3ad9e26f7e378f4ea1c",
+    "scripts/check-system.py": "515c199c658bb227ef530179e1f480d19f2670c4f9b28ed31abbd70ac5189ebb",
+    "scripts/fixtures/DefinitionDiagramProbe.java": "08b4ebbb2a1abbb4b91fdf221493984d3d81a11638ff7415f7830279aae19eee",
+    "scripts/payment-due-dates-support/SnapshotH2.java": "d1ade77d548c02c3e22309b7f911aa8eac7a022b08b804ea619ae790ee9eb329",
+    "agentflow-server/src/test/java/io/agentflow/system/SystemCheckTraceTest.java": "319af1924f82e8098c1651e5c745f3c55bf892c3969e70fce6ec42ed5fd1adfa"
+  },
+  "sourceManifests": [
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/v02-final-source-hashes.json",
+      "sha256": "adf404a72cc605494c59fbf2955c983058757fe4e9b522f8e068d6aa351a630d",
+      "files": 2079
+    },
+    {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/v03-web-final-source-hashes.json",
+      "sha256": "e288b0f77b1743d1a62ca140caea213c5a1cd21c4f730b97cb4af0abf26a05c2",
+      "files": 496
+    }
+  ],
+  "java": {
+    "runtime": "Corretto 17.0.16",
+    "initial": {
+      "PASS": 5305,
+      "FAIL": 3,
+      "ERROR": 1,
+      "SKIP": 0
+    },
+    "uniqueCases": 5309,
+    "scopeRerunCases": 25,
+    "finalUniquePassed": 5309,
+    "skipped": 0,
+    "aggregation": "The four repaired test classes replace the same 25 case identities; counts are not added.",
+    "evidence": "/fyoung/tmp/agentflow-remaining-20260928/v02-java-aggregate.json",
+    "repairs": [
+      "Two migration fixtures compare every original column and value, allow additive columns, and require legacy trace_id values to remain null.",
+      "The immutable-round conflict assertion supplies the repository mandatory transaction and still requires CONCURRENCY_CONFLICT.",
+      "The V113 cashier fixture inserts only V113 voucher columns and retains all three original revisions; current repositories execute only after upgrade."
+    ]
+  },
+  "web": {
+    "runtime": "Node 23.11.0",
+    "suiteCases": 1493,
+    "fullSuitePassed": 1492,
+    "fullSuiteSkipped": 1,
+    "captureScopePassed": 15,
+    "additionalUniqueCaptureCase": 1,
+    "finalUniqueVerified": 1493,
+    "typescriptAndBuild": "PASS",
+    "clockFixtureRepair": "Use one fixed historical microsecond timeline, including creation/start/completion/expiry/review, and reject creation at expiry.",
+    "captureBoundary": "Historical local HTTP capture validates parsing; it is not current corporate synchronization or browser acceptance.",
+    "openapi": {
+      "operations": 396,
+      "schemas": 868,
+      "requestExamples": 129
+    },
+    "buildWarning": "Existing chunk size warning remains; CI Node 22 was not run."
+  },
+  "tools": {
+    "pythonUnitTestsPassed": 49,
+    "dockerCallsMocked": true,
+    "javaAuthorCheck": {
+      "files": 1866,
+      "namedTypes": 3712,
+      "missing": 0,
+      "parseErrors": 0
+    },
+    "authorOnlyEdits": {
+      "files": 40,
+      "javadocEdits": 72,
+      "reconstructionVerified": true
+    }
+  },
+  "jar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/v02-final-server.jar",
+    "sha256": "cd6b0a45cc4ae8f5cc992e96f66b667dad06cb767edacf13a406acaa156850ff",
+    "sourceManifest": "/fyoung/tmp/agentflow-remaining-20260928/v02-final-source-hashes.json",
+    "sourceManifestSha256": "adf404a72cc605494c59fbf2955c983058757fe4e9b522f8e068d6aa351a630d",
+    "javaUniqueCases": 5309,
+    "packageUsesPreviouslyVerifiedTests": true
+  },
+  "fixedRuntime": {
+    "status": "PASS",
+    "jarSha256": "cd6b0a45cc4ae8f5cc992e96f66b667dad06cb767edacf13a406acaa156850ff",
+    "previousJarSha256": "0ee3226987459e2957b27e60fcd18de3de0e0bfcfa735378c7f9b48a91c335db",
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "unchangedTables": 281,
+        "populatedSources": [
+          "proxy",
+          "task",
+          "timer"
+        ]
+      },
+      {
+        "name": "restart-real-scheduler-and-replay",
+        "businessContextsVerified": 8,
+        "matchedNotificationOrigins": 8,
+        "replayedOriginalKeys": 6,
+        "timersAdvancedOnce": 2,
+        "sourceKinds": [
+          "proxy",
+          "deadline",
+          "escalation",
+          "timer"
+        ]
+      },
+      {
+        "name": "independent-restore",
+        "tables": 281,
+        "sameAuthorizedDetails": 4,
+        "duplicateNotifications": 0
+      }
+    ],
+    "boots": 7,
+    "businessHttpRequests": 233,
+    "traceHeaders": 265
+  },
+  "systemCheckRuntime": {
+    "status": "PASS",
+    "exitCode": 0,
+    "jarSha256": "cd6b0a45cc4ae8f5cc992e96f66b667dad06cb767edacf13a406acaa156850ff",
+    "scriptSha256": "515c199c658bb227ef530179e1f480d19f2670c4f9b28ed31abbd70ac5189ebb",
+    "actualCheckIds": [
+      "database",
+      "migrations",
+      "flowable",
+      "templates",
+      "authentication",
+      "notifications",
+      "sessionStorage",
+      "organization",
+      "organizationSync",
+      "objectStorage",
+      "model"
+    ],
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false
+  },
+  "retainedInitialRuntimeFailure": {
+    "status": "WRONG_CHECKER_FOR_BASELINE",
+    "failedEvidence": "/fyoung/tmp/agentflow-remaining-20260928/v02-final-runtime-20261007a/evidence.json",
+    "reason": "The schema-migration checker expects V127 to V128 and three newly added TRACE_ID columns. The selected prior fixed package already uses V128. Correct next run uses the existing business-trace package-upgrade checker, whose baseline includes those columns.",
+    "beforeColumnsSha256": "f49af1d3a9d4a2fb85df0a7bbd555fbe033a8d553a0dfb3c1304f8dc3935eb48",
+    "productionCodeChangedForRetry": false,
+    "correctScript": "scripts/check-direct-scheduler-business-trace-runtime.py"
+  },
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/v02-local-verified-20261007",
+  "archiveFiles": 3364,
+  "archiveManifestSha256": "1bfa7142d5b6946f23c12f31e6607c3500d75496aa9ae0a2d7cf01dc32eb9da6",
+  "review": {
+    "mode": "manual",
+    "security": "Only traceId and the authorized actor tenant cross the diagnostic boundary; no Actor credentials or foreign business context is propagated.",
+    "testAdequacy": "Actual reusable probe thread, two tenants, successful and failed probes, caller restoration and worker cleanup are asserted.",
+    "maintenance": "Existing bounded executor and timeout behavior are reused; no new framework or production test-only API."
+  },
+  "boundaries": [
+    "V02 remains OPEN: browser, PostgreSQL, complete requirement audit and target deployment acceptance are outstanding.",
+    "The fixed package checks V128 to V128 nonempty upgrade, scheduler continuity and independent H2 restore; there is no new migration.",
+    "Original failing reports are retained. The full initial Java invocation was not green; all unique cases passed after scoped fixture repairs.",
+    "No browser, PostgreSQL, Docker, corporate services, push, PR or CI was attempted."
+  ]
+}

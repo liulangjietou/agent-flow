@@ -26,7 +26,10 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** 使用真实候选 SQL 验证来源投影与工作器作用域；完整表约束由各 Agent 的持久化和业务集成测试覆盖。 */
+/**
+ * 使用真实候选 SQL 验证来源投影与工作器作用域；完整表约束由各 Agent 的持久化和业务集成测试覆盖。
+ * @author owlzhangfq@gmail.com
+ */
 class AgentBusinessTraceTest {
     private static final String TENANT = "tenant-a", BUSINESS = "ORIGINAL-BUSINESS", OLD_INSTANCE = "original-instance", OLD_TASK = "original-task";
     private final UUID applicationId = UUID.randomUUID(), runId = UUID.randomUUID();
@@ -141,6 +144,12 @@ class AgentBusinessTraceTest {
         };
     }
 
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll, Class<?> loggerType) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind { SUMMARY, DRAFT, EXPENSE, PRECHECK, RISK }
 }

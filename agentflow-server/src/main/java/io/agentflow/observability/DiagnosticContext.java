@@ -8,7 +8,10 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-/** 仅承载诊断关联，不提供身份或业务授权；显式作用域防止线程池串号。 */
+/**
+ * 仅承载诊断关联，不提供身份或业务授权；显式作用域防止线程池串号。
+ * @author owlzhangfq@gmail.com
+ */
 public record DiagnosticContext(String traceId, String tenantId, String businessNo, String processInstanceId, String taskId) {
     public static final String TRACE_ID = "traceId";
     public static final String TENANT_ID = "tenantId";
@@ -84,7 +87,10 @@ public record DiagnosticContext(String traceId, String tenantId, String business
     }
     private static void put(String key, String value) { if (value == null) MDC.remove(key); else MDC.put(key, value); }
 
-    /** 作用域只在创建它的执行线程内使用，不向异步线程传递可关闭实例。 */
+    /**
+     * 作用域只在创建它的执行线程内使用，不向异步线程传递可关闭实例。
+     * @author owlzhangfq@gmail.com
+     */
     public static final class Scope implements AutoCloseable {
         private final Map<String, String> previous;
         private boolean closed;

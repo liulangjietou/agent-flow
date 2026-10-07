@@ -5,7 +5,10 @@ import java.sql.DriverManager;
 import java.util.ArrayList;
 import java.util.Base64;
 
-/** 停服后只读提取实际部署资源和原定义文本；输出为编码后的有界验收记录。 */
+/**
+ * 停服后只读提取实际部署资源和原定义文本；输出为编码后的有界验收记录。
+ * @author owlzhangfq@gmail.com
+ */
 class DefinitionDiagramProbe {
     public static void main(String[] args) throws Exception {
         var result = new ArrayList<String>();

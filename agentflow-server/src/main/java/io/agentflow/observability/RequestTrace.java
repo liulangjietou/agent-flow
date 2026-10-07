@@ -3,7 +3,10 @@ package io.agentflow.observability;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 
-/** 服务器私有 request attribute 连接安全过滤器、业务错误和最终响应。 */
+/**
+ * 服务器私有 request attribute 连接安全过滤器、业务错误和最终响应。
+ * @author owlzhangfq@gmail.com
+ */
 public final class RequestTrace {
     private static final String TRACE_ATTRIBUTE = RequestTrace.class.getName() + ".traceId";
     private static final String TENANT_ATTRIBUTE = RequestTrace.class.getName() + ".tenantId";

@@ -193,7 +193,10 @@ final class InvoiceOfdArchive {
 
     private static IOException invalid() { return new IOException("OFD archive is invalid, ambiguous or exceeds its limits"); }
 
-    /** 正文与所有嵌套容器累计计算解压量及条目数，不能通过每层重新读包重置额度。 */
+    /**
+     * 正文与所有嵌套容器累计计算解压量及条目数，不能通过每层重新读包重置额度。
+     * @author owlzhangfq@gmail.com
+     */
     private static final class ExpansionBudget {
         private long bytes;
         private int entries;

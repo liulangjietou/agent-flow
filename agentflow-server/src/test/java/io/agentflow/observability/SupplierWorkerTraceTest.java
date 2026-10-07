@@ -24,7 +24,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-/** 供应商财务队列与本地补齐入口验证领取失败、旧记录及线程复用，不把诊断上下文作为授权主体。 */
+/**
+ * 供应商财务队列与本地补齐入口验证领取失败、旧记录及线程复用，不把诊断上下文作为授权主体。
+ * @author owlzhangfq@gmail.com
+ */
 class SupplierWorkerTraceTest {
     private static final UUID FAILED = UUID.randomUUID(), LEGACY = UUID.randomUUID();
     private static final String SOURCE = UUID.randomUUID().toString();
@@ -175,6 +178,12 @@ class SupplierWorkerTraceTest {
             }
         };
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll, Class<?> loggerType, String errorCode) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind { ADJUSTMENT_PREPARATION, ADJUSTMENT, HOLD, REVIEW, REQUEST, RETURN, PAYMENT, SETTLEMENT_PREPARATION, SETTLEMENT, ADJUSTMENT_COMPLETION, SETTLEMENT_COMPLETION }
 }

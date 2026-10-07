@@ -154,6 +154,12 @@ class DirectSchedulerTraceTest {
         };
     }
 
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll, Class<?> logger) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind { PROXY, DEADLINE, ESCALATION, TIMER, OVERDUE, RETENTION }
 }

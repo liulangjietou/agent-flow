@@ -3,7 +3,10 @@ import java.nio.file.*;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.*;
-/** 离线全表摘要供安装包升级对照。@author owlzhangfq@gmail.com */
+/**
+ * 离线全表摘要供安装包升级对照。
+ * @author owlzhangfq@gmail.com
+ */
 class SnapshotH2 {
   /** 按旧列或完整列生成逐表行数及原始值摘要。 */
   public static void main(String[] args) throws Exception {

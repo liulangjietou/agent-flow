@@ -23,7 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** 真实扫描 SQL 与工作器共同验证原报销轮次；当前轮次和其他租户不能替代持久来源。 */
+/**
+ * 真实扫描 SQL 与工作器共同验证原报销轮次；当前轮次和其他租户不能替代持久来源。
+ * @author owlzhangfq@gmail.com
+ */
 class ExpenseRecoveryBusinessTraceTest {
     private static final String TENANT="tenant-a", BUSINESS="EXPENSE-ORIGINAL", INSTANCE="original-instance";
     private final UUID application=UUID.randomUUID(), report=UUID.randomUUID(), id=UUID.randomUUID(), origin=UUID.randomUUID(), command=UUID.randomUUID();
@@ -261,6 +264,12 @@ class ExpenseRecoveryBusinessTraceTest {
             }
         };
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll,Class<?> loggerType,String errorCode) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind { ARCHIVE, BUDGET_REVIEW, PARTIAL_PREPARATION, PARTIAL_BUDGET, PARTIAL_ACCRUAL, PARTIAL_COMPLETION, RESOURCE_PREPARATION, RESOURCE_BUDGET, RESOURCE_COMPLETION, SETTLEMENT, PAYMENT_RECOVERY, VOUCHER_RECOVERY, ZERO_RECOVERY, REVERSAL_PREPARATION, REVERSAL }
 }

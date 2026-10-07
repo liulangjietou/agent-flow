@@ -15,7 +15,10 @@ import org.springframework.web.servlet.HandlerMapping;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
-/** 在 CORS 和安全链之前建立关联；完成日志仅包含路由模板、状态和耗时。 */
+/**
+ * 在 CORS 和安全链之前建立关联；完成日志仅包含路由模板、状态和耗时。
+ * @author owlzhangfq@gmail.com
+ */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class RequestTraceFilter extends OncePerRequestFilter {

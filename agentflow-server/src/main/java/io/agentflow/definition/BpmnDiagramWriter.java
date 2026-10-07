@@ -9,7 +9,10 @@ import java.util.Set;
 
 import static io.agentflow.definition.DefinitionModels.*;
 
-/** 受限定义的 BPMN DI 输出，图形标识独立生成，不修改任何流程元素。 */
+/**
+ * 受限定义的 BPMN DI 输出，图形标识独立生成，不修改任何流程元素。
+ * @author owlzhangfq@gmail.com
+ */
 final class BpmnDiagramWriter {
     private BpmnDiagramWriter() { }
 

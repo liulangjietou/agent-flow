@@ -25,6 +25,8 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.List;
@@ -64,6 +66,7 @@ class ApplicationResubmissionIntegrationTest {
     @Autowired ApprovalApplicationFacade facade;
     @Autowired CurrentActor currentActor;
     @Autowired JdbcTemplate jdbc;
+    @Autowired PlatformTransactionManager transactions;
     @MockitoSpyBean SubmissionRoundRepository roundRepository;
 
     @Test
@@ -180,8 +183,10 @@ class ApplicationResubmissionIntegrationTest {
         assertThat(frozenFirst.path("completedBy").asText()).isEqualTo("manager");
         assertThat(Instant.parse(frozenFirst.path("completedAt").asText()))
                 .isAfterOrEqualTo(Instant.parse(frozenFirst.path("submittedAt").asText()));
-        assertThatThrownBy(() -> roundRepository.complete("demo", UUID.fromString(id), 1,
-                firstTask.getProcessInstanceId(), SubmissionRound.Status.REJECTED, "不得覆盖", "finance", Instant.now()))
+        // 仓储完成轮次参与调用方事务，冲突断言也必须进入同一事务边界。
+        assertThatThrownBy(() -> new TransactionTemplate(transactions).executeWithoutResult(ignored ->
+                roundRepository.complete("demo", UUID.fromString(id), 1, firstTask.getProcessInstanceId(),
+                        SubmissionRound.Status.REJECTED, "不得覆盖", "finance", Instant.now())))
                 .isInstanceOfSatisfying(DomainException.class,
                         error -> assertThat(error.code()).isEqualTo("CONCURRENCY_CONFLICT"));
 

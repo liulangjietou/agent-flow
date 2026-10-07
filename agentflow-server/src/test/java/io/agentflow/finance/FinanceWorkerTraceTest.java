@@ -23,7 +23,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-/** 财务工作器及两类恢复入口验证领取失败、旧记录及线程复用，不把诊断上下文作为授权主体。 */
+/**
+ * 财务工作器及两类恢复入口验证领取失败、旧记录及线程复用，不把诊断上下文作为授权主体。
+ * @author owlzhangfq@gmail.com
+ */
 class FinanceWorkerTraceTest {
     private static final UUID FAILED = UUID.randomUUID(), LEGACY = UUID.randomUUID();
     private static final String SOURCE = UUID.randomUUID().toString();
@@ -168,6 +171,12 @@ class FinanceWorkerTraceTest {
                 new JdbcPaymentOperationRepository.Candidate("tenant-b", LEGACY, null),
                 new JdbcPaymentOperationRepository.Candidate("tenant-a", LEGACY, PRIVATE));
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll, Class<?> loggerType, String errorCode) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind { PRECHECK, INVOICE, BUDGET, VOUCHER, PAYMENT, PREPARATION, REQUEST, PAYEE, BALANCE_RECOVERY, VOUCHER_RECOVERY }
 }

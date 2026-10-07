@@ -9,7 +9,10 @@ import static io.agentflow.definition.DefinitionModels.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/** 图形边界及转换保留测试，不以引擎能运行代替图形完整性。 */
+/**
+ * 图形边界及转换保留测试，不以引擎能运行代替图形完整性。
+ * @author owlzhangfq@gmail.com
+ */
 class DefinitionDiagramTest {
     @Test
     void legacyGeometryRemainsAbsentAndUsesStableDefaultBounds() {

@@ -30,9 +30,14 @@ class ExpenseFinancialReportingMigrationTest {
             jdbc.update("INSERT INTO expense_precheck_revision(tenant_id,job_id,version,state_json) VALUES('report-upgrade',?,3,'{}')", precheck);
             var tables = List.of("approval_application", "approval_submission_round", "expense_report", "expense_report_revision",
                     "budget_occupation", "budget_operation", "expense_precheck_job", "expense_precheck_revision");
-            var before = tables.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table)).toList();
+            // 固定升级前的全部列；后续迁移可增加列，但不能修改任何原值或丢失原记录。
+            var originalQueries = tables.stream().map(table -> "SELECT "
+                    + String.join(",", jdbc.queryForMap("SELECT * FROM " + table).keySet()) + " FROM " + table).toList();
+            var before = originalQueries.stream().map(jdbc::queryForList).toList();
             var flyway = Flyway.configure().dataSource(source).load(); flyway.migrate();
-            assertThat(tables.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table)).toList()).isEqualTo(before);
+            assertThat(originalQueries.stream().map(jdbc::queryForList).toList()).isEqualTo(before);
+            assertThat(jdbc.queryForObject("SELECT trace_id FROM budget_operation", String.class)).isNull();
+            assertThat(jdbc.queryForObject("SELECT trace_id FROM expense_precheck_job", String.class)).isNull();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_submission_rejection", Integer.class)).isZero();
             var started = jdbc.queryForObject("SELECT started_at FROM expense_reporting_coverage WHERE fact_type='DUPLICATE_SUBMISSION'", java.time.OffsetDateTime.class);
             assertThat(started).isNotNull();

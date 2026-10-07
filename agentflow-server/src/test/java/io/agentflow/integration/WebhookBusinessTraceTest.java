@@ -29,7 +29,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** 原签名正文不重写；业务号从原索引读取，实例只使用匹配信封声明的原轮次。 */
+/**
+ * 原签名正文不重写；业务号从原索引读取，实例只使用匹配信封声明的原轮次。
+ * @author owlzhangfq@gmail.com
+ */
 class WebhookBusinessTraceTest {
     private static final String TENANT = "tenant-a", BUSINESS = "ORIGINAL-WEBHOOK", INSTANCE = "original-instance", TASK = "original-task";
     private final UUID applicationId = UUID.randomUUID(), deliveryId = UUID.randomUUID();
@@ -115,5 +118,8 @@ class WebhookBusinessTraceTest {
         return observed;
     }
 
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Scenario { NORMAL, APPLICATION_EVENT, ORIGINAL_ROUND_MISSING, TENANT_MISMATCH, APPLICATION_MISMATCH, MALFORMED, ROUND_NOT_INTEGER, ROUND_UNDECLARED }
 }

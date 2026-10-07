@@ -35,7 +35,10 @@ import static org.assertj.core.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 真实请求、授权、引擎和审计共同验证业务关联，拒绝使用请求头和重提后的新轮次补造旧事实。 */
+/**
+ * 真实请求、授权、引擎和审计共同验证业务关联，拒绝使用请求头和重提后的新轮次补造旧事实。
+ * @author owlzhangfq@gmail.com
+ */
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:approval-business-trace;DB_CLOSE_DELAY=-1",
         "agentflow.auth.demo-enabled=true", "agentflow.webhooks.worker-enabled=false",
         "agentflow.notifications.worker-enabled=false", "agentflow.sla.reminders-enabled=false"})

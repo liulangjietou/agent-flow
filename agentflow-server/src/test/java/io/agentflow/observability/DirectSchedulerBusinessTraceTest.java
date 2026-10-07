@@ -24,7 +24,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** 原生任务与财务约定各自提供真实身份，不借当前轮次或扫描线程的业务上下文。 */
+/**
+ * 原生任务与财务约定各自提供真实身份，不借当前轮次或扫描线程的业务上下文。
+ * @author owlzhangfq@gmail.com
+ */
 class DirectSchedulerBusinessTraceTest {
     private static final String TENANT="tenant-a", BUSINESS="DIRECT-ORIGINAL", INSTANCE="original-instance";
     private final UUID application=UUID.randomUUID(), id=UUID.randomUUID(), definition=UUID.randomUUID();
@@ -160,6 +163,12 @@ class DirectSchedulerBusinessTraceTest {
             }
         };
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll,Class<?> logger) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind { PROXY, DEADLINE, ESCALATION, TIMER, OVERDUE, RETENTION }
 }

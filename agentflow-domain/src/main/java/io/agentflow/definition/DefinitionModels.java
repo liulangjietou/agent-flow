@@ -75,7 +75,10 @@ public final class DefinitionModels {
         }
     }
 
-    /** 图形点只属于定义快照，不参与条件求值或审批决定。 */
+    /**
+     * 图形点只属于定义快照，不参与条件求值或审批决定。
+     * @author owlzhangfq@gmail.com
+     */
     public record DiagramPoint(Double x, Double y) { }
 
     /**

@@ -1,0 +1,896 @@
+{
+  "recordedAt": "2026-10-07T19:49:54.172030+00:00",
+  "taskId": "O01",
+  "status": "IMPLEMENTED_LOCAL_VERIFIED_POSTGRES_AND_FINAL_ACCEPTANCE_OPEN",
+  "sourceBaseCommit": "600f52e67ef7a1d59a0af64149917911a734ca69",
+  "regressionEvidence": "docs/evidence/local-regression-gate-20261007.json",
+  "diagnosticProbe": {
+    "redBehaviorFailures": 2,
+    "greenScopeUniqueCases": 40,
+    "fullRegressionPassed": true,
+    "actualProbeCount": 9,
+    "consecutiveTenants": 2,
+    "sameWorkerThread": true,
+    "sourceHashes": {
+      "agentflow-server/src/main/java/io/agentflow/system/SystemCheckService.java": "0d0677f6fe1db9b5d6d9376ef9bb1db9afbb47d8063fa131b171ef5bda290fe5",
+      "agentflow-server/src/test/java/io/agentflow/system/SystemCheckTraceTest.java": "319af1924f82e8098c1651e5c745f3c55bf892c3969e70fce6ec42ed5fd1adfa"
+    }
+  },
+  "executorInventory": {
+    "status": "CURRENT_SOURCES_MATCH_VERIFIED_STAGE_EVIDENCE",
+    "businessExecutorTypes": 53,
+    "scheduledJavaFiles": 45,
+    "scheduledMethods": 49,
+    "workers": [
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/agent/AssistWorker.java",
+        "sha256": "1d23c044b38a4a4a28e2c57642574f18fd9a29566d5aa2f5cf02324c8c6567a4",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-agent-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/agent/DraftAssistWorker.java",
+        "sha256": "3e5497170a778bfcfcf01df33452b365f39b294ed8be9f3c6556eb9a3226bb04",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-agent-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistWorker.java",
+        "sha256": "f6626ea84bd5cfb3f7ca56433fdebd0bbe525c59816319a294ed5fb731bdadf0",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-agent-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskWorker.java",
+        "sha256": "2bc9819d80bc687897150ed68cf2d153efe4b2fbee21bd4b55369cd30bab29d7",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-agent-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionWorker.java",
+        "sha256": "d1b73dad978c5a8deb64b5020914a45fde751f7904c62b1b40ead42110d3fb7a",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-agent-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "UNBOUND_INVOICE_OR_ORGANIZATION"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdWorker.java",
+        "sha256": "eaf8980e7c2c90cfd62512eb08cd0e7d2b0b1fd8d35b11f27aab26e75596e027",
+        "diagnosticRestoreScopes": 0,
+        "evidence": [],
+        "classification": "ISOLATED_DOCUMENT_PARSER",
+        "contextBinding": "NONE"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/agent/InvoicePdfWorker.java",
+        "sha256": "1e305d18d6099862193ef91b19cc14b8e19bbf5a3c56d2993b8e060d361822d8",
+        "diagnosticRestoreScopes": 0,
+        "evidence": [],
+        "classification": "ISOLATED_DOCUMENT_PARSER",
+        "contextBinding": "NONE"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationWorker.java",
+        "sha256": "61e087b37bb622eae8231351ffeff0882af4a00d047ee1b8f2402e28d8cb0052",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-agent-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/approval/process/ApprovalProxyNotificationScheduler.java",
+        "sha256": "81b29e0c11c28c1a5a30b76665fba32e8451ba765b2f7e9089e88e7b317d6502",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-direct-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/approval/process/TaskDeadlineReminderScheduler.java",
+        "sha256": "8737cb2539a6cb3de29e4e1dea8aeec92d2282deffc9e98756a102a0649139e3",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-direct-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/approval/process/TaskEscalationScheduler.java",
+        "sha256": "f315b8e2e34606e4e331b1a088755498942b8a9190ce8428b95e80e935bd2604",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-direct-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/approval/process/TimerWaitScheduler.java",
+        "sha256": "19bd23330cfe4ed643219a8047743a7be6f40d7685360c1d7b126b3109c53b1f",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-direct-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentCheckWorker.java",
+        "sha256": "2f2bfedcc178e3e732df8981481de5f56a9251482a3d3232be4238f84861c761",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-financial-review-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentExecutionWorker.java",
+        "sha256": "b7ff7af3f035e34ea0bfe4a52acfd0f105c7631b10ee354accee79c1e5ca88ac",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-financial-review-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentReviewWorker.java",
+        "sha256": "982504bf06bf1d189b514729c46907b9ce9f53c64df7442bdcc0e777b9a54d2c",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-financial-review-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/event/EventInboxWorker.java",
+        "sha256": "4912644c59d3a4b92fdabd2a38855978c8e5fda1bb3464e4408b2f0a74ac88aa",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-integration-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceDisbursementReturnWorker.java",
+        "sha256": "c5855dab8369870292ab0bc79a684f4f32d3b1851b21b6049aed774253424164",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-financial-review-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceOverdueScheduling.java",
+        "sha256": "da2e1d4277c335abf14eac85cc30b44d79d7dd6f0fca23960ae29216f9214def",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-direct-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentReviewWorker.java",
+        "sha256": "c456e750fe00ba7e11123cffc9fe6dd95c9cb386595c44b510234074e1dc3d84",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-financial-review-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentWorker.java",
+        "sha256": "af21efeb85dbdc986398b74a1942afe8229de9c5edaae3f4146e5a6779d5f97b",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-financial-review-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRequestCheckWorker.java",
+        "sha256": "435152c886f913e542c3618808c11fe922c2e30d0d380ba2ba42ef2eff079148",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-financial-review-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseArchiveWorker.java",
+        "sha256": "379df6cc58f417229aff0c96f712ed29eea56d95cc77bd9b655676ee57e8a0d8",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-expense-recovery-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetRetentionScheduling.java",
+        "sha256": "53982d730c7fc82755bbcca999b81f32a2e0a1c1f2a5a1870359bf134c1822ba",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-direct-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetReviewWorker.java",
+        "sha256": "7a75529d4bc973b62ce3aa07ec78cc65662ba2d33bedcf922f64b563f20d75fd",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-expense-recovery-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentWorker.java",
+        "sha256": "ff078ccce2cf57cce39acac4f50390e972d359adf841d08edd3d0b6094de6eaa",
+        "diagnosticRestoreScopes": 4,
+        "evidence": [
+          "docs/evidence/operation-tracing-expense-recovery-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePaymentReturnWorker.java",
+        "sha256": "667423f069b0613303e3551bdca503d026e45515e44e15ff2199842bdfec2798",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-financial-review-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanCheckWorker.java",
+        "sha256": "136d28d28367c7636c85903563f060311b0b21853d7178aca2e17d2f5fabd6ec",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-financial-review-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckWorker.java",
+        "sha256": "77e708b40ac77f82ccd0acba83972a25b99a7aa1805f0a817b4e0de2532f6e29",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-finance-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentWorker.java",
+        "sha256": "e59d47eb458de8920456917376278c50e99f4a7bc4294f6313a9b40ae5fc8d55",
+        "diagnosticRestoreScopes": 3,
+        "evidence": [
+          "docs/evidence/operation-tracing-expense-recovery-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSettlementWorker.java",
+        "sha256": "93bda7574d12f16576b08507758e96b06586e4bac4611d2e7d4dcccdcf102690",
+        "diagnosticRestoreScopes": 2,
+        "evidence": [
+          "docs/evidence/operation-tracing-expense-recovery-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/expense/InvoiceVerificationWorker.java",
+        "sha256": "7d14ccf6091f36b47aad2eae3dc151e72b558d9fe6001fad98c8b525d73ee141",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-finance-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "UNBOUND_INVOICE_OR_ORGANIZATION"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/finance/BudgetOperationWorker.java",
+        "sha256": "d321c8661127be582b4b7bb99c07cf69de1ca8d1c4018a5eac2dcc1a1c26cd6d",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-finance-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/finance/PaymentExecutionRequestWorker.java",
+        "sha256": "4c3f0ef3c15cf9938a47d6bc1446c5051b885be71fff69734a9a233d405ac252",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-finance-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationWorker.java",
+        "sha256": "0d1274af3f22a71de04f832a15c94b43db399c24b2131f85f7c9ada30eba85f8",
+        "diagnosticRestoreScopes": 2,
+        "evidence": [
+          "docs/evidence/operation-tracing-finance-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/finance/PaymentPayeeReviewWorker.java",
+        "sha256": "b31c3dbc03d37e9dcdabecf4bdc367de387c826839420d5739d3a201e19be35d",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-finance-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/finance/VoucherOperationWorker.java",
+        "sha256": "8b74953a58c223e29433528d67538938323c38077eae1299453e15934ad3d544",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-finance-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/finance/VoucherPreparationWorker.java",
+        "sha256": "cf3900cddbf21d1dd65330f609b9d57d8828c06a89fd05a95af83b68924aa139",
+        "diagnosticRestoreScopes": 2,
+        "evidence": [
+          "docs/evidence/operation-tracing-finance-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalExecutionWorker.java",
+        "sha256": "eff9a8ad8a7a5ffcea53cb5c2c44b6ce77440ee699adcf6d545cd0c278adfe0c",
+        "diagnosticRestoreScopes": 2,
+        "evidence": [
+          "docs/evidence/operation-tracing-expense-recovery-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalWorker.java",
+        "sha256": "91d52d0f1b5c4383fadfaa24231837b0ffb6d9efa7a7658a14fffac997692b44",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-financial-review-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/finance/callback/PaymentCallbackWorker.java",
+        "sha256": "28f04acf5f367604a6277dc47e1738b21c635ca3dec6514b714bbc014b10ad2a",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-integration-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/integration/WebhookWorker.java",
+        "sha256": "e77a43e413b41660c7e5c200e9628cdbc7e26273cb08fabca56f5b2ee7329311",
+        "diagnosticRestoreScopes": 0,
+        "evidence": [
+          "docs/evidence/operation-tracing-webhook-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryWorker.java",
+        "sha256": "4f1ceaf3eb8cddf197352775142f62094a3e01820d559510dbfd3743ea5764e7",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-integration-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationSyncWorker.java",
+        "sha256": "7d4e59de08bcd0f861860e9b0d66e40009d989fcc6f5c51249fd0984da35acb4",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-integration-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "UNBOUND_INVOICE_OR_ORGANIZATION"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/ProcurementPaymentCheckWorker.java",
+        "sha256": "da633715974d5f775fe5018f6ccc52c634144bd48610a5758f94fb524e3011c1",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-financial-review-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentPreparationWorker.java",
+        "sha256": "fd955f41f0838bea944a4eac25be28ebd03f6e7120e5b1d656daa7be01ba8d1e",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-supplier-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentWorker.java",
+        "sha256": "8727f2767824da0f1f1badbcb720090109d8e8ea21eba80233fbdc3bedb69973",
+        "diagnosticRestoreScopes": 2,
+        "evidence": [
+          "docs/evidence/operation-tracing-supplier-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableHoldWorker.java",
+        "sha256": "2bd1879c646311efa5a4215ff29b34d5525f2a1a6e83a2d131f877ba201decc7",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-supplier-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableReviewWorker.java",
+        "sha256": "24ce924c1337397bdf9d5780cbe49e10621cc7284e0d173e1b134c3c9905697e",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-supplier-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentExecutionWorker.java",
+        "sha256": "4bd909462d4bfc2feedc8f66d8dd5c753cceb8db273e89d46962a49ec2e0220a",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-supplier-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentReturnWorker.java",
+        "sha256": "5fb9ff353ef58520213531986ae0bc223d76c6c7bd2f853d628086e8c48bb426",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-supplier-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentWorker.java",
+        "sha256": "c0dfd4c25c7d6e4f1eca2e4ac1dde74c1182441280252758d2ccc31f4e58ba3f",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-supplier-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierSettlementPreparationWorker.java",
+        "sha256": "2dfe59e1fab05159682d303a67bb498c962a43251205b99c3a1bdb862b6fba97",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-supplier-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierSettlementWorker.java",
+        "sha256": "01dcf593a4ce4a88c3f609b23db5171fa18bf7846023b9cd89957bf5306c1d77",
+        "diagnosticRestoreScopes": 2,
+        "evidence": [
+          "docs/evidence/operation-tracing-supplier-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskWorker.java",
+        "sha256": "aa6f191c639aabdc0596eca60e45468b650b5ece6c0f134c118adc812458e011",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-integration-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      },
+      {
+        "source": "agentflow-server/src/main/java/io/agentflow/signature/SignatureWorker.java",
+        "sha256": "d3c19961b56056953003167d9f5adcb95c6c051fbaa947edec0969d4d6cfa32d",
+        "diagnosticRestoreScopes": 1,
+        "evidence": [
+          "docs/evidence/operation-tracing-integration-business-20261007.json"
+        ],
+        "classification": "BUSINESS_EXECUTOR",
+        "contextBinding": "ORIGINAL_BUSINESS_CONTEXT"
+      }
+    ],
+    "scheduledSources": [
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/agent/AssistScheduling.java",
+        "sha256": "4493af829bd08f81908a79d09bc442ef7632226380e4329f154076ecf0c9235e",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionScheduling.java",
+        "sha256": "46b09c972353c5585a387907d30ac1a8df304bd36bdfa19be0c0821c53ae865a",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/approval/process/ApprovalProxyNotificationScheduler.java",
+        "sha256": "81b29e0c11c28c1a5a30b76665fba32e8451ba765b2f7e9089e88e7b317d6502",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/approval/process/TaskDeadlineReminderScheduler.java",
+        "sha256": "8737cb2539a6cb3de29e4e1dea8aeec92d2282deffc9e98756a102a0649139e3",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/approval/process/TaskEscalationScheduler.java",
+        "sha256": "f315b8e2e34606e4e331b1a088755498942b8a9190ce8428b95e80e935bd2604",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/approval/process/TimerWaitScheduler.java",
+        "sha256": "19bd23330cfe4ed643219a8047743a7be6f40d7685360c1d7b126b3109c53b1f",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentCheckScheduling.java",
+        "sha256": "d0fc5a6134ea84098410ed549aebcfe53688d68e5b642c9454f75371bf58a485",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentExecutionScheduling.java",
+        "sha256": "db8095e2983fd36506e3dfdea0cde3b7fd99f901595280c61a7271724f4a9a01",
+        "scheduledMethods": 2
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/event/EventInboxWorker.java",
+        "sha256": "4912644c59d3a4b92fdabd2a38855978c8e5fda1bb3464e4408b2f0a74ac88aa",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceDisbursementReturnScheduling.java",
+        "sha256": "9b94bd3c5c02edb3c268acc182a8e5d08aa1ef5a043bd7e4afa75f8d7c02ab60",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceOverdueScheduling.java",
+        "sha256": "da2e1d4277c335abf14eac85cc30b44d79d7dd6f0fca23960ae29216f9214def",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentReviewScheduling.java",
+        "sha256": "9650c16224172ed83a0b5ca143fc46772b9f1567a7720eca90a58ddaa962bfbe",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentScheduling.java",
+        "sha256": "a38b4b1a0a7561c3e3e8f73eb722517ad690b5cceea32248a76ad07748a40e8c",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRequestCheckScheduling.java",
+        "sha256": "8424e0857d2ca3df002d5c182068fc3d85d40af2f3bbf554eedb790df986fd57",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseArchiveScheduling.java",
+        "sha256": "66df02b3f8bf774673983dcfa4ad3957ceffcfaac1a559fb00476fd522fd9216",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetRetentionScheduling.java",
+        "sha256": "53982d730c7fc82755bbcca999b81f32a2e0a1c1f2a5a1870359bf134c1822ba",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetReviewScheduling.java",
+        "sha256": "40c4fb78005388cbb595fdb63f6a3ab0a1f873824613def9d7ce397e8140dee2",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentScheduling.java",
+        "sha256": "68b181d344f2bd6c1948c54c68c71713ca797838bf26a787ab09409836cb32d3",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePaymentReturnScheduling.java",
+        "sha256": "1f2aee12d849e24e309eda9a336b677cc4bdf40f395ba90a792f2d3be8b6e880",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanCheckScheduling.java",
+        "sha256": "02c8c587cb7734606beeacb5f9f2eb7a3c4974f1ca338f39238bf16c4e305268",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckScheduling.java",
+        "sha256": "ca7cb541f165427f6dbc0c09c3e53d35b78207440b817c80e304627e440a2bbe",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentScheduling.java",
+        "sha256": "1919154397972a548b47d409e67dc6abf6a7b685d2506c5bca4fccd358dc36b9",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSettlementScheduling.java",
+        "sha256": "c4a9842798a5b48da7b44cb6263cfe45330016c1396f60fd7b5881bcd7c5c724",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/InvoiceVerificationScheduling.java",
+        "sha256": "c6427b1a1710e23e958cf22d88bd65260afa036a71ea58acee91a6e287b9a58a",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/finance/BudgetOperationScheduling.java",
+        "sha256": "c0037b165330132b9b1d331d7aa43cbacd0152f9eb59a55082c3a081a1555738",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentExecutionRequestScheduling.java",
+        "sha256": "e7f2f8694eff1e59896ddf857e85c43709af4688ac63d12453da903a2b147d64",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationScheduling.java",
+        "sha256": "7a077ffdbcfca3b86d15b40b080bd32b8559893c1efd07044b1f19c6207e2786",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentPayeeReviewScheduling.java",
+        "sha256": "7bea1500556abf5e5133dd7537d431fcdd891f0eb6158716c02f4b9f1b80e758",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherOperationScheduling.java",
+        "sha256": "09f3ecda05891015694e3d51a65e61482a4d1373fccd9113177c076899e8e942",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherPreparationScheduling.java",
+        "sha256": "39a0d294e939f756fee61c168f7c24f03f204767638a8c9a25e179760db23350",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalExecutionScheduling.java",
+        "sha256": "1cb196bff2067fd60950cd110eb5ddeefccaeefd36ca2b1c61e1352db5ff1dc1",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalScheduling.java",
+        "sha256": "d2279ad2272d585c47bf3273b5d72ea01c228872ae737b619e971e1279953639",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/finance/callback/PaymentCallbackWorker.java",
+        "sha256": "28f04acf5f367604a6277dc47e1738b21c635ca3dec6514b714bbc014b10ad2a",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/integration/WebhookWorker.java",
+        "sha256": "e77a43e413b41660c7e5c200e9628cdbc7e26273cb08fabca56f5b2ee7329311",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryScheduler.java",
+        "sha256": "2440b2c5ecea99dc1d2d9893fcb0535c52e76d20569c7931253a06d764dc1f42",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/organization/OrganizationSyncScheduling.java",
+        "sha256": "494803f72d5aaf871b0bfb4696709bd140b0d6481cc8492ecfe5836b4fdd4237",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/procurement/ProcurementPaymentCheckScheduling.java",
+        "sha256": "46bca2000de81cc35f509f0014dc68d16ee0131306e2d3bee489db9ab9f6a8a9",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentScheduling.java",
+        "sha256": "a83be09cf8c8a08b6f395772e722da7b72b039b11a487d9b097f4315605d107f",
+        "scheduledMethods": 2
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableHoldScheduling.java",
+        "sha256": "f8a906eb958fbdd2795e8349c3ca4a74cbb7d38d549fbb14d910f30691a1bae6",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableReviewScheduling.java",
+        "sha256": "f4101b2d885d3c38f934a2234d69b34561ad6949a1fa6ef53939147d726fc9fe",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentReturnScheduling.java",
+        "sha256": "f16763acbd503e0c053cce2b9baf475a8c6cfe4d20f53761514f862d40d8e7a1",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentScheduling.java",
+        "sha256": "d1e1300807a1f485db67c80b54fcebb9451982c4d72536b5061dc2f9f4928f62",
+        "scheduledMethods": 2
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/procurement/SupplierSettlementScheduling.java",
+        "sha256": "fb198eb4d749004a61f0a8149fb261bebd4f41070a26cddc1aeb87af6c00838c",
+        "scheduledMethods": 2
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/servicetask/ServiceTaskScheduling.java",
+        "sha256": "cccba91bb06ec7d93efc05d710b73a644a9e4c5b6463837639453a611ae3f4f8",
+        "scheduledMethods": 1
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/signature/SignatureScheduling.java",
+        "sha256": "ff1d50ca57a74ef7a2a9796bef9c02f7de978bc0405d0a7c05769ac863995b22",
+        "scheduledMethods": 1
+      }
+    ],
+    "additionalAsyncEntrypoints": [
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/system/SystemCheckService.java",
+        "sha256": "0d0677f6fe1db9b5d6d9376ef9bb1db9afbb47d8063fa131b171ef5bda290fe5",
+        "tests": [
+          "SystemCheckTraceTest.actualProbeThreadUsesAuthorizedTenantAndRestoresContextAfterEachRequest"
+        ],
+        "scope": "Actual existing single probe thread across two tenants and success/failure."
+      },
+      {
+        "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseArchiveController.java",
+        "sha256": "6dad2f8734230b11a8dc7b8767d381f405d566fd163b10541a5bdb74d71ed51b",
+        "tests": [
+          "ExpenseArchiveTraceTest"
+        ],
+        "scope": "Explicit request capture and restoration on the streaming response thread."
+      }
+    ],
+    "boundaries": [
+      "Method and scope counts describe the inventory, not a coverage percentage; stage tests and current full suite supply behavioral evidence.",
+      "Two isolated parser JVMs consume document bytes without business authority; binary results return to scoped InvoiceExtractionWorker. Business identity is not added to untrusted document input.",
+      "Invoice extraction, invoice verification and organization synchronization may have no approval application; all three business MDC keys are deliberately cleared.",
+      "HTTP body futures only collect bounded transport data; business scopes construct request headers and apply results."
+    ]
+  },
+  "systemCheckRuntime": {
+    "status": "PASS",
+    "exitCode": 0,
+    "jarSha256": "cd6b0a45cc4ae8f5cc992e96f66b667dad06cb767edacf13a406acaa156850ff",
+    "scriptSha256": "515c199c658bb227ef530179e1f480d19f2670c4f9b28ed31abbd70ac5189ebb",
+    "actualCheckIds": [
+      "database",
+      "migrations",
+      "flowable",
+      "templates",
+      "authentication",
+      "notifications",
+      "sessionStorage",
+      "organization",
+      "organizationSync",
+      "objectStorage",
+      "model"
+    ],
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false
+  },
+  "fixedRuntime": {
+    "status": "PASS",
+    "jarSha256": "cd6b0a45cc4ae8f5cc992e96f66b667dad06cb767edacf13a406acaa156850ff",
+    "previousJarSha256": "0ee3226987459e2957b27e60fcd18de3de0e0bfcfa735378c7f9b48a91c335db",
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "unchangedTables": 281,
+        "populatedSources": [
+          "proxy",
+          "task",
+          "timer"
+        ]
+      },
+      {
+        "name": "restart-real-scheduler-and-replay",
+        "businessContextsVerified": 8,
+        "matchedNotificationOrigins": 8,
+        "replayedOriginalKeys": 6,
+        "timersAdvancedOnce": 2,
+        "sourceKinds": [
+          "proxy",
+          "deadline",
+          "escalation",
+          "timer"
+        ]
+      },
+      {
+        "name": "independent-restore",
+        "tables": 281,
+        "sameAuthorizedDetails": 4,
+        "duplicateNotifications": 0
+      }
+    ],
+    "boots": 7,
+    "businessHttpRequests": 233,
+    "traceHeaders": 265
+  },
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/v02-local-verified-20261007",
+  "archiveManifestSha256": "1bfa7142d5b6946f23c12f31e6607c3500d75496aa9ae0a2d7cf01dc32eb9da6",
+  "boundaries": [
+    "Executor counts describe an audited inventory, not a coverage percentage.",
+    "OFD/PDF parser JVMs have no approval authority or business queue; bounded results return to the scoped extraction worker.",
+    "Unbound invoice and organization jobs intentionally clear approval business identifiers.",
+    "Each earlier fixed-runtime stage retains its explicit scope; final scheduler verification does not claim to rerun all paths.",
+    "PostgreSQL and V02 acceptance remain open."
+  ]
+}

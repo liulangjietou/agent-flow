@@ -413,7 +413,10 @@ final class InvoiceOfdRenderer {
             return bytes.toByteArray();
         } finally { writer.dispose(); }
     }
-    /** 每个容器拥有自己的 DOM/资源身份，所有容器仍共享本次渲染累计额度。 */
+    /**
+     * 每个容器拥有自己的 DOM/资源身份，所有容器仍共享本次渲染累计额度。
+     * @author owlzhangfq@gmail.com
+     */
     private record DocumentData(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents,
                                 Map<InvoiceOfdDocument.Page, List<InvoiceOfdAnnotations.Appearance>> annotations,
                                 Map<InvoiceOfdDocument.Page, List<InvoiceOfdSignatures.Stamp>> stamps) { }

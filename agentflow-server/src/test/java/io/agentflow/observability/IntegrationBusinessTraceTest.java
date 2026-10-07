@@ -31,7 +31,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** 真实候选 SQL 核对原业务、原轮次及通知归属；完整业务约束由各集成模块的持久化和公开接口测试覆盖。 */
+/**
+ * 真实候选 SQL 核对原业务、原轮次及通知归属；完整业务约束由各集成模块的持久化和公开接口测试覆盖。
+ * @author owlzhangfq@gmail.com
+ */
 class IntegrationBusinessTraceTest {
     private static final String TENANT = "tenant-a", BUSINESS = "ORIGINAL-INTEGRATION", INSTANCE = "original-instance", TASK = "original-task";
     private final UUID applicationId = UUID.randomUUID(), runId = UUID.randomUUID(), inboxId = UUID.randomUUID();
@@ -186,6 +189,12 @@ class IntegrationBusinessTraceTest {
         };
     }
 
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll, Class<?> loggerType) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind { SERVICE, SIGNATURE, NOTIFICATION, EVENT, EMPLOYEE_CALLBACK, SUPPLIER_CALLBACK }
 }

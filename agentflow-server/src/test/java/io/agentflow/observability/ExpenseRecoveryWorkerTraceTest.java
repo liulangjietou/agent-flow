@@ -25,7 +25,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-/** 费用财务队列、归档与本地恢复入口验证领取失败、旧记录及线程复用，不把诊断上下文作为授权主体。 */
+/**
+ * 费用财务队列、归档与本地恢复入口验证领取失败、旧记录及线程复用，不把诊断上下文作为授权主体。
+ * @author owlzhangfq@gmail.com
+ */
 class ExpenseRecoveryWorkerTraceTest {
     private static final UUID FAILED = UUID.randomUUID(), LEGACY = UUID.randomUUID();
     private static final String SOURCE = UUID.randomUUID().toString();
@@ -227,6 +230,12 @@ class ExpenseRecoveryWorkerTraceTest {
             }
         };
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll, Class<?> loggerType, String errorCode) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind { ARCHIVE, BUDGET_REVIEW, PARTIAL_PREPARATION, PARTIAL_BUDGET, PARTIAL_ACCRUAL, PARTIAL_COMPLETION, RESOURCE_PREPARATION, RESOURCE_BUDGET, RESOURCE_COMPLETION, SETTLEMENT, PAYMENT_RECOVERY, VOUCHER_RECOVERY, ZERO_RECOVERY, REVERSAL_PREPARATION, REVERSAL }
 }

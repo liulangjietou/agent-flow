@@ -16,7 +16,10 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.*;
 
-/** 验证异常、嵌套、错误分派和重复使用线程的真实诊断边界。 */
+/**
+ * 验证异常、嵌套、错误分派和重复使用线程的真实诊断边界。
+ * @author owlzhangfq@gmail.com
+ */
 class DiagnosticContextTest {
     @AfterEach void clear() { MDC.clear(); }
 

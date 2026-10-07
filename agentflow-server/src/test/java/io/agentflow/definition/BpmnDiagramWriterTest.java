@@ -7,7 +7,10 @@ import org.junit.jupiter.api.Test;
 import static io.agentflow.definition.DefinitionModels.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 旧图缺省连线的退化几何仍满足 BPMN DI 的两端点契约。 */
+/**
+ * 旧图缺省连线的退化几何仍满足 BPMN DI 的两端点契约。
+ * @author owlzhangfq@gmail.com
+ */
 class BpmnDiagramWriterTest {
     @Test
     void coincidentLegacyEndpointsRetainBothEnds() {

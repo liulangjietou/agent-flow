@@ -24,7 +24,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** 真实过滤器链验证响应、错误和已认证上下文共用追踪标识，不相信传入身份。 */
+/**
+ * 真实过滤器链验证响应、错误和已认证上下文共用追踪标识，不相信传入身份。
+ * @author owlzhangfq@gmail.com
+ */
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:request-trace;DB_CLOSE_DELAY=-1",
         "agentflow.auth.demo-enabled=true", "agentflow.webhooks.worker-enabled=false"})
 @AutoConfigureMockMvc
@@ -101,7 +104,10 @@ class RequestTraceIntegrationTest {
     private String token() { return "Bearer " + auth.login("demo", "alice", "demo").token(); }
     private static void assertTrace(String value) { assertThat(value).matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"); }
 
-    /** 仅测试上下文可用的探针，运行真实认证与异常处理。 */
+    /**
+     * 仅测试上下文可用的探针，运行真实认证与异常处理。
+     * @author owlzhangfq@gmail.com
+     */
     @RestController
     static class Probe {
         @GetMapping(PATH) public Map<String, String> context() {

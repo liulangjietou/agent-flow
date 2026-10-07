@@ -46,10 +46,14 @@ assert before == after, "Read-only check must not modify visible business state"
 checks = {check["id"]: check for check in report["checks"]}
 assert len(checks) == len(report["checks"]), "Check identifiers must be unique"
 assert set(checks) == {"database", "migrations", "flowable", "templates", "authentication", "notifications",
-                       "sessionStorage", "organization", "objectStorage", "model"}
+                       "sessionStorage", "organization", "organizationSync", "objectStorage", "model"}
 for check_id in ("database", "migrations", "flowable", "templates"):
     assert checks[check_id]["status"] == "UP", (check_id, checks[check_id]["code"])
 assert checks["authentication"]["code"] == "DEMO_AUTH_ONLY"
+# 组织来源只核对本地配置，不把配置成功报告为企业连接或同步验收。
+assert checks["organizationSync"]["status"] == "WARNING"
+assert checks["organizationSync"]["code"] in {"ORGANIZATION_SYNC_" + value for value in
+    ("DISABLED", "UNCONFIGURED", "SOURCE_CHANGED", "WORKER_DISABLED", "CONFIGURED")}
 assert not any(check["status"] == "NOT_IMPLEMENTED" for check in report["checks"])
 assert checks["objectStorage"]["code"] in {"LOCAL_ATTACHMENT_STORAGE", "ATTACHMENT_STORAGE_NOT_CONFIGURED"}
 assert checks["objectStorage"]["status"] == ("UP" if checks["objectStorage"]["code"] == "LOCAL_ATTACHMENT_STORAGE" else "WARNING")
@@ -66,5 +70,5 @@ for forbidden in ("jdbc:", "password=", "Bearer ", "agentflow-local-demo-only"):
 print(json.dumps({"result": "PASS", "origin": origin, "report": report,
                   "verified": ["anonymous-401", "approver-403", "admin-checks", "same-origin-login",
                                "untrusted-origin-403", "readiness", "business-state-unchanged", "redacted-response",
-                               "local-organization-state", "adapter-configuration-not-delivery"]},
+                               "local-organization-state", "organization-sync-configuration", "adapter-configuration-not-delivery"]},
                  ensure_ascii=False, indent=2))

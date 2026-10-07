@@ -25,7 +25,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** 候选 SQL 与实际工作器一起核验原付款、凭证、批准轮次和跨租户隔离。 */
+/**
+ * 候选 SQL 与实际工作器一起核验原付款、凭证、批准轮次和跨租户隔离。
+ * @author owlzhangfq@gmail.com
+ */
 class FinancialReviewBusinessTraceTest {
     private static final String TENANT="tenant-a", BUSINESS="REVIEW-ORIGINAL", INSTANCE="original-instance";
     private final UUID application=UUID.randomUUID(), id=UUID.randomUUID(), payment=UUID.randomUUID(), advance=UUID.randomUUID(), repayment=UUID.randomUUID(), check=UUID.randomUUID();
@@ -171,7 +174,13 @@ class FinancialReviewBusinessTraceTest {
             }
         };
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll,Class<?> type) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind {
         BUDGET_ADJUSTMENT_CHECK("budget_adjustment_check_job","DRAFT"),
         BUDGET_ADJUSTMENT_REVIEW("budget_adjustment_review","BUDGET"),

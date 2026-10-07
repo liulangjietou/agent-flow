@@ -15,7 +15,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** 归档下载使用另一线程写文件，验证实际控制器保留诊断关联且不传递业务身份。 */
+/**
+ * 归档下载使用另一线程写文件，验证实际控制器保留诊断关联且不传递业务身份。
+ * @author owlzhangfq@gmail.com
+ */
 class ExpenseArchiveTraceTest {
     @Test
     void actualDownloadCallbackKeepsRequestTraceWithoutLeavingItOnTheStreamingThread() throws Exception {

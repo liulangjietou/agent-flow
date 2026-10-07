@@ -1,6 +1,7 @@
 package io.agentflow.system;
 
 import io.agentflow.common.Actor;
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.notification.NotificationChannel;
 import io.agentflow.template.ClasspathProcessTemplateCatalog;
 import jakarta.annotation.PreDestroy;
@@ -71,13 +72,15 @@ public class SystemCheckService {
     /** 入口校验管理员权限后才调度依赖检查，结果不包含配置值或异常原文。 */
     public Report check(Actor actor) {
         actor.requireRole("ADMIN");
+        // 自检没有审批单据；租户只取已授权主体，诊断线程不继承调用方的业务标识。
+        var trace = new DiagnosticContext(DiagnosticContext.capture().traceId(), actor.tenantId());
         List<Check> checks = new ArrayList<>();
-        checks.add(inspect("database", () -> {
+        checks.add(inspect(trace, "database", () -> {
             diagnostics.database();
             return up("database", "数据库查询成功。");
         }));
-        checks.add(inspect("migrations", () -> up("migrations", "迁移校验通过，当前版本 V" + diagnostics.migrations() + "。")));
-        checks.add(inspect("flowable", () -> {
+        checks.add(inspect(trace, "migrations", () -> up("migrations", "迁移校验通过，当前版本 V" + diagnostics.migrations() + "。")));
+        checks.add(inspect(trace, "flowable", () -> {
             diagnostics.flowable(actor.tenantId());
             return up("flowable", "流程定义、实例、任务与历史查询均成功。");
         }));
@@ -88,25 +91,25 @@ public class SystemCheckService {
                 oidcEnabled ? "OIDC_CONFIGURED" : demoEnabled ? "DEMO_AUTH_ONLY" : "AUTH_PROVIDER_NOT_CONFIGURED",
                 oidcEnabled ? "已配置企业 OIDC 登录；本次未探测身份服务可用性，组织状态见本地目录检查。"
                         : demoEnabled ? "使用演示账号，企业身份认证尚未接入。" : "演示登录已关闭，企业身份认证尚未接入。"));
-        checks.add(inspect("notifications", () -> notificationCheck(actor.tenantId())));
-        checks.add(jdbcSessions ? inspect("sessionStorage", () -> {
+        checks.add(inspect(trace, "notifications", () -> notificationCheck(actor.tenantId())));
+        checks.add(jdbcSessions ? inspect(trace, "sessionStorage", () -> {
             diagnostics.sessions();
             return up("sessionStorage", "共享会话存储查询成功；空闲超时、令牌到期和当前身份映射仍受校验。");
         }) : new Check("sessionStorage", Status.WARNING, "JDBC_SESSIONS_DISABLED", oidcEnabled
                 ? "当前使用单实例内存会话；多实例部署需显式启用共享会话。"
                 : "共享会话未启用；此能力适用于企业 OIDC 登录。"));
-        checks.add(inspect("organization", () -> diagnostics.organization(actor.tenantId())
+        checks.add(inspect(trace, "organization", () -> diagnostics.organization(actor.tenantId())
                 ? new Check("organization", Status.UP, "LOCAL_ORGANIZATION_ENABLED",
                         "本租户已启用本地组织目录，存储查询成功；人员、任职与审批资格需在组织管理中核对。")
                 : new Check("organization", Status.WARNING, "LOCAL_ORGANIZATION_NOT_INITIALIZED",
                         "本租户尚未启用本地组织目录；管理员可在“组织与人员”中启用并配置。")));
-        checks.add(inspect("organizationSync", () -> organizationSyncCheck(actor.tenantId())));
-        checks.add(inspect("objectStorage", () -> diagnostics.attachments(actor.tenantId())
+        checks.add(inspect(trace, "organizationSync", () -> organizationSyncCheck(actor.tenantId())));
+        checks.add(inspect(trace, "objectStorage", () -> diagnostics.attachments(actor.tenantId())
                 ? new Check("objectStorage", Status.UP, "LOCAL_ATTACHMENT_STORAGE",
                         "附件元数据可查询，持久目录访问权限正常；本项未写入文件或校验全部存量内容。当前未接入内容扫描。")
                 : new Check("objectStorage", Status.WARNING, "ATTACHMENT_STORAGE_NOT_CONFIGURED",
                         "附件持久目录尚未配置；管理员配置后可在申请表单中上传。")));
-        checks.add(inspect("model", this::modelCheck));
+        checks.add(inspect(trace, "model", this::modelCheck));
         return new Report(Instant.now(), List.copyOf(checks));
     }
 
@@ -148,10 +151,12 @@ public class SystemCheckService {
                 message + "本次未连接企业来源，不代表同步结果或企业联调通过验收。");
     }
 
-    private Check inspect(String id, Supplier<Check> probe) {
+    private Check inspect(DiagnosticContext trace, String id, Supplier<Check> probe) {
         final Future<Check> task;
         try {
-            task = executor.submit(probe::get);
+            task = executor.submit(() -> {
+                try (var scope = trace.open()) { return probe.get(); }
+            });
         } catch (RejectedExecutionException exception) {
             return new Check(id, Status.UNKNOWN, "CHECK_BUSY", "另一项诊断仍在执行，本项未检查，请稍后重试。");
         }

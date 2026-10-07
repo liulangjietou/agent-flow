@@ -98,6 +98,9 @@ final class InvoiceOfdSignatures {
         return new Rectangle2D.Double(fields[0], fields[1], fields[2], fields[3]);
     }
 
-    /** Clip 坐标相对印章 Boundary 左上角，图片字节仍为原始内容。 */
+    /**
+     * Clip 坐标相对印章 Boundary 左上角，图片字节仍为原始内容。
+     * @author owlzhangfq@gmail.com
+     */
     record Stamp(InvoiceOfdSeal.Picture picture, Rectangle2D.Double boundary, Rectangle2D.Double clip) { }
 }

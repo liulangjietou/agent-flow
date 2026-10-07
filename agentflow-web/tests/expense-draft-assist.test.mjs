@@ -78,8 +78,12 @@ test('拒绝被替换的来源、目录、日期、金额、引用和不合法�
 test('合法空建议与微秒到期前确认保留，越过期限或缺少行程选择拒绝', async () => {
   const empty = detail(); empty.suggestion.lines = []; empty.canConfirm = false; empty.unavailableCode = 'AGENT_NO_SUGGESTIONS'
   assert.deepEqual(await model.readExpenseAssistDetail(empty, uuid(1), uuid(4)), empty)
-  const d = confirmed(); d.input.validUntil = '2026-10-05T00:00:00.000500Z'; d.review.at = '2026-10-05T00:00:00.000499Z'
+  // 微秒边界用完整的历史时间线，不能混用运行当天的创建时间和固定到期日。
+  const d = confirmed(); d.createdAt = '2026-10-04T23:59:50Z'; d.startedAt = '2026-10-04T23:59:51Z'; d.completedAt = '2026-10-04T23:59:52Z'
+  d.input.validUntil = '2026-10-05T00:00:00.000500Z'; d.review.at = '2026-10-05T00:00:00.000499Z'
   assert.deepEqual(await model.readExpenseAssistDetail(d, uuid(1), uuid(4)), d)
+  const createdTooLate = structuredClone(d); createdTooLate.createdAt = d.input.validUntil
+  await assert.rejects(model.readExpenseAssistDetail(createdTooLate, uuid(1), uuid(4)), unreadable)
   d.review.at = d.input.validUntil; await assert.rejects(model.readExpenseAssistDetail(d, uuid(1), uuid(4)), unreadable)
   const invalid = confirmed(['CATEGORY']); await assert.rejects(model.readExpenseAssistDetail(invalid, uuid(1), uuid(4)), unreadable)
 })

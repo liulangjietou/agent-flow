@@ -18,7 +18,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** 旧正文与失败恢复不能改变签名输入，也不能把前一租户留在后续任务。 */
+/**
+ * 旧正文与失败恢复不能改变签名输入，也不能把前一租户留在后续任务。
+ * @author owlzhangfq@gmail.com
+ */
 class WebhookWorkerTraceTest {
     @Test
     void legacyBodiesAndFailedAttemptsKeepStableTenantScopedTraceWithoutLeakingOtherContext() {

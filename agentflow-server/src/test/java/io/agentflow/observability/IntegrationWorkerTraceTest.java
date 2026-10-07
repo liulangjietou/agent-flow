@@ -27,7 +27,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-/** 集成工作器验证领取失败、旧记录及线程复用，不把诊断上下文作为授权主体。 */
+/**
+ * 集成工作器验证领取失败、旧记录及线程复用，不把诊断上下文作为授权主体。
+ * @author owlzhangfq@gmail.com
+ */
 class IntegrationWorkerTraceTest {
     private static final UUID FAILED = UUID.randomUUID(), LEGACY = UUID.randomUUID();
     private static final String SOURCE = UUID.randomUUID().toString();
@@ -138,6 +141,12 @@ class IntegrationWorkerTraceTest {
             }
         };
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll, Class<?> loggerType, String errorCode) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind { SERVICE, SIGNATURE, ORGANIZATION, NOTIFICATION, EVENT, CALLBACK }
 }

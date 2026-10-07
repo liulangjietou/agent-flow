@@ -140,7 +140,13 @@ final class InvoiceOfdSeal {
     }
     private static void require(Node node, int tag) throws IOException { if (node.tag() != tag) throw invalid(); }
 
-    /** 有界图片字节只在隔离进程内流转；显示尺寸最终由 StampAnnot 的 Boundary 决定。 */
+    /**
+     * 有界图片字节只在隔离进程内流转；显示尺寸最终由 StampAnnot 的 Boundary 决定。
+     * @author owlzhangfq@gmail.com
+     */
     record Picture(String format, byte[] bytes) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Node(int tag, int start, int end, List<Node> children) { }
 }

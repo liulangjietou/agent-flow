@@ -204,6 +204,9 @@ public class JdbcWebhookStore {
      */
     public record RetryRequest(String requestedBy, Instant requestedAt, String previousStatus, long previousVersion) { }
 
-    /** 已匹配本租户申请的诊断投影，不对外暴露或写回签名正文。 */
+    /**
+     * 已匹配本租户申请的诊断投影，不对外暴露或写回签名正文。
+     * @author owlzhangfq@gmail.com
+     */
     public record BusinessContext(String businessNo, String processInstanceId) { }
 }

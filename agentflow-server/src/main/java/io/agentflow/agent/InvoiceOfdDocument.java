@@ -337,7 +337,10 @@ final class InvoiceOfdDocument {
      */
     record Template(String file, String zOrder) { }
 
-    /** 同一来源的 XML 累计读取预算；嵌套文档不能重置字节或节点计数。 */
+    /**
+     * 同一来源的 XML 累计读取预算；嵌套文档不能重置字节或节点计数。
+     * @author owlzhangfq@gmail.com
+     */
     static final class XmlBudget {
         private int bytes;
         private int elements;

@@ -155,7 +155,10 @@ public class JdbcNotificationDeliveryStore {
     private static Timestamp stamp(Instant value) { return value == null ? null : Timestamp.from(persistedTime(value)); }
     private static Instant time(ResultSet row, String column) throws SQLException { var value = row.getTimestamp(column); return value == null ? null : value.toInstant(); }
 
-    /** 调度身份与诊断来源分开于消息正文保存。 */
+    /**
+     * 调度身份与诊断来源分开于消息正文保存。
+     * @author owlzhangfq@gmail.com
+     */
     public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId, String taskId) {
         /** 原业务事实不存在时保持空值，不借用当前线程。 */
         public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null, null); }

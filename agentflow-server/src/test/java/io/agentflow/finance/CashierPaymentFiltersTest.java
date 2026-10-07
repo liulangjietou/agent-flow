@@ -184,6 +184,9 @@ class CashierPaymentFiltersTest {
         String columns = "tenant_id,id,terms_json,decision_json,state_json,status,version,authorized_at,expires_at,legal_entity_id";
         var before = f.jdbc.queryForList("SELECT " + columns + " FROM payment_authorization ORDER BY id");
         var revisions = f.jdbc.queryForList("SELECT * FROM payment_authorization_revision ORDER BY authorization_id,version");
+        var originalVoucherRows = f.jdbc.queryForList("SELECT * FROM voucher_operation ORDER BY id");
+        String originalVoucherQuery = "SELECT " + String.join(",", originalVoucherRows.get(0).keySet()) + " FROM voucher_operation ORDER BY id";
+        var originalVoucherRevisions = f.jdbc.queryForList("SELECT * FROM voucher_operation_revision ORDER BY operation_id,version");
         var flyway = Flyway.configure().dataSource(f.source).target("114").load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
         assertThat(f.jdbc.queryForList("SELECT " + columns + " FROM payment_authorization ORDER BY id")).isEqualTo(before);
         assertThat(f.jdbc.queryForList("SELECT * FROM payment_authorization_revision ORDER BY authorization_id,version")).isEqualTo(revisions);
@@ -192,6 +195,11 @@ class CashierPaymentFiltersTest {
         assertThat(flyway.migrate().migrationsExecuted).isZero(); assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
         // V114 的旧列断言完成后再升到当前结构，新仓储不运行在旧表结构上。
         Flyway.configure().dataSource(f.source).load().migrate();
+        assertThat(f.jdbc.queryForList(originalVoucherQuery)).isEqualTo(originalVoucherRows);
+        assertThat(f.jdbc.queryForList("SELECT * FROM voucher_operation_revision ORDER BY operation_id,version")).isEqualTo(originalVoucherRevisions);
+        assertThat(f.jdbc.queryForObject("SELECT COUNT(*) FROM voucher_operation WHERE trace_id IS NOT NULL", Integer.class)).isZero();
+        assertThat(f.vouchers.find(f.tenant, selected.terms().voucherOperationId())).get()
+                .extracting(VoucherOperation::status).isEqualTo(VoucherOperation.Status.POSTED);
         assertThat(f.authorizations.find(f.tenant, selected.terms().id())).contains(selected); assertThat(f.authorizations.find(f.tenant, fresh.terms().id())).contains(fresh);
     }
 
@@ -254,7 +262,7 @@ class CashierPaymentFiltersTest {
             var posted = claimed.complete(new FinanceResult.Success<>(new VoucherObservation(command.id(), command.digest(), VoucherObservation.Status.POSTED, 1L, NOW,
                     "posting-1", "voucher-1", period.periodReference(), date, amount, amount, NOW, null)), NOW);
             var initial = PaymentAuthorization.issue(UUID.randomUUID(), posted, new EmployeeAccountSnapshot(entity, "alice", "payee-1", "****1234", "c".repeat(64), "v1"), "finance", authorized, authorized.plusSeconds(3600), dueDate);
-            tx.executeWithoutResult(ignored -> { vouchers.create(queued); vouchers.update(claimed); vouchers.update(posted); createAuthorization(initial); });
+            tx.executeWithoutResult(ignored -> { createVoucher(queued, claimed, posted); createAuthorization(initial); });
             if (reference == null) return initial;
             var directory = new PaymentAccountsPort.Directory(new PaymentAccountsPort.Request(entity, currency, "cashier"), accountVersion, authorized, authorized.plusSeconds(60),
                     List.of(new PaymentAccountsPort.DebitAccount(reference, "合成账户 " + accountVersion, "****5678", currency, accountVersion)));
@@ -266,6 +274,23 @@ class CashierPaymentFiltersTest {
                     jdbc.update("INSERT INTO payment_authorization_revision(tenant_id,authorization_id,version,state_json) VALUES(?,?,2,?)", tenant, initial.terms().id().toString(), JSON.write(executed));
                 }
             }); return executed;
+        }
+        /** 旧库只写 V113 已有列和三次原修订，不能要求其提前具备当前仓储的诊断列。 */
+        private void createVoucher(VoucherOperation queued, VoucherOperation claimed, VoucherOperation posted) {
+            if (!legacy) { vouchers.create(queued); vouchers.update(claimed); vouchers.update(posted); return; }
+            var command = posted.input().command(); var binding = command.binding();
+            jdbc.update("""
+                    INSERT INTO voucher_operation(tenant_id,id,business_type,business_id,application_id,round_no,kind,application_version,business_version,
+                    input_json,command_digest,state_json,version,status,attempts,highest_revision,created_at,updated_at)
+                    VALUES(?,?,'ADVANCE_REQUEST',?,?,?,?,?,?,?,?,?,?,'POSTED',?,?,?,?)
+                    """, tenant, command.id().toString(), binding.businessId().toString(), binding.applicationId().toString(),
+                    binding.roundNo(), command.kind().name(), binding.applicationVersion(), binding.businessVersion(),
+                    JSON.write(posted.input()), command.digest(), JSON.write(posted), posted.version(), posted.attempts(),
+                    posted.highestRevision(), Timestamp.from(posted.createdAt()), Timestamp.from(posted.updatedAt()));
+            for (var revision : List.of(queued, claimed, posted)) {
+                jdbc.update("INSERT INTO voucher_operation_revision(tenant_id,operation_id,version,state_json) VALUES(?,?,?,?)",
+                        tenant, command.id().toString(), revision.version(), JSON.write(revision));
+            }
         }
         private void createAuthorization(PaymentAuthorization value) {
             if (!legacy) { authorizations.create(value); return; }

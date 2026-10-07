@@ -21,7 +21,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-/** 六类工作器验证领取失败、旧记录及线程复用，不把诊断上下文作为授权主体。 */
+/**
+ * 六类工作器验证领取失败、旧记录及线程复用，不把诊断上下文作为授权主体。
+ * @author owlzhangfq@gmail.com
+ */
 class AgentWorkerTraceTest {
     private static final UUID FAILED = UUID.randomUUID(), LEGACY = UUID.randomUUID();
     private static final String SOURCE = UUID.randomUUID().toString();
@@ -129,6 +132,12 @@ class AgentWorkerTraceTest {
         };
     }
 
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll, Class<?> loggerType) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind { SUMMARY, DRAFT, INVOICE, EXPENSE, PRECHECK, RISK }
 }

@@ -14,7 +14,10 @@ import java.util.UUID;
 import static io.agentflow.definition.DefinitionModels.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** 验证持久草稿经真实 Flowable 部署后保留图形，审批语义仍由原流程图决定。 */
+/**
+ * 验证持久草稿经真实 Flowable 部署后保留图形，审批语义仍由原流程图决定。
+ * @author owlzhangfq@gmail.com
+ */
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:definition-diagram;DB_CLOSE_DELAY=-1", "agentflow.auth.demo-enabled=true"})
 class DefinitionDiagramIntegrationTest {
     @Autowired DefinitionApplicationService service;

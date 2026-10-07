@@ -23,7 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** 供应商原授权、原轮次及两个本地补齐入口共用真实候选 SQL；不替换核销守卫。 */
+/**
+ * 供应商原授权、原轮次及两个本地补齐入口共用真实候选 SQL；不替换核销守卫。
+ * @author owlzhangfq@gmail.com
+ */
 class SupplierBusinessTraceTest {
     private static final String TENANT="tenant-a", BUSINESS="SUPPLIER-ORIGINAL", INSTANCE="original-instance";
     private final UUID application=UUID.randomUUID(), id=UUID.randomUUID(), payment=UUID.randomUUID(), reservation=UUID.randomUUID();
@@ -146,7 +149,13 @@ class SupplierBusinessTraceTest {
             }
         };
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll,Class<?> type) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind {
         ADJUSTMENT_PREPARATION("supplier_adjustment_preparation"),
         ADJUSTMENT("supplier_payable_adjustment_operation"),

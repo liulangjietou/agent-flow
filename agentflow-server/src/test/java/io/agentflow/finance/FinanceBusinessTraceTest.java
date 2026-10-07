@@ -26,7 +26,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-/** 真实扫描 SQL 验证原业务投影与工作器作用域；完整约束和领取规则由财务持久化及 HTTP 集成测试覆盖。 */
+/**
+ * 真实扫描 SQL 验证原业务投影与工作器作用域；完整约束和领取规则由财务持久化及 HTTP 集成测试覆盖。
+ * @author owlzhangfq@gmail.com
+ */
 class FinanceBusinessTraceTest {
     private static final String TENANT = "tenant-a", BUSINESS = "ORIGINAL-FINANCE", INSTANCE = "original-instance";
     private final UUID applicationId = UUID.randomUUID(), reportId = UUID.randomUUID(), runId = UUID.randomUUID();
@@ -175,6 +178,12 @@ class FinanceBusinessTraceTest {
         };
     }
 
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll, Class<?> loggerType) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind { PRECHECK, BUDGET, VOUCHER, PAYMENT, PREPARATION, REQUEST, PAYEE, BALANCE_RECOVERY, VOUCHER_RECOVERY }
 }

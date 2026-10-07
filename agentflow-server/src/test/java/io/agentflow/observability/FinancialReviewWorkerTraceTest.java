@@ -26,7 +26,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-/** 预算调整、借还款、退票与采购预检工作器验证领取失败、旧记录及线程复用，不把诊断上下文作为授权主体。 */
+/**
+ * 预算调整、借还款、退票与采购预检工作器验证领取失败、旧记录及线程复用，不把诊断上下文作为授权主体。
+ * @author owlzhangfq@gmail.com
+ */
 class FinancialReviewWorkerTraceTest {
     private static final UUID FAILED = UUID.randomUUID(), LEGACY = UUID.randomUUID();
     private static final String SOURCE = UUID.randomUUID().toString();
@@ -177,6 +180,12 @@ class FinancialReviewWorkerTraceTest {
             }
         };
     }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private record Harness(Runnable poll, Class<?> loggerType, String errorCode) { }
+    /**
+     * @author owlzhangfq@gmail.com
+     */
     private enum Kind { BUDGET_ADJUSTMENT_CHECK, BUDGET_ADJUSTMENT_REVIEW, BUDGET_ADJUSTMENT_OPERATION, DISBURSEMENT_RETURN_CHECK, REPAYMENT_REVIEW_CHECK, ADVANCE_REPAYMENT_CHECK, ADVANCE_REQUEST_CHECK, EXPENSE_PAYMENT_RETURN_CHECK, EXPENSE_PLAN_CHECK, VOUCHER_REVERSAL_CHECK, PROCUREMENT_PAYMENT_CHECK }
 }
