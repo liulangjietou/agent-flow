@@ -19,7 +19,13 @@ public record ExpenseAdjustment(UUID id, long previousFinancialVersion, String a
      * 以本位币记录核减前后含税及税额。
      * @author owlzhangfq@gmail.com
      */
-    public record LineChange(int lineNo, Money previousGross, Money approvedGross, Money previousTax, Money approvedTax) { }
+    public record LineChange(int lineNo, Money previousGross, Money approvedGross, Money previousTax, Money approvedTax,
+                             @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) String reasonCode) {
+        /** 旧快照没有逐行原因，不补写字段或改变历史序列化摘要。 */
+        public LineChange(int lineNo, Money previousGross, Money approvedGross, Money previousTax, Money approvedTax) {
+            this(lineNo, previousGross, approvedGross, previousTax, approvedTax, null);
+        }
+    }
 
     /**
      * 冲销自动收敛的前后金额，供应用服务退还多余预留。

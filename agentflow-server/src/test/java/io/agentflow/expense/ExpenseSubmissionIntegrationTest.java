@@ -1994,6 +1994,69 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     @Test
+    void reductionPersistsDifferentLineReasonsAsOneAtomicAdjustment() throws Exception {
+        var report = fixture(false).report(); var first = report.content().lines().get(0);
+        var second = new ExpenseLine(7, first.categoryCode(), first.incurredOn(), first.endedOn(), first.cityCode(), first.quantity(), first.unit(),
+                first.claimedGross(), first.claimedTax(), List.of(), null, first.allocations(), "第二行合成办公费", null);
+        var content = new ExpenseContent(entity, report.content().type(), report.content().title(), List.of(first, second), List.of());
+        ok(send(path(report) + "/revise", "alice", Map.of("applicationVersion", app(report).version(), "financialVersion", report.version(), "content", content)), 200);
+        enterFinance(report); var before = current(report); long applicationVersion = app(report).version();
+        var input = new HashMap<String, Object>(reductionInput(report, "50", "3"));
+        input.put("reasonCode", "OTHER");
+        input.put("lines", List.of(Map.of("lineNo", 7, "approvedGross", "80", "approvedTax", "4", "reasonCode", "INVALID_INVOICE"),
+                Map.of("lineNo", 1, "approvedGross", "50", "approvedTax", "3", "reasonCode", "INELIGIBLE_COST")));
+        String path = reductionPath(report), key = UUID.randomUUID().toString();
+        var receipt = ok(send(path, "finance", key, input), 200);
+        assertThat(ok(send(path, "finance", key, input), 200)).isEqualTo(receipt);
+        var saved = current(report);
+        assertThat(saved.version()).isEqualTo(before.version() + 1); assertThat(app(report).version()).isEqualTo(applicationVersion + 1);
+        assertThat(saved.currentRound().originalLines()).isEqualTo(before.currentRound().originalLines());
+        assertThat(saved.currentRound().adjustments()).hasSize(1); assertThat(saved.currentRound().approvedGross()).isEqualTo(money("130"));
+        var changes = json.read(json.write(saved.currentRound().adjustments().get(0)), JsonNode.class).path("lineChanges");
+        assertThat(changes.get(0).path("lineNo").asInt()).isEqualTo(1);
+        assertThat(changes.get(0).path("reasonCode").asText()).isEqualTo("INELIGIBLE_COST");
+        assertThat(changes.get(1).path("lineNo").asInt()).isEqualTo(7);
+        assertThat(changes.get(1).path("reasonCode").asText()).isEqualTo("INVALID_INVOICE");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_report_revision WHERE report_id=? AND operation='REDUCE'", Integer.class, report.id().toString())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM budget_operation WHERE report_id=?", Integer.class, report.id().toString())).isEqualTo(2);
+    }
+
+    @Test
+    void invalidLineReasonTypesCannotCreateAnyFinancialAdjustment() throws Exception {
+        var report = fixture(false).report(); enterFinance(report); var before = current(report).state(); long version = app(report).version();
+        for (Object reason : List.of("UNKNOWN_REASON", "", "other", 0, true, List.of("OTHER"), Map.of("reasonCode", "OTHER"))) {
+            var input = new HashMap<String, Object>(reductionInput(report, "50", "3"));
+            input.put("lines", List.of(Map.of("lineNo", 1, "approvedGross", "50", "approvedTax", "3", "reasonCode", reason)));
+            assertThat(send(reductionPath(report), "finance", input).getStatus()).isEqualTo(400);
+            assertThat(current(report).state()).isEqualTo(before); assertThat(app(report).version()).isEqualTo(version);
+        }
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_report_revision WHERE report_id=? AND operation='REDUCE'", Integer.class, report.id().toString())).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM budget_operation WHERE report_id=?", Integer.class, report.id().toString())).isEqualTo(1);
+    }
+
+    @Test
+    void legacyReductionInputUsesCommonReasonAndOldSnapshotsKeepTheirJsonShape() throws Exception {
+        var report = fixture(false).report(); enterFinance(report);
+        var input = new HashMap<String, Object>(reductionInput(report, "50", "3"));
+        var line = new HashMap<String, Object>(Map.of("lineNo", 1, "approvedGross", "50", "approvedTax", "3"));
+        line.put("reasonCode", null); input.put("lines", List.of(line));
+        ok(send(reductionPath(report), "finance", input), 200); budgetWorker.poll();
+        ok(send(reductionPath(report), "finance", reductionInput(report, "40", "2")), 200);
+        var saved = current(report);
+        assertThat(saved.currentRound().adjustments()).hasSize(2).allSatisfy(adjustment ->
+                assertThat(adjustment.lineChanges()).singleElement().satisfies(change -> assertThat(change.reasonCode()).isEqualTo("INELIGIBLE_COST")));
+        var legacy = json.read(json.write(saved.state()), com.fasterxml.jackson.databind.node.ObjectNode.class);
+        for (var round : legacy.path("rounds")) for (var adjustment : round.path("adjustments")) for (var change : adjustment.path("lineChanges")) {
+            ((com.fasterxml.jackson.databind.node.ObjectNode) change).remove("reasonCode");
+        }
+        String snapshot = json.write(legacy);
+        var restored = ExpenseReport.restore(json.read(snapshot, ExpenseReport.State.class));
+        assertThat(json.write(restored.state())).isEqualTo(snapshot);
+        assertThat(restored.currentRound().adjustments()).allSatisfy(adjustment ->
+                assertThat(adjustment.lineChanges()).singleElement().satisfies(change -> assertThat(change.reasonCode()).isNull()));
+    }
+
+    @Test
     void concurrentReductionsOnlyAppendOneAdjustmentAndPendingBudgetBlocksAnother() throws Exception {
         var report = fixture(false).report(); enterFinance(report); var input = reductionInput(report, "40", "2"); String path = reductionPath(report);
         var executor = java.util.concurrent.Executors.newFixedThreadPool(2);

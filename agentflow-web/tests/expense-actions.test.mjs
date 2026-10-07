@@ -92,10 +92,10 @@ test('打开确认表单后键盘焦点进入首个输入，取消后不执行�
 test('核减默认保留原金额，填写原因和变化后才发送精确字符串，不修改原始正文', async () => {
   const calls = []; api.reduceExpense = async (...args) => { calls.push(args); return receipt() }; const p = panel()
   try {
-    p.state.prepare('REDUCE'); p.state.comment = '部分无效'; await p.state.execute(); assert.match(p.state.error, /原因/)
+    p.state.prepare('REDUCE'); p.state.comment = '部分无效'; await p.state.execute(); assert.match(p.state.error, /至少减少/)
     p.state.reason = 'INVALID_INVOICE'; await p.state.execute(); assert.match(p.state.error, /至少减少/); assert.equal(calls.length, 0)
     p.state.inputs[0].approvedGross = '25.00'; p.state.inputs[0].approvedTax = '1.25'; await p.state.execute()
-    assert.deepEqual(calls, [['report', 'task', { applicationVersion: 2, financialVersion: 5, comment: '部分无效', reasonCode: 'INVALID_INVOICE', lines: [{ lineNo: 1, approvedGross: '25.00', approvedTax: '1.25' }] }]])
+    assert.deepEqual(calls, [['report', 'task', { applicationVersion: 2, financialVersion: 5, comment: '部分无效', reasonCode: 'INVALID_INVOICE', lines: [{ lineNo: 1, approvedGross: '25.00', approvedTax: '1.25', reasonCode: 'INVALID_INVOICE' }] }]])
     assert.equal(p.props.detail.financialRound.approvedLines[0].gross.value, '100.00')
   } finally { p.close() }
 })

@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.HashMap;
 import java.util.UUID;
 
 /**
@@ -60,7 +61,9 @@ public class ExpenseReductionService {
         String currency = report.currentRound().baseCurrency();
         var lines = input.lines().stream().map(line -> new ExpenseReport.Reduction(line.lineNo(),
                 new Money(line.approvedGross(), currency), new Money(line.approvedTax(), currency))).toList();
-        var adjustment = report.reduce(input.financialVersion(), lines, actor.userId(), input.reasonCode().name(), input.comment(), now);
+        var lineReasons = new HashMap<Integer, String>();
+        for (var line : input.lines()) if (line.reasonCode() != null) lineReasons.put(line.lineNo(), line.reasonCode().name());
+        var adjustment = report.reduce(input.financialVersion(), lines, lineReasons, actor.userId(), input.reasonCode().name(), input.comment(), now);
         changes.persist(new ExpenseReductionResources().plan(before, report, loaded), actor.userId());
         reports.update(report, input.financialVersion(), actor.userId(), "REDUCE");
         // 核减后的预算仍需实际确认，期间通用财务批准守卫会阻止放行。
@@ -87,11 +90,16 @@ public class ExpenseReductionService {
         public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown expense reduction request field"); }
     }
     /**
-     * 客户端只指定已有行及新的含税、可抵扣税额，领域检查精度与减额边界。
+     * 客户端指定已有行的金额与可选原因；省略原因兼容旧请求，领域检查减额边界。
      * @author owlzhangfq@gmail.com
      */
     public record LineInput(@NotNull @Positive Integer lineNo, @NotNull @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = FinanceJsonConfiguration.DecimalAmountDeserializer.class) BigDecimal approvedGross,
-            @NotNull @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = FinanceJsonConfiguration.DecimalAmountDeserializer.class) BigDecimal approvedTax) {
+            @NotNull @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = FinanceJsonConfiguration.DecimalAmountDeserializer.class) BigDecimal approvedTax,
+            Reason reasonCode) {
+        /** 既有样例和内部调用可继续使用统一原因。 */
+        public LineInput(Integer lineNo, BigDecimal approvedGross, BigDecimal approvedTax) {
+            this(lineNo, approvedGross, approvedTax, null);
+        }
         /** 不允许在行内夹带新的票据、分摊或币种。 */
         @com.fasterxml.jackson.annotation.JsonAnySetter
         public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown expense reduction line field"); }
@@ -100,7 +108,16 @@ public class ExpenseReductionService {
      * 核减原因使用有限业务类别，补充文字始终必填；不引入未经配置的比例阈值。
      * @author owlzhangfq@gmail.com
      */
-    public enum Reason { INELIGIBLE_COST, OVER_STANDARD_NOT_ACCEPTED, INVALID_INVOICE, TAX_CORRECTION, OTHER }
+    public enum Reason {
+        INELIGIBLE_COST, OVER_STANDARD_NOT_ACCEPTED, INVALID_INVOICE, TAX_CORRECTION, OTHER;
+
+        /** 原因必须使用公开类别名称，数字序号等隐式转换不能成为业务依据。 */
+        @com.fasterxml.jackson.annotation.JsonCreator(mode = com.fasterxml.jackson.annotation.JsonCreator.Mode.DELEGATING)
+        public static Reason fromJson(com.fasterxml.jackson.databind.JsonNode value) {
+            if (!value.isTextual()) throw new IllegalArgumentException("Expense reduction reason must be a string");
+            return valueOf(value.textValue());
+        }
+    }
 
     /**
      * 幂等结果只保留操作标识与版本，明细差额仍须通过实时财务读取授权。

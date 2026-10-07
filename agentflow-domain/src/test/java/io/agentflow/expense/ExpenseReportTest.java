@@ -177,6 +177,29 @@ class ExpenseReportTest {
     }
 
     @Test
+    void lineReasonsFollowStableNumbersAndUnspecifiedLinesRetainTheCommonReason() {
+        var report = frozen(line(3, "10", "1", "CNY", List.of(), null), line(7, "20", "2", "CNY", List.of(), null));
+        var original = report.currentRound();
+        var adjustment = report.reduce(2, List.of(reduction(7, "15", "1"), reduction(3, "5", "0.5")),
+                Map.of(7, "TAX_CORRECTION"), "finance", "OTHER", "核对各行依据", ADJUSTED);
+        assertThat(adjustment.lineChanges()).extracting(ExpenseAdjustment.LineChange::lineNo).containsExactly(3, 7);
+        assertThat(adjustment.lineChanges()).extracting(ExpenseAdjustment.LineChange::reasonCode).containsExactly("OTHER", "TAX_CORRECTION");
+        assertThat(report.version()).isEqualTo(3); assertThat(report.rounds()).hasSize(1);
+        assertThat(report.currentRound().originalLines()).isEqualTo(original.originalLines());
+        assertThat(original.adjustments()).isEmpty();
+    }
+
+    @Test
+    void invalidOrUnrelatedLineReasonsCannotPartiallyChangeFinancialFacts() {
+        var report = frozen(line(3, "10", "1", "CNY", List.of(), null), line(7, "20", "2", "CNY", List.of(), null));
+        var before = report.state(); var reductions = List.of(reduction(3, "5", "0.5"), reduction(7, "15", "1"));
+        for (var reasons : List.of(Map.of(99, "OTHER"), Map.of(3, "OTHER", 7, ""), Map.of(7, "invalid"), Map.of(7, "A".repeat(65)))) {
+            fails("INVALID_EXPENSE_ADJUSTMENT", () -> report.reduce(2, reductions, reasons, "finance", "OTHER", "核对", ADJUSTED));
+            assertThat(report.state()).isEqualTo(before);
+        }
+    }
+
+    @Test
     void invalidLastLineCannotPartiallyReduceEarlierLinesOrAppendAudit() {
         var first = line(1, "10", "1", "CNY", List.of(), null);
         var second = line(2, "20", "2", "CNY", List.of(), null);

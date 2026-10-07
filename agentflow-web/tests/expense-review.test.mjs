@@ -46,7 +46,7 @@ function mount(Component = Actions, report = detail(), flow = workflow(), initia
   return { props, root, events, taskEvents, returnEvents, executeEvents, instance: () => instance.value, close: () => app.unmount(), failRead(cause) { readFailure = cause },
     button(label) { return nodes(root).find(node => node.tag === 'button' && text(node).trim() === label) },
     async input(label, value) { const node = nodes(root).find(node => node.props['aria-label'] === label); assert.ok(node, label); node.value = value; node.listeners.input({ target: node }); await tick() },
-    async reason(value) { const node = nodes(root).find(node => node.tag === 'select'); for (const option of node.options) option.selected = option.props.value === value; node.listeners.change({ target: node }); await tick() },
+    async reason(value) { const node = nodes(root).find(node => node.props['aria-label'] === '统一填写核减原因'); for (const option of node.options) option.selected = option.props.value === value; node.listeners.change({ target: node }); await tick() },
     async comment(value) { const node = nodes(root).find(node => node.tag === 'textarea'); node.value = value; node.listeners.input({ target: node }); await tick() },
     async open() { this.button('核减费用').props.onClick(); await tick() } }
 }
@@ -66,6 +66,50 @@ test('核减输入即时提示增额与税额越界，未填原因说明不允�
     await p.comment('核对原始票据后减少'); assert.equal(p.button('确认财务核减').props.disabled, false)
     await p.input('第 7 行核减后含税额', '')
     assert.equal(p.button('确认财务核减').props.disabled, true); assert.equal(writes, 0)
+  } finally { p.close() }
+})
+
+test('逐行核减必须各自填写原因，不同原因一次提交且未修改行不要求原因', async () => {
+  const report = detail(), requests = []
+  report.financialRound.approvedLines.push({ lineNo: 11, gross: money('30.00'), tax: money('0.00'), allocations: [] },
+    { lineNo: 19, gross: money('10.00'), tax: money('0.00'), allocations: [] })
+  api.reduceExpense = async (...args) => { requests.push(args); return { reportId: 'report', applicationId: 'app' } }
+  const p = mount(Actions, report)
+  const choose = async (label, value) => {
+    const node = nodes(p.root).find(node => node.tag === 'select' && node.props['aria-label'] === label)
+    assert.ok(node, label)
+    for (const option of node.options) option.selected = option.props.value === value
+    node.listeners.change({ target: node }); await tick()
+  }
+  try {
+    await p.open(); await p.input('第 7 行核减后含税额', '80'); await p.input('第 11 行核减后含税额', '20')
+    await p.comment('逐行核对票据和报销范围')
+    await choose('第 7 行核减原因', 'INVALID_INVOICE')
+    assert.equal(p.button('确认财务核减').props.disabled, true)
+    nodes(p.root).find(node => node.tag === 'form').props.onSubmit({ preventDefault() {} }); await tick()
+    assert.equal(requests.length, 0)
+    await choose('第 11 行核减原因', 'INELIGIBLE_COST')
+    assert.equal(p.button('确认财务核减').props.disabled, false)
+    nodes(p.root).find(node => node.tag === 'form').props.onSubmit({ preventDefault() {} }); await tick()
+    assert.equal(requests.length, 1)
+    assert.equal(requests[0][2].reasonCode, 'OTHER')
+    assert.deepEqual(requests[0][2].lines, [
+      { lineNo: 7, approvedGross: '80', approvedTax: '5.00', reasonCode: 'INVALID_INVOICE' },
+      { lineNo: 11, approvedGross: '20', approvedTax: '0.00', reasonCode: 'INELIGIBLE_COST' }])
+  } finally { p.close() }
+})
+
+test('核减历史逐行显示原因，旧行记录使用原统一原因且不补写历史', async () => {
+  const report = detail(), change = (lineNo, reasonCode) => ({ lineNo, previousGross: money('100'), approvedGross: money('80'), previousTax: money('5'), approvedTax: money('3'), ...(reasonCode ? { reasonCode } : {}) })
+  report.financialRound.adjustments = [{ id: 'adjustment', reasonCode: 'OTHER', comment: '原统一说明', adjustedBy: 'finance', adjustedAt: '2026-10-07T12:00:00Z',
+    lineChanges: [change(7, 'INVALID_INVOICE'), change(11)], offsetChanges: [] }]
+  const p = mount(Detail, report)
+  try {
+    await tick(); await tick()
+    const rows = nodes(p.root).filter(node => node.tag === 'li').map(text)
+    assert.ok(rows.some(row => /第 7 行/.test(row) && /票据不符合要求/.test(row)))
+    assert.ok(rows.some(row => /第 11 行/.test(row) && /其他原因/.test(row)))
+    assert.equal(report.financialRound.adjustments[0].lineChanges[1].reasonCode, undefined)
   } finally { p.close() }
 })
 

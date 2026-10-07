@@ -34,7 +34,7 @@ export interface FrozenExpenseLine {
 export type ReductionReason = 'INELIGIBLE_COST' | 'OVER_STANDARD_NOT_ACCEPTED' | 'INVALID_INVOICE' | 'TAX_CORRECTION' | 'OTHER'
 export interface ExpenseAdjustment {
   id: string; adjustedBy: string; adjustedAt: string; reasonCode: ReductionReason; comment: string
-  lineChanges: Array<{ lineNo: number; previousGross: Money; approvedGross: Money; previousTax: Money; approvedTax: Money }>
+  lineChanges: Array<{ lineNo: number; previousGross: Money; approvedGross: Money; previousTax: Money; approvedTax: Money; reasonCode?: ReductionReason }>
   offsetChanges: Array<{ advanceId: string; previousAmount: Money; amount: Money }>
 }
 export interface FinancialRound {
@@ -53,7 +53,7 @@ export interface ExpenseVersions { applicationVersion: number; financialVersion:
 export interface ExpenseTaskActivity { scopeKey: string; applicationId: string; taskId: string | undefined; applicationVersion: number | undefined; busy: boolean }
 export interface ExpenseReturnRequest { applicationId: string; draft: TaskReturnDraft }
 export interface ExpenseCommand extends ExpenseVersions { comment: string }
-export interface ReductionLine { lineNo: number; approvedGross: string; approvedTax: string }
+export interface ReductionLine { lineNo: number; approvedGross: string; approvedTax: string; reasonCode?: ReductionReason | '' }
 /** 财务任务操作可明确选用直接代理，申请人撤回和作废不接受该依据。 */
 export interface ExpenseTaskCommand extends ExpenseCommand { proxyId?: string }
 export interface ExpenseReduction extends ExpenseTaskCommand { lines: ReductionLine[]; reasonCode: ReductionReason }

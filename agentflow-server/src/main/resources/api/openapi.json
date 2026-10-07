@@ -63737,6 +63737,11 @@
           },
           "approvedTax": {
             "$ref": "#/components/schemas/Money"
+          },
+          "reasonCode": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+            "description": "本次实际采用的逐行原因。旧记录可能缺省，展示时沿用所属核减记录的统一原因；读取不回填历史。"
           }
         },
         "required": [
@@ -65515,6 +65520,20 @@
             "type": "string",
             "pattern": "^(?:0|[1-9][0-9]{0,14})(?:\\.[0-9]{1,2})?$",
             "description": "非负、至多两位小数，响应固定两位。禁止 JSON 浮点数和科学计数法。"
+          },
+          "reasonCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "INELIGIBLE_COST",
+              "OVER_STANDARD_NOT_ACCEPTED",
+              "INVALID_INVOICE",
+              "TAX_CORRECTION",
+              "OTHER"
+            ],
+            "description": "可选逐行核减原因；省略或 null 沿用本次统一原因，旧请求继续有效。"
           }
         },
         "required": [

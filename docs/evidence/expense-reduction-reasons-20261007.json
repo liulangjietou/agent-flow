@@ -1,0 +1,143 @@
+{
+  "recordedAt": "2026-10-07T21:22:34.228828+00:00",
+  "taskId": "U05",
+  "status": "IMPLEMENTED_LOCAL_FIXED_PACKAGE_BROWSER_PENDING",
+  "sourceBaseCommit": "aa5a82dcaf9c067a2dd0df7b28d02b9734ef1f0a",
+  "rootCause": "核减接口、快照和页面只记录整次调整原因，缺少按稳定费用行号保存和展示的字段。",
+  "requirements": [
+    {
+      "documentId": "01",
+      "lines": [
+        119,
+        119
+      ]
+    },
+    {
+      "documentId": "01",
+      "lines": [
+        144,
+        144
+      ]
+    },
+    {
+      "documentId": "05",
+      "lines": [
+        276,
+        281
+      ]
+    }
+  ],
+  "sourceHashes": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseAdjustment.java": "9496c643942273ccf57d19553e80b342eb22473c742b140b6778102dae3126fa",
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseReport.java": "70eeb386730fcfa085875a13212851e294102c67dd7bdc004eaf0d4dfc1897d6",
+    "agentflow-domain/src/test/java/io/agentflow/expense/ExpenseReportTest.java": "83a254de819e5e4b99d3b71bc23ed09b70e35f045ebd3abb88471aa4f069e556",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseReductionService.java": "1f65e7f2a6b9e96b2034adecf361dacd59a53db836ae7e7825f67787fb9d85a6",
+    "agentflow-server/src/main/resources/api/openapi.json": "495e3ce3f80aaf398a2025d517ed7440e21454bfc1c5df2184a604d463740263",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java": "cb5e79109249e5b1def34888b943af61e5fdce82f0974e9e1c1ece01171b5810",
+    "agentflow-web/src/components/ExpenseActions.vue": "444b87f20f2ebfeb16e7ed6449959f32d6e73fc71cf418915c18d9bbd1b0a221",
+    "agentflow-web/src/components/ExpenseDetail.vue": "f7e46cc9d57ec4ba0ba196277d91b1ac0792cd6b5dea39dd87f3e3a1a2868b6e",
+    "agentflow-web/src/expenses.ts": "127ab04d48daf05caa88f9fb0c4a784dc0433566fd6deac61fb0e3d38aad3ad8",
+    "agentflow-web/tests/expense-actions.test.mjs": "1801af94f7a01e63b479e943dbedf79c78c352b7c01c88919387387d965aed66",
+    "agentflow-web/tests/expense-review.test.mjs": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
+    "scripts/check-expense-reduction-reasons.py": "bbfc0e9d8e3b0ae574f0f0cffb9b8524d1018c7abe7049d3c576e2f7aa7d5abe"
+  },
+  "inputManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/u05-input-hashes.json",
+    "sha256": "b3fc44ffb39e51a29b55a06f382c9a3989db87d86e1d35a3749f8e2bc120156e",
+    "files": 2604
+  },
+  "red": {
+    "javaHttp": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/u05-java-red.log",
+      "failed": 1,
+      "expected": 200,
+      "actual": 400
+    },
+    "web": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/u05-web-red.log",
+      "failed": 2
+    }
+  },
+  "java": {
+    "scopedPassed": 411,
+    "newCases": 5,
+    "aggregateUniquePassed": 5316,
+    "fullRerun": false,
+    "evidence": "/fyoung/tmp/agentflow-remaining-20260928/u05-java-aggregate.json",
+    "sha256": "f6b38eea18b5edbb3094688c1b0b05bd431b0af72afab176c4a56c066502868d",
+    "runtime": "Amazon Corretto 17.0.16 arm64"
+  },
+  "web": {
+    "passed": 1514,
+    "failed": 0,
+    "skipped": 0,
+    "fullLog": "/fyoung/tmp/agentflow-remaining-20260928/u05-web-full.log",
+    "sha256": "5beffc27b17a1e932a16ec6d20d782633f503511f321f5b8ff6fdd4f515495be",
+    "typeCheckAndBuild": "PASS"
+  },
+  "openapi": {
+    "status": "PASS",
+    "operations": 396,
+    "schemas": 868,
+    "requestExamples": 129
+  },
+  "fixedPackage": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/u05-server.jar",
+    "sha256": "72c14062217d6ccc0085345656e16357a168011d5f2b86c2ecea5ac1cb0fcddf",
+    "runtimeDirectory": "/fyoung/tmp/agentflow-remaining-20260928/u05-reduction-runtime-b",
+    "runtimeEvidence": {
+      "status": "PASS",
+      "legacyJarSha256": "c3c28f841337d515b95fb09bc8560536ec076986f008a70019320869d5c87ed8",
+      "fixedJarSha256": "72c14062217d6ccc0085345656e16357a168011d5f2b86c2ecea5ac1cb0fcddf",
+      "checkerSha256": "bbfc0e9d8e3b0ae574f0f0cffb9b8524d1018c7abe7049d3c576e2f7aa7d5abe",
+      "sharedCheckerSha256": "38478ee9d7550251985ec8ca08789536ebaaaeb88590048b67cfb9e60baa4734",
+      "upgrade": {
+        "preservedTables": 281,
+        "preservedRows": 413,
+        "newMigrations": 0
+      },
+      "runtimeBoots": 4,
+      "httpRequests": 70,
+      "legacyHistoryUnchanged": true,
+      "explicitLineReasons": [
+        3,
+        7
+      ],
+      "newAdjustmentCount": 1,
+      "newBudgetCommandCount": 1,
+      "forceRestartPreservedFacts": true,
+      "replayBeforeAndAfterRestart": true,
+      "modelRequests": 0,
+      "browserRun": false,
+      "postgresRun": false,
+      "realEnterpriseServices": false
+    }
+  },
+  "compatibility": [
+    "旧请求省略或传空的逐行原因沿用统一原因。",
+    "旧快照没有字段时不回填，升级逐表逐列摘要保持不变。",
+    "共享金额 Reduction 值对象未改变，金额与原因一次事务提交，金融和审批版本各递增一次。",
+    "混合原因在请求顶层归类 OTHER，逐行真实原因完整保存；未变金额行不进入请求。"
+  ],
+  "review": {
+    "method": "manual call-chain, diff, authorization, serialization and replay review",
+    "findings": []
+  },
+  "retainedFailures": [
+    "第一次旧包运行夹具把业务审批和独立复核设为同人，职责隔离正确拒绝；修正合成审批人配置后重跑，没有改变产品权限规则。",
+    "首次范围编译使用 JDK 17.0.1，编译器内部 NullPointerException；改用本机 17.0.16 后通过，没有为此改变业务代码。",
+    "旧页面测试预期先提示统一原因；按新契约改为先提示没有金额变化，并补齐逐行原因载荷断言。",
+    "一次前端范围命令在仓库根目录误执行，未运行测试，随后从前端目录执行。"
+  ],
+  "archive": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/u05-reduction-reasons-verified-20261007",
+    "manifestSha256": "63da6918b8f03198cdf0c048fc6d2f62bf80b5855c522345180433ee4bab14e1",
+    "files": 52
+  },
+  "remaining": [
+    "真实浏览器、键盘、触屏和辅助设备验收",
+    "V02 的 PostgreSQL 与最终目标环境门禁",
+    "V03 余下规范逐项核对",
+    "E15 远端 PR/CI 交付"
+  ]
+}

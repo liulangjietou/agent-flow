@@ -85,17 +85,26 @@ public final class ExpenseReport {
     /** 只允许减额，先验证全部行再替换整个轮次，失败不能留下半次核减。 */
     public ExpenseAdjustment reduce(long expectedVersion, List<Reduction> reductions, String adjustedBy,
                                      String reasonCode, String comment, Instant at) {
+        return reduce(expectedVersion, reductions, Map.of(), adjustedBy, reasonCode, comment, at);
+    }
+
+    /** 按稳定行号记录原因；旧请求未逐行指定时沿用统一原因，仍只替换一次轮次快照。 */
+    public ExpenseAdjustment reduce(long expectedVersion, List<Reduction> reductions, Map<Integer, String> lineReasons,
+                                     String adjustedBy, String reasonCode, String comment, Instant at) {
         requireVersion(expectedVersion);
         var round = requireFrozenRound();
         String actor = actor(adjustedBy, 128);
         requireTime(at, latestEvent(round));
-        if (reasonCode == null || !reasonCode.matches("[A-Z][A-Z0-9_]{0,63}") || StringUtils.isBlank(comment) || comment.length() > 2000
+        if (!validAdjustmentReason(reasonCode) || lineReasons == null || StringUtils.isBlank(comment) || comment.length() > 2000
                 || CollectionUtils.isEmpty(reductions) || reductions.size() > ExpenseContent.MAX_LINES) {
             throw new DomainException("INVALID_EXPENSE_ADJUSTMENT", "A bounded reduction list, reason code and comment are required");
         }
         var requested = new HashMap<Integer, Reduction>();
         for (var reduction : reductions) {
             if (reduction == null || requested.put(reduction.lineNo(), reduction) != null) throw invalidReduction();
+        }
+        if (!requested.keySet().containsAll(lineReasons.keySet()) || lineReasons.values().stream().anyMatch(reason -> !validAdjustmentReason(reason))) {
+            throw new DomainException("INVALID_EXPENSE_ADJUSTMENT", "Line reasons must belong to requested reductions and use valid reason codes");
         }
         var approved = new ArrayList<ExpenseRound.ApprovedLine>();
         var changes = new ArrayList<ExpenseAdjustment.LineChange>();
@@ -105,7 +114,8 @@ public final class ExpenseReport {
             if (reduction == null) { approved.add(before); continue; }
             validateReduction(before, reduction);
             if (before.gross().compareTo(reduction.approvedGross()) != 0 || before.tax().compareTo(reduction.approvedTax()) != 0) {
-                changes.add(new ExpenseAdjustment.LineChange(before.lineNo(), before.gross(), reduction.approvedGross(), before.tax(), reduction.approvedTax()));
+                changes.add(new ExpenseAdjustment.LineChange(before.lineNo(), before.gross(), reduction.approvedGross(), before.tax(), reduction.approvedTax(),
+                        lineReasons.getOrDefault(before.lineNo(), reasonCode)));
             }
             approved.add(new ExpenseRound.ApprovedLine(before.lineNo(), reduction.approvedGross(), reduction.approvedTax(),
                     CostAllocation.apportion(round.originalLines().get(index).original().allocations(), reduction.approvedGross())));
@@ -131,6 +141,10 @@ public final class ExpenseReport {
                 round.content(), round.baseCurrency(), round.account(), round.originalLines(), approved, offsets, audit));
         rounds = List.copyOf(updated); version++;
         return adjustment;
+    }
+
+    private static boolean validAdjustmentReason(String value) {
+        return value != null && value.matches("[A-Z][A-Z0-9_]{0,63}");
     }
 
     private static ExpenseRound.FrozenLine freezeLine(ExpenseLine line, ExpenseAssessment fact, String baseCurrency) {

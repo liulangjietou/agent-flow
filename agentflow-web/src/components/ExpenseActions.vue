@@ -2,7 +2,7 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { selectedApprovalProxy } from '../taskActions'
-import { changedReductions, expenseError, moneyLabel, previewReduction, reductionReasons, type ExpenseDetail, type ExpenseWorkflow, type ExpenseReductionPreview, type ExpenseReturnRequest, type ReductionLine, type ReductionReason } from '../expenses'
+import { expenseError, moneyLabel, previewReduction, reductionReasons, type ExpenseDetail, type ExpenseWorkflow, type ExpenseReductionPreview, type ExpenseReturnRequest, type ReductionLine, type ReductionReason } from '../expenses'
 
 const props = defineProps<{ detail: ExpenseDetail; workflow: ExpenseWorkflow; scopeKey: string; locked?: boolean }>()
 const emit = defineEmits<{ changed: []; busy: [value: boolean]; refresh: []; preview: [value: ExpenseReductionPreview | null]; returnMissing: [value: ExpenseReturnRequest] }>()
@@ -30,7 +30,13 @@ const reduction = computed(() => {
     return { preview, issue: preview.lines.length ? '' : '请至少减少一行的含税额或可抵扣税额。' }
   } catch (cause) { return { preview: null, issue: (cause as Error).message } }
 })
-const reductionIssue = computed(() => reduction.value.issue || (!reason.value ? '请选择核减原因。' : !comment.value.trim() ? '请填写本次操作说明。' : ''))
+const reductionIssue = computed(() => {
+  if (reduction.value.issue) return reduction.value.issue
+  const missing = reduction.value.preview?.lines.find(line => !line.reasonCode)
+  return missing ? `请选择第 ${missing.lineNo} 行的核减原因。` : !comment.value.trim() ? '请填写本次操作说明。' : ''
+})
+// 统一填写只是逐行选择的快捷方式，随后允许单独更改任意行。
+watch(reason, value => { if (value) for (const line of inputs.value) line.reasonCode = value }, { flush: 'sync' })
 watch(() => reduction.value.preview, value => emit('preview', value), { flush: 'sync' })
 // 打开确认表单即锁住同一任务的审批，表单自己的保存与取消仍由 blocked 控制。
 watch(() => pending.value !== null || saving.value || requiresRefresh.value, value => emit('busy', value), { flush: 'sync' })
@@ -44,7 +50,7 @@ function prepare(action: Action) {
   if (blocked.value || !allowed.value[action]) return
   reset(); pending.value = action
   if ((action === 'RECEIVE' || action === 'REDUCE') && props.workflow.task?.canActDirectly === false && proxyOptions.value.length === 1) selectedProxy.value = proxyOptions.value[0].proxyId
-  if (action === 'REDUCE') inputs.value = props.detail.financialRound!.approvedLines.map(line => ({ lineNo: line.lineNo, approvedGross: line.gross.value, approvedTax: line.tax.value }))
+  if (action === 'REDUCE') inputs.value = props.detail.financialRound!.approvedLines.map(line => ({ lineNo: line.lineNo, approvedGross: line.gross.value, approvedTax: line.tax.value, reasonCode: '' }))
   const generation = epoch
   void nextTick(() => { if (generation === epoch && pending.value === action) formElement.value?.querySelector<HTMLElement>('select, input, textarea')?.focus() })
 }
@@ -64,12 +70,12 @@ async function execute() {
   error.value = ''
   if (action === 'RECEIVE' && missingOriginals.value.length) { error.value = '请逐项确认收到的纸质材料；存在缺失时请退回补齐。'; return }
   if (!comment.value.trim()) { error.value = '请填写本次操作说明。'; return }
-  if (action === 'REDUCE' && !reason.value) { error.value = '请选择核减原因。'; return }
   let lines: ReductionLine[] = []
   if (action === 'REDUCE') {
-    try { lines = changedReductions(props.detail.financialRound!.approvedLines, inputs.value) }
-    catch (cause) { error.value = (cause as Error).message; return }
+    if (reductionIssue.value) { error.value = reductionIssue.value; return }
+    lines = reduction.value.preview!.lines
   }
+  const reasonCode = new Set(lines.map(line => line.reasonCode)).size === 1 ? lines[0]!.reasonCode as ReductionReason : 'OTHER'
   const generation = epoch, id = props.detail.id, taskId = props.workflow.task?.taskId
   let proxyId: string | undefined
   if (action === 'RECEIVE' || action === 'REDUCE') {
@@ -81,7 +87,7 @@ async function execute() {
   saving.value = true
   try {
     const result = action === 'RECEIVE' ? await api.receiveExpense(id, taskId!, input)
-      : action === 'REDUCE' ? await api.reduceExpense(id, taskId!, { ...input, reasonCode: reason.value as ReductionReason, lines })
+      : action === 'REDUCE' ? await api.reduceExpense(id, taskId!, { ...input, reasonCode, lines })
       : action === 'WITHDRAW' ? await api.withdrawExpense(id, input) : await api.cancelExpense(id, input)
     if (generation !== epoch) return
     if (result.reportId !== id || result.applicationId !== props.detail.applicationId) throw new Error('Expense receipt mismatch')
@@ -125,14 +131,15 @@ async function execute() {
       <template v-if="pending === 'REDUCE'">
         <p>只填写核减后的金额。原始提交内容保留；借款抵扣随总额减少，预算调整确认前不能批准本节点。</p>
         <div class="reduction-table" role="group" aria-label="核减后金额">
-          <div class="reduction-head"><span>费用行 / 当前核定</span><span>核减后含税额</span><span>核减后可抵扣税额</span></div>
+          <div class="reduction-head"><span>费用行 / 当前核定</span><span>核减后含税额</span><span>核减后可抵扣税额</span><span>本行核减原因</span></div>
           <div v-for="(line, index) in inputs" :key="line.lineNo" class="reduction-row">
             <div><strong>第 {{ line.lineNo }} 行</strong><small>{{ moneyLabel(detail.financialRound!.approvedLines[index]!.gross) }}</small></div>
             <label><span class="mobile-label">核减后含税额</span><input v-model="line.approvedGross" :aria-label="`第 ${line.lineNo} 行核减后含税额`" inputmode="decimal" autocomplete="off" maxlength="18" :disabled="blocked" required /></label>
             <label><span class="mobile-label">核减后可抵扣税额</span><input v-model="line.approvedTax" :aria-label="`第 ${line.lineNo} 行核减后可抵扣税额`" inputmode="decimal" autocomplete="off" maxlength="18" :disabled="blocked" required /></label>
+            <label><span class="mobile-label">本行核减原因</span><select v-model="line.reasonCode" :aria-label="`第 ${line.lineNo} 行核减原因`" :disabled="blocked"><option value="" disabled>请选择原因</option><option v-for="(text, value) in reductionReasons" :key="value" :value="value">{{ text }}</option></select></label>
           </div>
         </div>
-        <label>核减原因<select v-model="reason" :disabled="blocked" required><option value="" disabled>请选择原因</option><option v-for="(text, value) in reductionReasons" :key="value" :value="value">{{ text }}</option></select></label>
+        <label>统一填写原因（可逐行调整）<select v-model="reason" aria-label="统一填写核减原因" :disabled="blocked"><option value="" disabled>可选：为各行统一填写</option><option v-for="(text, value) in reductionReasons" :key="value" :value="value">{{ text }}</option></select></label>
         <div v-if="reduction.preview" class="reduction-preview" aria-label="尚未保存的核减预览" aria-live="polite">
           <strong>核减预览 · 尚未保存</strong>
           <dl><div><dt>原申报总额</dt><dd>{{ moneyLabel(reduction.preview.original) }}</dd></div><div><dt>核减后核定</dt><dd>{{ moneyLabel(reduction.preview.gross) }}</dd></div><div><dt>借款冲销</dt><dd>{{ moneyLabel(reduction.preview.offset) }}</dd></div><div><dt>应付余额</dt><dd>{{ moneyLabel(reduction.preview.payable) }}</dd></div></dl>
@@ -150,5 +157,5 @@ async function execute() {
 <style scoped>
 .receipt-checklist{margin:14px 0;padding:8px 14px;border:1px solid var(--line);border-radius:8px}.receipt-checklist legend{font-size:12px}.expense-actions .receipt-checklist label{display:flex;align-items:center;gap:10px}.receipt-checklist input{flex-shrink:0;width:16px;height:16px}
 .reduction-preview{padding:14px;border:1px solid var(--line);border-radius:8px}.reduction-preview>strong{font-size:12px}.reduction-preview dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:12px 0}.reduction-preview dt{font-size:11px;color:var(--muted)}.reduction-preview dd{margin:6px 0 0;font:12px 'DM Mono',monospace;overflow-wrap:anywhere}
-.expense-actions{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}.action-row{display:flex;gap:10px;flex-wrap:wrap}.expense-actions h4{font-size:15px;margin:0 0 10px}.expense-actions p{font-size:12px;line-height:1.8;color:var(--muted)}.expense-actions .expense-error{color:var(--red);background:#fff0ed;padding:12px;border-radius:8px}.expense-actions form{background:var(--paper);padding:18px;border-radius:12px}.expense-actions label{display:grid;gap:8px;margin:14px 0;font-size:12px}.expense-actions textarea{font:inherit;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:10px;max-width:100%}.expense-actions textarea:focus-visible{outline:3px solid var(--teal);outline-offset:2px}.reduction-head,.reduction-row{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px;align-items:center}.reduction-head{font-size:11px;color:var(--muted);padding:10px 0;border-bottom:1px solid var(--line)}.reduction-row{border-bottom:1px solid var(--line);padding:10px 0}.reduction-row small{display:block;font:10px 'DM Mono',monospace;margin-top:5px;overflow-wrap:anywhere}.reduction-row strong{font-size:12px}.reduction-row label{margin:0;min-width:0}.reduction-row input{width:100%;min-width:0;font:12px 'DM Mono',monospace}.mobile-label{display:none}@media(max-width:600px){.reduction-head{display:none}.reduction-row{grid-template-columns:1fr 1fr}.reduction-row>div{grid-column:1/-1}.mobile-label{display:block;font-size:10px}.expense-actions form{padding:12px}}
+.expense-actions{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}.action-row{display:flex;gap:10px;flex-wrap:wrap}.expense-actions h4{font-size:15px;margin:0 0 10px}.expense-actions p{font-size:12px;line-height:1.8;color:var(--muted)}.expense-actions .expense-error{color:var(--red);background:#fff0ed;padding:12px;border-radius:8px}.expense-actions form{background:var(--paper);padding:18px;border-radius:12px}.expense-actions label{display:grid;gap:8px;margin:14px 0;font-size:12px}.expense-actions textarea{font:inherit;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:10px;max-width:100%}.expense-actions textarea:focus-visible{outline:3px solid var(--teal);outline-offset:2px}.reduction-head,.reduction-row{display:grid;grid-template-columns:1.2fr 1fr 1fr 1.4fr;gap:12px;align-items:center}.reduction-head{font-size:11px;color:var(--muted);padding:10px 0;border-bottom:1px solid var(--line)}.reduction-row{border-bottom:1px solid var(--line);padding:10px 0}.reduction-row small{display:block;font:10px 'DM Mono',monospace;margin-top:5px;overflow-wrap:anywhere}.reduction-row strong{font-size:12px}.reduction-row label{margin:0;min-width:0}.reduction-row select{width:100%;min-width:0;font-size:12px}.reduction-row input{width:100%;min-width:0;font:12px 'DM Mono',monospace}.mobile-label{display:none}@media(max-width:600px){.reduction-head{display:none}.reduction-row{grid-template-columns:1fr 1fr}.reduction-row>div{grid-column:1/-1}.mobile-label{display:block;font-size:10px}.expense-actions form{padding:12px}}
 </style>
