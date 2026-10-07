@@ -88,7 +88,7 @@ agentflow:
 
 logging:
   pattern:
-    level: "%5p traceId=%X{traceId:-} tenantId=%X{tenantId:-}"
+    level: "%5p traceId=%X{traceId:-} tenantId=%X{tenantId:-} businessNo=%X{businessNo:-} processInstanceId=%X{processInstanceId:-} taskId=%X{taskId:-}"
 
 management:
   prometheus:

@@ -16,7 +16,7 @@ public interface ApplicationAuditPort {
      * 申请生命周期操作，不承载表单原文。
      * @author owlzhangfq@gmail.com
      */
-    record ApplicationOperation(String tenantId, UUID applicationId, long aggregateVersion, int roundNo,
+    record ApplicationOperation(String tenantId, String businessNo, UUID applicationId, long aggregateVersion, int roundNo,
                                 String processInstanceId, String actor, Action action,
                                 ApplicationStatus previousStatus, ApplicationStatus currentStatus,
                                 String comment) { }

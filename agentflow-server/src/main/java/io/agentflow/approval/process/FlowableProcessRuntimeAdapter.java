@@ -1,6 +1,7 @@
 package io.agentflow.approval.process;
 
 import io.agentflow.approval.model.SubmissionRisk;
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.event.EventContractBindings;
 import io.agentflow.approval.service.ProcessRuntimePort;
 import io.agentflow.common.DomainException;
@@ -83,51 +84,53 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     @Transactional
     public StartedProcess start(StartProcessCommand command) {
         ProcessDefinition definition = boundDefinition(command.definitionBinding());
-        var risk = SubmissionRisk.unassessed();
-        var selected = FormAssigneeBindings.Snapshot.EMPTY;
-        ExpenseSelfApprovalSnapshot expenseSelection = null;
-        ExpenseSplitRoutingSnapshot splitRouting = null;
-        // 首提和重提均检查已绑定版本；先确认引擎来源，避免误停同名内置流程。
-        if (command.tenantId().equals(definition.getTenantId())) {
-            var published = platformDefinitions.lockPublished(command.tenantId(), command.processKey(), command.definitionVersion()).orElse(null);
-            if (published != null) {
-                published.requireStartEnabled();
-                eventContracts.requireAvailable(command.tenantId(), published.graph());
-                serviceTasks.requireReady(command.tenantId(), published.graph(), published.formSchema(), command.payload() == null ? Map.of() : command.payload());
-                // 任职要求只取实际绑定的租户定义，同名新定义不能改变内置申请或旧轮次来源。
-                if (command.initiatorContext() == null && initiatorRequirements.required(command.tenantId(), published.graph())) {
-                    throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");
+        try (var scope = DiagnosticContext.forBusiness(command.tenantId(), command.businessNo(), null, null).open()) {
+            var risk = SubmissionRisk.unassessed();
+            var selected = FormAssigneeBindings.Snapshot.EMPTY;
+            ExpenseSelfApprovalSnapshot expenseSelection = null;
+            ExpenseSplitRoutingSnapshot splitRouting = null;
+            // 首提和重提均检查已绑定版本；先确认引擎来源，避免误停同名内置流程。
+            if (command.tenantId().equals(definition.getTenantId())) {
+                var published = platformDefinitions.lockPublished(command.tenantId(), command.processKey(), command.definitionVersion()).orElse(null);
+                if (published != null) {
+                    published.requireStartEnabled();
+                    eventContracts.requireAvailable(command.tenantId(), published.graph());
+                    serviceTasks.requireReady(command.tenantId(), published.graph(), published.formSchema(), command.payload() == null ? Map.of() : command.payload());
+                    // 任职要求只取实际绑定的租户定义，同名新定义不能改变内置申请或旧轮次来源。
+                    if (command.initiatorContext() == null && initiatorRequirements.required(command.tenantId(), published.graph())) {
+                        throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");
+                    }
+                    if (published.graph().riskPolicy() != null) {
+                        risk = published.graph().riskPolicy().assess(published.id(), published.version(), published.formSchema(),
+                                published.graph().conditionLanguageVersion(), command.payload());
+                    }
+                    selected = formAssignees.freeze(command.tenantId(), published.graph(), command.payload());
+                    expenseSelection = expenseSelfApproval.freeze(command, published, definition.getId(), selected);
+                    splitRouting = expenseSplitRouting.require(command, published);
                 }
-                if (published.graph().riskPolicy() != null) {
-                    risk = published.graph().riskPolicy().assess(published.id(), published.version(), published.formSchema(),
-                            published.graph().conditionLanguageVersion(), command.payload());
-                }
-                selected = formAssignees.freeze(command.tenantId(), published.graph(), command.payload());
-                expenseSelection = expenseSelfApproval.freeze(command, published, definition.getId(), selected);
-                splitRouting = expenseSplitRouting.require(command, published);
             }
+            Map<String, Object> variables = new HashMap<>();
+            variables.put("tenantId", command.tenantId());
+            variables.put("applicationId", command.applicationId().toString());
+            variables.put("businessNo", command.businessNo());
+            variables.put("roundNo", command.roundNo());
+            if (command.initiatorContext() != null) variables.put(INITIATOR_CONTEXT, json.write(command.initiatorContext()));
+            if (!selected.nodes().isEmpty()) variables.put(FORM_ASSIGNEES, json.write(selected));
+            if (expenseSelection != null) variables.put(ExpenseSelfApprovalBindings.VARIABLE, json.write(expenseSelection));
+            var splitVariables = ExpenseSplitRoutingBindings.variables(splitRouting, definition.getId());
+            if (!splitVariables.isEmpty()) variables.put(ExpenseSplitRoutingBindings.VARIABLE, splitVariables);
+            // 表单的显式 null 需要原样交给引擎，不能因不可变拷贝丢失清空语义。
+            variables.put("formData", command.payload() == null ? Map.of()
+                    : Collections.unmodifiableMap(new HashMap<>(command.payload())));
+            if (command.formSchema() != null) variables.put("formFieldTypes", command.formSchema().fieldTypes());
+            org.flowable.engine.runtime.ProcessInstance instance = runtimeService
+                    .createProcessInstanceBuilder().processDefinitionId(definition.getId())
+                    .businessKey(command.businessNo()).tenantId(command.tenantId()).variables(variables).start();
+            // 会签会同时产生多张待办；兼容端口只提供首个标识，不把它作为全部运行任务。
+            List<Task> firstTasks = taskService.createTaskQuery().processInstanceId(instance.getId())
+                    .orderByTaskCreateTime().asc().orderByTaskId().asc().listPage(0, 1);
+            return new StartedProcess(instance.getId(), firstTasks.isEmpty() ? null : firstTasks.get(0).getId(), risk);
         }
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("tenantId", command.tenantId());
-        variables.put("applicationId", command.applicationId().toString());
-        variables.put("businessNo", command.businessNo());
-        variables.put("roundNo", command.roundNo());
-        if (command.initiatorContext() != null) variables.put(INITIATOR_CONTEXT, json.write(command.initiatorContext()));
-        if (!selected.nodes().isEmpty()) variables.put(FORM_ASSIGNEES, json.write(selected));
-        if (expenseSelection != null) variables.put(ExpenseSelfApprovalBindings.VARIABLE, json.write(expenseSelection));
-        var splitVariables = ExpenseSplitRoutingBindings.variables(splitRouting, definition.getId());
-        if (!splitVariables.isEmpty()) variables.put(ExpenseSplitRoutingBindings.VARIABLE, splitVariables);
-        // 表单的显式 null 需要原样交给引擎，不能因不可变拷贝丢失清空语义。
-        variables.put("formData", command.payload() == null ? Map.of()
-                : Collections.unmodifiableMap(new HashMap<>(command.payload())));
-        if (command.formSchema() != null) variables.put("formFieldTypes", command.formSchema().fieldTypes());
-        org.flowable.engine.runtime.ProcessInstance instance = runtimeService
-                .createProcessInstanceBuilder().processDefinitionId(definition.getId())
-                .businessKey(command.businessNo()).tenantId(command.tenantId()).variables(variables).start();
-        // 会签会同时产生多张待办；兼容端口只提供首个标识，不把它作为全部运行任务。
-        List<Task> firstTasks = taskService.createTaskQuery().processInstanceId(instance.getId())
-                .orderByTaskCreateTime().asc().orderByTaskId().asc().listPage(0, 1);
-        return new StartedProcess(instance.getId(), firstTasks.isEmpty() ? null : firstTasks.get(0).getId(), risk);
     }
 
     /** 路由更新复查唯一活跃实例和实际轮次，保留原任务与历史提交快照。 */
@@ -209,16 +212,20 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     @Override
     @Transactional
     public CompletedTask complete(CompleteTaskCommand command) {
-        Task task = taskService.createTaskQuery().taskId(command.taskId()).singleResult();
+        Task task = taskService.createTaskQuery().taskId(command.taskId()).includeProcessVariables().singleResult();
         if (task == null) {
             throw new DomainException("NOT_FOUND", "Task not found");
         }
-        if (command.comment() != null && !command.comment().isBlank()) {
-            taskService.addComment(task.getId(), task.getProcessInstanceId(), command.comment());
+        Object businessNo = task.getProcessVariables().get("businessNo");
+        try (var scope = DiagnosticContext.forBusiness(command.tenantId(), businessNo instanceof String value ? value : null,
+                task.getProcessInstanceId(), task.getId()).open()) {
+            if (command.comment() != null && !command.comment().isBlank()) {
+                taskService.addComment(task.getId(), task.getProcessInstanceId(), command.comment());
+            }
+            taskService.complete(task.getId(), Map.of("lastAction", command.action()));
+            boolean ended = runtimeService.createProcessInstanceQuery().processInstanceId(task.getProcessInstanceId()).singleResult() == null;
+            return new CompletedTask(task.getId(), ended);
         }
-        taskService.complete(task.getId(), Map.of("lastAction", command.action()));
-        boolean ended = runtimeService.createProcessInstanceQuery().processInstanceId(task.getProcessInstanceId()).singleResult() == null;
-        return new CompletedTask(task.getId(), ended);
     }
 
     @Override

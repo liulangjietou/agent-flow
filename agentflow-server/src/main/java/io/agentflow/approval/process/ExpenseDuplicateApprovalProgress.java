@@ -78,7 +78,7 @@ public class ExpenseDuplicateApprovalProgress {
                 application.recordTaskAction(application.version());
                 if (task.getAssignee() == null) tasks.claim(task.getId(), subject);
                 tasks.complete(task.getId(), Map.of("lastAction", ExpenseDuplicateApprovalPolicy.ACTION));
-                audit.record(new TaskAuditPort.TaskOperation(application.tenantId(), task.getId(), application.id(), application.version(),
+                audit.record(new TaskAuditPort.TaskOperation(application.tenantId(), application.businessNo(), task.getId(), application.id(), application.version(),
                         application.roundNo(), instanceId, ACTOR, ExpenseDuplicateApprovalPolicy.ACTION, reason, subject,
                         task.getTaskDefinitionKey(), task.getName(), application.status(), application.status(), null, null, proof));
                 advanced = true; break;

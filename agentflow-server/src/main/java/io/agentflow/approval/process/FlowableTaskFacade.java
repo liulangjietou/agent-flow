@@ -1,6 +1,7 @@
 package io.agentflow.approval.process;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.TaskAction;
 import io.agentflow.approval.model.TaskDelegation;
@@ -177,104 +178,107 @@ public class FlowableTaskFacade {
         TaskAction normalized = TaskAction.parse(action);
         var authorized = authorization.requireAction(taskId, actor, normalized, proxyId);
         task = authorized.task();
-        var proxyUse = authorized.proxyUse();
-        ApplicationStatus previousStatus = application.status();
-        delegation(task).requireAction(normalized);
-        CountersignProgress countersign = countersign(task);
-        if (countersign != null) countersign.requireAction(normalized);
-        var previousTaskIds = normalized == TaskAction.APPROVE ? notifications.pendingTaskIds(application) : java.util.Set.<String>of();
-        var stoppedAudience = normalized == TaskAction.RETURN || normalized == TaskAction.REJECT
-                ? notifications.unfinishedAudience(application) : java.util.List.<io.agentflow.notification.TaskAudiencePort.Audience>of();
-        var closedAudience = normalized == TaskAction.APPROVE && countersign != null
-                && countersign.mode() != io.agentflow.definition.DefinitionModels.ApprovalMode.ALL
-                ? notifications.beforeCountersignCompletion(application, taskService.createTaskQuery()
-                    .processInstanceId(task.getProcessInstanceId()).taskDefinitionKey(task.getTaskDefinitionKey()).active().list().stream()
-                    .map(Task::getId).filter(id -> !id.equals(taskId)).collect(java.util.stream.Collectors.toSet()))
-                : java.util.List.<io.agentflow.notification.TaskAudiencePort.Audience>of();
-        String auditEventId;
-        switch (normalized) {
-            case CLAIM -> {
-                taskService.claim(taskId, actor.userId());
-                application.recordTaskAction(expectedVersion);
-                applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
-            }
-            case RELEASE -> {
-                requireAssignee(task, actor);
-                taskService.unclaim(taskId);
-                application.recordTaskAction(expectedVersion);
-                applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
-            }
-            case TRANSFER -> {
-                requireTarget(actor, targetUser);
-                authorization.requireTargetAllowed(task, targetUser);
-                // 转交后原委派关系结束，不能让下一次委派沿用陈旧的 owner。
-                task.setOwner(null);
-                task.setDelegationState(null);
-                task.setAssignee(targetUser);
-                taskService.saveTask(task);
-                application.recordTaskAction(expectedVersion);
-                applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, targetUser, previousStatus, proxyUse);
-            }
-            case DELEGATE -> {
-                requireTarget(actor, targetUser);
-                authorization.requireTargetAllowed(task, targetUser);
-                // 候选组任务还没有 assignee，显式记录实际发起委派的责任人。
-                taskService.setOwner(taskId, actor.userId());
-                taskService.delegateTask(taskId, targetUser);
-                application.recordTaskAction(expectedVersion);
-                applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, targetUser, previousStatus, proxyUse);
-            }
-            case RESOLVE -> {
-                requireComment(comment);
-                application.recordTaskAction(expectedVersion);
-                taskService.addComment(taskId, task.getProcessInstanceId(), comment);
-                taskService.resolveTask(taskId);
-                applicationRepository.update(application, expectedVersion);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, task.getOwner(), previousStatus, proxyUse);
-            }
-            case REJECT, RETURN -> {
-                requireComment(comment);
-                var stopping = subprocessStops.before(application);
-                if (normalized == TaskAction.RETURN) {
-                    application.returnToApplicant(expectedVersion);
-                } else {
-                    application.reject(expectedVersion);
+        try (var trace = DiagnosticContext.forBusiness(application.tenantId(), application.businessNo(),
+                task.getProcessInstanceId(), task.getId()).open()) {
+            var proxyUse = authorized.proxyUse();
+            ApplicationStatus previousStatus = application.status();
+            delegation(task).requireAction(normalized);
+            CountersignProgress countersign = countersign(task);
+            if (countersign != null) countersign.requireAction(normalized);
+            var previousTaskIds = normalized == TaskAction.APPROVE ? notifications.pendingTaskIds(application) : java.util.Set.<String>of();
+            var stoppedAudience = normalized == TaskAction.RETURN || normalized == TaskAction.REJECT
+                    ? notifications.unfinishedAudience(application) : java.util.List.<io.agentflow.notification.TaskAudiencePort.Audience>of();
+            var closedAudience = normalized == TaskAction.APPROVE && countersign != null
+                    && countersign.mode() != io.agentflow.definition.DefinitionModels.ApprovalMode.ALL
+                    ? notifications.beforeCountersignCompletion(application, taskService.createTaskQuery()
+                        .processInstanceId(task.getProcessInstanceId()).taskDefinitionKey(task.getTaskDefinitionKey()).active().list().stream()
+                        .map(Task::getId).filter(id -> !id.equals(taskId)).collect(java.util.stream.Collectors.toSet()))
+                    : java.util.List.<io.agentflow.notification.TaskAudiencePort.Audience>of();
+            String auditEventId;
+            switch (normalized) {
+                case CLAIM -> {
+                    taskService.claim(taskId, actor.userId());
+                    application.recordTaskAction(expectedVersion);
+                    applicationRepository.update(application, expectedVersion);
+                    auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
                 }
-                recordDecisionAssignee(task, actor, proxyUse);
-                taskService.addComment(task.getId(), task.getProcessInstanceId(), comment);
-                processRuntime.terminate(new ProcessRuntimePort.TerminateProcessCommand(
-                        actor.tenantId(), stopping.instanceToStop(task.getProcessInstanceId()), normalized + " by " + actor.userId()));
-                applicationRepository.update(application, expectedVersion);
-                completeRound(task, application, actor, comment);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
-                subprocessStops.after(stopping, application, actor.userId());
+                case RELEASE -> {
+                    requireAssignee(task, actor);
+                    taskService.unclaim(taskId);
+                    application.recordTaskAction(expectedVersion);
+                    applicationRepository.update(application, expectedVersion);
+                    auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
+                }
+                case TRANSFER -> {
+                    requireTarget(actor, targetUser);
+                    authorization.requireTargetAllowed(task, targetUser);
+                    // 转交后原委派关系结束，不能让下一次委派沿用陈旧的 owner。
+                    task.setOwner(null);
+                    task.setDelegationState(null);
+                    task.setAssignee(targetUser);
+                    taskService.saveTask(task);
+                    application.recordTaskAction(expectedVersion);
+                    applicationRepository.update(application, expectedVersion);
+                    auditEventId = audit(task, application, actor, normalized.name(), comment, targetUser, previousStatus, proxyUse);
+                }
+                case DELEGATE -> {
+                    requireTarget(actor, targetUser);
+                    authorization.requireTargetAllowed(task, targetUser);
+                    // 候选组任务还没有 assignee，显式记录实际发起委派的责任人。
+                    taskService.setOwner(taskId, actor.userId());
+                    taskService.delegateTask(taskId, targetUser);
+                    application.recordTaskAction(expectedVersion);
+                    applicationRepository.update(application, expectedVersion);
+                    auditEventId = audit(task, application, actor, normalized.name(), comment, targetUser, previousStatus, proxyUse);
+                }
+                case RESOLVE -> {
+                    requireComment(comment);
+                    application.recordTaskAction(expectedVersion);
+                    taskService.addComment(taskId, task.getProcessInstanceId(), comment);
+                    taskService.resolveTask(taskId);
+                    applicationRepository.update(application, expectedVersion);
+                    auditEventId = audit(task, application, actor, normalized.name(), comment, task.getOwner(), previousStatus, proxyUse);
+                }
+                case REJECT, RETURN -> {
+                    requireComment(comment);
+                    var stopping = subprocessStops.before(application);
+                    if (normalized == TaskAction.RETURN) {
+                        application.returnToApplicant(expectedVersion);
+                    } else {
+                        application.reject(expectedVersion);
+                    }
+                    recordDecisionAssignee(task, actor, proxyUse);
+                    taskService.addComment(task.getId(), task.getProcessInstanceId(), comment);
+                    processRuntime.terminate(new ProcessRuntimePort.TerminateProcessCommand(
+                            actor.tenantId(), stopping.instanceToStop(task.getProcessInstanceId()), normalized + " by " + actor.userId()));
+                    applicationRepository.update(application, expectedVersion);
+                    completeRound(task, application, actor, comment);
+                    auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
+                    subprocessStops.after(stopping, application, actor.userId());
+                }
+                case APPROVE -> {
+                    expenses.requireApproval(application, task);
+                    var before = subprocesses.before(application);
+                    application.recordTaskAction(expectedVersion);
+                    recordDecisionAssignee(task, actor, proxyUse);
+                    ProcessRuntimePort.CompletedTask completed = processRuntime.complete(
+                            new ProcessRuntimePort.CompleteTaskCommand(actor.tenantId(), taskId, normalized.name(), comment));
+                    completion.persistProgress(application, expectedVersion, task.getProcessInstanceId(),
+                            completed.processEnded(), actor.userId(), comment);
+                    auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
+                    expenses.taskApproved(application, task, actor.userId(), auditEventId);
+                    subprocesses.afterAdvance(before, application);
+                }
+                default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
             }
-            case APPROVE -> {
-                expenses.requireApproval(application, task);
-                var before = subprocesses.before(application);
-                application.recordTaskAction(expectedVersion);
-                recordDecisionAssignee(task, actor, proxyUse);
-                ProcessRuntimePort.CompletedTask completed = processRuntime.complete(
-                        new ProcessRuntimePort.CompleteTaskCommand(actor.tenantId(), taskId, normalized.name(), comment));
-                completion.persistProgress(application, expectedVersion, task.getProcessInstanceId(),
-                        completed.processEnded(), actor.userId(), comment);
-                auditEventId = audit(task, application, actor, normalized.name(), comment, null, previousStatus, proxyUse);
-                expenses.taskApproved(application, task, actor.userId(), auditEventId);
-                subprocesses.afterAdvance(before, application);
+            if (normalized == TaskAction.REJECT) {
+                expenseReleases.release(application, actor.userId(), Instant.now());
+                procurementReservations.releaseStopped(application, actor.userId(), Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
             }
-            default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
+            notifications.taskActed(application, actor.userId(), normalized, taskId, task.getName(), previousTaskIds, stoppedAudience);
+            notifications.countersignCompleted(application, actor.userId(), closedAudience);
+            return new ActionResult(taskId, normalized.name(), application.status().name(), application.version(), auditEventId);
         }
-        if (normalized == TaskAction.REJECT) {
-            expenseReleases.release(application, actor.userId(), Instant.now());
-            procurementReservations.releaseStopped(application, actor.userId(), Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
-        }
-        notifications.taskActed(application, actor.userId(), normalized, taskId, task.getName(), previousTaskIds, stoppedAudience);
-        notifications.countersignCompleted(application, actor.userId(), closedAudience);
-        return new ActionResult(taskId, normalized.name(), application.status().name(), application.version(), auditEventId);
     }
 
     /** 接收人选择只对当前可操作任务开放，执行时再次按同一权威目录复核。 */
@@ -328,7 +332,7 @@ public class FlowableTaskFacade {
 
     private String audit(Task task, Application application, Actor actor, String action, String comment, String targetUser,
                          ApplicationStatus previousStatus, ApprovalProxyUse proxyUse) {
-        return auditPort.record(new TaskAuditPort.TaskOperation(actor.tenantId(), task.getId(), application.id(),
+        return auditPort.record(new TaskAuditPort.TaskOperation(actor.tenantId(), application.businessNo(), task.getId(), application.id(),
                 application.version(), application.roundNo(), task.getProcessInstanceId(), actor.userId(), action,
                 comment, targetUser, task.getTaskDefinitionKey(), task.getName(), previousStatus, application.status(), null, proxyUse));
     }

@@ -9,16 +9,30 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /** 仅承载诊断关联，不提供身份或业务授权；显式作用域防止线程池串号。 */
-public record DiagnosticContext(String traceId, String tenantId) {
+public record DiagnosticContext(String traceId, String tenantId, String businessNo, String processInstanceId, String taskId) {
     public static final String TRACE_ID = "traceId";
     public static final String TENANT_ID = "tenantId";
+    public static final String BUSINESS_NO = "businessNo";
+    public static final String PROCESS_INSTANCE_ID = "processInstanceId";
+    public static final String TASK_ID = "taskId";
     public static final String HEADER = "X-Trace-Id";
     private static final Pattern TRACE = Pattern.compile("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
     private static final int MAX_LOG_IDENTIFIER = 128;
 
+    /** 入口与旧队列没有已授权的业务上下文，不继承复用线程中的业务标识。 */
+    public DiagnosticContext(String traceId, String tenantId) {
+        this(traceId, tenantId, null, null, null);
+    }
+
     /** 捕获已建立的诊断上下文；没有请求的独立执行生成自己的追踪标识。 */
     public static DiagnosticContext capture() {
-        return new DiagnosticContext(currentIdOr(UUID.randomUUID().toString()), MDC.get(TENANT_ID));
+        return new DiagnosticContext(currentIdOr(UUID.randomUUID().toString()), MDC.get(TENANT_ID),
+                MDC.get(BUSINESS_NO), MDC.get(PROCESS_INSTANCE_ID), MDC.get(TASK_ID));
+    }
+
+    /** 调用方完成授权或原执行绑定校验后，以实际业务事实建立子作用域，不继承父单的业务标识。 */
+    public static DiagnosticContext forBusiness(String tenantId, String businessNo, String processInstanceId, String taskId) {
+        return new DiagnosticContext(currentIdOr(UUID.randomUUID().toString()), tenantId, businessNo, processInstanceId, taskId);
     }
 
     /** 在同事务审计和事件之间保留请求来源；旧调用没有请求时沿用事件标识。 */
@@ -46,14 +60,21 @@ public record DiagnosticContext(String traceId, String tenantId) {
         var previous = new HashMap<String, String>();
         previous.put(TRACE_ID, MDC.get(TRACE_ID));
         previous.put(TENANT_ID, MDC.get(TENANT_ID));
+        previous.put(BUSINESS_NO, MDC.get(BUSINESS_NO));
+        previous.put(PROCESS_INSTANCE_ID, MDC.get(PROCESS_INSTANCE_ID));
+        previous.put(TASK_ID, MDC.get(TASK_ID));
         MDC.put(TRACE_ID, traceId);
         put(TENANT_ID, safeIdentifier(tenantId));
+        put(BUSINESS_NO, safeIdentifier(businessNo));
+        put(PROCESS_INSTANCE_ID, safeIdentifier(processInstanceId));
+        put(TASK_ID, safeIdentifier(taskId));
         return new Scope(previous);
     }
 
     private static String safeIdentifier(String value) {
         if (value == null) return null;
-        String safe = value.replaceAll("[\\p{Cntrl}\\p{Zl}\\p{Zp}]", "_");
+        // 诊断字段不允许伪造键分隔符或改变文本方向；业务和审计原值保持不变。
+        String safe = value.replaceAll("[\\p{Cntrl}\\p{Cf}\\p{Z}=]", "_");
         return safe.substring(0, Math.min(MAX_LOG_IDENTIFIER, safe.length()));
     }
     private static void put(String key, String value) { if (value == null) MDC.remove(key); else MDC.put(key, value); }

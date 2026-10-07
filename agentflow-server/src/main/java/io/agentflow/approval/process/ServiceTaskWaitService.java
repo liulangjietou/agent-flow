@@ -80,7 +80,7 @@ public class ServiceTaskWaitService {
         }
         String actor = "system:service:" + command.contract().key(); String reason = "operationId=" + command.id() + ", nodeId=" + origin.nodeId();
         completion.persistProgress(application, previous, origin.processInstanceId(), ended, actor, reason);
-        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.id(), application.version(), application.roundNo(),
+        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.businessNo(), application.id(), application.version(), application.roundNo(),
                 origin.processInstanceId(), actor, ApplicationAuditPort.Action.SERVICE_TASK_COMPLETED, ApplicationStatus.IN_APPROVAL, application.status(), reason));
         subprocesses.afterAdvance(before, application);
         notifications.processAdvanced(application, actor, null, context.node().name(), previousTasks);

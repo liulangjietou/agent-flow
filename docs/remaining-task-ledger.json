@@ -2904,7 +2904,7 @@
           ]
         }
       ],
-      "observed": "六处直接定时入口已接通，249 个唯一范围用例通过；固定包 7 次启动、6 次原键重放、281 表恢复通过，四类入口产生的 8 条通知来源一致且无重复。继续可信业务号及原实例/任务标识，O01 保持 OPEN。",
+      "observed": "API、Flowable 创建及审批审计已关联授权业务号和实际实例/任务；260 个唯一用例通过，最终固定包 6 次启动及 281 表恢复通过。继续其余后台原业务标识，O01 保持 OPEN。",
       "references": [
         {
           "path": "docs/superpowers/plans/2026-10-07-operation-tracing.md",
@@ -2940,6 +2940,10 @@
         },
         {
           "path": "docs/evidence/operation-tracing-direct-scheduler-20261007.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/operation-tracing-approval-business-20261007.json",
           "line": 1
         }
       ],
@@ -2977,6 +2981,10 @@
       "directSchedulerStage": {
         "status": "PASSED_LOCAL_FIXED_PACKAGE_WITH_EXPLICIT_SCOPE",
         "evidence": "docs/evidence/operation-tracing-direct-scheduler-20261007.json"
+      },
+      "approvalBusinessStage": {
+        "status": "PASSED_LOCAL_FIXED_PACKAGE_WITH_EXPLICIT_SCOPE",
+        "evidence": "docs/evidence/operation-tracing-approval-business-20261007.json"
       }
     },
     {
@@ -4180,16 +4188,16 @@
   },
   "latestProgress": {
     "taskId": "O01",
-    "status": "DIRECT_SCHEDULERS_VERIFIED_BUSINESS_IDENTIFIERS_IN_PROGRESS",
-    "recordedAt": "2026-10-07T16:48:48.674224+00:00",
+    "status": "APPROVAL_BUSINESS_VERIFIED_WORKER_BUSINESS_IN_PROGRESS",
+    "recordedAt": "2026-10-07T17:13:00.343825+00:00",
     "knownOpenTaskCount": 38,
-    "evidence": "docs/evidence/operation-tracing-direct-scheduler-20261007.json"
+    "evidence": "docs/evidence/operation-tracing-approval-business-20261007.json"
   },
   "localMainIntegration": {
-    "verifiedThroughCommit": "cb11a4d8926f974103133014fdf0c3334da0cd8a",
-    "mergeCommit": "cb11a4d8926f974103133014fdf0c3334da0cd8a",
+    "verifiedThroughCommit": "acae8abf1aee93aa9477453f96e1a8e416e812df",
+    "mergeCommit": "acae8abf1aee93aa9477453f96e1a8e416e812df",
     "originMainFetchedAtMerge": "2ac75649c026501460a59464d80f9a48ddf6ecd7",
     "remotePush": false,
-    "note": "Previous expense recovery stage was merged into local main. This stage is verified by its fixed package and source hashes; remote delivery remains gated."
+    "note": "Previous direct scheduler stage is merged into local main. This stage has fixed-package and source-hash evidence; remote delivery remains gated."
   }
 }

@@ -121,7 +121,7 @@ public class SubprocessStopService {
                 expenses.release(application, actor, now);
                 procurement.releaseStopped(application, actor, now);
             }
-            audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.id(), application.version(),
+            audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.businessNo(), application.id(), application.version(),
                     application.roundNo(), node.round().processInstanceId(), actor, ApplicationAuditPort.Action.SUBPROCESS_STOPPED,
                     ApplicationStatus.IN_APPROVAL, application.status(), reason));
             notifications.subprocessStopped(application, actor, node.audience(), true);

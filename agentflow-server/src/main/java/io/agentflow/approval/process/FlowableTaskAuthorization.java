@@ -1,6 +1,9 @@
 package io.agentflow.approval.process;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.observability.DiagnosticContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import io.agentflow.approval.model.TaskAction;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.service.TaskRecipientDirectory;
@@ -21,6 +24,7 @@ import java.util.List;
  */
 @Component
 public class FlowableTaskAuthorization {
+    private static final Logger LOG = LoggerFactory.getLogger(FlowableTaskAuthorization.class);
     private final TaskService tasks;
     private final TaskRecipientDirectory recipients;
     private final ApplicationRepository applications;
@@ -40,6 +44,7 @@ public class FlowableTaskAuthorization {
         if (!canAct(actor, task)) {
             throw new DomainException("FORBIDDEN", "The task is not assigned to or available for the current user");
         }
+        traceAuthorized(task, actor);
         return task;
     }
 
@@ -50,6 +55,7 @@ public class FlowableTaskAuthorization {
                 && !proxies.forActor(actor, java.time.Instant.now()).canRead(task)) {
             throw new DomainException("FORBIDDEN", "The task is not available for the current user");
         }
+        traceAuthorized(task, actor);
         return task;
     }
 
@@ -78,6 +84,14 @@ public class FlowableTaskAuthorization {
      * @author owlzhangfq@gmail.com
      */
     public record AuthorizedTask(Task task, ApprovalProxyUse proxyUse) { }
+
+    private void traceAuthorized(Task task, Actor actor) {
+        Object businessNo = task.getProcessVariables().get("businessNo");
+        try (var scope = DiagnosticContext.forBusiness(actor.tenantId(), businessNo instanceof String value ? value : null,
+                task.getProcessInstanceId(), task.getId()).open()) {
+            LOG.info("Task access authorized, errorCode={}", "NONE");
+        }
+    }
 
     private Task requireActive(String taskId, Actor actor) {
         actor.requireRole("APPROVER");

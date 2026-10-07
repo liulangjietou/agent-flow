@@ -1,6 +1,9 @@
 package io.agentflow.approval;
 
 import io.agentflow.approval.model.Application;
+import io.agentflow.observability.DiagnosticContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import io.agentflow.approval.process.SubprocessProgressService;
 import io.agentflow.approval.process.SubprocessStopService;
 import io.agentflow.approval.model.BusinessReference;
@@ -39,6 +42,7 @@ import java.util.UUID;
  */
 @Service
 public class ApprovalApplicationFacade {
+    private static final Logger LOG = LoggerFactory.getLogger(ApprovalApplicationFacade.class);
     private static final String BUNDLED_LEGACY_PROCESS = "expense-reimbursement";
     private static final long BUNDLED_LEGACY_VERSION = 1L;
     private final ApplicationRepository repository;
@@ -252,6 +256,7 @@ public class ApprovalApplicationFacade {
         if (!isVisible(actor, application)) {
             throw new DomainException("NOT_FOUND", "Application not found");
         }
+        traceAuthorized(application);
         return application;
     }
 
@@ -285,7 +290,14 @@ public class ApprovalApplicationFacade {
             throw new DomainException("FORBIDDEN", "Only the applicant can revise, submit, withdraw or cancel this application");
         }
         executionLocks.requireRoot(application);
+        traceAuthorized(application);
         return application;
+    }
+
+    private void traceAuthorized(Application application) {
+        try (var scope = DiagnosticContext.forBusiness(application.tenantId(), application.businessNo(), null, null).open()) {
+            LOG.info("Application access authorized, errorCode={}", "NONE");
+        }
     }
 
     /** 附件写入复用申请人的资源授权，状态与版本由申请聚合继续判断。 */

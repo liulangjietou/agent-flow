@@ -146,7 +146,7 @@ public class SubprocessStartService {
     }
 
     private void record(Application application, String instanceId, ApplicationAuditPort.Action action, ApplicationStatus previous) {
-        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.id(), application.version(),
+        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.businessNo(), application.id(), application.version(),
                 application.roundNo(), instanceId, SYSTEM_ACTOR, action, previous, application.status(), "由父流程调用节点发起"));
     }
 

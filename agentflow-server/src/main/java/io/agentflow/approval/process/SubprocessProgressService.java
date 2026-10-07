@@ -112,7 +112,7 @@ public class SubprocessProgressService {
             application.recordRuntimeAction(version);
             String reason = "Completed subprocess calls: " + finishedCalls.stream().map(call -> call.id().toString()).toList();
             completion.persistProgress(application, version, round.processInstanceId(), ended, SubprocessStartService.SYSTEM_ACTOR, reason);
-            audit.record(new ApplicationAuditPort.ApplicationOperation(before.tenant, application.id(), application.version(), node.roundNo(),
+            audit.record(new ApplicationAuditPort.ApplicationOperation(before.tenant, application.businessNo(), application.id(), application.version(), node.roundNo(),
                     round.processInstanceId(), SubprocessStartService.SYSTEM_ACTOR, ApplicationAuditPort.Action.SUBPROCESS_COMPLETED,
                     ApplicationStatus.IN_APPROVAL, application.status(), reason));
             notifications.processAdvanced(application, SubprocessStartService.SYSTEM_ACTOR, null, null,

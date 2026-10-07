@@ -214,7 +214,7 @@ public class TimerWaitService {
 
     private void record(Binding binding, String actor, ApplicationAuditPort.Action action, String reason) {
         var app = binding.application();
-        audit.record(new ApplicationAuditPort.ApplicationOperation(app.tenantId(), app.id(), app.version(), app.roundNo(),
+        audit.record(new ApplicationAuditPort.ApplicationOperation(app.tenantId(), app.businessNo(), app.id(), app.version(), app.roundNo(),
                 binding.round().processInstanceId(), actor, action, ApplicationStatus.IN_APPROVAL, app.status(), reason));
     }
 

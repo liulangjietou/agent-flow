@@ -182,7 +182,7 @@ public class InstanceControlService {
                 || history == null || history.getEndTime() == null || history.getDeleteReason() == null) throw unavailable();
         applications.update(application, input.expectedVersion());
         rounds.complete(application.tenantId(), id, roundNo, instanceId, SubmissionRound.Status.CANCELLED, reason, actor.userId(), completedAt);
-        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), id, application.version(), roundNo,
+        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.businessNo(), id, application.version(), roundNo,
                 instanceId, actor.userId(), ApplicationAuditPort.Action.INSTANCE_TERMINATE, ApplicationStatus.IN_APPROVAL,
                 ApplicationStatus.CANCELLED, reason));
         stops.after(plan, application, actor.userId());
@@ -276,7 +276,7 @@ public class InstanceControlService {
         String operator = root ? actor.userId() : SubprocessStartService.SYSTEM_ACTOR;
         // 原具名原因只保存在根申请；子申请用系统身份与原调用来源解释联动，不外传父表单或自由文本。
         String reason = root ? input.reason().strip() : "Subprocess runtime controlled through root application " + rootId + ", action=" + action;
-        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.id(), application.version(),
+        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.businessNo(), application.id(), application.version(),
                 application.roundNo(), binding.round().processInstanceId(), operator, action, ApplicationStatus.IN_APPROVAL,
                 ApplicationStatus.IN_APPROVAL, reason));
         return operator;

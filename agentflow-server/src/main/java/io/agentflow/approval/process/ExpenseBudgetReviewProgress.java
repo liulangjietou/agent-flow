@@ -71,7 +71,7 @@ public class ExpenseBudgetReviewProgress {
         // 任务局部标记只由本推进器设置，完成后即消失，不污染后续人工任务的职责判断。
         tasks.setVariableLocal(task.getId(), AUTOMATIC_MARKER, true);
         tasks.complete(task.getId(), Map.of("lastAction", ExpenseBudgetApprovalPolicy.AUTOMATIC_ACTION));
-        String auditId = audit.record(new TaskAuditPort.TaskOperation(application.tenantId(), task.getId(), application.id(), application.version(),
+        String auditId = audit.record(new TaskAuditPort.TaskOperation(application.tenantId(), application.businessNo(), task.getId(), application.id(), application.version(),
                 application.roundNo(), instanceId, ExpenseBudgetApprovalPolicy.SYSTEM_ACTOR, ExpenseBudgetApprovalPolicy.AUTOMATIC_ACTION,
                 "本轮原预算操作已实际确认冻结，无需例外审批。", null, task.getTaskDefinitionKey(), task.getName(), application.status(), application.status(),
                 null, null, null, new TaskAuditPort.BudgetConfirmation(original.input().command().id(), original.input().command().digest())));

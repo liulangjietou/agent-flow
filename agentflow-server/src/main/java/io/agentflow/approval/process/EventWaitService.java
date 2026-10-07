@@ -85,7 +85,7 @@ public class EventWaitService {
         String actor = "system:event:" + contract.sourceKey();
         String reason = "eventId=" + command.eventId() + ", waitId=" + command.waitId();
         completion.persistProgress(application, previous, binding.round().processInstanceId(), ended, actor, reason);
-        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.id(), application.version(), application.roundNo(),
+        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.businessNo(), application.id(), application.version(), application.roundNo(),
                 binding.round().processInstanceId(), actor, ApplicationAuditPort.Action.EVENT_RECEIVED, ApplicationStatus.IN_APPROVAL, application.status(), reason));
         subprocesses.afterAdvance(before, application);
         notifications.processAdvanced(application, actor, null, binding.node().name(), previousTasks);

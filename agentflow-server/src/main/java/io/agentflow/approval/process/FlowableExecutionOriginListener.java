@@ -10,6 +10,10 @@ import org.flowable.common.engine.api.delegate.event.FlowableEventListener;
 import org.flowable.common.engine.api.delegate.event.FlowableEventType;
 import org.flowable.job.api.Job;
 import org.flowable.task.service.delegate.DelegateTask;
+import org.flowable.engine.RuntimeService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -18,10 +22,14 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class FlowableExecutionOriginListener implements FlowableEventListener {
+    private static final Logger LOG = LoggerFactory.getLogger(FlowableExecutionOriginListener.class);
     private final JdbcTemplate jdbc;
+    private final ObjectProvider<RuntimeService> runtime;
 
     /** 与引擎使用同一事务数据源，禁止提交后补写来源。 */
-    public FlowableExecutionOriginListener(JdbcTemplate jdbc) { this.jdbc = jdbc; }
+    public FlowableExecutionOriginListener(JdbcTemplate jdbc, ObjectProvider<RuntimeService> runtime) {
+        this.jdbc = jdbc; this.runtime = runtime;
+    }
 
     /** 创建来源只写一次；转交、暂停和原 ID 重试不改写原始来源。 */
     @Override
@@ -37,11 +45,17 @@ public class FlowableExecutionOriginListener implements FlowableEventListener {
     private void capture(String tenant, String process, String kind, String id) {
         // 全局维护任务没有业务租户或流程，不能从当前线程借用归属。
         if (tenant == null || tenant.isBlank() || process == null) return;
-        jdbc.update("""
-                INSERT INTO workflow_execution_origin(tenant_id,object_kind,object_id,trace_id)
-                SELECT ?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM workflow_execution_origin
-                    WHERE tenant_id=? AND object_kind=? AND object_id=?)
-                """, tenant, kind, id, DiagnosticContext.capture().traceId(), tenant, kind, id);
+        // 任务可能属于当前调用的子流程；只读取它自己实例中的受控变量。
+        var variables = runtime.getObject().getVariables(process, List.of("tenantId", "businessNo"));
+        String businessNo = tenant.equals(variables.get("tenantId")) && variables.get("businessNo") instanceof String value ? value : null;
+        try (var scope = DiagnosticContext.forBusiness(tenant, businessNo, process, "TASK".equals(kind) ? id : null).open()) {
+            jdbc.update("""
+                    INSERT INTO workflow_execution_origin(tenant_id,object_kind,object_id,trace_id)
+                    SELECT ?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM workflow_execution_origin
+                        WHERE tenant_id=? AND object_kind=? AND object_id=?)
+                    """, tenant, kind, id, DiagnosticContext.capture().traceId(), tenant, kind, id);
+            LOG.info("Workflow execution origin staged, errorCode={}, objectKind={}, objectId={}", "NONE", kind, id);
+        }
     }
 
     /** 来源登记失败与原任务一起回滚，不产生无法关联的新任务。 */

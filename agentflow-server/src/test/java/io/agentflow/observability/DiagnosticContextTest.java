@@ -21,6 +21,68 @@ class DiagnosticContextTest {
     @AfterEach void clear() { MDC.clear(); }
 
     @Test
+    void freshScopeClearsForeignBusinessIdentifiersAndRestoresThemOnExit() {
+        MDC.put("businessNo", "prior-business"); MDC.put("processInstanceId", "prior-instance"); MDC.put("taskId", "prior-task");
+        MDC.put("unrelated", "kept"); var previous = MDC.getCopyOfContextMap();
+        try (var scope = new DiagnosticContext(UUID.randomUUID().toString(), "next-tenant").open()) {
+            assertThat(MDC.getCopyOfContextMap()).doesNotContainKeys("businessNo", "processInstanceId", "taskId");
+            assertThat(MDC.get("unrelated")).isEqualTo("kept");
+        }
+        assertThat(MDC.getCopyOfContextMap()).isEqualTo(previous);
+    }
+
+    @Test
+    void capturedBusinessIdentifiersSurviveTheExplicitThreadHandoff() throws Exception {
+        var executor = Executors.newSingleThreadExecutor();
+        try (var scope = new DiagnosticContext(UUID.randomUUID().toString(), "tenant-a").open()) {
+            MDC.put("businessNo", "business-a"); MDC.put("processInstanceId", "instance-a"); MDC.put("taskId", "task-a");
+            var captured = DiagnosticContext.capture();
+            assertThat(executor.submit(() -> {
+                try (var restored = captured.open()) { return MDC.getCopyOfContextMap(); }
+            }).get(5, TimeUnit.SECONDS)).containsEntry("businessNo", "business-a")
+                    .containsEntry("processInstanceId", "instance-a").containsEntry("taskId", "task-a");
+            assertThat(executor.submit(MDC::getCopyOfContextMap).get(5, TimeUnit.SECONDS)).isNullOrEmpty();
+        } finally { executor.shutdownNow(); }
+    }
+
+    @Test
+    void legacyWorkerCannotBorrowTheCallersCurrentRoundOrTask() {
+        try (var scope = new DiagnosticContext(UUID.randomUUID().toString(), "caller").open()) {
+            MDC.put("businessNo", "resubmitted-business"); MDC.put("processInstanceId", "new-round"); MDC.put("taskId", "new-task");
+            var previous = MDC.getCopyOfContextMap();
+            try (var restored = DiagnosticContext.restored(null, "original-tenant", "synthetic-queue", "original-id").open()) {
+                assertThat(MDC.getCopyOfContextMap()).doesNotContainKeys("businessNo", "processInstanceId", "taskId");
+            }
+            assertThat(MDC.getCopyOfContextMap()).isEqualTo(previous);
+        }
+    }
+
+    @Test
+    void explicitBusinessContextSanitizesEveryLogIdentifierAndRestoresOuterScope() {
+        String unsafe = "trusted\r\nvalue\u2028" + "x".repeat(200);
+        try (var outer = new DiagnosticContext(UUID.randomUUID().toString(), "parent", "parent-business", "parent-instance", "parent-task").open()) {
+            var previous = MDC.getCopyOfContextMap();
+            try (var inner = new DiagnosticContext(UUID.randomUUID().toString(), unsafe, unsafe, unsafe, unsafe).open()) {
+                for (String key : java.util.List.of("tenantId", "businessNo", "processInstanceId", "taskId")) {
+                    assertThat(MDC.get(key)).hasSize(128).doesNotContain("\r", "\n", "\u2028");
+                }
+            }
+            assertThat(MDC.getCopyOfContextMap()).isEqualTo(previous);
+        }
+        assertThat(MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+
+    @Test
+    void businessNumberCannotInsertAdditionalDiagnosticFieldsIntoTheTextLog() {
+        String unsafe = "invoice tenantId=foreign\u00a0taskId=forged\u202e";
+        try (var scope = new DiagnosticContext(UUID.randomUUID().toString(), "tenant-a", unsafe, "actual-instance", "actual-task").open()) {
+            assertThat(MDC.get("businessNo")).doesNotContain(" ", "=", "\u00a0", "\u202e");
+            assertThat(MDC.get("tenantId")).isEqualTo("tenant-a");
+            assertThat(MDC.get("taskId")).isEqualTo("actual-task");
+        }
+    }
+
+    @Test
     void completionLogContainsTraceAndTrustedTenantButNoRequestOrExceptionContent() throws Exception {
         var logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(RequestTraceFilter.class);
         var appender = new ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent>() {

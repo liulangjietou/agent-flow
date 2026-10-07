@@ -68,7 +68,7 @@ public class ExpenseReductionService {
                 ExpenseFormContract.submittedPayload(report.currentRound(), priorControls.routingFlag(report, application.formSchema()),
                         projects.routingFlag(report, application.formSchema())));
         var operation = budgets.reserve(actor.tenantId(), reportId, report.version(), context.control().input().accountingDate(), context.targetDigest(), now);
-        audit.record(new TaskAuditPort.TaskOperation(actor.tenantId(), context.taskId(), application.id(), application.version(),
+        audit.record(new TaskAuditPort.TaskOperation(actor.tenantId(), application.businessNo(), context.taskId(), application.id(), application.version(),
                 application.roundNo(), context.processInstanceId(), actor.userId(), AUDIT_ACTION, input.comment(), null,
                 context.nodeId(), context.nodeName(), application.status(), application.status(), null, context.proxyUse()));
         notifications.expenseAdjusted(application, actor.userId());

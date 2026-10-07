@@ -176,7 +176,7 @@ public class ApprovalApplicationService {
 
     private void recordApplicationOperation(Application application, String actor, ApplicationAuditPort.Action action,
                                             ApplicationStatus previousStatus, String instanceId, String comment) {
-        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.id(),
+        audit.record(new ApplicationAuditPort.ApplicationOperation(application.tenantId(), application.businessNo(), application.id(),
                 application.version(), application.roundNo(), instanceId, actor, action, previousStatus,
                 application.status(), comment));
     }

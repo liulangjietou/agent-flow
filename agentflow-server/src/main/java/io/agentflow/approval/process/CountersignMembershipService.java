@@ -123,7 +123,7 @@ public class CountersignMembershipService {
         } else change = runtime.remove(task, input.targetTaskId());
         applications.update(application, input.expectedVersion());
         var facts = new TaskAuditPort.MembershipChange(change.executionId(), change.targetTaskId(), change.totalBefore(), change.totalAfter(), change.completed());
-        String eventId = audit.record(new TaskAuditPort.TaskOperation(actor.tenantId(), taskId, application.id(), application.version(),
+        String eventId = audit.record(new TaskAuditPort.TaskOperation(actor.tenantId(), application.businessNo(), taskId, application.id(), application.version(),
                 application.roundNo(), task.getProcessInstanceId(), actor.userId(), input.action() == Action.ADD ? "ADD_SIGNER" : "REMOVE_SIGNER",
                 input.reason().strip(), change.targetUser(), task.getTaskDefinitionKey(), task.getName(),
                 ApplicationStatus.IN_APPROVAL, ApplicationStatus.IN_APPROVAL, facts));
