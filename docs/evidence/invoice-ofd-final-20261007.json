@@ -1,0 +1,242 @@
+{
+  "status": "LOCAL_IMPLEMENTATION_AND_FIXED_RUNTIME_PASSED_ENVIRONMENT_GATES_PENDING",
+  "recordedAt": "2026-10-07T12:30:47.346188+00:00",
+  "implementationThroughCommit": "aee7cd2e92ceb59987c1204dddc1ed35b86851d6",
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionService.java": "61d10a1910b2870904ceeb104dd80478f17644fa97134911b250b17b259f720a",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionSources.java": "ca9da221946f00f3f364ce54576fe7679332783412ef4e46c2a5b261a7d571fc",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdAnnotations.java": "28ac134c29516c413bf8a61c2624b72b8f5d0ee7841c629997c1bfaccaa3d653",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdArchive.java": "915f979b7bf4b62cf667b22d23dd3d05ede40230f9a6cf6fdfd95d49d385a876",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdClips.java": "cfca603fd66caa6f9a24565c746f96dd732dee1e3592f6c20c61d6568b6d0e34",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdDocument.java": "61bcaac3e6ebd8071e98354e78a1bc6341e54ae438d6b8f71b7f3ecc769d0d47",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdFonts.java": "e62a448d051571c4f8aedfdf56047a3b26eb66eed7f6bd7caf4f49c8e631ffa6",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdImages.java": "bc43147e00f38884a078ee45db606832152cd286074654adcc89bb6526514367",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdRenderer.java": "a2658bccca35098458439e11050f6a5cc6221cecf114034f0e4183a947db55a6",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdResources.java": "f456a51d7bd14713fd597b7ddd1f98372fa9b6628bc6e67dd90d571e45f164f6",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdSeal.java": "5454c0e37a0a3dce8743c4cc7f434dac66679ce8ab0c26fe39cdf04fc93592f0",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdSignatures.java": "b980c0fd97d33ceab77520a0808fe89d94cebaba93fe02063d5f323cd71d5554",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdText.java": "9aaa51fecdea6a381d1be6f641ef7b6ca224b1cbfb4e95a92f498a09b8a21932",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdVector.java": "141394e951c89c858beaa61be5980dbbc8dee2bc7832d00fc045b982dd0c45e4",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdXml.java": "e9ad5e5eff4c46418f358cb516b57bd8d97bb92e2a17d91751d37a15ad58ccb3",
+    "agentflow-server/src/main/resources/api/openapi.json": "4237b91062928ba767c0f497ad9672c66423d73595171cb27daf109632814608",
+    "agentflow-server/src/main/resources/application.yml": "182d638212a400b82642e4229cb2dbd956c5d32fed275d4f5d7ba55fd04fd2e7",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionApiIntegrationTest.java": "80f3ae0be790d2adfdcadc37e36574070e954a1e91e302cb47a30e81b83f526b",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionModelTest.java": "a9236916060c6bcef350c004ff42b562d43e4f6685892b879dd20c35d830e18d",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdAnnotationsTest.java": "bff95ca8bd19fc3f034c85ac572b0f360af88488fd5100cfc6636527cc8d8468",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdBlendTest.java": "9dec44c6d456d66511389ba4ae9cd8bf10685ecd0a9db22c326e16162fa4a80e",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdCompatibilityTest.java": "afee025a79806cd2eac0222caa22720f5b3208120aef5d530fa2d1ffc37218bd",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdDrawingTest.java": "b1e8bb07d8f41e150e25ab28e98af352220fc691ddde77577c1d63cd36d4d474",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdPackagingProbe.java": "4269a91df49c794b38310dbd1933cf58f2d06a7b798b31026ef6d0b2e46e17ee",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdRendererTest.java": "ed9ff0fa6c204405ddc1f2f125638b29cd02177f360c9d128ccfc3b79004de20",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdSignaturesTest.java": "1b8ee41f4f4fe5cee91957f9a7219bfe0bd55b6495b8f9123a79991fc2ab7c24",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdSourceTest.java": "178cc136476c00759ae01bc374c31ca4c0bcc17d3243d5cda531872bd79f5ad4",
+    "agentflow-server/src/test/java/io/agentflow/auth/OidcTestProvider.java": "d0bc33ab2d51ca5622edc7bde153ea71f8cb597c9f74ab56912b8522f3b4027b",
+    "agentflow-web/src/components/InvoiceExtraction.vue": "a7ba1eb653fca6f3afaa8ba3d260563ef55b28c822ed29fa68ec03942c95d58c",
+    "agentflow-web/src/invoiceExtraction.ts": "0cef65e1a91112eee6c9cc4d565e73c8262ab37dc1762aae281488eb9dca49d4",
+    "agentflow-web/tests/invoice-extraction.test.mjs": "cd0621cad7c6ba8e13abc76deadaefbd622c2feed7022b7b7194c327201bc6e1",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-invoice-ofd-extraction.py": "e8ac110bde3724887ebdf189d5a9af38d7bec72362ebe9c7aae0773261f02db7",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7",
+    "scripts/fixtures/ExpenseRiskOidcFixture.java": "2f9952710952fb955b3d227070e82cf890f58c6fe9f8a4374445e7de4aebabee"
+  },
+  "precedingEvidence": [
+    {
+      "evidence": "docs/evidence/invoice-ofd-compatibility-20261007.json",
+      "sha256": "2de44c01f93a719c3c369a6d6aeb0c7d4ed58a36090f6ccb696e5c136a4fbf6f",
+      "archiveManifest": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-compatibility-verified/manifest.json",
+        "sha256": "9efa1a7e2f1658c0ebcedb15e3f3fc1972de93007581569e189b3833c82f082b",
+        "files": 16
+      }
+    },
+    {
+      "evidence": "docs/evidence/invoice-ofd-signatures-20261007.json",
+      "sha256": "bf3e98f15dd7fe8263deb1988f731625923199abd59368855df23c78c3c14a50",
+      "archiveManifest": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-signatures-verified/manifest.json",
+        "sha256": "d24764b8007e2b85ec91c8d6dccbd17fd7992435a6a6cadabd612aedf804e974",
+        "files": 52
+      }
+    },
+    {
+      "evidence": "docs/evidence/invoice-ofd-source-integration-20261007.json",
+      "sha256": "9128313db83042d73b3d7594b1fca7b91e40e9aba7516dbbdd40cdb9b32a5f24",
+      "archiveManifest": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-source-verified/manifest.json",
+        "sha256": "7a3ad2bf286c53fb4151c3348c082b9744d6c60d06cb077b00ef66be8e2ce530",
+        "files": 53
+      }
+    },
+    {
+      "evidence": "docs/evidence/invoice-ofd-short-delta-20261007.json",
+      "sha256": "e5332e6f9ff9821e38c68d6ffbb54de49ff868ba899bc091c7d425d0b5906448",
+      "archiveManifest": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-delta-verified/manifest.json",
+        "sha256": "4f388c53ab87d90a00bb59672c774a4917b41115d740a17f0c14fffae5f36f14",
+        "files": 25
+      }
+    },
+    {
+      "evidence": "docs/evidence/invoice-ofd-blend-20261007.json",
+      "sha256": "e455157e6cd4d7a7798b21197684ee791478d41e3ffd7a683c22b1f3a83f1a6c",
+      "archiveManifest": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-blend-verified/manifest.json",
+        "sha256": "877f884ca19b216c8ef4da2ebce1ee16c7a0046d7f767d1cec4a87218b3802cf",
+        "files": 32
+      }
+    },
+    {
+      "evidence": "docs/evidence/invoice-ofd-signature-identifiers-20261007.json",
+      "sha256": "122dad959cdf765f618759cc6ed37f26facb82315d181f7aa4b57b52488bed6d",
+      "archiveManifest": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-signature-id-verified/manifest.json",
+        "sha256": "e9de925d5dba00626cb4b8e1aaa0cc2494c2150ceb21fa5dc7c59418e4e8124a",
+        "files": 33
+      }
+    }
+  ],
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-final-verified/manifest.json",
+    "sha256": "e80a93118e9e34ec05eb78b4c126e96be99f4ee72c47480bcc4e2cdff15d198b",
+    "files": 188
+  },
+  "fixedJar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-ofd-xsid-server.jar",
+    "sha256": "4136a9fcc512d45a5a37f738a8fb9d31d564624d235299f8b8f2e8552858fd20"
+  },
+  "runtime": {
+    "status": "PASSED",
+    "database": "H2",
+    "beforeSha256": "3cc9e82e2d32a774516431b1c01482e3e53629d5b93b55ccba15908ffccb598a",
+    "afterSha256": "4136a9fcc512d45a5a37f738a8fb9d31d564624d235299f8b8f2e8552858fd20",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "realEnterpriseModelVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "tables": 280,
+        "rows": 369,
+        "allRowsAndColumnsUnchanged": true
+      },
+      {
+        "name": "all-pages-and-two-lost-receipts",
+        "modelCalls": 2,
+        "queueReplay": true,
+        "reviewReplay": true,
+        "oldXmlQueuedRunContinued": true,
+        "invoiceFinanceUnchanged": true
+      },
+      {
+        "name": "independent-paired-restore",
+        "tables": 280,
+        "rows": 394,
+        "originalDatabaseUnchanged": true,
+        "originalTaskContinued": true,
+        "fontFilesIncluded": true
+      }
+    ],
+    "httpRecords": 123,
+    "modelCalls": 2,
+    "boots": 6,
+    "ownedProcessesStopped": true
+  },
+  "schemas": [
+    {
+      "before": "original/before-upgrade",
+      "after": "original/after-upgrade",
+      "lines": 6761,
+      "sha256": "9997e3f99afb9d294e908835c74fecc80bed27e5c125d6abbe61010dc38c4e40"
+    },
+    {
+      "before": "original/before-restore",
+      "after": "restored/restored-before-start",
+      "lines": 6761,
+      "sha256": "a93c1839a28798d41832a06059c3241395e5cf526b366fd314b1a992441e1ad9"
+    }
+  ],
+  "httpContracts": {
+    "result": "PASS",
+    "responses": 121,
+    "requests": 33,
+    "beforeResponses": 63,
+    "binaryResponses": 2
+  },
+  "frontendActualResponses": {
+    "status": "PASSED",
+    "counts": {
+      "options": 5,
+      "details": 19,
+      "pages": 2,
+      "receipts": 5
+    },
+    "browserVerified": false
+  },
+  "fixedPackage": {
+    "cases": 13,
+    "successfulSources": 9,
+    "rejectedSources": 4,
+    "visuallyReviewedPages": 12,
+    "unmodifiedPublicInvoicesSucceeded": [
+      "public-3",
+      "public-4",
+      "public-5"
+    ],
+    "expectedRejectedPublicOriginals": {
+      "public-1": "Missing referenced drawing resource",
+      "public-2": "Unsupported malformed metadata/first TextCode coordinate"
+    }
+  },
+  "testEvidence": {
+    "sourceIntegrationJvm": 258,
+    "finalRendererScopeJvm": 206,
+    "webScope": 55,
+    "typecheck": "PASSED",
+    "productionWebBuild": "PASSED",
+    "openapi": "PASSED",
+    "countsOverlap": true
+  },
+  "review": {
+    "kind": "self-review",
+    "unresolvedKnownFindings": 0,
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-final-verified/review.md"
+  },
+  "retainedBackupFiles": {
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/synthetic-peer-state.json": "5ee7189053157794770270a0bb9787a3bcd64f717f866f355baf32e1a28dc990",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/manifest.json": "98b840952f7c5edbcd6e4a0789dc4b5f2af12ad6afc49ecc28f6f58fdabecad7",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/attachments/681405e0-3893-4c42-aeb8-d07c566fe128.bin": "757c576d18e5f2278b42a7a6c99c4e5ec2b4196e1f7ed129db4f614acfccdfdc",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/attachments/30c5a89b-f691-4c3b-a831-e72e245a7660.bin": "4c0633cebfb9f98dae99431bbaf4047be812255e4c7908bec3365d9c4075dea7",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/attachments/4f228be8-5ced-45ed-85a9-d091f6f9514d.bin": "e8d0ac2fc60428be7bb0b47697abf2fddc80e4971218fad15dd104a13d549c17",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/attachments/de4fe9dd-2a82-4cfc-9096-db95c58be6f6.bin": "c9ebc53e923437624dae08cc283e8e6920bb42c2e7242a6b10560dc6223a924e",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/attachments/03e902d9-7037-439f-9770-b42428f23dd8.bin": "399c84b906c0427f10fa3d4034926431fecf17e34512aea5c42d57a9311531ba",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/attachments/f950906d-e6f9-4c2f-9de7-a367dd9b07dc.bin": "05f5b98ab26575a90d531eda3e38d033ba16206cc24b5356abd040f6e12562eb",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/fonts/9667150c3ea518cc9b1f076874ebe2ca2de0f66bd9854f824b9421443a7a419a.ttf": "9667150c3ea518cc9b1f076874ebe2ca2de0f66bd9854f824b9421443a7a419a",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/fonts/835edf3d22f2b45e58b4c77efb2f009533a21e084059dd3b183f9b0a2d2f1278.ttf": "835edf3d22f2b45e58b4c77efb2f009533a21e084059dd3b183f9b0a2d2f1278",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/fonts/c886ca3172d8ce9189976992d145ec090500a4ff516ecb9d4df56b1a78336247.ttf": "c886ca3172d8ce9189976992d145ec090500a4ff516ecb9d4df56b1a78336247",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/fonts/658718d77497145281cb0ec45ff2fe7c6e18062b2a38f837d0d792d9be3a9ba3.ttc": "658718d77497145281cb0ec45ff2fe7c6e18062b2a38f837d0d792d9be3a9ba3",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/fonts/fonts.json": "8ff2e0b81cd4534ab22740ce8d33949ba9baf4b336133eb3c7b40c82da3025f8",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/fonts/f3b4ffff71c2a0c7227d37497683b2498fb2d0a4e8beae26f022e3ccfcaabfa3.ttf": "f3b4ffff71c2a0c7227d37497683b2498fb2d0a4e8beae26f022e3ccfcaabfa3",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/backup/data/agentflow.mv.db": "f69c4b384ea95053585482c2f8d3783d8921cd63cccc16fe26ca7cfe1118cb5a",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/restored-fonts/9667150c3ea518cc9b1f076874ebe2ca2de0f66bd9854f824b9421443a7a419a.ttf": "9667150c3ea518cc9b1f076874ebe2ca2de0f66bd9854f824b9421443a7a419a",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/restored-fonts/835edf3d22f2b45e58b4c77efb2f009533a21e084059dd3b183f9b0a2d2f1278.ttf": "835edf3d22f2b45e58b4c77efb2f009533a21e084059dd3b183f9b0a2d2f1278",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/restored-fonts/c886ca3172d8ce9189976992d145ec090500a4ff516ecb9d4df56b1a78336247.ttf": "c886ca3172d8ce9189976992d145ec090500a4ff516ecb9d4df56b1a78336247",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/restored-fonts/658718d77497145281cb0ec45ff2fe7c6e18062b2a38f837d0d792d9be3a9ba3.ttc": "658718d77497145281cb0ec45ff2fe7c6e18062b2a38f837d0d792d9be3a9ba3",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/restored-fonts/fonts.json": "080a73f1b80db567bed9cc62d4d6a98829e2abaeb55c4ab0db867df58755bbf5",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/restored-fonts/f3b4ffff71c2a0c7227d37497683b2498fb2d0a4e8beae26f022e3ccfcaabfa3.ttf": "f3b4ffff71c2a0c7227d37497683b2498fb2d0a4e8beae26f022e3ccfcaabfa3",
+    "/fyoung/tmp/agentflow-remaining-20260928/a01-runtime-20261007c/original/data/agentflow.mv.db": "f69c4b384ea95053585482c2f8d3783d8921cd63cccc16fe26ca7cfe1118cb5a"
+  },
+  "preservedRuntimeAttempts": {
+    "a": "Fixture path guard rejected resolved /Volumes alias before application boot",
+    "b": "Data and two lost receipts passed; copying protected macOS system font flags failed; fixed content-copy and digest check"
+  },
+  "boundaries": {
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "realEnterpriseModelVerified": false,
+    "independentVendorRasterComparison": false,
+    "cryptographicSignatureVerification": false,
+    "remotePushOrPr": false,
+    "remainingInvoiceLifecycleAcceptance": "V01"
+  }
+}
