@@ -1,0 +1,74 @@
+{
+  "status": "OFD_COMPATIBILITY_SCOPE_VERIFIED_FULL_A01_PENDING",
+  "baseCommit": "ac1a6a5343e79b7027dce1a89fa73401939d9d41",
+  "recordedAt": "2026-10-07T11:27:39.332380+00:00",
+  "red": {
+    "tests": 4,
+    "errors": 3,
+    "reason": "Existing normalized fixtures did not cover legacy namespace, omitted nonvisual annotation metadata, or redundant CropBox"
+  },
+  "tests": {
+    "InvoiceOfdCompatibilityTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "InvoiceOfdDocumentTest": {
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "InvoiceOfdRendererTest": {
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "InvoiceOfdAnnotationsTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "InvoiceOfdTemplateTest": {
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "InvoiceOfdCompositeTest": {
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "InvoiceOfdArchiveTest": {
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdXml.java": "a2554af5f4b72ff9d2157a069d078ef68ed34b5ba7416dd2a9808266c01b80b3",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdDocument.java": "8338f526038dfe519b6156c1f0378f7425f739ac76f1f92770e22dc3f9127879",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdAnnotations.java": "6a9958c26df465e47c7f942483e40e2bbbf51bc54b86c48ab80529c0f00bc609",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdRenderer.java": "a9bdd15e6f8e9c89008631ec4c686704268de511d78af80c73a0bf0869c891f5",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdCompatibilityTest.java": "80978005a8abc9b46f03adf4cdc43172461d53f1d6074bc49fc5f1a8cc12ccf0",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdAnnotationsTest.java": "bff95ca8bd19fc3f034c85ac572b0f360af88488fd5100cfc6636527cc8d8468"
+  },
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-compatibility-verified/manifest.json",
+    "sha256": "9efa1a7e2f1658c0ebcedb15e3f3fc1972de93007581569e189b3833c82f082b",
+    "files": 16
+  },
+  "boundaries": {
+    "publicOfdExtraction": false,
+    "signatures": false,
+    "fixedPackageVerified": false,
+    "browserVerified": false,
+    "postgresqlVerified": false
+  }
+}

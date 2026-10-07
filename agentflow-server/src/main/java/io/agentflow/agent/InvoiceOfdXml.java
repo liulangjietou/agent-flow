@@ -15,16 +15,19 @@ import org.w3c.dom.Node;
  * @author owlzhangfq@gmail.com
  */
 final class InvoiceOfdXml {
-    private static final String NAMESPACE = "http://www.ofdspec.org/2016";
+    private static final Set<String> NAMESPACES = Set.of("http://www.ofdspec.org/2016", "http://www.ofdspec.org");
     private static final double MAX_NUMBER = 1_000_000;
     private static final Pattern DECIMAL = Pattern.compile("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?");
     private InvoiceOfdXml() { }
+
+    /** 兼容已见旧票面的命名空间；同一包的版本一致性由 XML 入口一次检查。 */
+    static boolean ofdNamespace(String namespace) { return namespace != null && NAMESPACES.contains(namespace); }
 
     static List<Element> children(Element parent) throws IOException {
         var result = new ArrayList<Element>();
         for (Node node = parent.getFirstChild(); node != null; node = node.getNextSibling()) {
             if (node instanceof Element element) {
-                if (!NAMESPACE.equals(element.getNamespaceURI())) throw invalid();
+                if (!ofdNamespace(element.getNamespaceURI()) || !element.getNamespaceURI().equals(parent.getNamespaceURI())) throw invalid();
                 result.add(element);
             }
         }

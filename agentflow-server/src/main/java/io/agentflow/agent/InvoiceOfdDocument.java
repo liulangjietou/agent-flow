@@ -24,7 +24,6 @@ import org.xml.sax.helpers.DefaultHandler;
  * @author owlzhangfq@gmail.com
  */
 final class InvoiceOfdDocument {
-    private static final String NAMESPACE = "http://www.ofdspec.org/2016";
     private static final int MAX_XML_BYTES = 2 * 1024 * 1024;
     private static final int MAX_TOTAL_XML_BYTES = 8 * 1024 * 1024;
     private static final int MAX_ELEMENTS = 100_000;
@@ -164,7 +163,7 @@ final class InvoiceOfdDocument {
         var pending = new ArrayDeque<Element>(); pending.add(root);
         while (!pending.isEmpty()) {
             Element element = pending.removeFirst();
-            if (NAMESPACE.equals(element.getNamespaceURI())) {
+            if (InvoiceOfdXml.ofdNamespace(element.getNamespaceURI())) {
                 String name = element.getLocalName();
                 if (FILE_TEXT_REFERENCES.contains(context(element))) {
                     String target = archive.file(base, text(element));
@@ -188,7 +187,7 @@ final class InvoiceOfdDocument {
     }
 
     private static String context(Element element) {
-        if (!(element.getParentNode() instanceof Element parent) || !NAMESPACE.equals(parent.getNamespaceURI())) return "";
+        if (!(element.getParentNode() instanceof Element parent) || !InvoiceOfdXml.ofdNamespace(parent.getNamespaceURI())) return "";
         return parent.getLocalName() + "/" + element.getLocalName();
     }
 
@@ -223,7 +222,7 @@ final class InvoiceOfdDocument {
     }
 
     private static boolean named(Element element, String name) {
-        return NAMESPACE.equals(element.getNamespaceURI()) && name.equals(element.getLocalName());
+        return InvoiceOfdXml.ofdNamespace(element.getNamespaceURI()) && name.equals(element.getLocalName());
     }
 
     private static Element child(Element parent, String name, boolean required) throws IOException {
@@ -274,6 +273,7 @@ final class InvoiceOfdDocument {
         private final Map<String, Document> documents = new HashMap<>();
         private int bytes;
         private int elements;
+        private String namespace;
 
         private XmlFiles(InvoiceOfdArchive archive) { this.archive = archive; }
 
@@ -306,6 +306,12 @@ final class InvoiceOfdDocument {
                     if (++elements > MAX_ELEMENTS || element.getAttributes().getLength() > MAX_ATTRIBUTES
                             || element.hasAttributeNS(XMLConstants.XML_NS_URI, "base")
                             || "http://www.w3.org/2001/XInclude".equals(element.getNamespaceURI())) throw invalid();
+                    // 不改写 DOM 或原件；显式拒绝混用两个版本，避免下游引用与图元采用不同解释。
+                    String candidate = element.getNamespaceURI();
+                    if (InvoiceOfdXml.ofdNamespace(candidate)) {
+                        if (namespace != null && !namespace.equals(candidate)) throw invalid();
+                        namespace = candidate;
+                    }
                     addChildren(element, pending);
                 }
                 documents.put(file, document);

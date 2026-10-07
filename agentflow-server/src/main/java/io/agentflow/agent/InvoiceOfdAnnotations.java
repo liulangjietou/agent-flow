@@ -66,8 +66,9 @@ final class InvoiceOfdAnnotations {
     private static Appearance appearance(Element annotation) throws IOException {
         shape(annotation, ATTRIBUTES, Set.of("Remark", "Parameters", "Appearance"));
         if (!TYPES.contains(required(annotation, "Type"))) throw invalid();
-        required(annotation, "Creator");
-        date(required(annotation, "LastModDate"));
+        // 渲染不判定文件规范符合性；真实票面省略这两项非绘制元数据时仍保留静态外观。
+        if (annotation.hasAttribute("Creator")) required(annotation, "Creator");
+        if (annotation.hasAttribute("LastModDate")) date(required(annotation, "LastModDate"));
         boolean visible = bool(annotation, "Visible", true);
         // GB/T 33190 表 61 中这些标志作用于 Remark 的交互和打印，不改变静态 Appearance。
         bool(annotation, "Print", true); bool(annotation, "NoZoom", false);

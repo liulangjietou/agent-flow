@@ -13,6 +13,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -115,7 +116,13 @@ final class InvoiceOfdRenderer {
 
     private static void area(Element area) throws IOException {
         if (area == null) return;
-        shape(area, Set.of(), Set.of("PhysicalBox", "ApplicationBox", "ContentBox", "BleedBox"));
+        shape(area, Set.of(), Set.of("PhysicalBox", "ApplicationBox", "ContentBox", "BleedBox", "CropBox"));
+        Element crop = child(area, "CropBox", false);
+        if (crop != null) {
+            // 仅兼容公开票据中等同物理边界的冗余框；其他扩展语义不明，不能猜测后裁掉内容。
+            Element physical = child(area, "PhysicalBox", true);
+            if (!Arrays.equals(numbers(text(crop), 4), numbers(text(physical), 4))) throw invalid();
+        }
         for (Element box : children(area)) {
             shape(box, Set.of(), Set.of());
             double[] values = numbers(text(box), 4);

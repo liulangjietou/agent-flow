@@ -161,7 +161,7 @@ class InvoiceOfdAnnotationsTest {
     void rejectsAmbiguousMetadataInvalidDatesAndUnknownAppearanceAttributes() throws Exception {
         String valid = annot(500, "Path", "", "0 0 10 10", "");
         for (String bad : List.of(valid.replace("Type=\"Path\"", "Type=\"Unknown\""),
-                valid.replace(" Creator=\"Synthetic\"", ""), valid.replace("2026-10-02", "2026-02-30"),
+                valid.replace("Creator=\"Synthetic\"", "Creator=\" \""), valid.replace("2026-10-02", "2026-02-30"),
                 valid.replace("2026-10-02", "2026-10-02T12:00:00"),
                 valid.replace("<ofd:Appearance", "<ofd:Remark>A</ofd:Remark><ofd:Remark>B</ofd:Remark><ofd:Appearance"),
                 valid.replace("<ofd:Appearance", "<ofd:Parameters><ofd:Parameter Name=\"same\">A</ofd:Parameter><ofd:Parameter Name=\"same\">B</ofd:Parameter></ofd:Parameters><ofd:Appearance"),
