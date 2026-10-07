@@ -19,7 +19,7 @@ final class InvoiceOfdVector {
     private InvoiceOfdVector() { }
 
     static Set<String> attributes(String... extra) {
-        var attributes = new HashSet<>(Set.of("ID", "Name", "Boundary", "CTM", "Alpha", "Visible", "DrawParam"));
+        var attributes = new HashSet<>(Set.of("ID", "Name", "Boundary", "CTM", "Alpha", "Visible", "DrawParam", "BlendMode"));
         attributes.addAll(InvoiceOfdStyle.ATTRIBUTES); attributes.addAll(Arrays.asList(extra));
         return Set.copyOf(attributes);
     }

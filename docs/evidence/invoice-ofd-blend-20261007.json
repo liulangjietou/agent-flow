@@ -1,0 +1,157 @@
+{
+  "status": "BOUNDED_DARKEN_AND_EMPTY_CLIPS_PASSED",
+  "red": {
+    "blendTests": 3,
+    "blendErrors": 2,
+    "emptyClipsNativeProbe": "a01-empty-clips-red.log",
+    "emptyClipsBaselineJarSha256": "5cfbbbf5a1e3fe397c2bae1be0ed5a1a280a443e8185d5344681af2d93fdaa34"
+  },
+  "greenTests": 204,
+  "tests": {
+    "io.agentflow.agent.InvoiceDocumentProcessTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceExtractionModelTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdAnnotationsTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdArchiveTest": {
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdBlendTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCffDataTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCidFontTest": {
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCompatibilityTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCompositeTest": {
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDeployedFontsTest": {
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDocumentTest": {
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDrawingTest": {
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdFontTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdInspectorTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdPathTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdRendererTest": {
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdResultTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdSignaturesTest": {
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdSourceTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdTemplateTest": {
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdRenderer.java": "a2658bccca35098458439e11050f6a5cc6221cecf114034f0e4183a947db55a6",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdClips.java": "cfca603fd66caa6f9a24565c746f96dd732dee1e3592f6c20c61d6568b6d0e34",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdVector.java": "141394e951c89c858beaa61be5980dbbc8dee2bc7832d00fc045b982dd0c45e4",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdBlendTest.java": "9dec44c6d456d66511389ba4ae9cd8bf10685ecd0a9db22c326e16162fa4a80e",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdDrawingTest.java": "b1e8bb07d8f41e150e25ab28e98af352220fc691ddde77577c1d63cd36d4d474",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdRendererTest.java": "ed9ff0fa6c204405ddc1f2f125638b29cd02177f360c9d128ccfc3b79004de20"
+  },
+  "reference": "https://www.w3.org/TR/compositing-1/#blendingdarken",
+  "implementation": "Existing PDFBox BlendComposite for Normal/Darken primitives; image and object alpha compose. Unsupported group blend modes reject the whole source. Empty Clips retain Boundary; empty Clip/Area reject.",
+  "regressionCorrection": "Initial green run found an old assertion rejecting empty Clips; retained the malformed empty Clip case and positive whole-image equality plus nested-boundary tests.",
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-blend-verified/manifest.json",
+    "sha256": "877f884ca19b216c8ef4da2ebce1ee16c7a0046d7f767d1cec4a87218b3802cf",
+    "files": 32
+  },
+  "jar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-ofd-blend-server.jar",
+    "sha256": "672c57c26db2630d1ab4dab6ea0e0d14db492f4d4596cd5c30c253c51f499ae5"
+  },
+  "boundaries": {
+    "fixedPackageInProgress": true,
+    "browserVerified": false,
+    "postgresqlVerified": false
+  }
+}

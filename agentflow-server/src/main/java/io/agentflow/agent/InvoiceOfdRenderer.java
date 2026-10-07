@@ -1,6 +1,5 @@
 package io.agentflow.agent;
 
-import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -24,12 +23,14 @@ import java.util.Set;
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
 import javax.imageio.stream.MemoryCacheImageOutputStream;
+import org.apache.pdfbox.pdmodel.graphics.blend.BlendComposite;
+import org.apache.pdfbox.pdmodel.graphics.blend.BlendMode;
 import org.w3c.dom.Element;
 import static io.agentflow.agent.InvoiceOfdResult.*;
 import static io.agentflow.agent.InvoiceOfdXml.*;
 
 /**
- * 将已经完整预检的 OFD 页面绘制为有序图片；尚未接入公开内容适配器。
+ * 将已经完整预检的 OFD 页面绘制为有序图片，供公开内容适配器使用。
  * @author owlzhangfq@gmail.com
  */
 final class InvoiceOfdRenderer {
@@ -280,6 +281,9 @@ final class InvoiceOfdRenderer {
         boolean image = object.getLocalName().equals("ImageObject");
         boolean composite = object.getLocalName().equals("CompositeObject");
         if (image || composite) shape(object, RESOURCE_OBJECT_ATTRIBUTES, Set.of("Clips"));
+        var blend = blendMode(object);
+        // 目前只支持独立图元的混色，不能让组内图元覆盖后静默丢弃整组 BlendMode。
+        if (composite && blend != BlendMode.NORMAL) throw invalid();
         id(object, "ID");
         var box = InvoiceOfdVector.boundary(object);
         var style = InvoiceOfdStyle.resolve(object, resources, inherited);
@@ -293,15 +297,27 @@ final class InvoiceOfdRenderer {
             Element clipping = child(object, "Clips", false);
             boolean transformClip = clipping != null && bool(clipping, "TransFlag", false);
             if (transformClip) graphics.transform(transform(object));
-            if (clipping != null) graphics.clip(clips.read(clipping, resources, style, graphics.getTransform()));
+            if (clipping != null) {
+                var region = clips.read(clipping, resources, style, graphics.getTransform());
+                if (region != null) graphics.clip(region);
+            }
             if (!transformClip) graphics.transform(transform(object));
             double[] matrix = new double[6]; graphics.getTransform().getMatrix(matrix);
             for (double value : matrix) bounded(value);
-            graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, alpha / 255f));
+            graphics.setComposite(BlendComposite.getInstance(blend, alpha / 255f));
             if (image) image(graphics, resources, object);
             else if (composite) composite(graphics, resources, object, style, alpha);
             else paint(graphics, resources, object, style);
         } finally { graphics.dispose(); }
+    }
+
+    private static BlendMode blendMode(Element object) throws IOException {
+        if (!object.hasAttribute("BlendMode")) return BlendMode.NORMAL;
+        return switch (object.getAttribute("BlendMode")) {
+            case "Normal" -> BlendMode.NORMAL;
+            case "Darken" -> BlendMode.DARKEN;
+            default -> throw invalid();
+        };
     }
 
     private void composite(Graphics2D graphics, InvoiceOfdResources resources, Element object,

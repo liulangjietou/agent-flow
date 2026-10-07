@@ -191,7 +191,7 @@ class InvoiceOfdRendererTest {
     @Test
     void rejectsUnimplementedVisualFeaturesBeforeReturningPages() throws Exception {
         for (String content : List.of(path("0 0 5 5", "0 0 0", "DrawParam=\"10\""),
-                path("0 0 5 5", "0 0 0", "").replace("</ofd:PathObject>", "<ofd:Clips/></ofd:PathObject>"))) {
+                path("0 0 5 5", "0 0 0", "").replace("</ofd:PathObject>", "<ofd:Clips><ofd:Clip/></ofd:Clips></ofd:PathObject>"))) {
             var files = fixture(1); page(files, 0, "", content);
             assertThatThrownBy(() -> render(files)).isInstanceOf(IOException.class);
         }

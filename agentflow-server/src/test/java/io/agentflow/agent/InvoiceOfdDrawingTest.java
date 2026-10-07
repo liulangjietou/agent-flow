@@ -266,7 +266,7 @@ class InvoiceOfdDrawingTest {
             page(files, 0, "", vector("0 0 20 20", "DrawParam=\"30\"", "", "M 1 5 L 19 5"));
             assertThatThrownBy(() -> render(files)).as(style).isInstanceOf(IOException.class);
         }
-        for (String clip : List.of("<ofd:Clips/>", "<ofd:Clips><ofd:Clip/></ofd:Clips>", "<ofd:Clips><ofd:Clip><ofd:Area/></ofd:Clip></ofd:Clips>")) {
+        for (String clip : List.of("<ofd:Clips><ofd:Clip/></ofd:Clips>", "<ofd:Clips><ofd:Clip><ofd:Area/></ofd:Clip></ofd:Clips>")) {
             var files = drawingFixture(); page(files, 0, "", rectangle("0 0 20 20", "", "<ofd:FillColor Value=\"255 0 0\"/>" + clip));
             assertThatThrownBy(() -> render(files)).isInstanceOf(IOException.class);
         }

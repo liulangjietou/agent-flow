@@ -21,7 +21,7 @@ final class InvoiceOfdClips {
     private int areas;
     private long booleanWork;
 
-    /** toPixels 描述调用方已经确定的裁剪坐标空间；返回同一空间中的区域。 */
+    /** 返回同一坐标空间的附加区域；真实票面的空 Clips 返回 null，保留已有边界裁剪。 */
     Area read(Element clips, InvoiceOfdResources resources, InvoiceOfdStyle inherited, AffineTransform toPixels) throws IOException {
         return read(clips, resources, inherited, toPixels, 1);
     }
@@ -31,7 +31,7 @@ final class InvoiceOfdClips {
         if (depth > MAX_DEPTH) throw invalid();
         shape(clips, Set.of("TransFlag"), Set.of("Clip"));
         var values = children(clips);
-        if (values.isEmpty()) throw invalid();
+        if (values.isEmpty()) return null;
         Area result = null;
         for (Element clip : values) {
             shape(clip, Set.of(), Set.of("Area"));
@@ -68,9 +68,11 @@ final class InvoiceOfdClips {
         if (bool(vector, "Stroke", !text)) combine(region, geometry(style.stroke(outline, objectToPixels)), false);
         Element nested = child(vector, "Clips", false);
         boolean transformClip = nested != null && bool(nested, "TransFlag", false);
-        if (transformClip) combine(region, read(nested, resources, style, objectToPixels, depth + 1), true);
+        Area nestedRegion = nested == null ? null : read(nested, resources, style,
+                transformClip ? objectToPixels : boundaryToPixels, depth + 1);
+        if (transformClip && nestedRegion != null) combine(region, nestedRegion, true);
         region.transform(own);
-        if (nested != null && !transformClip) combine(region, read(nested, resources, style, boundaryToPixels, depth + 1), true);
+        if (!transformClip && nestedRegion != null) combine(region, nestedRegion, true);
         region.transform(AffineTransform.getTranslateInstance(boundary.x, boundary.y));
         combine(region, geometry(boundary), true);
         region.transform(areaTransform); count(region);

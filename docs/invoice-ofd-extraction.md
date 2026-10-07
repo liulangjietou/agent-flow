@@ -6,7 +6,7 @@
 
 ## 支持范围
 
-沿用路径、文字、PNG/JPEG、复合图元、模板、静态批注和有界裁剪。颜色包括 Gray/RGB/CMYK、位深、调色板、受限 ICC 和透明度。文字按明确字体字形与 TextCode/CGTransform 坐标绘制，不用 OCR 或系统字体猜测缺字。
+沿用路径、文字、PNG/JPEG、复合图元、模板、静态批注和有界裁剪。颜色包括 Gray/RGB/CMYK、位深、调色板、受限 ICC 和透明度。独立路径、文字和图片支持 Normal/Darken 混色，图元 Alpha 与图片自身 Alpha 同时参与合成；复合组的非 Normal 混色尚不支持，整份拒绝。真实票面的空 Clips 按无附加裁剪处理，保留当前 Boundary；空 Clip/Area 仍是错误。文字按明确字体字形与 TextCode/CGTransform 坐标绘制，不用 OCR 或系统字体猜测缺字。
 
 签章外观支持 SES v1/v4 中的 PNG/JPEG 或单页嵌套 OFD。正文、模板、签章、批注按顺序合成；印章保留透明背景。多页嵌套章缺少明确页选择语义，整份拒绝。没有可见外观的签名不会合成一个章。
 
