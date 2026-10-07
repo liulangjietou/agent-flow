@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-07T12:31:45.411017+00:00",
+  "recordedAt": "2026-10-07T12:45:33.717433+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -2277,7 +2277,7 @@
           ]
         }
       ],
-      "observed": "原本地 XML 页面和终态重启已有证据；A01 新增 OFD 公开模型全页输入、排队强退和人工确认原键恢复、旧 XML 排队接续及独立配套还原的实际 HTTP 证据。图片/PDF/XML 兜底、模型执行中重启、超时迟到、权限/来源变动等完整运行与真实页面仍须继续验收。",
+      "observed": "五种模型输入和本地 XML 已完成固定包 HTTP 验收：10 次启动、508 次 HTTP、9 次合成模型请求；实际租约 64.132656 秒到期不重发、超时迟到、原件/失权/目的地变化和原键恢复通过。13 个运行终态与财务/原审批保持，399 份页面解析通过。只剩真实浏览器补验，合成模型不证明真实准确率。",
       "references": [
         {
           "path": "docs/evidence/invoice-extraction-ui-20261002.json",
@@ -2290,12 +2290,17 @@
         {
           "path": "docs/evidence/invoice-ofd-final-20261007.json",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/invoice-model-runtime-20261007.json",
+          "line": 1
         }
       ],
       "acceptance": "使用受控本地模型完成图片、PDF、XML 兜底及接通后的 OFD 实际 HTTP/页面；排队与执行中重启、超时、迟到结果、权限和来源变动、原键恢复通过；不算真实模型准确率。",
       "dependsOn": [
         "A01"
-      ]
+      ],
+      "localRuntimeStatus": "PASSED_BROWSER_PENDING"
     },
     {
       "id": "V02",
@@ -3956,7 +3961,6 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "V01",
     "V03"
   ],
   "externalDelivery": {
@@ -3982,17 +3986,17 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "A01",
-    "status": "LOCAL_IMPLEMENTATION_AND_FIXED_RUNTIME_PASSED_ENVIRONMENT_GATES_PENDING",
-    "recordedAt": "2026-10-07T12:31:45.411017+00:00",
-    "evidence": "docs/evidence/invoice-ofd-final-20261007.json",
+    "taskId": "V01",
+    "status": "FIXED_RUNTIME_AND_CONTRACTS_PASSED_BROWSER_PENDING",
+    "recordedAt": "2026-10-07T12:45:33.717433+00:00",
+    "evidence": "docs/evidence/invoice-model-runtime-20261007.json",
     "knownOpenTaskCount": 34
   },
   "localMainIntegration": {
-    "verifiedThroughCommit": "aee7cd2e92ceb59987c1204dddc1ed35b86851d6",
-    "mergeCommit": "aee7cd2e92ceb59987c1204dddc1ed35b86851d6",
+    "verifiedThroughCommit": "fa5a1b26e26f31fb548941944b325402876f5872",
+    "mergeCommit": "fa5a1b26e26f31fb548941944b325402876f5872",
     "originMainFetchedAtMerge": "2ac75649c026501460a59464d80f9a48ddf6ecd7",
     "remotePush": false,
-    "note": "Completed A01 implementation and fixed-package self-review are included in the local main fast-forward at user request. V01/V03 continue; browser, PostgreSQL and external delivery remain separate gates."
+    "note": "A01 fixed-package closure is merged locally at user request. V01 runtime and contracts now pass; only its browser gate remains. V03 original-clause audit continues. No remote delivery."
   }
 }

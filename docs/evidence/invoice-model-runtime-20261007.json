@@ -1,0 +1,152 @@
+{
+  "status": "FIXED_RUNTIME_AND_CONTRACTS_PASSED_BROWSER_PENDING",
+  "recordedAt": "2026-10-07T12:45:33.717433+00:00",
+  "baselineCommit": "fa5a1b26e26f31fb548941944b325402876f5872",
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionService.java": "61d10a1910b2870904ceeb104dd80478f17644fa97134911b250b17b259f720a",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionSources.java": "ca9da221946f00f3f364ce54576fe7679332783412ef4e46c2a5b261a7d571fc",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdAnnotations.java": "28ac134c29516c413bf8a61c2624b72b8f5d0ee7841c629997c1bfaccaa3d653",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdArchive.java": "915f979b7bf4b62cf667b22d23dd3d05ede40230f9a6cf6fdfd95d49d385a876",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdClips.java": "cfca603fd66caa6f9a24565c746f96dd732dee1e3592f6c20c61d6568b6d0e34",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdDocument.java": "61bcaac3e6ebd8071e98354e78a1bc6341e54ae438d6b8f71b7f3ecc769d0d47",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdFonts.java": "e62a448d051571c4f8aedfdf56047a3b26eb66eed7f6bd7caf4f49c8e631ffa6",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdImages.java": "bc43147e00f38884a078ee45db606832152cd286074654adcc89bb6526514367",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdRenderer.java": "a2658bccca35098458439e11050f6a5cc6221cecf114034f0e4183a947db55a6",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdResources.java": "f456a51d7bd14713fd597b7ddd1f98372fa9b6628bc6e67dd90d571e45f164f6",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdSeal.java": "5454c0e37a0a3dce8743c4cc7f434dac66679ce8ab0c26fe39cdf04fc93592f0",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdSignatures.java": "b980c0fd97d33ceab77520a0808fe89d94cebaba93fe02063d5f323cd71d5554",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdText.java": "9aaa51fecdea6a381d1be6f641ef7b6ca224b1cbfb4e95a92f498a09b8a21932",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdVector.java": "141394e951c89c858beaa61be5980dbbc8dee2bc7832d00fc045b982dd0c45e4",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdXml.java": "e9ad5e5eff4c46418f358cb516b57bd8d97bb92e2a17d91751d37a15ad58ccb3",
+    "agentflow-server/src/main/resources/api/openapi.json": "4237b91062928ba767c0f497ad9672c66423d73595171cb27daf109632814608",
+    "agentflow-server/src/main/resources/application.yml": "182d638212a400b82642e4229cb2dbd956c5d32fed275d4f5d7ba55fd04fd2e7",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionApiIntegrationTest.java": "80f3ae0be790d2adfdcadc37e36574070e954a1e91e302cb47a30e81b83f526b",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionModelTest.java": "a9236916060c6bcef350c004ff42b562d43e4f6685892b879dd20c35d830e18d",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdAnnotationsTest.java": "bff95ca8bd19fc3f034c85ac572b0f360af88488fd5100cfc6636527cc8d8468",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdBlendTest.java": "9dec44c6d456d66511389ba4ae9cd8bf10685ecd0a9db22c326e16162fa4a80e",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdCompatibilityTest.java": "afee025a79806cd2eac0222caa22720f5b3208120aef5d530fa2d1ffc37218bd",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdDrawingTest.java": "b1e8bb07d8f41e150e25ab28e98af352220fc691ddde77577c1d63cd36d4d474",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdPackagingProbe.java": "4269a91df49c794b38310dbd1933cf58f2d06a7b798b31026ef6d0b2e46e17ee",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdRendererTest.java": "ed9ff0fa6c204405ddc1f2f125638b29cd02177f360c9d128ccfc3b79004de20",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdSignaturesTest.java": "1b8ee41f4f4fe5cee91957f9a7219bfe0bd55b6495b8f9123a79991fc2ab7c24",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdSourceTest.java": "178cc136476c00759ae01bc374c31ca4c0bcc17d3243d5cda531872bd79f5ad4",
+    "agentflow-server/src/test/java/io/agentflow/auth/OidcTestProvider.java": "d0bc33ab2d51ca5622edc7bde153ea71f8cb597c9f74ab56912b8522f3b4027b",
+    "agentflow-web/src/components/InvoiceExtraction.vue": "a7ba1eb653fca6f3afaa8ba3d260563ef55b28c822ed29fa68ec03942c95d58c",
+    "agentflow-web/src/invoiceExtraction.ts": "0cef65e1a91112eee6c9cc4d565e73c8262ab37dc1762aae281488eb9dca49d4",
+    "agentflow-web/tests/invoice-extraction.test.mjs": "cd0621cad7c6ba8e13abc76deadaefbd622c2feed7022b7b7194c327201bc6e1",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-invoice-ofd-extraction.py": "e8ac110bde3724887ebdf189d5a9af38d7bec72362ebe9c7aae0773261f02db7",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7",
+    "scripts/fixtures/ExpenseRiskOidcFixture.java": "2f9952710952fb955b3d227070e82cf890f58c6fe9f8a4374445e7de4aebabee",
+    "scripts/check-invoice-model-runtime.py": "e61496003e17bce8036b8cf3f736a634ab38b0f1cb6b6b58c6f1bce27657ac35",
+    "scripts/fixtures/InvoiceExtractionRuntimeProbe.java": "b16308e246e17a7749d3a5b5cf57fd6716e74bd68fe329e6c773a32269266568",
+    "agentflow-web/scripts/check-expense-prior-contracts.mjs": "90ba0e495ef60a7ccce4258b1be7db8f145c6329bf398ede253afee009afc349",
+    "agentflow-domain/src/main/java/io/agentflow/agent/InvoiceExtractionInput.java": "7fb4e168373e9b48429710eab0cc6ff746189aed4f53fdfa6e07342e5abf2888",
+    "agentflow-domain/src/main/java/io/agentflow/agent/InvoiceExtractionPort.java": "7d5a480f5f1cd447f54f9977d172c62e8eb62088678f45d3b41ec0333c555ec4",
+    "agentflow-domain/src/main/java/io/agentflow/agent/InvoiceExtractionRun.java": "6abd6e8cf3137e4edbfe7187b82a9b8f6d993343e749a6140d3a054522a4f7f9",
+    "agentflow-domain/src/main/java/io/agentflow/agent/InvoiceExtractionSuggestion.java": "ecc74fb0b7006566bbb5bbde0c81525a52e563eb633753cde43920071e40b491",
+    "agentflow-domain/src/test/java/io/agentflow/agent/InvoiceExtractionRunTest.java": "f033ec11c82429c81a7b6b7fce45e1259aa251d697e6cb6470d01b9306ebee3f",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionController.java": "d67f6eca6ee9cacf7284c015f2747e5cd473a456252f5cf00814192b563bcac3",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionEligibility.java": "6045db204b7c50ddb077eea647751e92728aeb1e5ef57d15fa717e755b9f73ab",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionEngine.java": "9b79d58c43f5fa10288f4369922204f58c52bbd55bda84b58001e0142d941080",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionScheduling.java": "46b09c972353c5585a387907d30ac1a8df304bd36bdfa19be0c0821c53ae865a",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionWorker.java": "5a6e60a42a2b18639e84c9c849a45dda7f873c93890af915a7b5845b4392a183",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionXml.java": "3ed597609e75668350c03cada841fd6afa14b235b5db20ddddf528110bbfa566",
+    "agentflow-server/src/main/java/io/agentflow/agent/JdbcInvoiceExtractionRunRepository.java": "736728045bcbc25acb98d0fa276101274e783ff88b7c9f87d9a4b2452038d18e",
+    "agentflow-server/src/main/java/io/agentflow/agent/OpenAiCompatibleInvoiceExtractionModel.java": "6185530bfd955530a93da3a539abe207f4c51d66f3dcf2bafd02c9ca5f06be14",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionIntegrationTest.java": "b043bc2f890c3bc0d55dfb894e63db9d61e4ac52241d733120aa338b460e4962",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionMigrationTest.java": "fab6193ee1f9a0b8662813fa35a3c3a70814373becf260423118775c1a2a7633",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionSchedulingTest.java": "4306f284f245837d809168e0c461214d74474ff19b0c868d589052d7e7d325d8",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionXmlTest.java": "026d2157ad7f1eea30376fe75e764acc6c967c43d4c192f25b79f43ffd815b00"
+  },
+  "fixedJar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-ofd-xsid-server.jar",
+    "sha256": "4136a9fcc512d45a5a37f738a8fb9d31d564624d235299f8b8f2e8552858fd20"
+  },
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/v01-runtime-verified/manifest.json",
+    "sha256": "fb23c9e9dc0d42221f97f45d70579736fee4a9ca78625951203f62182b070a7f",
+    "files": 112
+  },
+  "runtime": {
+    "status": "PASSED",
+    "jarSha256": "4136a9fcc512d45a5a37f738a8fb9d31d564624d235299f8b8f2e8552858fd20",
+    "database": "H2",
+    "checks": [
+      {
+        "name": "all-formats-and-owner-boundaries",
+        "modelFormats": [
+          "PNG",
+          "JPEG",
+          "PDF",
+          "XML",
+          "OFD"
+        ],
+        "structuredXmlModelCalls": 0,
+        "queuedRestartOriginalKeys": 6,
+        "deniedForeignReadsAndReviews": 6
+      },
+      {
+        "name": "invalid-empty-timeout-and-running-crash",
+        "lateReplyDidNotOverwrite": true,
+        "expiredOriginalLeaseSeconds": 64.132656,
+        "interruptedModelRequests": 1,
+        "originalQueueReceiptReplayed": true
+      },
+      {
+        "name": "source-owner-and-target-changes",
+        "additionalModelRequests": 0,
+        "changedOriginalFailed": true,
+        "revokedOwnerFailed": true,
+        "changedTargetFailed": true
+      },
+      {
+        "name": "final-restart",
+        "runs": 13,
+        "allStatesAndTransitionsUnchanged": true,
+        "originalReviewReceiptReplayed": true,
+        "financeAndOriginalTasksUnchanged": true
+      }
+    ],
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "realEnterpriseModelVerified": false,
+    "boots": 10,
+    "httpRecords": 508,
+    "modelCalls": 9,
+    "ownedProcessesStopped": true
+  },
+  "httpContracts": {
+    "result": "PASS",
+    "responses": 502,
+    "requests": 55,
+    "beforeResponses": 92,
+    "binaryResponses": 6
+  },
+  "frontendActualResponses": {
+    "status": "PASSED",
+    "counts": {
+      "options": 13,
+      "details": 357,
+      "pages": 6,
+      "receipts": 23
+    },
+    "browserVerified": false
+  },
+  "previousFixedPackageEvidence": {
+    "path": "docs/evidence/invoice-ofd-final-20261007.json",
+    "sha256": "07291230f6ab76e7efd94634014e5cdd05baa229854639d11678ad650f7a0a8b"
+  },
+  "review": {
+    "kind": "self-review",
+    "unresolvedKnownFindings": 0,
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/v01-runtime-verified/review.md"
+  },
+  "boundaries": {
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "realEnterpriseModelVerified": false,
+    "remotePushOrPr": false
+  }
+}
