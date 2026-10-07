@@ -1,0 +1,180 @@
+{
+  "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_FINAL_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
+  "recordedAt": "2026-10-07T11:21:02.908917+00:00",
+  "verifiedSourceCommit": "259c9933ee12615cdcd3b2e8daed89d81449cd06",
+  "review": {
+    "base": "fb0a9a7832f1dc5f0427eff013694eff8917c1fb",
+    "head": "259c9933ee12615cdcd3b2e8daed89d81449cd06",
+    "P0": 0,
+    "P1": 0,
+    "P2": 0,
+    "unresolved": 0,
+    "report": "/fyoung/tmp/agentflow-remaining-20260928/f15-final-verified/f15-final-review.md",
+    "method": "One independent read-only whole-plan review; archive and source digests rechecked, tests not rerun in final review."
+  },
+  "sourceSha256": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/reporting/ExpenseFinancialMetrics.java": "40f7bcfadc2aec484129f37ec52397979c4ce4bf9a12eeec7ca46d10c3df3ef2",
+    "agentflow-domain/src/main/java/io/agentflow/expense/reporting/ExpenseResourceMetrics.java": "aba133393e5ceb2e6701fa3b6a3a03be5f1a629ed86210077210fe3a3bb86980",
+    "agentflow-domain/src/test/java/io/agentflow/expense/reporting/ExpenseFinancialMetricsTest.java": "e87d0c01133e97ca1791e9ec0cca56b96610021b29275721bdb46a7dd7199b80",
+    "agentflow-domain/src/test/java/io/agentflow/expense/reporting/ExpenseResourceMetricsTest.java": "891c9814f2671d719871b44bf424ba1d2dbe1d818132fd0b9ba0328dc4c3de82",
+    "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java": "9075992aec9df51b9b4f58b181257089d07bac8acfea81424b28abcae0e1ec1c",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRequestService.java": "25644a5f421a08b70dc3ab3631c98423dcf22b7d985aa8b0a74734d7378c8179",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseController.java": "e25f720e32cc1a20e163987ec3f18d41d11c741df0176500771f4fe04902123d",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseDraftService.java": "0b2a773796bf3b61c705c06fc38a1ad402e1d5a817eb643bcfa9db38cc055262",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanService.java": "2c9a6f5cf86d924bc8b0a2eba0707ac3322b4a13391ec9482478bb6a8bab8c16",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckResources.java": "cdcfceb0b729efcdd66580527a68fdb16e6ff3e270825021506ba083d03b75e4",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckService.java": "cf6cb399d29fa71ae61d4bf41693ed30082a7af051f6712a08855f73c72832cf",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSubmissionRejections.java": "b52184259afeba59da9fb98cf3b442eb9380da8c2d4423a8d9327fc38d36cc48",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSubmissionService.java": "46f90d06501b768a3655b096b7baace4e6659d03effbd4fd32b097eef54510e1",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseFinancialReport.java": "fc293ab2206b50c064a753338503b736df9a777949cb1c6d6e40cd8670ca6616",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseFinancialReportController.java": "07190df168590ab3921e1e2e64dd7e6f995f268a697978b37f318a393d017597",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseFinancialReportQuery.java": "2f51ecc3ef8516502c28bdba773bc5697a07e8e62960bf1e01cecff995348ff9",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseReportQueryParameters.java": "43023c8a5ccd58af374e23bce2f843eb3db059cf74a86d30facfed002aac306e",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseReportScope.java": "bd4015c1bc8c439fa0dcede6c7fb47e0327609e818ee8a6e82ce755c0256aaca",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseReportingActivity.java": "dd8522169ab4d8e4a4a3cebb37447aeef136da248f1d4d40d0f22df8cbbac5f8",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseReportingOperations.java": "ddde5eb29e5c76547d9cd926929f6d4350165502af160d267b354376841b8b8a",
+    "agentflow-server/src/main/java/io/agentflow/expense/reporting/ExpenseReportingResources.java": "5b7653572c9dca6fd3452baa2c92413c97a8dacaa81e811b3c07bdf283a109b6",
+    "agentflow-server/src/main/resources/api/openapi.json": "c870f3758eabceeae16b7f90cd49ad7f2fab23eca2a08e030d6141aebac896ae",
+    "agentflow-server/src/main/resources/db/migration/V121__expense_reporting_rejections.sql": "7eab30c66bc0a87fc4c49c7e79896ec4905d6f5c30729723ef15a6cfaba27ba8",
+    "agentflow-server/src/test/java/io/agentflow/approval/ExpenseFinancialReportingIntegrationTest.java": "b28768b2d488384ce08e7a4606e3091c3ded0d1857c049b280ae5527e2955321",
+    "agentflow-server/src/test/java/io/agentflow/expense/AdvanceRepaymentIntegrationTest.java": "7c0e2a77670afe639e3a9e252abb4075a99e67515ffbe65ff2cb8773eb843f0b",
+    "agentflow-server/src/test/java/io/agentflow/expense/AdvanceRequestIntegrationTest.java": "14c3bdbec92d87254eccc1a401e1bd80364848f3df2c8dc41b17d968e4be8ef7",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseFinancialReportingMigrationTest.java": "740e29b508d5aed3ae4e230b8e4071a1b0dcb82d01dd1d95ae43378cd380466e",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpensePlanIntegrationTest.java": "d5a8dfc412cd22eea6019cd9e39b16ca5ef6318ed9539611302bbf241fde57bd",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java": "4cdfee376689b42bf74ba141018e85ea2adfd62aa3d69d529f2ffe5d31a770fc",
+    "agentflow-server/src/test/java/io/agentflow/expense/reporting/ExpenseReportQueryParametersTest.java": "d2c3d1d3aeed8195ccc6725798bb3b9dd4d17785a7f09b57c45626d58d1ba413",
+    "agentflow-web/scripts/check-expense-financial-responses.mjs": "66438e684286b0231414e9edae86b3f464074522230492f122ba81cc0ff25e45",
+    "agentflow-web/scripts/check-openapi.mjs": "1418125ee93292dd8a8a3e14714ba9e471424ab9fa9ec8a38a5c570be787abe6",
+    "agentflow-web/scripts/test-requests.mjs": "be02db3aeae71b1460c3af3727108883e1b63ac8e4a35c801c1e72d0f608fd4a",
+    "agentflow-web/src/App.vue": "7aad2f8ec9e13e1e67299f7c08b978e066f729f63a68f6c43d6e67dad44ccc94",
+    "agentflow-web/src/api.ts": "a9f14cac5e27f565bbdc847516294686cacd6c797afdf30699f3d749cefaa1ff",
+    "agentflow-web/src/components/ExpenseFinancialReporting.vue": "84fa556d7fd686208deff748e860e066fd37c88e74b2603a2862148ab11f27ed",
+    "agentflow-web/src/components/WorkspaceNavigation.vue": "90b4ee7badc3f18d4e115eb692111e1d35ea1f464786ba8f338bb3e3f224df53",
+    "agentflow-web/src/expenseFinancialReporting.ts": "5482d849625e7788d0a7fe3064e1f171f1f79b54fd3b85f32ba14d270e2e3664",
+    "agentflow-web/src/workspaceNavigation.ts": "3cb5a95299494a5994db82c6beec68d6116b91fb4bc2b075a40efcb73fdba21e",
+    "agentflow-web/tests/expense-financial-reporting.test.mjs": "37a2d3c0cf0b6a8461c2b9f5ba2ff584193f8e583b48fff42ce988f495964bca",
+    "agentflow-web/tests/fixtures/expense-financial-reporting.mjs": "6596e2129b7fd81367834527cd1b8a7273624733fa24e8abaf902ef73f585f92",
+    "scripts/check-expense-financial-reporting.py": "ead6061be11bbb62564b08e013a6a8136924d39fa9bd2a90ecdf430163eea0b9",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/fixtures/ExpenseRiskOidcFixture.java": "2f9952710952fb955b3d227070e82cf890f58c6fe9f8a4374445e7de4aebabee"
+  },
+  "precedingEvidence": [
+    {
+      "evidence": "docs/evidence/expense-financial-reporting-task1-20261004.json",
+      "sha256": "9863efee16be197b895416ed805c9b8c7e65a304d6cd3f8e7eeabe4844b646b7",
+      "archiveManifest": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f15-task1-verified/manifest.json",
+        "sha256": "83508fc9fb92f5bd7b1cde471bec71c0816858d74e32bf946b9f94912f4addc0",
+        "files": 11
+      }
+    },
+    {
+      "evidence": "docs/evidence/expense-financial-reporting-task2-20261004.json",
+      "sha256": "b3d5b59996368a2e056ae48d446a29b6e1ace44acca231a5a1602a6ff452f584",
+      "archiveManifest": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f15-task2-verified/manifest.json",
+        "sha256": "cfb8746c39827e7845a6f7d030f450992e6daf3448d515f31a7be6776079f0bb",
+        "files": 54
+      }
+    },
+    {
+      "evidence": "docs/evidence/expense-financial-reporting-task3-20261004.json",
+      "sha256": "1fe93afbbd2a358cc421ba7cd27f8ac90f6d8d22ad04d360ca21c7dc7dec75dd",
+      "archiveManifest": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f15-task3-verified/manifest.json",
+        "sha256": "c98042e593c0ff124c36c8b0c5837374987631ae09c7551e2202cccf1c0f10f9",
+        "files": 51
+      }
+    },
+    {
+      "evidence": "docs/evidence/expense-financial-reporting-runtime-20261007.json",
+      "sha256": "0c1e0f60dce0e25a978f7c73054dc92d0dd30ca4e1ae64b2574a2bc91e6b180e",
+      "archiveManifest": {
+        "path": "/fyoung/tmp/agentflow-remaining-20260928/f15-runtime-verified/manifest.json",
+        "sha256": "f5ad64f6b8f2f2926395ddea5f4f58e8bc1c7ef3471beb03de2c123f63a8d40d",
+        "files": 134
+      }
+    }
+  ],
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/f15-final-verified/manifest.json",
+    "sha256": "eeb2776e320844d046bc7ce2e5572f9484ca2c95c66f65afa17edee92a9911c3",
+    "files": 49
+  },
+  "fixedJar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-reporting-server-task3.jar",
+    "sha256": "3cc9e82e2d32a774516431b1c01482e3e53629d5b93b55ccba15908ffccb598a"
+  },
+  "runtime": {
+    "status": "PASSED",
+    "startedAt": "2026-10-07T11:06:47.515957+00:00",
+    "beforeSha256": "cf7b8815deda4fd4c42de938a9322d94e7b70bf9289bfaeebebda2c01b73a331",
+    "afterSha256": "3cc9e82e2d32a774516431b1c01482e3e53629d5b93b55ccba15908ffccb598a",
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-v120-upgrade",
+        "oldTables": 278,
+        "oldRows": 359,
+        "changedOldTables": [
+          "flyway_schema_history"
+        ]
+      },
+      {
+        "name": "failed-submission-crash-original-key-and-attempts",
+        "recorded": 1,
+        "prechecks": 1,
+        "privateLaterVerificationExcluded": true
+      },
+      {
+        "name": "original-rounds-payment-and-current-resources",
+        "paymentCommands": 1,
+        "planConsumed": "40.00",
+        "planExecutionRate": 0.4,
+        "loanOutstanding": "300.00",
+        "unknownSeparatedFromFailure": true
+      },
+      {
+        "name": "independent-paired-restore",
+        "tables": 280,
+        "rows": 1029,
+        "schemaStatements": 2228,
+        "originalDatabaseUnchanged": true,
+        "originalTaskContinued": true,
+        "originalRejectionPreserved": true
+      }
+    ],
+    "finishedAt": "2026-10-07T11:07:43.973976+00:00",
+    "httpRecords": 285,
+    "providerCalls": 90,
+    "boots": 5,
+    "ownedProcessesStopped": true
+  },
+  "httpContracts": {
+    "result": "PASS",
+    "responses": 282,
+    "requests": 90,
+    "beforeResponses": 58,
+    "binaryResponses": 3
+  },
+  "frontendActualResponses": {
+    "result": "PASS",
+    "reports": 16,
+    "denied": 4,
+    "invalid": 0,
+    "submittedAcrossSnapshots": 43,
+    "sourceSha256": "5482d849625e7788d0a7fe3064e1f171f1f79b54fd3b85f32ba14d270e2e3664",
+    "contractSha256": "c870f3758eabceeae16b7f90cd49ad7f2fab23eca2a08e030d6141aebac896ae",
+    "output": "/fyoung/tmp/agentflow-financial-parser-oFpqkJ"
+  },
+  "boundaries": {
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "realEnterpriseSourcesVerified": false,
+    "remotePushOrPr": false,
+    "finalReviewPending": false
+  }
+}

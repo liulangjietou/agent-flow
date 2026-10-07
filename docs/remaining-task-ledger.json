@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-04T19:50:48.593966+00:00",
+  "recordedAt": "2026-10-07T11:21:02.908917+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -22,16 +22,15 @@
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
     ],
     "localDeliveryBreakdown": {
-      "recordedAt": "2026-10-04T19:50:48.593966+00:00",
+      "recordedAt": "2026-10-07T11:21:02.908917+00:00",
       "implementationRemaining": {
-        "count": 2,
+        "count": 1,
         "taskIds": [
-          "A01",
-          "F15"
+          "A01"
         ]
       },
       "implementedAwaitingBrowserAndPostgresVerification": {
-        "count": 14,
+        "count": 15,
         "taskIds": [
           "A02",
           "A03",
@@ -46,7 +45,8 @@
           "F16",
           "F05",
           "F09",
-          "F14"
+          "F14",
+          "F15"
         ]
       },
       "note": "This is a breakdown of the 16 OPEN local delivery tasks, not additional tasks or new completion claims."
@@ -1894,14 +1894,14 @@
           ]
         }
       ],
-      "observed": "当前运营统计涵盖审批均时、退回、SLA、通知和 Agent 采纳；没有费用 P50/P90、超标核减、查验重复拦截、借款账龄和计划执行率的读模型。",
+      "observed": "费用财务只读报表及页面已实现：原轮次权限、P50/P90、超标核减、查验与重复拦截、借款账龄、计划执行及积压均有范围测试；固定 V120→V121 升级、拒绝后强退原键恢复和独立配套还原通过，285 份实际响应通过契约，一次最终审查 P0/P1/P2 为 0。浏览器与 PostgreSQL 待补验，保持 OPEN。",
       "references": [
         {
-          "path": "agentflow-domain/src/main/java/io/agentflow/approval/operations/ApprovalOperationsReadPort.java",
-          "line": 36
+          "path": "docs/expense-financial-reporting.md",
+          "line": 1
         },
         {
-          "path": "docs/operations-outcome-metrics.md",
+          "path": "docs/evidence/expense-financial-reporting-final-review-20261007.json",
           "line": 1
         }
       ],
@@ -3957,7 +3957,6 @@
     "scope": "首次台账审计基线；后续进展见 latestProgress 和各任务 completion，历史检查不冒充当前全量检查。"
   },
   "recommendedNextTaskIds": [
-    "F15",
     "A01"
   ],
   "externalDelivery": {
@@ -3983,17 +3982,17 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "F14",
+    "taskId": "F15",
     "status": "LOCAL_IMPLEMENTATION_RUNTIME_AND_FINAL_REVIEW_VERIFIED_BROWSER_POSTGRES_PENDING",
-    "recordedAt": "2026-10-04T19:50:48.593966+00:00",
-    "evidence": "docs/evidence/expense-project-approvals-final-review-20261004.json",
+    "recordedAt": "2026-10-07T11:21:02.908917+00:00",
+    "evidence": "docs/evidence/expense-financial-reporting-final-review-20261007.json",
     "knownOpenTaskCount": 34
   },
   "localMainIntegration": {
-    "verifiedThroughCommit": "17892790ff1e65f6581dec13339872788158a73a",
-    "mergeCommit": "17892790ff1e65f6581dec13339872788158a73a",
+    "verifiedThroughCommit": "259c9933ee12615cdcd3b2e8daed89d81449cd06",
+    "mergeCommit": "259c9933ee12615cdcd3b2e8daed89d81449cd06",
     "originMainFetchedAtMerge": "2ac75649c026501460a59464d80f9a48ddf6ecd7",
     "remotePush": false,
-    "note": "Completed F14 code including the final review fix fast-forwarded into local main at user request; remote delivery remains E15 after V02."
+    "note": "Completed F15 implementation and whole-plan final review through this commit are included in the local main fast-forward at user request; remote delivery remains E15 after V02."
   }
 }
