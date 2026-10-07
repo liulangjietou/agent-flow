@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { api, type Task, type TaskAction, type TaskActionInput } from '../api'
-import { isApprovalDecision, needsComment, needsRecipient, taskActionInput, taskActionLabels, TaskRecipientsQuery } from '../taskActions'
+import { isApprovalDecision, needsComment, needsRecipient, taskActionInput, taskActionLabels, TaskRecipientsQuery, type TaskReturnDraft } from '../taskActions'
 import CountersignMembers from './CountersignMembers.vue'
 import type { CountersignInput, CountersignView } from '../countersignMembership'
 import { approvalPolicyLabel } from '../approvalPolicy'
@@ -38,6 +38,14 @@ function prepare(action: TaskAction) {
   if (needsRecipient(action)) reloadRecipients()
   else void nextTick(() => { if (pending.value === action && !props.locked) opinionInput.value?.focus() })
 }
+/** 外部预填仅属于本任务，不能覆盖正在填写的意见或直接发出审批命令。 */
+function prepareReturn(draft: TaskReturnDraft): boolean {
+  if (props.locked || pending.value || membershipOpen.value || !actions.value.includes('RETURN')
+    || draft.scopeKey !== props.scopeKey || draft.taskId !== props.task.taskId || draft.expectedVersion !== props.task.version) return false
+  prepare('RETURN'); comment.value = draft.comment
+  return true
+}
+defineExpose({ prepareReturn })
 function execute(action: TaskAction) {
   if (props.locked || recipients.loading || recipients.error) return
   try { error.value = ''; emit('execute', taskActionInput(props.task, action, comment.value, target.value, recipients.users, selectedProxy.value)) }

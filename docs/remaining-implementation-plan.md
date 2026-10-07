@@ -1,8 +1,8 @@
 # 剩余工作实施方案
 
-2026-10-07 当前：已编号 40 项 OPEN。22 项本地功能的已知实现缺口已补齐，18 项等待适用的浏览器或 PostgreSQL 验收，另 4 项等待浏览器/辅助设备。新发现的 U03 已补齐实时核减校验、顶部四项金额预览与审批锁定，见[实施与验证](expense-review-feedback.md)。V01、V02、V03 三项整体核验及 15 项企业联调/远端交付仍开放；V03 未结束，已知实现缺口为零不等于全项目无遗漏。
+2026-10-07 当前：已编号 41 项 OPEN。23 项本地功能的已知实现缺口已补齐，18 项等待适用的浏览器或 PostgreSQL 验收，另 5 项等待浏览器/辅助设备。新发现的 U04 已补齐收单材料核对与缺件退回预填，见[实施与验证](expense-receipt-checklist.md)。V01、V02、V03 三项整体核验及 15 项企业联调/远端交付仍开放；V03 未结束，已知实现缺口为零不等于全项目无遗漏。
 
-本次前端完整 1,507 项、类型检查、构建和 OpenAPI 通过。Java 与固定包没有改动，沿用 U02 的 5,311 项组合去重证据和原固定包运行范围；未冒充重跑。见[当前台账](remaining-task-ledger.md)、[U02 证据](evidence/expense-feedback-20261007.json)和[U03 证据](evidence/expense-review-feedback-20261007.json)。
+本次前端完整 1,512 项、类型检查、构建和 OpenAPI 通过。Java 与固定包没有改动，沿用 U02 的 5,311 项组合去重证据和原固定包运行范围；未冒充重跑。见[当前台账](remaining-task-ledger.md)、[U02 证据](evidence/expense-feedback-20261007.json)和[U04 证据](evidence/expense-receipt-checklist-20261007.json)。
 
 接续顺序：完成 V03 原始条款逐项映射并修复新发现的代码缺口；在对应环境可用后完成 V01/V02，随后按 E15 完成远端交付。已经验证的本地成果按用户授权持续 fast-forward 合入 main。
 

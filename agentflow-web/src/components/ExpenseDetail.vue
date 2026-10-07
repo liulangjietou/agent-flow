@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
-import { ExpenseDetailQuery, budgetIssues, expenseTypes, moneyLabel, policyExceptionLabels, previewReduction, reductionReasons, type ExpenseTaskActivity, type ExpenseReductionPreview } from '../expenses'
+import { ExpenseDetailQuery, budgetIssues, expenseTypes, moneyLabel, policyExceptionLabels, previewReduction, reductionReasons, type ExpenseTaskActivity, type ExpenseReductionPreview, type ExpenseReturnRequest } from '../expenses'
 import ExpenseActions from './ExpenseActions.vue'
 import ExpenseEditor from './ExpenseEditor.vue'
 import VoucherStatus from './VoucherStatus.vue'
@@ -17,7 +17,7 @@ import ExpensePriorControlPanel from './ExpensePriorControlPanel.vue'
 import ExpenseBudgetReviewPanel from './ExpenseBudgetReviewPanel.vue'
 import { budgetApprovalIssues } from '../expenseBudgetReview'
 const props = defineProps<{ reportId: string; applicationId: string; scopeKey: string; version?: number; taskId?: string; roundNo?: number; locked?: boolean; applicant?: boolean }>()
-const emit = defineEmits<{ changed: []; busy: [value: boolean]; taskActivity: [value: ExpenseTaskActivity] }>()
+const emit = defineEmits<{ changed: []; busy: [value: boolean]; taskActivity: [value: ExpenseTaskActivity]; returnMissing: [value: ExpenseReturnRequest] }>()
 const query = reactive(new ExpenseDetailQuery(api.expenseReport, api.expenseWorkflow))
 const notice = ref('')
 const editing = ref(false)
@@ -111,7 +111,7 @@ const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
       <ExpensePriorControlPanel v-if="query.detail.financialRound && query.detail.roundNo > 0" :report-id="query.detail.id" :application-id="query.detail.applicationId" :round-no="query.detail.roundNo" :scope-key="scopeKey" :version="query.detail.applicationVersion" :locked="!!locked || businessBusy || query.loading" />
       <ExpenseBudgetReviewPanel v-if="query.detail.financialRound && query.detail.roundNo > 0" :report-id="query.detail.id" :application-id="query.detail.applicationId" :round-no="query.detail.roundNo" :scope-key="scopeKey" :version="query.detail.applicationVersion" :locked="!!locked || businessBusy || query.loading" />
       <ExpenseRiskPanel v-if="query.detail.financialRound && query.detail.roundNo > 0" :report="query.detail" :task-id="roundNo === undefined ? (taskId ?? query.workflow?.task?.taskId) : undefined" :scope-key="scopeKey" :locked="!!locked || businessBusy || query.loading || explanationLocked" @busy="riskBusy = $event" @dirty="riskDirty = $event" />
-      <ExpenseActions v-if="query.workflow && roundNo === undefined" :detail="query.detail" :workflow="query.workflow" :scope-key="scopeKey" :locked="actionsLocked" @changed="changed" @busy="businessBusy = $event" @preview="reductionPreview = $event" @refresh="load" />
+      <ExpenseActions v-if="query.workflow && roundNo === undefined" :detail="query.detail" :workflow="query.workflow" :scope-key="scopeKey" :locked="actionsLocked" @changed="changed" @busy="businessBusy = $event" @preview="reductionPreview = $event" @return-missing="emit('returnMissing', $event)" @refresh="load" />
       <VoucherStatus v-if="financial && ['APPROVED', 'REVOKED'].includes(query.detail.applicationStatus)" :application-id="query.detail.applicationId" :business-id="query.detail.id" business-type="EXPENSE" :round-no="query.detail.roundNo" :application-version="query.detail.applicationVersion" :business-version="query.detail.financialVersion" :scope-key="scopeKey" :locked="actionsLocked" @busy="businessBusy = $event" @changed="load" />
       <FinancePaymentStatus v-if="financial && ['APPROVED', 'REVOKED'].includes(query.detail.applicationStatus)" :application-id="query.detail.applicationId" :business-id="query.detail.id" :round-no="query.detail.roundNo" :application-version="query.detail.applicationVersion" :business-version="query.detail.financialVersion" :scope-key="scopeKey" :locked="actionsLocked" @busy="businessBusy = $event" />
       <VoucherStatus v-if="financial && ['APPROVED', 'REVOKED'].includes(query.detail.applicationStatus)" payment :application-id="query.detail.applicationId" :business-id="query.detail.id" business-type="EXPENSE" :round-no="query.detail.roundNo" :application-version="query.detail.applicationVersion" :business-version="query.detail.financialVersion" :scope-key="scopeKey" :locked="actionsLocked" @busy="businessBusy = $event" @changed="load" />

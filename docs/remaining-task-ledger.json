@@ -1,28 +1,28 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-07T20:46:09.834451+00:00",
+  "recordedAt": "2026-10-07T20:54:13.432562+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 40,
+    "knownOpenTaskCount": 41,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 22,
+      "LOCAL_DEVELOPMENT": 23,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 40,
+    "projectRemainingLowerBound": 41,
     "completionPercentage": null,
     "notes": [
-      "40 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "41 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
     ],
     "localDeliveryBreakdown": {
-      "recordedAt": "2026-10-07T20:46:09.834451+00:00",
+      "recordedAt": "2026-10-07T20:54:13.432562+00:00",
       "implementationRemaining": {
         "count": 0,
         "taskIds": [],
@@ -51,14 +51,15 @@
           "O01"
         ]
       },
-      "note": "22 OPEN local targets: 18 implemented awaiting applicable browser/PostgreSQL gates; W02, U01, U02 and U03 awaiting browser/devices. V03 audit remains incomplete.",
+      "note": "23 OPEN local targets: 18 implemented awaiting applicable browser/PostgreSQL gates; W02 and U01-U04 awaiting browser/devices. V03 audit remains incomplete.",
       "implementedAwaitingBrowserVerification": {
-        "count": 4,
+        "count": 5,
         "taskIds": [
           "W02",
           "U01",
           "U02",
-          "U03"
+          "U03",
+          "U04"
         ]
       }
     }
@@ -2338,7 +2339,7 @@
           ]
         }
       ],
-      "observed": "Java 组合去重 5311 项保留 U02 已验范围，固定包 c3c28f84 保持原运行证据。U03 前端 1507 项全部通过，类型检查、构建、OpenAPI 通过。浏览器、PostgreSQL、完整条款核对和目标部署仍待完成。",
+      "observed": "Java 组合去重 5311 项保留 U02 已验范围，固定包 c3c28f84 保持原运行证据。U04 前端 1512 项全部通过，类型检查、构建、OpenAPI 通过。浏览器、PostgreSQL、完整条款核对和目标部署仍待完成。",
       "references": [
         {
           "path": "docs/postgres-release-gate.md",
@@ -2378,9 +2379,9 @@
         "status": "PASS",
         "evidence": "docs/evidence/local-regression-gate-20261007.json",
         "javaUniqueCases": 5311,
-        "webUniqueCases": 1507,
+        "webUniqueCases": 1512,
         "scopeSupplement": "docs/evidence/expense-feedback-20261007.json",
-        "webScopeSupplement": "docs/evidence/expense-review-feedback-20261007.json"
+        "webScopeSupplement": "docs/evidence/expense-receipt-checklist-20261007.json"
       }
     },
     {
@@ -3183,6 +3184,45 @@
         }
       ],
       "acceptance": "实时金额与原因校验、稳定行号及整数分预览，核减低于借款时冲销下调；顶部明确未保存；本次表单可操作但外层审批锁定，取消/刷新及旧身份任务版本安全隔离。",
+      "dependsOn": [],
+      "implementationStatus": "IMPLEMENTED_LOCAL_COMPONENTS_BUILD_BROWSER_PENDING"
+    },
+    {
+      "id": "U04",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "工作台交互",
+      "status": "OPEN",
+      "title": "收单材料勾选与缺件退回预填",
+      "sourceRefs": [
+        {
+          "documentId": "01",
+          "section": "财务审核页",
+          "lines": [
+            123,
+            123
+          ]
+        },
+        {
+          "documentId": "01",
+          "section": "原型演示路径",
+          "lines": [
+            142,
+            143
+          ]
+        }
+      ],
+      "observed": "两项原行为先失败后修复；材料逐项核对、缺件阻止签收、原任务退回预填及确认、旧上下文和人工意见保护已实现。前端完整 1512 项、类型检查、构建和 OpenAPI 通过；浏览器及辅助设备待补验。",
+      "references": [
+        {
+          "path": "docs/evidence/expense-receipt-checklist-20261007.json",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-receipt-checklist.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "未勾齐不签收；缺件带入可编辑退回原因但不直接执行，当前身份/任务/版本绑定，保留原人工意见及代理权限，电子原文件不被纸质确认替代。",
       "dependsOn": [],
       "implementationStatus": "IMPLEMENTED_LOCAL_COMPONENTS_BUILD_BROWSER_PENDING"
     }
@@ -4351,15 +4391,15 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "U03",
+    "taskId": "U04",
     "status": "LOCAL_IMPLEMENTATION_VERIFIED_REQUIREMENT_AUDIT_CONTINUES",
-    "recordedAt": "2026-10-07T20:46:09.834451+00:00",
-    "knownOpenTaskCount": 40,
-    "evidence": "docs/evidence/expense-review-feedback-20261007.json"
+    "recordedAt": "2026-10-07T20:54:13.432562+00:00",
+    "knownOpenTaskCount": 41,
+    "evidence": "docs/evidence/expense-receipt-checklist-20261007.json"
   },
   "localMainIntegration": {
-    "verifiedThroughCommit": "6d45c67a47e591f3d27aab81c234d933681be393",
-    "mergeCommit": "6d45c67a47e591f3d27aab81c234d933681be393",
+    "verifiedThroughCommit": "d66b6b527f82715dc35440783a8282666a8fe913",
+    "mergeCommit": "d66b6b527f82715dc35440783a8282666a8fe913",
     "originMainFetchedAtMerge": "2ac75649c026501460a59464d80f9a48ddf6ecd7",
     "remotePush": false,
     "note": "Local main was verified at this source base before the current commit. This stage is ready for authorized fast-forward integration; remote delivery remains gated."

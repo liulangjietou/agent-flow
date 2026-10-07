@@ -1,4 +1,6 @@
 import type { Task, TaskAction, TaskActionInput } from './api'
+/** 外部业务面板仅预填退回意见，仍由当前待办明确确认。 */
+export interface TaskReturnDraft { scopeKey: string; taskId: string; expectedVersion: number; comment: string }
 
 export const taskActionLabels: Record<TaskAction, string> = {
   APPROVE: '批准申请', RETURN: '退回申请', REJECT: '驳回申请', TRANSFER: '转交任务',

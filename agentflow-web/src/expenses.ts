@@ -1,5 +1,6 @@
 import type { PriorControlSource } from './expensePriorControl'
 import type { ApprovalProxyOption, ApprovalProxyUse } from './api'
+import type { TaskReturnDraft } from './taskActions'
 
 /** 所有金额以十进制字符串传输；币种来自服务端财务事实。 */
 export interface Money { value: string; currency: string }
@@ -50,6 +51,7 @@ export interface ExpenseDetail { id: string; applicationId: string; businessNo: 
 export interface ExpenseVersions { applicationVersion: number; financialVersion: number }
 /** 费用操作锁绑定当前待办身份，旧组件卸载不能解除另一个任务的锁。 */
 export interface ExpenseTaskActivity { scopeKey: string; applicationId: string; taskId: string | undefined; applicationVersion: number | undefined; busy: boolean }
+export interface ExpenseReturnRequest { applicationId: string; draft: TaskReturnDraft }
 export interface ExpenseCommand extends ExpenseVersions { comment: string }
 export interface ReductionLine { lineNo: number; approvedGross: string; approvedTax: string }
 /** 财务任务操作可明确选用直接代理，申请人撤回和作废不接受该依据。 */

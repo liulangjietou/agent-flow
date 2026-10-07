@@ -2,14 +2,18 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { selectedApprovalProxy } from '../taskActions'
-import { changedReductions, expenseError, moneyLabel, previewReduction, reductionReasons, type ExpenseDetail, type ExpenseWorkflow, type ExpenseReductionPreview, type ReductionLine, type ReductionReason } from '../expenses'
+import { changedReductions, expenseError, moneyLabel, previewReduction, reductionReasons, type ExpenseDetail, type ExpenseWorkflow, type ExpenseReductionPreview, type ExpenseReturnRequest, type ReductionLine, type ReductionReason } from '../expenses'
 
 const props = defineProps<{ detail: ExpenseDetail; workflow: ExpenseWorkflow; scopeKey: string; locked?: boolean }>()
-const emit = defineEmits<{ changed: []; busy: [value: boolean]; refresh: []; preview: [value: ExpenseReductionPreview | null] }>()
+const emit = defineEmits<{ changed: []; busy: [value: boolean]; refresh: []; preview: [value: ExpenseReductionPreview | null]; returnMissing: [value: ExpenseReturnRequest] }>()
 type Action = 'RECEIVE' | 'REDUCE' | 'WITHDRAW' | 'CANCEL'
 const labels: Record<Action, string> = { RECEIVE: '确认原件签收', REDUCE: '确认财务核减', WITHDRAW: '确认撤回审批', CANCEL: '确认作废费用单' }
 const pending = ref<Action | null>(null), comment = ref(''), reason = ref<ReductionReason | ''>(''), inputs = ref<ReductionLine[]>([])
 const selectedProxy = ref('')
+const receivedOriginals = ref<string[]>([])
+const originals = computed(() => [{ key: 'report', label: '报销单纸质材料' }, ...props.detail.content.lines.flatMap(line =>
+  line.invoiceIds.map((id, index) => ({ key: id, label: `第 ${line.lineNo} 行第 ${index + 1} 份发票纸质材料` })))])
+const missingOriginals = computed(() => originals.value.filter(item => !receivedOriginals.value.includes(item.key)))
 const proxyOptions = computed(() => props.workflow.task?.proxyOptions ?? [])
 const proxy = computed(() => proxyOptions.value.find(option => option.proxyId === selectedProxy.value))
 const timeLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
@@ -30,7 +34,7 @@ const reductionIssue = computed(() => reduction.value.issue || (!reason.value ? 
 watch(() => reduction.value.preview, value => emit('preview', value), { flush: 'sync' })
 // 打开确认表单即锁住同一任务的审批，表单自己的保存与取消仍由 blocked 控制。
 watch(() => pending.value !== null || saving.value || requiresRefresh.value, value => emit('busy', value), { flush: 'sync' })
-function reset() { pending.value = null; comment.value = ''; reason.value = ''; inputs.value = []; selectedProxy.value = ''; error.value = '' }
+function reset() { pending.value = null; comment.value = ''; reason.value = ''; inputs.value = []; selectedProxy.value = ''; receivedOriginals.value = []; error.value = '' }
 watch(() => [props.scopeKey, props.detail.id, props.detail.applicationVersion, props.detail.financialVersion, props.workflow.task?.taskId,
   JSON.stringify([props.workflow.task?.canActDirectly, props.workflow.task?.proxyOptions, allowed.value])], () => {
   epoch++; reset(); requiresRefresh.value = false; saving.value = false
@@ -45,10 +49,20 @@ function prepare(action: Action) {
   void nextTick(() => { if (generation === epoch && pending.value === action) formElement.value?.querySelector<HTMLElement>('select, input, textarea')?.focus() })
 }
 function cancel() { if (!saving.value) reset() }
+/** 缺件只产生当前任务的退回草稿，不签收、不直接退回，也不将票据标识写入通用意见。 */
+function returnMissing() {
+  const task = props.workflow.task
+  if (pending.value !== 'RECEIVE' || blocked.value || !allowed.value.RECEIVE || !task || !missingOriginals.value.length) return
+  const request: ExpenseReturnRequest = { applicationId: props.detail.applicationId,
+    draft: { scopeKey: props.scopeKey, taskId: task.taskId, expectedVersion: props.detail.applicationVersion,
+      comment: `纸质材料缺失，请补齐后重新提交：${missingOriginals.value.map(item => item.label).join('；')}。${comment.value.trim() ? '\n' + comment.value.trim() : ''}` } }
+  reset(); emit('returnMissing', request)
+}
 async function execute() {
   const action = pending.value
   if (!action || blocked.value || !allowed.value[action]) return
   error.value = ''
+  if (action === 'RECEIVE' && missingOriginals.value.length) { error.value = '请逐项确认收到的纸质材料；存在缺失时请退回补齐。'; return }
   if (!comment.value.trim()) { error.value = '请填写本次操作说明。'; return }
   if (action === 'REDUCE' && !reason.value) { error.value = '请选择核减原因。'; return }
   let lines: ReductionLine[] = []
@@ -90,7 +104,14 @@ async function execute() {
     </div>
     <form v-else ref="formElement" @submit.prevent="execute">
       <h4>{{ labels[pending] }}</h4>
-      <p v-if="pending === 'RECEIVE'">请核对本轮纸质原件与费用明细。签收会记录办理人和时间，随后仍需完成当前节点审批。</p>
+      <template v-if="pending === 'RECEIVE'">
+        <p>逐项勾选本轮已收到的纸质材料。纸质签收不替代电子票据原文件；签收后仍需完成当前节点审批。</p>
+        <fieldset class="receipt-checklist"><legend>已收到的纸质材料</legend>
+          <label v-for="item in originals" :key="item.key"><input v-model="receivedOriginals" type="checkbox" :value="item.key" :disabled="blocked" />{{ item.label }}</label>
+        </fieldset>
+        <p v-if="missingOriginals.length" role="status">还有 {{ missingOriginals.length }} 项未确认收到，不能签收。缺失项会带入退回原因，仍需确认退回。</p>
+        <button type="button" class="return" :disabled="blocked || !missingOriginals.length" @click="returnMissing">缺失并退回</button>
+      </template>
       <p v-if="pending === 'WITHDRAW'">撤回会停止本轮待办，保留现有占用供补正。重新提交将开始新一轮审批。</p>
       <p v-if="pending === 'CANCEL'">作废后不能再编辑或提交。已预留资金将安排释放，原内容和历史记录保留。</p>
       <template v-if="(pending === 'RECEIVE' || pending === 'REDUCE') && proxyOptions.length">
@@ -120,13 +141,14 @@ async function execute() {
         <p v-if="reductionIssue" class="expense-error" role="status">{{ reductionIssue }}</p>
       </template>
       <label>操作说明<textarea v-model="comment" rows="3" maxlength="2000" :disabled="blocked" required /></label>
-      <div class="action-row"><button type="button" class="secondary" :disabled="saving" @click="cancel">取消</button><button :class="pending === 'CANCEL' ? 'return' : 'primary'" :disabled="blocked || (pending === 'REDUCE' && !!reductionIssue)">{{ saving ? '正在提交…' : labels[pending] }}</button></div>
+      <div class="action-row"><button type="button" class="secondary" :disabled="saving" @click="cancel">取消</button><button :class="pending === 'CANCEL' ? 'return' : 'primary'" :disabled="blocked || (pending === 'REDUCE' && !!reductionIssue) || (pending === 'RECEIVE' && !!missingOriginals.length)">{{ saving ? '正在提交…' : labels[pending] }}</button></div>
     </form>
     <button v-if="requiresRefresh" type="button" class="secondary" :disabled="saving || locked" @click="emit('refresh')">刷新费用状态</button>
   </section>
 </template>
 
 <style scoped>
+.receipt-checklist{margin:14px 0;padding:8px 14px;border:1px solid var(--line);border-radius:8px}.receipt-checklist legend{font-size:12px}.expense-actions .receipt-checklist label{display:flex;align-items:center;gap:10px}.receipt-checklist input{flex-shrink:0;width:16px;height:16px}
 .reduction-preview{padding:14px;border:1px solid var(--line);border-radius:8px}.reduction-preview>strong{font-size:12px}.reduction-preview dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:12px 0}.reduction-preview dt{font-size:11px;color:var(--muted)}.reduction-preview dd{margin:6px 0 0;font:12px 'DM Mono',monospace;overflow-wrap:anywhere}
 .expense-actions{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}.action-row{display:flex;gap:10px;flex-wrap:wrap}.expense-actions h4{font-size:15px;margin:0 0 10px}.expense-actions p{font-size:12px;line-height:1.8;color:var(--muted)}.expense-actions .expense-error{color:var(--red);background:#fff0ed;padding:12px;border-radius:8px}.expense-actions form{background:var(--paper);padding:18px;border-radius:12px}.expense-actions label{display:grid;gap:8px;margin:14px 0;font-size:12px}.expense-actions textarea{font:inherit;resize:vertical;border:1px solid var(--line);border-radius:8px;padding:10px;max-width:100%}.expense-actions textarea:focus-visible{outline:3px solid var(--teal);outline-offset:2px}.reduction-head,.reduction-row{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:12px;align-items:center}.reduction-head{font-size:11px;color:var(--muted);padding:10px 0;border-bottom:1px solid var(--line)}.reduction-row{border-bottom:1px solid var(--line);padding:10px 0}.reduction-row small{display:block;font:10px 'DM Mono',monospace;margin-top:5px;overflow-wrap:anywhere}.reduction-row strong{font-size:12px}.reduction-row label{margin:0;min-width:0}.reduction-row input{width:100%;min-width:0;font:12px 'DM Mono',monospace}.mobile-label{display:none}@media(max-width:600px){.reduction-head{display:none}.reduction-row{grid-template-columns:1fr 1fr}.reduction-row>div{grid-column:1/-1}.mobile-label{display:block;font-size:10px}.expense-actions form{padding:12px}}
 </style>

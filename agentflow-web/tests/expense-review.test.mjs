@@ -4,6 +4,7 @@ import { createRenderer, createSSRApp, effectScope, h, nextTick, reactive, ref }
 import { renderToString } from 'vue/server-renderer'
 const { default: Actions } = await import(process.env.AGENTFLOW_TEST_EXPENSEACTIONSREVIEW)
 const { default: Detail } = await import(process.env.AGENTFLOW_TEST_EXPENSEDETAILREVIEW)
+const { default: TaskPanel } = await import(process.env.AGENTFLOW_TEST_TASKACTIONSREVIEW)
 const { action } = await import(process.env.AGENTFLOW_TEST_ACTION_FOCUS)
 const { api } = await import(process.env.AGENTFLOW_TEST_API)
 const { previewReduction } = await import(process.env.AGENTFLOW_TEST_EXPENSES)
@@ -24,10 +25,10 @@ const workflow = () => ({ reportId: 'report', applicationId: 'app', applicationV
 const nodes = node => [node, ...(node.children ?? []).flatMap(nodes)]
 const text = node => [node.text ?? '', ...(node.children ?? []).map(text)].join(' ')
 const tick = async () => { await new Promise(resolve => setImmediate(resolve)); await nextTick() }
-function mount(Component = Actions, report = detail()) {
-  const events = [], taskEvents = []
+function mount(Component = Actions, report = detail(), flow = workflow(), initial = null) {
+  const events = [], taskEvents = [], returnEvents = [], executeEvents = [], instance = ref(null)
   let readFailure = null
-  api.expenseReport = async () => { if (readFailure) throw readFailure; return structuredClone(report) }; api.expenseWorkflow = async () => workflow()
+  api.expenseReport = async () => { if (readFailure) throw readFailure; return structuredClone(report) }; api.expenseWorkflow = async () => flow
   const element = tag => ({ tag, tagName: tag.toUpperCase(), children: [], props: {}, listeners: {}, parent: null, text: '', value: '',
     addEventListener(kind, handler) { this.listeners[kind] = handler }, removeEventListener(kind) { delete this.listeners[kind] },
     get options() { return nodes(this).filter(node => node.tag === 'option') },
@@ -38,11 +39,11 @@ function mount(Component = Actions, report = detail()) {
     remove, parentNode: node => node.parent, nextSibling: node => node.parent?.children[node.parent.children.indexOf(node) + 1] ?? null,
     patchProp(node, key, old, value) { node.props[key] = value; if (key === 'value') node.value = value },
     setText: (node, value) => { node.text = value }, setElementText: (node, value) => { node.text = value; node.children = [] } })
-  const props = reactive(Component === Actions ? { detail: report, workflow: workflow(), scopeKey: 'tenant:alice', locked: false }
-    : { reportId: 'report', applicationId: 'app', taskId: 'task', version: 2, scopeKey: 'tenant:alice', locked: false })
-  const root = element('root'), app = renderer.createApp({ setup: () => () => h(Component, { ...props, onBusy: value => events.push(value), onTaskActivity: value => taskEvents.push(value) }) })
+  const props = reactive(initial ?? (Component === Actions ? { detail: report, workflow: flow, scopeKey: 'tenant:alice', locked: false }
+    : { reportId: 'report', applicationId: 'app', taskId: 'task', version: 2, scopeKey: 'tenant:alice', locked: false }))
+  const root = element('root'), app = renderer.createApp({ setup: () => () => h(Component, { ...props, ref: instance, onBusy: value => events.push(value), onTaskActivity: value => taskEvents.push(value), onReturnMissing: value => returnEvents.push(value), onExecute: value => executeEvents.push(value) }) })
   app.mount(root)
-  return { props, root, events, taskEvents, close: () => app.unmount(), failRead(cause) { readFailure = cause },
+  return { props, root, events, taskEvents, returnEvents, executeEvents, instance: () => instance.value, close: () => app.unmount(), failRead(cause) { readFailure = cause },
     button(label) { return nodes(root).find(node => node.tag === 'button' && text(node).trim() === label) },
     async input(label, value) { const node = nodes(root).find(node => node.props['aria-label'] === label); assert.ok(node, label); node.value = value; node.listeners.input({ target: node }); await tick() },
     async reason(value) { const node = nodes(root).find(node => node.tag === 'select'); for (const option of node.options) option.selected = option.props.value === value; node.listeners.change({ target: node }); await tick() },
@@ -65,6 +66,66 @@ test('核减输入即时提示增额与税额越界，未填原因说明不允�
     await p.comment('核对原始票据后减少'); assert.equal(p.button('确认财务核减').props.disabled, false)
     await p.input('第 7 行核减后含税额', '')
     assert.equal(p.button('确认财务核减').props.disabled, true); assert.equal(writes, 0)
+  } finally { p.close() }
+})
+
+test('收单必须逐项核对纸质材料，缺失项阻止签收并预填退回且不直接写入', async () => {
+  let writes = 0; api.receiveExpense = async () => { writes++; return { reportId: 'report', applicationId: 'app' } }
+  const report = detail(), flow = workflow()
+  report.content.lines = [{ lineNo: 7, invoiceIds: ['invoice-private-first', 'invoice-private-second'] }]
+  Object.assign(flow.task, { stage: 'RECEIPT', canReceive: true, canReduce: false })
+  const p = mount(Actions, report, flow)
+  try {
+    p.button('确认原件签收').props.onClick(); await tick(); await p.comment('核对材料')
+    assert.equal(p.button('确认原件签收').props.disabled, true)
+    const checks = nodes(p.root).filter(node => node.tag === 'input' && node.props.type === 'checkbox')
+    assert.equal(checks.length, 3)
+    for (const node of checks.slice(0, 2)) { node.checked = true; node.listeners.change({ target: node }); await tick() }
+    await tick(); assert.equal(p.button('确认原件签收').props.disabled, true)
+    assert.equal(p.button('缺失并退回').props.disabled, false)
+    p.button('缺失并退回').props.onClick(); await tick()
+    assert.equal(p.returnEvents.length, 1); assert.equal(p.events.at(-1), false)
+    assert.deepEqual(p.returnEvents[0], { applicationId: 'app', draft: { scopeKey: 'tenant:alice', taskId: 'task', expectedVersion: 2,
+      comment: '纸质材料缺失，请补齐后重新提交：第 7 行第 2 份发票纸质材料。\n核对材料' } })
+    assert.doesNotMatch(p.returnEvents[0].draft.comment, /invoice-private/)
+    assert.equal(writes, 0)
+  } finally { p.close() }
+})
+
+test('全部纸质材料勾选后才能签收，取消再打开与版本变化不能继承上次确认', async () => {
+  const flow = workflow(); Object.assign(flow.task, { stage: 'RECEIPT', canReceive: true, canReduce: false })
+  const p = mount(Actions, detail(), flow), calls = []
+  api.receiveExpense = async (...args) => { calls.push(args); return { reportId: 'report', applicationId: 'app' } }
+  const confirm = async () => { const node = nodes(p.root).find(node => node.tag === 'input' && node.props.type === 'checkbox'); node.checked = true; node.listeners.change({ target: node }); await tick() }
+  try {
+    p.button('确认原件签收').props.onClick(); await tick(); await confirm()
+    assert.equal(p.button('缺失并退回').props.disabled, true)
+    p.button('取消').props.onClick(); await tick(); p.button('确认原件签收').props.onClick(); await tick()
+    assert.equal(p.button('确认原件签收').props.disabled, true)
+    await confirm(); p.props.detail.applicationVersion++; p.props.workflow.applicationVersion++; await tick()
+    p.button('确认原件签收').props.onClick(); await tick(); assert.equal(p.button('确认原件签收').props.disabled, true)
+    await confirm(); await p.comment('原件逐项核对无缺失')
+    await nodes(p.root).find(node => node.tag === 'form').props.onSubmit({ preventDefault() {} }); await tick()
+    assert.equal(calls.length, 1); assert.deepEqual(calls[0], ['report', 'task', { applicationVersion: 3, financialVersion: 5, comment: '原件逐项核对无缺失' }])
+  } finally { p.close() }
+})
+
+test('缺件预填进入真实退回表单并允许修改，确认前不执行；旧上下文和现有人工意见不能被覆盖', async () => {
+  const props = { task: { taskId: 'task', version: 2, allowedActions: ['RETURN', 'APPROVE'] }, scopeKey: 'tenant:alice', locked: false }
+  const p = mount(TaskPanel, detail(), workflow(), props)
+  const draft = { scopeKey: 'tenant:alice', taskId: 'task', expectedVersion: 2, comment: '缺少第 7 行纸质材料' }
+  try {
+    for (const invalid of [{ scopeKey: 'tenant:bob' }, { taskId: 'other' }, { expectedVersion: 1 }]) assert.equal(p.instance().prepareReturn({ ...draft, ...invalid }), false)
+    p.props.locked = true; await tick(); assert.equal(p.instance().prepareReturn(draft), false); p.props.locked = false; await tick()
+    assert.equal(p.instance().prepareReturn(draft), true); await tick()
+    assert.equal(nodes(p.root).find(node => node.tag === 'textarea').value, draft.comment); assert.deepEqual(p.executeEvents, [])
+    await p.comment('人工补充：请补齐后重新提交')
+    assert.equal(p.instance().prepareReturn({ ...draft, comment: '迟到内容' }), false)
+    assert.equal(nodes(p.root).find(node => node.tag === 'textarea').value, '人工补充：请补齐后重新提交')
+    await nodes(p.root).find(node => node.tag === 'form').props.onSubmit({ preventDefault() {} })
+    assert.deepEqual(p.executeEvents, [{ action: 'RETURN', expectedVersion: 2, comment: '人工补充：请补齐后重新提交', targetUser: undefined }])
+    p.props.task.version++; await tick(); assert.equal(!!nodes(p.root).find(node => node.tag === 'textarea'), false)
+    p.props.task.allowedActions = ['APPROVE']; await tick(); assert.equal(p.instance().prepareReturn({ ...draft, expectedVersion: 3 }), false)
   } finally { p.close() }
 })
 
@@ -149,7 +210,7 @@ test('实际父页面接线禁止审批与加签且保持核减可编辑，旧�
   const scope = effectScope(); let membershipWrites = 0
   const deps = { activeTask: ref({ taskId: 'task', applicationId: 'app', version: 2 }), activeApplication: ref({ id: 'app', version: 2, roundNo: 1, businessReference: { type: 'EXPENSE', id: 'report' } }),
     actorScope: ref('tenant:alice'), busy: ref(false), writesBlocked: ref(false), api: { changeCountersignMembers: async () => { membershipWrites++; return {} } },
-    clearTaskSelection() {}, refreshWorkspace: async () => {}, notice: ref(''), errorMessage: e => e.message, selectTask: async () => {} }
+    clearTaskSelection() {}, refreshWorkspace: async () => {}, notice: ref(''), errorMessage: e => e.message, selectTask: async () => {}, nextTick, taskActionsPanel: ref(null) }
   const state = scope.run(() => taskState(deps))
   let expenseAttrs, taskAttrs
   async function render() {
@@ -162,7 +223,7 @@ test('实际父页面接线禁止审批与加签且保持核减可编辑，旧�
   }
   const current = () => ({ scopeKey: deps.actorScope.value, applicationId: deps.activeApplication.value.id, taskId: deps.activeTask.value.taskId, applicationVersion: deps.activeApplication.value.version, busy: true })
   try {
-    await render(); assert.equal(typeof expenseAttrs.onTaskActivity, 'function')
+    await render(); assert.equal(typeof expenseAttrs.onTaskActivity, 'function'); assert.equal(typeof expenseAttrs.onReturnMissing, 'function')
     const original = current(); expenseAttrs.onTaskActivity(original)
     const locked = await render(); assert.equal(taskAttrs.locked, true); assert.equal(expenseAttrs.locked, false)
     assert.match(locked, /费用操作尚未结束/); assert.match(locked, /role="tab"[^>]*disabled/)
@@ -177,6 +238,29 @@ test('实际父页面接线禁止审批与加签且保持核减可编辑，旧�
     state.expenseTaskActivity(current()); deps.actorScope.value = 'tenant:bob'; assert.equal(state.expenseTaskBusy.value, false)
     state.expenseTaskActivity({ ...original, busy: true }); assert.equal(state.expenseTaskBusy.value, false)
   } finally { scope.stop() }
+})
+
+test('缺件从真实费用详情转交，父待办在下次渲染前后复核上下文，不把迟到草稿带入新任务', async () => {
+  const scope = effectScope(), prepared = []
+  const deps = { activeTask: ref({ taskId: 'task', version: 2 }), activeApplication: ref({ id: 'app', version: 2 }), actorScope: ref('tenant:alice'),
+    busy: ref(false), writesBlocked: ref(false), notice: ref(''), taskActionsPanel: ref({ prepareReturn: value => { prepared.push(value); return true } }), nextTick }
+  const state = scope.run(() => taskState(deps)), flow = workflow()
+  Object.assign(flow.task, { stage: 'RECEIPT', canReceive: true, canReduce: false })
+  const p = mount(Detail, detail(), flow)
+  try {
+    await tick(); p.button('确认原件签收').props.onClick(); await tick(); p.button('缺失并退回').props.onClick(); await tick()
+    assert.equal(p.returnEvents.length, 1); assert.equal(p.taskEvents.at(-1).busy, false)
+    const request = p.returnEvents[0]
+    await state.prepareExpenseReturn(request); assert.deepEqual(prepared, [request.draft])
+    for (const flag of [deps.busy, deps.writesBlocked, state.expenseTaskBusy]) { flag.value = true; await state.prepareExpenseReturn(request); flag.value = false }
+    assert.equal(prepared.length, 1)
+    const waiting = state.prepareExpenseReturn(request); deps.activeTask.value = { taskId: 'new', version: 2 }; await waiting
+    assert.equal(prepared.length, 1)
+    deps.activeTask.value = { taskId: 'task', version: 2 }; deps.activeApplication.value = { id: 'app', version: 3 }; await state.prepareExpenseReturn(request)
+    deps.activeApplication.value = { id: 'other', version: 2 }; await state.prepareExpenseReturn(request)
+    deps.activeApplication.value = { id: 'app', version: 2 }; deps.actorScope.value = 'tenant:bob'; await state.prepareExpenseReturn(request)
+    assert.equal(prepared.length, 1)
+  } finally { p.close(); scope.stop() }
 })
 
 test('业务审批人无法读取敏感费用时完成受限读取仍解除加载锁，不以完整财务权限代替任务授权', async () => {

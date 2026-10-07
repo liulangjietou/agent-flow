@@ -42,7 +42,7 @@ for (const component of ['WorkspaceTabs', 'ExpenseFinancialReporting', 'ExpenseP
 process.env.AGENTFLOW_TEST_ACCOUNT_MAPPINGS = resolve(output, 'accountMappings.js')
 process.env.AGENTFLOW_TEST_ACCOUNT_MAPPING_DRAFTS = resolve(output, 'accountMappingDrafts.js')
 // 财务核减运行真实子表单和费用详情，覆盖逐次输入与向父任务发出的事件。
-for (const name of ['ExpenseActions', 'ExpenseDetail']) {
+for (const name of ['ExpenseActions', 'ExpenseDetail', 'TaskActions']) {
   const descriptor = parse(readFileSync(resolve(root, `src/components/${name}.vue`), 'utf8'), { filename: `${name}.vue` }).descriptor
   const source = compileScript(descriptor, { id: name + 'Review', inlineTemplate: true }).content
     .replace(/from ['"]vue['"]/g, `from '${pathToFileURL(resolve(root, 'node_modules/vue/dist/vue.runtime.esm-bundler.js')).href}'`)
@@ -483,7 +483,7 @@ const actionFunction = appSyntax.statements.find(node => ts.isFunctionDeclaratio
 writeFileSync(resolve(output, 'ActionFocus.js'), ts.transpileModule(`export function action(deps) { const { activeTask, activeApplication, busy, writesBlocked, expenseTaskBusy, actorScope, page, api, refreshWorkspace, notice, taskActionLabels, statusLabel, errorMessage, nextTick, operationStatus } = deps; ${actionFunction.getText(appSyntax)}; return performAction; }`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)
 process.env.AGENTFLOW_TEST_ACTION_FOCUS = resolve(output, 'ActionFocus.js')
 // 同时执行待办父页面的真实事件、状态重置与按钮绑定，避免只验证子组件。
-const expenseTaskFunctions = ['expenseTaskActivity', 'performMembershipChange'].map(name => {
+const expenseTaskFunctions = ['expenseTaskActivity', 'prepareExpenseReturn', 'performMembershipChange'].map(name => {
   const node = appSyntax.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === name)
   if (!node) throw new Error(`Missing actual expense task function: ${name}`)
   return node.getText(appSyntax)
@@ -493,8 +493,8 @@ const expenseTaskState = appSyntax.statements.filter(node =>
   || ts.isExpressionStatement(node) && node.getText(appSyntax).startsWith('watch(') && node.getText(appSyntax).includes('expenseTaskBusy.value = false')
 ).map(node => node.getText(appSyntax)).join('\n')
 writeFileSync(resolve(output, 'ExpenseTaskState.js'), ts.transpileModule(`import { ref, watch } from '${pathToFileURL(resolve(root, 'node_modules/vue/dist/vue.runtime.esm-bundler.js')).href}';
-export function state(deps) { const { activeTask, activeApplication, actorScope, busy, writesBlocked, api, clearTaskSelection, refreshWorkspace, notice, errorMessage, selectTask } = deps;
-${expenseTaskState}\n${expenseTaskFunctions}\nreturn { expenseTaskBusy, expenseTaskActivity, performMembershipChange }; }`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)
+export function state(deps) { const { activeTask, activeApplication, actorScope, busy, writesBlocked, api, clearTaskSelection, refreshWorkspace, notice, errorMessage, selectTask, nextTick, taskActionsPanel } = deps;
+${expenseTaskState}\n${expenseTaskFunctions}\nreturn { expenseTaskBusy, expenseTaskActivity, prepareExpenseReturn, performMembershipChange }; }`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)
 process.env.AGENTFLOW_TEST_EXPENSETASKSTATE = resolve(output, 'ExpenseTaskState.js')
 const taskArea = parse(readFileSync(resolve(root, 'src/App.vue'), 'utf8')).descriptor.template.content.match(/<WorkspaceTabs[\s\S]*?<TaskActions[^>]*\/>/)?.[0]
 if (!taskArea) throw new Error('Missing actual expense task area')

@@ -1,0 +1,97 @@
+{
+  "recordedAt": "2026-10-07T20:54:13.432562+00:00",
+  "taskId": "U04",
+  "status": "IMPLEMENTED_LOCAL_COMPONENTS_BUILD_BROWSER_PENDING",
+  "sourceBaseCommit": "d66b6b527f82715dc35440783a8282666a8fe913",
+  "sourceHashes": {
+    "agentflow-web/scripts/test-requests.mjs": "39a1d66906e606a3cf1186ae00593eed862f2d500a1f19e2bf0dadc7d4cdd238",
+    "agentflow-web/src/App.vue": "20e4f0149177d7db73caa9eaddee985f5e0114621dd852fa2f8333c622de3ea1",
+    "agentflow-web/src/components/ExpenseActions.vue": "0f55baa43bd03b45be7cde5bfed9f1730c3eafe29d9f3a6da71566bf1627d754",
+    "agentflow-web/src/components/ExpenseDetail.vue": "8eb443652789e088d853d1c5abcb19a4614f0f47988007dc2ee97327ca58f207",
+    "agentflow-web/src/components/TaskActions.vue": "52959be6568d813125589cb88c0ebe0db89f27b617dbf6e9b983db711d14bda4",
+    "agentflow-web/src/expenses.ts": "957957257dd40d4f73d6ebc1a9a6a6a7fdba93b049f78d991eea0ebf23fbf255",
+    "agentflow-web/src/taskActions.ts": "4fe79c77a72162d0139674b8db452cf6b3846b5b46e591c2d4b24363e894a2b5",
+    "agentflow-web/tests/expense-actions.test.mjs": "efddf1dfa47e0412acf4513ab7aa41badcd123be9601fffdaceab67961f47782",
+    "agentflow-web/tests/expense-review.test.mjs": "c34fe206175a676da2348261bfd62fb080b8cd850a7a5a299d464a138266e401"
+  },
+  "inputManifest": "/fyoung/tmp/agentflow-remaining-20260928/u04-input-hashes.json",
+  "inputManifestSha256": "821c0cca8e0de8652c465ed7c6d435b869802e0d5031be05b9fed4fd662641c8",
+  "requirements": [
+    {
+      "documentId": "01",
+      "lines": [
+        123,
+        123
+      ]
+    },
+    {
+      "documentId": "01",
+      "lines": [
+        142,
+        143
+      ]
+    },
+    {
+      "documentId": "01",
+      "lines": [
+        147,
+        147
+      ]
+    }
+  ],
+  "rootCause": "收单原来只有说明和确认按钮，没有逐项勾选或缺失材料草稿；原测试只验证说明、版本、代理与幂等，未覆盖材料确认及退回接线。",
+  "behavior": [
+    "原费用版本的报销单及关联发票纸质材料默认均未确认；未全部勾选时界面和处理器均拒绝签收。",
+    "缺失并退回只生成当前申请/任务/版本的意见草稿，释放原收单表单后在原 TaskActions 打开退回确认；不直接发出签收或退回请求。",
+    "预填只含稳定费用行号、材料序号及人工补充说明，不自动复制发票标识、账户、金额或费用描述到通用意见。",
+    "原 TaskActions 保持代理选择、权限、版本、人工可修改意见和必填规则；已有待确认意见或加签表单不被覆盖。",
+    "账号/任务/版本变化清空勾选；父入口在渲染前后复核上下文，旧草稿不能打开新任务。"
+  ],
+  "validation": {
+    "redFailures": 2,
+    "redLog": "/fyoung/tmp/agentflow-remaining-20260928/u04-receipt-red.log",
+    "newBehaviorCases": 5,
+    "webFull": {
+      "passed": 1512,
+      "total": 1512,
+      "failed": 0,
+      "skipped": 0,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/u04-web-full.log"
+    },
+    "typecheckAndBuild": "PASS",
+    "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/u04-build.log",
+    "openApi": {
+      "result": "PASS",
+      "operations": 396,
+      "schemas": 868,
+      "requestExamples": 129
+    },
+    "backendChanged": false,
+    "javaRerun": false,
+    "priorJavaGate": "docs/evidence/expense-feedback-20261007.json",
+    "priorJavaUniquePassed": 5311
+  },
+  "retainedHarnessCorrections": [
+    "首轮范围通过 30 项；追加实际 DOM 交互后两处模拟未等待 Vue 更新，修正为每次勾选/父锁状态变更后等待渲染；最终完整 1512 项通过，原日志保留。"
+  ],
+  "review": {
+    "codeQuality": "收单确认归 ExpenseActions；预填归通用 TaskActions；App 只负责同一上下文转交，没有新后端业务层或重复权限规则。",
+    "security": "退回草稿不自动执行，旧上下文拒绝，原意见不覆盖，通用意见不自动携带敏感票据标识；物理材料核对仍由办理人负责。",
+    "coverage": "真实模板与处理器验证缺件、全收、取消、版本变化、预填可编辑、既有意见保护、读写锁和迟到草稿。"
+  },
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/u04-receipt-checklist-verified-20261007",
+  "archiveFiles": 21,
+  "archiveManifestSha256": "a59cdc525c75d85aa451752cbcbde16d26d74e637dd166e4750be5e028051964",
+  "webAssets": {
+    "index.html": "548fd9af01a6e56f8498eba4fe43675402b8053c8e178fd1de323a6864b672ca",
+    "assets/index--pginMHj.js": "d9cd0d5eee3de8b45aae873254a7349086c6570b25b8424fa22de606422633f0",
+    "assets/index-B6EhxyNg.css": "af641ebfc94ab9075b4dc184b679fd120a6427af2146c3cfb4cd6ab65ef6f4e6"
+  },
+  "boundaries": [
+    "逐项勾选是当前页面的人工核对，不声称服务端能自动验证纸质材料真实性；电子原文件仍沿原归档链保存。",
+    "浏览器、触屏及辅助设备验收未执行，U04 保持 OPEN。",
+    "Java、数据库和接口契约未改；既有 5311 项组合结果及固定包证据保留原范围。",
+    "未执行 PostgreSQL、Docker、真实企业系统、远端推送、PR 或 CI。",
+    "V03 尚未核对完所有条款；不把本项完成当作全项目完成。"
+  ]
+}
