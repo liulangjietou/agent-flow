@@ -2,6 +2,7 @@ package io.agentflow.agent;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -35,14 +36,14 @@ public class JdbcPrecheckExplanationRepository {
         try {
             int count = jdbc.update("""
                     INSERT INTO agent_precheck_explanation_run(tenant_id,id,report_id,application_id,requested_by,
-                        application_version,financial_version,precheck_id,precheck_attempt,status,version,active_report_id,context_json,state_json,created_at)
-                    SELECT r.tenant_id,?,r.id,r.application_id,r.employee_id,a.version,r.version,j.id,j.attempt_no,'QUEUED',1,r.id,?,?,?
+                        application_version,financial_version,precheck_id,precheck_attempt,status,version,active_report_id,context_json,state_json,created_at,trace_id)
+                    SELECT r.tenant_id,?,r.id,r.application_id,r.employee_id,a.version,r.version,j.id,j.attempt_no,'QUEUED',1,r.id,?,?,?,?
                     FROM expense_report r JOIN approval_application a ON a.tenant_id=r.tenant_id AND a.id=r.application_id
                     JOIN expense_precheck_job j ON j.tenant_id=r.tenant_id AND j.report_id=r.id
                     WHERE r.tenant_id=? AND r.id=? AND r.application_id=? AND r.employee_id=? AND a.created_by=r.employee_id
                     AND a.version=? AND r.version=? AND j.id=? AND j.attempt_no=? AND j.version=3 AND j.status=?
                     AND j.application_version=a.version AND j.financial_version=r.version
-                    """, context.id().toString(), json.write(context), json.write(run.state()), Timestamp.from(context.createdAt()),
+                    """, context.id().toString(), json.write(context), json.write(run.state()), Timestamp.from(context.createdAt()), DiagnosticContext.capture().traceId(),
                     context.tenantId(), input.reportId().toString(), input.applicationId().toString(), context.requestedBy(),
                     input.applicationVersion(), input.financialVersion(), input.precheckId().toString(), input.attempt(), input.result().name());
             if (count != 1) throw new DomainException("AGENT_INPUT_CHANGED", "Precheck changed before explanation persistence");
@@ -85,9 +86,9 @@ public class JdbcPrecheckExplanationRepository {
     /** 每次最多十项，运行中仅在租约过期后再次扫描。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM agent_precheck_explanation_run WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
+                SELECT tenant_id,id,trace_id FROM agent_precheck_explanation_run WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
                 ORDER BY created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), Timestamp.from(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), Timestamp.from(now));
     }
 
     /** 页面历史只读索引，原始内容仅在单条详情中返回本人。 */
@@ -128,7 +129,7 @@ public class JdbcPrecheckExplanationRepository {
      * 队列扫描仅提供定位键。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
     /**
      * 轻量索引不携带模型文本与费用内容。
      * @author owlzhangfq@gmail.com

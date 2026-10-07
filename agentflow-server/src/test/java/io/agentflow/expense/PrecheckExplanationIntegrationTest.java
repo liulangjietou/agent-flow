@@ -11,6 +11,8 @@ import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
+import org.slf4j.MDC;
 import io.agentflow.finance.FinanceGatewayConfiguration;
 import io.agentflow.finance.Money;
 import io.agentflow.organization.OrganizationAppointment;
@@ -64,6 +66,8 @@ class PrecheckExplanationIntegrationTest {
     private static final String ISSUE = "precheck:finding[0]";
     private static final AtomicInteger REQUESTS = new AtomicInteger();
     private static final AtomicReference<String> MODE = new AtomicReference<>("success");
+    private static final AtomicReference<String> LAST_TRACE = new AtomicReference<>();
+    private String lastRequestTrace;
     private static final AtomicReference<String> LAST_BODY = new AtomicReference<>();
     private static final java.util.concurrent.ExecutorService HTTP_THREADS = Executors.newFixedThreadPool(2);
     private static final HttpServer MODEL = server();
@@ -115,6 +119,24 @@ class PrecheckExplanationIntegrationTest {
         }
     }
     @AfterAll static void stop() { MODEL.stop(0); HTTP_THREADS.shutdownNow(); }
+
+    @Test
+    void tracePersistsThroughQueueAndReachesModel() throws Exception {
+        var report = report();
+        UUID id = queue(report, checked(report));
+        String expectedTrace = lastRequestTrace;
+        assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(jdbc.queryForMap("SELECT * FROM agent_precheck_explanation_run WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        LAST_TRACE.set(null);
+        worker.poll();
+        assertThat(LAST_TRACE.get()).isEqualTo(expectedTrace);
+        assertThat(jdbc.queryForMap("SELECT * FROM agent_precheck_explanation_run WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
+    }
 
     @Test void explicitInputAndIdempotentReviewNeverChangeFinancialFactsOrRuleResult() throws Exception {
         var report = report(); var job = checked(report); var original = reports.find("demo", report.id()).orElseThrow().state();
@@ -325,6 +347,7 @@ class PrecheckExplanationIntegrationTest {
     private UUID remember(JsonNode receipt) { UUID id = UUID.fromString(receipt.path("id").asText()); queued.add(id); return id; }
     private JsonNode read(ExpenseReport report, String suffix, String user, int expected) throws Exception {
         var response = mvc.perform(get(path(report) + suffix).header("Authorization", token(user))).andReturn().getResponse();
+        lastRequestTrace = response.getHeader(DiagnosticContext.HEADER);
         assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(expected);
         if (expected == 200) assertThat(response.getHeader("Cache-Control")).contains("no-store");
         return json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class);
@@ -332,6 +355,7 @@ class PrecheckExplanationIntegrationTest {
     private JsonNode send(ExpenseReport report, String suffix, String user, Object body, String key, int expected) throws Exception {
         var response = mvc.perform(post(path(report) + suffix).header("Authorization", token(user)).header("Idempotency-Key", key)
                 .contentType("application/json").content(json.write(body))).andReturn().getResponse();
+        lastRequestTrace = response.getHeader(DiagnosticContext.HEADER);
         assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(expected);
         return json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class);
     }
@@ -342,7 +366,7 @@ class PrecheckExplanationIntegrationTest {
         try {
             var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0); server.setExecutor(HTTP_THREADS);
             server.createContext("/v1/chat/completions", exchange -> {
-                REQUESTS.incrementAndGet(); String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8); LAST_BODY.set(body);
+                REQUESTS.incrementAndGet(); String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8); LAST_BODY.set(body); LAST_TRACE.set(exchange.getRequestHeaders().getFirst(DiagnosticContext.HEADER));
                 var request = wire.read(body, JsonNode.class); var input = wire.read(request.at("/messages/1/content").asText(), JsonNode.class);
                 var source = java.util.stream.StreamSupport.stream(input.path("sources").spliterator(), false)
                         .filter(value -> value.at("/reference/sourceId").asText().equals(ISSUE)).findFirst().orElseThrow();

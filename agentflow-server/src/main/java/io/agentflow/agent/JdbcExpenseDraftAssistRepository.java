@@ -2,6 +2,7 @@ package io.agentflow.agent;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -36,13 +37,13 @@ public class JdbcExpenseDraftAssistRepository {
         try {
             int inserted = jdbc.update("""
                     INSERT INTO agent_expense_draft_run(tenant_id,id,report_id,application_id,requested_by,
-                        application_version,financial_version,status,version,active_report_id,context_json,state_json,created_at)
-                    SELECT r.tenant_id,?,r.id,r.application_id,r.employee_id,a.version,r.version,'QUEUED',1,r.id,?,?,?
+                        application_version,financial_version,status,version,active_report_id,context_json,state_json,created_at,trace_id)
+                    SELECT r.tenant_id,?,r.id,r.application_id,r.employee_id,a.version,r.version,'QUEUED',1,r.id,?,?,?,?
                     FROM expense_report r JOIN approval_application a ON a.tenant_id=r.tenant_id AND a.id=r.application_id
                     WHERE r.tenant_id=? AND r.id=? AND r.application_id=? AND r.employee_id=? AND a.created_by=r.employee_id
                         AND a.version=? AND r.version=? AND a.status IN ('DRAFT','RETURNED','WITHDRAWN')
                         AND a.business_type='EXPENSE' AND a.business_id=r.id
-                    """, context.id().toString(), json.write(context), json.write(run.state()), Timestamp.from(context.createdAt()),
+                    """, context.id().toString(), json.write(context), json.write(run.state()), Timestamp.from(context.createdAt()), DiagnosticContext.capture().traceId(),
                     context.tenantId(), input.reportId().toString(), input.applicationId().toString(), context.requestedBy(),
                     input.applicationVersion(), input.financialVersion());
             if (inserted != 1) throw new DomainException("AGENT_INPUT_CHANGED", "Expense draft changed before persistence");
@@ -85,9 +86,9 @@ public class JdbcExpenseDraftAssistRepository {
     /** 扫描有界队列，运行中记录仅在原租约过期后进入结算候选。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM agent_expense_draft_run WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
+                SELECT tenant_id,id,trace_id FROM agent_expense_draft_run WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
                 ORDER BY created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), Timestamp.from(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), Timestamp.from(now));
     }
 
     /** 列表只返回版本和状态，行程、目录、模型正文在本人详情入口读取。 */
@@ -130,7 +131,7 @@ public class JdbcExpenseDraftAssistRepository {
      * 队列扫描不读取或暴露原模型内容。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
     /**
      * 历史索引保留原双版本，不把确认状态解释为已保存费用。
      * @author owlzhangfq@gmail.com

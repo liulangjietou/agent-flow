@@ -5,6 +5,8 @@ import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
+import org.slf4j.MDC;
 import io.agentflow.expense.InvoiceOriginal;
 import io.agentflow.expense.InvoiceOriginalFiles;
 import io.agentflow.expense.InvoiceWalletService;
@@ -65,6 +67,7 @@ class InvoiceExtractionIntegrationTest {
             + "<TaxSupervisionInfo><InvoiceNumber>000077</InvoiceNumber></TaxSupervisionInfo></EInvoice>").getBytes(StandardCharsets.UTF_8);
     private static final byte[] FALLBACK = "<Invoice><Number>000077</Number></Invoice>".getBytes(StandardCharsets.UTF_8);
     private static final AtomicInteger REQUESTS = new AtomicInteger();
+    private static final AtomicReference<String> LAST_TRACE = new AtomicReference<>();
     private static final AtomicReference<String> LAST_BODY = new AtomicReference<>("");
     private static final HttpServer MODEL_SERVER = model();
     private static final Path DIRECTORY = Path.of("/fyoung/tmp/agentflow-extraction-" + UUID.randomUUID());
@@ -100,6 +103,29 @@ class InvoiceExtractionIntegrationTest {
         actors.clear();
     }
     @AfterAll static void stop() { MODEL_SERVER.stop(0); }
+
+    @Test
+    void tracePersistsThroughQueueAndReachesModel() throws Exception {
+        UUID invoice = original(FALLBACK);
+        var prepared = service.prepare(invoice);
+        String expectedTrace = UUID.randomUUID().toString();
+        UUID id;
+        try (var ignored = new DiagnosticContext(expectedTrace, "demo").open()) {
+            id = queue(prepared, target());
+        }
+        actors.clear();
+        assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(jdbc.queryForMap("SELECT * FROM agent_invoice_extraction_run WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        LAST_TRACE.set(null);
+        worker.poll();
+        assertThat(LAST_TRACE.get()).isEqualTo(expectedTrace);
+        assertThat(jdbc.queryForMap("SELECT * FROM agent_invoice_extraction_run WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
+    }
 
     @Test void localXmlCompletesWithModelDisabledAndConfirmationNeverChangesInvoiceState() {
         configuration.setEnabled(false); int requests = REQUESTS.get();
@@ -235,7 +261,7 @@ class InvoiceExtractionIntegrationTest {
             var results = List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
             assertThat(results).containsOnlyOnce("AGENT_RUN_ACTIVE");
             UUID id = UUID.fromString(results.stream().filter(value -> !value.equals("AGENT_RUN_ACTIVE")).findFirst().orElseThrow());
-            queued.add(new JdbcInvoiceExtractionRunRepository.Candidate("demo", id));
+            queued.add(new JdbcInvoiceExtractionRunRepository.Candidate("demo", id, null));
             assertThat(service.list(prepared.input().invoiceId(), 0, 10).total()).isOne();
         } finally { threads.shutdownNow(); }
     }
@@ -318,7 +344,7 @@ class InvoiceExtractionIntegrationTest {
     }
     private UUID queue(InvoiceExtractionService.Prepared prepared, String target) {
         var receipt = service.queue(prepared, prepared.method(), target);
-        queued.add(new JdbcInvoiceExtractionRunRepository.Candidate(actors.actor().tenantId(), receipt.id())); return receipt.id();
+        queued.add(new JdbcInvoiceExtractionRunRepository.Candidate(actors.actor().tenantId(), receipt.id(), null)); return receipt.id();
     }
     private String target() { return configuration.targetDigest(InvoiceExtractionRun.CONTRACT_VERSION); }
     private Map<String, Object> financial(UUID invoice) { return jdbc.queryForMap("SELECT * FROM finance_resource WHERE resource_type='INVOICE' AND id=?", invoice.toString()); }
@@ -334,7 +360,7 @@ class InvoiceExtractionIntegrationTest {
             var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/v1/chat/completions", exchange -> {
                 String request = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-                LAST_BODY.set(request); REQUESTS.incrementAndGet();
+                LAST_BODY.set(request); LAST_TRACE.set(exchange.getRequestHeaders().getFirst(DiagnosticContext.HEADER)); REQUESTS.incrementAndGet();
                 var body = JSON.read(request, com.fasterxml.jackson.databind.JsonNode.class);
                 var metadata = JSON.read(body.at("/messages/1/content/0/text").asText(), com.fasterxml.jackson.databind.JsonNode.class).path("source");
                 var result = Map.of("proposals", List.of(Map.of("field", "INVOICE_NUMBER", "value", "000077", "confidence", "MEDIUM", "evidence", List.of(Map.of(

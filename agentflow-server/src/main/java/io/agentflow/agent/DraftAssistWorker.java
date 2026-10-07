@@ -1,5 +1,7 @@
 package io.agentflow.agent;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class DraftAssistWorker {
     private static final Logger LOG = LoggerFactory.getLogger(DraftAssistWorker.class);
+    private static final String TRACE_SOURCE = "draft-assist";
     private final JdbcDraftAssistRunRepository runs;
     private final DraftAssistService service;
     private final DraftAssistModelPort model;
@@ -23,15 +26,18 @@ public class DraftAssistWorker {
     public void poll() {
         for (var candidate : runs.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
-                if (context == null) continue;
-                DraftSuggestion suggestion = null; AssistRun.Failure failure = null;
-                try { suggestion = model.generate(context); }
-                catch (AssistModelPort.ModelFailure unavailable) { failure = unavailable.failure(); }
-                service.finish(context.tenantId(), context.id(), suggestion, failure, Instant.now());
-            } catch (RuntimeException failure) {
-                LOG.error("Draft assist execution failed, errorCode={}, runId={}", "WORKER_FAILURE", candidate.id());
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                try {
+                    var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
+                    if (context == null) continue;
+                    DraftSuggestion suggestion = null; AssistRun.Failure failure = null;
+                    try { suggestion = model.generate(context); }
+                    catch (AssistModelPort.ModelFailure unavailable) { failure = unavailable.failure(); }
+                    service.finish(context.tenantId(), context.id(), suggestion, failure, Instant.now());
+                } catch (RuntimeException failure) {
+                    LOG.error("Draft assist execution failed, errorCode={}, runId={}", "WORKER_FAILURE", candidate.id());
+                }
             }
         }
     }

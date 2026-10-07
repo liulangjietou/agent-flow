@@ -53,7 +53,17 @@ class ExpenseRiskPersistenceTest {
         var source = new DriverManagerDataSource("jdbc:h2:mem:expense-risk-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(source).target("114").load().migrate(); jdbc = new JdbcTemplate(source);
         seed(primaryReport, primaryApplication); seed(comparisonReport, comparisonApplication); beforeMigration = businessRows();
-        Flyway.configure().dataSource(source).target("115").load().migrate();
+        Flyway.configure().dataSource(source).load().migrate();
+        // 后续迁移允许新增查询投影，但原列和原行必须完整保留；执行前再冻结包含新列的完整基线。
+        var migrated = businessRows();
+        assertThat(migrated).hasSize(beforeMigration.size());
+        for (int table = 0; table < beforeMigration.size(); table++) {
+            assertThat(migrated.get(table)).hasSize(beforeMigration.get(table).size());
+            for (int row = 0; row < beforeMigration.get(table).size(); row++) {
+                assertThat(migrated.get(table).get(row)).containsAllEntriesOf(beforeMigration.get(table).get(row));
+            }
+        }
+        beforeMigration = migrated;
         var manager = new DataSourceTransactionManager(source); tx = new TransactionTemplate(manager);
         var proxy = new ProxyFactory(new JdbcExpenseRiskRepository(jdbc, json));
         proxy.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource()));
@@ -238,7 +248,7 @@ class ExpenseRiskPersistenceTest {
                     input.sources().stream().map(AssistModelPort.Source::reference).toList()))); }
     private ExpenseRiskRun loaded(ExpenseRiskRun run) { return runs.find(TENANT, run.context().id()).orElseThrow().run(); }
     private List<Long> versions(ExpenseRiskRun run) { return jdbc.queryForList("SELECT run_version FROM agent_expense_risk_transition WHERE run_id=? ORDER BY run_version", Long.class, run.context().id().toString()); }
-    private List<List<Map<String, Object>>> businessRows() { return BUSINESS_TABLES.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table)).toList(); }
+    private List<List<Map<String, Object>>> businessRows() { return BUSINESS_TABLES.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table + " ORDER BY 1,2")).toList(); }
     private void assertEmptyRiskTables() { for (var table : List.of("agent_expense_risk_run", "agent_expense_risk_document", "agent_expense_risk_transition")) assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class)).isZero(); }
     private static void error(String code, Runnable action) { assertThatThrownBy(action::run).isInstanceOfSatisfying(DomainException.class, failure -> assertThat(failure.code()).isEqualTo(code)); }
 }

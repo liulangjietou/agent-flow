@@ -1,0 +1,226 @@
+{
+  "taskId": "O01",
+  "stage": "SIX_AGENT_QUEUES",
+  "status": "PASSED_LOCAL_STAGE_O01_REMAINS_OPEN",
+  "recordedAt": "2026-10-07T13:49:04.287597+00:00",
+  "sourceBaseCommit": "ce241c16c5b7c72e7a0f33328b4b70995e68c1c5",
+  "sourceHashes": {
+    "agentflow-server/src/main/java/io/agentflow/agent/AssistWorker.java": "394c5d8de2e041a406af2a61f397a456665b849fad591a328c434f5da0d965ae",
+    "agentflow-server/src/main/java/io/agentflow/agent/DraftAssistWorker.java": "5f11b31c49c3bfc845ec73e954cec765c83dea15adbcf466a19476a6a0642ef0",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistWorker.java": "44d06bdaf2fe415e1beb3d7e72378f64c51d01e1dcfea3bcd32e257bb1a19dba",
+    "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskWorker.java": "ea8dd490283175ecac4fd0e80e1cc652e61ac8a178e85987b2fc5165ae994f49",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionWorker.java": "ac9ab7e06121ab87445522f59945f5287701b1233206adaa7b16b5c452b6f23a",
+    "agentflow-server/src/main/java/io/agentflow/agent/JdbcAssistJobRepository.java": "6cc74807c2f2a9fe14cd5def0c0d9177ed99027e3ed797e2fb137614724105a0",
+    "agentflow-server/src/main/java/io/agentflow/agent/JdbcDraftAssistRunRepository.java": "d3015eb33fc2a33a3aa444d4c7b6548a055e762060dc933a132ddedf6f26a833",
+    "agentflow-server/src/main/java/io/agentflow/agent/JdbcExpenseDraftAssistRepository.java": "bc85deabe03985cd52a7937f407f5e2402bd7910ac0732c7a52a0b6da935baf6",
+    "agentflow-server/src/main/java/io/agentflow/agent/JdbcExpenseRiskRepository.java": "c686bb9610d725418334c15a6039d6e299cc033a1b675099ff62cc1fb58b33b7",
+    "agentflow-server/src/main/java/io/agentflow/agent/JdbcInvoiceExtractionRunRepository.java": "66416661db65203ef872db6d7244a55ad0d0fa6c2df2e49619597bdbc46ea3f8",
+    "agentflow-server/src/main/java/io/agentflow/agent/JdbcPrecheckExplanationRepository.java": "70c6ba5b27a56e2845ff0d27317d03cb0c939abb0bab59490c83b4178d842d95",
+    "agentflow-server/src/main/java/io/agentflow/agent/OpenAiTextClient.java": "c607cf82c40e662059d75cc6d385540aa88d5b25dcd5224470367d58d5ca8e81",
+    "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationWorker.java": "6b992cd1f9e20197cc505a2203b97acbaec28f68361c0cbf0261381ebb08e513",
+    "agentflow-server/src/main/java/io/agentflow/observability/DiagnosticContext.java": "ae93629262febc126657711a0306aa0a334f381e8002813b129d1d09b82e5004",
+    "agentflow-server/src/test/java/io/agentflow/agent/AssistExecutionIntegrationTest.java": "10749e857730d95cc434c2be90787deae31e7a5906faa537ab86ab560b70e98e",
+    "agentflow-server/src/test/java/io/agentflow/agent/DraftAssistIntegrationTest.java": "903c5222c1f8c0091e0654f88e887719ee54a5b77abb2acc07f713b4e0f76c02",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseDraftAssistPersistenceTest.java": "b6f49fdf4d2c339c524f4b420b3696ea46ba7be9f784351df4f78b78adecda97",
+    "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskPersistenceTest.java": "74f034cad5b3a8a5c72baf8a37ef34b16597422a4cdbc1a968c7523e5417dbd7",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionIntegrationTest.java": "a9124a03cd784230b019766b6f93059d6b0b97683d7a303657ce838ed5edb366",
+    "agentflow-server/src/test/java/io/agentflow/approval/ExpenseRiskIntegrationTest.java": "6bb59603024816fc4b040b9c5d09dbac802b1185b1af88c51249a73e14b97239",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseDraftAssistIntegrationTest.java": "070cab488cce67abc170e823cd9cf70e44d05f2344f8eb5cda3549b7f487fa67",
+    "agentflow-server/src/test/java/io/agentflow/expense/PrecheckExplanationIntegrationTest.java": "d393b5503ac196b872eaeb6114c89f34fc8f0103c6fbcb79c387dade0a4fc089",
+    "agentflow-server/src/main/resources/db/migration/V122__agent_queue_trace.sql": "64f02665c778c3167fda3c10c505ecdbe3905dc8f6f9fa65b328edda2c2c2b4a",
+    "agentflow-server/src/test/java/io/agentflow/agent/AgentWorkerTraceTest.java": "d00ce4c87af6bec69020cd6efb4af2dabc4111a5aa1714e25da496f0f1fb41f5",
+    "scripts/check-agent-trace-runtime.py": "ac736d5fe00b636419d185d7d69e4a66adfefebc244fe2d9931e4b9aecd19a66",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7",
+    "scripts/fixtures/ExpenseRiskOidcFixture.java": "2f9952710952fb955b3d227070e82cf890f58c6fe9f8a4374445e7de4aebabee",
+    "agentflow-server/src/test/java/io/agentflow/auth/OidcTestProvider.java": "d0bc33ab2d51ca5622edc7bde153ea71f8cb597c9f74ab56912b8522f3b4027b"
+  },
+  "manifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/o01-agent-trace-verified/manifest.json",
+    "sha256": "f8cf6895fffc0568b63eaff3ded7dc070291a6f6d1d0b153fe37f3f25eea3592"
+  },
+  "jar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/o01-agent-trace-server.jar",
+    "sha256": "188b3fbc7b662f47f4983c45a957edf2bd2e5880d5936e69fdb794a3bfefeefc"
+  },
+  "reproduction": {
+    "tests": 6,
+    "failures": 6,
+    "errors": 0,
+    "cause": "Queue records did not preserve the request trace; workers and shared model client did not propagate it"
+  },
+  "validation": {
+    "scopedTests": 307,
+    "failures": 0,
+    "errors": 0,
+    "classes": [
+      {
+        "class": "io.agentflow.expense.PrecheckExplanationIntegrationTest",
+        "tests": 23
+      },
+      {
+        "class": "io.agentflow.expense.ExpenseDraftAssistIntegrationTest",
+        "tests": 31
+      },
+      {
+        "class": "io.agentflow.integration.WebhookWorkerTraceTest",
+        "tests": 1
+      },
+      {
+        "class": "io.agentflow.integration.WebhookIntegrationTest",
+        "tests": 13
+      },
+      {
+        "class": "io.agentflow.agent.ExpenseDraftAssistPersistenceTest",
+        "tests": 17
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionModelTest",
+        "tests": 14
+      },
+      {
+        "class": "io.agentflow.agent.DraftAssistMigrationTest",
+        "tests": 1
+      },
+      {
+        "class": "io.agentflow.agent.AssistExecutionIntegrationTest",
+        "tests": 14
+      },
+      {
+        "class": "io.agentflow.agent.ExpenseDraftModelTest",
+        "tests": 19
+      },
+      {
+        "class": "io.agentflow.agent.AssistRunQueryIntegrationTest",
+        "tests": 21
+      },
+      {
+        "class": "io.agentflow.agent.AgentWorkerTraceTest",
+        "tests": 6
+      },
+      {
+        "class": "io.agentflow.agent.ExpenseRiskPersistenceTest",
+        "tests": 25
+      },
+      {
+        "class": "io.agentflow.agent.ExpenseDraftAssistMigrationTest",
+        "tests": 1
+      },
+      {
+        "class": "io.agentflow.agent.AssistSchedulingTest",
+        "tests": 2
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionIntegrationTest",
+        "tests": 15
+      },
+      {
+        "class": "io.agentflow.agent.PrecheckExplanationMigrationTest",
+        "tests": 1
+      },
+      {
+        "class": "io.agentflow.agent.ExpenseRiskModelTest",
+        "tests": 18
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionSchedulingTest",
+        "tests": 2
+      },
+      {
+        "class": "io.agentflow.agent.ExpenseRiskExecutionTest",
+        "tests": 31
+      },
+      {
+        "class": "io.agentflow.agent.AssistExecutionMigrationTest",
+        "tests": 1
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionMigrationTest",
+        "tests": 1
+      },
+      {
+        "class": "io.agentflow.agent.DraftAssistIntegrationTest",
+        "tests": 14
+      },
+      {
+        "class": "io.agentflow.agent.InvoiceExtractionApiIntegrationTest",
+        "tests": 14
+      },
+      {
+        "class": "io.agentflow.observability.DiagnosticContextTest",
+        "tests": 5
+      },
+      {
+        "class": "io.agentflow.api.RequestTraceIntegrationTest",
+        "tests": 4
+      },
+      {
+        "class": "io.agentflow.approval.ExpenseRiskIntegrationTest",
+        "tests": 13
+      }
+    ],
+    "scopeMethod": "306 cases passed in final scope run; the ExpenseRiskPersistenceTest fixture was then repaired and all 25 cases passed, replacing its previous result. Unique total is 307, not 331.",
+    "initialGreenTests": 17,
+    "fixtureRepairs": [
+      "Current repository persistence tests must migrate to the current schema, not V108/V115",
+      "Preserve every original row/column across upgrade, then compare full current records across business execution"
+    ],
+    "package": "PASSED",
+    "fixedRuntime": {
+      "status": "PASS",
+      "database": "H2",
+      "previousJarSha256": "6e457ab9934077a67b166ba515fe73fc1bd99316c5caabe95652fa74f2d9a313",
+      "jarSha256": "188b3fbc7b662f47f4983c45a957edf2bd2e5880d5936e69fdb794a3bfefeefc",
+      "browserVerified": false,
+      "postgresqlVerified": false,
+      "realEnterpriseModelVerified": false,
+      "checks": [
+        {
+          "name": "nonempty-upgrade",
+          "tables": 280,
+          "legacyQueues": 6,
+          "inventedOrigins": 0
+        },
+        {
+          "name": "six-workers-after-process-restart",
+          "legacyStableTraces": 6,
+          "persistedRequestTraces": 6,
+          "actualModelRequests": 12,
+          "originalKeyReplays": 12,
+          "originalApprovalsUnchanged": true
+        },
+        {
+          "name": "independent-restore",
+          "tables": 280,
+          "sameQueueRows": 12,
+          "sameAuthorizedDetails": 12,
+          "resentModelRequests": 0
+        }
+      ],
+      "boots": 7,
+      "modelRequests": 12,
+      "businessHttpRequests": 164,
+      "responseTraces": 238
+    }
+  },
+  "migration": {
+    "version": "122",
+    "tables": 6,
+    "nullableTraceColumn": true,
+    "historicalTraceBackfill": false,
+    "domainContextsAndStateDigestsChanged": false
+  },
+  "selfReview": {
+    "scope": "Six repository insert/scan pairs, worker claim/send/finish scopes, shared HTTP header, migration/legacy handling, failure logs and selective-input boundaries",
+    "unresolvedFindingsInThisStage": []
+  },
+  "remaining": [
+    "Trusted businessNo/processInstanceId/taskId binding",
+    "Other persisted worker chains and external adapters",
+    "PostgreSQL verification",
+    "Original V03 clause audit and existing delivery gates"
+  ],
+  "remotePush": false,
+  "pullRequest": null
+}

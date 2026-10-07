@@ -1,5 +1,7 @@
 package io.agentflow.agent;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -12,6 +14,7 @@ import java.time.Instant;
 @Service
 public class AssistWorker {
     private static final Logger LOG = LoggerFactory.getLogger(AssistWorker.class);
+    private static final String TRACE_SOURCE = "assist-run";
     private final JdbcAssistJobRepository jobs;
     private final AssistExecutionService execution;
     private final AssistModelPort model;
@@ -25,16 +28,19 @@ public class AssistWorker {
     public void poll() {
         for (var candidate : jobs.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var job = execution.claim(candidate.tenantId(), candidate.runId(), Instant.now());
-                if (job == null) continue;
-                AssistSuggestion suggestion = null; AssistRun.Failure failure = null;
-                try { suggestion = model.generate(AssistConfiguration.PROMPT_VERSION, job.sources()); }
-                catch (AssistModelPort.ModelFailure modelFailure) { failure = modelFailure.failure(); }
-                execution.finish(job, suggestion, failure, Instant.now());
-            } catch (RuntimeException failure) {
-                // 原始异常可能含远端地址或业务输入，日志只记录稳定分类与运行编号。
-                LOG.error("Assist execution failed, errorCode={}, runId={}", "WORKER_FAILURE", candidate.runId());
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.runId().toString()).open()) {
+                try {
+                    var job = execution.claim(candidate.tenantId(), candidate.runId(), Instant.now());
+                    if (job == null) continue;
+                    AssistSuggestion suggestion = null; AssistRun.Failure failure = null;
+                    try { suggestion = model.generate(AssistConfiguration.PROMPT_VERSION, job.sources()); }
+                    catch (AssistModelPort.ModelFailure modelFailure) { failure = modelFailure.failure(); }
+                    execution.finish(job, suggestion, failure, Instant.now());
+                } catch (RuntimeException failure) {
+                    // 原始异常可能含远端地址或业务输入，日志只记录稳定分类与运行编号。
+                    LOG.error("Assist execution failed, errorCode={}, runId={}", "WORKER_FAILURE", candidate.runId());
+                }
             }
         }
     }

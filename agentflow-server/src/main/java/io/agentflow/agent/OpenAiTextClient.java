@@ -2,6 +2,7 @@ package io.agentflow.agent;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import java.io.ByteArrayOutputStream;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -57,6 +58,7 @@ final class OpenAiTextClient {
                 "messages", List.of(Map.of("role", "system", "content", instruction), Map.of("role", "user", "content", content))));
         var request = HttpRequest.newBuilder(endpoint).timeout(Duration.ofSeconds(timeout))
                 .header("Content-Type", "application/json; charset=utf-8").POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+        request.header(DiagnosticContext.HEADER, DiagnosticContext.capture().traceId());
         if (!apiKey.isBlank()) request.header("Authorization", "Bearer " + apiKey);
         var future = client.sendAsync(request.build(), response -> new BoundedBody());
         try {

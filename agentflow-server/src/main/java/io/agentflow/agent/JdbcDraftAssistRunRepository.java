@@ -2,6 +2,7 @@ package io.agentflow.agent;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -31,10 +32,10 @@ public class JdbcDraftAssistRunRepository implements DraftAssistRunRepository {
         var context = run.context();
         if (run.state().status() != DraftAssistRun.Status.QUEUED || run.state().version() != 1) throw conflict();
         int changed = jdbc.update("""
-                INSERT INTO agent_draft_assist_run(id,tenant_id,application_id,application_version,status,version,context_json,state_json,created_at)
-                SELECT ?,tenant_id,id,version,'QUEUED',1,?,?,? FROM approval_application
+                INSERT INTO agent_draft_assist_run(id,tenant_id,application_id,application_version,status,version,context_json,state_json,created_at,trace_id)
+                SELECT ?,tenant_id,id,version,'QUEUED',1,?,?,?,? FROM approval_application
                 WHERE tenant_id=? AND id=? AND version=? AND created_by=?
-                """, context.id().toString(), json.write(context), json.write(run.state()), Timestamp.from(context.createdAt()),
+                """, context.id().toString(), json.write(context), json.write(run.state()), Timestamp.from(context.createdAt()), DiagnosticContext.capture().traceId(),
                 context.tenantId(), context.input().applicationId().toString(), context.input().applicationVersion(), context.requestedBy());
         if (changed != 1) throw new DomainException("AGENT_INPUT_CHANGED", "Draft changed before queue persistence");
         append(run);
@@ -74,9 +75,9 @@ public class JdbcDraftAssistRunRepository implements DraftAssistRunRepository {
     /** 待执行与超时记录有界扫描；历史建议不重复执行。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM agent_draft_assist_run
+                SELECT tenant_id,id,trace_id FROM agent_draft_assist_run
                 WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), Timestamp.from(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), Timestamp.from(now));
     }
 
     /** 同申请排队前在申请锁内检查，避免不同幂等键产生同时执行的建议。 */
@@ -128,7 +129,7 @@ public class JdbcDraftAssistRunRepository implements DraftAssistRunRepository {
      * 工作扫描只返回不透明标识。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
     /**
      * 申请人索引不含任何提示或表单正文。
      * @author owlzhangfq@gmail.com

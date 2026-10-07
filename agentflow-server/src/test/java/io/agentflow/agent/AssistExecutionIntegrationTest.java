@@ -3,6 +3,8 @@ package io.agentflow.agent;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
+import org.slf4j.MDC;
 import org.flowable.engine.TaskService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterAll;
@@ -46,6 +48,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class AssistExecutionIntegrationTest {
     private static final JsonUtil FIXTURE_JSON = new JsonUtil(new com.fasterxml.jackson.databind.ObjectMapper());
     private static final AtomicInteger REQUESTS = new AtomicInteger();
+    private static final AtomicReference<String> LAST_TRACE = new AtomicReference<>();
+    private String lastRequestTrace;
     private static final AtomicReference<String> LAST_BODY = new AtomicReference<>("");
     private static final AtomicReference<String> MODE = new AtomicReference<>("success");
     private static final java.util.concurrent.ExecutorService HTTP_THREADS = Executors.newFixedThreadPool(2);
@@ -65,7 +69,7 @@ class AssistExecutionIntegrationTest {
             server.setExecutor(HTTP_THREADS);
             server.createContext("/v1/chat/completions", exchange -> {
                 REQUESTS.incrementAndGet(); String mode = MODE.get();
-                String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8); LAST_BODY.set(body);
+                String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8); LAST_BODY.set(body); LAST_TRACE.set(exchange.getRequestHeaders().getFirst(DiagnosticContext.HEADER));
                 assertThat(exchange.getRequestHeaders().getFirst("Authorization")).isEqualTo("Bearer fixture-key");
                 if (mode.equals("timeout")) {
                     try { Thread.sleep(1500); } catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
@@ -99,6 +103,24 @@ class AssistExecutionIntegrationTest {
     @Autowired JdbcAssistJobRepository jobs;
     @Autowired AssistConfiguration configuration;
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    @Test
+    void tracePersistsThroughQueueAndReachesModel() throws Exception {
+        String app = application();
+        String id = queue(app, task(app)).path("id").asText();
+        String expectedTrace = lastRequestTrace;
+        assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(jdbc.queryForMap("SELECT * FROM agent_assist_job WHERE tenant_id='demo' AND run_id=?", id)
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        LAST_TRACE.set(null);
+        worker.poll();
+        assertThat(LAST_TRACE.get()).isEqualTo(expectedTrace);
+        assertThat(jdbc.queryForMap("SELECT * FROM agent_assist_job WHERE tenant_id='demo' AND run_id=?", id)
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
+    }
 
     @Test
     void queuesOnlyExplicitReadableSourcesWithoutCallingModelOrApproving() throws Exception {
@@ -334,8 +356,10 @@ class AssistExecutionIntegrationTest {
     private static String path(String app) { return "/api/v1/applications/" + app + "/assist-runs"; }
     private String token(String user) { return "Bearer " + auth.login("demo", user, "demo").token(); }
     private JsonNode read(MockHttpServletRequestBuilder request, String user, int expected) throws Exception {
-        return json.read(mvc.perform(request.header("Authorization", token(user))).andExpect(status().is(expected))
-                .andReturn().getResponse().getContentAsString(), JsonNode.class);
+        var response = mvc.perform(request.header("Authorization", token(user))).andExpect(status().is(expected))
+                .andReturn().getResponse();
+        lastRequestTrace = response.getHeader(DiagnosticContext.HEADER);
+        return json.read(response.getContentAsString(), JsonNode.class);
     }
     private JsonNode write(MockHttpServletRequestBuilder request, String user, Object body, int expected) throws Exception {
         return read(request.header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON).content(json.write(body)), user, expected);

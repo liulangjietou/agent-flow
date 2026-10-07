@@ -2,6 +2,7 @@ package io.agentflow.agent;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -42,12 +43,12 @@ public class JdbcInvoiceExtractionRunRepository {
         try {
             int changed = jdbc.update("""
                     INSERT INTO agent_invoice_extraction_run(id,tenant_id,invoice_id,owner_id,original_id,original_digest,
-                        original_format,original_bytes,page_count,method,target_digest,status,version,context_json,state_json,created_at,active_invoice_id)
-                    SELECT ?,tenant_id,invoice_id,owner_id,id,sha256,format,byte_size,?,?,?,'QUEUED',1,?,?,?,invoice_id
+                        original_format,original_bytes,page_count,method,target_digest,status,version,context_json,state_json,created_at,active_invoice_id,trace_id)
+                    SELECT ?,tenant_id,invoice_id,owner_id,id,sha256,format,byte_size,?,?,?,'QUEUED',1,?,?,?,invoice_id,?
                     FROM invoice_original WHERE tenant_id=? AND invoice_id=? AND owner_id=? AND id=? AND sha256=?
                         AND format=? AND byte_size=? AND status='READY'
                     """, context.id().toString(), input.pageCount(), context.method().name(), context.targetDigest(), json.write(context),
-                    json.write(run.state()), timestamp(context.createdAt()), context.tenantId(), input.invoiceId().toString(), context.requestedBy(),
+                    json.write(run.state()), timestamp(context.createdAt()), DiagnosticContext.capture().traceId(), context.tenantId(), input.invoiceId().toString(), context.requestedBy(),
                     input.originalId().toString(), input.originalDigest(), input.format().name(), input.originalBytes());
             if (changed != 1) throw new DomainException("AGENT_INPUT_CHANGED", "Invoice original changed before queue persistence");
         } catch (DuplicateKeyException duplicate) { throw new DomainException("AGENT_RUN_ACTIVE", "Invoice extraction is already active"); }
@@ -95,9 +96,9 @@ public class JdbcInvoiceExtractionRunRepository {
     /** 超时任务与待执行任务有界扫描，超时仅结算，不重新发送。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM agent_invoice_extraction_run
+                SELECT tenant_id,id,trace_id FROM agent_invoice_extraction_run
                 WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT ?
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), BATCH_SIZE);
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), BATCH_SIZE);
     }
 
     /** 领取或结算时在运行锁内读取原租约，过期结果不可覆盖终态。 */
@@ -164,7 +165,7 @@ public class JdbcInvoiceExtractionRunRepository {
      * 扫描结果仅携带不透明定位标识。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
     /**
      * 历史索引不包含票面数据。
      * @author owlzhangfq@gmail.com

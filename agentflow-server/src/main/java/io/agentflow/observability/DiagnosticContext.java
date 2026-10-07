@@ -32,6 +32,11 @@ public record DiagnosticContext(String traceId, String tenantId) {
         return UUID.nameUUIDFromBytes((kind + "\u0000" + tenant + "\u0000" + id).getBytes(StandardCharsets.UTF_8)).toString();
     }
 
+    /** 从持久队列恢复来源；旧记录或损坏字段仅使用稳定的独立标识，不回写来源。 */
+    public static DiagnosticContext restored(String traceId, String tenantId, String kind, String id) {
+        return new DiagnosticContext(validTrace(traceId) ? traceId : legacyId(kind, tenantId, id), tenantId);
+    }
+
     /** 持久化追踪字段按有界 UUID 校验，不能把外部正文写进响应头或日志。 */
     public static boolean validTrace(String value) { return value != null && TRACE.matcher(value).matches(); }
 

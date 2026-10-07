@@ -1,5 +1,7 @@
 package io.agentflow.agent;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ExpenseRiskWorker {
     private static final Logger LOG = LoggerFactory.getLogger(ExpenseRiskWorker.class);
+    private static final String TRACE_SOURCE = "expense-risk";
     private final JdbcExpenseRiskRepository runs;
     private final ExpenseRiskService service;
     private final ExpenseRiskModelPort model;
@@ -29,22 +32,25 @@ public class ExpenseRiskWorker {
     public void poll() {
         for (var candidate : runs.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
-                if (context == null) continue;
-                try { if (!service.sendable(context, Instant.now())) continue; }
-                catch (DomainException unavailable) {
-                    // 发送检查事务已回滚；独立失败事务不能被其 rollback-only 标记一起撤销。
-                    service.finish(context.tenantId(), context.id(), null, AssistRun.Failure.INPUT_UNAVAILABLE, Instant.now());
-                    continue;
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                try {
+                    var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
+                    if (context == null) continue;
+                    try { if (!service.sendable(context, Instant.now())) continue; }
+                    catch (DomainException unavailable) {
+                        // 发送检查事务已回滚；独立失败事务不能被其 rollback-only 标记一起撤销。
+                        service.finish(context.tenantId(), context.id(), null, AssistRun.Failure.INPUT_UNAVAILABLE, Instant.now());
+                        continue;
+                    }
+                    ExpenseRiskSuggestion suggestion = null; AssistRun.Failure failure = null;
+                    try { suggestion = model.generate(context); }
+                    catch (AssistModelPort.ModelFailure unavailable) { failure = unavailable.failure(); }
+                    service.finish(context.tenantId(), context.id(), suggestion, failure, Instant.now());
+                } catch (RuntimeException failure) {
+                    LOG.error("Expense risk execution failed, errorCode={}, runId={}, exceptionType={}",
+                            "WORKER_FAILURE", candidate.id(), failure.getClass().getSimpleName());
                 }
-                ExpenseRiskSuggestion suggestion = null; AssistRun.Failure failure = null;
-                try { suggestion = model.generate(context); }
-                catch (AssistModelPort.ModelFailure unavailable) { failure = unavailable.failure(); }
-                service.finish(context.tenantId(), context.id(), suggestion, failure, Instant.now());
-            } catch (RuntimeException failure) {
-                LOG.error("Expense risk execution failed, errorCode={}, runId={}, exceptionType={}",
-                        "WORKER_FAILURE", candidate.id(), failure.getClass().getSimpleName());
             }
         }
     }

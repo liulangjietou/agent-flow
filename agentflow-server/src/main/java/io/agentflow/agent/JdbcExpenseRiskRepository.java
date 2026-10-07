@@ -3,6 +3,7 @@ package io.agentflow.agent;
 import io.agentflow.auth.DeferredActorAuthentication;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -40,13 +41,13 @@ public class JdbcExpenseRiskRepository {
         try {
             int count = jdbc.update("""
                     INSERT INTO agent_expense_risk_run(tenant_id,id,report_id,application_id,round_no,requested_by,task_id,
-                        authentication_kind,login_reference,status,version,active_report_id,context_json,state_json,created_at)
-                    SELECT r.tenant_id,?,r.id,r.application_id,a.round_no,?,?,?,?, 'QUEUED',1,r.id,?,?,?
+                        authentication_kind,login_reference,status,version,active_report_id,context_json,state_json,created_at,trace_id)
+                    SELECT r.tenant_id,?,r.id,r.application_id,a.round_no,?,?,?,?, 'QUEUED',1,r.id,?,?,?,?
                     FROM expense_report r JOIN approval_application a ON a.tenant_id=r.tenant_id AND a.id=r.application_id
                     WHERE r.tenant_id=? AND r.id=? AND r.application_id=? AND a.version=? AND r.version=?
                         AND a.round_no=? AND a.status='IN_APPROVAL'
                     """, context.id().toString(), context.requestedBy(), context.taskId(), login.kind().name(), login.value(),
-                    json.write(context), json.write(run.state()), Timestamp.from(context.createdAt()), context.tenantId(),
+                    json.write(context), json.write(run.state()), Timestamp.from(context.createdAt()), DiagnosticContext.capture().traceId(), context.tenantId(),
                     primary.reportId().toString(), primary.applicationId().toString(), primary.applicationVersion(), primary.financialVersion(), primary.roundNo());
             if (count != 1) throw changed();
         } catch (DuplicateKeyException active) { throw new DomainException("AGENT_RUN_ACTIVE", "Expense report already has an active risk explanation"); }
@@ -101,9 +102,9 @@ public class JdbcExpenseRiskRepository {
     /** 扫描队列或已到期租约；运行中未到期的请求不会被另一个进程重领。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM agent_expense_risk_run WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
+                SELECT tenant_id,id,trace_id FROM agent_expense_risk_run WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
                 ORDER BY created_at,id LIMIT ?
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), Timestamp.from(now), BATCH_SIZE);
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), Timestamp.from(now), BATCH_SIZE);
     }
 
     /** 索引限于已授权的主单原轮次，不返回对照单标识、认证引用或模型正文。 */
@@ -163,7 +164,7 @@ public class JdbcExpenseRiskRepository {
      * 后台候选只携带定位，不携带身份凭据或业务材料。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
     /**
      * 主单已授权轮次的轻量历史，不泄露对照单信息。
      * @author owlzhangfq@gmail.com

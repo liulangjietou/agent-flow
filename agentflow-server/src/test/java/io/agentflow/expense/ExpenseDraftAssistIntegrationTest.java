@@ -10,6 +10,8 @@ import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
+import org.slf4j.MDC;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.FinanceGatewayConfiguration;
 import java.net.InetSocketAddress;
@@ -57,6 +59,8 @@ class ExpenseDraftAssistIntegrationTest {
     private static final AtomicInteger MODEL_CALLS = new AtomicInteger(), CATALOG_CALLS = new AtomicInteger(), OBSERVATIONS = new AtomicInteger();
     private static final AtomicReference<String> MODEL_MODE = new AtomicReference<>("success"), CATALOG_MODE = new AtomicReference<>("success");
     private static final AtomicReference<Runnable> DURING_CATALOG = new AtomicReference<>();
+    private static final AtomicReference<String> LAST_TRACE = new AtomicReference<>();
+    private String lastRequestTrace;
     private static final AtomicReference<String> LAST_MODEL = new AtomicReference<>();
     private static final AtomicReference<UUID> ENTITY = new AtomicReference<>();
     private static final UUID FOREIGN_ENTITY = UUID.randomUUID();
@@ -102,6 +106,24 @@ class ExpenseDraftAssistIntegrationTest {
         Files.writeString(OBSERVATION_DIRECTORY.resolve("manifest.json"), wire.write(Map.of("directory", OBSERVATION_DIRECTORY.toString(),
                 "observations", OBSERVATIONS.get(), "modelRequests", MODEL_CALLS.get(), "catalogRequests", CATALOG_CALLS.get())));
         System.out.println("Expense draft observations=" + OBSERVATION_DIRECTORY);
+    }
+
+    @Test
+    void tracePersistsThroughQueueAndReachesModel() throws Exception {
+        var report = report();
+        UUID id = queue(report);
+        String expectedTrace = lastRequestTrace;
+        assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(jdbc.queryForMap("SELECT * FROM agent_expense_draft_run WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        LAST_TRACE.set(null);
+        worker.poll();
+        assertThat(LAST_TRACE.get()).isEqualTo(expectedTrace);
+        assertThat(jdbc.queryForMap("SELECT * FROM agent_expense_draft_run WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
     }
 
     @Test void previewQueueAndGranularConfirmationPreserveFinancialFactsAndIdempotentReplay() throws Exception {
@@ -307,12 +329,14 @@ class ExpenseDraftAssistIntegrationTest {
     }
     private JsonNode read(ExpenseReport report, String suffix, String user, int status) throws Exception {
         var response = mvc.perform(get(path(report) + suffix).header("Authorization", token(user))).andReturn().getResponse();
+        lastRequestTrace = response.getHeader(DiagnosticContext.HEADER);
         var body = json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class); observe("GET", suffix, null, response.getStatus(), body);
         assertThat(response.getStatus()).as(body.toString()).isEqualTo(status); if (status == 200) assertThat(response.getHeader("Cache-Control")).contains("no-store"); return body;
     }
     private JsonNode send(ExpenseReport report, String suffix, String user, Object input, String key, int status) throws Exception {
         var response = mvc.perform(post(path(report) + suffix).header("Authorization", token(user)).header("Idempotency-Key", key)
                 .contentType("application/json").content(json.write(input))).andReturn().getResponse();
+        lastRequestTrace = response.getHeader(DiagnosticContext.HEADER);
         var body = json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class); observe("POST", suffix, input, response.getStatus(), body);
         assertThat(response.getStatus()).as(body.toString()).isEqualTo(status);
         if (status < 300 && suffix.equals("/preview")) assertThat(response.getHeader("Cache-Control")).contains("no-store"); return body;
@@ -337,7 +361,7 @@ class ExpenseDraftAssistIntegrationTest {
             };
             server.createContext("/finance/catalog", catalog); server.createContext("/changed-finance/catalog", catalog);
             server.createContext("/model", exchange -> {
-                MODEL_CALLS.incrementAndGet(); String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8); LAST_MODEL.set(body);
+                MODEL_CALLS.incrementAndGet(); String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8); LAST_MODEL.set(body); LAST_TRACE.set(exchange.getRequestHeaders().getFirst(DiagnosticContext.HEADER));
                 var request = wire.read(body, JsonNode.class); var input = wire.read(request.at("/messages/1/content").asText(), JsonNode.class);
                 var evidence = java.util.stream.StreamSupport.stream(input.path("sources").spliterator(), false)
                         .filter(value -> Set.of("expense:itinerary[1]", ExpenseDraftAssistInput.CATALOG).contains(value.at("/reference/sourceId").asText()))

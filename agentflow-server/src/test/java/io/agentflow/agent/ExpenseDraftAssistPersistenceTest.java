@@ -48,7 +48,7 @@ class ExpenseDraftAssistPersistenceTest {
 
     @BeforeEach void setup() {
         var source = new DriverManagerDataSource("jdbc:h2:mem:expense-draft-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
-        Flyway.configure().dataSource(source).target("108").load().migrate(); jdbc = new JdbcTemplate(source);
+        Flyway.configure().dataSource(source).load().migrate(); jdbc = new JdbcTemplate(source);
         var manager = new DataSourceTransactionManager(source); tx = new TransactionTemplate(manager);
         var proxy = new ProxyFactory(new JdbcExpenseDraftAssistRepository(jdbc, json));
         proxy.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource()));

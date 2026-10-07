@@ -1,5 +1,7 @@
 package io.agentflow.agent;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +15,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Service
 public class InvoiceExtractionWorker {
     private static final Logger LOG = LoggerFactory.getLogger(InvoiceExtractionWorker.class);
+    private static final String TRACE_SOURCE = "invoice-extraction";
     private final JdbcInvoiceExtractionRunRepository runs;
     private final InvoiceExtractionService service;
     private final InvoiceExtractionPort extraction;
@@ -25,23 +28,26 @@ public class InvoiceExtractionWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Invoice extraction worker must run outside a transaction");
         for (var candidate : runs.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
-                if (context == null) continue;
-                InvoiceExtractionSuggestion suggestion = null; InvoiceExtractionRun.Failure failure = null;
-                try { suggestion = extraction.generate(context); }
-                catch (AssistModelPort.ModelFailure rejected) {
-                    failure = switch (rejected.failure()) {
-                        case MODEL_UNAVAILABLE -> InvoiceExtractionRun.Failure.MODEL_UNAVAILABLE;
-                        case MODEL_TIMEOUT -> InvoiceExtractionRun.Failure.EXECUTION_TIMEOUT;
-                        case INVALID_MODEL_OUTPUT -> InvoiceExtractionRun.Failure.INVALID_RESULT;
-                        case INPUT_UNAVAILABLE -> InvoiceExtractionRun.Failure.INPUT_UNAVAILABLE;
-                    };
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                try {
+                    var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
+                    if (context == null) continue;
+                    InvoiceExtractionSuggestion suggestion = null; InvoiceExtractionRun.Failure failure = null;
+                    try { suggestion = extraction.generate(context); }
+                    catch (AssistModelPort.ModelFailure rejected) {
+                        failure = switch (rejected.failure()) {
+                            case MODEL_UNAVAILABLE -> InvoiceExtractionRun.Failure.MODEL_UNAVAILABLE;
+                            case MODEL_TIMEOUT -> InvoiceExtractionRun.Failure.EXECUTION_TIMEOUT;
+                            case INVALID_MODEL_OUTPUT -> InvoiceExtractionRun.Failure.INVALID_RESULT;
+                            case INPUT_UNAVAILABLE -> InvoiceExtractionRun.Failure.INPUT_UNAVAILABLE;
+                        };
+                    }
+                    service.finish(context.tenantId(), context.id(), suggestion, failure, Instant.now());
+                } catch (RuntimeException failed) {
+                    // 异常可能包含票面或外部正文，日志仅记录稳定分类和任务标识。
+                    LOG.error("Invoice extraction execution failed, errorCode={}, runId={}", "WORKER_FAILURE", candidate.id());
                 }
-                service.finish(context.tenantId(), context.id(), suggestion, failure, Instant.now());
-            } catch (RuntimeException failed) {
-                // 异常可能包含票面或外部正文，日志仅记录稳定分类和任务标识。
-                LOG.error("Invoice extraction execution failed, errorCode={}, runId={}", "WORKER_FAILURE", candidate.id());
             }
         }
     }

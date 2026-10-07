@@ -1,5 +1,7 @@
 package io.agentflow.agent;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class PrecheckExplanationWorker {
     private static final Logger LOG = LoggerFactory.getLogger(PrecheckExplanationWorker.class);
+    private static final String TRACE_SOURCE = "precheck-explanation";
     private final JdbcPrecheckExplanationRepository runs;
     private final PrecheckExplanationService service;
     private final PrecheckExplanationModelPort model;
@@ -23,16 +26,19 @@ public class PrecheckExplanationWorker {
     public void poll() {
         for (var candidate : runs.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
-                if (context == null || !service.sendable(context, Instant.now())) continue;
-                PrecheckExplanationSuggestion suggestion = null; AssistRun.Failure failure = null;
-                try { suggestion = model.generate(context); }
-                catch (AssistModelPort.ModelFailure unavailable) { failure = unavailable.failure(); }
-                service.finish(context.tenantId(), context.id(), suggestion, failure, Instant.now());
-            } catch (RuntimeException failure) {
-                LOG.error("Precheck explanation execution failed, errorCode={}, runId={}, exceptionType={}",
-                        "WORKER_FAILURE", candidate.id(), failure.getClass().getSimpleName());
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                try {
+                    var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
+                    if (context == null || !service.sendable(context, Instant.now())) continue;
+                    PrecheckExplanationSuggestion suggestion = null; AssistRun.Failure failure = null;
+                    try { suggestion = model.generate(context); }
+                    catch (AssistModelPort.ModelFailure unavailable) { failure = unavailable.failure(); }
+                    service.finish(context.tenantId(), context.id(), suggestion, failure, Instant.now());
+                } catch (RuntimeException failure) {
+                    LOG.error("Precheck explanation execution failed, errorCode={}, runId={}, exceptionType={}",
+                            "WORKER_FAILURE", candidate.id(), failure.getClass().getSimpleName());
+                }
             }
         }
     }

@@ -11,6 +11,8 @@ import io.agentflow.calendar.CalendarRules;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
+import org.slf4j.MDC;
 import io.agentflow.definition.DefinitionApplicationService;
 import io.agentflow.expense.*;
 import io.agentflow.finance.*;
@@ -71,6 +73,8 @@ class ExpenseRiskIntegrationTest {
     private static final Actor ADMIN = new Actor("demo", "admin", Set.of("ADMIN", "PROCESS_ADMIN"));
     private static final ExpenseSubprocessGatewayFixture GATEWAY = new ExpenseSubprocessGatewayFixture();
     private static final AtomicInteger MODEL_CALLS = new AtomicInteger();
+    private static final AtomicReference<String> LAST_TRACE = new AtomicReference<>();
+    private String lastRequestTrace;
     private static final AtomicReference<String> LAST_MODEL = new AtomicReference<>();
     private static final java.util.concurrent.ExecutorService HTTP_THREADS = Executors.newFixedThreadPool(2);
     private static final HttpServer MODEL = modelServer();
@@ -121,6 +125,25 @@ class ExpenseRiskIntegrationTest {
         assertThat(GATEWAY.failure()).isNull();
     }
     @AfterAll static void stopOwnedServers() { MODEL.stop(0); HTTP_THREADS.shutdownNow(); GATEWAY.close(); }
+
+    @Test
+    void tracePersistsThroughQueueAndReachesModel() throws Exception {
+        var primary = submitted(false);
+        var comparison = submitted(false);
+        UUID id = queue(primary, scope(primary, comparison));
+        String expectedTrace = lastRequestTrace;
+        assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(jdbc.queryForMap("SELECT * FROM agent_expense_risk_run WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        LAST_TRACE.set(null);
+        worker.poll();
+        assertThat(LAST_TRACE.get()).isEqualTo(expectedTrace);
+        assertThat(jdbc.queryForMap("SELECT * FROM agent_expense_risk_run WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
+    }
 
     @Test void actualExpenseTasksPreviewQueueExplainAndReviewWithoutChangingApprovalOrMoney() throws Exception {
         var primary = submitted(false); var comparison = submitted(false); var scope = scope(primary, comparison); String task = task(primary).getId();
@@ -279,7 +302,7 @@ class ExpenseRiskIntegrationTest {
     private org.springframework.mock.web.MockHttpServletResponse postBody(String path, String user, Object body) throws Exception { return mvc.perform(post(path).header("Authorization", token(user)).contentType("application/json").content(json.write(body))).andReturn().getResponse(); }
     private JsonNode send(String path, String user, Object body, String key, int expected) throws Exception { return response(mvc.perform(post(path).header("Authorization", token(user)).header("Idempotency-Key", key).contentType("application/json").content(json.write(body))).andReturn().getResponse(), expected); }
     private JsonNode read(String path, String user, int expected) throws Exception { return response(mvc.perform(get(path).header("Authorization", token(user))).andReturn().getResponse(), expected); }
-    private JsonNode response(org.springframework.mock.web.MockHttpServletResponse response, int expected) throws Exception { assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(expected); if (expected < 300) assertThat(response.getHeader("Cache-Control")).contains("no-store"); return json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class); }
+    private JsonNode response(org.springframework.mock.web.MockHttpServletResponse response, int expected) throws Exception { lastRequestTrace = response.getHeader(DiagnosticContext.HEADER); assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(expected); if (expected < 300) assertThat(response.getHeader("Cache-Control")).contains("no-store"); return json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class); }
     private List<Object> businessState(ExpenseReport... selected) { var facts = new ArrayList<Object>(); for (var report : selected) { facts.add(reports.find("demo", report.id()).orElseThrow().state()); var app = application(report); facts.add(List.of(app.version(), app.status(), task(report).getId())); facts.add(occupations.find("demo", report.id()).orElseThrow()); } return facts; }
     private static String expensePath(ExpenseReport report) { return "/api/v1/expense-reports/" + report.id(); }
     private static String path(ExpenseReport report) { return expensePath(report) + "/risk-explanations"; }
@@ -289,7 +312,7 @@ class ExpenseRiskIntegrationTest {
             var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0); server.setExecutor(HTTP_THREADS);
             server.createContext("/v1/chat/completions", exchange -> {
                 try {
-                    String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8); LAST_MODEL.set(body); MODEL_CALLS.incrementAndGet();
+                    String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8); LAST_MODEL.set(body); LAST_TRACE.set(exchange.getRequestHeaders().getFirst(DiagnosticContext.HEADER)); MODEL_CALLS.incrementAndGet();
                     var request = wire.read(body, JsonNode.class); var input = wire.read(request.at("/messages/1/content").asText(), JsonNode.class);
                     var evidence = java.util.stream.StreamSupport.stream(input.path("sources").spliterator(), false).map(s -> s.path("reference")).toList();
                     var items = java.util.stream.StreamSupport.stream(input.path("concerns").spliterator(), false).map(c -> Map.of("concernSourceId", c.path("sourceId").asText(), "kind", c.path("kind").asText(),

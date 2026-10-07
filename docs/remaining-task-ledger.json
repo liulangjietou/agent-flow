@@ -2903,7 +2903,7 @@
           ]
         }
       ],
-      "observed": "请求/认证/CSRF/CORS、审批审计、Webhook 持久化与投递、归档下载线程已建立来源关联；134 项范围测试及固定包 6 启动/187 HTTP/接收后强退/280 表升级还原通过。其余 Agent/worker 和业务号/实例/任务标识正在继续接线，O01 保持 OPEN。",
+      "observed": "请求/Webhook/下载线程阶段已通过；六类 Agent 队列、工作器和模型 HTTP 来源追踪补齐，范围去重 307 项和固定包 7 次启动、12 次模型接收、非空升级/排队强退/原键重放/独立恢复通过。其余 worker 和业务号/实例/任务标识继续接线，O01 保持 OPEN。",
       "references": [
         {
           "path": "docs/superpowers/plans/2026-10-07-operation-tracing.md",
@@ -2911,6 +2911,10 @@
         },
         {
           "path": "docs/evidence/operation-tracing-request-webhook-20261007.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/operation-tracing-agent-20261007.json",
           "line": 1
         }
       ],
@@ -2920,6 +2924,10 @@
       "requestWebhookStage": {
         "status": "PASSED_LOCAL_FIXED_PACKAGE",
         "evidence": "docs/evidence/operation-tracing-request-webhook-20261007.json"
+      },
+      "agentQueueStage": {
+        "status": "PASSED_LOCAL_FIXED_PACKAGE",
+        "evidence": "docs/evidence/operation-tracing-agent-20261007.json"
       }
     }
   ],
@@ -4086,16 +4094,16 @@
   },
   "latestProgress": {
     "taskId": "O01",
-    "status": "REQUEST_WEBHOOK_STAGE_VERIFIED_OTHER_CHAINS_IN_PROGRESS",
-    "recordedAt": "2026-10-07T13:26:49.332199+00:00",
+    "status": "AGENT_STAGE_VERIFIED_OTHER_WORKERS_AND_BUSINESS_IDENTIFIERS_IN_PROGRESS",
+    "recordedAt": "2026-10-07T13:49:04.287597+00:00",
     "knownOpenTaskCount": 37,
-    "evidence": "docs/evidence/operation-tracing-request-webhook-20261007.json"
+    "evidence": "docs/evidence/operation-tracing-agent-20261007.json"
   },
   "localMainIntegration": {
-    "verifiedThroughCommit": "f9eef1ba29b34bda01f0824ea40803269b9fffe7",
-    "mergeCommit": "f9eef1ba29b34bda01f0824ea40803269b9fffe7",
+    "verifiedThroughCommit": "ce241c16c5b7c72e7a0f33328b4b70995e68c1c5",
+    "mergeCommit": "ce241c16c5b7c72e7a0f33328b4b70995e68c1c5",
     "originMainFetchedAtMerge": "2ac75649c026501460a59464d80f9a48ddf6ecd7",
     "remotePush": false,
-    "note": "U01 is merged locally. Verified O01 request/webhook stage is ready for the next local fast-forward; full O01, browser/PostgreSQL and external gates remain."
+    "note": "Verified O01 Agent queue stage is ready for the next local fast-forward; full O01, browser/PostgreSQL and external gates remain."
   }
 }
