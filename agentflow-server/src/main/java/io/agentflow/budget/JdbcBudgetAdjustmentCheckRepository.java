@@ -95,9 +95,12 @@ public class JdbcBudgetAdjustmentCheckRepository {
     /** 只读取十项；过期运行用于记录超时，不重复发送旧任务。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM budget_adjustment_check_job WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
-                ORDER BY created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), Timestamp.from(now));
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,NULL AS process_instance_id FROM budget_adjustment_check_job q
+                LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+                WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until<=?)
+                ORDER BY q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), Timestamp.from(now));
     }
     /** 历史只按单据归属查询，使用有界稳定游标。 */
     public List<BudgetAdjustmentCheck> list(String tenant, UUID requestId, UUID before, int limit) {
@@ -136,7 +139,9 @@ public class JdbcBudgetAdjustmentCheckRepository {
      * 扫描项不复制敏感快照，领取后在锁内重新读取。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) {
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 缺少原业务事实时保持空值，不继承工作线程残留值。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
     }

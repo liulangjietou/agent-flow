@@ -27,10 +27,12 @@ public class BudgetAdjustmentCheckWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Budget adjustment worker must execute outside a database transaction");
         for (var candidate : jobs.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "budget-adjustment-check", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "budget-adjustment-check", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var job = execution.claim(candidate.tenantId(), candidate.id(), Instant.now());
                     if (job == null) continue;
+                    LOG.info("Financial review execution claimed, errorCode={}, source={}, operationId={}", "NONE", "budget-adjustment-check", candidate.id());
                     BudgetAdjustmentCheck.Result result;
                     try { result = evaluator.evaluate(job); }
                     catch (RuntimeException failed) {

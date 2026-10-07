@@ -97,8 +97,19 @@ public class JdbcBudgetAdjustmentReviewRepository {
     }
     /** 只扫描十个标识，租约到期只落失败，不把旧结果重新排队。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id,trace_id FROM budget_adjustment_review WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY requested_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
+        return jdbc.query("""
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,NULL AS process_instance_id FROM budget_adjustment_review q
+                LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+                WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until<=?) ORDER BY q.requested_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now));
+    }
+
+    /** 批准快照还原并校验后，只按其中的原轮次查实例，不读取申请当前轮次。 */
+    public String findProcessInstance(ApprovedBudgetAdjustment source) {
+        return jdbc.query("SELECT process_instance_id FROM approval_submission_round WHERE tenant_id=? AND application_id=? AND round_no=?",
+                (row, index) -> row.getString("process_instance_id"), source.tenantId(), source.applicationId().toString(), source.round().roundNo())
+                .stream().filter(Objects::nonNull).findFirst().orElse(null);
     }
     private BudgetAdjustmentReview restore(ResultSet row, int index) throws SQLException {
         var value = json.read(row.getString("state_json"), BudgetAdjustmentReview.class); var input = value.input(); var source = input.source();
@@ -132,7 +143,9 @@ public class JdbcBudgetAdjustmentReviewRepository {
      * 后台只传原租户及读取标识。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) {
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 缺少原业务事实时保持空值，不继承工作线程残留值。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
     }

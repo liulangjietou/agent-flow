@@ -27,18 +27,32 @@ public class BudgetAdjustmentExecutionWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Budget execution worker must run outside a database transaction");
         for (var candidate : operations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "budget-adjustment-operation", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "budget-adjustment-operation", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
-                    try {
-                        var result = claimed.status() == BudgetAdjustmentOperation.Status.EXECUTING
-                                ? gateway.execute(claimed.command()) : gateway.query(claimed.command());
-                        service.finish(claimed, result, Instant.now());
-                    } catch (RuntimeException failed) {
-                        service.fail(claimed, Instant.now()); LOG.error("Budget execution failed, errorCode={}, operationId={}", "EXECUTION_FAILURE", candidate.id());
+                    String instance = candidate.businessNo() == null ? null : operations.findProcessInstance(claimed.command().source());
+                    try (var business = DiagnosticContext.capture().withBusiness(candidate.businessNo(), instance, null).open()) {
+                        process(candidate, claimed);
                     }
                 } catch (RuntimeException failed) { LOG.error("Budget execution worker failed, errorCode={}, operationId={}", "EXECUTION_WORKER_FAILURE", candidate.id()); }
             }
         }
     }
+    /** 失败回写再次异常时也在原轮次作用域内记录，避免外层日志丢失实例。 */
+    private void process(JdbcBudgetAdjustmentOperationRepository.Candidate candidate, BudgetAdjustmentOperation claimed) {
+        try {
+            try {
+                LOG.info("Financial review execution claimed, errorCode={}, source={}, operationId={}", "NONE", "budget-adjustment-operation", candidate.id());
+                var result = claimed.status() == BudgetAdjustmentOperation.Status.EXECUTING
+                        ? gateway.execute(claimed.command()) : gateway.query(claimed.command());
+                service.finish(claimed, result, Instant.now());
+            } catch (RuntimeException failed) {
+                service.fail(claimed, Instant.now()); LOG.error("Budget execution failed, errorCode={}, operationId={}", "EXECUTION_FAILURE", candidate.id());
+            }
+        } catch (RuntimeException failed) {
+            LOG.error("Budget execution worker failed, errorCode={}, operationId={}", "EXECUTION_WORKER_FAILURE", candidate.id());
+        }
+    }
+
 }

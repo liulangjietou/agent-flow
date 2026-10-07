@@ -103,7 +103,13 @@ class BudgetAdjustmentExecutionPersistenceTest {
         assertThat(reopenedReviews.find(tenant, ready.input().id()).orElseThrow().supports(queued.command())).isTrue();
         assertThat(reopenedReviews.revision(tenant, ready.input().id(), 3)).contains(ready);
         assertThat(reopened.activeForRequest(tenant, source.requestId())).contains(queued);
-        assertThat(reopened.due(queued.createdAt())).containsExactly(new JdbcBudgetAdjustmentOperationRepository.Candidate(tenant, queued.command().id(), origin));
+        assertThat(reopened.due(queued.createdAt())).singleElement().satisfies(candidate -> {
+            assertThat(candidate.tenantId()).isEqualTo(tenant);
+            assertThat(candidate.id()).isEqualTo(queued.command().id());
+            assertThat(candidate.traceId()).isEqualTo(origin);
+            assertThat(candidate.businessNo()).isEqualTo(new JdbcApplicationRepository(jdbc, json).findById(tenant, queued.command().source().applicationId()).orElseThrow().businessNo());
+            assertThat(candidate.processInstanceId()).isNull();
+        });
         assertThat(count("budget_adjustment_review_revision")).isEqualTo(4); assertThat(count("budget_adjustment_operation_revision")).isEqualTo(1);
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> operations.create(queued, ready.input().id()))).isInstanceOf(DomainException.class);
         assertThat(count("budget_adjustment_operation")).isEqualTo(1);

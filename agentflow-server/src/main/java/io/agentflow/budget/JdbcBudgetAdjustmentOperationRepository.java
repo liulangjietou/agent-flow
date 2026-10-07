@@ -103,10 +103,20 @@ public class JdbcBudgetAdjustmentOperationRepository {
     /** 一批十个原标识，安全结束的旧指令永不被重新领取。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM budget_adjustment_operation WHERE retired_version IS NULL AND
-                ((status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?) OR (status IN ('EXECUTING','QUERYING') AND lease_until<=?))
-                ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,NULL AS process_instance_id FROM budget_adjustment_operation q
+                LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+                WHERE q.retired_version IS NULL AND
+                ((q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at<=?) OR (q.status IN ('EXECUTING','QUERYING') AND q.lease_until<=?))
+                ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now), timestamp(now));
+    }
+
+    /** 批准快照还原并校验后，只按其中的原轮次查实例，不读取申请当前轮次。 */
+    public String findProcessInstance(ApprovedBudgetAdjustment source) {
+        return jdbc.query("SELECT process_instance_id FROM approval_submission_round WHERE tenant_id=? AND application_id=? AND round_no=?",
+                (row, index) -> row.getString("process_instance_id"), source.tenantId(), source.applicationId().toString(), source.round().roundNo())
+                .stream().filter(Objects::nonNull).findFirst().orElse(null);
     }
     /** 结束证明引用当前已停止的安全修订，任何失败都回滚释放独占。 */
     @Transactional(propagation = Propagation.MANDATORY)
@@ -177,7 +187,9 @@ public class JdbcBudgetAdjustmentOperationRepository {
      * 扫描候选不携带台账金额或审批正文。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) {
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 缺少原业务事实时保持空值，不继承工作线程残留值。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
     }

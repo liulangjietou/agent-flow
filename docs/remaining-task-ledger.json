@@ -2904,7 +2904,7 @@
           ]
         }
       ],
-      "observed": "审批、Agent、核心财务、核心集成及 Webhook 业务标识已通过本地验收。Webhook 阶段 57 项回归、6 次启动、8 组原轮次关联和 281 表恢复通过。继续其余后台业务标识，O01 保持 OPEN。",
+      "observed": "审批、Agent、核心财务、核心集成、Webhook 及财务复核业务标识已通过本地验收。财务复核累计 597 项回归、8 次启动、6 组预算上下文及 281 表恢复通过；其余八类复核由范围测试核验。继续供应商、报销恢复及直接调度，O01 保持 OPEN。",
       "references": [
         {
           "path": "docs/superpowers/plans/2026-10-07-operation-tracing.md",
@@ -2960,6 +2960,10 @@
         },
         {
           "path": "docs/evidence/operation-tracing-webhook-business-20261007.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/operation-tracing-financial-review-business-20261007.json",
           "line": 1
         }
       ],
@@ -3017,6 +3021,10 @@
       "webhookBusinessStage": {
         "status": "PASSED_LOCAL_FIXED_PACKAGE_WITH_EXPLICIT_SCOPE",
         "evidence": "docs/evidence/operation-tracing-webhook-business-20261007.json"
+      },
+      "financialReviewBusinessStage": {
+        "status": "PASSED_LOCAL_FIXED_PACKAGE_WITH_EXPLICIT_SCOPE",
+        "evidence": "docs/evidence/operation-tracing-financial-review-business-20261007.json"
       }
     },
     {

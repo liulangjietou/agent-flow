@@ -26,9 +26,11 @@ public class AdvanceRepaymentReviewWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Repayment worker must execute outside a database transaction");
         for (var candidate : checks.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "repayment-review-check", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "repayment-review-check", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Financial review execution claimed, errorCode={}, source={}, operationId={}", "NONE", "repayment-review-check", candidate.id());
                     try {
                         var input = claimed.input(); service.finish(claimed, port.query(input.tenantId(), input.targetDigest(), input.request()), Instant.now());
                     } catch (RuntimeException failure) {

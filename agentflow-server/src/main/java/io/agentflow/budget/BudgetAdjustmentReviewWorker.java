@@ -27,18 +27,32 @@ public class BudgetAdjustmentReviewWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Budget review worker must run outside a database transaction");
         for (var candidate : reviews.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "budget-adjustment-review", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "budget-adjustment-review", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
-                    try {
-                        var source = claimed.input().source();
-                        var result = ledger.read(source.tenantId(), source.round().targetDigest(), source.round().content().ledgerRequest(source.employeeId()));
-                        service.finish(claimed, result, Instant.now());
-                    } catch (RuntimeException failed) {
-                        service.fail(claimed, Instant.now()); LOG.error("Budget review failed, errorCode={}, reviewId={}", "REVIEW_FAILURE", candidate.id());
+                    String instance = candidate.businessNo() == null ? null : reviews.findProcessInstance(claimed.input().source());
+                    try (var business = DiagnosticContext.capture().withBusiness(candidate.businessNo(), instance, null).open()) {
+                        process(candidate, claimed);
                     }
                 } catch (RuntimeException failed) { LOG.error("Budget review worker failed, errorCode={}, reviewId={}", "REVIEW_WORKER_FAILURE", candidate.id()); }
             }
         }
     }
+    /** 失败回写再次异常时也在原轮次作用域内记录，避免外层日志丢失实例。 */
+    private void process(JdbcBudgetAdjustmentReviewRepository.Candidate candidate, BudgetAdjustmentReview claimed) {
+        try {
+            try {
+                LOG.info("Financial review execution claimed, errorCode={}, source={}, operationId={}", "NONE", "budget-adjustment-review", candidate.id());
+                var source = claimed.input().source();
+                var result = ledger.read(source.tenantId(), source.round().targetDigest(), source.round().content().ledgerRequest(source.employeeId()));
+                service.finish(claimed, result, Instant.now());
+            } catch (RuntimeException failed) {
+                service.fail(claimed, Instant.now()); LOG.error("Budget review failed, errorCode={}, reviewId={}", "REVIEW_FAILURE", candidate.id());
+            }
+        } catch (RuntimeException failed) {
+            LOG.error("Budget review worker failed, errorCode={}, operationId={}", "REVIEW_WORKER_FAILURE", candidate.id());
+        }
+    }
+
 }

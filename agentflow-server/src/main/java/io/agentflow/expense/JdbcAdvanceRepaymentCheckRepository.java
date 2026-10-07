@@ -62,8 +62,14 @@ public class JdbcAdvanceRepaymentCheckRepository {
     }
     /** 租约超时也进入有界扫描，由应用服务标记失败。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id,trace_id FROM advance_repayment_check WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
+        return jdbc.query("""
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,r.process_instance_id AS process_instance_id FROM advance_repayment_check q
+                LEFT JOIN payment_authorization origin ON origin.tenant_id=q.tenant_id AND origin.id=q.payment_id
+                LEFT JOIN approval_application a ON a.tenant_id=origin.tenant_id AND a.id=origin.application_id
+                LEFT JOIN approval_submission_round r ON r.tenant_id=a.tenant_id AND r.application_id=a.id AND r.round_no=origin.round_no
+                WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until<=?) ORDER BY q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now));
     }
     private RowMapper<AdvanceRepaymentCheck> row() {
         return (row, index) -> {
@@ -88,7 +94,9 @@ public class JdbcAdvanceRepaymentCheckRepository {
      * 扫描仅返回身份，原件按租约领取后再加载。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) {
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 缺少原业务事实时保持空值，不继承工作线程残留值。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
     }
