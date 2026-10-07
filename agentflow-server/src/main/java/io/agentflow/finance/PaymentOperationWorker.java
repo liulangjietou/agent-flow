@@ -34,9 +34,11 @@ public class PaymentOperationWorker {
         for (var candidate : operations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
             try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
-                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                    TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Finance execution claimed, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
                     if (claimed.status() == PaymentOperation.Status.CHECKING) claimed = checkAccounts(claimed);
                     if (claimed == null) continue;
                     try {
@@ -57,7 +59,8 @@ public class PaymentOperationWorker {
         for (var candidate : operations.missingAdvanceBalances()) {
             if (Thread.currentThread().isInterrupted()) return;
             try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
-                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                    TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try { disbursements.recover(candidate.tenantId(), candidate.id()); }
                 catch (RuntimeException failed) {
                     LOG.error("Advance disbursement recovery failed, errorCode={}, authorizationId={}",

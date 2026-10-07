@@ -123,9 +123,13 @@ public class JdbcVoucherOperationRepository {
     /** 每批只扫描十个已到期任务，不在扫描中加载敏感凭证正文。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM voucher_operation WHERE (status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
-                OR (status IN ('POSTING','QUERYING') AND lease_until<=?) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM voucher_operation q
+                LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+                LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=q.round_no
+                WHERE (q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at<=?) OR (q.status IN ('POSTING','QUERYING') AND q.lease_until<=?)
+                ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now), timestamp(now));
     }
 
     /** 两种业务的数据库绑定都来自明确用途，支付凭证使用原支付用途。 */
@@ -159,5 +163,8 @@ public class JdbcVoucherOperationRepository {
      * 候选仅携带租户与操作标识，领取后重新读取实际命令。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 没有原业务事实的历史调用保留空值，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
+    }
 }

@@ -68,8 +68,15 @@ public class JdbcPaymentPayeeReviewRepository {
     }
     /** 每批最多十个只读请求；失败记录不会自动无限重试外部账户。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id,trace_id FROM payment_payee_review WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
+        return jdbc.query("""
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM payment_payee_review q
+                LEFT JOIN payment_authorization auth ON auth.tenant_id=q.tenant_id AND auth.id=q.original_authorization_id
+                LEFT JOIN approval_application a ON a.tenant_id=auth.tenant_id AND a.id=auth.application_id
+                LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=auth.round_no
+                WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until<=?)
+                ORDER BY q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now));
     }
 
     private RowMapper<PaymentPayeeReview> row() {
@@ -103,5 +110,8 @@ public class JdbcPaymentPayeeReviewRepository {
      * 后台候选仅包含标识，不提前加载或输出账户快照。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 没有原业务事实的历史调用保留空值，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
+    }
 }

@@ -40,7 +40,10 @@ public class InvoiceVerificationWorker {
                     TRACE_SOURCE, candidate.id().toString()).open()) {
                 try {
                     var job = execution.claim(candidate.tenantId(), candidate.id(), Instant.now());
-                    if (job != null) execute(job);
+                    if (job != null) {
+                        LOG.info("Finance execution claimed, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
+                        execute(job);
+                    }
                 } catch (RuntimeException failed) {
                     // 不把可能包含原件、票面或目标凭据的异常正文写入日志。
                     LOG.error("Invoice verification execution failed, errorCode={}, jobId={}", "WORKER_FAILURE", candidate.id());

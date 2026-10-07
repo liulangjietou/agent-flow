@@ -28,10 +28,12 @@ public class ExpensePrecheckWorker {
         for (var candidate : jobs.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
             try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
-                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                    TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), null, null).open()) {
                 try {
                     var job = execution.claim(candidate.tenantId(), candidate.id(), Instant.now());
                     if (job == null) continue;
+                    LOG.info("Finance execution claimed, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
                     ExpensePrecheckJob.Result result;
                     try { result = evaluator.evaluate(job); }
                     catch (RuntimeException failed) {

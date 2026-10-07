@@ -2904,7 +2904,7 @@
           ]
         }
       ],
-      "observed": "审批及六类 Agent 执行已关联可信业务标识。Agent 阶段 249 项回归、7 次固定包启动、12 次模型调用和 281 表恢复通过；财务、集成及直接调度业务标识继续接通，O01 保持 OPEN。",
+      "observed": "审批、Agent 及八类核心财务队列的业务标识已通过本地验收。核心财务阶段 231 项回归、8 次启动、22 条命令各接收一次、281 表恢复通过；继续其余后台业务标识，O01 保持 OPEN。",
       "references": [
         {
           "path": "docs/superpowers/plans/2026-10-07-operation-tracing.md",
@@ -2948,6 +2948,10 @@
         },
         {
           "path": "docs/evidence/operation-tracing-agent-business-20261007.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/operation-tracing-finance-business-20261007.json",
           "line": 1
         }
       ],
@@ -2993,6 +2997,10 @@
       "agentBusinessStage": {
         "status": "PASSED_LOCAL_FIXED_PACKAGE_WITH_EXPLICIT_SCOPE",
         "evidence": "docs/evidence/operation-tracing-agent-business-20261007.json"
+      },
+      "financeBusinessStage": {
+        "status": "PASSED_LOCAL_FIXED_PACKAGE_WITH_EXPLICIT_SCOPE",
+        "evidence": "docs/evidence/operation-tracing-finance-business-20261007.json"
       }
     },
     {

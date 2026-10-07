@@ -69,10 +69,13 @@ public class JdbcBudgetOperationRepository {
     /** 到期恢复最多十条，重试退避在持久状态中，不随进程重启重置。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM budget_operation
-                WHERE (status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?) OR (status IN ('EXECUTING','QUERYING') AND lease_until<=?)
-                ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no FROM budget_operation q
+                LEFT JOIN expense_report e ON e.tenant_id=q.tenant_id AND e.id=q.report_id
+                LEFT JOIN approval_application a ON a.tenant_id=e.tenant_id AND a.id=e.application_id
+                WHERE (q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at<=?) OR (q.status IN ('EXECUTING','QUERYING') AND q.lease_until<=?)
+                ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no")), timestamp(now), timestamp(now));
     }
 
     private RowMapper<BudgetOperation> row() {
@@ -104,5 +107,8 @@ public class JdbcBudgetOperationRepository {
      * 扫描不加载财务数据，取得单据锁后再读取完整操作。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo) {
+        /** 没有原业务事实的历史调用保留空值，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null); }
+    }
 }

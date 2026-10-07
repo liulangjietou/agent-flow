@@ -36,7 +36,8 @@ public class VoucherPreparationWorker {
         for (var candidate : payments.missingVoucherPreparations()) {
             if (Thread.currentThread().isInterrupted()) return;
             try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
-                    PAYMENT_TRACE_SOURCE, candidate.id().toString()).open()) {
+                    PAYMENT_TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try { paid.recover(candidate.tenantId(), candidate.id()); }
                 catch (RuntimeException failed) { LOG.error("Payment voucher registration failed, errorCode={}, paymentId={}", "REGISTRATION_FAILURE", candidate.id()); }
             }
@@ -44,9 +45,11 @@ public class VoucherPreparationWorker {
         for (var candidate : preparations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
             try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
-                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                    TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var work = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (work == null) continue;
+                    LOG.info("Finance execution claimed, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
                     var job = work.preparation(); var input = job.input(); var source = work.source();
                     try {
                         var period = periods.period(candidate.tenantId(), input.targetDigest(), source.periodRequest());

@@ -97,30 +97,41 @@ public class JdbcPaymentOperationRepository {
     /** 升级后补建缺失的付款准备；只扫描实际成功记录，不查询或重发资金交易。 */
     public List<Candidate> missingVoucherPreparations() {
         return jdbc.query("""
-                SELECT p.tenant_id,p.id,p.trace_id FROM payment_operation p
-                JOIN payment_authorization a ON a.tenant_id=p.tenant_id AND a.id=p.id
-                WHERE p.status='SUCCEEDED'
-                AND NOT EXISTS (SELECT 1 FROM voucher_preparation v WHERE v.tenant_id=a.tenant_id AND v.application_id=a.application_id AND v.round_no=a.round_no AND v.kind='PAYMENT')
-                AND NOT EXISTS (SELECT 1 FROM voucher_operation v WHERE v.tenant_id=a.tenant_id AND v.application_id=a.application_id AND v.round_no=a.round_no AND v.kind='PAYMENT')
-                ORDER BY p.updated_at,p.id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")));
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM payment_operation q
+                JOIN payment_authorization auth ON auth.tenant_id=q.tenant_id AND auth.id=q.id
+                LEFT JOIN approval_application a ON a.tenant_id=auth.tenant_id AND a.id=auth.application_id
+                LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=auth.round_no
+                WHERE q.status='SUCCEEDED'
+                AND NOT EXISTS (SELECT 1 FROM voucher_preparation v WHERE v.tenant_id=auth.tenant_id AND v.application_id=auth.application_id AND v.round_no=auth.round_no AND v.kind='PAYMENT')
+                AND NOT EXISTS (SELECT 1 FROM voucher_operation v WHERE v.tenant_id=auth.tenant_id AND v.application_id=auth.application_id AND v.round_no=auth.round_no AND v.kind='PAYMENT')
+                ORDER BY q.updated_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")));
     }
     /** 扫描只取十个标识，不加载或输出账户及金额。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM payment_operation WHERE (status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
-                OR (status IN ('CHECKING','SENDING','QUERYING') AND lease_until<=?) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM payment_operation q
+                LEFT JOIN payment_authorization auth ON auth.tenant_id=q.tenant_id AND auth.id=q.id
+                LEFT JOIN approval_application a ON a.tenant_id=auth.tenant_id AND a.id=auth.application_id
+                LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=auth.round_no
+                WHERE (q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at<=?) OR (q.status IN ('CHECKING','SENDING','QUERYING') AND q.lease_until<=?)
+                ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now), timestamp(now));
     }
     /** 旧版本的成功借款付款按原业务身份补建余额，不重新发送资金命令。 */
     public List<Candidate> missingAdvanceBalances() {
         return jdbc.query("""
-                SELECT p.tenant_id,p.id,p.trace_id FROM payment_operation p
-                JOIN payment_authorization a ON a.tenant_id=p.tenant_id AND a.id=p.id
-                WHERE p.status='SUCCEEDED' AND a.purpose='EMPLOYEE_ADVANCE'
-                AND NOT EXISTS (SELECT 1 FROM finance_resource r WHERE r.tenant_id=a.tenant_id AND r.resource_type='ADVANCE' AND r.id=a.business_id)
-                ORDER BY p.updated_at,p.id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")));
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM payment_operation q
+                JOIN payment_authorization auth ON auth.tenant_id=q.tenant_id AND auth.id=q.id
+                LEFT JOIN approval_application a ON a.tenant_id=auth.tenant_id AND a.id=auth.application_id
+                LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=auth.round_no
+                WHERE q.status='SUCCEEDED' AND auth.purpose='EMPLOYEE_ADVANCE'
+                AND NOT EXISTS (SELECT 1 FROM finance_resource r WHERE r.tenant_id=auth.tenant_id AND r.resource_type='ADVANCE' AND r.id=auth.business_id)
+                ORDER BY q.updated_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")));
     }
     private RowMapper<PaymentOperation> row() {
         return (row, index) -> {
@@ -143,5 +154,8 @@ public class JdbcPaymentOperationRepository {
      * 调度候选不包含任何付款明细。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 没有原业务事实的历史调用保留空值，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
+    }
 }

@@ -28,9 +28,11 @@ public class PaymentExecutionRequestWorker {
         for (var candidate : requests.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
             try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
-                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                    TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var work = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (work == null) continue;
+                    LOG.info("Finance execution claimed, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
                     try {
                         var input = work.request().input(); var terms = work.authorization().terms(); var payee = terms.payee();
                         var debitResult = accounts.debitAccounts(input.tenantId(), terms.targetDigest(), new PaymentAccountsPort.Request(payee.legalEntityId(), terms.amount().currency(), input.cashier()));

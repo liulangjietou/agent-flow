@@ -1,0 +1,276 @@
+{
+  "recordedAt": "2026-10-07T17:38:41.836427+00:00",
+  "taskId": "O01",
+  "status": "CORE_FINANCE_BUSINESS_IDENTIFIERS_PASSED_O01_OPEN",
+  "sourceBaseCommit": "3e5b9c505b78c7c3955b8933bccddeef5dc639d5",
+  "sourceHashes": {
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckWorker.java": "77e708b40ac77f82ccd0acba83972a25b99a7aa1805f0a817b4e0de2532f6e29",
+    "agentflow-server/src/main/java/io/agentflow/expense/InvoiceVerificationWorker.java": "7d14ccf6091f36b47aad2eae3dc151e72b558d9fe6001fad98c8b525d73ee141",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpensePrecheckRepository.java": "7c3b506843e5fa0f905381f327a4178be0ae316f33298ebc5658488628e23103",
+    "agentflow-server/src/main/java/io/agentflow/finance/BudgetOperationWorker.java": "d321c8661127be582b4b7bb99c07cf69de1ca8d1c4018a5eac2dcc1a1c26cd6d",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcBudgetOperationRepository.java": "14ff7f6d8882a831c8e2469c1322366fd9ba9753fb7db687c662ae85bef81a64",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcPaymentExecutionRequestRepository.java": "b30bfa9fcdc504a754020d6192ac8d0c2c46a85c3d5a944b46c5fb6a05992f70",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcPaymentOperationRepository.java": "80df574ffb8dbaec6f58d7bd69289d6e70b8957ce9d9cd76e60d5a4785d5dfb8",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcPaymentPayeeReviewRepository.java": "1203d354d086e3f0fac72beef575f1a09352faa47eacd84061c344272ee1b7a3",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcVoucherOperationRepository.java": "ac6e50897e8508f05d5dd0db37e3cd2ad75916c266b143ade77ef7b78c68c943",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcVoucherPreparationRepository.java": "c38a2d5882180815b9e89e4cc169db4fe11009b8353025d23300d7077b6e9d84",
+    "agentflow-server/src/main/java/io/agentflow/finance/PaymentExecutionRequestWorker.java": "4c3f0ef3c15cf9938a47d6bc1446c5051b885be71fff69734a9a233d405ac252",
+    "agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationWorker.java": "0d1274af3f22a71de04f832a15c94b43db399c24b2131f85f7c9ada30eba85f8",
+    "agentflow-server/src/main/java/io/agentflow/finance/PaymentPayeeReviewWorker.java": "b31c3dbc03d37e9dcdabecf4bdc367de387c826839420d5739d3a201e19be35d",
+    "agentflow-server/src/main/java/io/agentflow/finance/VoucherOperationWorker.java": "8b74953a58c223e29433528d67538938323c38077eae1299453e15934ad3d544",
+    "agentflow-server/src/main/java/io/agentflow/finance/VoucherPreparationWorker.java": "cf3900cddbf21d1dd65330f609b9d57d8828c06a89fd05a95af83b68924aa139",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpensePrecheckIntegrationTest.java": "2d226ceab4fda3fc711ff4801f8ff4e3467e9e3ec30cc6d6d042d504aec06b1b",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpensePrecheckMigrationTest.java": "5cbae2d8b28cf1c5633e02fe3c5a4e221c33aebc269b7b8e5b680027c19c463f",
+    "agentflow-server/src/test/java/io/agentflow/expense/InvoiceVerificationIntegrationTest.java": "1f32c46bbc94229db9cfde35591f4c6954bf85e9ecbb5fb22b7e15798c8c5021",
+    "agentflow-server/src/test/java/io/agentflow/expense/InvoiceVerificationMigrationTest.java": "093356def7ac329d248821f42caa5379f53babbc8be75cb7917b979d59772c28",
+    "agentflow-server/src/test/java/io/agentflow/expense/InvoiceVerificationSchedulingTest.java": "22d50df749bd102affb522014f309379a8fe0e6985cb82c44c0f3f20766d829e",
+    "agentflow-server/src/test/java/io/agentflow/finance/BudgetOperationIntegrationTest.java": "0db900a803512f1978d076af8c98c2ef69a8bc8ffcf76cc4016a04f92d711878",
+    "agentflow-server/src/test/java/io/agentflow/finance/BudgetOperationMigrationTest.java": "5a0bd7005bf4421f685425a4d1e074f11e1299e13983018226524077c404a475",
+    "agentflow-server/src/test/java/io/agentflow/finance/FinanceBusinessTraceTest.java": "0a28860bc62f233615cb4e8d96033bf4efecf36bbd4e3e89aeb779fc65ee4c45",
+    "agentflow-server/src/test/java/io/agentflow/finance/FinanceWorkerTraceTest.java": "f357139e4c9230e85a7d362110f8186c999a44b2a7f0c96a013fcc3d15e3c9fa",
+    "agentflow-server/src/test/java/io/agentflow/finance/PaymentAccessTest.java": "66c76fd242f8b6c2530d2fdced2b2ae346d8adf016d88cbfc965d86684f857dd",
+    "agentflow-server/src/test/java/io/agentflow/finance/PaymentExecutionRequestMigrationTest.java": "3096b700961597477df238b5f63c8b6d4d5cd1855065c4192897ced650a699d8",
+    "agentflow-server/src/test/java/io/agentflow/finance/PaymentMigrationTest.java": "dbdbe923d7b0fd114bbce123edd815a009308dfdb5fa08d5e5ce57d1cb9b4ae3",
+    "agentflow-server/src/test/java/io/agentflow/finance/PaymentOperationIntegrationTest.java": "caf375fc1a6327eada1e6b240e1957851d924840093db2c556f1269e9c48cd8d",
+    "agentflow-server/src/test/java/io/agentflow/finance/PaymentPayeeReviewMigrationTest.java": "1ab95d51f8b8eaf80bb055b6e1c69d07aa29ae9c5ad6d0ae697a642294e60b86",
+    "agentflow-server/src/test/java/io/agentflow/finance/PaymentPersistenceTest.java": "f0883548341672abab400526ab907120cbd953d61b668766acd8dcd0a9e7721c",
+    "agentflow-server/src/test/java/io/agentflow/finance/PaymentVoucherMigrationTest.java": "ad204f1264da71fce6da12452aeffc7716b65eb4b3bc8a116191e427b0412970",
+    "agentflow-server/src/test/java/io/agentflow/finance/VoucherOperationIntegrationTest.java": "7870980fabb3f1d1e3e75be658614c96888c2fea5cdb65d905cbaaf153d5a133",
+    "agentflow-server/src/test/java/io/agentflow/finance/VoucherOperationMigrationTest.java": "4753577e8b6d0e74f6ec2a45c1f9ded3df2e839c962447ab453138f1059e970f",
+    "agentflow-server/src/test/java/io/agentflow/finance/VoucherPreparationMigrationTest.java": "0e0a19762bbe2841e2ffc529d4b56809baf77f3cf1a49b331afb868c1dbdf334",
+    "agentflow-server/src/test/java/io/agentflow/observability/DiagnosticContextTest.java": "fb3f3ea7475f621c3479e604f514e158542fec2c5d7be8fd7491e5bc47005311",
+    "scripts/check-agent-trace-runtime.py": "ac736d5fe00b636419d185d7d69e4a66adfefebc244fe2d9931e4b9aecd19a66",
+    "scripts/check-expense-financial-reporting.py": "ead6061be11bbb62564b08e013a6a8136924d39fa9bd2a90ecdf430163eea0b9",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-finance-business-trace-runtime.py": "b770787b6768f9f452c770ed011623a68a829a0f7db65b4a4bcd225bfe737fd4",
+    "scripts/check-finance-trace-runtime.py": "e51559254bc3135b139f0cdaa1412ff6747fbd23eb1891671834251aa888e215",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7"
+  },
+  "jar": "/fyoung/tmp/agentflow-remaining-20260928/o01-finance-business-server.jar",
+  "jarSha256": "bb69c9044acf51f5dfd33974b168ff630ce7600b3d42e426771223a95c282861",
+  "reproducedBehaviorFailures": 16,
+  "redTests": 29,
+  "scopeUniqueTests": 231,
+  "scopeRootTestClasses": 20,
+  "testScope": {
+    "tests": 231,
+    "suites": {
+      "io.agentflow.finance.FinanceBusinessTraceTest": 29,
+      "io.agentflow.finance.FinanceWorkerTraceTest": 10,
+      "io.agentflow.observability.DiagnosticContextTest": 10,
+      "io.agentflow.expense.ExpensePrecheckIntegrationTest": 28,
+      "io.agentflow.expense.ExpensePrecheckMigrationTest": 1,
+      "io.agentflow.expense.InvoiceVerificationIntegrationTest": 14,
+      "io.agentflow.expense.InvoiceVerificationMigrationTest": 1,
+      "io.agentflow.expense.InvoiceVerificationSchedulingTest": 1,
+      "io.agentflow.finance.BudgetOperationIntegrationTest": 14,
+      "io.agentflow.finance.BudgetOperationMigrationTest": 1,
+      "io.agentflow.finance.VoucherOperationIntegrationTest": 36,
+      "io.agentflow.finance.VoucherOperationMigrationTest": 1,
+      "io.agentflow.finance.VoucherPreparationMigrationTest": 1,
+      "io.agentflow.finance.PaymentOperationIntegrationTest": 67,
+      "io.agentflow.finance.PaymentPersistenceTest": 9,
+      "io.agentflow.finance.PaymentAccessTest": 4,
+      "io.agentflow.finance.PaymentMigrationTest": 1,
+      "io.agentflow.finance.PaymentExecutionRequestMigrationTest": 1,
+      "io.agentflow.finance.PaymentPayeeReviewMigrationTest": 1,
+      "io.agentflow.finance.PaymentVoucherMigrationTest": 1
+    },
+    "note": "Count testcase nodes; Surefire parent PaymentOperationIntegrationTest reports tests=0 while containing 67 nested cases."
+  },
+  "runtime": {
+    "status": "PASS",
+    "database": "H2",
+    "previousJarSha256": "c5099c30d25018defb880a64d1038efc59d676ba5762b80422b25aed03108c2a",
+    "jarSha256": "bb69c9044acf51f5dfd33974b168ff630ce7600b3d42e426771223a95c282861",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "realFinancialSystemsVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "unchangedTables": 281,
+        "unchangedQueueTables": 8
+      },
+      {
+        "name": "persisted-worker-recovery",
+        "businessContextsVerified": 14,
+        "queueTables": 8,
+        "originalRequestCounts": {
+          "INVOICE": 1,
+          "PRECHECK": 5,
+          "BUDGET": 1,
+          "VOUCHER": 1,
+          "PAYMENT": 7,
+          "PAYEE": 1
+        },
+        "currentRequestCounts": {
+          "INVOICE": 1,
+          "PRECHECK": 5,
+          "BUDGET": 1,
+          "VOUCHER": 3,
+          "PREPARATION": 3,
+          "PAYMENT": 9,
+          "REQUEST": 9,
+          "PAYEE": 1
+        },
+        "originalKeyReplays": 14,
+        "independentInvoiceHasNoWorkflowIdentifiers": true,
+        "financeDoesNotInventApprovalTask": true
+      },
+      {
+        "name": "independent-restore",
+        "tables": 281,
+        "sameAuthorizedDetails": 16,
+        "resentRequests": 0
+      }
+    ],
+    "boots": 8,
+    "gatewayRequests": 116,
+    "responseTraces": 399,
+    "businessHttpRequests": 288,
+    "gatewayCommands": 10,
+    "duplicateCommands": 0
+  },
+  "gatewayCommandAudit": {
+    "status": "PASS",
+    "source": "/fyoung/tmp/agentflow-remaining-20260928/o01-finance-business-runtime-20261007a/finance-traces.json",
+    "sourceSha256": "c11af00a7fd62f6702b386a864f9d374bcf50e187c1335bbc7f5d06d7387e209",
+    "uniqueCommands": 22,
+    "receivedCommands": 22,
+    "duplicates": 0,
+    "byOperation": {
+      "budget-command": 12,
+      "voucher-command": 8,
+      "payment-command": 2
+    },
+    "commands": [
+      {
+        "operation": "budget-command",
+        "requestId": "0cf4bf7f-31ce-41cf-a2ae-22ca91f5f412",
+        "receives": 1
+      },
+      {
+        "operation": "budget-command",
+        "requestId": "0ed6889e-740e-45f6-aa29-53e4f9803d47",
+        "receives": 1
+      },
+      {
+        "operation": "budget-command",
+        "requestId": "379b99fc-abec-4fe9-ad40-fc3c043d8eb7",
+        "receives": 1
+      },
+      {
+        "operation": "budget-command",
+        "requestId": "3bf67d2a-c88b-4583-b377-d9580c8f159b",
+        "receives": 1
+      },
+      {
+        "operation": "budget-command",
+        "requestId": "42b381dc-896b-4d5a-bac2-8b9d29dcd97b",
+        "receives": 1
+      },
+      {
+        "operation": "budget-command",
+        "requestId": "8d392dad-32e1-473f-9324-bf76714e6166",
+        "receives": 1
+      },
+      {
+        "operation": "budget-command",
+        "requestId": "8d5cf220-1c3b-4ca1-b899-56f89cbac617",
+        "receives": 1
+      },
+      {
+        "operation": "budget-command",
+        "requestId": "b91428fd-7ee3-4df9-b74f-b024afb1b8a1",
+        "receives": 1
+      },
+      {
+        "operation": "budget-command",
+        "requestId": "d585e391-caa6-4c6e-be6e-6b164adf549b",
+        "receives": 1
+      },
+      {
+        "operation": "budget-command",
+        "requestId": "d6f6784e-ed53-43d1-95d4-0cd038fb4e0f",
+        "receives": 1
+      },
+      {
+        "operation": "budget-command",
+        "requestId": "e3eea2f5-008b-4df4-ab94-44ad4125516d",
+        "receives": 1
+      },
+      {
+        "operation": "budget-command",
+        "requestId": "f99dd2ec-6dc3-484d-a724-1ba7bd2e7adf",
+        "receives": 1
+      },
+      {
+        "operation": "payment-command",
+        "requestId": "58570dc2-b6d7-4c4c-b90f-912300fd4dea",
+        "receives": 1
+      },
+      {
+        "operation": "payment-command",
+        "requestId": "78104d3f-8200-485e-9828-367e3c1b26c9",
+        "receives": 1
+      },
+      {
+        "operation": "voucher-command",
+        "requestId": "00a9e6aa-de03-4c10-9869-18311fd210de",
+        "receives": 1
+      },
+      {
+        "operation": "voucher-command",
+        "requestId": "01fada8f-4771-48cb-a9f9-bbaf02ba92e5",
+        "receives": 1
+      },
+      {
+        "operation": "voucher-command",
+        "requestId": "3333e51c-d824-4596-bd8f-8525dbfa3d4a",
+        "receives": 1
+      },
+      {
+        "operation": "voucher-command",
+        "requestId": "5c9b83a8-e7c0-4495-8731-e63583c1d835",
+        "receives": 1
+      },
+      {
+        "operation": "voucher-command",
+        "requestId": "5fff93c8-ca01-4b0c-9f12-c1eb41f135e7",
+        "receives": 1
+      },
+      {
+        "operation": "voucher-command",
+        "requestId": "758a51af-b872-440b-9abf-a3d29373b95d",
+        "receives": 1
+      },
+      {
+        "operation": "voucher-command",
+        "requestId": "77c34928-b23a-4dd5-a02b-2f8e0b9f3048",
+        "receives": 1
+      },
+      {
+        "operation": "voucher-command",
+        "requestId": "fcd6f179-d0c0-46e1-8b8b-a03cbc622729",
+        "receives": 1
+      }
+    ],
+    "note": "Runtime gatewayCommands=10 counts payment/voucher peer receipts only; this independent audit includes all 12 budget commands as well."
+  },
+  "fixedRuntimeEvidence": "/fyoung/tmp/agentflow-remaining-20260928/o01-finance-business-runtime-20261007a/evidence.json",
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/o01-finance-business-verified",
+  "archiveFiles": 2510,
+  "archiveManifestSha256": "935a9944dadcb771294c89fbba30d583737d6d9e897fb3e5fce98d4607897eb3",
+  "boundaries": [
+    "七类队列和两处原付款恢复入口按同租户持久索引关联；付款及凭证查原授权轮次，不借当前申请轮次。",
+    "费用预检及预算只关联已确认的业务号；独立发票查验三个业务字段为空，财务执行不虚构人工审批任务。",
+    "诊断投影和作用域不修改原领取、授权、命令、幂等键、重试和结算规则；没有数据库迁移。",
+    "固定包核对八类队列。旧包的凭证准备及付款请求已执行并生成待处理子命令，旧任务恢复日志核对六类；新波次核对八类，共十四组。",
+    "八次启动、二百八十八次业务 HTTP、一百一十六次网关请求及二百八十一表恢复通过，十六份授权详情一致，恢复没有重发。",
+    "runtime.gatewayCommands 只计付款/凭证回环收据十条；独立原始 HTTP 审计另含十二条预算命令，总二十二条各接收一次。",
+    "Surefire 的 PaymentOperationIntegrationTest 父套件 tests 属性为零但 XML 包含六十七个嵌套用例；按 testcase 节点去重统计二百三十一项，原始 XML 保留。",
+    "财务复核、供应商、报销恢复、集成与直接调度的业务标识继续接通；浏览器、PostgreSQL、真实外部系统及远端交付门禁保留，O01 保持 OPEN。"
+  ]
+}

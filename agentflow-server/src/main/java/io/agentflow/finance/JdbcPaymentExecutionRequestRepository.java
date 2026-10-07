@@ -57,9 +57,14 @@ public class JdbcPaymentExecutionRequestRepository {
     /** 每批扫描最多十条，持久租约过期后仍按同一选择恢复。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM payment_execution_request WHERE (status='QUEUED' AND next_attempt_at<=?) OR (status='RUNNING' AND lease_until<=?)
-                ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM payment_execution_request q
+                LEFT JOIN payment_authorization auth ON auth.tenant_id=q.tenant_id AND auth.id=q.authorization_id
+                LEFT JOIN approval_application a ON a.tenant_id=auth.tenant_id AND a.id=auth.application_id
+                LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=auth.round_no
+                WHERE (q.status='QUEUED' AND q.next_attempt_at<=?) OR (q.status='RUNNING' AND q.lease_until<=?)
+                ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now), timestamp(now));
     }
     private RowMapper<PaymentExecutionRequest> row() {
         return (row, index) -> {
@@ -83,5 +88,8 @@ public class JdbcPaymentExecutionRequestRepository {
      * 调度标识不返回付款内容。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 没有原业务事实的历史调用保留空值，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
+    }
 }

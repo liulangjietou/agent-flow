@@ -29,9 +29,11 @@ public class VoucherOperationWorker {
         for (var candidate : operations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
             try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
-                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                    TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Finance execution claimed, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
                     try {
                         var input = claimed.input();
                         var result = claimed.status() == VoucherOperation.Status.POSTING ? accounting.post(input.targetDigest(), input.command()) : accounting.query(input.targetDigest(), input.command());
