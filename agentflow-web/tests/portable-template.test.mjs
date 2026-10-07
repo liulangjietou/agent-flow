@@ -15,6 +15,19 @@ const source = () => ({ key: 'source-key', name: '原流程', graph: structuredC
 const file = value => ({ size: new TextEncoder().encode(value).length, text: async () => value })
 const envelope = () => JSON.parse(serializePortableTemplate(source()))
 
+test('模板拐点完整往返，拒绝超限、缺坐标和非数值且保留旧模板兼容', () => {
+  const value = source()
+  value.graph.edges[0].waypoints = [{ x: 107.5, y: 21 }, { x: 220, y: 212 }]
+  assert.deepEqual(parsePortableTemplate(serializePortableTemplate(value)), value)
+  for (const points of [[{ x: 1, y: 2 }], [{ x: '1', y: 2 }, { x: 3, y: 4 }],
+    [{ x: -1, y: 2 }, { x: 3, y: 4 }], [{ x: 1 }, { x: 3, y: 4 }],
+    Array.from({ length: 33 }, () => ({ x: 1, y: 2 }))]) {
+    const invalid = structuredClone(value); invalid.graph.edges[0].waypoints = points
+    assert.throws(() => serializePortableTemplate(invalid))
+  }
+  assert.deepEqual(parsePortableTemplate(serializePortableTemplate(source())), source())
+})
+
 test('职责分离模板保留 20 个最长节点引用，不被旧的 256 字符属性上限截断', () => {
   const value = source()
   const references = Array.from({ length: 20 }, (_, i) => `node${i}`.padEnd(128, 'x'))

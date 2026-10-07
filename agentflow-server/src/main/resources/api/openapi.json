@@ -57783,7 +57783,7 @@
             "description": "人工审批节点的 assigneeRule 为 user:账号或 role:角色；approvalMode 支持 SINGLE（缺省，一人处理）、ALL（全员会签）、ANY（任一人同意）和 PERCENT（按比例通过）。PERCENT 必须明确提供 approvalPercentage，为 1..100 的整数文本；其他方式禁止残留该属性。会签在激活时固定有效成员，ANY/PERCENT 同时固定所需人数，比例向上取整。达标结束其他待办但不伪造同意；任一驳回结束整轮。空名单回滚本次操作；增减签仅限 ALL。 可选期限配置必须同时提供 deadlineCalendarId（UUID）、deadlineCalendarRevision（正整数文本，明确历史修订）和 deadlineWorkingMinutes（1..527040 的整数文本），仅 USER_TASK 可用。发布时核对同租户日历修订存在。 TIMER_WAIT 必须明确配置 timerDelaySeconds，为 1..31536000 的规范正整数文本，从实际激活时计时。禁止表达式、重复或 cron；其他节点不可配置该属性。重启保留原到期时间。含等待的每条结束路径必须包含人工审批。 EVENT_WAIT 必须明确配置 eventContractKey 和 eventContractVersion，绑定同租户已发布且启用的白名单契约精确版本。发布及每次新轮次发起均复核；停用期间在审等待保留且不消费。外部事件不能传入流程变量或代替人工审批。 SUB_PROCESS 必须明确配置 subprocessKey 和 subprocessVersion，按同租户精确发布版本调用普通子审批；subprocessInput.目标字段指定父字段。发布和实际激活复核版本、输入类型及敏感权限，子申请独立审批，父流程等待其结论；不自动继承未映射变量或合并子输出。"
           }
         },
-        "description": "USER_TASK properties.assigneeRule 使用 user:账号 或 role:角色。x/y 为布局坐标文本。仅列出的节点类型支持发布。 COPY 的 properties.recipientRule 为发布时可用的收件规则；字段 nodeAccess 可引用抄送节点。抄送流程每条结束路径必须经过人工审批。",
+        "description": "USER_TASK properties.assigneeRule 使用 user:账号 或 role:角色。x/y 为布局坐标文本。仅列出的节点类型支持发布。 COPY 的 properties.recipientRule 为发布时可用的收件规则；字段 nodeAccess 可引用抄送节点。抄送流程每条结束路径必须经过人工审批。 x/y 为有限非负坐标文本，节点外框不得超过 1000000 的布局边界；缺省坐标仅在展示及新发布时计算，不回写旧图。",
         "required": [
           "id",
           "name",
@@ -57809,6 +57809,14 @@
           },
           "defaultBranch": {
             "type": "boolean"
+          },
+          "waypoints": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/components/schemas/DiagramPoint"
+            },
+            "description": "布局拐点，不参与流程语义；缺省或空列表由发布器生成确定的默认连线，显式提供时至少两个点。"
           }
         },
         "required": [
@@ -96589,6 +96597,26 @@
         ],
         "additionalProperties": false,
         "description": "FINANCE 当前身份完整可读原轮次范围。不可读来源不返回存在性计数；管理员没有敏感字段豁免。金额逐币种汇总，类别间轮次数不可相加。"
+      },
+      "DiagramPoint": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "x",
+          "y"
+        ],
+        "properties": {
+          "x": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000
+          },
+          "y": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        }
       }
     }
   }

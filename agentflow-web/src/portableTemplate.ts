@@ -3,6 +3,7 @@ import type { Graph } from './api'
 import { validateFormSchema, type FormSchema } from './formSchema.js'
 import { subprocessFieldKey } from './subprocessDesigner.js'
 import { MAX_RESPONSIBILITY_REFERENCE_TEXT } from './approvalResponsibilities.js'
+import { MAX_DIAGRAM_COORDINATE, MAX_DIAGRAM_WAYPOINTS, nodeRectangle } from './designerLayout.js'
 
 export const TEMPLATE_FILE_LIMIT = 1024 * 1024
 export const TEMPLATE_FORMAT = 'agentflow-process-template'
@@ -85,12 +86,22 @@ function process(value: unknown, version: 1 | 2): PortableProcess {
       if (inputs.includes(key) && !subprocessFieldKey(value)) throw new Error('子流程输入只能引用父表单字段标识，不能使用路径或表达式。')
       if ((key === 'x' || key === 'y') && (!Number.isFinite(Number(value)) || Number(value) < 0 || Number(value) > 1_000_000)) throw new Error('节点位置必须在 0 至 1000000 之间。')
     }
+    const box = nodeRectangle({ type: n.type as string, x: Number(properties.x ?? 0), y: Number(properties.y ?? 0) })
+    if (box.x + box.width > MAX_DIAGRAM_COORDINATE || box.y + box.height > MAX_DIAGRAM_COORDINATE) throw new Error('节点外框超过布局边界。')
   }
   for (const raw of g.edges) {
-    const e = object(raw, ['id', 'source', 'target', 'condition', 'defaultBranch'], ['id', 'source', 'target', 'condition', 'defaultBranch'], '连线')
+    const e = object(raw, ['id', 'source', 'target', 'condition', 'defaultBranch', 'waypoints'], ['id', 'source', 'target', 'condition', 'defaultBranch'], '连线')
     for (const key of ['id', 'source', 'target']) text(e[key], '连线标识', 128)
     text(e.condition, '分支条件', 4000, true)
     if (typeof e.defaultBranch !== 'boolean') throw new Error('默认分支必须是布尔值。')
+    if (e.waypoints !== undefined) {
+      list(e.waypoints, '连线拐点', MAX_DIAGRAM_WAYPOINTS)
+      if (e.waypoints.length === 1) throw new Error('连线至少需要两个拐点，缺省布局使用空列表。')
+      for (const rawPoint of e.waypoints) {
+        const point = object(rawPoint, ['x', 'y'], ['x', 'y'], '连线拐点')
+        if ([point.x, point.y].some(value => typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > MAX_DIAGRAM_COORDINATE)) throw new Error('连线拐点必须是布局范围内的数值。')
+      }
+    }
   }
   if (p.formSchema !== null) {
     const schema = object(p.formSchema, ['schemaVersion', 'fields'], ['schemaVersion', 'fields'], '表单')

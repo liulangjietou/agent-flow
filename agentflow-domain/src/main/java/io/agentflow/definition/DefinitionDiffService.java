@@ -60,6 +60,7 @@ public final class DefinitionDiffService {
             modified(changes, Area.EDGE, id, id, "target", oldEdge.target(), newEdge.target());
             modified(changes, Area.EDGE, id, id, "condition", oldEdge.condition(), newEdge.condition());
             modified(changes, Area.EDGE, id, id, "defaultBranch", oldEdge.defaultBranch(), newEdge.defaultBranch());
+            modified(changes, Area.LAYOUT, id, id, "waypoints", oldEdge.waypoints(), newEdge.waypoints());
         }
         Map<String, List<String>> oldOrder = branchOrder(before), newOrder = branchOrder(after);
         for (String source : union(oldOrder, newOrder)) {

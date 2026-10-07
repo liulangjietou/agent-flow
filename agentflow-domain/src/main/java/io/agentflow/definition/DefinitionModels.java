@@ -56,7 +56,12 @@ public final class DefinitionModels {
      * 流程边。
      * @author owlzhangfq@gmail.com
      */
-    public record Edge(String id, String source, String target, String condition, boolean defaultBranch) {
+    public record Edge(String id, String source, String target, String condition, boolean defaultBranch, List<DiagramPoint> waypoints) {
+        /** 历史连线未保存拐点，发布时使用确定的默认布局。 */
+        public Edge(String id, String source, String target, String condition, boolean defaultBranch) {
+            this(id, source, target, condition, defaultBranch, List.of());
+        }
+
         public Edge(String id, String source, String target, String condition) {
             this(id, source, target, condition, false);
         }
@@ -66,8 +71,12 @@ public final class DefinitionModels {
                 throw new DomainException("INVALID_EDGE", "Edge id, source and target are required");
             }
             condition = condition == null ? "" : condition.trim();
+            waypoints = waypoints == null ? List.of() : List.copyOf(waypoints);
         }
     }
+
+    /** 图形点只属于定义快照，不参与条件求值或审批决定。 */
+    public record DiagramPoint(Double x, Double y) { }
 
     /**
      * 不可变的流程图。

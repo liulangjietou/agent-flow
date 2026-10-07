@@ -133,7 +133,9 @@ export interface SimulationResult {
 }
 export interface Actor { tenantId: string; userId: string; roles: string[] }
 export interface GraphNode { id: string; name: string; type: string; properties: Record<string, string> }
-export interface GraphEdge { id: string; source: string; target: string; condition: string; defaultBranch: boolean }
+/** 未缩放的图形坐标，不参与业务路由。@author owlzhangfq@gmail.com */
+export interface DiagramPoint { x: number; y: number }
+export interface GraphEdge { id: string; source: string; target: string; condition: string; defaultBranch: boolean; waypoints?: DiagramPoint[] }
 /** 提交时规则的明确分级，未知与未命中不等于低风险。@author owlzhangfq@gmail.com */
 export type SubmissionRiskLevel = 'UNASSESSED' | 'UNMATCHED' | 'LOW' | 'MEDIUM' | 'HIGH'
 /** 随流程版本发布的公共规则。@author owlzhangfq@gmail.com */

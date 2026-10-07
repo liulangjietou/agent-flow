@@ -31,6 +31,7 @@ public final class DefinitionValidator {
     /** 图元素共享标识空间；已知流程标识时一并检查，避免部署时才发生冲突。 */
     public List<String> validate(Graph graph, FormSchema formSchema, String processKey) {
         List<String> errors = new ArrayList<>();
+        errors.addAll(DefinitionDiagram.validate(graph));
         try { io.agentflow.expense.ExpenseSelfApprovalPolicy.validate(graph, formSchema); }
         catch (io.agentflow.common.DomainException invalid) { errors.add(invalid.code()); }
         try { io.agentflow.expense.ExpenseDuplicateApprovalPolicy.validate(graph, formSchema); }

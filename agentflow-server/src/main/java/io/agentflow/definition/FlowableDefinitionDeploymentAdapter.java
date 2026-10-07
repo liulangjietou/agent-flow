@@ -76,6 +76,8 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
             StringBuilder xml = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
                     .append("<definitions xmlns=\"http://www.omg.org/spec/BPMN/20100524/MODEL\" ")
                     .append("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" ")
+                    .append("xmlns:bpmndi=\"http://www.omg.org/spec/BPMN/20100524/DI\" ")
+                    .append("xmlns:dc=\"http://www.omg.org/spec/DD/20100524/DC\" xmlns:di=\"http://www.omg.org/spec/DD/20100524/DI\" ")
                     .append("xmlns:flowable=\"http://flowable.org/bpmn\" targetNamespace=\"http://agentflow.io/process\">");
             eventMessages.values().forEach(id -> xml.append("<message id=\"").append(id).append("\" name=\"").append(id).append("\"/>"));
             xml.append("<process id=\"").append(escape(draft.key())).append("\" name=\"")
@@ -129,7 +131,9 @@ public class FlowableDefinitionDeploymentAdapter implements DefinitionDeployment
                 }
                 xml.append("</sequenceFlow>");
             }
-            return xml.append("</process></definitions>").toString();
+            xml.append("</process>");
+            BpmnDiagramWriter.append(xml, graph, draft.key(), eventMessages.values());
+            return xml.append("</definitions>").toString();
         }
 
         /** 消息标识完全由适配器生成，并避开同一 BPMN 文档的业务标识，不对外提供广播名称。 */

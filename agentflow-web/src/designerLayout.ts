@@ -5,6 +5,8 @@ export const MIN_ZOOM = 0.5
 export const MAX_ZOOM = 1.6
 export const ZOOM_STEP = 0.1
 export const CANVAS_PADDING = 36
+export const MAX_DIAGRAM_COORDINATE = 1_000_000
+export const MAX_DIAGRAM_WAYPOINTS = 32
 const GRID = 9
 const ROW_SPACING = 120
 const COLUMN_GAP = 64
@@ -23,7 +25,7 @@ export interface RoutedEdge { edge: GraphEdge; points: Point[]; path: string; la
 export interface Viewport { width: number; height: number; left: number; top: number }
 
 /** 所有坐标运算共用同一份节点几何。 */
-export function nodeRectangle(node: DesignerNode): NodeRectangle {
+export function nodeRectangle(node: Pick<DesignerNode, 'type' | 'x' | 'y'>): NodeRectangle {
   const compact = node.type === 'START' || node.type === 'END'
   return { x: node.x, y: node.y, width: compact ? 67 : 126, height: compact ? 42 : 64 }
 }
@@ -157,6 +159,8 @@ export function routeEdges(nodes: DesignerNode[], edges: GraphEdge[], labelFor: 
     const clear = candidates.filter(points => !all.some(rectangle => crossesNode(points, rectangle)))
     clear.sort((a, b) => pathLength(a) - pathLength(b))
     const points = compactPoints(clear[0] ?? direct)
+    // 零长连线也保留两端，确保保存后满足 BPMN DI 的两点契约。
+    if (points.length === 1) points.push({ ...end })
     const horizontal = points.slice(1).map((point, index) => [points[index]!, point] as const)
       .filter(([a, b]) => a.y === b.y).sort((a, b) => Math.abs(b[0].x - b[1].x) - Math.abs(a[0].x - a[1].x))[0]
     const text = shortLabel(labelFor(edge))
@@ -164,6 +168,12 @@ export function routeEdges(nodes: DesignerNode[], edges: GraphEdge[], labelFor: 
     return [{ edge, points, path: points.map((point, index) => `${index ? 'L' : 'M'} ${point.x} ${point.y}`).join(' '), label, text,
       fullText: labelFor(edge), obstructed: !clear.length }]
   })
+}
+
+/** 保存画布实际自动路由结果；保留所有连线和出线顺序，失效节点仍交由统一校验报告。 */
+export function serializeDesignerEdges(nodes: DesignerNode[], edges: GraphEdge[]): GraphEdge[] {
+  const points = new Map(routeEdges(nodes, edges).map(route => [route.edge.id, route.points]))
+  return edges.map(edge => ({ ...edge, waypoints: (points.get(edge.id) ?? edge.waypoints)?.map(point => ({ ...point })) }))
 }
 
 /** 画布随节点、回边和条件标签扩展；不再截断固定尺寸之外的流程。 */

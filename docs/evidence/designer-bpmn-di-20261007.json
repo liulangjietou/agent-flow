@@ -1,0 +1,94 @@
+{
+  "recordedAt": "2026-10-07T15:09:26.484368+00:00",
+  "taskId": "W03",
+  "status": "IMPLEMENTED_LOCAL_FIXED_PACKAGE_BROWSER_POSTGRES_PENDING",
+  "sourceBaseCommit": "e293eb56447a9d2a687a71df9301dd27362d70c6",
+  "sourceHashes": {
+    "agentflow-domain/src/main/java/io/agentflow/definition/ConditionLanguageUpgrade.java": "35b925e5e03086fa032126c2360fc91806d601be78b29885e7ce59db5a32a478",
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionDiffService.java": "33bd57d4028f8fe1d69d7e7032109d633952757262dc7e9c6cd83cf1d6835a7b",
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionModels.java": "b62151acb3c57c4b59ce0aeeba8cf607d9cf0ea52cbe8cf94156a387e51d251f",
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionValidator.java": "1d45005bca7c758d430276161d027ddb2ef7fc01110fd7bfa89e208d8d440b16",
+    "agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java": "acf6e53e0525eaf5a260803799ec8e13d0626cbbc2c31752d41becdf3d67c6bb",
+    "agentflow-server/src/main/java/io/agentflow/definition/JdbcDefinitionDraftRepository.java": "e73018d76e3126617feffbe7a05a7cda93a1ce8b035ad690bd04dd71bfe27a96",
+    "agentflow-server/src/main/resources/api/openapi.json": "edf45ab5c6b728b65e7aae65d7e4970eb4179f1ffa798697d2fbfd7ed0814f49",
+    "agentflow-server/src/test/java/io/agentflow/servicetask/ServiceTaskRuntimeIntegrationTest.java": "1b55f1c721121fe854b11f9f0ec3fabf432e475899cd828ba42704ad0bb01ca8",
+    "agentflow-web/scripts/test-requests.mjs": "790471b9573bb4a0f27d925fb4c6cfca4847f2375c9a266121e81cd5c538f28c",
+    "agentflow-web/src/App.vue": "67aeb44e13bab11f895165836d22d65b3c1472224e21e5e3b5c665d519175045",
+    "agentflow-web/src/api.ts": "3f2796f4a56f0aed8c9f0d9edeaafee803890d45d33daa5af60f343f647240da",
+    "agentflow-web/src/definitionComparison.ts": "2fb979b46fca7790f44f1b06a7a7dab85f70100f20c52132d8a25ef31990c894",
+    "agentflow-web/src/definitionSimulation.ts": "66c96cbf7cb4b7a56ffa70c5b2799d76384f4502514a24e2f42c8f5ef2c99afd",
+    "agentflow-web/src/designerLayout.ts": "64cb6940edd305c580eccc341be7a5076be172ba8107c23d1e8e74a2581d16c4",
+    "agentflow-web/src/portableTemplate.ts": "b4f3741373ba990cdfdfa3106254b3e2cba2fa3f611af5eae72a9645537bd3f7",
+    "agentflow-web/tests/layout.test.mjs": "49360afcfae2abe65435278492d2802b5ec19ca9bfe8ade6ad37b987a8741dd9",
+    "agentflow-web/tests/portable-template.test.mjs": "eac3413b4a394f1de2a0f97df1ae7938ab0f33bdac23eba0338ac2ac61681a0c",
+    "agentflow-domain/src/main/java/io/agentflow/definition/DefinitionDiagram.java": "e9b0c0a5fea971398433ef2e344a7c508709ffd7eb75daa7ff61a832f2d08754",
+    "agentflow-domain/src/test/java/io/agentflow/definition/DefinitionDiagramTest.java": "c5c39f9fbed43ee53aca3bb906969399b1a78661bef2fb0f6b61ec0f9b27953c",
+    "agentflow-server/src/main/java/io/agentflow/definition/BpmnDiagramWriter.java": "88718367e3360ca73753c94cdb306e5f25fa8a5be639bd087f7809b136089572",
+    "agentflow-server/src/test/java/io/agentflow/definition/BpmnDiagramWriterTest.java": "d64ca30af9ebfa8f01f6b4ef8a13967e5d9e92fa043d2fcef921fe670da7f04f",
+    "agentflow-server/src/test/java/io/agentflow/definition/DefinitionDiagramIntegrationTest.java": "87309cc64a005710177399381178a5a9b74f8d3c2f54cd43c8c06256bd91457a",
+    "agentflow-web/scripts/create-diagram-fixture.mjs": "ecc5fae77cc5555e01747f92b5035e137ea51d737189992f4e70ff65cab7a418",
+    "scripts/check-definition-diagram-runtime.py": "e23f3ba8e72e1e29922d9027a542ba025f542f691a97876970eefeac8934da01",
+    "scripts/fixtures/DefinitionDiagramProbe.java": "d7c3b247428af208e38e9b8ef22218515077930fddb0581451e6d95329452375",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7",
+    "scripts/payment-due-dates-support/CompareH2Schema.java": "4e92f585f39d6ce6a43bd400a31216179e8b7f15f5f676abd80b5fb7b12a0a3b",
+    "agentflow-web/package-lock.json": "657b44e10e4865fbcddc505c610629bdaa9f1041941127e701e82f40bc2e7c40",
+    "agentflow-web/src/designerGraph.ts": "1947e36e95ed8c7fe596c6f902c7e05715b462c03d467a5d8bdfa82f7fd48c00",
+    "agentflow-web/src/formSchema.ts": "a2114f9959b76d6b6d673d193227cd8802c340f4922c01db2f095eab448b91c4",
+    "agentflow-web/src/subprocessDesigner.ts": "dd78192286071429defc38a097b48ba17eaae7bc9175236fdd22046923ad999a",
+    "agentflow-web/src/serviceTasks.ts": "a79ce36f2ad4f6a1a6136f73ea4d965b00b7f9e667738ac51669dc4ca2e85b24"
+  },
+  "jar": "/fyoung/tmp/agentflow-remaining-20260928/w03-diagram-final-server.jar",
+  "jarSha256": "d369949781f14ed5be6ee401ff8dcfdc5868e13fbcc70b7e6cd21356afd2914d",
+  "scopeUniqueTests": 283,
+  "frontendTests": 113,
+  "testReportNote": "283 个唯一后端用例：原 282 项范围中服务任务旧断言要求启停重写已发布 JSON，改为保持原文本后 18 项复测通过；新增重合端点 1 项先失败后修复，最终 9 项图形范围复测通过。不是单次全量 283 项绿灯。前端最终 113 项通过；保留历史失败日志。",
+  "runtime": {
+    "status": "PASS",
+    "jarSha256": "d369949781f14ed5be6ee401ff8dcfdc5868e13fbcc70b7e6cd21356afd2914d",
+    "previousJarSha256": "0bc5752bb9a29429c2acb23abc04e338129669b8f8dcef3fd79604563070f445",
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "tables": 280,
+        "legacyDraftAndPublishedGraphUnchanged": true
+      },
+      {
+        "name": "publish-kill-replay-and-original-approval",
+        "preservedOldXml": true,
+        "sameOriginalTasks": 3,
+        "exactShapes": 5,
+        "exactEdges": 5,
+        "retainedSequenceOrder": true
+      },
+      {
+        "name": "independent-restore",
+        "tables": 280,
+        "sameAuthorizedDetails": 5
+      }
+    ],
+    "boots": 6,
+    "businessHttpRequests": 38
+  },
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/w03-diagram-verified/manifest.json",
+  "archiveSha256": "73d001e1943f8f3bc7ece9405465871722ace117ef08add49de00dc876c35398",
+  "review": {
+    "mode": "SELF_REVIEW",
+    "unresolvedFindingsInStage": [],
+    "independentReview": false
+  },
+  "scope": [
+    "Actual designer snapshots persist routing points with bounded numeric geometry",
+    "Deployed BPMN resource preserves exact shapes and fractional waypoints without changing routing priority",
+    "Immutable published graph text and original runtime bindings survive availability changes",
+    "Coincident endpoints retain both ends in designer snapshots and legacy export"
+  ],
+  "remaining": [
+    "Real browser rendering and interaction verification",
+    "PostgreSQL migration and runtime gate"
+  ]
+}

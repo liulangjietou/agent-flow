@@ -126,6 +126,8 @@ const ruleLabels: Record<string, string> = {
   DUPLICATE_NODE: '节点标识重复', DUPLICATE_EDGE: '连线标识重复', EDGE_NODE_NOT_FOUND: '连线引用了不存在的节点',
   INVALID_NODE_ID: '节点标识不合法，请使用如 review_1 的编号，不能以数字开头或包含空白、冒号、斜杠',
   INVALID_EDGE_ID: '连线标识不合法，请使用如 route_1 的编号，不能以数字开头或包含空白、冒号、斜杠',
+  DIAGRAM_NODE_POSITION_INVALID: '节点位置无效或超出画布范围，请移动该节点或重新自动布局',
+  DIAGRAM_EDGE_WAYPOINTS_INVALID: '连线路径无效，请重新自动布局后保存',
   INVALID_PROCESS_KEY: '流程标识不合法，请使用如 expense_1 的编号，不能以数字开头或包含空白、冒号、斜杠',
   NODE_EDGE_ID_CONFLICT: '连线与节点标识重复，请在高级画布删除该连线后重新连接',
   PROCESS_KEY_CONFLICT: '流程标识与节点或连线标识重复，请更换流程标识',

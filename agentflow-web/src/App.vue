@@ -110,7 +110,7 @@ import { describeBranch, branchTooltip } from './conditionPresentation'
 import { editQuickGraph, type QuickCommand } from './quickDesigner'
 import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNode, type DesignerDeadline } from './designerGraph'
 import { connectCanvasGraph, insertCanvasGraph, deleteCanvasNode, orderCanvasBranches, CANVAS_KEY_STEP, CANVAS_LARGE_KEY_STEP } from './designerEditing'
-import { arrangeNodes, routeEdges, graphBounds, fittedViewport, clampZoom, zoomedScroll, draggedPosition, nodeRectangle, CANVAS_PADDING, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, type Point } from './designerLayout'
+import { arrangeNodes, routeEdges, serializeDesignerEdges, graphBounds, fittedViewport, clampZoom, zoomedScroll, draggedPosition, nodeRectangle, CANVAS_PADDING, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, type Point } from './designerLayout'
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
 import EnterpriseLogoutDialog from './components/EnterpriseLogoutDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
@@ -337,7 +337,7 @@ function graphPayload(): Graph {
     conditionLanguageVersion: conditionLanguageVersion.value,
     riskPolicy: copyRiskPolicy(definitionRiskPolicy.value),
     nodes: serializeDesignerNodes(nodes.value),
-    edges: edges.value.map(edge => ({ ...edge, condition: edge.defaultBranch ? '' : edge.condition.trim() }))
+    edges: serializeDesignerEdges(nodes.value, edges.value).map(edge => ({ ...edge, condition: edge.defaultBranch ? '' : edge.condition.trim() }))
   }
 }
 function applyDefinition(definition: Definition) {

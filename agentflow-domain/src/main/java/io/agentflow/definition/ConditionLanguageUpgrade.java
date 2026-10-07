@@ -16,7 +16,7 @@ public final class ConditionLanguageUpgrade {
             String condition = render(parser.parse(edge.condition(), 1));
             // 等价转换超出新版限制时整次失败，不能截断或部分升级。
             parser.parse(condition, 2);
-            return new Edge(edge.id(), edge.source(), edge.target(), condition, edge.defaultBranch());
+            return new Edge(edge.id(), edge.source(), edge.target(), condition, edge.defaultBranch(), edge.waypoints());
         }).toList(), 2, graph.riskPolicy() == null ? null : new ApprovalRiskPolicy(graph.riskPolicy().rules().stream().map(rule -> {
             String condition = render(parser.parse(rule.condition(), 1));
             parser.parse(condition, 2);

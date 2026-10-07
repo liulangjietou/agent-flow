@@ -1,11 +1,50 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-const { arrangeNodes, nodeRectangle, routeEdges, graphBounds, fittedViewport, zoomedScroll, draggedPosition, clampZoom } = await import(process.env.AGENTFLOW_TEST_LAYOUT)
+const { arrangeNodes, nodeRectangle, routeEdges, serializeDesignerEdges, graphBounds, fittedViewport, zoomedScroll, draggedPosition, clampZoom } = await import(process.env.AGENTFLOW_TEST_LAYOUT)
 const { loadDesignerNodes, serializeDesignerNodes } = await import(process.env.AGENTFLOW_TEST_DESIGNER_GRAPH)
+const { createEditor } = await import(process.env.AGENTFLOW_TEST_RISK_EDITOR)
 const node = (id, type = 'USER_TASK') => ({ id, name: id, type, x: 40, y: 60, assigneeRule: 'role:MANAGER', originalProperties: { businessTag: '保留', assigneeRule: 'role:MANAGER' }, loadedPosition: { x: 40, y: 60 } })
 const edge = (source, target, condition = '', defaultBranch = false) => ({ id: source + '-' + target, source, target, condition, defaultBranch })
 const split = () => ({ nodes: [node('start', 'START'), node('gate', 'EXCLUSIVE_GATEWAY'), node('a'), node('b'), node('b2'), node('end', 'END')],
   edges: [edge('start', 'gate'), edge('gate', 'a', 'amount > 100'), edge('gate', 'b', '', true), edge('a', 'end'), edge('b', 'b2'), edge('b2', 'end')] })
+
+test('端点完全重合的零长连线仍保留两个端点，能够保存并导出', () => {
+  const nodes = [{ ...node('start', 'START'), x: 80, y: 60 }, { ...node('end', 'END'), x: 147, y: 60 }]
+  const saved = serializeDesignerEdges(nodes, [edge('start', 'end')])
+  assert.deepEqual(saved[0].waypoints, [{ x: 147, y: 81 }, { x: 147, y: 81 }])
+})
+
+test('保存实际画布拐点并保留出线顺序，移动重算且独立快照不会污染原图', () => {
+  const graph = split(), nodes = arrangeNodes(graph.nodes, graph.edges).nodes
+  const before = structuredClone(graph), routes = routeEdges(nodes, graph.edges)
+  const saved = serializeDesignerEdges(nodes, graph.edges)
+  assert.deepEqual(saved.map(item => item.id), graph.edges.map(item => item.id))
+  assert.deepEqual(saved.map(item => item.waypoints), routes.map(item => item.points))
+  assert.deepEqual(saved.map(({ waypoints, ...semantic }) => semantic), graph.edges)
+  assert.deepEqual(serializeDesignerEdges(loadDesignerNodes(serializeDesignerNodes(nodes)), saved), saved)
+  const original = structuredClone(saved)
+  nodes.find(item => item.id === 'a').y += 90
+  assert.notDeepEqual(serializeDesignerEdges(nodes, saved).find(item => item.target === 'a').waypoints, original.find(item => item.target === 'a').waypoints)
+  saved[0].waypoints[0].x += 999
+  assert.deepEqual(routes[0].points, original[0].waypoints)
+  assert.deepEqual(graph, before)
+})
+
+test('保存时缺失端点的无效连线仍保留供服务端校验，不静默删除', () => {
+  const edges = [edge('missing', 'end')]
+  assert.equal(serializeDesignerEdges([node('end', 'END')], edges)[0].id, edges[0].id)
+})
+
+test('父页面实际保存入口带上自动拐点，条件清理不丢失布局或分支顺序', () => {
+  const graph = split(), nodes = arrangeNodes(graph.nodes, graph.edges).nodes
+  const state = createEditor({ nodes: { value: nodes }, edges: { value: graph.edges },
+    conditionLanguageVersion: { value: 2 }, definitionRiskPolicy: { value: null } })
+  const saved = state.graphPayload()
+  assert.deepEqual(saved.edges.map(item => item.waypoints), routeEdges(nodes, graph.edges).map(route => route.points))
+  assert.deepEqual(saved.edges.map(item => item.id), graph.edges.map(item => item.id))
+  assert.equal(saved.conditionLanguageVersion, 2)
+  assert.deepEqual(loadDesignerNodes(saved.nodes).map(({ x, y }) => ({ x, y })), nodes.map(({ x, y }) => ({ x, y })))
+})
 
 test('按最长路径排列不等长分支，汇合在所有来路之后且主路径水平', () => {
   const graph = split(), before = structuredClone(graph)

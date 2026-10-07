@@ -256,7 +256,7 @@ class ServiceTaskRuntimeIntegrationTest {
     }
 
     @Test
-    void definitionAvailabilityResaveDoesNotInvalidateOriginalWaitWhenJsonOrderChanges() throws Exception {
+    void definitionAvailabilityPreservesStoredGraphAndOriginalWaitWhenJsonOrderChanges() throws Exception {
         String id = draft("service1", "review");
         var definition = definitions.findPublished("demo", application(id).path("processKey").asText(), 1).orElseThrow();
         String original = jdbc.queryForObject("SELECT graph_json FROM approval_definition WHERE id=?", String.class, definition.id().toString());
@@ -272,7 +272,7 @@ class ServiceTaskRuntimeIntegrationTest {
                 .header("Authorization", token("admin")).contentType(MediaType.APPLICATION_JSON)
                 .content(json.write(Map.of("startEnabled", false, "expectedRevision", definition.revision(), "reason", "仅停止新的发起"))))
                 .andExpect(status().isOk());
-        assertThat(jdbc.queryForObject("SELECT graph_json FROM approval_definition WHERE id=?", String.class, definition.id().toString())).isNotEqualTo(previousJvm);
+        assertThat(jdbc.queryForObject("SELECT graph_json FROM approval_definition WHERE id=?", String.class, definition.id().toString())).isEqualTo(previousJvm);
         apply(queued); advance(queued.input().command().id(), Instant.now());
         assertThat(tasksFor(id)).hasSize(1); assertThat(provider.effects).hasValue(1);
     }

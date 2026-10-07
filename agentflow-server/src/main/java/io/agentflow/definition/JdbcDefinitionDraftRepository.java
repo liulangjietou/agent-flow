@@ -42,8 +42,9 @@ public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository 
         long expectedRevision = draft.revision() - 1;
         int updated;
         try {
+            // 已发布或归档的原图不再序列化回写，新增布局缺省值不能改变在审绑定摘要。
             updated = jdbcTemplate.update("""
-                    UPDATE approval_definition SET name=?, version=?, revision=?, status=?, graph_json=?, form_schema_json=?, notification_texts_json=?, start_enabled=?,
+                    UPDATE approval_definition SET name=?, version=?, revision=?, status=?, graph_json=CASE WHEN status='DRAFT' THEN ? ELSE graph_json END, form_schema_json=?, notification_texts_json=?, start_enabled=?,
                         published_at=CASE WHEN ?='PUBLISHED' THEN COALESCE(published_at, CURRENT_TIMESTAMP) ELSE published_at END,
                         updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND id=? AND revision=?
                     """, draft.name(), persistedVersion, draft.revision(), draft.status().name(), graphJson, schemaJson, textsJson, draft.startEnabled(),
