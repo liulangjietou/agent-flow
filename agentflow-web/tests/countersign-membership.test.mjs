@@ -130,7 +130,7 @@ test('HTTP 成功但错配回执不能清除恢复槽或改人重发', async () 
 
 test('父页面加签成功后实际重读新版本，不能被写入期间 busy 拦住', async () => {
   const box = value => ({ value }), reads = [], env = {
-    activeTask: box(task()), activeApplication: box({ id: 'application', version: 2 }), busy: box(false), writesBlocked: box(false),
+    activeTask: box(task()), activeApplication: box({ id: 'application', version: 2 }), busy: box(false), writesBlocked: box(false), expenseTaskBusy: box(false),
     actorScope: box('demo:finance'), notice: box(''), detailLoading: box(false), detailError: box(''), taskTab: box('detail'),
     page: box('workbench'), taskDetailPanel: box(null), nextTick: async () => {}, errorMessage: error => error.message,
     refreshWorkspace: async () => {}, api: {

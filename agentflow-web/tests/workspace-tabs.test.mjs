@@ -14,7 +14,7 @@ async function html(render, data) {
   return renderToString(app)
 }
 test('实际待办详情页签包含角色和选中面板关系', async () => {
-  const value = await html(taskRender, { taskTab: 'timeline', activeTask: { taskId: 'task', applicationId: 'app', version: 1 }, activeApplication: null, actorScope: 'tenant:alice' })
+  const value = await html(taskRender, { taskTab: 'timeline', expenseTaskBusy: false, activeTask: { taskId: 'task', applicationId: 'app', version: 1 }, activeApplication: null, actorScope: 'tenant:alice' })
   assert.match(value, /role="tablist"/); assert.match(value, /role="tab"/); assert.match(value, /aria-controls=/); assert.match(value, /role="tabpanel"/)
 })
 test('实际历史页签包含角色和选中面板关系', async () => {
@@ -23,7 +23,7 @@ test('实际历史页签包含角色和选中面板关系', async () => {
 })
 function actionFixture() {
   let focusCount = 0
-  const state = { activeTask: ref({ taskId: 'task' }), activeApplication: ref({ id: 'app' }), busy: ref(false), writesBlocked: ref(false), actorScope: ref('tenant:alice'), page: ref('workbench'), api: { taskAction: async () => ({ applicationStatus: 'APPROVED' }) }, refreshWorkspace: async () => {}, notice: ref(''), taskActionLabels: { APPROVE: '批准' }, statusLabel: s => s, errorMessage: e => e.message, nextTick: async () => {}, operationStatus: ref({ focus() { focusCount++ } }) }
+  const state = { activeTask: ref({ taskId: 'task' }), activeApplication: ref({ id: 'app' }), busy: ref(false), writesBlocked: ref(false), expenseTaskBusy: ref(false), actorScope: ref('tenant:alice'), page: ref('workbench'), api: { taskAction: async () => ({ applicationStatus: 'APPROVED' }) }, refreshWorkspace: async () => {}, notice: ref(''), taskActionLabels: { APPROVE: '批准' }, statusLabel: s => s, errorMessage: e => e.message, nextTick: async () => {}, operationStatus: ref({ focus() { focusCount++ } }) }
   return { state, run: action(state), focusCount: () => focusCount }
 }
 test('审批完成卸载原操作后，焦点到结果提示', async () => {

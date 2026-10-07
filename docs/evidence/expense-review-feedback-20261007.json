@@ -1,0 +1,100 @@
+{
+  "recordedAt": "2026-10-07T20:46:09.834451+00:00",
+  "taskId": "U03",
+  "status": "IMPLEMENTED_LOCAL_COMPONENTS_BUILD_BROWSER_PENDING",
+  "sourceBaseCommit": "6d45c67a47e591f3d27aab81c234d933681be393",
+  "sourceHashes": {
+    "agentflow-web/src/expenses.ts": "79c259291330be74a9836d59ca2a226cf237b8b3a87c45d0c5a61feb6c8e09fe",
+    "agentflow-web/src/components/ExpenseActions.vue": "56194a7c5a77519de4f15952ae6bc034a459b001aea51acefe08df809207d75f",
+    "agentflow-web/src/components/ExpenseDetail.vue": "57af263f8aa5cc6b0f01cbe5e9b05b979651196c37bcb1dc92be549a51286d85",
+    "agentflow-web/src/App.vue": "58b43dcab038c11755e396db6a148692f1118179c66fa3ce5dea765c6aebd1d0",
+    "agentflow-web/scripts/test-requests.mjs": "457cf7d79efdece95203e1d95f13a727d04770e9ff4cd4575c3a3f25425a9eed",
+    "agentflow-web/tests/expense-review.test.mjs": "f8fa4cbb136df1c5cb10c76ebfde2c1f2567807370675446824b30d9cd1076ca",
+    "agentflow-web/tests/expense-actions.test.mjs": "d265c72063a5814d0568a9f801e670e7e1a3b903a5811595e7d03e2cb020a062",
+    "agentflow-web/tests/workspace-tabs.test.mjs": "fff361e31a06a41457bb18d2f3907923eb61151bc94661b85237e78199a0ad29",
+    "agentflow-web/tests/countersign-membership.test.mjs": "0981fae3843c69485a86704ddf3d08543696cfb5bee54ea50918860056e05ea5"
+  },
+  "inputManifest": "/fyoung/tmp/agentflow-remaining-20260928/u03-input-hashes.json",
+  "inputManifestSha256": "c226ecde115d7bea1a3abb7beb4500611eb8448719a6fe7526202d453e1082a9",
+  "requirements": [
+    {
+      "documentId": "01",
+      "lines": [
+        119,
+        121
+      ]
+    },
+    {
+      "documentId": "01",
+      "lines": [
+        144,
+        147
+      ]
+    }
+  ],
+  "rootCause": "原组件仅在 execute 时校验核减，输入状态及 busy 事件没有接入父任务；顶部金额只显示已保存快照。原测试主要执行提交方法，未覆盖逐次输入、顶部汇总和父模板接线。",
+  "ownership": {
+    "expenses.ts": "共用已有核减规则，以整数分预览原申报、核定、税额、冲销封顶和应付，保留稳定行号与原始数据。",
+    "ExpenseActions.vue": "表单实时反馈与未保存预览；打开、执行、结果待确认均保持外层操作锁。",
+    "ExpenseDetail.vue": "顶部四项金额和保存状态；当前费用查询/表单状态向父任务回传。",
+    "App.vue": "当前身份、申请、任务与版本匹配后锁定审批/加签和详情页签；原任务回调不影响新任务。"
+  },
+  "red": {
+    "initialBehaviorFailures": 4,
+    "file": "/fyoung/tmp/agentflow-remaining-20260928/u03-web-red-verified.log",
+    "additionalTopSummaryFailures": 1,
+    "additionalFile": "/fyoung/tmp/agentflow-remaining-20260928/u03-summary-red.log"
+  },
+  "validation": {
+    "webFull": {
+      "total": 1507,
+      "passed": 1507,
+      "failed": 0,
+      "skipped": 0,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/u03-web-full-final.log"
+    },
+    "newBehaviorCases": 9,
+    "scopeBeforeFinalSummary": {
+      "passed": 40,
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/u03-web-scope-final.log"
+    },
+    "typecheckAndBuild": "PASS",
+    "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/u03-build-final.log",
+    "openApi": {
+      "result": "PASS",
+      "operations": 396,
+      "schemas": 868,
+      "requestExamples": 129
+    },
+    "backendChanged": false,
+    "javaRerun": false,
+    "priorJavaGate": "docs/evidence/expense-feedback-20261007.json",
+    "priorJavaUniquePassed": 5311,
+    "backendBudgetGuard": "FlowableTaskFacade already removes APPROVE based on ExpenseApprovalService.approvalFailure; write entry rechecks inside transaction."
+  },
+  "retainedHarnessFailures": [
+    "初始预览测试对响应式对象使用 structuredClone，修正夹具后在原 HEAD 重新确认四项真实行为失败。",
+    "第一次装配命令路径错误，保留该次日志；没有作为产品 RED。",
+    "受限读取测试错误替换构造器已捕获的函数，改为让原函数返回受限响应；该次测试进程已结束。",
+    "完整回归初次 1506 项中旧加签装配漏传新增状态，补齐依赖后最终 1507 项全部通过。"
+  ],
+  "review": {
+    "codeQuality": "共享核减规则，没有复制服务端预算/权限策略；没有新增后端接口或迁移。",
+    "security": "受限财务读取仍可回到原通用审批权限；事件固定身份/任务/申请版本；未知结果不释放审批锁；预览不产生预算或付款事实。",
+    "coverage": "真实 Vue 模板和 App 方法覆盖父子接线、大额一分、税额越界、取消、未知结果、刷新、旧回调与受限权限。"
+  },
+  "webAssets": {
+    "index.html": "169fca87d6c7be85e0c5270e70db100183097c4e561ea5cc95fc8c3e39c2baa7",
+    "assets/index-DNm6Ecip.js": "a99d786caa5ca24025ce4abbfba93c8cb6ff370e1011834063aa6a46384634bd",
+    "assets/index-B4A_YjBg.css": "715dfbd4c933d41382ff181f8a77cbce50515548da94022d5c6e6751454560e4"
+  },
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/u03-expense-review-verified-20261007",
+  "archiveFiles": 27,
+  "archiveManifestSha256": "bbe6142f5542a09415fd08ad2629004160f1d148e6d92c668dfdc6aac2d87de9",
+  "boundaries": [
+    "真实浏览器、滚动固定位置、触屏与辅助设备未验证，U03 保持 OPEN。",
+    "Java 固定包未改，既有 Java/运行证据保留各自原范围，未声称重跑。",
+    "未调用真实企业接口、模型、预算或付款；PostgreSQL、Docker、远端推送及 PR 未执行。",
+    "V03 原始条款核对继续；签收缺件勾选等相邻需求不因本次核减交互完成而关闭。"
+  ]
+}

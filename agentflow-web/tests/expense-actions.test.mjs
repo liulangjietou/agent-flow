@@ -10,7 +10,7 @@ const originals = { receiveExpense: api.receiveExpense, reduceExpense: api.reduc
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })
 const money = value => ({ value, currency: 'CNY' })
 const detail = () => ({ id: 'report', applicationId: 'app', applicationVersion: 2, financialVersion: 5, roundNo: 1,
-  financialRound: { approvedLines: [{ lineNo: 1, gross: money('100.00'), tax: money('5.00') }] } })
+  financialRound: { baseCurrency: 'CNY', originalLines: [{ claimedBase: money('100.00') }], offsetTotal: money('0.00'), approvedLines: [{ lineNo: 1, gross: money('100.00'), tax: money('5.00') }] } })
 const workflow = () => ({ reportId: 'report', applicationId: 'app', applicationVersion: 2, financialVersion: 5, roundNo: 1,
   canWithdraw: true, canCancel: true, task: { taskId: 'task', stage: 'FINANCE_REVIEW', canReceive: true, canReduce: true }, budget: { confirmedCurrent: true } })
 const receipt = () => ({ reportId: 'report', applicationId: 'app', applicationVersion: 3, financialVersion: 6 })

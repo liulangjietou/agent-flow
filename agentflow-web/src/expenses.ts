@@ -48,6 +48,8 @@ export interface ExpenseBudgetRetentionView {
 }
 export interface ExpenseDetail { id: string; applicationId: string; businessNo: string; applicationStatus: string; applicationVersion: number; financialVersion: number; roundNo: number; editable: boolean; content: ExpenseContent; financialRound: FinancialRound | null; budgetRetention?: ExpenseBudgetRetentionView | null }
 export interface ExpenseVersions { applicationVersion: number; financialVersion: number }
+/** 费用操作锁绑定当前待办身份，旧组件卸载不能解除另一个任务的锁。 */
+export interface ExpenseTaskActivity { scopeKey: string; applicationId: string; taskId: string | undefined; applicationVersion: number | undefined; busy: boolean }
 export interface ExpenseCommand extends ExpenseVersions { comment: string }
 export interface ReductionLine { lineNo: number; approvedGross: string; approvedTax: string }
 /** 财务任务操作可明确选用直接代理，申请人撤回和作废不接受该依据。 */
@@ -91,18 +93,36 @@ export function moneyLabel(money: Money): string {
 }
 /** 只发送实际减少的已有行；保留输入字符串，不改变币种或其他财务对象。 */
 export function changedReductions(before: ApprovedLine[], inputs: ReductionLine[]): ReductionLine[] {
+  const result = reductionChanges(before, inputs)
+  if (!result.length) throw new Error('请至少减少一行的含税额或可抵扣税额。')
+  return result
+}
+function reductionChanges(before: ApprovedLine[], inputs: ReductionLine[]): ReductionLine[] {
   const seen = new Set<number>(), result: ReductionLine[] = []
   for (const input of inputs) {
     const original = before.find(line => line.lineNo === input.lineNo)
     if (!original || seen.has(input.lineNo)) throw new Error('费用行已变化，请刷新后重新核对。')
     seen.add(input.lineNo)
-    const gross = amountMinor(input.approvedGross), tax = amountMinor(input.approvedTax)
+    let gross: bigint, tax: bigint
+    try { gross = amountMinor(input.approvedGross); tax = amountMinor(input.approvedTax) }
+    catch { throw new Error(`第 ${input.lineNo} 行金额请填写普通十进制，最多两位小数。`) }
     if (gross > amountMinor(original.gross.value) || tax > amountMinor(original.tax.value) || tax > gross) throw new Error(`第 ${input.lineNo} 行只能减少金额，税额不能超过含税额。`)
     if (gross !== amountMinor(original.gross.value) || tax !== amountMinor(original.tax.value)) result.push({ ...input })
   }
-  if (!result.length) throw new Error('请至少减少一行的含税额或可抵扣税额。')
   return result
 }
+/** 仅预览未保存核减；原申报固定，冲销总额按核定额封顶，不产生预算或付款事实。 */
+export function previewReduction(round: FinancialRound, inputs: ReductionLine[]) {
+  const lines = reductionChanges(round.approvedLines, inputs)
+  const changes = new Map(lines.map(line => [line.lineNo, line]))
+  const gross = round.approvedLines.reduce((sum, line) => sum + amountMinor(changes.get(line.lineNo)?.approvedGross ?? line.gross.value), 0n)
+  const tax = round.approvedLines.reduce((sum, line) => sum + amountMinor(changes.get(line.lineNo)?.approvedTax ?? line.tax.value), 0n)
+  const original = round.originalLines.reduce((sum, line) => sum + amountMinor(line.claimedBase.value), 0n)
+  const existingOffset = amountMinor(round.offsetTotal.value), offset = existingOffset < gross ? existingOffset : gross
+  const money = (minor: bigint): Money => ({ currency: round.baseCurrency, value: `${minor / 100n}.${(minor % 100n).toString().padStart(2, '0')}` })
+  return { lines, original: money(original), gross: money(gross), tax: money(tax), offset: money(offset), payable: money(gross - offset) }
+}
+export type ExpenseReductionPreview = ReturnType<typeof previewReduction>
 export function expenseError(cause: unknown): string {
   const failure = cause as { status?: number; code?: string }
   const messages: Record<string, string> = {
