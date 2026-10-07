@@ -28,8 +28,13 @@ public class ApprovalProxyNotificationScheduler {
         try {
             var candidates = notifications.candidates(Instant.now(), after);
             for (var candidate : candidates) {
-                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "approval-proxy-notification", candidate.proxyId() + ":" + candidate.taskId()).open()) {
-                    try { notifications.pending(candidate); }
+                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "approval-proxy-notification", candidate.proxyId() + ":" + candidate.taskId())
+                        .withBusiness(candidate.businessNo(), candidate.processInstanceId(), candidate.taskId()).open()) {
+                    try {
+                        if (notifications.pending(candidate)) {
+                            LOG.info("Direct scheduler execution completed, errorCode={}, source={}, objectId={}", "NONE", "approval-proxy-notification", candidate.proxyId() + ":" + candidate.taskId());
+                        }
+                    }
                     catch (RuntimeException failure) {
                         LOG.error("Approval proxy notification failed, errorCode={}, taskId={}, proxyId={}",
                                 "APPROVAL_PROXY_NOTIFICATION_FAILED", candidate.taskId(), candidate.proxyId());

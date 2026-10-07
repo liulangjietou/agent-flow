@@ -74,8 +74,10 @@ public class TimerWaitService {
     @Transactional(readOnly = true)
     public List<Candidate> candidates(Instant now, Candidate after) {
         StringBuilder sql = new StringBuilder("""
-                SELECT j.ID_,j.DUEDATE_,j.TENANT_ID_,o.trace_id FROM ACT_RU_TIMER_JOB j
+                SELECT j.ID_,j.DUEDATE_,j.TENANT_ID_,o.trace_id,j.PROCESS_INSTANCE_ID_ AS process_instance_id,business.business_no FROM ACT_RU_TIMER_JOB j
                 LEFT JOIN workflow_execution_origin o ON o.tenant_id=j.TENANT_ID_ AND o.object_kind='TIMER' AND o.object_id=j.ID_
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=j.TENANT_ID_ AND submitted.process_instance_id=j.PROCESS_INSTANCE_ID_
+                LEFT JOIN approval_application business ON business.tenant_id=submitted.tenant_id AND business.id=submitted.application_id
                 WHERE j.DUEDATE_<=?
                 """);
         var parameters = new ArrayList<Object>(); parameters.add(Timestamp.from(now));
@@ -84,7 +86,7 @@ public class TimerWaitService {
             parameters.add(Timestamp.from(after.dueAt())); parameters.add(Timestamp.from(after.dueAt())); parameters.add(after.jobId());
         }
         sql.append(" ORDER BY j.DUEDATE_,j.ID_ LIMIT ?"); parameters.add(BATCH_SIZE);
-        return jdbc.query(sql.toString(), (row, index) -> new Candidate(row.getString("ID_"), row.getTimestamp("DUEDATE_").toInstant(), row.getString("TENANT_ID_"), row.getString("trace_id")), parameters.toArray());
+        return jdbc.query(sql.toString(), (row, index) -> new Candidate(row.getString("ID_"), row.getTimestamp("DUEDATE_").toInstant(), row.getString("TENANT_ID_"), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), parameters.toArray());
     }
 
     /** 到期后只推进精确绑定的等待执行，提前、暂停、已撤回或已经消费时不执行。 */
@@ -233,7 +235,9 @@ public class TimerWaitService {
     /** @author owlzhangfq@gmail.com */
     private record Binding(Application application, SubmissionRound round, DefinitionModels.Node node, boolean suspended) { }
     /** @author owlzhangfq@gmail.com */
-    public record Candidate(String jobId, Instant dueAt, String tenantId, String traceId) {
+    public record Candidate(String jobId, Instant dueAt, String tenantId, String traceId, String businessNo, String processInstanceId) {
+        /** 旧扫描不推测业务关联；已知的原生任务编号仍可用于诊断。 */
+        public Candidate(String jobId, Instant dueAt, String tenantId, String traceId) { this(jobId, dueAt, tenantId, traceId, null, null); }
         /** 历史等待仍按原到期和原 ID 执行，缺失来源保持空值。 */
         public Candidate(String jobId, Instant dueAt) { this(jobId, dueAt, null, null); }
     }

@@ -2904,7 +2904,7 @@
           ]
         }
       ],
-      "observed": "审批、Agent、核心财务、集成、Webhook、财务复核、供应商及报销恢复业务标识已通过本地验收。报销恢复 468 项范围回归、固定包四类入口八组业务上下文、36 条命令各一次及 281 表恢复通过；六类直接调度继续开发，O01 保持 OPEN。",
+      "observed": "请求、审批、Agent、财务、集成、供应商、报销恢复及六类直接调度的五字段诊断关联已接通；直接调度 279 项相关用例及固定包 281 表升级/恢复、八组上下文通过。最终核对发现系统自检独立线程尚缺请求上下文，正在修复；PostgreSQL 与最终整体验收仍待完成。",
       "references": [
         {
           "path": "docs/superpowers/plans/2026-10-07-operation-tracing.md",
@@ -2972,6 +2972,10 @@
         },
         {
           "path": "docs/evidence/operation-tracing-expense-recovery-business-20261007.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/operation-tracing-direct-business-20261007.json",
           "line": 1
         }
       ],
@@ -3041,6 +3045,10 @@
       "expenseRecoveryBusinessStage": {
         "status": "PASSED_LOCAL_FIXED_PACKAGE_WITH_EXPLICIT_SCOPE",
         "evidence": "docs/evidence/operation-tracing-expense-recovery-business-20261007.json"
+      },
+      "directSchedulerBusinessStage": {
+        "status": "PASSED_LOCAL_FIXED_PACKAGE_WITH_EXPLICIT_SCOPE",
+        "evidence": "docs/evidence/operation-tracing-direct-business-20261007.json"
       }
     },
     {

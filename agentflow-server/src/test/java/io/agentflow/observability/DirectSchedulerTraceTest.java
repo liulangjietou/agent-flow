@@ -39,7 +39,7 @@ class DirectSchedulerTraceTest {
         var logger = (Logger) LoggerFactory.getLogger(harness.logger());
         var appender = appender(); logger.addAppender(appender);
         String caller = UUID.randomUUID().toString();
-        try (var outer = new DiagnosticContext(caller, "caller-tenant").open()) {
+        try (var outer = new DiagnosticContext(caller, "caller-tenant", "caller-business", "caller-instance", "caller-task").open()) {
             var previous = MDC.getCopyOfContextMap();
             harness.poll().run(); harness.poll().run();
             assertThat(MDC.getCopyOfContextMap()).isEqualTo(previous);
@@ -50,10 +50,13 @@ class DirectSchedulerTraceTest {
                     softly.assertThat(DiagnosticContext.validTrace(context.get("traceId"))).isTrue();
                     softly.assertThat(context.get("traceId")).isNotEqualTo(caller);
                     softly.assertThat(context.get("tenantId")).isNotEqualTo("caller-tenant");
+                    softly.assertThat(context).doesNotContainKeys("businessNo", "processInstanceId");
+                    softly.assertThat(context.get("taskId")).isNotEqualTo("caller-task");
                 }
                 softly.assertThat(observed.get(0).get("traceId")).isNotEqualTo(observed.get(1).get("traceId"));
-                softly.assertThat(appender.list).hasSize(kind == Kind.TIMER ? 4 : 2);
-                for (var event : appender.list) {
+                var errors = appender.list.stream().filter(event -> event.getLevel() == ch.qos.logback.classic.Level.ERROR).toList();
+                softly.assertThat(errors).hasSize(kind == Kind.TIMER ? 4 : 2);
+                for (var event : errors) {
                     softly.assertThat(event.getFormattedMessage()).doesNotContain(PRIVATE);
                     softly.assertThat(event.getThrowableProxy()).isNull();
                     softly.assertThat(event.getMDCPropertyMap().get("traceId")).isEqualTo(observed.get(0).get("traceId"));
@@ -67,7 +70,7 @@ class DirectSchedulerTraceTest {
     void persistedSourceIsRestoredBeforeEnteringBusinessService(Kind kind) {
         String trace = UUID.randomUUID().toString(); var observed = new ArrayList<Map<String, String>>();
         var harness = harness(kind, false, ignored -> observed.add(MDC.getCopyOfContextMap()), trace);
-        try (var scope = new DiagnosticContext(UUID.randomUUID().toString(), "caller-tenant").open()) {
+        try (var scope = new DiagnosticContext(UUID.randomUUID().toString(), "caller-tenant", "caller-business", "caller-instance", "caller-task").open()) {
             var previous = MDC.getCopyOfContextMap(); harness.poll().run();
             assertThat(observed).hasSize(2).allSatisfy(context -> {
                 assertThat(context.get("traceId")).isEqualTo(trace);

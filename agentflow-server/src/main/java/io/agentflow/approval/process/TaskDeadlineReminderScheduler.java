@@ -31,9 +31,12 @@ public class TaskDeadlineReminderScheduler {
         try {
             var candidates = reminders.candidates(now, after);
             for (var candidate : candidates) {
-                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "task-deadline-reminder", candidate.taskId()).open()) {
+                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "task-deadline-reminder", candidate.taskId())
+                        .withBusiness(candidate.businessNo(), candidate.processInstanceId(), candidate.taskId()).open()) {
                     try {
-                        reminders.remind(candidate.taskId(), now);
+                        if (reminders.remind(candidate.taskId(), now)) {
+                            LOG.info("Direct scheduler execution completed, errorCode={}, source={}, objectId={}", "NONE", "task-deadline-reminder", candidate.taskId());
+                        }
                     } catch (RuntimeException exception) {
                         LOG.error("Task deadline reminder failed, errorCode={}, taskId={}", "SLA_REMINDER_FAILED", candidate.taskId());
                     }

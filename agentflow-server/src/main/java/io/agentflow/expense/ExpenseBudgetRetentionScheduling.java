@@ -32,8 +32,12 @@ public class ExpenseBudgetRetentionScheduling {
         try {
             var page = repository.candidates(now, after);
             for (var candidate : page) {
-                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-budget-retention", candidate.reportId() + ":" + candidate.roundNo()).open()) {
-                    try { service.process(candidate, now); }
+                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-budget-retention", candidate.reportId() + ":" + candidate.roundNo())
+                        .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
+                    try {
+                        service.process(candidate, now);
+                        LOG.info("Direct scheduler execution completed, errorCode={}, source={}, objectId={}", "NONE", "expense-budget-retention", candidate.reportId() + ":" + candidate.roundNo());
+                    }
                     catch (RuntimeException failure) {
                         LOG.error("Budget retention processing failed, errorCode={}, tenant={}, reportId={}, round={}",
                                 "BUDGET_RETENTION_PROCESSING_FAILED", candidate.tenantId(), candidate.reportId(), candidate.roundNo());

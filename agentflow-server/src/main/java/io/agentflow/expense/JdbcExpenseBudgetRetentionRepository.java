@@ -70,15 +70,17 @@ public class JdbcExpenseBudgetRetentionRepository {
 
     /** 按稳定复合键翻页；未知任务留在原处重试，但不会永久占据第一页。 */
     public List<Candidate> candidates(Instant now, Candidate after) {
-        String condition = after == null ? "" : " AND (tenant_id>? OR (tenant_id=? AND report_id>?) OR (tenant_id=? AND report_id=? AND round_no>?))";
+        String condition = after == null ? "" : " AND (r.tenant_id>? OR (r.tenant_id=? AND r.report_id>?) OR (r.tenant_id=? AND r.report_id=? AND r.round_no>?))";
         Object[] parameters = after == null ? new Object[]{Timestamp.from(now), BATCH_SIZE}
                 : new Object[]{Timestamp.from(now), after.tenantId(), after.tenantId(), after.reportId().toString(),
                     after.tenantId(), after.reportId().toString(), after.roundNo(), BATCH_SIZE};
         return jdbc.query("""
-                SELECT tenant_id,report_id,round_no,trace_id FROM expense_budget_retention
-                WHERE status IN ('RETAINED','RECONCILING','RELEASE_QUEUED') AND expires_at<=?
-                """ + condition + " ORDER BY tenant_id,report_id,round_no LIMIT ?",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("report_id")), row.getInt("round_no"), row.getString("trace_id")), parameters);
+                SELECT r.tenant_id,r.report_id,r.round_no,r.trace_id,business.business_no,submitted.process_instance_id FROM expense_budget_retention r
+                LEFT JOIN approval_application business ON business.tenant_id=r.tenant_id AND business.id=r.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=r.round_no
+                WHERE r.status IN ('RETAINED','RECONCILING','RELEASE_QUEUED') AND r.expires_at<=?
+                """ + condition + " ORDER BY r.tenant_id,r.report_id,r.round_no LIMIT ?",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("report_id")), row.getInt("round_no"), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), parameters);
     }
 
     private ExpenseBudgetRetention map(ResultSet row, int index) throws SQLException {
@@ -104,7 +106,9 @@ public class JdbcExpenseBudgetRetentionRepository {
      * 调度游标只携带定位键，执行时在单据锁内重新读取当前状态。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID reportId, int roundNo, String traceId) {
+    public record Candidate(String tenantId, UUID reportId, int roundNo, String traceId, String businessNo, String processInstanceId) {
+        /** 旧扫描不推测业务关联，也不借用调用线程的实例或任务。 */
+        public Candidate(String tenantId, UUID reportId, int roundNo, String traceId) { this(tenantId, reportId, roundNo, traceId, null, null); }
         /** 旧来源保持空值，由入口生成稳定的独立执行标识。 */
         public Candidate(String tenantId, UUID reportId, int roundNo) { this(tenantId, reportId, roundNo, null); }
     }

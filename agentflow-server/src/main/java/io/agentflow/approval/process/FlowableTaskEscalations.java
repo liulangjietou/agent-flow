@@ -43,8 +43,10 @@ public class FlowableTaskEscalations {
     public List<Candidate> candidates(Instant now, Candidate after) {
         var parameters = new ArrayList<Object>(List.of(TaskEscalationBindings.DUE_AT, now.toEpochMilli(), TaskEscalationBindings.ESCALATED_AT));
         var sql = new StringBuilder("""
-                SELECT t.ID_,v.LONG_,t.TENANT_ID_,o.trace_id FROM ACT_RU_TASK t JOIN ACT_RU_VARIABLE v ON v.TASK_ID_=t.ID_
+                SELECT t.ID_,v.LONG_,t.TENANT_ID_,o.trace_id,t.PROC_INST_ID_ AS process_instance_id,business.business_no FROM ACT_RU_TASK t JOIN ACT_RU_VARIABLE v ON v.TASK_ID_=t.ID_
                 LEFT JOIN workflow_execution_origin o ON o.tenant_id=t.TENANT_ID_ AND o.object_kind='TASK' AND o.object_id=t.ID_
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=t.TENANT_ID_ AND submitted.process_instance_id=t.PROC_INST_ID_
+                LEFT JOIN approval_application business ON business.tenant_id=submitted.tenant_id AND business.id=submitted.application_id
                 WHERE t.SUSPENSION_STATE_=1 AND v.NAME_=? AND v.TYPE_='date' AND v.LONG_<=?
                 AND NOT EXISTS (SELECT 1 FROM ACT_RU_VARIABLE marker WHERE marker.TASK_ID_=t.ID_ AND marker.NAME_=?)
                 """);
@@ -53,7 +55,7 @@ public class FlowableTaskEscalations {
             parameters.add(after.dueAt().toEpochMilli()); parameters.add(after.dueAt().toEpochMilli()); parameters.add(after.taskId());
         }
         sql.append(" ORDER BY v.LONG_,t.ID_ LIMIT ?"); parameters.add(BATCH_SIZE);
-        return jdbc.query(sql.toString(), (row, index) -> new Candidate(row.getString("ID_"), Instant.ofEpochMilli(row.getLong("LONG_")), row.getString("TENANT_ID_"), row.getString("trace_id")), parameters.toArray());
+        return jdbc.query(sql.toString(), (row, index) -> new Candidate(row.getString("ID_"), Instant.ofEpochMilli(row.getLong("LONG_")), row.getString("TENANT_ID_"), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), parameters.toArray());
     }
 
     /** 申请与原任务锁后重查；完成、撤回、终止及父子暂停不能靠先前扫描结果继续投递。 */
@@ -87,7 +89,9 @@ public class FlowableTaskEscalations {
     /** 有界游标只记录原生任务事实，不提供任务操作权限。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String taskId, Instant dueAt, String tenantId, String traceId) {
+    public record Candidate(String taskId, Instant dueAt, String tenantId, String traceId, String businessNo, String processInstanceId) {
+        /** 旧扫描不推测业务关联；已知的原生任务编号仍可用于诊断。 */
+        public Candidate(String taskId, Instant dueAt, String tenantId, String traceId) { this(taskId, dueAt, tenantId, traceId, null, null); }
         /** 旧扫描候选不从当前请求推测归属或来源。 */
         public Candidate(String taskId, Instant dueAt) { this(taskId, dueAt, null, null); }
     }

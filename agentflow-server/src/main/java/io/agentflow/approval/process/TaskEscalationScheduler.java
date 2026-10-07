@@ -28,8 +28,13 @@ public class TaskEscalationScheduler {
         try {
             var candidates = escalations.candidates(now, after);
             for (var candidate : candidates) {
-                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "task-escalation", candidate.taskId()).open()) {
-                    try { escalations.escalate(candidate.taskId(), now); }
+                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "task-escalation", candidate.taskId())
+                        .withBusiness(candidate.businessNo(), candidate.processInstanceId(), candidate.taskId()).open()) {
+                    try {
+                        if (escalations.escalate(candidate.taskId(), now)) {
+                            LOG.info("Direct scheduler execution completed, errorCode={}, source={}, objectId={}", "NONE", "task-escalation", candidate.taskId());
+                        }
+                    }
                     catch (RuntimeException failure) {
                         LOG.error("Task escalation failed, errorCode={}, taskId={}", "SLA_ESCALATION_FAILED", candidate.taskId());
                     }

@@ -30,8 +30,13 @@ public class AdvanceOverdueScheduling {
         try {
             var page = repository.candidates(now, after);
             for (var candidate : page) {
-                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "advance-overdue", candidate.id().toString()).open()) {
-                    try { reminders.remind(candidate, now); }
+                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "advance-overdue", candidate.id().toString())
+                        .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
+                    try {
+                        if (reminders.remind(candidate, now)) {
+                            LOG.info("Direct scheduler execution completed, errorCode={}, source={}, objectId={}", "NONE", "advance-overdue", candidate.id());
+                        }
+                    }
                     catch (RuntimeException failure) { LOG.error("Advance overdue reminder failed, errorCode={}, tenant={}, advanceId={}", "ADVANCE_OVERDUE_REMINDER_FAILED", candidate.tenantId(), candidate.id()); }
                 }
             }

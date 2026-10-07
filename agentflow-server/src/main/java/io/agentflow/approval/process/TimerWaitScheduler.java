@@ -29,8 +29,13 @@ public class TimerWaitScheduler {
         try {
             var candidates = waits.candidates(now, after);
             for (var candidate : candidates) {
-                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "timer-wait", candidate.jobId()).open()) {
-                    try { waits.advance(candidate.jobId(), now); }
+                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "timer-wait", candidate.jobId())
+                        .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
+                    try {
+                        if (waits.advance(candidate.jobId(), now)) {
+                            LOG.info("Direct scheduler execution completed, errorCode={}, source={}, objectId={}", "NONE", "timer-wait", candidate.jobId());
+                        }
+                    }
                     catch (RuntimeException failure) {
                         LOG.error("Timer wait failed, errorCode={}, jobId={}", "TIMER_EXECUTION_FAILED", candidate.jobId());
                         try { waits.failed(candidate.jobId(), failure); }
