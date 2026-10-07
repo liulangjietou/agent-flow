@@ -37,17 +37,39 @@ class InvoiceOfdCompatibilityTest {
     }
 
     @Test
-    void rejectsMixedNamespacesBetweenFilesAndInsideDrawingContent() throws Exception {
-        for (String file : List.of("OFD.xml", "Doc_0/Pages/P1.xml", "Doc_0/Resources.xml")) {
-            var files = fixture(2);
-            replace(files, file, CURRENT_NAMESPACE, LEGACY_NAMESPACE);
-            assertThatThrownBy(() -> render(files)).isInstanceOf(IOException.class);
-        }
+    void rejectsMixedNamespacesInsideOneXmlAndUnknownDrawingNamespaces() throws Exception {
         var files = fixture(2);
         page(files, 1, "", path("0 0 10 10", "255 0 0", "")
                 .replace("<ofd:PathObject ", "<ofd:PathObject xmlns:ofd=\"" + LEGACY_NAMESPACE + "\" "));
         assertThatThrownBy(() -> render(files)).isInstanceOf(IOException.class);
         replace(files, "Doc_0/Pages/P1.xml", LEGACY_NAMESPACE + "\"", "https://example.invalid/ofd\"");
+        assertThatThrownBy(() -> render(files)).isInstanceOf(IOException.class);
+    }
+
+    @Test
+    void rendersExplicitlySupportedNamespacesChosenIndependentlyByReferencedFiles() throws Exception {
+        var files = fixture(2);
+        page(files, 0, "", path("0 0 10 10", "255 0 0", ""));
+        page(files, 1, "", text("", "<ofd:TextCode X=\"1\" Y=\"6\">A</ofd:TextCode>"));
+        for (String file : List.of("OFD.xml", "Doc_0/Document.xml", "Doc_0/Pages/P0.xml", "Doc_0/Pages/P1.xml")) {
+            replace(files, file, CURRENT_NAMESPACE, LEGACY_NAMESPACE);
+        }
+        // 旧票面可以引用使用 2016 命名空间的独立资源文件；各文件内仍只有明确的一种版本。
+        var pages = render(files);
+        assertThat(pixel(pages.get(0), 5, 5)).isEqualTo(Color.RED.getRGB());
+        assertThat(pixel(pages.get(1), 2, 4)).isEqualTo(Color.BLACK.getRGB());
+    }
+
+    @Test
+    void acceptsOnlyKnownUnqualifiedNonvisualAnnotationParameters() throws Exception {
+        var files = fixture(1);
+        replace(files, "Doc_0/Document.xml", "</ofd:Document>", "<ofd:Annotations>Annots.xml</ofd:Annotations></ofd:Document>");
+        files.put("Doc_0/Annots.xml", xml("Annotations", "<ofd:Page PageID=\"1\"><ofd:FileLoc>PageAnnot.xml</ofd:FileLoc></ofd:Page>"));
+        files.put("Doc_0/PageAnnot.xml", xml("PageAnnot", "<ofd:Annot ID=\"501\" Type=\"Watermark\">"
+                + "<Parameters><Parameter Name=\"Location\">https://example.invalid/never-follow</Parameter></Parameters>"
+                + "<ofd:Appearance Boundary=\"4 3 5 5\">" + path("0 0 10 10", "255 0 0", "") + "</ofd:Appearance></ofd:Annot>"));
+        assertThat(pixel(render(files).get(0), 5, 4)).isEqualTo(Color.RED.getRGB());
+        replace(files, "Doc_0/PageAnnot.xml", "ofd:PathObject", "PathObject");
         assertThatThrownBy(() -> render(files)).isInstanceOf(IOException.class);
     }
 

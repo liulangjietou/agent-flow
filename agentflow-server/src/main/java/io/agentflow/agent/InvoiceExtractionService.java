@@ -60,7 +60,11 @@ public class InvoiceExtractionService {
         }
         boolean modelAvailable = external && unavailable == null;
         return new InputOptions(prepared.input, prepared.method,
-                !external ? Transmission.NONE : prepared.input.format() == InvoiceOriginal.Format.XML ? Transmission.XML_TEXT : Transmission.ORIGINAL_BYTES,
+                !external ? Transmission.NONE : switch (prepared.input.format()) {
+                    case XML -> Transmission.XML_TEXT;
+                    case OFD -> Transmission.RENDERED_PAGES;
+                    default -> Transmission.ORIGINAL_BYTES;
+                },
                 unavailable == null, unavailable, modelAvailable ? configuration.getProviderId() : null,
                 modelAvailable ? configuration.getModel() : null, modelAvailable ? configuration.uri().getAuthority() : null,
                 modelAvailable ? configuration.targetDigest(InvoiceExtractionRun.CONTRACT_VERSION) : null, sources.supportedFormats());
@@ -227,7 +231,7 @@ public class InvoiceExtractionService {
      * 发送完整原始字节时包括原件内部元数据，XML 发送完整正文、元素名及属性。
      * @author owlzhangfq@gmail.com
      */
-    public enum Transmission { NONE, XML_TEXT, ORIGINAL_BYTES }
+    public enum Transmission { NONE, XML_TEXT, ORIGINAL_BYTES, RENDERED_PAGES }
     /**
      * 只展示本人原件引用、实际方式与可用目的地，不返回文件正文或凭据。
      * @author owlzhangfq@gmail.com

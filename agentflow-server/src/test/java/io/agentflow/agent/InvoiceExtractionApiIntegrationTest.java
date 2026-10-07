@@ -96,7 +96,7 @@ class InvoiceExtractionApiIntegrationTest {
         assertThat(input.path("method").asText()).isEqualTo("STRUCTURED_XML");
         assertThat(input.path("transmission").asText()).isEqualTo("NONE");
         assertThat(input.path("enabled").asBoolean()).isTrue(); assertThat(input.path("targetDigest").isNull()).isTrue();
-        assertThat(input.path("supportedFormats").toString()).contains("XML", "PDF").doesNotContain("OFD");
+        assertThat(input.path("supportedFormats").toString()).contains("XML", "PDF", "OFD");
         var receipt = send(path(invoice), queueBody(input), key(), 202); String run = node(receipt).path("id").asText();
         assertThat(receipt.getHeader("Cache-Control")).isEqualTo("no-store");
         assertThat(receipt.getHeader("Idempotency-Replayed")).isEqualTo("false");
@@ -203,6 +203,37 @@ class InvoiceExtractionApiIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT status FROM agent_invoice_extraction_run WHERE invoice_id=?", String.class, invoice.toString())).isEqualTo("QUEUED");
     }
 
+    @Test void ofdInputBindsAllPagesAndConsentWhileOriginalKeyReplaysWithoutRendering() throws Exception {
+        byte[] bytes = InvoiceOfdArchiveTest.zip(InvoiceOfdRendererTest.fixture(2));
+        UUID invoice = original(bytes, InvoiceOriginal.Format.OFD); var financial = finance(invoice);
+        var disabled = read(path(invoice) + "/input", "alice", 200);
+        assertThat(disabled.path("enabled").asBoolean()).isFalse();
+        assertThat(disabled.path("transmission").asText()).isEqualTo("RENDERED_PAGES");
+        assertThat(disabled.at("/input/pageCount").asInt()).isEqualTo(2);
+        assertThat(disabled.at("/input/originalBytes").asInt()).isEqualTo(bytes.length);
+        configuration.setEnabled(true); configuration.setEndpoint("http://127.0.0.1:9/chat"); configuration.setProviderId("fixture"); configuration.setModel("fixture-model");
+        var input = read(path(invoice) + "/input", "alice", 200); var body = queueBody(input);
+        var denied = new LinkedHashMap<>(body); denied.put("externalSendConfirmed", false); send(path(invoice), denied, key(), 422);
+        denied = new LinkedHashMap<>(body); denied.put("pageCount", 1); send(path(invoice), denied, key(), 400);
+        read(path(invoice) + "/input", "admin", 404); read(path(invoice) + "/input", "bob", 404);
+        String requestKey = key(); var first = send(path(invoice), body, requestKey, 202);
+        String run = node(first).path("id").asText();
+        assertThat(read(path(invoice) + "/" + run, "alice", 200).at("/input/pageCount").asInt()).isEqualTo(2);
+        doThrow(new DomainException("FILE_INTEGRITY_FAILED", "Fixture original is unavailable")).when(files).read(any());
+        var replay = send(path(invoice), body, requestKey, 202);
+        assertThat(replay.getContentAsString()).isEqualTo(first.getContentAsString());
+        assertThat(replay.getHeader("Idempotency-Replayed")).isEqualTo("true");
+        assertThat(runCount(invoice)).isOne(); assertThat(finance(invoice)).isEqualTo(financial);
+    }
+
+    @Test void aLaterOfdPageFailureProducesNoQueueReceiptOrFinancialChange() throws Exception {
+        var contents = InvoiceOfdRendererTest.fixture(2);
+        InvoiceOfdRendererTest.page(contents, 1, "", "<ofd:UnknownObject/>");
+        UUID invoice = original(InvoiceOfdArchiveTest.zip(contents), InvoiceOriginal.Format.OFD); var financial = finance(invoice);
+        assertThat(read(path(invoice) + "/input", "alice", 422).path("code").asText()).isEqualTo("INVOICE_EXTRACTION_SOURCE_UNAVAILABLE");
+        assertThat(runCount(invoice)).isZero(); assertThat(finance(invoice)).isEqualTo(financial);
+    }
+
     @Test void ownerTenantAndAdminIsolationApplyToEveryEntryWhileReplayRetainsOriginalRoleBinding() throws Exception {
         UUID invoice = original(LOCAL); var body = queueBody(read(path(invoice) + "/input", "alice", 200)); String requestKey = key();
         String run = node(send(path(invoice), body, requestKey, 202)).path("id").asText(); worker.poll();
@@ -269,13 +300,16 @@ class InvoiceExtractionApiIntegrationTest {
         send(path(invoice) + "/" + run + "/review", review, requestKey, 200);
     }
 
-    private UUID original(byte[] bytes) {
+    private UUID original(byte[] bytes) { return original(bytes, InvoiceOriginal.Format.XML); }
+    private UUID original(byte[] bytes, InvoiceOriginal.Format format) {
         actors.set(new Actor("demo", "alice", Set.of("EMPLOYEE")));
         try {
-            var original = wallet.reserve(new InvoiceWalletService.UploadInput("original.xml", (long) bytes.length,
-                    AssistConfiguration.digest(new String(bytes, StandardCharsets.UTF_8)), InvoiceOriginal.Format.XML));
+            String digest = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+            var original = wallet.reserve(new InvoiceWalletService.UploadInput("original." + format.name().toLowerCase(java.util.Locale.ROOT),
+                    (long) bytes.length, digest, format));
             wallet.upload(original.id(), new ByteArrayInputStream(bytes)); return original.id();
-        } finally { actors.clear(); }
+        } catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException(impossible); }
+        finally { actors.clear(); }
     }
     private static String key() { return UUID.randomUUID().toString(); }
     private static String path(UUID invoice) { return "/api/v1/invoices/" + invoice + "/extraction-runs"; }

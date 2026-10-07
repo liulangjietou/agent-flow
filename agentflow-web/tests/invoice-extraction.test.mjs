@@ -13,10 +13,10 @@ afterEach(() => { Object.assign(api, originalApi); globalThis.fetch = originalFe
 const settle = () => new Promise(resolve => setImmediate(resolve))
 const uuid = n => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
 const when = '2026-10-02T00:00:00Z'
-const input = (format = 'XML') => ({ invoiceId: uuid(1), originalId: uuid(2), originalDigest: 'a'.repeat(64), format, originalBytes: 321, pageCount: format === 'PDF' ? 3 : 1 })
+const input = (format = 'XML') => ({ invoiceId: uuid(1), originalId: uuid(2), originalDigest: 'a'.repeat(64), format, originalBytes: 321, pageCount: ['PDF', 'OFD'].includes(format) ? 3 : 1 })
 const item = () => ({ id: uuid(1), version: 1, original: { id: uuid(2), filename: '本人原件.xml', sha256: 'a'.repeat(64), size: 321, format: 'XML', status: 'READY' }, verification: 'PENDING', occupation: 'AVAILABLE', facts: null, use: null, failureCode: null, checkedAt: null })
-const options = (method = 'STRUCTURED_XML', format = 'XML') => ({ input: input(format), method, transmission: method === 'STRUCTURED_XML' ? 'NONE' : format === 'XML' ? 'XML_TEXT' : 'ORIGINAL_BYTES', enabled: true, unavailableCode: null,
-  providerId: method === 'MODEL' ? 'fixture' : null, model: method === 'MODEL' ? 'fixture-v1' : null, destination: method === 'MODEL' ? '127.0.0.1' : null, targetDigest: method === 'MODEL' ? 'b'.repeat(64) : null, supportedFormats: ['XML', 'PNG', 'JPEG', 'PDF'] })
+const options = (method = 'STRUCTURED_XML', format = 'XML') => ({ input: input(format), method, transmission: method === 'STRUCTURED_XML' ? 'NONE' : format === 'XML' ? 'XML_TEXT' : format === 'OFD' ? 'RENDERED_PAGES' : 'ORIGINAL_BYTES', enabled: true, unavailableCode: null,
+  providerId: method === 'MODEL' ? 'fixture' : null, model: method === 'MODEL' ? 'fixture-v1' : null, destination: method === 'MODEL' ? '127.0.0.1' : null, targetDigest: method === 'MODEL' ? 'b'.repeat(64) : null, supportedFormats: ['XML', 'PNG', 'JPEG', 'PDF', 'OFD'] })
 const summary = () => ({ id: uuid(3), method: 'STRUCTURED_XML', status: 'COMPLETED', version: 3, createdAt: when })
 const page = (number = 0) => ({ items: [summary()], total: 1, page: number, pageSize: 20 })
 const detail = () => ({ ...summary(), input: input(), startedAt: when, completedAt: when, failure: null, review: null, canConfirm: true,
@@ -40,7 +40,7 @@ test('票夹提供来源、历史、详情、发起和人工复核入口', () =>
 })
 
 test('来源目录区分本地与完整外发，拒绝伪造票据身份及矛盾确认范围', () => {
-  for (const value of [options(), options('MODEL'), options('MODEL', 'PDF')]) assert.deepEqual(extraction.readExtractionOptions(value, uuid(1)), value)
+  for (const value of [options(), options('MODEL'), options('MODEL', 'PDF'), options('MODEL', 'OFD')]) assert.deepEqual(extraction.readExtractionOptions(value, uuid(1)), value)
   assert.equal(extraction.extractionMatches(input(), item()), true)
   assert.equal(extraction.extractionMatches(input(), { ...item(), original: { ...item().original, sha256: 'f'.repeat(64) } }), false)
   const disabled = { ...options('MODEL'), enabled: false, unavailableCode: 'AGENT_MODEL_DISABLED', providerId: null, model: null, destination: null, targetDigest: null }
@@ -320,4 +320,29 @@ test('票据详情把提取忙碌和未保存修订纳入导航与查验互斥',
     state.extractionBusy = false; state.extractionDirty = true; assert.equal(state.interactionsBusy, true); assert.equal(events.at(-1), true)
     state.extractionDirty = false; assert.equal(state.interactionsBusy, false)
   } finally { app.unmount() }
+})
+
+
+test('OFD 仅允许全部页图外发，实际页面说明和默认授权绑定本次来源', async () => {
+  const value = options('MODEL', 'OFD')
+  for (const transmission of ['ORIGINAL_BYTES', 'XML_TEXT', 'NONE']) {
+    assert.throws(() => extraction.readExtractionOptions({ ...value, transmission }, uuid(1)), unreadable)
+  }
+  assert.throws(() => extraction.readExtractionOptions({ ...options('MODEL', 'PDF'), transmission: 'RENDERED_PAGES' }, uuid(1)), unreadable)
+  reads(); api.invoiceExtractionInput = async () => value
+  const sent = []; api.generateInvoiceExtraction = async (...args) => { sent.push(args); return { id: uuid(3), status: 'QUEUED', version: 1 } }
+  const props = { scopeKey: 'demo/ofd-' + ++index, item: { ...item(), original: { ...item().original, format: 'OFD' } } }
+  const p = panel(props)
+  try {
+    await settle(); assert.equal(p.state.options.input.pageCount, 3); await p.state.generate(); assert.equal(sent.length, 0)
+    p.state.externalSendConfirmed = true; await p.state.generate(); assert.equal(sent.length, 1)
+    assert.equal(sent[0][1].expectedOriginalDigest, value.input.originalDigest)
+    assert.equal(sent[0][1].targetDigest, value.targetDigest); assert.equal(p.state.externalSendConfirmed, false)
+  } finally { p.close() }
+  const html = await renderToString(createSSRApp({ ...Rendered, async setup(props, ctx) {
+    const render = Rendered.setup(props, ctx); await settle(); await settle(); return render
+  } }, { ...props, scopeKey: props.scopeKey + '/render', refreshVersion: 0, locked: false }))
+  assert.match(html, /全部 3 页图像/); assert.match(html, /文字、图形、批注和可见签章/)
+  assert.match(html, /发送全部页面并提取票面/); assert.match(html, /签章图像仅用于票面展示/)
+  assert.ok(!html.includes('将发送完整原文件'))
 })

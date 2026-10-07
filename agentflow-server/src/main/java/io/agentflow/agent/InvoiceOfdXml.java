@@ -20,7 +20,7 @@ final class InvoiceOfdXml {
     private static final Pattern DECIMAL = Pattern.compile("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?");
     private InvoiceOfdXml() { }
 
-    /** 兼容已见旧票面的命名空间；同一包的版本一致性由 XML 入口一次检查。 */
+    /** 兼容已见旧票面的命名空间；同一 XML 的版本一致性由解析入口一次检查。 */
     static boolean ofdNamespace(String namespace) { return namespace != null && NAMESPACES.contains(namespace); }
 
     static List<Element> children(Element parent) throws IOException {

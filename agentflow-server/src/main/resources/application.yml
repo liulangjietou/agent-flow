@@ -48,6 +48,7 @@ agentflow:
     precheck-worker-enabled: ${AGENTFLOW_EXPENSE_PRECHECK_WORKER_ENABLED:true}
     precheck-timeout-seconds: ${AGENTFLOW_EXPENSE_PRECHECK_TIMEOUT_SECONDS:300}
   invoices:
+    ofd-font-catalog: ${AGENTFLOW_INVOICE_OFD_FONT_CATALOG:}
     extraction-worker-enabled: ${AGENTFLOW_INVOICE_EXTRACTION_WORKER_ENABLED:true}
     verification-worker-enabled: ${AGENTFLOW_INVOICE_VERIFICATION_WORKER_ENABLED:true}
     max-wallet-bytes: ${AGENTFLOW_INVOICE_MAX_WALLET_BYTES:1073741824}

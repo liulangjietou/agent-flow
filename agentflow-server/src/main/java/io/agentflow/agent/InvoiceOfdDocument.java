@@ -277,7 +277,6 @@ final class InvoiceOfdDocument {
         private final InvoiceOfdArchive archive;
         private final Map<String, Document> documents = new HashMap<>();
         private final XmlBudget budget;
-        private String namespace;
 
         private XmlFiles(InvoiceOfdArchive archive, XmlBudget budget) { this.archive = archive; this.budget = budget; }
 
@@ -304,13 +303,14 @@ final class InvoiceOfdDocument {
                     @Override public void fatalError(SAXParseException error) throws SAXException { throw error; }
                 });
                 Document document = builder.parse(source);
+                String namespace = null;
                 var pending = new ArrayDeque<Element>(); pending.add(document.getDocumentElement());
                 while (!pending.isEmpty()) {
                     Element element = pending.removeFirst();
                     if (++budget.elements > MAX_ELEMENTS || element.getAttributes().getLength() > MAX_ATTRIBUTES
                             || element.hasAttributeNS(XMLConstants.XML_NS_URI, "base")
                             || "http://www.w3.org/2001/XInclude".equals(element.getNamespaceURI())) throw invalid();
-                    // 不改写 DOM 或原件；显式拒绝混用两个版本，避免下游引用与图元采用不同解释。
+                    // 每份 XML 内严格使用一个已知版本；旧票面可以引用新版资源 XML，原字节不改写。
                     String candidate = element.getNamespaceURI();
                     if (InvoiceOfdXml.ofdNamespace(candidate)) {
                         if (namespace != null && !namespace.equals(candidate)) throw invalid();

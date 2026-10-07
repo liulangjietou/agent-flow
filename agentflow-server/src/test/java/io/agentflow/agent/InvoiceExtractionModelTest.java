@@ -244,14 +244,44 @@ class InvoiceExtractionModelTest {
     }
 
     @Test
-    void unimplementedFormatsAreNotAdvertisedOrSilentlyTreatedAsText() throws Exception {
-        assertThat(sources.supportedFormats()).containsExactly(InvoiceOriginal.Format.PNG, InvoiceOriginal.Format.JPEG, InvoiceOriginal.Format.XML, InvoiceOriginal.Format.PDF);
-        for (var format : List.of(InvoiceOriginal.Format.OFD)) {
-            var original = original(format, new byte[]{1}); clearInvocations(files);
-            assertThatThrownBy(() -> sources.prepare(original)).isInstanceOfSatisfying(DomainException.class,
-                    failure -> assertThat(failure.code()).isEqualTo("INVOICE_EXTRACTION_FORMAT_UNSUPPORTED"));
-            verifyNoInteractions(files);
+    void ofdSendsEveryPageInOrderAndLimitsEvidenceToTheInspectedOriginal() throws Exception {
+        var contents = InvoiceOfdRendererTest.fixture(2);
+        InvoiceOfdRendererTest.page(contents, 0, "", InvoiceOfdRendererTest.path("0 0 10 10", "255 0 0", ""));
+        InvoiceOfdRendererTest.page(contents, 1, "", InvoiceOfdRendererTest.path("0 0 10 10", "0 0 255", ""));
+        byte[] bytes = InvoiceOfdArchiveTest.zip(contents);
+        var original = original(InvoiceOriginal.Format.OFD, bytes);
+        output.set(result(original, "001234", "001234", 2));
+        var suggestion = extraction.generate(context(original, 2));
+        assertThat(suggestion.proposals().get(0).evidence().get(0).page()).isEqualTo(2);
+        var content = request.get().path("messages").get(1).path("content");
+        assertThat(content.size()).isEqualTo(5);
+        assertThat(content.get(0).path("text").asText()).contains(original.sha256(), "OFD", "pageCount");
+        for (int page = 1; page <= 2; page++) {
+            assertThat(content.get(page * 2 - 1).path("text").asText()).isEqualTo("OFD page " + page + " of 2");
+            var part = content.get(page * 2);
+            assertThat(part.path("type").asText()).isEqualTo("image_url");
+            String url = part.path("image_url").path("url").asText();
+            assertThat(url).startsWith("data:image/png;base64,");
+            byte[] png = Base64.getDecoder().decode(url.substring(url.indexOf(',') + 1));
+            assertThat(InvoiceOfdRendererTest.pixel(png, 5, 5)).isEqualTo((page == 1 ? java.awt.Color.RED : java.awt.Color.BLUE).getRGB());
         }
+        assertThat(request.get().toString()).doesNotContain("file_data", original.filename(), original.ownerId(), original.tenantId(), Base64.getEncoder().encodeToString(bytes));
+        output.set(result(original, "001234", "001234", 3));
+        assertFailure(() -> extraction.generate(context(original, 2)), AssistRun.Failure.INVALID_MODEL_OUTPUT);
+    }
+
+    @Test
+    void invalidOrChangedOfdNeverSendsPartialContentToTheModel() throws Exception {
+        assertThat(sources.supportedFormats()).containsExactly(InvoiceOriginal.Format.PNG, InvoiceOriginal.Format.JPEG,
+                InvoiceOriginal.Format.XML, InvoiceOriginal.Format.PDF, InvoiceOriginal.Format.OFD);
+        var malformed = original(InvoiceOriginal.Format.OFD, new byte[]{1});
+        assertFailure(() -> extraction.generate(context(malformed)), AssistRun.Failure.INPUT_UNAVAILABLE);
+        var contents = InvoiceOfdRendererTest.fixture(2);
+        InvoiceOfdRendererTest.page(contents, 1, "", "<ofd:UnknownObject/>");
+        var laterFailure = original(InvoiceOriginal.Format.OFD, InvoiceOfdArchiveTest.zip(contents));
+        assertFailure(() -> extraction.generate(context(laterFailure, 2)), AssistRun.Failure.INPUT_UNAVAILABLE);
+        var twoPages = original(InvoiceOriginal.Format.OFD, InvoiceOfdArchiveTest.zip(InvoiceOfdRendererTest.fixture(2)));
+        assertFailure(() -> extraction.generate(context(twoPages)), AssistRun.Failure.INPUT_UNAVAILABLE);
         assertThat(calls.get()).isZero();
     }
 

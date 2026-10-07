@@ -5,7 +5,7 @@ export type ExtractionStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | '
 export type ExtractionField = keyof typeof extractionFields
 export interface ExtractionSource { invoiceId: string; originalId: string; originalDigest: string; format: InvoiceFormat; originalBytes: number; pageCount: number }
 export interface ExtractionOptions {
-  input: ExtractionSource; method: ExtractionMethod; transmission: 'NONE' | 'XML_TEXT' | 'ORIGINAL_BYTES'; enabled: boolean
+  input: ExtractionSource; method: ExtractionMethod; transmission: 'NONE' | 'XML_TEXT' | 'ORIGINAL_BYTES' | 'RENDERED_PAGES'; enabled: boolean
   unavailableCode: string | null; providerId: string | null; model: string | null; destination: string | null; targetDigest: string | null; supportedFormats: InvoiceFormat[]
 }
 export interface ExtractionSelection { field: ExtractionField; value: string }
@@ -61,7 +61,7 @@ export function readExtractionOptions(value: unknown, invoiceId: string): Extrac
     if (value.input.format !== 'XML' || value.transmission !== 'NONE' || !value.enabled || value.unavailableCode !== null
         || [value.providerId, value.model, value.destination, value.targetDigest].some(v => v !== null)) throw unreadable()
   } else {
-    if (value.transmission !== (value.input.format === 'XML' ? 'XML_TEXT' : 'ORIGINAL_BYTES')) throw unreadable()
+    if (value.transmission !== (value.input.format === 'XML' ? 'XML_TEXT' : value.input.format === 'OFD' ? 'RENDERED_PAGES' : 'ORIGINAL_BYTES')) throw unreadable()
     if (value.enabled ? !text(value.providerId) || !text(value.model) || !text(value.destination) || !digest(value.targetDigest) || value.unavailableCode !== null
       : !text(value.unavailableCode) || [value.providerId, value.model, value.destination, value.targetDigest].some(v => v !== null)) throw unreadable()
   }
@@ -164,7 +164,7 @@ const messages: Record<string, string> = {
   AGENT_RUN_ACTIVE: '本票据已有正在执行的提取，请刷新历史记录。', CONCURRENCY_CONFLICT: '这条记录已更新，请刷新后重新核对。',
   AGENT_RUN_STATE_CONFLICT: '这条记录已经处理，请刷新历史。', INVALID_AGENT_REVIEW: '请核对所选字段和人工修订。',
   INVALID_AGENT_OUTPUT: '字段格式或来源不符合要求，请核对后保存。', INVALID_AGENT_CONSENT: '请重新核对处理方式和本次外发确认。',
-  INVOICE_EXTRACTION_FORMAT_UNSUPPORTED: '当前暂不支持此格式的提取。OFD 原件仍可保存和查验，完整渲染尚未开放。',
+  INVOICE_EXTRACTION_FORMAT_UNSUPPORTED: '当前不支持此格式的提取，请核对原件格式。',
   INVOICE_EXTRACTION_SOURCE_UNAVAILABLE: '原件无法完整读取或超过提取限制，请下载原件核对。最多 20 MiB、10 页。',
   INVOICE_EXTRACTION_SOURCE_BUSY: '原件解析正在处理其他请求，请稍后刷新。',
   FORBIDDEN: '当前账号不可读取或处理这份本人提取记录。', NOT_FOUND: '记录不存在或当前账号不可读取。',

@@ -11,6 +11,7 @@ import java.util.Set;
 import javax.xml.datatype.DatatypeConstants;
 import javax.xml.datatype.DatatypeFactory;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import static io.agentflow.agent.InvoiceOfdXml.*;
 
 /**
@@ -64,6 +65,7 @@ final class InvoiceOfdAnnotations {
     }
 
     private static Appearance appearance(Element annotation) throws IOException {
+        qualifyParameterMetadata(annotation);
         shape(annotation, ATTRIBUTES, Set.of("Remark", "Parameters", "Appearance"));
         if (!TYPES.contains(required(annotation, "Type"))) throw invalid();
         // 渲染不判定文件规范符合性；真实票面省略这两项非绘制元数据时仍保留静态外观。
@@ -92,6 +94,26 @@ final class InvoiceOfdAnnotations {
         // 附录 A.4 的 Boundary 为可选；省略时沿用所在页面坐标，不合成额外边界。
         var boundary = appearance.hasAttribute("Boundary") ? InvoiceOfdVector.boundary(appearance) : null;
         return new Appearance(appearance, boundary, visible);
+    }
+
+    /** 仅兼容真实票面的无命名空间参数元数据；外观和图元绝不补命名空间或猜测类型。 */
+    private static void qualifyParameterMetadata(Element annotation) {
+        for (Node node = annotation.getFirstChild(); node != null; node = node.getNextSibling()) {
+            if (!(node instanceof Element parameters) || !parameters.getLocalName().equals("Parameters")) continue;
+            if (parameters.getNamespaceURI() == null) parameters = qualify(annotation, parameters);
+            if (!annotation.getNamespaceURI().equals(parameters.getNamespaceURI())) continue;
+            for (Node entry = parameters.getFirstChild(); entry != null; entry = entry.getNextSibling()) {
+                if (entry instanceof Element parameter && parameter.getNamespaceURI() == null && parameter.getLocalName().equals("Parameter")) {
+                    qualify(annotation, parameter);
+                }
+            }
+        }
+    }
+
+    private static Element qualify(Element owner, Element element) {
+        String prefix = owner.getPrefix();
+        String name = prefix == null ? element.getLocalName() : prefix + ":" + element.getLocalName();
+        return (Element) owner.getOwnerDocument().renameNode(element, owner.getNamespaceURI(), name);
     }
 
     private static void date(String value) throws IOException {

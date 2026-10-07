@@ -168,10 +168,11 @@ onUnmounted(() => { active = false; abortReads(); emit('busy', false); emit('dir
           <p v-if="options.enabled" class="extraction-destination">发送至 {{ options.providerId }} · {{ options.model }} · {{ options.destination }}</p>
           <p v-else role="status">{{ extractionError({ code: options.unavailableCode }) }}</p>
           <p v-if="options.transmission === 'XML_TEXT'">将发送完整 XML 正文、元素名和属性，其中可能含购销双方信息。</p>
+          <p v-else-if="options.transmission === 'RENDERED_PAGES'">将发送 OFD 的全部 {{ options.input.pageCount }} 页图像，包含文字、图形、批注和可见签章，其中可能含购销双方信息。签章图像仅用于票面展示，查验结论仍以正式查验为准。</p>
           <p v-else>将发送完整原文件，包括票面、内部元数据及 PDF 中的内嵌内容。</p>
           <label class="extraction-consent"><input v-model="externalSendConfirmed" type="checkbox" :disabled="locked || dirty || !options.enabled" />我已核对原件，同意本次发送上述完整内容至显示的模型目的地</label>
         </template>
-        <button type="button" class="secondary" :disabled="!canGenerate" @click="generate">{{ sending ? '正在保存请求…' : options.method === 'STRUCTURED_XML' ? '提取本地 XML 字段' : '发送原件并提取票面' }}</button>
+        <button type="button" class="secondary" :disabled="!canGenerate" @click="generate">{{ sending ? '正在保存请求…' : options.method === 'STRUCTURED_XML' ? '提取本地 XML 字段' : options.transmission === 'RENDERED_PAGES' ? '发送全部页面并提取票面' : '发送原件并提取票面' }}</button>
         <p v-if="running">已有任务在执行，请从下方原记录刷新结果。</p>
       </template>
     </section>

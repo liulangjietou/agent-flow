@@ -53143,9 +53143,10 @@
             "enum": [
               "NONE",
               "XML_TEXT",
-              "ORIGINAL_BYTES"
+              "ORIGINAL_BYTES",
+              "RENDERED_PAGES"
             ],
-            "description": "NONE 不外发；XML_TEXT 外发完整 XML 正文、元素名和属性；ORIGINAL_BYTES 外发完整图片或 PDF 原始字节，包括内部元数据和内嵌内容。"
+            "description": "NONE 不外发；XML_TEXT 外发完整 XML 正文、元素名和属性；ORIGINAL_BYTES 外发完整图片或 PDF 原始字节，包括内部元数据和内嵌内容；RENDERED_PAGES 外发 OFD 的全部有序 PNG 页图与页码，包含文字、图形、批注和可见签章，不声明验签或真实性。"
           },
           "enabled": {
             "type": "boolean"
@@ -53209,7 +53210,8 @@
                 "XML",
                 "PNG",
                 "JPEG",
-                "PDF"
+                "PDF",
+                "OFD"
               ]
             },
             "minItems": 1,

@@ -1,0 +1,216 @@
+{
+  "status": "OFD_PUBLIC_SOURCE_API_MODEL_UI_SCOPED_TESTS_PASSED_FIXED_PACKAGE_PENDING",
+  "recordedAt": "2026-10-07T11:51:11.174526+00:00",
+  "baseCommit": "674936bd3c3f50ec6d6a74280521500f9b7b8c51",
+  "tests": {
+    "io.agentflow.agent.InvoiceOfdDeployedFontsTest": {
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCompatibilityTest": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDocumentTest": {
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdSourceTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCompositeTest": {
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdRendererTest": {
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdTemplateTest": {
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoicePdfSourceTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdArchiveTest": {
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceExtractionMigrationTest": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceExtractionApiIntegrationTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdSignaturesTest": {
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdPathTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdFontTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDrawingTest": {
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdResultTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdAnnotationsTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCidFontTest": {
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceExtractionSchedulingTest": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceExtractionModelTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceExtractionIntegrationTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceExtractionXmlTest": {
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCffDataTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdInspectorTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceDocumentProcessTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceExtractionRunTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "totalTests": 258,
+  "webTests": 55,
+  "typecheck": true,
+  "webBuild": true,
+  "openApi": {
+    "operations": 396,
+    "schemas": 867,
+    "requestExamples": 129
+  },
+  "red": {
+    "metadata": {
+      "tests": 6,
+      "errors": 2
+    },
+    "sources": {
+      "tests": 3,
+      "failures": 1,
+      "errors": 2
+    },
+    "web": {
+      "failures": 2,
+      "invalidInitialCommandNotCounted": true
+    }
+  },
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionService.java": "61d10a1910b2870904ceeb104dd80478f17644fa97134911b250b17b259f720a",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionSources.java": "ca9da221946f00f3f364ce54576fe7679332783412ef4e46c2a5b261a7d571fc",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdAnnotations.java": "28ac134c29516c413bf8a61c2624b72b8f5d0ee7841c629997c1bfaccaa3d653",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdDocument.java": "61bcaac3e6ebd8071e98354e78a1bc6341e54ae438d6b8f71b7f3ecc769d0d47",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdXml.java": "e9ad5e5eff4c46418f358cb516b57bd8d97bb92e2a17d91751d37a15ad58ccb3",
+    "agentflow-server/src/main/resources/api/openapi.json": "4237b91062928ba767c0f497ad9672c66423d73595171cb27daf109632814608",
+    "agentflow-server/src/main/resources/application.yml": "182d638212a400b82642e4229cb2dbd956c5d32fed275d4f5d7ba55fd04fd2e7",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionApiIntegrationTest.java": "80f3ae0be790d2adfdcadc37e36574070e954a1e91e302cb47a30e81b83f526b",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionModelTest.java": "a9236916060c6bcef350c004ff42b562d43e4f6685892b879dd20c35d830e18d",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdCompatibilityTest.java": "4d8f966e413beab7279cd0e3e23f33dbfdd19a8ec143bb0b6982f94f99e6e3f0",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdSourceTest.java": "178cc136476c00759ae01bc374c31ca4c0bcc17d3243d5cda531872bd79f5ad4",
+    "agentflow-web/src/components/InvoiceExtraction.vue": "a7ba1eb653fca6f3afaa8ba3d260563ef55b28c822ed29fa68ec03942c95d58c",
+    "agentflow-web/src/invoiceExtraction.ts": "0cef65e1a91112eee6c9cc4d565e73c8262ab37dc1762aae281488eb9dca49d4",
+    "agentflow-web/tests/invoice-extraction.test.mjs": "cd0621cad7c6ba8e13abc76deadaefbd622c2feed7022b7b7194c327201bc6e1",
+    "docs/invoice-ofd-extraction.md": "2117230b8b5df5c03c7b79e005ca10d3c720dcfc5664782ecb750a4d4e80143b"
+  },
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-source-verified/manifest.json",
+    "sha256": "7a3ad2bf286c53fb4151c3348c082b9744d6c60d06cb077b00ef66be8e2ce530",
+    "files": 53
+  },
+  "boundaries": {
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "realEnterpriseModelVerified": false,
+    "fixedPackageVerified": false,
+    "publicOriginalInvoiceRendering": "All first three originals still reject documented missing or unsupported data; no partial rendering claimed"
+  }
+}

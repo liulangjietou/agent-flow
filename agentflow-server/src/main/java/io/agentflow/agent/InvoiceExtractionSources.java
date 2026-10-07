@@ -5,11 +5,15 @@ import io.agentflow.expense.InvoiceOriginal;
 import io.agentflow.expense.InvoiceOriginalFiles;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
 import javax.imageio.stream.MemoryCacheImageInputStream;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -22,13 +26,25 @@ public class InvoiceExtractionSources {
     private static final long MAX_IMAGE_PIXELS = 20_000_000;
     private static final int MAX_IMAGE_SIDE = 12_000;
     private static final List<InvoiceOriginal.Format> SUPPORTED = List.of(
-            InvoiceOriginal.Format.PNG, InvoiceOriginal.Format.JPEG, InvoiceOriginal.Format.XML, InvoiceOriginal.Format.PDF);
+            InvoiceOriginal.Format.PNG, InvoiceOriginal.Format.JPEG, InvoiceOriginal.Format.XML, InvoiceOriginal.Format.PDF, InvoiceOriginal.Format.OFD);
     private final InvoiceOriginalFiles files;
+    private final Path ofdFontCatalog;
 
     /** 保留原有不可变文件读取和摘要校验，不额外复制文件到业务记录。 */
-    public InvoiceExtractionSources(InvoiceOriginalFiles files) { this.files = files; }
+    public InvoiceExtractionSources(InvoiceOriginalFiles files) { this(files, ""); }
 
-    /** 只公布已经实现的内容适配器；OFD 在适配完成前不接受外发。 */
+    /** 字体清单只取自部署配置；空配置仅接受内嵌字体，文件与 face 摘要由隔离进程校验。 */
+    @Autowired
+    public InvoiceExtractionSources(InvoiceOriginalFiles files,
+            @Value("${agentflow.invoices.ofd-font-catalog:}") String ofdFontCatalog) {
+        this.files = files;
+        this.ofdFontCatalog = org.springframework.util.StringUtils.hasText(ofdFontCatalog) ? Path.of(ofdFontCatalog) : null;
+        if (this.ofdFontCatalog != null && !this.ofdFontCatalog.isAbsolute()) {
+            throw new IllegalArgumentException("OFD font catalog must use an absolute deployment path");
+        }
+    }
+
+    /** 只公布已经实现的内容适配器；具体原件仍须完整解析且不超过处理上限。 */
     public List<InvoiceOriginal.Format> supportedFormats() { return SUPPORTED; }
 
     /** 完整原件一次性限额，超限或不可读直接失败，不能静默丢弃内容后发送。 */
@@ -39,6 +55,7 @@ public class InvoiceExtractionSources {
         original.requireReady();
         if (!SUPPORTED.contains(original.format())) throw new DomainException("INVOICE_EXTRACTION_FORMAT_UNSUPPORTED", "Invoice extraction format is not supported");
         byte[] bytes = files.read(original);
+        if (original.format() == InvoiceOriginal.Format.OFD) return ofd(original, bytes);
         int pages = original.format() == InvoiceOriginal.Format.PDF ? new InvoicePdfInspector().pageCount(bytes) : 1;
         var input = new InvoiceExtractionInput(original.invoiceId(), original.id(), original.sha256(), original.format(), original.size(), pages);
         if (original.format() == InvoiceOriginal.Format.PDF) {
@@ -53,6 +70,19 @@ public class InvoiceExtractionSources {
         requireImage(original.format(), bytes);
         String url = "data:" + original.format().mediaType() + ";base64," + Base64.getEncoder().encodeToString(bytes);
         return new Prepared(input, List.of(Map.of("type", "image_url", "image_url", Map.of("url", url, "detail", "high"))), null, null);
+    }
+
+    private Prepared ofd(InvoiceOriginal original, byte[] bytes) {
+        // 先完成所有页面；任何后页或后章失败均不能留下可外发的部分来源。
+        var pages = new InvoiceOfdInspector().render(bytes, ofdFontCatalog);
+        var input = new InvoiceExtractionInput(original.invoiceId(), original.id(), original.sha256(), original.format(), original.size(), pages.size());
+        var parts = new ArrayList<Map<String, Object>>(pages.size() * 2);
+        for (int i = 0; i < pages.size(); i++) {
+            parts.add(Map.of("type", "text", "text", "OFD page " + (i + 1) + " of " + pages.size()));
+            String url = "data:image/png;base64," + Base64.getEncoder().encodeToString(pages.get(i));
+            parts.add(Map.of("type", "image_url", "image_url", Map.of("url", url, "detail", "high")));
+        }
+        return new Prepared(input, parts, null, null);
     }
 
     private static void requireImage(InvoiceOriginal.Format format, byte[] bytes) {
