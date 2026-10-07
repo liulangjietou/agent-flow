@@ -105,12 +105,27 @@ class ApprovalProxyNotificationsIntegrationTest {
         definition = publish();
     }
 
+    @Test void futureProxyKeepsGrantOriginAfterSubmissionAndRevocation() throws Exception {
+        Instant starts = Instant.now().plusSeconds(60); String trace = UUID.randomUUID().toString();
+        ApprovalProxy proxy;
+        try (var scope = new io.agentflow.observability.DiagnosticContext(trace, admin.tenantId()).open()) {
+            proxy = proxies.create(admin, definition.id(), principal.id(), substitute.id(), starts, starts.plusSeconds(3600), "未来代理来源");
+        }
+        var task = submit();
+        assertThat(notifications.candidates(starts, null)).filteredOn(value -> value.proxyId().equals(proxy.id()) && value.taskId().equals(task.getId()))
+                .singleElement().extracting("traceId").isEqualTo(trace);
+        try (var scope = new io.agentflow.observability.DiagnosticContext(UUID.randomUUID().toString(), admin.tenantId()).open()) {
+            proxies.revoke(admin, proxy.id(), 1, "保留原授权来源");
+        }
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM organization_approval_proxy WHERE tenant_id=? AND id=?", String.class, admin.tenantId(), proxy.id().toString())).isEqualTo(trace);
+    }
+
     @Test void lateGrantCreatesOneMinimalNoticeWithoutClaimingTaskOrCreatingReadingAuthority() throws Exception {
         var task = submit(); var original = current(task); var proxy = grant();
         var candidate = candidate(proxy, task);
         assertThat(notifications.pending(candidate)).isTrue();
         assertThat(notifications.pending(candidate)).isFalse();
-        assertThat(notifications.candidates(Instant.now(), null)).doesNotContain(candidate);
+        assertThat(notifications.candidates(Instant.now(), null)).noneMatch(value -> value.proxyId().equals(candidate.proxyId()) && value.taskId().equals(candidate.taskId()));
         var messages = read("/notifications", substituteToken, 200).path("items");
         assertThat(messages).hasSize(1);
         assertThat(messages.toString()).doesNotContain("私密标题", "PRIVATE-", "私密节点", "private-value");
@@ -128,8 +143,8 @@ class ApprovalProxyNotificationsIntegrationTest {
         Instant starts = Instant.now().plusSeconds(3);
         var proxy = proxies.create(admin, definition.id(), principal.id(), substitute.id(), starts, starts.plusSeconds(60), "未来代理");
         var task = submit(); var candidate = candidate(proxy, task);
-        assertThat(notifications.candidates(Instant.now(), null)).doesNotContain(candidate);
-        assertThat(notifications.candidates(starts, null)).contains(candidate);
+        assertThat(notifications.candidates(Instant.now(), null)).noneMatch(value -> value.proxyId().equals(candidate.proxyId()) && value.taskId().equals(candidate.taskId()));
+        assertThat(notifications.candidates(starts, null)).anyMatch(value -> value.proxyId().equals(candidate.proxyId()) && value.taskId().equals(candidate.taskId()));
         assertThat(notifications.pending(candidate)).isFalse();
         Thread.sleep(Math.max(0, java.time.Duration.between(Instant.now(), starts).toMillis()) + 30);
         assertThat(notifications.pending(candidate)).isTrue();
@@ -295,7 +310,7 @@ class ApprovalProxyNotificationsIntegrationTest {
         assertThat(current(task).getAssignee()).isNull();
         assertThat(sourceCount()).isEqualTo(4);
         var pending = candidate(proxy, task);
-        assertThat(notifications.candidates(Instant.now(), null)).contains(pending);
+        assertThat(notifications.candidates(Instant.now(), null)).anyMatch(value -> value.proxyId().equals(pending.proxyId()) && value.taskId().equals(pending.taskId()));
         assertThat(notifications.pending(pending)).isTrue();
         assertThat(notifications.pending(pending)).isFalse();
         assertThat(sourceCount()).isEqualTo(5);

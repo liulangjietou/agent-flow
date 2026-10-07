@@ -33,7 +33,7 @@ import java.util.UUID;
 public class FlowableApprovalProxyNotifications {
     public static final int BATCH_SIZE = 100;
     private static final String CANDIDATES = """
-            SELECT p.tenant_id,p.id AS proxy_id,a.id AS application_id,t.ID_ AS task_id
+            SELECT p.tenant_id,p.id AS proxy_id,a.id AS application_id,t.ID_ AS task_id,p.trace_id
             FROM organization_approval_proxy p
             JOIN organization_person principal ON principal.tenant_id=p.tenant_id AND principal.id=p.principal_id
             JOIN organization_person substitute ON substitute.tenant_id=p.tenant_id AND substitute.id=p.substitute_id
@@ -81,7 +81,7 @@ public class FlowableApprovalProxyNotifications {
         }
         sql.append(" ORDER BY p.tenant_id,p.id,t.ID_ LIMIT ?"); parameters.add(BATCH_SIZE);
         return jdbc.query(sql.toString(), (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("proxy_id")),
-                UUID.fromString(row.getString("application_id")), row.getString("task_id")), parameters.toArray());
+                UUID.fromString(row.getString("application_id")), row.getString("task_id"), row.getString("trace_id")), parameters.toArray());
     }
 
     /** 锁等待之后重新观察期限和任务，不把扫描时的候选项当成通知或读取授权。 */
@@ -94,7 +94,7 @@ public class FlowableApprovalProxyNotifications {
         var parameters = times(Instant.now()); parameters.add(tenantId); parameters.add(taskId);
         var candidates = jdbc.query(CANDIDATES + " AND t.SUSPENSION_STATE_=1 AND p.tenant_id=? AND t.ID_=? ORDER BY p.id",
                 (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("proxy_id")),
-                        UUID.fromString(row.getString("application_id")), row.getString("task_id")), parameters.toArray());
+                        UUID.fromString(row.getString("application_id")), row.getString("task_id"), row.getString("trace_id")), parameters.toArray());
         for (var candidate : candidates) notify(candidate, InboxMessage.Kind.TASK_OVERDUE);
     }
 
@@ -136,7 +136,7 @@ public class FlowableApprovalProxyNotifications {
         var parameters = times(now); parameters.add(application.tenantId()); parameters.add(application.id().toString());
         var candidates = jdbc.query(CANDIDATES + " AND p.tenant_id=? AND a.id=? ORDER BY p.id,t.ID_",
                 (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("proxy_id")),
-                        UUID.fromString(row.getString("application_id")), row.getString("task_id")), parameters.toArray());
+                        UUID.fromString(row.getString("application_id")), row.getString("task_id"), row.getString("trace_id")), parameters.toArray());
         var targets = new HashMap<String, List<TaskAudiencePort.ProxyRecipient>>();
         for (var candidate : candidates) {
             var original = previous.stream().filter(item -> item.taskId().equals(candidate.taskId())).findFirst().orElse(null);
@@ -214,7 +214,10 @@ public class FlowableApprovalProxyNotifications {
     /** 扫描游标只携带原始关联，实际处理必须在锁内重查。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID proxyId, UUID applicationId, String taskId) { }
+    public record Candidate(String tenantId, UUID proxyId, UUID applicationId, String taskId, String traceId) {
+        /** 显式业务调用和旧来源不伪造异步创建来源。 */
+        public Candidate(String tenantId, UUID proxyId, UUID applicationId, String taskId) { this(tenantId, proxyId, applicationId, taskId, null); }
+    }
 
     /** 来源仅用于抑制失效外发，不赋予消息持有人申请或表单读取权。
      * @author owlzhangfq@gmail.com

@@ -73,14 +73,18 @@ public class TimerWaitService {
     /** 到期与标识共同分页，无关或不可执行的引擎任务不会阻塞后续页面。 */
     @Transactional(readOnly = true)
     public List<Candidate> candidates(Instant now, Candidate after) {
-        StringBuilder sql = new StringBuilder("SELECT ID_,DUEDATE_ FROM ACT_RU_TIMER_JOB WHERE DUEDATE_<=?");
+        StringBuilder sql = new StringBuilder("""
+                SELECT j.ID_,j.DUEDATE_,j.TENANT_ID_,o.trace_id FROM ACT_RU_TIMER_JOB j
+                LEFT JOIN workflow_execution_origin o ON o.tenant_id=j.TENANT_ID_ AND o.object_kind='TIMER' AND o.object_id=j.ID_
+                WHERE j.DUEDATE_<=?
+                """);
         var parameters = new ArrayList<Object>(); parameters.add(Timestamp.from(now));
         if (after != null) {
-            sql.append(" AND (DUEDATE_>? OR (DUEDATE_=? AND ID_>?))");
+            sql.append(" AND (j.DUEDATE_>? OR (j.DUEDATE_=? AND j.ID_>?))");
             parameters.add(Timestamp.from(after.dueAt())); parameters.add(Timestamp.from(after.dueAt())); parameters.add(after.jobId());
         }
-        sql.append(" ORDER BY DUEDATE_,ID_ LIMIT ?"); parameters.add(BATCH_SIZE);
-        return jdbc.query(sql.toString(), (row, index) -> new Candidate(row.getString("ID_"), row.getTimestamp("DUEDATE_").toInstant()), parameters.toArray());
+        sql.append(" ORDER BY j.DUEDATE_,j.ID_ LIMIT ?"); parameters.add(BATCH_SIZE);
+        return jdbc.query(sql.toString(), (row, index) -> new Candidate(row.getString("ID_"), row.getTimestamp("DUEDATE_").toInstant(), row.getString("TENANT_ID_"), row.getString("trace_id")), parameters.toArray());
     }
 
     /** 到期后只推进精确绑定的等待执行，提前、暂停、已撤回或已经消费时不执行。 */
@@ -229,7 +233,10 @@ public class TimerWaitService {
     /** @author owlzhangfq@gmail.com */
     private record Binding(Application application, SubmissionRound round, DefinitionModels.Node node, boolean suspended) { }
     /** @author owlzhangfq@gmail.com */
-    public record Candidate(String jobId, Instant dueAt) { }
+    public record Candidate(String jobId, Instant dueAt, String tenantId, String traceId) {
+        /** 历史等待仍按原到期和原 ID 执行，缺失来源保持空值。 */
+        public Candidate(String jobId, Instant dueAt) { this(jobId, dueAt, null, null); }
+    }
     /** @author owlzhangfq@gmail.com */
     public enum State { WAITING, FAILED, SUSPENDED }
     /** @author owlzhangfq@gmail.com */

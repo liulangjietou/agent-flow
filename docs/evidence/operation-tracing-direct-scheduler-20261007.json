@@ -1,0 +1,127 @@
+{
+  "recordedAt": "2026-10-07T16:48:48.674224+00:00",
+  "taskId": "O01",
+  "status": "DIRECT_SCHEDULER_STAGE_PASSED_O01_OPEN",
+  "sourceBaseCommit": "cb11a4d8926f974103133014fdf0c3334da0cd8a",
+  "sourceHashes": {
+    "agentflow-server/src/main/java/io/agentflow/approval/process/ApprovalProxyNotificationScheduler.java": "e52dac5140da3d12b99ba7f23a5d47499d66e65371d248db4081404db348f12a",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/ExecutionOriginConfiguration.java": "e73a2d5cd31ca83733a57a0f10a7e611411885c6d8aac16308890e5ab906aa9f",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableApprovalProxyNotifications.java": "9029b0a4ccfeedca85709b2a4f25e427271515dd722c697fabbe23726d26d74d",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableExecutionOriginListener.java": "88be165afdcf5fabeaa23459cdcd4398524b591ebe79de55c94d0470d13cd19a",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskDeadlineReminders.java": "21bc971544cf62d43e1bc94c68c1d5ffbb84982d98d5d2a0007da4084e2c34fb",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskEscalations.java": "4a6e5d184f98345c1710f9f54aab1156e6a7582a08f3dc526bed7519d2d13a1a",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/TaskDeadlineReminderScheduler.java": "2116d8d666a9c4a22c2c438daa7b3d1d3ee94fbf065f80d0c7d33bfe8386bb5d",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/TaskEscalationScheduler.java": "01eb7bb1a9b8968543b48865be741fe0852d085c0febeea0697217b65bfb7ba1",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/TimerWaitScheduler.java": "23f195e7cc420e1f7cc42434adb93e183e96007f7be3521c7936328de5049e94",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/TimerWaitService.java": "e891eafa6e04a4abd19fb93cfcbf45a4eaac3e277e29a59dfd84bda6dc0c2b04",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceOverdueScheduling.java": "dd8fd9cd3d18876c996ac2600df95410152e2c74e661b12a3fe4deb9e6c16430",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetRetentionScheduling.java": "d2fe2403e61aa470310065f0d141f0d6962b67f483bac4b320ab8a9a2a51f6c7",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcAdvanceOverdueRepository.java": "fcbf111d78589618eb70e98407b3bd760e19b71bdcc8457e5693ffa095d6a28a",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcEmployeeAdvanceRepository.java": "69fc34ce95bdb360ba47e5bc87a1ead1f45b92a213531c8677b5c596ce3ed196",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseBudgetRetentionRepository.java": "8b8583b04f489601660d320f09a4030a090e5ea32a91ca8480bf1a2cb078dac7",
+    "agentflow-server/src/main/java/io/agentflow/observability/DiagnosticContext.java": "ae93629262febc126657711a0306aa0a334f381e8002813b129d1d09b82e5004",
+    "agentflow-server/src/main/java/io/agentflow/organization/JdbcApprovalProxyRepository.java": "a7d84ded3db6d8eb177f75883a1e1f41140abbab54f931ea839be9fe78f2749e",
+    "agentflow-server/src/main/resources/db/migration/V128__direct_scheduler_origin_traces.sql": "07e422bf4e0b258a178496e1c7423d8214bc5b62f849b81ee84f540b8d986078",
+    "agentflow-server/src/test/java/io/agentflow/expense/AdvanceRequestIntegrationTest.java": "637f760e7b25374cbddb81bf2816123af09eb38c5396515b840c794a57bfbe8c",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseBudgetRetentionIntegrationTest.java": "98a2caa2225d9175c91a7fb8d42aad8c551783704dbd8b6323e36b49e10b2419",
+    "agentflow-server/src/test/java/io/agentflow/observability/DirectSchedulerTraceTest.java": "aba0638375b9c9d21ea4bc32bda2867aaccabe14df2b4837d6a8a36e62324c39",
+    "agentflow-server/src/test/java/io/agentflow/observability/NativeSchedulerTraceIntegrationTest.java": "da0ba4b69e0260bc6ce54205894866d2494241daa7fac67f42dcba19d7b3442c",
+    "agentflow-server/src/test/java/io/agentflow/organization/ApprovalProxyNotificationsIntegrationTest.java": "6b1fdc0612fe07d5a0e64024cb8fd918b53d196a2571bd101f924c434779ca0f",
+    "scripts/check-agent-trace-runtime.py": "ac736d5fe00b636419d185d7d69e4a66adfefebc244fe2d9931e4b9aecd19a66",
+    "scripts/check-definition-diagram-runtime.py": "e23f3ba8e72e1e29922d9027a542ba025f542f691a97876970eefeac8934da01",
+    "scripts/check-direct-scheduler-trace-runtime.py": "1106e52f512003599f7db388ce433149a6c03b2090b1dad1f1863de4edd08da4",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7"
+  },
+  "jar": "/fyoung/tmp/agentflow-remaining-20260928/o01-direct-scheduler-server.jar",
+  "jarSha256": "cc855ca76f11180692a9981d7983b74642f4579315865acabc094052f6e36a16",
+  "reproducedBehaviorFailures": 12,
+  "missingPersistenceChecks": 7,
+  "scopeUniqueTests": 249,
+  "scopeSuites": 25,
+  "testScope": {
+    "AdvanceOverdueMigrationTest": 2,
+    "AdvanceOverdueSchedulingTest": 1,
+    "AdvanceRepaymentIntegrationTest": 68,
+    "AdvanceRequestIntegrationTest": 29,
+    "ApprovalProxyApiIntegrationTest": 9,
+    "ApprovalProxyDecisionIntegrationTest": 11,
+    "ApprovalProxyLifecycleMigrationTest": 1,
+    "ApprovalProxyMigrationTest": 1,
+    "ApprovalProxyNotificationMigrationTest": 1,
+    "ApprovalProxyNotificationSchedulerTest": 1,
+    "ApprovalProxyNotificationsIntegrationTest": 22,
+    "ApprovalProxyPersistenceIntegrationTest": 10,
+    "ApprovalProxyTaskReadIntegrationTest": 11,
+    "DiagnosticContextTest": 5,
+    "DirectSchedulerTraceTest": 18,
+    "ExpenseBudgetRetentionIntegrationTest": 12,
+    "ExpenseBudgetRetentionMigrationTest": 1,
+    "ExpenseBudgetRetentionSchedulingTest": 1,
+    "FinancialResourceRepositoryTest": 16,
+    "NativeSchedulerTraceIntegrationTest": 4,
+    "TaskDeadlineIntegrationTest": 7,
+    "TaskDeadlineReminderSchedulerTest": 1,
+    "TaskEscalationIntegrationTest": 7,
+    "TaskEscalationSchedulerTest": 1,
+    "TimerWaitIntegrationTest": 9
+  },
+  "runtime": {
+    "status": "PASS",
+    "jarSha256": "cc855ca76f11180692a9981d7983b74642f4579315865acabc094052f6e36a16",
+    "previousJarSha256": "4549dbd4f242433de3590fc45f6d117fc237a2d069b12515f6c163b48bbb8e77",
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "originalTables": 280,
+        "newNullableColumns": 3,
+        "newOriginTableEmpty": true,
+        "populatedLegacySources": [
+          "proxy",
+          "task",
+          "timer"
+        ]
+      },
+      {
+        "name": "restart-real-scheduler-and-replay",
+        "matchedNotificationOrigins": 8,
+        "replayedOriginalKeys": 6,
+        "timersAdvancedOnce": 2,
+        "sourceKinds": [
+          "proxy",
+          "deadline",
+          "escalation",
+          "timer"
+        ]
+      },
+      {
+        "name": "independent-restore",
+        "tables": 281,
+        "sameAuthorizedDetails": 4,
+        "duplicateNotifications": 0
+      }
+    ],
+    "boots": 7,
+    "businessHttpRequests": 231,
+    "traceHeaders": 263
+  },
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/o01-direct-scheduler-verified",
+  "archiveManifestSha256": "fcb08716045af7d0d30c2e68c426c3caa57779c6888d05e025e21444dbd6481b",
+  "archivedFiles": 163,
+  "validationNotes": [
+    "Initial 123 tests had one stale full-record cursor assertion; business identity comparison was corrected and the final 138-test run passed. Combined current-source scope has 249 unique passing tests.",
+    "Native origin insertion participates in task/timer transactions; suspension, deadletter movement, retry, tenant isolation and rollback were tested with the real engine.",
+    "Fixed runtime exercised proxy, deadline, escalation and timer schedulers. Advance overdue and budget retention paths were verified by unit and JDBC/HTTP integration suites, not claimed as populated fixed-runtime paths.",
+    "V128 keeps legacy trace fields null, creates no retrospective engine origins and preserves all original rows across 280 tables. Restore includes 281 tables."
+  ],
+  "remaining": [
+    "Trusted businessNo/processInstanceId/taskId correlation",
+    "Final fixed-version V02 and clause audit V03",
+    "Existing browser, PostgreSQL and external acceptance gates"
+  ],
+  "remotePush": false
+}

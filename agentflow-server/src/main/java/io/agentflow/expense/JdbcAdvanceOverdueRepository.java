@@ -31,7 +31,7 @@ public class JdbcAdvanceOverdueRepository {
             cursor = " AND (p.due_on>? OR (p.due_on=? AND p.advance_id>?))";
             parameters.add(after.dueOn()); parameters.add(after.dueOn()); parameters.add(after.id().toString());
         }
-        return query("SELECT p.tenant_id,p.advance_id,p.due_on FROM employee_advance_order p WHERE p.tenant_id=? AND p.employee_id=? AND p.legal_entity_id=? AND p.due_on<?"
+        return query("SELECT p.tenant_id,p.advance_id,p.due_on,p.trace_id FROM employee_advance_order p WHERE p.tenant_id=? AND p.employee_id=? AND p.legal_entity_id=? AND p.due_on<?"
                 + cursor + " ORDER BY p.due_on,p.advance_id LIMIT " + BATCH_SIZE, parameters);
     }
 
@@ -44,7 +44,7 @@ public class JdbcAdvanceOverdueRepository {
             parameters.add(after.dueOn()); parameters.add(after.dueOn()); parameters.add(after.tenantId()); parameters.add(after.tenantId()); parameters.add(after.id().toString());
         }
         return query("""
-                SELECT p.tenant_id,p.advance_id,p.due_on FROM employee_advance_order p
+                SELECT p.tenant_id,p.advance_id,p.due_on,p.trace_id FROM employee_advance_order p
                 JOIN advance_request a ON a.tenant_id=p.tenant_id AND a.id=p.advance_id
                 WHERE p.due_on<? AND NOT EXISTS (SELECT 1 FROM advance_overdue_reminder n WHERE n.tenant_id=p.tenant_id AND n.advance_id=p.advance_id)
                 """ + cursor + " ORDER BY p.due_on,p.tenant_id,p.advance_id LIMIT " + BATCH_SIZE, parameters);
@@ -70,12 +70,15 @@ public class JdbcAdvanceOverdueRepository {
     }
 
     private List<Candidate> query(String sql, List<Object> parameters) {
-        return jdbc.query(sql, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("advance_id")), row.getDate("due_on").toLocalDate()), parameters.toArray());
+        return jdbc.query(sql, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("advance_id")), row.getDate("due_on").toLocalDate(), row.getString("trace_id")), parameters.toArray());
     }
 
     /**
      * 内部游标只从实际查询结果生成，不接受外部传入的归属或日期。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, LocalDate dueOn) { }
+    public record Candidate(String tenantId, UUID id, LocalDate dueOn, String traceId) {
+        /** 旧索引没有创建来源，不从扫描线程补写。 */
+        public Candidate(String tenantId, UUID id, LocalDate dueOn) { this(tenantId, id, dueOn, null); }
+    }
 }

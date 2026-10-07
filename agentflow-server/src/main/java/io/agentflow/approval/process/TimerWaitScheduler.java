@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.observability.DiagnosticContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -28,18 +29,20 @@ public class TimerWaitScheduler {
         try {
             var candidates = waits.candidates(now, after);
             for (var candidate : candidates) {
-                try { waits.advance(candidate.jobId(), now); }
-                catch (RuntimeException failure) {
-                    LOG.error("Timer wait failed, errorCode={}, jobId={}", "TIMER_EXECUTION_FAILED", candidate.jobId(), failure);
-                    try { waits.failed(candidate.jobId(), failure); }
-                    catch (RuntimeException recordingFailure) {
-                        LOG.error("Timer wait failure recording failed, errorCode={}, jobId={}", "TIMER_FAILURE_RECORDING_FAILED", candidate.jobId(), recordingFailure);
+                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "timer-wait", candidate.jobId()).open()) {
+                    try { waits.advance(candidate.jobId(), now); }
+                    catch (RuntimeException failure) {
+                        LOG.error("Timer wait failed, errorCode={}, jobId={}", "TIMER_EXECUTION_FAILED", candidate.jobId());
+                        try { waits.failed(candidate.jobId(), failure); }
+                        catch (RuntimeException recordingFailure) {
+                            LOG.error("Timer wait failure recording failed, errorCode={}, jobId={}", "TIMER_FAILURE_RECORDING_FAILED", candidate.jobId());
+                        }
                     }
                 }
             }
             after = candidates.size() == TimerWaitService.BATCH_SIZE ? candidates.get(candidates.size() - 1) : null;
         } catch (RuntimeException failure) {
-            LOG.error("Timer wait scan failed, errorCode={}", "TIMER_SCAN_FAILED", failure);
+            LOG.error("Timer wait scan failed, errorCode={}", "TIMER_SCAN_FAILED");
         }
     }
 }

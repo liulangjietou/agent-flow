@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -31,13 +32,15 @@ public class ExpenseBudgetRetentionScheduling {
         try {
             var page = repository.candidates(now, after);
             for (var candidate : page) {
-                try { service.process(candidate, now); }
-                catch (RuntimeException failure) {
-                    LOG.error("Budget retention processing failed, errorCode={}, tenant={}, reportId={}, round={}",
-                            "BUDGET_RETENTION_PROCESSING_FAILED", candidate.tenantId(), candidate.reportId(), candidate.roundNo(), failure);
+                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-budget-retention", candidate.reportId() + ":" + candidate.roundNo()).open()) {
+                    try { service.process(candidate, now); }
+                    catch (RuntimeException failure) {
+                        LOG.error("Budget retention processing failed, errorCode={}, tenant={}, reportId={}, round={}",
+                                "BUDGET_RETENTION_PROCESSING_FAILED", candidate.tenantId(), candidate.reportId(), candidate.roundNo());
+                    }
                 }
             }
             after = page.size() == JdbcExpenseBudgetRetentionRepository.BATCH_SIZE ? page.get(page.size() - 1) : null;
-        } catch (RuntimeException failure) { LOG.error("Budget retention scan failed, errorCode={}", "BUDGET_RETENTION_SCAN_FAILED", failure); }
+        } catch (RuntimeException failure) { LOG.error("Budget retention scan failed, errorCode={}", "BUDGET_RETENTION_SCAN_FAILED"); }
     }
 }

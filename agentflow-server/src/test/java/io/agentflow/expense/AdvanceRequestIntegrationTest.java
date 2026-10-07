@@ -199,6 +199,17 @@ class AdvanceRequestIntegrationTest {
         assertThat(overdueChecks.failure("demo", "alice", legal, at)).isEqualTo("ADVANCE_OVERDUE");
     }
 
+    @Test void repaymentDoesNotReplaceTheOriginalAdvanceOverdueSource() {
+        String trace = UUID.randomUUID().toString(); var due = LocalDate.now().minusDays(1); EmployeeAdvance paid;
+        try (var scope = new io.agentflow.observability.DiagnosticContext(trace, "demo").open()) {
+            paid = overdueBalance("demo", "alice", entity, due, "CNY");
+        }
+        try (var scope = new io.agentflow.observability.DiagnosticContext(UUID.randomUUID().toString(), "demo").open()) { repay(paid, "20"); }
+        assertThat(overdueRepository.ownedDueBefore("demo", "alice", entity, due.plusDays(1), null))
+                .filteredOn(value -> value.id().equals(paid.id())).singleElement().extracting("traceId").isEqualTo(trace);
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM employee_advance_order WHERE tenant_id='demo' AND advance_id=?", String.class, paid.id().toString())).isEqualTo(trace);
+    }
+
     @Test void overdueReminderUsesFrozenZoneAndLatestBalanceAndRemainsOnceAfterRepayment() throws Exception {
         var paid = approvedBalance(); var candidate = overdueCandidate(paid);
         var at = paid.dueOn().plusDays(1).atStartOfDay(java.time.ZoneId.of("Pacific/Kiritimati")).toInstant();
@@ -218,7 +229,7 @@ class AdvanceRequestIntegrationTest {
         repay(paid, "80");
         assertThat(overdueReminders.remind(candidate, at.plusSeconds(86400))).isFalse();
         assertThat(jdbc.queryForMap("SELECT * FROM advance_overdue_reminder WHERE tenant_id='demo' AND advance_id=?", paid.id().toString())).isEqualTo(evidence);
-        assertThat(overdueRepository.candidates(at, null)).doesNotContain(candidate);
+        assertThat(overdueRepository.candidates(at, null)).noneMatch(value -> value.tenantId().equals(candidate.tenantId()) && value.id().equals(candidate.id()));
         var settledBeforeScan = approvedBalance(); repay(settledBeforeScan, "100");
         assertThat(overdueReminders.remind(overdueCandidate(settledBeforeScan), at)).isFalse();
         assertThat(overdueRepository.recorded(overdueCandidate(settledBeforeScan))).isFalse();

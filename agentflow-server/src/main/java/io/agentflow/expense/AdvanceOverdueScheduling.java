@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -29,10 +30,12 @@ public class AdvanceOverdueScheduling {
         try {
             var page = repository.candidates(now, after);
             for (var candidate : page) {
-                try { reminders.remind(candidate, now); }
-                catch (RuntimeException failure) { LOG.error("Advance overdue reminder failed, errorCode={}, tenant={}, advanceId={}", "ADVANCE_OVERDUE_REMINDER_FAILED", candidate.tenantId(), candidate.id(), failure); }
+                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "advance-overdue", candidate.id().toString()).open()) {
+                    try { reminders.remind(candidate, now); }
+                    catch (RuntimeException failure) { LOG.error("Advance overdue reminder failed, errorCode={}, tenant={}, advanceId={}", "ADVANCE_OVERDUE_REMINDER_FAILED", candidate.tenantId(), candidate.id()); }
+                }
             }
             after = page.size() == JdbcAdvanceOverdueRepository.BATCH_SIZE ? page.get(page.size() - 1) : null;
-        } catch (RuntimeException failure) { LOG.error("Advance overdue scan failed, errorCode={}", "ADVANCE_OVERDUE_SCAN_FAILED", failure); }
+        } catch (RuntimeException failure) { LOG.error("Advance overdue scan failed, errorCode={}", "ADVANCE_OVERDUE_SCAN_FAILED"); }
     }
 }

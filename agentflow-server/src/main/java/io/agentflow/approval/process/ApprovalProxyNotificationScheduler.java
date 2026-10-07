@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.observability.DiagnosticContext;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,15 +28,17 @@ public class ApprovalProxyNotificationScheduler {
         try {
             var candidates = notifications.candidates(Instant.now(), after);
             for (var candidate : candidates) {
-                try { notifications.pending(candidate); }
-                catch (RuntimeException failure) {
-                    LOG.error("Approval proxy notification failed, errorCode={}, taskId={}, proxyId={}",
-                            "APPROVAL_PROXY_NOTIFICATION_FAILED", candidate.taskId(), candidate.proxyId(), failure);
+                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "approval-proxy-notification", candidate.proxyId() + ":" + candidate.taskId()).open()) {
+                    try { notifications.pending(candidate); }
+                    catch (RuntimeException failure) {
+                        LOG.error("Approval proxy notification failed, errorCode={}, taskId={}, proxyId={}",
+                                "APPROVAL_PROXY_NOTIFICATION_FAILED", candidate.taskId(), candidate.proxyId());
+                    }
                 }
             }
             after = candidates.size() == FlowableApprovalProxyNotifications.BATCH_SIZE ? candidates.get(candidates.size() - 1) : null;
         } catch (RuntimeException failure) {
-            LOG.error("Approval proxy notification scan failed, errorCode={}", "APPROVAL_PROXY_NOTIFICATION_SCAN_FAILED", failure);
+            LOG.error("Approval proxy notification scan failed, errorCode={}", "APPROVAL_PROXY_NOTIFICATION_SCAN_FAILED");
         }
     }
 }

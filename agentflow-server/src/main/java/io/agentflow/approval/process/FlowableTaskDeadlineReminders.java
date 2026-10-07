@@ -44,7 +44,8 @@ public class FlowableTaskDeadlineReminders {
         var parameters = new ArrayList<Object>(List.of(Timestamp.from(now),
                 FlowableTaskDeadlineListener.CALENDAR_ID, FlowableTaskDeadlineListener.REMINDED_AT));
         var sql = new StringBuilder("""
-                SELECT t.ID_, t.DUE_DATE_ FROM ACT_RU_TASK t
+                SELECT t.ID_, t.DUE_DATE_, t.TENANT_ID_, o.trace_id FROM ACT_RU_TASK t
+                LEFT JOIN workflow_execution_origin o ON o.tenant_id=t.TENANT_ID_ AND o.object_kind='TASK' AND o.object_id=t.ID_
                 WHERE t.SUSPENSION_STATE_=1 AND t.DUE_DATE_<=?
                 AND EXISTS (SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.TASK_ID_=t.ID_ AND v.NAME_=?)
                 AND NOT EXISTS (SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.TASK_ID_=t.ID_ AND v.NAME_=?)
@@ -58,7 +59,7 @@ public class FlowableTaskDeadlineReminders {
         sql.append(" ORDER BY t.DUE_DATE_,t.ID_ LIMIT ?");
         parameters.add(BATCH_SIZE);
         return jdbc.query(sql.toString(), (row, index) -> new Candidate(row.getString("ID_"),
-                row.getTimestamp("DUE_DATE_").toInstant()), parameters.toArray());
+                row.getTimestamp("DUE_DATE_").toInstant(), row.getString("TENANT_ID_"), row.getString("trace_id")), parameters.toArray());
     }
 
     /** 锁后重查真实任务与当前轮次，完成、撤回及旧轮次不再投递。 */
@@ -91,5 +92,8 @@ public class FlowableTaskDeadlineReminders {
      * 有界扫描游标只描述引擎事实，不提供审批权限。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String taskId, Instant dueAt) { }
+    public record Candidate(String taskId, Instant dueAt, String tenantId, String traceId) {
+        /** 旧扫描候选不从当前请求推测归属或来源。 */
+        public Candidate(String taskId, Instant dueAt) { this(taskId, dueAt, null, null); }
+    }
 }

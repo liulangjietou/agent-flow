@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.Money;
@@ -30,9 +31,9 @@ public class JdbcEmployeeAdvanceRepository implements EmployeeAdvanceRepository 
         if (!advance.balance().reservations().isEmpty() || !advance.balance().consumptions().isEmpty() || !advance.repayments().isEmpty()
                 || !advance.disbursementReturns().isEmpty()) throw new DomainException("INVALID_ADVANCE", "A new advance must be an unallocated actual payment");
         store.create(KIND, stored(advance), actor);
-        jdbc.update("INSERT INTO employee_advance_order(tenant_id,advance_id,employee_id,legal_entity_id,currency,paid_on,due_on) VALUES(?,?,?,?,?,?,?)",
+        jdbc.update("INSERT INTO employee_advance_order(tenant_id,advance_id,employee_id,legal_entity_id,currency,paid_on,due_on,trace_id) VALUES(?,?,?,?,?,?,?,?)",
                 advance.tenantId(), advance.id().toString(), advance.employeeId(), advance.legalEntityId().toString(),
-                advance.balance().limit().currency(), advance.paidOn(), advance.dueOn());
+                advance.balance().limit().currency(), advance.paidOn(), advance.dueOn(), DiagnosticContext.capture().traceId());
     }
 
     @Override @Transactional

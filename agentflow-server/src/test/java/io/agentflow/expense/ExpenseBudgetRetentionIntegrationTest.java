@@ -65,6 +65,21 @@ class ExpenseBudgetRetentionIntegrationTest {
         configuration.setTenants(Map.of(TENANT, tenant)); configuration.validate();
     }
 
+    @Test void retentionKeepsStopOriginWhenItsReleaseIsQueued() {
+        var fixture = fixture(true); var report = fixture.report(); String trace = UUID.randomUUID().toString();
+        try (var scope = new io.agentflow.observability.DiagnosticContext(trace, TENANT).open()) {
+            stop(report, SubmissionRound.Status.WITHDRAWN, STOPPED);
+        }
+        Instant expires = retention(report).expiresAt();
+        assertThat(retentions.candidates(expires, null)).filteredOn(value -> value.reportId().equals(report.id()))
+                .singleElement().extracting("traceId").isEqualTo(trace);
+        try (var scope = new io.agentflow.observability.DiagnosticContext(UUID.randomUUID().toString(), TENANT).open()) {
+            service.process(candidate(report), expires);
+        }
+        assertThat(retention(report).status()).isEqualTo(ExpenseBudgetRetention.Status.RELEASE_QUEUED);
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM expense_budget_retention WHERE tenant_id=? AND report_id=? AND round_no=1", String.class, TENANT, report.id().toString())).isEqualTo(trace);
+    }
+
     @Test void bothStopConclusionsCapturePersistedTimeAndEditsOrPolicyChangesDoNotMoveTheDeadline() {
         for (var status : List.of(SubmissionRound.Status.RETURNED, SubmissionRound.Status.WITHDRAWN)) {
             var fixture = fixture(true); stop(fixture.report(), status, STOPPED.plusNanos(123456789));
@@ -209,15 +224,16 @@ class ExpenseBudgetRetentionIntegrationTest {
     }
 
     @Test void databaseCursorTraversesMoreThanOnePageOfUnresolvedBudgetRecords() {
-        var created = new java.util.HashSet<JdbcExpenseBudgetRetentionRepository.Candidate>();
+        var created = new java.util.HashSet<List<Object>>();
         for (int i = 0; i <= JdbcExpenseBudgetRetentionRepository.BATCH_SIZE; i++) {
-            var fixture = fixture(false); stop(fixture.report(), SubmissionRound.Status.RETURNED, STOPPED); created.add(candidate(fixture.report()));
+            var fixture = fixture(false); stop(fixture.report(), SubmissionRound.Status.RETURNED, STOPPED);
+            created.add(List.of(TENANT, fixture.report().id(), 1));
         }
-        var seen = new java.util.HashSet<JdbcExpenseBudgetRetentionRepository.Candidate>();
+        var seen = new java.util.HashSet<List<Object>>();
         JdbcExpenseBudgetRetentionRepository.Candidate after = null; int pages = 0;
         do {
             var page = retentions.candidates(STOPPED.plusSeconds(3 * 86400), after); pages++;
-            for (var item : page) assertThat(seen.add(item)).isTrue();
+            for (var item : page) assertThat(seen.add(List.of(item.tenantId(), item.reportId(), item.roundNo()))).isTrue();
             after = page.size() == JdbcExpenseBudgetRetentionRepository.BATCH_SIZE ? page.get(page.size() - 1) : null;
         } while (after != null && pages < 10);
         assertThat(after).isNull(); assertThat(pages).isGreaterThan(1); assertThat(seen).containsAll(created);

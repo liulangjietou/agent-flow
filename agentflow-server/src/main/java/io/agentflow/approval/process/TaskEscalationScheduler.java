@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.observability.DiagnosticContext;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,12 +28,14 @@ public class TaskEscalationScheduler {
         try {
             var candidates = escalations.candidates(now, after);
             for (var candidate : candidates) {
-                try { escalations.escalate(candidate.taskId(), now); }
-                catch (RuntimeException failure) {
-                    LOG.error("Task escalation failed, errorCode={}, taskId={}", "SLA_ESCALATION_FAILED", candidate.taskId(), failure);
+                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "task-escalation", candidate.taskId()).open()) {
+                    try { escalations.escalate(candidate.taskId(), now); }
+                    catch (RuntimeException failure) {
+                        LOG.error("Task escalation failed, errorCode={}, taskId={}", "SLA_ESCALATION_FAILED", candidate.taskId());
+                    }
                 }
             }
             after = candidates.size() == FlowableTaskEscalations.BATCH_SIZE ? candidates.get(candidates.size() - 1) : null;
-        } catch (RuntimeException failure) { LOG.error("Task escalation scan failed, errorCode={}", "SLA_ESCALATION_SCAN_FAILED", failure); }
+        } catch (RuntimeException failure) { LOG.error("Task escalation scan failed, errorCode={}", "SLA_ESCALATION_SCAN_FAILED"); }
     }
 }

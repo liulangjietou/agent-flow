@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.common.DomainException;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,11 +36,11 @@ public class JdbcApprovalProxyRepository implements ApprovalProxyRepository {
     public void insert(String tenantId, ApprovalProxy proxy) {
         jdbc.update("""
                 INSERT INTO organization_approval_proxy
-                (tenant_id,id,definition_id,principal_id,substitute_id,starts_at,ends_at,reason,created_by,created_at,revision)
-                VALUES (?,?,?,?,?,?,?,?,?,?,1)
+                (tenant_id,id,definition_id,principal_id,substitute_id,starts_at,ends_at,reason,created_by,created_at,revision,trace_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,1,?)
                 """, tenantId, proxy.id().toString(), proxy.definitionId().toString(), proxy.principalId().toString(),
                 proxy.substituteId().toString(), Timestamp.from(proxy.startsAt()), Timestamp.from(proxy.endsAt()),
-                proxy.reason(), proxy.createdBy(), Timestamp.from(proxy.createdAt()));
+                proxy.reason(), proxy.createdBy(), Timestamp.from(proxy.createdAt()), DiagnosticContext.capture().traceId());
     }
 
     @Override

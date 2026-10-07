@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,12 +36,12 @@ public class JdbcExpenseBudgetRetentionRepository {
                 || !value.updatedAt().equals(value.retainedAt())) throw conflict();
         int inserted = jdbc.update("""
                 INSERT INTO expense_budget_retention(tenant_id,report_id,application_id,round_no,stopped_status,
-                    retained_at,retention_days,expires_at,status,version,state_json,updated_at)
-                SELECT r.tenant_id,r.id,r.application_id,s.round_no,s.status,s.completed_at,?,?,'RETAINED',1,?,?
+                    retained_at,retention_days,expires_at,status,version,state_json,updated_at,trace_id)
+                SELECT r.tenant_id,r.id,r.application_id,s.round_no,s.status,s.completed_at,?,?,'RETAINED',1,?,?,?
                 FROM expense_report r JOIN approval_submission_round s
                     ON s.tenant_id=r.tenant_id AND s.application_id=r.application_id
                 WHERE r.tenant_id=? AND r.id=? AND r.application_id=? AND s.round_no=? AND s.status=? AND s.completed_at=?
-                """, value.policy().retentionDays(), Timestamp.from(value.expiresAt()), json.write(value), Timestamp.from(value.updatedAt()),
+                """, value.policy().retentionDays(), Timestamp.from(value.expiresAt()), json.write(value), Timestamp.from(value.updatedAt()), DiagnosticContext.capture().traceId(),
                 value.tenantId(), value.reportId().toString(), value.applicationId().toString(), value.roundNo(),
                 value.stoppedStatus().name(), Timestamp.from(value.retainedAt()));
         if (inserted != 1) throw conflict();
@@ -74,10 +75,10 @@ public class JdbcExpenseBudgetRetentionRepository {
                 : new Object[]{Timestamp.from(now), after.tenantId(), after.tenantId(), after.reportId().toString(),
                     after.tenantId(), after.reportId().toString(), after.roundNo(), BATCH_SIZE};
         return jdbc.query("""
-                SELECT tenant_id,report_id,round_no FROM expense_budget_retention
+                SELECT tenant_id,report_id,round_no,trace_id FROM expense_budget_retention
                 WHERE status IN ('RETAINED','RECONCILING','RELEASE_QUEUED') AND expires_at<=?
                 """ + condition + " ORDER BY tenant_id,report_id,round_no LIMIT ?",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("report_id")), row.getInt("round_no")), parameters);
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("report_id")), row.getInt("round_no"), row.getString("trace_id")), parameters);
     }
 
     private ExpenseBudgetRetention map(ResultSet row, int index) throws SQLException {
@@ -103,5 +104,8 @@ public class JdbcExpenseBudgetRetentionRepository {
      * 调度游标只携带定位键，执行时在单据锁内重新读取当前状态。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID reportId, int roundNo) { }
+    public record Candidate(String tenantId, UUID reportId, int roundNo, String traceId) {
+        /** 旧来源保持空值，由入口生成稳定的独立执行标识。 */
+        public Candidate(String tenantId, UUID reportId, int roundNo) { this(tenantId, reportId, roundNo, null); }
+    }
 }

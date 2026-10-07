@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.observability.DiagnosticContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,15 +31,17 @@ public class TaskDeadlineReminderScheduler {
         try {
             var candidates = reminders.candidates(now, after);
             for (var candidate : candidates) {
-                try {
-                    reminders.remind(candidate.taskId(), now);
-                } catch (RuntimeException exception) {
-                    LOG.error("Task deadline reminder failed, errorCode={}, taskId={}", "SLA_REMINDER_FAILED", candidate.taskId(), exception);
+                try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "task-deadline-reminder", candidate.taskId()).open()) {
+                    try {
+                        reminders.remind(candidate.taskId(), now);
+                    } catch (RuntimeException exception) {
+                        LOG.error("Task deadline reminder failed, errorCode={}, taskId={}", "SLA_REMINDER_FAILED", candidate.taskId());
+                    }
                 }
             }
             after = candidates.size() == FlowableTaskDeadlineReminders.BATCH_SIZE ? candidates.get(candidates.size() - 1) : null;
         } catch (RuntimeException exception) {
-            LOG.error("Task deadline scan failed, errorCode={}", "SLA_SCAN_FAILED", exception);
+            LOG.error("Task deadline scan failed, errorCode={}", "SLA_SCAN_FAILED");
         }
     }
 }
