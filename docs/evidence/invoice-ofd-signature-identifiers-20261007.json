@@ -1,0 +1,157 @@
+{
+  "status": "SIGNATURE_XS_ID_PASSED",
+  "rootCause": "Signature/StampAnnot identifiers are xs:ID, but the implementation incorrectly parsed them as numeric ST_ID; the original public DigitalSign.ofd and the corrected regression both reproduced the failure. PageRef remains numeric.",
+  "red": {
+    "tests": 12,
+    "errors": 1,
+    "errorType": "java.io.IOException",
+    "report": "a01-signature-id-red2.xml"
+  },
+  "preservedAttempts": "First unit RED failed in a no-appearance fixture replacement; corrected fixture and restored unchanged production baseline before the valid RED. The premature first GREEN was explicitly stopped.",
+  "greenTests": 206,
+  "tests": {
+    "io.agentflow.agent.InvoiceDocumentProcessTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceExtractionModelTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdAnnotationsTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdArchiveTest": {
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdBlendTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCffDataTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCidFontTest": {
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCompatibilityTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCompositeTest": {
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDeployedFontsTest": {
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDocumentTest": {
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDrawingTest": {
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdFontTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdInspectorTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdPathTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdRendererTest": {
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdResultTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdSignaturesTest": {
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdSourceTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdTemplateTest": {
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdSignatures.java": "b980c0fd97d33ceab77520a0808fe89d94cebaba93fe02063d5f323cd71d5554",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdSignaturesTest.java": "1b8ee41f4f4fe5cee91957f9a7219bfe0bd55b6495b8f9123a79991fc2ab7c24"
+  },
+  "references": [
+    "GB/T 33190-2016 tables 66 and 69, captured pages 83 and 86",
+    "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/signatures/Signatures.java",
+    "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/signatures/appearance/StampAnnot.java"
+  ],
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-signature-id-verified/manifest.json",
+    "sha256": "e9de925d5dba00626cb4b8e1aaa0cc2494c2150ceb21fa5dc7c59418e4e8124a",
+    "files": 33
+  },
+  "jar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-ofd-xsid-server.jar",
+    "sha256": "4136a9fcc512d45a5a37f738a8fb9d31d564624d235299f8b8f2e8552858fd20"
+  },
+  "boundaries": {
+    "fixedPackageInProgress": true,
+    "browserVerified": false,
+    "postgresqlVerified": false
+  }
+}

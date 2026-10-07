@@ -10,6 +10,8 @@
 
 签章外观支持 SES v1/v4 中的 PNG/JPEG 或单页嵌套 OFD。正文、模板、签章、批注按顺序合成；印章保留透明背景。多页嵌套章缺少明确页选择语义，整份拒绝。没有可见外观的签名不会合成一个章。
 
+签名及印章标识按 `xs:ID` 名称规则读取，接受 `s001`、中文名称等，长度限制为 256 字符，同时兼容已有有界数字标识；重复标识仍拒绝。页面引用继续使用数字 `ST_RefID`，不与签名标识混用。依据为 GB/T 33190—2016 表 66、69，以及 [OFDRW 的签名索引定义](https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/signatures/Signatures.java)。
+
 支持 `http://www.ofdspec.org/2016` 和已有票面的 `http://www.ofdspec.org`，不同 XML 文件可各用一种；同一 XML 内混合绘制命名空间仍拒绝。批注缺省 Creator/LastModDate 和无命名空间的 Parameters/Parameter 仅作非绘制兼容；外观、图元不补命名空间。
 
 完整处理并不表示支持 OFD 的所有可选扩展。渐变和底纹、TextObject 合成斜体或非默认 Weight、未知图元、缺失绘制资源、缺失首段文字坐标或非法间距、无法精确取得的字体、无法解释的签章等，均使整个原件失败；不能跳过后页、后章或未知内容后提交模型。字体资源的 Bold/Italic 声明可以选择配置中明确提供的相应字体面，不自动拉伸或描粗字形。

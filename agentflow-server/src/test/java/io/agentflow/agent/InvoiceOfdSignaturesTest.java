@@ -66,6 +66,40 @@ class InvoiceOfdSignaturesTest {
     }
 
     @Test
+    void acceptsXmlSignatureAndStampIdsWithoutChangingNumericPageReferences() throws Exception {
+        for (String identifier : List.of("s001", "签章_1", "signature-1.2")) {
+            for (boolean appearance : List.of(false, true)) {
+                var files = fixture(1);
+                page(files, 0, "", path("0 0 20 20", "0 0 255", ""));
+                signed(files, appearance ? stamp(1, 1, "3 3 8 8", "") : "", signature(4, "PNG", picture()), false);
+                replace(files, "Doc_0/Signs/Index.xml", "<ofd:MaxSignId>1</ofd:MaxSignId>", "<ofd:MaxSignId>" + identifier + "</ofd:MaxSignId>");
+                replace(files, "Doc_0/Signs/Index.xml", "ID=\"1\"", "ID=\"" + identifier + "\"");
+                if (appearance) replace(files, "Doc_0/Signs/Signature.xml", "StampAnnot ID=\"1\"", "StampAnnot ID=\"" + identifier + "\"");
+                assertThat(pixel(render(files).get(0), 4, 5)).isEqualTo((appearance ? Color.RED : Color.BLUE).getRGB());
+            }
+        }
+    }
+
+    @Test
+    void rejectsMalformedOrRepeatedStringIdsWhilePageReferencesRemainNumeric() throws Exception {
+        for (String identifier : List.of("", "bad id", "prefix:name", "a/b", "s".repeat(257))) {
+            var files = fixture(1);
+            signed(files, stamp(1, 1, "3 3 8 8", ""), signature(4, "PNG", picture()), false);
+            replace(files, "Doc_0/Signs/Index.xml", "ID=\"1\"", "ID=\"" + identifier + "\"");
+            assertThatThrownBy(() -> render(files)).isInstanceOf(IOException.class);
+        }
+        var duplicate = fixture(1);
+        signed(duplicate, stamp(1, 1, "3 3 8 8", "") + stamp(2, 1, "3 3 8 8", ""), signature(4, "PNG", picture()), false);
+        replace(duplicate, "Doc_0/Signs/Signature.xml", "StampAnnot ID=\"1\"", "StampAnnot ID=\"s001\"");
+        replace(duplicate, "Doc_0/Signs/Signature.xml", "StampAnnot ID=\"2\"", "StampAnnot ID=\"s001\"");
+        assertThatThrownBy(() -> render(duplicate)).isInstanceOf(IOException.class);
+        var wrongPage = fixture(1);
+        signed(wrongPage, stamp(1, 1, "3 3 8 8", ""), signature(4, "PNG", picture()), false);
+        replace(wrongPage, "Doc_0/Signs/Signature.xml", "PageRef=\"1\"", "PageRef=\"s001\"");
+        assertThatThrownBy(() -> render(wrongPage)).isInstanceOf(IOException.class);
+    }
+
+    @Test
     void rendersTheCompleteNestedSealWithoutWhiteBackgroundOrResourceCacheCollision() throws Exception {
         var files = fixture(1);
         page(files, 0, "", path("0 0 20 20", "0 0 255", "").replace("L 10 0 L 10 10 L 0 10", "L 20 0 L 20 20 L 0 20"));

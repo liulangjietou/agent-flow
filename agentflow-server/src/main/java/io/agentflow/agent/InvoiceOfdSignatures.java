@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.w3c.dom.DOMException;
 import org.w3c.dom.Element;
 import static io.agentflow.agent.InvoiceOfdXml.*;
 
@@ -18,6 +19,7 @@ import static io.agentflow.agent.InvoiceOfdXml.*;
 final class InvoiceOfdSignatures {
     private static final int MAX_SIGNATURES = 128;
     private static final int MAX_STAMPS = 1024;
+    private static final int MAX_IDENTIFIER_LENGTH = 256;
     private InvoiceOfdSignatures() { }
 
     /** 无外观签名保留正文；有外观却无法完整取得图像时拒绝整个来源。 */
@@ -36,13 +38,13 @@ final class InvoiceOfdSignatures {
             Element index = contents.root(indexFile, "Signatures");
             shape(index, Set.of(), Set.of("MaxSignId", "Signature"));
             Element maximum = child(index, "MaxSignId", false);
-            if (maximum != null) { shape(maximum, Set.of(), Set.of()); integer(text(maximum).trim(), 0, 0xffff_ffffL); }
-            var identifiers = new HashSet<Long>();
-            var stampIds = new HashSet<Long>();
+            if (maximum != null) { shape(maximum, Set.of(), Set.of()); identifier(maximum, text(maximum)); }
+            var identifiers = new HashSet<String>();
+            var stampIds = new HashSet<String>();
             var signatureFiles = new HashSet<String>();
             for (Element definition : children(index, "Signature")) {
                 shape(definition, Set.of("ID", "Type", "BaseLoc"), Set.of());
-                if (++count > MAX_SIGNATURES || !identifiers.add(id(definition, "ID"))) throw invalid();
+                if (++count > MAX_SIGNATURES || !identifiers.add(identifier(definition, required(definition, "ID")))) throw invalid();
                 if (definition.hasAttribute("Type") && !Set.of("Seal", "Sign").contains(definition.getAttribute("Type"))) throw invalid();
                 String file = archive.file(parent(indexFile), required(definition, "BaseLoc"));
                 if (!signatureFiles.add(file)) throw invalid();
@@ -67,7 +69,7 @@ final class InvoiceOfdSignatures {
                 try (var stream = archive.open(imageFile)) { picture = InvoiceOfdSeal.read(stream.readAllBytes(), seal == null); }
                 for (Element appearance : appearances) {
                     shape(appearance, Set.of("ID", "PageRef", "Boundary", "Clip"), Set.of());
-                    if (++stamps > MAX_STAMPS || !stampIds.add(id(appearance, "ID"))) throw invalid();
+                    if (++stamps > MAX_STAMPS || !stampIds.add(identifier(appearance, required(appearance, "ID")))) throw invalid();
                     var page = pages.get(id(appearance, "PageRef"));
                     if (page == null) throw invalid();
                     var boundary = box(required(appearance, "Boundary"));
@@ -78,6 +80,16 @@ final class InvoiceOfdSignatures {
         }
         result.replaceAll((page, values) -> List.copyOf(values));
         return Map.copyOf(result);
+    }
+
+    /** 签名使用 xs:ID 而非数字 ST_ID；DOM 校验 XML 名称，不挂入文档，兼容已有数字标识。 */
+    private static String identifier(Element element, String raw) throws IOException {
+        String value = raw.trim();
+        if (value.isEmpty() || value.length() > MAX_IDENTIFIER_LENGTH || value.indexOf(':') >= 0) throw invalid();
+        if (value.matches("\\+?[0-9]+")) return Long.toString(integer(value, 0, 0xffff_ffffL));
+        try { element.getOwnerDocument().createElement(value); }
+        catch (DOMException rejected) { throw invalid(); }
+        return value;
     }
 
     private static Rectangle2D.Double box(String value) throws IOException {
