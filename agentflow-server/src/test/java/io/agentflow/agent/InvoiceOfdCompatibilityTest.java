@@ -99,6 +99,26 @@ class InvoiceOfdCompatibilityTest {
         assertThatThrownBy(() -> render(files)).isInstanceOf(IOException.class);
     }
 
+    @Test
+    void extendsShortExplicitDeltasUsingTheOfdrwInvoiceCompatibilityRule() throws Exception {
+        // OFDRW 2.4.0 DeltaTool 对已给出但不足的序列延续末项，缺省序列仍为零。
+        for (String value : List.of("AAA", "A中𠀀")) {
+            var compact = fixture(1); var expanded = fixture(1);
+            page(compact, 0, "", text("", "<ofd:TextCode X=\"1\" Y=\"6\" DeltaX=\"g 1 4\" DeltaY=\"1\">" + value + "</ofd:TextCode>"));
+            page(expanded, 0, "", text("", "<ofd:TextCode X=\"1\" Y=\"6\" DeltaX=\"4 4\" DeltaY=\"1 1\">" + value + "</ofd:TextCode>"));
+            assertThat(render(compact).get(0)).isEqualTo(render(expanded).get(0));
+        }
+        var compact = fixture(1); var expanded = fixture(1);
+        String glyphs = "<ofd:CGTransform CodePosition=\"0\" CodeCount=\"2\" GlyphCount=\"3\"><ofd:Glyphs>2 3 4</ofd:Glyphs></ofd:CGTransform>";
+        page(compact, 0, "", text("", glyphs + "<ofd:TextCode X=\"1\" Y=\"6\" DeltaX=\"4\">BB</ofd:TextCode>"));
+        page(expanded, 0, "", text("", glyphs + "<ofd:TextCode X=\"1\" Y=\"6\" DeltaX=\"4 4\">BB</ofd:TextCode>"));
+        assertThat(render(compact).get(0)).isEqualTo(render(expanded).get(0));
+        for (String invalid : List.of("", "g 0 4", "NaN", "g 25001 4", "4 invalid")) {
+            page(compact, 0, "", text("", "<ofd:TextCode X=\"1\" Y=\"6\" DeltaX=\"" + invalid + "\">AAA</ofd:TextCode>"));
+            assertThatThrownBy(() -> render(compact)).isInstanceOf(IOException.class);
+        }
+    }
+
     private List<byte[]> render(Map<String, byte[]> files) throws IOException {
         Path source = Files.write(directory.resolve(UUID.randomUUID() + ".ofd"), zip(files));
         return InvoiceOfdRenderer.render(InvoiceOfdArchive.read(source));

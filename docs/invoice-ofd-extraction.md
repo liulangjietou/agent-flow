@@ -12,7 +12,9 @@
 
 支持 `http://www.ofdspec.org/2016` 和已有票面的 `http://www.ofdspec.org`，不同 XML 文件可各用一种；同一 XML 内混合绘制命名空间仍拒绝。批注缺省 Creator/LastModDate 和无命名空间的 Parameters/Parameter 仅作非绘制兼容；外观、图元不补命名空间。
 
-完整处理并不表示支持 OFD 的所有可选扩展。渐变和底纹、TextObject 合成斜体或非默认 Weight、未知图元、缺失绘制资源、不完整文字坐标或间距、无法精确取得的字体、无法解释的签章等，均使整个原件失败；不能跳过后页、后章或未知内容后提交模型。字体资源的 Bold/Italic 声明可以选择配置中明确提供的相应字体面，不自动拉伸或描粗字形。
+完整处理并不表示支持 OFD 的所有可选扩展。渐变和底纹、TextObject 合成斜体或非默认 Weight、未知图元、缺失绘制资源、缺失首段文字坐标或非法间距、无法精确取得的字体、无法解释的签章等，均使整个原件失败；不能跳过后页、后章或未知内容后提交模型。字体资源的 Bold/Italic 声明可以选择配置中明确提供的相应字体面，不自动拉伸或描粗字形。
+
+文字间距另采用 [OFDRW 2.4.0 DeltaTool 的既有兼容规则](https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-reader/src/main/java/org/ofdrw/reader/DeltaTool.java)：DeltaX/DeltaY 已给出但长度不足时，余下字形延续最后一个明确间距；整个属性缺省仍为零。空序列、非法数值、超限重复与缺失首段 X/Y 坐标仍失败。这是参考实现的兼容行为，不声明为标准强制规则。
 
 ## 字体清单
 

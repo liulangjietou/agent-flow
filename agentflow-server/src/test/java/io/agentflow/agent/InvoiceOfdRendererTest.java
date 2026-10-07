@@ -136,7 +136,7 @@ class InvoiceOfdRendererTest {
 
     @Test
     void rejectsBrokenTextPositionsMalformedTransformsAndUnboundedRepetition() throws Exception {
-        for(String content:List.of("<ofd:TextCode Y=\"6\">A</ofd:TextCode>","<ofd:TextCode X=\"1\" Y=\"6\" DeltaX=\"g 999999999 4\">AA</ofd:TextCode>","<ofd:TextCode X=\"1\" Y=\"6\" DeltaX=\"1\">AAA</ofd:TextCode>","<ofd:TextCode X=\"1\" Y=\"6\">\\D800</ofd:TextCode>","<ofd:CGTransform CodePosition=\"0\" GlyphCount=\"2\"><ofd:Glyphs>2</ofd:Glyphs></ofd:CGTransform><ofd:TextCode X=\"1\" Y=\"6\">A</ofd:TextCode>","<ofd:TextCode X=\"1\" Y=\"6\">A</ofd:TextCode><ofd:CGTransform CodePosition=\"0\"><ofd:Glyphs>2</ofd:Glyphs></ofd:CGTransform>")) {
+        for(String content:List.of("<ofd:TextCode Y=\"6\">A</ofd:TextCode>","<ofd:TextCode X=\"1\" Y=\"6\" DeltaX=\"g 999999999 4\">AA</ofd:TextCode>","<ofd:TextCode X=\"1\" Y=\"6\" DeltaX=\"\">AAA</ofd:TextCode>","<ofd:TextCode X=\"1\" Y=\"6\">\\D800</ofd:TextCode>","<ofd:CGTransform CodePosition=\"0\" GlyphCount=\"2\"><ofd:Glyphs>2</ofd:Glyphs></ofd:CGTransform><ofd:TextCode X=\"1\" Y=\"6\">A</ofd:TextCode>","<ofd:TextCode X=\"1\" Y=\"6\">A</ofd:TextCode><ofd:CGTransform CodePosition=\"0\"><ofd:Glyphs>2</ofd:Glyphs></ofd:CGTransform>")) {
             var files=fixture(1);page(files,0,"",text("",content));assertThatThrownBy(()->render(files)).isInstanceOf(IOException.class);
         }
     }

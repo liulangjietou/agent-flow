@@ -146,8 +146,9 @@ final class InvoiceOfdText {
             if (position + repeat > MAX_GLYPHS) throw invalid();
             for (int end = position + repeat; position < end; position++) if (position < result.length) result[position] = offset;
         }
-        // 多余偏移不对应任何绘制点，仍全部校验；不足时不猜测或重复最后一个间距。
-        if (position < result.length) throw invalid();
+        // OFDRW 2.4.0 DeltaTool 的票据兼容规则：短且非空的显式序列延续末项；缺省仍为零。
+        // 多余偏移不对应绘制点，但前面仍逐项校验其数值和展开上限。
+        if (position < result.length) java.util.Arrays.fill(result, position, result.length, result[position - 1]);
         return result;
     }
 

@@ -1,0 +1,145 @@
+{
+  "status": "BOUNDED_SHORT_DELTA_COMPATIBILITY_PASSED",
+  "red": {
+    "tests": 27,
+    "errors": 1
+  },
+  "greenTests": 200,
+  "tests": {
+    "io.agentflow.agent.InvoiceOfdDeployedFontsTest": {
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCompatibilityTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDocumentTest": {
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdSourceTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCompositeTest": {
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdRendererTest": {
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdTemplateTest": {
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdArchiveTest": {
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdSignaturesTest": {
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdPathTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdFontTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDrawingTest": {
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdResultTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdAnnotationsTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCidFontTest": {
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceExtractionModelTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCffDataTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdInspectorTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceDocumentProcessTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdText.java": "9aaa51fecdea6a381d1be6f641ef7b6ca224b1cbfb4e95a92f498a09b8a21932",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdCompatibilityTest.java": "afee025a79806cd2eac0222caa22720f5b3208120aef5d530fa2d1ffc37218bd",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdRendererTest.java": "c0b0b7feb682ae7d3d23001ed69416135bb270a46bfe14af767837a1c3d1277b"
+  },
+  "referenceImplementation": "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-reader/src/main/java/org/ofdrw/reader/DeltaTool.java",
+  "basis": "Reference implementation compatibility: extend only explicit nonempty short sequences with their last value; absent sequences remain zero. Not stated as a normative rule.",
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-delta-verified/manifest.json",
+    "sha256": "4f388c53ab87d90a00bb59672c774a4917b41115d740a17f0c14fffae5f36f14",
+    "files": 25
+  },
+  "jar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-ofd-server.jar",
+    "sha256": "5cfbbbf5a1e3fe397c2bae1be0ed5a1a280a443e8185d5344681af2d93fdaa34"
+  },
+  "boundaries": {
+    "fixedPackageInProgress": true,
+    "browserVerified": false,
+    "postgresqlVerified": false
+  }
+}
