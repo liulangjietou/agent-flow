@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceGatewayConfiguration;
 import org.slf4j.Logger;
@@ -16,6 +17,7 @@ import static io.agentflow.expense.InvoiceVerificationJob.Failure;
 @Service
 public class InvoiceVerificationWorker {
     private static final Logger LOG = LoggerFactory.getLogger(InvoiceVerificationWorker.class);
+    private static final String TRACE_SOURCE = "invoice-verification";
     private final JdbcInvoiceVerificationRepository jobs;
     private final InvoiceVerificationService execution;
     private final JdbcInvoiceOriginalRepository originals;
@@ -34,12 +36,15 @@ public class InvoiceVerificationWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Invoice worker must execute outside a database transaction");
         for (var candidate : jobs.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var job = execution.claim(candidate.tenantId(), candidate.id(), Instant.now());
-                if (job != null) execute(job);
-            } catch (RuntimeException failed) {
-                // 不把可能包含原件、票面或目标凭据的异常正文写入日志。
-                LOG.error("Invoice verification execution failed, errorCode={}, jobId={}", "WORKER_FAILURE", candidate.id());
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                try {
+                    var job = execution.claim(candidate.tenantId(), candidate.id(), Instant.now());
+                    if (job != null) execute(job);
+                } catch (RuntimeException failed) {
+                    // 不把可能包含原件、票面或目标凭据的异常正文写入日志。
+                    LOG.error("Invoice verification execution failed, errorCode={}, jobId={}", "WORKER_FAILURE", candidate.id());
+                }
             }
         }
     }

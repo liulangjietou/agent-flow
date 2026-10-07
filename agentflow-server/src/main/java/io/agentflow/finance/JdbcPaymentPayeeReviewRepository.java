@@ -2,6 +2,7 @@ package io.agentflow.finance;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -32,10 +33,10 @@ public class JdbcPaymentPayeeReviewRepository {
         var input = value.input(); var original = input.original();
         jdbc.update("""
                 INSERT INTO payment_payee_review(tenant_id,id,original_authorization_id,original_authorization_version,voucher_operation_id,voucher_version,requested_by,
-                input_json,state_json,version,status,attempts,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?)
+                input_json,state_json,version,status,attempts,created_at,updated_at,trace_id)
+                VALUES(?,?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?)
                 """, original.tenantId(), input.id().toString(), original.id().toString(), input.authorizationVersion(), original.voucherOperationId().toString(),
-                input.voucherVersion(), input.requestedBy(), json.write(input), json.write(value), timestamp(input.requestedAt()), timestamp(value.updatedAt()));
+                input.voucherVersion(), input.requestedBy(), json.write(input), json.write(value), timestamp(input.requestedAt()), timestamp(value.updatedAt()), DiagnosticContext.capture().traceId());
         append(value);
     }
 
@@ -67,8 +68,8 @@ public class JdbcPaymentPayeeReviewRepository {
     }
     /** 每批最多十个只读请求；失败记录不会自动无限重试外部账户。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id FROM payment_payee_review WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now));
+        return jdbc.query("SELECT tenant_id,id,trace_id FROM payment_payee_review WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
     }
 
     private RowMapper<PaymentPayeeReview> row() {
@@ -102,5 +103,5 @@ public class JdbcPaymentPayeeReviewRepository {
      * 后台候选仅包含标识，不提前加载或输出账户快照。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
 }

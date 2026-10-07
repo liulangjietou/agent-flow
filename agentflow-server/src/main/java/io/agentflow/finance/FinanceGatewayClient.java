@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.observability.DiagnosticContext;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -311,6 +312,7 @@ public class FinanceGatewayClient {
         if (targetDigest != null && !targetDigest.equals(destination.digest(tenantId))) return unavailable(FinanceResult.Failure.TARGET_CHANGED);
         var request = HttpRequest.newBuilder(destination.baseUri().resolve(operation.path)).timeout(destination.timeout())
                 .header("Content-Type", "application/json; charset=utf-8").header("Accept", "application/json")
+                .header(DiagnosticContext.HEADER, DiagnosticContext.capture().traceId())
                 .POST(HttpRequest.BodyPublishers.ofString(json.write(new Request(CONTRACT_VERSION, tenantId, requestId, data)), StandardCharsets.UTF_8));
         if (operation == Operation.BUDGET_COMMAND || operation == Operation.PAYMENT_COMMAND || operation == Operation.VOUCHER_COMMAND
                 || operation == Operation.VOUCHER_REVERSAL_COMMAND || operation == Operation.BUDGET_REVERSAL_COMMAND || operation == Operation.BUDGET_ADJUSTMENT_COMMAND

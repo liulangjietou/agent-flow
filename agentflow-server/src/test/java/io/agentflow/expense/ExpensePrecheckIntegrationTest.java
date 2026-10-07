@@ -11,6 +11,8 @@ import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
+import org.slf4j.MDC;
 import io.agentflow.finance.BudgetPrecheckPort;
 import io.agentflow.finance.EmployeeAccountPort;
 import io.agentflow.finance.EmployeeAccountSnapshot;
@@ -78,6 +80,7 @@ class ExpensePrecheckIntegrationTest {
     private static final AtomicReference<JsonNode> LAST_BUDGET = new AtomicReference<>();
     private static final AtomicInteger SERIAL = new AtomicInteger();
     private static final String ZONE = "Pacific/Kiritimati";
+    private static final List<String> TRACES = new java.util.concurrent.CopyOnWriteArrayList<>();
     private static JsonUtil wire;
     private final Actor admin = new Actor("demo", "admin", Set.of("ADMIN"));
     private UUID entity;
@@ -141,6 +144,25 @@ class ExpensePrecheckIntegrationTest {
         actors.clear();
     }
     @AfterAll static void closeServer() { SERVER.stop(0); }
+
+    @Test
+    void tracePersistsThroughQueueAndReachesFinanceGateway() throws Exception {
+        var report = fixture(false).report();
+        var queued = queue(report, "alice", UUID.randomUUID().toString(), input(report), 202);
+        UUID id = id(queued); String expectedTrace = queued.getHeader("X-Trace-Id");
+        assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(jdbc.queryForMap("SELECT * FROM expense_precheck_job WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        TRACES.clear();
+        worker.poll();
+        assertThat(job(id).status()).isEqualTo(Status.READY);
+        assertThat(TRACES).isNotEmpty().containsOnly(expectedTrace);
+        assertThat(jdbc.queryForMap("SELECT * FROM expense_precheck_job WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
+    }
 
     @Test
     void blockedResultRetainsExplanationFreshnessWithoutAReadyPreview() throws Exception {
@@ -731,6 +753,7 @@ class ExpensePrecheckIntegrationTest {
         try {
             var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/finance/", exchange -> {
+                TRACES.add(exchange.getRequestHeaders().getFirst("X-Trace-Id"));
                 String operation = exchange.getRequestURI().getPath().substring("/finance/".length()); CALLS.computeIfAbsent(operation, key -> new AtomicInteger()).incrementAndGet();
                 var request = wire.read(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8), JsonNode.class);
                 byte[] bytes = RESPONDER.get().apply(operation, request).getBytes(StandardCharsets.UTF_8);

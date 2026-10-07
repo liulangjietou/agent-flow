@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.observability.DiagnosticContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,7 @@ import java.time.Instant;
 @Service
 public class BudgetOperationWorker {
     private static final Logger LOG = LoggerFactory.getLogger(BudgetOperationWorker.class);
+    private static final String TRACE_SOURCE = "budget-operation";
     private final JdbcBudgetOperationRepository operations;
     private final BudgetOperationService execution;
     private final BudgetSystemPort budget;
@@ -25,18 +27,21 @@ public class BudgetOperationWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Budget worker must execute outside a database transaction");
         for (var candidate : operations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input();
-                    var result = claimed.status() == BudgetOperation.Status.EXECUTING ? budget.execute(input.targetDigest(), input.command()) : budget.query(input.targetDigest(), input.command());
-                    execution.finish(claimed, result, Instant.now());
+                    var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var input = claimed.input();
+                        var result = claimed.status() == BudgetOperation.Status.EXECUTING ? budget.execute(input.targetDigest(), input.command()) : budget.query(input.targetDigest(), input.command());
+                        execution.finish(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) {
+                        execution.fail(claimed, Instant.now());
+                        LOG.error("Budget dispatch failed, errorCode={}, operationId={}", "INTERNAL_ERROR", candidate.id());
+                    }
                 } catch (RuntimeException failed) {
-                    execution.fail(claimed, Instant.now());
-                    LOG.error("Budget dispatch failed, errorCode={}, operationId={}", "INTERNAL_ERROR", candidate.id());
+                    LOG.error("Budget worker failed, errorCode={}, operationId={}", "WORKER_FAILURE", candidate.id());
                 }
-            } catch (RuntimeException failed) {
-                LOG.error("Budget worker failed, errorCode={}, operationId={}", "WORKER_FAILURE", candidate.id());
             }
         }
     }

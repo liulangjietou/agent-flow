@@ -9,6 +9,8 @@ import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
+import org.slf4j.MDC;
 import io.agentflow.finance.callback.*;
 import io.agentflow.expense.*;
 import io.agentflow.notification.NotificationTexts;
@@ -70,6 +72,7 @@ class PaymentOperationIntegrationTest {
     private static final AtomicReference<String> LAST_KEY = new AtomicReference<>();
     private static final Map<UUID, PaymentCommand> COMMANDS = new ConcurrentHashMap<>();
     private static final Map<UUID, VoucherCommand> VOUCHER_COMMANDS = new ConcurrentHashMap<>();
+    private static final List<String> TRACES = new java.util.concurrent.CopyOnWriteArrayList<>();
     private static JsonUtil wire;
     private final List<UUID> fixtures = new ArrayList<>();
     @Autowired JsonUtil json;
@@ -170,6 +173,68 @@ class PaymentOperationIntegrationTest {
         jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject IN ('finance','cashier')");
     }
     @AfterAll static void stop() { SERVER.stop(0); HTTP_THREADS.shutdownNow(); }
+
+    @Test
+    void traceExecutionRequestContinuesIntoPaymentAndPaymentVoucher() {
+        var authorization = authorized(); String expectedTrace = UUID.randomUUID().toString();
+        PaymentExecutionRequest queued;
+        try (var trace = new DiagnosticContext(expectedTrace, "demo").open()) { queued = request(authorization, "v1"); }
+        assertThat(jdbc.queryForMap("SELECT * FROM payment_execution_request WHERE tenant_id='demo' AND id=?", queued.input().id().toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        TRACES.clear(); requestWorker.poll();
+        assertThat(executionRequests.find("demo", queued.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.READY);
+        UUID id = authorization.terms().id(); var operation = operations.find("demo", id).orElseThrow();
+        COMMANDS.put(id, operation.input().command());
+        assertThat(jdbc.queryForMap("SELECT * FROM payment_operation WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        worker.poll(); assertThat(reload(operation).settleable()).isTrue();
+        assertThat(TRACES).hasSize(5).containsOnly(expectedTrace);
+        var preparation = paymentPreparation(operation);
+        assertThat(jdbc.queryForMap("SELECT * FROM voucher_preparation WHERE tenant_id='demo' AND id=?", preparation.input().id().toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        preparationWorker.poll(); voucherWorker.poll();
+        assertThat(paymentVoucher(operation).usablePosted()).isTrue();
+        assertThat(TRACES).hasSize(8).containsOnly(expectedTrace);
+        assertThat(MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+
+    @Test
+    void tracePayeeReviewRetainsItsExplicitRequest() {
+        var original = authorized(); var ended = original.voidBeforeExecution("finance", "合成追踪复核", now());
+        tx().executeWithoutResult(status -> authorizations.update(ended));
+        var voucher = vouchers.find("demo", original.terms().voucherOperationId()).orElseThrow();
+        String expectedTrace = UUID.randomUUID().toString(); PaymentPayeeReview queued;
+        try (var trace = new DiagnosticContext(expectedTrace, "demo").open()) {
+            queued = tx().execute(status -> payeeReviewService.register(ended, voucher.version(), "finance", now()));
+        }
+        assertThat(jdbc.queryForMap("SELECT * FROM payment_payee_review WHERE tenant_id='demo' AND id=?", queued.input().id().toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        TRACES.clear(); payeeReviewWorker.poll();
+        assertThat(payeeReviews.find("demo", queued.input().id()).orElseThrow().status()).isEqualTo(PaymentPayeeReview.Status.READY);
+        assertThat(TRACES).containsExactly(expectedTrace);
+        assertThat(WRITES.get()).isZero();
+        assertThat(MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+
+    @Test
+    void tracePersistsThroughQueueAndReachesFinanceGateway() throws Exception {
+        var authorization = authorized(); String expectedTrace = UUID.randomUUID().toString();
+        PaymentOperation queued;
+        try (var trace = new DiagnosticContext(expectedTrace, "demo").open()) { queued = register(authorization); }
+        UUID id = queued.input().command().id();
+        assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(jdbc.queryForMap("SELECT * FROM payment_operation WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        TRACES.clear();
+        worker.poll();
+        assertThat(reload(queued).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
+        assertThat(TRACES).isNotEmpty().containsOnly(expectedTrace);
+        assertThat(jdbc.queryForMap("SELECT * FROM payment_operation WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
+    }
 
     @Test void requestAccountChangeNotifiesOriginalParticipantsWithoutCreatingPayment() throws Exception {
         var authorization = authorized(); var request = request(authorization, "v2"); requestWorker.poll();
@@ -1214,6 +1279,7 @@ class PaymentOperationIntegrationTest {
         try {
             var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0); server.setExecutor(HTTP_THREADS);
             server.createContext("/finance/", exchange -> {
+                TRACES.add(exchange.getRequestHeaders().getFirst("X-Trace-Id"));
                 var path = exchange.getRequestURI().getPath();
                 if (path.endsWith("payment-command")) WRITES.incrementAndGet(); else if (path.endsWith("payment-query")) QUERIES.incrementAndGet();
                 else if (path.endsWith("voucher-command")) VOUCHER_WRITES.incrementAndGet(); else if (path.endsWith("voucher-query")) VOUCHER_QUERIES.incrementAndGet();

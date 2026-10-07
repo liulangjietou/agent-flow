@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.common.DomainException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +16,8 @@ import java.time.temporal.ChronoUnit;
 @Service
 public class VoucherPreparationWorker {
     private static final Logger LOG = LoggerFactory.getLogger(VoucherPreparationWorker.class);
+    private static final String PAYMENT_TRACE_SOURCE = "payment-operation";
+    private static final String TRACE_SOURCE = "voucher-preparation";
     private final JdbcVoucherPreparationRepository preparations;
     private final VoucherPreparationService execution;
     private final AccountingPeriodPort periods;
@@ -32,27 +35,33 @@ public class VoucherPreparationWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Voucher preparation must execute outside a database transaction");
         for (var candidate : payments.missingVoucherPreparations()) {
             if (Thread.currentThread().isInterrupted()) return;
-            try { paid.recover(candidate.tenantId(), candidate.id()); }
-            catch (RuntimeException failed) { LOG.error("Payment voucher registration failed, errorCode={}, paymentId={}", "REGISTRATION_FAILURE", candidate.id()); }
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    PAYMENT_TRACE_SOURCE, candidate.id().toString()).open()) {
+                try { paid.recover(candidate.tenantId(), candidate.id()); }
+                catch (RuntimeException failed) { LOG.error("Payment voucher registration failed, errorCode={}, paymentId={}", "REGISTRATION_FAILURE", candidate.id()); }
+            }
         }
         for (var candidate : preparations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var work = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (work == null) continue;
-                var job = work.preparation(); var input = job.input(); var source = work.source();
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.id().toString()).open()) {
                 try {
-                    var period = periods.period(candidate.tenantId(), input.targetDigest(), source.periodRequest());
-                    if (!(period instanceof FinanceResult.Success<AccountingPeriodPort.OpenPeriod> availablePeriod)) { execution.finish(job, null, problem(period), Instant.now()); continue; }
-                    var mapping = mappings.mapping(candidate.tenantId(), input.targetDigest(), job.mappingRequest());
-                    if (!(mapping instanceof FinanceResult.Success<AccountMappingPort.Mapping> availableMapping)) { execution.finish(job, null, problem(mapping), Instant.now()); continue; }
-                    var command = source.prepare(input.id(), availablePeriod.value(), availableMapping.value(), Instant.now().truncatedTo(ChronoUnit.MICROS));
-                    execution.finish(job, command, null, Instant.now());
-                } catch (RuntimeException failure) {
-                    var result = failure instanceof DomainException domain ? VoucherPreparationService.classify(domain) : VoucherPreparation.Result.unavailable("INTERNAL_ERROR");
-                    execution.finish(job, null, result, Instant.now());
-                    LOG.error("Voucher preparation failed, errorCode={}, preparationId={}", result.code(), input.id());
-                }
-            } catch (RuntimeException failed) { LOG.error("Voucher preparation worker failed, errorCode={}, preparationId={}", "WORKER_FAILURE", candidate.id()); }
+                    var work = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (work == null) continue;
+                    var job = work.preparation(); var input = job.input(); var source = work.source();
+                    try {
+                        var period = periods.period(candidate.tenantId(), input.targetDigest(), source.periodRequest());
+                        if (!(period instanceof FinanceResult.Success<AccountingPeriodPort.OpenPeriod> availablePeriod)) { execution.finish(job, null, problem(period), Instant.now()); continue; }
+                        var mapping = mappings.mapping(candidate.tenantId(), input.targetDigest(), job.mappingRequest());
+                        if (!(mapping instanceof FinanceResult.Success<AccountMappingPort.Mapping> availableMapping)) { execution.finish(job, null, problem(mapping), Instant.now()); continue; }
+                        var command = source.prepare(input.id(), availablePeriod.value(), availableMapping.value(), Instant.now().truncatedTo(ChronoUnit.MICROS));
+                        execution.finish(job, command, null, Instant.now());
+                    } catch (RuntimeException failure) {
+                        var result = failure instanceof DomainException domain ? VoucherPreparationService.classify(domain) : VoucherPreparation.Result.unavailable("INTERNAL_ERROR");
+                        execution.finish(job, null, result, Instant.now());
+                        LOG.error("Voucher preparation failed, errorCode={}, preparationId={}", result.code(), input.id());
+                    }
+                } catch (RuntimeException failed) { LOG.error("Voucher preparation worker failed, errorCode={}, preparationId={}", "WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
     private static VoucherPreparation.Result problem(FinanceResult<?> result) {

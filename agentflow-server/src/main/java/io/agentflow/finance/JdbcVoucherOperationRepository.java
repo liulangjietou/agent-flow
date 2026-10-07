@@ -3,6 +3,7 @@ package io.agentflow.finance;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -33,11 +34,11 @@ public class JdbcVoucherOperationRepository {
         var command = value.input().command(); var binding = command.binding();
         jdbc.update("""
                 INSERT INTO voucher_operation(tenant_id,id,business_type,business_id,application_id,round_no,kind,application_version,business_version,
-                input_json,command_digest,state_json,version,status,attempts,highest_revision,created_at,updated_at,next_attempt_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',0,0,?,?,?)
+                input_json,command_digest,state_json,version,status,attempts,highest_revision,created_at,updated_at,next_attempt_at,trace_id)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',0,0,?,?,?,?)
                 """, command.tenantId(), command.id().toString(), businessType(command).name(), binding.businessId().toString(), binding.applicationId().toString(),
                 binding.roundNo(), command.kind().name(), binding.applicationVersion(), binding.businessVersion(), json.write(value.input()), command.digest(), json.write(value),
-                timestamp(value.createdAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()));
+                timestamp(value.createdAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()), DiagnosticContext.capture().traceId());
         append(value);
     }
 
@@ -122,9 +123,9 @@ public class JdbcVoucherOperationRepository {
     /** 每批只扫描十个已到期任务，不在扫描中加载敏感凭证正文。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM voucher_operation WHERE (status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
+                SELECT tenant_id,id,trace_id FROM voucher_operation WHERE (status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
                 OR (status IN ('POSTING','QUERYING') AND lease_until<=?) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), timestamp(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
     }
 
     /** 两种业务的数据库绑定都来自明确用途，支付凭证使用原支付用途。 */
@@ -158,5 +159,5 @@ public class JdbcVoucherOperationRepository {
      * 候选仅携带租户与操作标识，领取后重新读取实际命令。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
 }

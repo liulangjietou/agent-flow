@@ -10,6 +10,8 @@ import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
+import org.slf4j.MDC;
 import io.agentflow.finance.FinanceGatewayConfiguration;
 import io.agentflow.finance.FinanceResult;
 import io.agentflow.finance.Money;
@@ -64,6 +66,7 @@ class InvoiceVerificationIntegrationTest {
     private static final AtomicReference<JsonNode> RECEIVED = new AtomicReference<>();
     private static final AtomicInteger CALLS = new AtomicInteger();
     private static final AtomicInteger STATUS = new AtomicInteger(200);
+    private static final List<String> TRACES = new java.util.concurrent.CopyOnWriteArrayList<>();
     private static JsonUtil wire;
 
     @DynamicPropertySource
@@ -108,6 +111,25 @@ class InvoiceVerificationIntegrationTest {
         actors.clear();
     }
     @AfterAll static void closeServer() { SERVER.stop(0); }
+
+    @Test
+    void tracePersistsThroughQueueAndReachesFinanceGateway() throws Exception {
+        UUID invoice = original(true);
+        var queued = queue(invoice, "alice", UUID.randomUUID().toString(), input(invoice), 202);
+        UUID id = id(queued); String expectedTrace = queued.getHeader("X-Trace-Id");
+        assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(jdbc.queryForMap("SELECT * FROM invoice_verification_job WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        TRACES.clear();
+        worker.poll();
+        assertThat(job(id).status()).isEqualTo(InvoiceVerificationJob.Status.SUCCEEDED);
+        assertThat(TRACES).isNotEmpty().containsOnly(expectedTrace);
+        assertThat(jdbc.queryForMap("SELECT * FROM invoice_verification_job WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
+    }
 
     @Test
     void optionsLocateActiveJobWithoutDependingOnUuidHistoryOrder() throws Exception {
@@ -343,6 +365,7 @@ class InvoiceVerificationIntegrationTest {
         try {
             var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/finance/invoice-verification", exchange -> {
+                TRACES.add(exchange.getRequestHeaders().getFirst("X-Trace-Id"));
                 CALLS.incrementAndGet();
                 var request = wire.read(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8), JsonNode.class); RECEIVED.set(request);
                 byte[] body = RESPONDER.get().apply(request).getBytes(StandardCharsets.UTF_8);

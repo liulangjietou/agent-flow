@@ -2,6 +2,7 @@ package io.agentflow.finance;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -31,11 +32,11 @@ public class JdbcVoucherPreparationRepository {
         var input = value.input(); var source = input.source();
         jdbc.update("""
                 INSERT INTO voucher_preparation(tenant_id,id,business_type,business_id,application_id,round_no,kind,application_version,business_version,
-                employee_id,attempt_no,input_json,state_json,version,status,active_application_id,created_at,payment_operation_id,payment_version)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?,?,?)
+                employee_id,attempt_no,input_json,state_json,version,status,active_application_id,created_at,payment_operation_id,payment_version,trace_id)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?,?,?,?)
                 """, source.tenantId(), input.id().toString(), source.businessType().name(), source.businessId().toString(), source.applicationId().toString(), source.roundNo(),
                 source.kind().name(), source.applicationVersion(), source.businessVersion(), source.employeeId(), input.attempt(), json.write(input), json.write(value),
-                source.applicationId().toString(), timestamp(value.createdAt()), source.paymentOperationId() == null ? null : source.paymentOperationId().toString(), source.paymentVersion());
+                source.applicationId().toString(), timestamp(value.createdAt()), source.paymentOperationId() == null ? null : source.paymentOperationId().toString(), source.paymentVersion(), DiagnosticContext.capture().traceId());
         append(value);
     }
     /** 固定原输入和前一版本，落库失败连同凭证登记一并回滚。 */
@@ -62,8 +63,8 @@ public class JdbcVoucherPreparationRepository {
     }
     /** 有界扫描只读取身份，领取事务重新获取原输入。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id FROM voucher_preparation WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now));
+        return jdbc.query("SELECT tenant_id,id,trace_id FROM voucher_preparation WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
     }
     private RowMapper<VoucherPreparation> row() {
         return (row, index) -> {
@@ -92,5 +93,5 @@ public class JdbcVoucherPreparationRepository {
      * 扫描不加载财务明细或个人信息。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
 }

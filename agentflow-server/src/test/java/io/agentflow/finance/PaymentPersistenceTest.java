@@ -140,8 +140,8 @@ class PaymentPersistenceTest {
         register(initial, voucher); var claim = queued.claim(NOW, LEASE); tx.executeWithoutResult(status -> operations.update(claim));
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> operations.update(queued.claim(NOW.plusSeconds(1), LEASE)))).isInstanceOf(DomainException.class);
         assertThat(operations.find(TENANT, initial.terms().id())).contains(claim);
-        assertThat(operations.due(NOW.plusSeconds(19))).doesNotContain(new JdbcPaymentOperationRepository.Candidate(TENANT, initial.terms().id()));
-        assertThat(operations.due(NOW.plusSeconds(20))).contains(new JdbcPaymentOperationRepository.Candidate(TENANT, initial.terms().id()));
+        assertThat(operations.due(NOW.plusSeconds(19))).extracting(JdbcPaymentOperationRepository.Candidate::id).doesNotContain(initial.terms().id());
+        assertThat(operations.due(NOW.plusSeconds(20))).extracting(JdbcPaymentOperationRepository.Candidate::id).contains(initial.terms().id());
     }
 
     @Test void changedAuthorizationTermsAndOperationTargetCannotBeWrittenAndRelationalTamperingFailsClosed() {

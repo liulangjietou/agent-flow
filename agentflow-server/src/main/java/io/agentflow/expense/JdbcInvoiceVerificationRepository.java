@@ -2,6 +2,7 @@ package io.agentflow.expense;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -34,9 +35,9 @@ public class JdbcInvoiceVerificationRepository {
         try {
             jdbc.update("""
                     INSERT INTO invoice_verification_job(tenant_id,id,invoice_id,owner_id,original_id,original_digest,invoice_version,
-                    input_json,state_json,version,status,active_invoice_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?)
+                    input_json,state_json,version,status,active_invoice_id,created_at,trace_id) VALUES(?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?,?)
                     """, input.tenantId(), input.id().toString(), input.invoiceId().toString(), input.ownerId(), input.originalId().toString(),
-                    input.originalDigest(), input.invoiceVersion(), json.write(input), json.write(job), input.invoiceId().toString(), Timestamp.from(job.createdAt()));
+                    input.originalDigest(), input.invoiceVersion(), json.write(input), json.write(job), input.invoiceId().toString(), Timestamp.from(job.createdAt()), DiagnosticContext.capture().traceId());
         } catch (DuplicateKeyException duplicate) { throw new DomainException("INVOICE_VERIFICATION_ACTIVE", "Invoice already has an active verification job"); }
         append(job);
     }
@@ -106,9 +107,9 @@ public class JdbcInvoiceVerificationRepository {
     /** 每次只扫描十项，过期运行用于结算超时而非再次发送。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM invoice_verification_job WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
+                SELECT tenant_id,id,trace_id FROM invoice_verification_job WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
                 ORDER BY created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), Timestamp.from(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), Timestamp.from(now));
     }
 
     /** 本人单张发票的有界历史使用固定游标顺序。 */
@@ -149,5 +150,5 @@ public class JdbcInvoiceVerificationRepository {
      * 扫描结果仅含定位标识，不带原件或敏感票面。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
 }

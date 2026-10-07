@@ -7,6 +7,8 @@ import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
+import org.slf4j.MDC;
 import io.agentflow.expense.*;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -55,6 +57,7 @@ class BudgetOperationIntegrationTest {
     private static final AtomicReference<BiFunction<String, JsonNode, Object>> RESPONDER = new AtomicReference<>();
     private static final AtomicInteger WRITES = new AtomicInteger(), QUERIES = new AtomicInteger();
     private static final AtomicReference<String> LAST_KEY = new AtomicReference<>();
+    private static final List<String> TRACES = new java.util.concurrent.CopyOnWriteArrayList<>();
     private static JsonUtil wire;
     private final List<UUID> fixtures = new ArrayList<>();
     @Autowired JsonUtil json;
@@ -99,6 +102,26 @@ class BudgetOperationIntegrationTest {
         }
     }
     @AfterAll static void stop() { SERVER.stop(0); HTTP_THREADS.shutdownNow(); }
+
+    @Test
+    void tracePersistsThroughQueueAndReachesFinanceGateway() throws Exception {
+        var report = report(true); String expectedTrace = UUID.randomUUID().toString();
+        BudgetOperation queued;
+        try (var trace = new DiagnosticContext(expectedTrace, "demo").open()) { queued = reserve(report); }
+        UUID id = queued.input().command().id();
+        assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(jdbc.queryForMap("SELECT * FROM budget_operation WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        TRACES.clear();
+        worker.poll();
+        assertThat(reload(queued).status()).isEqualTo(BudgetOperation.Status.APPLIED);
+        assertThat(TRACES).isNotEmpty().containsOnly(expectedTrace);
+        assertThat(jdbc.queryForMap("SELECT * FROM budget_operation WHERE tenant_id='demo' AND id=?", id.toString())
+                .get("TRACE_ID")).isEqualTo(expectedTrace);
+        assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
+        assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
+    }
 
     @Test
     void unknownBudgetResultNotifiesOriginalApplicantOnceAndDoesNotExposeFinancialDetails() {
@@ -389,6 +412,7 @@ class BudgetOperationIntegrationTest {
         try {
             var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0); server.setExecutor(HTTP_THREADS);
             server.createContext("/finance/", exchange -> {
+                TRACES.add(exchange.getRequestHeaders().getFirst("X-Trace-Id"));
                 var path = exchange.getRequestURI().getPath(); if (path.endsWith("budget-command")) WRITES.incrementAndGet(); else QUERIES.incrementAndGet();
                 LAST_KEY.set(exchange.getRequestHeaders().getFirst("Idempotency-Key"));
                 var request = wire.read(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8), JsonNode.class);

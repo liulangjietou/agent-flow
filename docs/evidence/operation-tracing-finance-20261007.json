@@ -1,0 +1,123 @@
+{
+  "recordedAt": "2026-10-07T14:11:04.701946+00:00",
+  "taskId": "O01",
+  "status": "FINANCE_STAGE_PASSED_LOCAL_FIXED_PACKAGE_O01_OPEN",
+  "sourceBaseCommit": "22267769d960ceac4f06e46b0b22819b68108224",
+  "sourceHashes": {
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckWorker.java": "96c0988df60129c800ac04e9c673207ae78e9d84475d7d70987c769a9561b2c1",
+    "agentflow-server/src/main/java/io/agentflow/expense/InvoiceVerificationWorker.java": "fcc700a6073cf9f345b8c5860ceec7de71275e686f6c27b916a3a4011e81d72f",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpensePrecheckRepository.java": "04cad67a40edb13037ce32f9b36d62d7a04f6571a2c1ffa4da942849b64c4903",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcInvoiceVerificationRepository.java": "64d8c1c4c5a70cc8fb98e1ff2d984cdd77333bb226332895753abd34043aff87",
+    "agentflow-server/src/main/java/io/agentflow/finance/BudgetOperationWorker.java": "99849f1d6a727074bf9f8c52da31ca631c336cfe1837feed1f5aaac8d724771a",
+    "agentflow-server/src/main/java/io/agentflow/finance/FinanceGatewayClient.java": "4380d649a3a0b93fb369c75afec409e281efd24d5200a11115b3c9007b8484b1",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcBudgetOperationRepository.java": "6fc98fb6c2de6e58ef8c1ffead6b55c4e21713a146b8008432c56a58900de878",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcPaymentExecutionRequestRepository.java": "4c83faf8f13d98f933c55db1f1490cc97387d6446c991a7b651b47d5ade55c11",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcPaymentOperationRepository.java": "eb01541716596604900ca87b870d221c3ead16a974639465b0d183c384ca138f",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcPaymentPayeeReviewRepository.java": "b45b4b7b61e8baa37157d39f4d02d9f1c04d493c7abb219e87735cd6aee2fa4d",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcVoucherOperationRepository.java": "fd1eb2c9a48d722e6d56c1d200b85efc7233a91c359de75fb321653feeee8da0",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcVoucherPreparationRepository.java": "72e2ffe88b44b2fe06105000ccdd2db90b8356150e73052382f0bf0574430d0a",
+    "agentflow-server/src/main/java/io/agentflow/finance/PaymentExecutionRequestWorker.java": "7755ebc9b723933e7b31d84c91bf58c9eba5e64a3e9d081b00c95208f41f77c1",
+    "agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationWorker.java": "5bffb88d4173dac65409c596a7fc0050d0022c16ecf3275bd0b7338d44a6a6b5",
+    "agentflow-server/src/main/java/io/agentflow/finance/PaymentPayeeReviewWorker.java": "7da77a1ee9fc93eb9d55cc77dd2f797c7fc45e8b23d2c921b7f59aee426f799c",
+    "agentflow-server/src/main/java/io/agentflow/finance/VoucherOperationWorker.java": "6f113be98073b8685086abb77c0a084de73496dabfbfaa90309d48d7f8f4b570",
+    "agentflow-server/src/main/java/io/agentflow/finance/VoucherPreparationWorker.java": "ca1ee4613de3e52fbfcfc300618f3517a93c1699acd80f77095839bb1dfbfd6c",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpensePrecheckIntegrationTest.java": "2d226ceab4fda3fc711ff4801f8ff4e3467e9e3ec30cc6d6d042d504aec06b1b",
+    "agentflow-server/src/test/java/io/agentflow/expense/InvoiceVerificationIntegrationTest.java": "1f32c46bbc94229db9cfde35591f4c6954bf85e9ecbb5fb22b7e15798c8c5021",
+    "agentflow-server/src/test/java/io/agentflow/finance/BudgetOperationIntegrationTest.java": "0db900a803512f1978d076af8c98c2ef69a8bc8ffcf76cc4016a04f92d711878",
+    "agentflow-server/src/test/java/io/agentflow/finance/FinanceGatewayClientTest.java": "415143fe2671f53fcd9b3518b6327433acb7ec630763667830f9730c27af6a41",
+    "agentflow-server/src/test/java/io/agentflow/finance/PaymentOperationIntegrationTest.java": "8a7edcdd90d5eb9a45adeed2de42e613f64d0418d51e6320b7c6d95b1b338db8",
+    "agentflow-server/src/test/java/io/agentflow/finance/PaymentPersistenceTest.java": "f0883548341672abab400526ab907120cbd953d61b668766acd8dcd0a9e7721c",
+    "agentflow-server/src/test/java/io/agentflow/finance/VoucherOperationIntegrationTest.java": "7870980fabb3f1d1e3e75be658614c96888c2fea5cdb65d905cbaaf153d5a133",
+    "agentflow-server/src/main/resources/db/migration/V123__finance_queue_trace.sql": "2d3db0aaadea35477e896e8480b56800b7c3f65a0f9ac1d911b04145efa615cf",
+    "agentflow-server/src/test/java/io/agentflow/finance/FinanceWorkerTraceTest.java": "fc4ee3b7f5c76e9e44b1c288ab5599d3de886d95bb133c5b7acd4e3ec833476e",
+    "scripts/check-finance-trace-runtime.py": "0e73b52476dedfd3e67ac11b927124f78b1d6b7a23d037c944002df5dfa8bff1",
+    "scripts/check-agent-trace-runtime.py": "ac736d5fe00b636419d185d7d69e4a66adfefebc244fe2d9931e4b9aecd19a66",
+    "scripts/check-expense-financial-reporting.py": "ead6061be11bbb62564b08e013a6a8136924d39fa9bd2a90ecdf430163eea0b9",
+    "scripts/check-expense-prior-controls.py": "b4cc7d61a5cba38c8b47549374bfe400250884b854431c25e36e0445745e9e58",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7",
+    "scripts/payment-due-dates-support/CompareH2Schema.java": "4e92f585f39d6ce6a43bd400a31216179e8b7f15f5f676abd80b5fb7b12a0a3b",
+    "scripts/fixtures/ExpenseRiskOidcFixture.java": "2f9952710952fb955b3d227070e82cf890f58c6fe9f8a4374445e7de4aebabee",
+    "agentflow-server/src/test/java/io/agentflow/auth/OidcTestProvider.java": "d0bc33ab2d51ca5622edc7bde153ea71f8cb597c9f74ab56912b8522f3b4027b",
+    "agentflow-server/src/main/java/io/agentflow/observability/DiagnosticContext.java": "ae93629262febc126657711a0306aa0a334f381e8002813b129d1d09b82e5004"
+  },
+  "jar": "/fyoung/tmp/agentflow-remaining-20260928/o01-finance-trace-server.jar",
+  "jarSha256": "6c7afa401cc9886bbf717a745d78cc7f78124f1baee76157b04d3b949d1e44e3",
+  "redTests": 9,
+  "initialGreenTests": 19,
+  "scopeTests": 636,
+  "testReportNote": "本次 Maven 汇总 636 项、退出码 0。嵌套 PaymentBatches 的 66 项在文本报告中汇总，随后外层 0 项覆盖同名 XML；保留原日志，不把该 XML 伪称为 66 项报告。",
+  "runtime": {
+    "status": "PASS",
+    "database": "H2",
+    "previousJarSha256": "188b3fbc7b662f47f4983c45a957edf2bd2e5880d5936e69fdb794a3bfefeefc",
+    "jarSha256": "6c7afa401cc9886bbf717a745d78cc7f78124f1baee76157b04d3b949d1e44e3",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "realFinancialSystemsVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "tables": 280,
+        "queueTables": 8,
+        "inventedOrigins": 0
+      },
+      {
+        "name": "persisted-worker-recovery",
+        "queueTables": 8,
+        "legacyRequestCounts": {
+          "INVOICE": 1,
+          "PRECHECK": 5,
+          "BUDGET": 1,
+          "VOUCHER": 1,
+          "PAYMENT": 6,
+          "PAYEE": 1
+        },
+        "currentRequestCounts": {
+          "INVOICE": 1,
+          "PRECHECK": 5,
+          "BUDGET": 1,
+          "VOUCHER": 3,
+          "PREPARATION": 3,
+          "PAYMENT": 8,
+          "REQUEST": 8,
+          "PAYEE": 1
+        },
+        "originalKeyReplays": 14
+      },
+      {
+        "name": "independent-restore",
+        "tables": 280,
+        "sameAuthorizedDetails": 16,
+        "resentRequests": 0
+      }
+    ],
+    "boots": 8,
+    "gatewayRequests": 116,
+    "responseTraces": 402,
+    "businessHttpRequests": 291
+  },
+  "gatewayCommands": 22,
+  "duplicateCommands": 0,
+  "sensitiveLogChecks": "PASS",
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/o01-finance-trace-verified/manifest.json",
+  "archiveSha256": "0ded9dd6778d4cf0d16b67724cdae58bcd791b53eb28ab155533578947eb6f8a",
+  "review": {
+    "mode": "SELF_REVIEW",
+    "unresolvedFindingsInStage": [],
+    "independentReview": false
+  },
+  "scope": [
+    "Eight original queue tables gain nullable trace_id in V123",
+    "Eight workers and two payment recovery entrances restore per-record context",
+    "Finance gateway uses X-Trace-Id without replacing requestId or Idempotency-Key",
+    "Preparation/posting and execution-request/payment/payment-voucher retain origin"
+  ],
+  "remaining": [
+    "Other worker and scheduler chains",
+    "Trusted business/process/task identifiers",
+    "Browser and PostgreSQL gates",
+    "Real enterprise integration"
+  ]
+}

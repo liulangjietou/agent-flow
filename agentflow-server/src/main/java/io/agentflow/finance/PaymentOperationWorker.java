@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.AdvanceDisbursementService;
 import org.slf4j.Logger;
@@ -15,6 +16,7 @@ import java.time.Instant;
 @Service
 public class PaymentOperationWorker {
     private static final Logger LOG = LoggerFactory.getLogger(PaymentOperationWorker.class);
+    private static final String TRACE_SOURCE = "payment-operation";
     private final JdbcPaymentOperationRepository operations;
     private final PaymentOperationService execution;
     private final PaymentAccountsPort accounts;
@@ -31,30 +33,36 @@ public class PaymentOperationWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Payment worker must execute outside a database transaction");
         for (var candidate : operations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
-                if (claimed.status() == PaymentOperation.Status.CHECKING) claimed = checkAccounts(claimed);
-                if (claimed == null) continue;
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input(); FinanceResult<PaymentObservation> result;
-                    if (claimed.status() == PaymentOperation.Status.SENDING) {
-                        claimed.requireSendAt(Instant.now()); result = payments.execute(input.targetDigest(), input.command());
-                    } else result = payments.query(input.targetDigest(), input.command());
-                    execution.finish(claimed, result, Instant.now());
-                } catch (RuntimeException failed) {
-                    var reason = failed instanceof DomainException domain && "PAYMENT_AUTHORIZATION_EXPIRED".equals(domain.code())
-                            ? PaymentOperation.Failure.AUTHORIZATION_EXPIRED : PaymentOperation.Failure.INTERNAL_ERROR;
-                    execution.fail(claimed, reason, Instant.now());
-                    LOG.error("Payment dispatch failed, errorCode={}, authorizationId={}", reason, candidate.id());
-                }
-            } catch (RuntimeException failed) { LOG.error("Payment worker failed, errorCode={}, authorizationId={}", "WORKER_FAILURE", candidate.id()); }
+                    var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    if (claimed.status() == PaymentOperation.Status.CHECKING) claimed = checkAccounts(claimed);
+                    if (claimed == null) continue;
+                    try {
+                        var input = claimed.input(); FinanceResult<PaymentObservation> result;
+                        if (claimed.status() == PaymentOperation.Status.SENDING) {
+                            claimed.requireSendAt(Instant.now()); result = payments.execute(input.targetDigest(), input.command());
+                        } else result = payments.query(input.targetDigest(), input.command());
+                        execution.finish(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) {
+                        var reason = failed instanceof DomainException domain && "PAYMENT_AUTHORIZATION_EXPIRED".equals(domain.code())
+                                ? PaymentOperation.Failure.AUTHORIZATION_EXPIRED : PaymentOperation.Failure.INTERNAL_ERROR;
+                        execution.fail(claimed, reason, Instant.now());
+                        LOG.error("Payment dispatch failed, errorCode={}, authorizationId={}", reason, candidate.id());
+                    }
+                } catch (RuntimeException failed) { LOG.error("Payment worker failed, errorCode={}, authorizationId={}", "WORKER_FAILURE", candidate.id()); }
+            }
         }
         for (var candidate : operations.missingAdvanceBalances()) {
             if (Thread.currentThread().isInterrupted()) return;
-            try { disbursements.recover(candidate.tenantId(), candidate.id()); }
-            catch (RuntimeException failed) {
-                LOG.error("Advance disbursement recovery failed, errorCode={}, authorizationId={}",
-                        failed instanceof DomainException domain ? domain.code() : "SETTLEMENT_FAILURE", candidate.id());
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                try { disbursements.recover(candidate.tenantId(), candidate.id()); }
+                catch (RuntimeException failed) {
+                    LOG.error("Advance disbursement recovery failed, errorCode={}, authorizationId={}",
+                            failed instanceof DomainException domain ? domain.code() : "SETTLEMENT_FAILURE", candidate.id());
+                }
             }
         }
     }

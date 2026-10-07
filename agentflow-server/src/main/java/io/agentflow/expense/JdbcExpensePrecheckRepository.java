@@ -2,6 +2,7 @@ package io.agentflow.expense;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -34,10 +35,10 @@ public class JdbcExpensePrecheckRepository {
         try {
             jdbc.update("""
                     INSERT INTO expense_precheck_job(tenant_id,id,report_id,application_id,employee_id,application_version,
-                    financial_version,attempt_no,input_json,state_json,version,status,active_report_id,created_at)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?)
+                    financial_version,attempt_no,input_json,state_json,version,status,active_report_id,created_at,trace_id)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?,?)
                     """, input.tenantId(), input.id().toString(), input.reportId().toString(), input.applicationId().toString(), input.employeeId(),
-                    input.applicationVersion(), input.financialVersion(), input.attempt(), json.write(input), json.write(job), input.reportId().toString(), Timestamp.from(job.createdAt()));
+                    input.applicationVersion(), input.financialVersion(), input.attempt(), json.write(input), json.write(job), input.reportId().toString(), Timestamp.from(job.createdAt()), DiagnosticContext.capture().traceId());
         } catch (DuplicateKeyException duplicate) { throw new DomainException("EXPENSE_PRECHECK_ACTIVE", "Expense report already has an active precheck"); }
         append(job);
     }
@@ -82,9 +83,9 @@ public class JdbcExpensePrecheckRepository {
     /** 只读取十项；过期运行用于记录超时，不重复发送旧任务。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM expense_precheck_job WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
+                SELECT tenant_id,id,trace_id FROM expense_precheck_job WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
                 ORDER BY created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), Timestamp.from(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), Timestamp.from(now));
     }
     /** 历史只按单据归属查询，使用有界稳定游标。 */
     public List<ExpensePrecheckJob> list(String tenant, UUID reportId, UUID before, int limit) {
@@ -123,5 +124,5 @@ public class JdbcExpensePrecheckRepository {
      * 扫描项不复制敏感快照，领取后在锁内重新读取。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
 }

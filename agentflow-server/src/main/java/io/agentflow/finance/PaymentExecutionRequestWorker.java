@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.observability.DiagnosticContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,7 @@ import java.time.Instant;
 @Service
 public class PaymentExecutionRequestWorker {
     private static final Logger LOG = LoggerFactory.getLogger(PaymentExecutionRequestWorker.class);
+    private static final String TRACE_SOURCE = "payment-execution-request";
     private final JdbcPaymentExecutionRequestRepository requests;
     private final PaymentExecutionRequestService execution;
     private final PaymentAccountsPort accounts;
@@ -25,20 +27,23 @@ public class PaymentExecutionRequestWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Payment request worker must execute outside a database transaction");
         for (var candidate : requests.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var work = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (work == null) continue;
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.id().toString()).open()) {
                 try {
-                    var input = work.request().input(); var terms = work.authorization().terms(); var payee = terms.payee();
-                    var debitResult = accounts.debitAccounts(input.tenantId(), terms.targetDigest(), new PaymentAccountsPort.Request(payee.legalEntityId(), terms.amount().currency(), input.cashier()));
-                    if (!(debitResult instanceof FinanceResult.Success<PaymentAccountsPort.Directory> debit)) { failed(work, debitResult); continue; }
-                    var payeeResult = accounts.currentPayee(input.tenantId(), terms.targetDigest(), new PaymentAccountsPort.PayeeRequest(payee.legalEntityId(), payee.employeeId()));
-                    if (!(payeeResult instanceof FinanceResult.Success<EmployeeAccountPort.Account> current)) { failed(work, payeeResult); continue; }
-                    execution.finish(work, debit.value(), current.value(), Instant.now());
-                } catch (RuntimeException failed) {
-                    execution.fail(work, PaymentExecutionRequest.Failure.INTERNAL_ERROR, false, Instant.now());
-                    LOG.error("Payment request check failed, errorCode={}, requestId={}", "CHECK_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failed) { LOG.error("Payment request worker failed, errorCode={}, requestId={}", "WORKER_FAILURE", candidate.id()); }
+                    var work = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (work == null) continue;
+                    try {
+                        var input = work.request().input(); var terms = work.authorization().terms(); var payee = terms.payee();
+                        var debitResult = accounts.debitAccounts(input.tenantId(), terms.targetDigest(), new PaymentAccountsPort.Request(payee.legalEntityId(), terms.amount().currency(), input.cashier()));
+                        if (!(debitResult instanceof FinanceResult.Success<PaymentAccountsPort.Directory> debit)) { failed(work, debitResult); continue; }
+                        var payeeResult = accounts.currentPayee(input.tenantId(), terms.targetDigest(), new PaymentAccountsPort.PayeeRequest(payee.legalEntityId(), payee.employeeId()));
+                        if (!(payeeResult instanceof FinanceResult.Success<EmployeeAccountPort.Account> current)) { failed(work, payeeResult); continue; }
+                        execution.finish(work, debit.value(), current.value(), Instant.now());
+                    } catch (RuntimeException failed) {
+                        execution.fail(work, PaymentExecutionRequest.Failure.INTERNAL_ERROR, false, Instant.now());
+                        LOG.error("Payment request check failed, errorCode={}, requestId={}", "CHECK_FAILURE", candidate.id());
+                    }
+                } catch (RuntimeException failed) { LOG.error("Payment request worker failed, errorCode={}, requestId={}", "WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
     private void failed(PaymentExecutionRequestService.Work work, FinanceResult<?> result) {

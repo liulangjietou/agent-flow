@@ -8,6 +8,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.expense.*;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,6 +48,7 @@ class FinanceGatewayClientTest {
     private final JsonUtil json = new JsonUtil(mapper);
     private final AtomicReference<Function<JsonNode, String>> responder = new AtomicReference<>();
     private final AtomicReference<JsonNode> received = new AtomicReference<>();
+    private final AtomicReference<String> traceHeader = new AtomicReference<>();
     private final AtomicReference<String> path = new AtomicReference<>();
     private final AtomicReference<String> authorization = new AtomicReference<>();
     private final AtomicInteger requests = new AtomicInteger();
@@ -79,6 +81,17 @@ class FinanceGatewayClientTest {
 
     @AfterEach
     void stop() { TransactionSynchronizationManager.setActualTransactionActive(false); server.stop(0); executor.shutdownNow(); }
+
+    @Test
+    void sourceTraceUsesSeparateHeaderWithoutReplacingProtocolRequestIdentity() {
+        String traceId = UUID.randomUUID().toString();
+        try (var scope = new DiagnosticContext(traceId, "tenant-a").open()) {
+            master.catalog("tenant-a", "alice").requireValue();
+        }
+        assertThat(traceHeader.get()).isEqualTo(traceId);
+        assertThat(received.get().path("requestId").asText()).isNotEqualTo(traceId);
+        assertThat(received.get().has("traceId")).isFalse();
+    }
 
     @Test
     void actualHttpCarriesFixedPathTenantEmployeeAndOnlyItsConfiguredCredential() {
@@ -413,6 +426,7 @@ class FinanceGatewayClientTest {
     }
 
     private void handle(HttpExchange exchange) throws IOException {
+        traceHeader.set(exchange.getRequestHeaders().getFirst("X-Trace-Id"));
         requests.incrementAndGet(); path.set(exchange.getRequestURI().getPath()); authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
         var request = json.read(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8), JsonNode.class); received.set(request);
         byte[] body = responder.get().apply(request).getBytes(StandardCharsets.UTF_8);

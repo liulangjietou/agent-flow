@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.observability.DiagnosticContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,7 @@ import java.time.Instant;
 @Service
 public class PaymentPayeeReviewWorker {
     private static final Logger LOG = LoggerFactory.getLogger(PaymentPayeeReviewWorker.class);
+    private static final String TRACE_SOURCE = "payment-payee-review";
     private final JdbcPaymentPayeeReviewRepository reviews;
     private final PaymentPayeeReviewService service;
     private final PaymentAccountsPort accounts;
@@ -25,17 +27,20 @@ public class PaymentPayeeReviewWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Payee review worker must execute outside a database transaction");
         for (var candidate : reviews.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.id().toString()).open()) {
                 try {
-                    var original = claimed.input().original(); var payee = original.payee();
-                    var result = accounts.currentPayee(original.tenantId(), original.targetDigest(), new PaymentAccountsPort.PayeeRequest(payee.legalEntityId(), payee.employeeId()));
-                    service.finish(claimed, result, Instant.now());
-                } catch (RuntimeException failed) {
-                    service.fail(claimed, Instant.now());
-                    LOG.error("Payee review read failed, errorCode={}, reviewId={}", "ACCOUNT_READ_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failed) { LOG.error("Payee review worker failed, errorCode={}, reviewId={}", "REVIEW_WORKER_FAILURE", candidate.id()); }
+                    var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var original = claimed.input().original(); var payee = original.payee();
+                        var result = accounts.currentPayee(original.tenantId(), original.targetDigest(), new PaymentAccountsPort.PayeeRequest(payee.legalEntityId(), payee.employeeId()));
+                        service.finish(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) {
+                        service.fail(claimed, Instant.now());
+                        LOG.error("Payee review read failed, errorCode={}, reviewId={}", "ACCOUNT_READ_FAILURE", candidate.id());
+                    }
+                } catch (RuntimeException failed) { LOG.error("Payee review worker failed, errorCode={}, reviewId={}", "REVIEW_WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
 }

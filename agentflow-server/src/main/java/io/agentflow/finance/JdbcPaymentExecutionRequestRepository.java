@@ -2,6 +2,7 @@ package io.agentflow.finance;
 
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -31,10 +32,10 @@ public class JdbcPaymentExecutionRequestRepository {
         var input = value.input(); var authorization = authorizations.find(input.tenantId(), input.authorizationId()).orElseThrow(JdbcPaymentExecutionRequestRepository::conflict);
         if (!PaymentExecutionRequest.queue(input.id(), authorization, input.cashier(), input.debitReference(), input.debitVersion(), value.createdAt()).equals(value)) throw conflict();
         jdbc.update("""
-                INSERT INTO payment_execution_request(tenant_id,id,authorization_id,authorization_version,cashier_id,input_json,state_json,version,status,attempts,created_at,updated_at,next_attempt_at)
-                VALUES(?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?)
+                INSERT INTO payment_execution_request(tenant_id,id,authorization_id,authorization_version,cashier_id,input_json,state_json,version,status,attempts,created_at,updated_at,next_attempt_at,trace_id)
+                VALUES(?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?,?)
                 """, input.tenantId(), input.id().toString(), input.authorizationId().toString(), input.authorizationVersion(), input.cashier(), json.write(input), json.write(value),
-                timestamp(value.createdAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt())); append(value);
+                timestamp(value.createdAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()), DiagnosticContext.capture().traceId()); append(value);
     }
     /** 比较原输入与版本，不能用重试更换出纳、账户或授权，也不能覆盖较新的领取。 */
     @Transactional(propagation = Propagation.MANDATORY)
@@ -56,9 +57,9 @@ public class JdbcPaymentExecutionRequestRepository {
     /** 每批扫描最多十条，持久租约过期后仍按同一选择恢复。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM payment_execution_request WHERE (status='QUEUED' AND next_attempt_at<=?) OR (status='RUNNING' AND lease_until<=?)
+                SELECT tenant_id,id,trace_id FROM payment_execution_request WHERE (status='QUEUED' AND next_attempt_at<=?) OR (status='RUNNING' AND lease_until<=?)
                 ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), timestamp(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
     }
     private RowMapper<PaymentExecutionRequest> row() {
         return (row, index) -> {
@@ -82,5 +83,5 @@ public class JdbcPaymentExecutionRequestRepository {
      * 调度标识不返回付款内容。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
 }

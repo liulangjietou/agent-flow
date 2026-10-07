@@ -1,32 +1,33 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-07T13:01:54.330119+00:00",
+  "recordedAt": "2026-10-07T14:06:21.995252+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 37,
+    "knownOpenTaskCount": 38,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 19,
+      "LOCAL_DEVELOPMENT": 20,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 37,
+    "projectRemainingLowerBound": 38,
     "completionPercentage": null,
     "notes": [
-      "37 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "38 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
     ],
     "localDeliveryBreakdown": {
-      "recordedAt": "2026-10-07T12:57:12.253309+00:00",
+      "recordedAt": "2026-10-07T14:06:21.995252+00:00",
       "implementationRemaining": {
-        "count": 1,
+        "count": 2,
         "taskIds": [
-          "O01"
+          "O01",
+          "W03"
         ]
       },
       "implementedAwaitingBrowserAndPostgresVerification": {
@@ -50,7 +51,7 @@
           "F15"
         ]
       },
-      "note": "19 OPEN local targets: O01 in progress, 16 awaiting browser/PostgreSQL, W02 and U01 awaiting browser/devices. No double counting.",
+      "note": "20 OPEN local targets: O01 in progress, W03 confirmed by source audit, 16 awaiting browser/PostgreSQL, W02 and U01 awaiting browser/devices. No double counting.",
       "implementedAwaitingBrowserVerification": {
         "count": 2,
         "taskIds": [
@@ -2903,7 +2904,7 @@
           ]
         }
       ],
-      "observed": "请求/Webhook/下载线程阶段已通过；六类 Agent 队列、工作器和模型 HTTP 来源追踪补齐，范围去重 307 项和固定包 7 次启动、12 次模型接收、非空升级/排队强退/原键重放/独立恢复通过。其余 worker 和业务号/实例/任务标识继续接线，O01 保持 OPEN。",
+      "observed": "请求/Webhook/下载、六类 Agent 队列及八类财务队列已通过范围与固定包验收。财务阶段 636 项回归，8 次启动、291 次业务 HTTP、116 次网关请求、280 表升级/恢复，22 条财务命令无重复发送。其余 worker 与业务号/实例/任务标识继续接线，O01 保持 OPEN。",
       "references": [
         {
           "path": "docs/superpowers/plans/2026-10-07-operation-tracing.md",
@@ -2915,6 +2916,10 @@
         },
         {
           "path": "docs/evidence/operation-tracing-agent-20261007.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/operation-tracing-finance-20261007.json",
           "line": 1
         }
       ],
@@ -2928,7 +2933,42 @@
       "agentQueueStage": {
         "status": "PASSED_LOCAL_FIXED_PACKAGE",
         "evidence": "docs/evidence/operation-tracing-agent-20261007.json"
+      },
+      "financeQueueStage": {
+        "status": "PASSED_LOCAL_FIXED_PACKAGE",
+        "evidence": "docs/evidence/operation-tracing-finance-20261007.json"
       }
+    },
+    {
+      "id": "W03",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "流程设计与发布",
+      "status": "OPEN",
+      "title": "设计器坐标和连线路径导出为 BPMN DI",
+      "sourceRefs": [
+        {
+          "documentId": "03",
+          "section": "§4.3 图形信息",
+          "lines": [
+            358,
+            358
+          ]
+        }
+      ],
+      "observed": "节点 x/y 已随草稿保存且排除语义差异；自动连线拐点只在画布计算，发布器未输出 BPMNShape、BPMNEdge 或 waypoint。已沿实际保存和部署调用链确认，不能以 W02 交互完成代替图形导出。",
+      "references": [
+        {
+          "path": "docs/superpowers/plans/2026-10-07-designer-bpmn-di.md",
+          "line": 1
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java",
+          "line": 132
+        }
+      ],
+      "acceptance": "节点边界及连线拐点经校验后保存和发布为有效 BPMN DI，Flowable 能读取原图形信息；兼容旧草稿且不改变条件、分支顺序或语义差异。",
+      "dependsOn": [],
+      "implementationStatus": "NOT_STARTED"
     }
   ],
   "sourceSectionIndex": [
@@ -3228,7 +3268,8 @@
       "openTaskIds": [
         "F13",
         "W01",
-        "V03"
+        "V03",
+        "W03"
       ],
       "existingEvidencePointers": [
         {
@@ -4068,6 +4109,7 @@
   },
   "recommendedNextTaskIds": [
     "O01",
+    "W03",
     "V03"
   ],
   "externalDelivery": {
@@ -4094,16 +4136,16 @@
   },
   "latestProgress": {
     "taskId": "O01",
-    "status": "AGENT_STAGE_VERIFIED_OTHER_WORKERS_AND_BUSINESS_IDENTIFIERS_IN_PROGRESS",
-    "recordedAt": "2026-10-07T13:49:04.287597+00:00",
-    "knownOpenTaskCount": 37,
-    "evidence": "docs/evidence/operation-tracing-agent-20261007.json"
+    "status": "FINANCE_STAGE_VERIFIED_OTHER_WORKERS_AND_BUSINESS_IDENTIFIERS_IN_PROGRESS",
+    "recordedAt": "2026-10-07T14:11:04.701946+00:00",
+    "knownOpenTaskCount": 38,
+    "evidence": "docs/evidence/operation-tracing-finance-20261007.json"
   },
   "localMainIntegration": {
-    "verifiedThroughCommit": "ce241c16c5b7c72e7a0f33328b4b70995e68c1c5",
-    "mergeCommit": "ce241c16c5b7c72e7a0f33328b4b70995e68c1c5",
+    "verifiedThroughCommit": "22267769d960ceac4f06e46b0b22819b68108224",
+    "mergeCommit": "22267769d960ceac4f06e46b0b22819b68108224",
     "originMainFetchedAtMerge": "2ac75649c026501460a59464d80f9a48ddf6ecd7",
     "remotePush": false,
-    "note": "Verified O01 Agent queue stage is ready for the next local fast-forward; full O01, browser/PostgreSQL and external gates remain."
+    "note": "Verified O01 finance stage is ready for local fast-forward; W03 is now registered and all existing delivery gates remain."
   }
 }

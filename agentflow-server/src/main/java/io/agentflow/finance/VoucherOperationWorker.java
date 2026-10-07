@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.common.DomainException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +15,7 @@ import java.time.Instant;
 @Service
 public class VoucherOperationWorker {
     private static final Logger LOG = LoggerFactory.getLogger(VoucherOperationWorker.class);
+    private static final String TRACE_SOURCE = "voucher-operation";
     private final JdbcVoucherOperationRepository operations;
     private final VoucherOperationService execution;
     private final AccountingVoucherPort accounting;
@@ -26,19 +28,22 @@ public class VoucherOperationWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Voucher worker must execute outside a database transaction");
         for (var candidate : operations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
+                    TRACE_SOURCE, candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input();
-                    var result = claimed.status() == VoucherOperation.Status.POSTING ? accounting.post(input.targetDigest(), input.command()) : accounting.query(input.targetDigest(), input.command());
-                    execution.finish(claimed, result, Instant.now());
-                } catch (RuntimeException failed) {
-                    var reason = failed instanceof DomainException domain && "VOUCHER_EVIDENCE_EXPIRED".equals(domain.code())
-                            ? VoucherOperation.Failure.EVIDENCE_EXPIRED : VoucherOperation.Failure.INTERNAL_ERROR;
-                    execution.fail(claimed, reason, Instant.now());
-                    LOG.error("Voucher dispatch failed, errorCode={}, operationId={}", reason, candidate.id());
-                }
-            } catch (RuntimeException failed) { LOG.error("Voucher worker failed, errorCode={}, operationId={}", "WORKER_FAILURE", candidate.id()); }
+                    var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var input = claimed.input();
+                        var result = claimed.status() == VoucherOperation.Status.POSTING ? accounting.post(input.targetDigest(), input.command()) : accounting.query(input.targetDigest(), input.command());
+                        execution.finish(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) {
+                        var reason = failed instanceof DomainException domain && "VOUCHER_EVIDENCE_EXPIRED".equals(domain.code())
+                                ? VoucherOperation.Failure.EVIDENCE_EXPIRED : VoucherOperation.Failure.INTERNAL_ERROR;
+                        execution.fail(claimed, reason, Instant.now());
+                        LOG.error("Voucher dispatch failed, errorCode={}, operationId={}", reason, candidate.id());
+                    }
+                } catch (RuntimeException failed) { LOG.error("Voucher worker failed, errorCode={}, operationId={}", "WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
 }
