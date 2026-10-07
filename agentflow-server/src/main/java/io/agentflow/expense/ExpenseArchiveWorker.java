@@ -29,10 +29,14 @@ public class ExpenseArchiveWorker {
         var candidates = archives.candidates(cursor); if (candidates.isEmpty()) cursor = null;
         for (var candidate : candidates) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-archive", candidate.reportId().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-archive", candidate.reportId().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var manifest = service.prepare(candidate.tenantId(), candidate.reportId());
-                    if (manifest != null) { files.verify(manifest); service.complete(manifest); }
+                    if (manifest != null) {
+                        LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "expense-archive", candidate.reportId());
+                        files.verify(manifest); service.complete(manifest);
+                    }
                 } catch (DomainException blocked) {
                     try { service.block(candidate.tenantId(), candidate.reportId(), blocked.code()); }
                     catch (RuntimeException failed) { log(candidate, failed); }

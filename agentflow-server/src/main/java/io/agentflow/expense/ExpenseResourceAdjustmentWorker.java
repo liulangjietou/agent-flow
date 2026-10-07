@@ -43,9 +43,11 @@ public class ExpenseResourceAdjustmentWorker {
     private void prepare() {
         for (var candidate : preparations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-resource-preparation", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-resource-preparation", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = preparing.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "expense-resource-preparation", candidate.id());
                     try {
                         var input = claimed.input(); var result = periods.period(candidate.tenantId(), input.basis().consumption().input().targetDigest(), input.periodRequest());
                         preparing.finish(claimed, result, Instant.now());
@@ -57,9 +59,11 @@ public class ExpenseResourceAdjustmentWorker {
     private void budget() {
         for (var candidate : budgets.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "budget-consumption-reversal", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "budget-consumption-reversal", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = budgetExecution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "budget-consumption-reversal", candidate.id());
                     try {
                         var input = claimed.input(); var result = claimed.status() == BudgetConsumptionReversalOperation.Status.EXECUTING
                                 ? budgetPort.execute(input.targetDigest(), input.command()) : budgetPort.query(input.targetDigest(), input.command());
@@ -72,8 +76,12 @@ public class ExpenseResourceAdjustmentWorker {
     private void resources() {
         for (var candidate : adjustments.ready()) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-resource-adjustment", candidate.id().toString()).open()) {
-                try { resourceExecution.apply(candidate); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-resource-adjustment", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
+                try {
+                    LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "expense-resource-adjustment", candidate.id());
+                    resourceExecution.apply(candidate);
+                }
                 catch (DomainException problem) {
                     try { if (!"CONCURRENCY_CONFLICT".equals(problem.code())) resourceExecution.block(candidate, problem.code()); }
                     catch (RuntimeException failed) { log("ADJUSTMENT_RESOURCE_BLOCK_FAILURE", candidate.id(), failed); }

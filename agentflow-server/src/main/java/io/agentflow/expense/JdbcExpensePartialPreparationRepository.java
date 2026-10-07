@@ -94,8 +94,15 @@ public class JdbcExpensePartialPreparationRepository {
     }
     /** 到期租约与新排队各有确定持久身份，单批最多十笔。 */
     public List<Candidate> due(Instant at) {
-        return jdbc.query("SELECT tenant_id,id,trace_id FROM expense_partial_adjustment_preparation WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(at));
+        return jdbc.query("""
+                SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM expense_partial_adjustment_preparation q
+                LEFT JOIN expense_partial_adjustment origin ON origin.tenant_id=q.tenant_id AND origin.id=q.adjustment_id AND origin.report_id=q.report_id
+                LEFT JOIN expense_report report ON report.tenant_id=origin.tenant_id AND report.id=origin.report_id
+                LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=report.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+                WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until<=?) ORDER BY q.created_at,q.id LIMIT 10
+                """,
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(at));
     }
     private ExpensePartialAdjustmentPreparation locked(ExpensePartialAdjustmentPreparation next) {
         var input = next.input(); var basis = input.adjustment().input().basis(); reports.lock(basis.tenantId(), basis.reportId());
@@ -164,7 +171,9 @@ public class JdbcExpensePartialPreparationRepository {
      * 扫描候选仅携带租户和准备编号。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) {
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 旧候选没有业务关联时保留空值，工作器不得借用调用线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
     }

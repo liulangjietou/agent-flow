@@ -63,8 +63,14 @@ public class JdbcVoucherReversalPreparationRepository {
     }
     /** 每次只领取有限数量，并由应用服务处理超时旧租约。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id,trace_id FROM voucher_reversal_preparation WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
+        return jdbc.query("""
+                SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM voucher_reversal_preparation q
+                LEFT JOIN voucher_operation origin ON origin.tenant_id=q.tenant_id AND origin.id=q.operation_id
+                LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=origin.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+                WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until<=?) ORDER BY q.created_at,q.id LIMIT 10
+                """,
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now));
     }
     private RowMapper<VoucherReversalPreparation> row() {
         return (row, index) -> {
@@ -86,7 +92,9 @@ public class JdbcVoucherReversalPreparationRepository {
      * 扫描只携带租户与任务标识。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) {
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 旧候选没有业务关联时保留空值，工作器不得借用调用线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
     }

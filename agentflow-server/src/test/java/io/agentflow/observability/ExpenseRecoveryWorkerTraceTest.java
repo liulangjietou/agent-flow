@@ -47,7 +47,7 @@ class ExpenseRecoveryWorkerTraceTest {
             }
         };
         appender.start(); logger.addAppender(appender);
-        try (var outer = new DiagnosticContext(UUID.randomUUID().toString(), "caller-tenant").open()) {
+        try (var outer = new DiagnosticContext(UUID.randomUUID().toString(), "caller-tenant", "caller-business", "caller-instance", "caller-task").open()) {
             var caller = MDC.getCopyOfContextMap();
             harness.poll().run();
             assertThat(MDC.getCopyOfContextMap()).isEqualTo(caller);
@@ -58,9 +58,12 @@ class ExpenseRecoveryWorkerTraceTest {
             assertThat(observed.get(0)).containsEntry("traceId", SOURCE).containsEntry("tenantId", "tenant-a");
             assertThat(observed.get(1)).containsEntry("tenantId", "tenant-b");
             assertThat(observed.get(2)).containsEntry("tenantId", "tenant-a");
-            for (var context : observed) assertThat(DiagnosticContext.validTrace(context.get("traceId"))).isTrue();
+            for (var context : observed) {
+                assertThat(DiagnosticContext.validTrace(context.get("traceId"))).isTrue();
+                assertThat(context).doesNotContainKeys("businessNo", "processInstanceId", "taskId");
+            }
             assertThat(observed.get(1).get("traceId")).isNotEqualTo(SOURCE).isNotEqualTo(observed.get(2).get("traceId"));
-            assertThat(appender.list).hasSize(2).allSatisfy(event -> {
+            assertThat(appender.list.stream().filter(event -> event.getLevel() == ch.qos.logback.classic.Level.ERROR).toList()).hasSize(2).allSatisfy(event -> {
                 assertThat(event.getMDCPropertyMap()).containsEntry("traceId", SOURCE).containsEntry("tenantId", "tenant-a");
                 assertThat(event.getFormattedMessage()).contains(harness.errorCode()).doesNotContain(PRIVATE);
                 assertThat(event.getThrowableProxy()).isNull();

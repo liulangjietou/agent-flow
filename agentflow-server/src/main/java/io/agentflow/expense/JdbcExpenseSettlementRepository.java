@@ -71,24 +71,32 @@ public class JdbcExpenseSettlementRepository {
 
     /** 本地核销不含网络等待，消费者用原报销锁完成有界短事务。 */
     public List<Candidate> pending() {
-        return jdbc.query("SELECT tenant_id,report_id,version,trace_id FROM expense_settlement WHERE status='QUEUED' ORDER BY updated_at,tenant_id,report_id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("report_id")), row.getLong("version"), row.getString("trace_id")));
+        return jdbc.query("""
+                SELECT q.tenant_id,q.report_id,q.version,q.trace_id,business.business_no,submitted.process_instance_id FROM expense_settlement q
+                LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=q.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=q.round_no
+                WHERE q.status='QUEUED' ORDER BY q.updated_at,q.tenant_id,q.report_id LIMIT 10
+                """,
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("report_id")), row.getLong("version"), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")));
     }
 
     /** 轮转游标避免未满足零应付条件的前十份凭证阻塞后续升级补登，进程重启可安全重扫。 */
     public List<RecoveryCandidate> recoveryCandidates(RecoveryCandidate after) {
         String sql = """
-                SELECT f.* FROM (
-                    SELECT 'PAYMENT' AS kind,p.tenant_id,a.business_id AS report_id,p.id,p.trace_id FROM payment_operation p
+                SELECT f.*,business.business_no,submitted.process_instance_id FROM (
+                    SELECT 'PAYMENT' AS kind,p.tenant_id,a.business_id AS report_id,p.id,p.trace_id,a.application_id,a.round_no FROM payment_operation p
                     JOIN payment_authorization a ON a.tenant_id=p.tenant_id AND a.id=p.id
                     WHERE a.purpose='EXPENSE_REIMBURSEMENT' AND p.status='SUCCEEDED'
                     UNION ALL
-                    SELECT 'VOUCHER' AS kind,tenant_id,business_id AS report_id,id,trace_id FROM voucher_operation
+                    SELECT 'VOUCHER' AS kind,tenant_id,business_id AS report_id,id,trace_id,application_id,round_no FROM voucher_operation
                     WHERE kind='EXPENSE_ACCRUAL' AND status='POSTED'
                     UNION ALL
-                    SELECT 'ZERO' AS kind,tenant_id,business_id AS report_id,id,trace_id FROM voucher_preparation
+                    SELECT 'ZERO' AS kind,tenant_id,business_id AS report_id,id,trace_id,application_id,round_no FROM voucher_preparation
                     WHERE kind='EXPENSE_ACCRUAL' AND status='NOT_REQUIRED'
-                ) f WHERE NOT EXISTS (SELECT 1 FROM expense_settlement s WHERE s.tenant_id=f.tenant_id AND s.report_id=f.report_id)
+                ) f
+                LEFT JOIN approval_application business ON business.tenant_id=f.tenant_id AND business.id=f.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=f.round_no
+                WHERE NOT EXISTS (SELECT 1 FROM expense_settlement s WHERE s.tenant_id=f.tenant_id AND s.report_id=f.report_id)
                 """;
         var args = new java.util.ArrayList<Object>();
         if (after != null) {
@@ -96,7 +104,7 @@ public class JdbcExpenseSettlementRepository {
             args.addAll(List.of(after.kind().name(), after.kind().name(), after.tenantId(), after.kind().name(), after.tenantId(), after.id().toString()));
         }
         return jdbc.query(sql + " ORDER BY f.kind,f.tenant_id,f.id LIMIT 10", (row, index) -> new RecoveryCandidate(
-                FundingKind.valueOf(row.getString("kind")), row.getString("tenant_id"), UUID.fromString(row.getString("report_id")), UUID.fromString(row.getString("id")), row.getString("trace_id")), args.toArray());
+                FundingKind.valueOf(row.getString("kind")), row.getString("tenant_id"), UUID.fromString(row.getString("report_id")), UUID.fromString(row.getString("id")), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), args.toArray());
     }
 
     private RowMapper<ExpenseSettlement> row() {
@@ -127,7 +135,9 @@ public class JdbcExpenseSettlementRepository {
      * 调度候选不携带金额、回单或其他敏感数据。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID reportId, long version, String traceId) {
+    public record Candidate(String tenantId, UUID reportId, long version, String traceId, String businessNo, String processInstanceId) {
+        /** 旧候选没有业务关联时保留空值，工作器不得借用调用线程。 */
+        public Candidate(String tenantId, UUID reportId, long version, String traceId) { this(tenantId, reportId, version, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public Candidate(String tenantId, UUID reportId, long version) { this(tenantId, reportId, version, null); }
     }
@@ -142,7 +152,9 @@ public class JdbcExpenseSettlementRepository {
      * 补登扫描游标不携带财务金额或回单。
      * @author owlzhangfq@gmail.com
      */
-    public record RecoveryCandidate(FundingKind kind, String tenantId, UUID reportId, UUID id, String traceId) {
+    public record RecoveryCandidate(FundingKind kind, String tenantId, UUID reportId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 旧候选没有业务关联时保留空值，工作器不得借用调用线程。 */
+        public RecoveryCandidate(FundingKind kind, String tenantId, UUID reportId, UUID id, String traceId) { this(kind, tenantId, reportId, id, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public RecoveryCandidate(FundingKind kind, String tenantId, UUID reportId, UUID id) { this(kind, tenantId, reportId, id, null); }
     }

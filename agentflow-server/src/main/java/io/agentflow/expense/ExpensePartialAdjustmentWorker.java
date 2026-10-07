@@ -46,9 +46,11 @@ public class ExpensePartialAdjustmentWorker {
     private void prepare() {
         for (var candidate : preparations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-partial-preparation", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-partial-preparation", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = preparing.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "expense-partial-preparation", candidate.id());
                     try { preparing.finish(claimed, reader.read(claimed), Instant.now()); }
                     catch (RuntimeException failed) { preparing.fail(claimed, Instant.now()); log("PARTIAL_PREPARATION_READ_FAILURE", candidate.id(), failed); }
                 } catch (RuntimeException failed) { log("PARTIAL_PREPARATION_WORKER_FAILURE", candidate.id(), failed); }
@@ -58,9 +60,11 @@ public class ExpensePartialAdjustmentWorker {
     private void budget() {
         for (var candidate : adjustments.dueBudget(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-partial-budget", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-partial-budget", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = finance.claimBudget(candidate.tenantId(), candidate.id(), candidate.operationId(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "expense-partial-budget", candidate.id());
                     try {
                         var input = claimed.input(); var result = claimed.status() == BudgetConsumptionReductionOperation.Status.EXECUTING
                                 ? budgets.execute(input.targetDigest(), input.command()) : budgets.query(input.targetDigest(), input.command());
@@ -73,9 +77,11 @@ public class ExpensePartialAdjustmentWorker {
     private void accrual() {
         for (var candidate : adjustments.dueAccrual(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-partial-accrual", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-partial-accrual", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = finance.claimAccrual(candidate.tenantId(), candidate.id(), candidate.operationId(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "expense-partial-accrual", candidate.id());
                     try {
                         var input = claimed.input(); var result = claimed.status() == ExpenseAccrualReductionOperation.Status.POSTING
                                 ? accruals.post(input.targetDigest(), input.command()) : accruals.query(input.targetDigest(), input.command());
@@ -88,8 +94,12 @@ public class ExpensePartialAdjustmentWorker {
     private void completeResources() {
         for (var candidate : adjustments.ready()) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-partial-adjustment", candidate.id().toString()).open()) {
-                try { resources.apply(candidate); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-partial-adjustment", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
+                try {
+                    LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "expense-partial-adjustment", candidate.id());
+                    resources.apply(candidate);
+                }
                 catch (DomainException changed) {
                     try { if (!"CONCURRENCY_CONFLICT".equals(changed.code())) resources.block(candidate, changed.code()); }
                     catch (RuntimeException failed) { log("PARTIAL_RESOURCE_BLOCK_FAILURE", candidate.id(), failed); }

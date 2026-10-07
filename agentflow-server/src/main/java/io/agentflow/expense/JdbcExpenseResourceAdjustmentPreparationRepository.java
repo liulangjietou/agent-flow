@@ -78,8 +78,15 @@ public class JdbcExpenseResourceAdjustmentPreparationRepository {
     }
     /** 到期读取有界扫描，运行中任务只在租约过期时恢复。 */
     public List<Candidate> due(Instant at) {
-        return jdbc.query("SELECT tenant_id,id,trace_id FROM expense_resource_adjustment_preparation WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(at));
+        // 准备登记时已固定原结算及消费编号；结算输入不可替换，不沿当前申请轮次查询。
+        return jdbc.query("""
+                SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM expense_resource_adjustment_preparation q
+                LEFT JOIN expense_settlement origin ON origin.tenant_id=q.tenant_id AND origin.report_id=q.report_id AND origin.budget_operation_id=q.consumption_id
+                LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=origin.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+                WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until<=?) ORDER BY q.created_at,q.id LIMIT 10
+                """,
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(at));
     }
     private RowMapper<ExpenseResourceAdjustmentPreparation> row() {
         return (row, index) -> {
@@ -110,7 +117,9 @@ public class JdbcExpenseResourceAdjustmentPreparationRepository {
      * 调度索引不携带金额或原件正文。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) {
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 旧候选没有业务关联时保留空值，工作器不得借用调用线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
     }

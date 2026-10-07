@@ -81,15 +81,16 @@ public class JdbcExpenseBudgetReviewRepository {
     /** 只扫描已有预算终态或等待系统通过的当前轮次，调度延后防止早期节点饥饿。 */
     public List<Candidate> due(Instant at) {
         return jdbc.query("""
-                SELECT r.tenant_id,r.report_id,r.application_id,r.round_no,b.id AS operation_id,COALESCE(b.trace_id,r.trace_id) AS trace_id FROM expense_budget_review r
+                SELECT r.tenant_id,r.report_id,r.application_id,r.round_no,b.id AS operation_id,COALESCE(b.trace_id,r.trace_id) AS trace_id,a.business_no,submitted.process_instance_id FROM expense_budget_review r
                 JOIN approval_application a ON a.tenant_id=r.tenant_id AND a.id=r.application_id AND a.round_no=r.round_no
                 JOIN budget_operation b ON b.tenant_id=r.tenant_id AND b.id=COALESCE(r.authorized_operation_id,r.original_operation_id)
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=a.tenant_id AND submitted.application_id=a.id AND submitted.round_no=r.round_no
                 WHERE a.status='IN_APPROVAL' AND r.next_check_at<=? AND
                     ((r.status IN ('WAITING_BUDGET','AUTHORIZED') AND b.status IN ('APPLIED','REJECTED')) OR
                     (r.status='CONFIRMED' AND r.budget_node_id IS NOT NULL AND r.automatic_audit_id IS NULL AND r.authorized_operation_id IS NULL))
                 ORDER BY r.next_check_at,r.tenant_id,r.report_id,r.round_no LIMIT 10
                 """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("report_id")),
-                        UUID.fromString(row.getString("application_id")), row.getInt("round_no"), row.getString("trace_id"), UUID.fromString(row.getString("operation_id"))), Timestamp.from(at));
+                        UUID.fromString(row.getString("application_id")), row.getInt("round_no"), row.getString("trace_id"), UUID.fromString(row.getString("operation_id")), row.getString("business_no"), row.getString("process_instance_id")), Timestamp.from(at));
     }
 
     /** 轮询时刻不是业务事实，不为尚未到达的原生节点追加虚假的审批修订。 */
@@ -178,7 +179,9 @@ public class JdbcExpenseBudgetReviewRepository {
      * 后台扫描只持有身份，进入申请锁后重新核对真实状态。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID reportId, UUID applicationId, int roundNo, String traceId, UUID operationId) {
+    public record Candidate(String tenantId, UUID reportId, UUID applicationId, int roundNo, String traceId, UUID operationId, String businessNo, String processInstanceId) {
+        /** 旧候选没有业务关联时保留空值，工作器不得借用调用线程。 */
+        public Candidate(String tenantId, UUID reportId, UUID applicationId, int roundNo, String traceId, UUID operationId) { this(tenantId, reportId, applicationId, roundNo, traceId, operationId, null, null); }
         /** 显式恢复旧身份时保留兼容入口，持久扫描始终携带原操作。 */
         public Candidate(String tenantId, UUID reportId, UUID applicationId, int roundNo, String traceId) { this(tenantId, reportId, applicationId, roundNo, traceId, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */

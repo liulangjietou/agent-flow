@@ -38,9 +38,11 @@ public class VoucherReversalExecutionWorker {
     private void prepare() {
         for (var candidate : preparations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "voucher-reversal-preparation", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "voucher-reversal-preparation", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = preparing.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "voucher-reversal-preparation", candidate.id());
                     try {
                         var input = claimed.input(); var command = input.source().command(); var original = originalPort.query(input.targetDigest(), command);
                         FinanceResult<AccountingPeriodPort.OpenPeriod> period = new FinanceResult.Unavailable<>(FinanceResult.Failure.INVALID_RESPONSE);
@@ -59,9 +61,11 @@ public class VoucherReversalExecutionWorker {
     private void execute() {
         for (var candidate : operations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "voucher-reversal-operation", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "voucher-reversal-operation", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "voucher-reversal-operation", candidate.id());
                     try {
                         var input = claimed.input(); var result = claimed.status() == VoucherReversalOperation.Status.POSTING ? port.post(input.targetDigest(), input.command()) : port.query(input.targetDigest(), input.command());
                         execution.finish(claimed, result, Instant.now());

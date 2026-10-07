@@ -83,12 +83,15 @@ public class JdbcExpenseArchiveRepository {
     /** 固定游标轮转，前页缺原件或凭证的单据不会饿死后续可归档报销。 */
     public List<Candidate> candidates(Candidate after) {
         String sql = """
-                SELECT s.tenant_id,s.report_id,s.trace_id FROM expense_settlement s WHERE s.status='SETTLED'
+                SELECT s.tenant_id,s.report_id,s.trace_id,business.business_no,submitted.process_instance_id FROM expense_settlement s
+                LEFT JOIN approval_application business ON business.tenant_id=s.tenant_id AND business.id=s.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=s.round_no
+                WHERE s.status='SETTLED'
                 AND NOT EXISTS(SELECT 1 FROM expense_archive a WHERE a.tenant_id=s.tenant_id AND a.report_id=s.report_id AND a.round_no=s.round_no AND a.archived_at IS NOT NULL)
                 """;
         var args = new java.util.ArrayList<Object>();
         if (after != null) { sql += " AND (s.tenant_id>? OR (s.tenant_id=? AND s.report_id>?))"; args.addAll(List.of(after.tenantId(), after.tenantId(), after.reportId().toString())); }
-        return jdbc.query(sql + " ORDER BY s.tenant_id,s.report_id LIMIT 10", (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("report_id")), row.getString("trace_id")), args.toArray());
+        return jdbc.query(sql + " ORDER BY s.tenant_id,s.report_id LIMIT 10", (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("report_id")), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), args.toArray());
     }
     /** 摘要校验和下载使用同一份保存字节，不重新序列化历史档案。 */
     public static String sha256(String value) {
@@ -104,7 +107,9 @@ public class JdbcExpenseArchiveRepository {
      * 后台扫描身份不携带财务原文。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID reportId, String traceId) {
+    public record Candidate(String tenantId, UUID reportId, String traceId, String businessNo, String processInstanceId) {
+        /** 旧候选没有业务关联时保留空值，工作器不得借用调用线程。 */
+        public Candidate(String tenantId, UUID reportId, String traceId) { this(tenantId, reportId, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public Candidate(String tenantId, UUID reportId) { this(tenantId, reportId, null); }
     }

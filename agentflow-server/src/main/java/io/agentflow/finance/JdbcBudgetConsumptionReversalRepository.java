@@ -79,10 +79,14 @@ public class JdbcBudgetConsumptionReversalRepository {
     /** 未知按持久退避查询，租约超时不得被扫描器改成首次发送。 */
     public List<Candidate> due(Instant at) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM budget_consumption_reversal_operation
-                WHERE (status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?) OR (status IN ('EXECUTING','QUERYING') AND lease_until<=?)
-                ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(at), timestamp(at));
+                SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM budget_consumption_reversal_operation q
+                LEFT JOIN expense_resource_adjustment origin ON origin.tenant_id=q.tenant_id AND origin.id=q.id
+                LEFT JOIN expense_report report ON report.tenant_id=origin.tenant_id AND report.id=origin.report_id
+                LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=report.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+                WHERE (q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at<=?) OR (q.status IN ('EXECUTING','QUERYING') AND q.lease_until<=?)
+                ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(at), timestamp(at));
     }
     private RowMapper<BudgetConsumptionReversalOperation> row() {
         return (row, index) -> {
@@ -110,7 +114,9 @@ public class JdbcBudgetConsumptionReversalRepository {
      * 扫描只传固定租户和命令编号。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) {
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 旧候选没有业务关联时保留空值，工作器不得借用调用线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
     }

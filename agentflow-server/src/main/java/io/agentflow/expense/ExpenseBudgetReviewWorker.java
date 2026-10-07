@@ -29,8 +29,12 @@ public class ExpenseBudgetReviewWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Budget review worker must start outside a transaction");
         for (var candidate : reviews.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-budget-review", candidate.reportId() + ":" + candidate.roundNo()).open()) {
-                try { recovery.recover(candidate); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-budget-review", candidate.reportId() + ":" + candidate.roundNo())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
+                try {
+                    LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "expense-budget-review", candidate.reportId());
+                    recovery.recover(candidate);
+                }
                 catch (RuntimeException failure) {
                     LOG.error("Budget review recovery failed, errorCode={}, reportId={}", "RECOVERY_FAILURE", candidate.reportId());
                     try { recovery.defer(candidate); }

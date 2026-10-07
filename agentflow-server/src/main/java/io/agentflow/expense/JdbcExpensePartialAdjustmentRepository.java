@@ -212,8 +212,14 @@ public class JdbcExpensePartialAdjustmentRepository {
     public List<Candidate> dueAccrual(Instant at) { return due("accrual", at); }
     /** 两侧成功后独立扫描本地完成，数据库异常或重启不会再次发送已成功命令。 */
     public List<Candidate> ready() {
-        return jdbc.query("SELECT tenant_id,id,report_id,version,trace_id FROM expense_partial_adjustment WHERE status='READY' AND completed_at IS NULL AND retired_at IS NULL ORDER BY updated_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), UUID.fromString(row.getString("report_id")), row.getLong("version"), row.getString("trace_id")));
+        return jdbc.query("""
+                SELECT q.tenant_id,q.id,q.report_id,q.version,q.trace_id,business.business_no,submitted.process_instance_id FROM expense_partial_adjustment q
+                LEFT JOIN expense_report report ON report.tenant_id=q.tenant_id AND report.id=q.report_id
+                LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=report.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=q.round_no
+                WHERE q.status='READY' AND q.completed_at IS NULL AND q.retired_at IS NULL ORDER BY q.updated_at,q.id LIMIT 10
+                """,
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), UUID.fromString(row.getString("report_id")), row.getLong("version"), row.getString("trace_id"), null, row.getString("business_no"), row.getString("process_instance_id")));
     }
     /** 调用方持有原报销锁；只读拒绝不标记事务回滚，使应用服务能够原子停止失效队列。 */
     public ExpenseAdjustmentFundingSource dispatchSource(ExpensePartialAdjustment value) {
@@ -228,11 +234,14 @@ public class JdbcExpensePartialAdjustmentRepository {
     }
     private List<Candidate> due(String side, Instant at) {
         // 预算与会计分别授权，后台来源必须读取当前指令的登记记录，不能沿用调整创建请求。
-        return jdbc.query("SELECT a.tenant_id,a.id,a.report_id,a.version,o.trace_id,a." + side + "_operation_id AS operation_id FROM expense_partial_adjustment a "
+        return jdbc.query("SELECT a.tenant_id,a.id,a.report_id,a.version,o.trace_id,business.business_no,submitted.process_instance_id,a." + side + "_operation_id AS operation_id FROM expense_partial_adjustment a "
                 + "LEFT JOIN expense_partial_adjustment_operation o ON o.tenant_id=a.tenant_id AND o.adjustment_id=a.id AND o.id=a." + side + "_operation_id "
+                + "LEFT JOIN expense_report report ON report.tenant_id=a.tenant_id AND report.id=a.report_id "
+                + "LEFT JOIN approval_application business ON business.tenant_id=a.tenant_id AND business.id=report.application_id "
+                + "LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=a.round_no "
                 + "WHERE a.retired_at IS NULL AND ((a." + side + "_status IN ('QUEUED','UNKNOWN') AND a." + side
                 + "_next_at<=?) OR (a." + side + "_status IN ('EXECUTING','POSTING','QUERYING') AND a." + side + "_lease_until<=?)) ORDER BY a.updated_at,a.id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), UUID.fromString(row.getString("report_id")), row.getLong("version"), row.getString("trace_id"), UUID.fromString(row.getString("operation_id"))), timestamp(at), timestamp(at));
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), UUID.fromString(row.getString("report_id")), row.getLong("version"), row.getString("trace_id"), UUID.fromString(row.getString("operation_id")), row.getString("business_no"), row.getString("process_instance_id")), timestamp(at), timestamp(at));
     }
 
     private void save(ExpensePartialAdjustment value) {
@@ -363,7 +372,9 @@ public class JdbcExpensePartialAdjustmentRepository {
      * 工作器只传租户、报销和当前修订，账务内容由实际状态恢复。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, UUID reportId, long version, String traceId, UUID operationId) {
+    public record Candidate(String tenantId, UUID id, UUID reportId, long version, String traceId, UUID operationId, String businessNo, String processInstanceId) {
+        /** 旧候选没有业务关联时保留空值，工作器不得借用调用线程。 */
+        public Candidate(String tenantId, UUID id, UUID reportId, long version, String traceId, UUID operationId) { this(tenantId, id, reportId, version, traceId, operationId, null, null); }
         /** 本地资源完成没有外部指令身份。 */
         public Candidate(String tenantId, UUID id, UUID reportId, long version, String traceId) { this(tenantId, id, reportId, version, traceId, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */

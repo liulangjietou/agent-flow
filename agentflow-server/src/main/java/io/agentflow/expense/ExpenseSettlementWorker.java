@@ -32,16 +32,24 @@ public class ExpenseSettlementWorker {
         if (candidates.isEmpty()) recoveryCursor = null;
         for (var candidate : candidates) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-settlement-recovery", candidate.kind() + ":" + candidate.id()).open()) {
-                try { registration.recover(candidate); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-settlement-recovery", candidate.kind() + ":" + candidate.id())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
+                try {
+                    LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "expense-settlement-recovery", candidate.id());
+                    registration.recover(candidate);
+                }
                 catch (RuntimeException failed) { log(candidate.reportId(), failed); }
             }
             recoveryCursor = candidate;
         }
         for (var candidate : settlements.pending()) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-settlement", candidate.reportId().toString()).open()) {
-                try { execution.consume(candidate); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-settlement", candidate.reportId().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
+                try {
+                    LOG.info("Expense recovery execution started, errorCode={}, source={}, operationId={}", "NONE", "expense-settlement", candidate.reportId());
+                    execution.consume(candidate);
+                }
                 catch (DomainException problem) {
                     try { if (!"CONCURRENCY_CONFLICT".equals(problem.code())) execution.block(candidate, problem.code()); }
                     catch (RuntimeException failed) { log(candidate.reportId(), failed); }
