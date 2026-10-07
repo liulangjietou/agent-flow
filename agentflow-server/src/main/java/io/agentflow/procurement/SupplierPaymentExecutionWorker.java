@@ -29,9 +29,11 @@ public class SupplierPaymentExecutionWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Supplier cashier preparation must run outside a database transaction");
         for (var candidate : requests.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-payment-execution", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-payment-execution", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Supplier execution started, errorCode={}, source={}, operationId={}", "NONE", "supplier-payment-execution", candidate.id());
                     try {
                         var result = reader.read(execution.authorization(claimed), claimed.input().cashier()); execution.finish(claimed, result, Instant.now());
                     } catch (RuntimeException failed) {

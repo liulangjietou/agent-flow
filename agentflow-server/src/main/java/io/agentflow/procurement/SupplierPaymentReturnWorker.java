@@ -29,9 +29,11 @@ public class SupplierPaymentReturnWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Supplier return reads must execute outside a database transaction");
         for (var candidate : checks.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-payment-return", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-payment-return", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Supplier execution started, errorCode={}, source={}, operationId={}", "NONE", "supplier-payment-return", candidate.id());
                     try { service.finish(claimed, gateway.query(claimed.input().request()), Instant.now()); }
                     catch (RuntimeException failure) {
                         service.fail(claimed, Instant.now()); LOG.error("Supplier return read failed, errorCode={}, checkId={}", "SUPPLIER_PAYMENT_RETURN_READ_FAILURE", candidate.id());

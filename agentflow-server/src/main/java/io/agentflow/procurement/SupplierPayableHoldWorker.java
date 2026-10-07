@@ -29,9 +29,11 @@ public class SupplierPayableHoldWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Supplier payable hold worker must execute outside a database transaction");
         for (var candidate : operations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-payable-hold", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-payable-hold", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Supplier execution started, errorCode={}, source={}, operationId={}", "NONE", "supplier-payable-hold", candidate.id());
                     try {
                         if (claimed.status() == SupplierPayableHoldOperation.Status.RESERVING) {
                             claimed.requireSendAt(Instant.now()); execution.finish(claimed, gateway.reserve(claimed.command()), Instant.now());

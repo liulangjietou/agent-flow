@@ -30,9 +30,11 @@ public class SupplierSettlementPreparationWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Supplier settlement preparation must run outside a database transaction");
         for (var candidate : preparations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-settlement-preparation", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-settlement-preparation", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Supplier execution started, errorCode={}, source={}, operationId={}", "NONE", "supplier-settlement-preparation", candidate.id());
                     try {
                         var input = claimed.input(); var result = reader.read(input.payment().command(), input.accountingDate()); execution.finish(claimed, result, Instant.now());
                     } catch (RuntimeException failed) {

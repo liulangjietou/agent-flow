@@ -35,9 +35,11 @@ public class SupplierAdjustmentWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Supplier adjustment execution must run outside a database transaction");
         for (var candidate : operations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-adjustment", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-adjustment", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Supplier execution started, errorCode={}, source={}, operationId={}", "NONE", "supplier-adjustment", candidate.id());
                     try {
                         if (claimed.status() == SupplierPayableAdjustmentOperation.Status.CHECKING) {
                             var command = claimed.command(); var result = reader.read(command.source(), command.period().request().accountingDate());
@@ -52,9 +54,11 @@ public class SupplierAdjustmentWorker {
         }
         for (var candidate : operations.awaitingLocalCompletion()) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-adjustment", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-adjustment", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var operation = operations.find(candidate.tenantId(), candidate.id()).orElseThrow(); if (!operation.adjusted()) continue;
+                    LOG.info("Supplier execution started, errorCode={}, source={}, operationId={}", "NONE", "supplier-adjustment", candidate.id());
                     var checked = returns.query(operation.command().source().returns().request());
                     if (checked instanceof FinanceResult.Success<SupplierPaymentReturnPort.Receipt> success) completion.complete(operation, success.value(), Instant.now());
                     else LOG.error("Supplier adjustment completion bank read failed, errorCode={}, operationId={}", "SUPPLIER_ADJUSTMENT_COMPLETION_BANK_UNAVAILABLE", candidate.id());

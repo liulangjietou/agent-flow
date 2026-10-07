@@ -130,7 +130,8 @@ def execute_input(runtime, payment):
 def paid(runtime, fixture):
     request = create(runtime, fixture); payment = held(runtime, request)
     runtime.call('POST', cashier_path(payment) + '/actions', execute_input(runtime, payment), 'cashier', 202)
-    view = wait_for(lambda: runtime.call('GET', cashier_path(payment), user='cashier'), lambda v: v.get('operation') and v['operation']['status'] not in ('QUEUED', 'CHECKING', 'EXECUTING'))
+    view = wait_for(lambda: runtime.call('GET', cashier_path(payment), user='cashier'),
+                    lambda v: v.get('operation') and v['operation']['status'] not in ('QUEUED', 'CHECKING', 'SENDING', 'UNKNOWN', 'QUERYING'))
     assert view['operation']['status'] == 'SUCCEEDED', view
     return {'request': request, 'payment': payment}
 

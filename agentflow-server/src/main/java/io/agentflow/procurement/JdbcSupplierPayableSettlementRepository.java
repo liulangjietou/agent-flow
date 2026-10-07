@@ -196,21 +196,28 @@ public class JdbcSupplierPayableSettlementRepository {
     /** 恢复扫描排除已结束尝试；状态未知只能由领域领取原号查询。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM supplier_payable_settlement_operation WHERE retired_version IS NULL AND ((status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
-                OR (status IN ('CHECKING','SETTLING','QUERYING') AND lease_until<=?)) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
+                SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM supplier_payable_settlement_operation q
+                LEFT JOIN supplier_payment_authorization origin ON origin.tenant_id=q.tenant_id AND origin.id=q.payment_id
+                LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=origin.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+                WHERE q.retired_version IS NULL AND ((q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at<=?)
+                OR (q.status IN ('CHECKING','SETTLING','QUERYING') AND q.lease_until<=?)) ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now), timestamp(now));
     }
 
     /** ERP 已确认但本地暂等银行复核时，只补原占用完成，不再调用任何结算写入。 */
     public List<Candidate> awaitingLocalCompletion() {
         return jdbc.query("""
-                SELECT o.tenant_id,o.id,o.trace_id FROM supplier_payable_settlement_operation o
+                SELECT o.tenant_id,o.id,o.trace_id,business.business_no,submitted.process_instance_id FROM supplier_payable_settlement_operation o
                 JOIN procurement_payable_reservation r ON r.tenant_id=o.tenant_id AND r.id=o.reservation_id
                 JOIN supplier_payment_operation b ON b.tenant_id=o.tenant_id AND b.id=o.payment_id
+                LEFT JOIN supplier_payment_authorization origin ON origin.tenant_id=o.tenant_id AND origin.id=o.payment_id
+                LEFT JOIN approval_application business ON business.tenant_id=o.tenant_id AND business.id=origin.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
                 WHERE o.status='SETTLED' AND o.retired_version IS NULL AND r.version=1 AND b.status='SUCCEEDED'
                 AND NOT (%s)
                 ORDER BY o.updated_at,o.id LIMIT 10
-                """.formatted(SupplierPayableReturnGuard.BLOCKED_SQL), (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")));
+                """.formatted(SupplierPayableReturnGuard.BLOCKED_SQL), (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")));
     }
     private SupplierPayableSettlementOperation restore(ResultSet row, int index) throws SQLException {
         var value = json.read(row.getString("state_json"), SupplierPayableSettlementOperation.class); var command = value.command();
@@ -250,7 +257,9 @@ public class JdbcSupplierPayableSettlementRepository {
      * 后台扫描只返回结算身份。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) {
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 原业务关联不存在时保持空值，不借用当前审批轮次或工作线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
     }

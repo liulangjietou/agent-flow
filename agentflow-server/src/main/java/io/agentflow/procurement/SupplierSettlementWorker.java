@@ -31,9 +31,11 @@ public class SupplierSettlementWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Supplier settlement execution must run outside a database transaction");
         for (var candidate : settlements.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-settlement", candidate.id().toString()).open()) {
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-settlement", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Supplier execution started, errorCode={}, source={}, operationId={}", "NONE", "supplier-settlement", candidate.id());
                     try {
                         if (claimed.status() == SupplierPayableSettlementOperation.Status.CHECKING) {
                             var command = claimed.command(); var result = reader.read(command.payment(), command.period().request().accountingDate());
@@ -48,8 +50,11 @@ public class SupplierSettlementWorker {
         }
         for (var candidate : settlements.awaitingLocalCompletion()) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-settlement", candidate.id().toString()).open()) {
-                try { execution.completeLocal(candidate.tenantId(), candidate.id(), Instant.now()); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-settlement", candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
+                try {
+                    LOG.info("Supplier execution started, errorCode={}, source={}, operationId={}", "NONE", "supplier-settlement", candidate.id());
+                    execution.completeLocal(candidate.tenantId(), candidate.id(), Instant.now()); }
                 catch (RuntimeException failed) { LOG.error("Supplier local settlement completion failed, errorCode={}, operationId={}", "SUPPLIER_SETTLEMENT_COMPLETION_FAILURE", candidate.id()); }
             }
         }

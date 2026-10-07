@@ -190,18 +190,25 @@ public class JdbcSupplierPayableAdjustmentRepository {
     /** 恢复扫描排除已结束尝试；状态未知只能由领域领取原号查询。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM supplier_payable_adjustment_operation WHERE retired_version IS NULL AND ((status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
-                OR (status IN ('CHECKING','ADJUSTING','QUERYING') AND lease_until<=?)) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
+                SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM supplier_payable_adjustment_operation q
+                LEFT JOIN supplier_payment_authorization origin ON origin.tenant_id=q.tenant_id AND origin.id=q.payment_id
+                LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=origin.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+                WHERE q.retired_version IS NULL AND ((q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at<=?)
+                OR (q.status IN ('CHECKING','ADJUSTING','QUERYING') AND q.lease_until<=?)) ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now), timestamp(now));
     }
 
     /** ERP 已确认但本地暂等银行复核时，只补原占用完成，不再调用任何调整写入。 */
     public List<Candidate> awaitingLocalCompletion() {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM supplier_payable_adjustment_operation
-                WHERE status='ADJUSTED' AND retired_version IS NULL AND completed_version IS NULL
-                ORDER BY updated_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")));
+                SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM supplier_payable_adjustment_operation q
+                LEFT JOIN supplier_payment_authorization origin ON origin.tenant_id=q.tenant_id AND origin.id=q.payment_id
+                LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=origin.application_id
+                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+                WHERE q.status='ADJUSTED' AND q.retired_version IS NULL AND q.completed_version IS NULL
+                ORDER BY q.updated_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")));
     }
 
     // 与账本、分录和占用同事务调用；后续查询只改变状态，不得再次占用办理位置。
@@ -267,7 +274,9 @@ public class JdbcSupplierPayableAdjustmentRepository {
      * 后台扫描只返回调整身份。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) {
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 原业务关联不存在时保持空值，不借用当前审批轮次或工作线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
         /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
         public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
     }

@@ -479,7 +479,9 @@ class SupplierPaymentPersistenceTest {
         }
         var duplicate = SupplierPaymentReturnCheck.queue(new SupplierPaymentReturnCheck.Input(UUID.randomUUID(), tenant, payment.command().targetDigest(), payment.version(), request, "finance", time));
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> returnChecks.create(duplicate))).isInstanceOf(DataIntegrityViolationException.class);
-        assertThat(returnChecks.due(time)).contains(new JdbcSupplierPaymentReturnCheckRepository.Candidate(tenant, queued.input().id(), sourceTrace));
+        assertThat(returnChecks.due(time)).extracting(JdbcSupplierPaymentReturnCheckRepository.Candidate::tenantId,
+                JdbcSupplierPaymentReturnCheckRepository.Candidate::id, JdbcSupplierPaymentReturnCheckRepository.Candidate::traceId)
+                .contains(org.assertj.core.api.Assertions.tuple(tenant, queued.input().id(), sourceTrace));
         assertThat(returnChecks.find("other", queued.input().id())).isEmpty();
     }
 

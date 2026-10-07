@@ -36,6 +36,9 @@ final class SupplierMigrationJdbcTemplate extends JdbcTemplate {
                     "SELECT tenant_id,id,NULL AS trace_id FROM " + table);
             sql = sql.replace("SELECT o.tenant_id,o.id,o.trace_id FROM " + table,
                     "SELECT o.tenant_id,o.id,NULL AS trace_id FROM " + table);
+            if (sql.contains("FROM " + table + " q") || sql.contains("FROM " + table + " o")) {
+                sql = sql.replace("q.trace_id,", "NULL AS trace_id,").replace("o.trace_id,", "NULL AS trace_id,");
+            }
         }
         return super.query(sql, mapper, args);
     }
