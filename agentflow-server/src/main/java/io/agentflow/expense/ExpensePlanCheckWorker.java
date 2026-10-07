@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -25,18 +27,20 @@ public class ExpensePlanCheckWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Expense plan worker must execute outside a database transaction");
         for (var candidate : jobs.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var job = execution.claim(candidate.tenantId(), candidate.id(), Instant.now());
-                if (job == null) continue;
-                ExpensePlanCheck.Result result;
-                try { result = evaluator.evaluate(job); }
-                catch (RuntimeException failed) {
-                    result = ExpensePlanCheck.Result.unavailable("INTERNAL_ERROR");
-                    LOG.error("Expense plan check failed, errorCode={}, jobId={}", "INTERNAL_ERROR", candidate.id());
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-plan-check", candidate.id().toString()).open()) {
+                try {
+                    var job = execution.claim(candidate.tenantId(), candidate.id(), Instant.now());
+                    if (job == null) continue;
+                    ExpensePlanCheck.Result result;
+                    try { result = evaluator.evaluate(job); }
+                    catch (RuntimeException failed) {
+                        result = ExpensePlanCheck.Result.unavailable("INTERNAL_ERROR");
+                        LOG.error("Expense plan check failed, errorCode={}, jobId={}", "INTERNAL_ERROR", candidate.id());
+                    }
+                    execution.finish(job, result, Instant.now());
+                } catch (RuntimeException failed) {
+                    LOG.error("Expense plan check execution failed, errorCode={}, jobId={}", "WORKER_FAILURE", candidate.id());
                 }
-                execution.finish(job, result, Instant.now());
-            } catch (RuntimeException failed) {
-                LOG.error("Expense plan check execution failed, errorCode={}, jobId={}", "WORKER_FAILURE", candidate.id());
             }
         }
     }

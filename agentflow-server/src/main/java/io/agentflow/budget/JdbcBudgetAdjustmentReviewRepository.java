@@ -1,5 +1,7 @@
 package io.agentflow.budget;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.FinanceResult;
@@ -38,9 +40,9 @@ public class JdbcBudgetAdjustmentReviewRepository {
         if (!BudgetAdjustmentReview.queue(input).equals(value) || input.attempt() != latestAttempt(source.tenantId(), source.requestId(), input.requestedBy()) + 1) throw conflict();
         try {
             jdbc.update("""
-                    INSERT INTO budget_adjustment_review(tenant_id,id,request_id,application_id,employee_id,request_version,requested_by,attempt_no,
-                    requested_at,input_json,state_json,version,status,updated_at,active_request_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?)
-                    """, source.tenantId(), input.id().toString(), source.requestId().toString(), source.applicationId().toString(), source.employeeId(),
+                    INSERT INTO budget_adjustment_review(trace_id,tenant_id,id,request_id,application_id,employee_id,request_version,requested_by,attempt_no,
+                    requested_at,input_json,state_json,version,status,updated_at,active_request_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?)
+                    """, DiagnosticContext.capture().traceId(), source.tenantId(), input.id().toString(), source.requestId().toString(), source.applicationId().toString(), source.employeeId(),
                     source.approvedRequestVersion(), input.requestedBy(), input.attempt(), timestamp(input.requestedAt()), json.write(input), json.write(value),
                     timestamp(value.updatedAt()), source.requestId().toString());
         } catch (DuplicateKeyException duplicate) { throw new DomainException("BUDGET_ADJUSTMENT_REVIEW_ACTIVE", "The finance actor already has an active budget ledger review"); }
@@ -95,8 +97,8 @@ public class JdbcBudgetAdjustmentReviewRepository {
     }
     /** 只扫描十个标识，租约到期只落失败，不把旧结果重新排队。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id FROM budget_adjustment_review WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY requested_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now));
+        return jdbc.query("SELECT tenant_id,id,trace_id FROM budget_adjustment_review WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY requested_at,id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
     }
     private BudgetAdjustmentReview restore(ResultSet row, int index) throws SQLException {
         var value = json.read(row.getString("state_json"), BudgetAdjustmentReview.class); var input = value.input(); var source = input.source();
@@ -130,5 +132,8 @@ public class JdbcBudgetAdjustmentReviewRepository {
      * 后台只传原租户及读取标识。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }

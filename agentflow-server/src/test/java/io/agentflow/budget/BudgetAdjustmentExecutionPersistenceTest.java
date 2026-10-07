@@ -93,7 +93,9 @@ class BudgetAdjustmentExecutionPersistenceTest {
     }
 
     @Test void originalApprovalReadyRevisionAndSingleConsumptionSurviveRepositoryReconstruction() {
-        var source = approved(); var ready = ready(source, "finance", 2); var queued = authorize(ready);
+        var source = approved(); var ready = ready(source, "finance", 2);
+        String origin = UUID.randomUUID().toString(); BudgetAdjustmentOperation queued;
+        try (var scope = new io.agentflow.observability.DiagnosticContext(origin, tenant).open()) { queued = authorize(ready); }
         var reopenedReviews = new JdbcBudgetAdjustmentReviewRepository(jdbc, json, sources);
         var reopened = new JdbcBudgetAdjustmentOperationRepository(jdbc, json, sources, reopenedReviews);
         assertThat(reopened.find(tenant, queued.command().id())).contains(queued);
@@ -101,7 +103,7 @@ class BudgetAdjustmentExecutionPersistenceTest {
         assertThat(reopenedReviews.find(tenant, ready.input().id()).orElseThrow().supports(queued.command())).isTrue();
         assertThat(reopenedReviews.revision(tenant, ready.input().id(), 3)).contains(ready);
         assertThat(reopened.activeForRequest(tenant, source.requestId())).contains(queued);
-        assertThat(reopened.due(queued.createdAt())).containsExactly(new JdbcBudgetAdjustmentOperationRepository.Candidate(tenant, queued.command().id()));
+        assertThat(reopened.due(queued.createdAt())).containsExactly(new JdbcBudgetAdjustmentOperationRepository.Candidate(tenant, queued.command().id(), origin));
         assertThat(count("budget_adjustment_review_revision")).isEqualTo(4); assertThat(count("budget_adjustment_operation_revision")).isEqualTo(1);
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> operations.create(queued, ready.input().id()))).isInstanceOf(DomainException.class);
         assertThat(count("budget_adjustment_operation")).isEqualTo(1);
@@ -211,11 +213,13 @@ class BudgetAdjustmentExecutionPersistenceTest {
         assertThat(jdbc.queryForList("SELECT * FROM approval_application")).isEqualTo(applications);
         assertThat(jdbc.queryForList("SELECT * FROM budget_adjustment_revision ORDER BY request_version")).isEqualTo(original);
         assertThat(sources.derive(tenant, source.requestId())).isEqualTo(source);
+        assertThat(upgrade.migrate().migrationsExecuted).isZero(); assertThat(upgrade.validateWithResult().validationSuccessful).isTrue();
+        // 先独立验证 V77 保持原批准，再升级到当前结构供当前仓储写入新增诊断列。
+        Flyway.configure().dataSource(dataSource).defaultSchema(schema).load().migrate();
         var ready = ready(source, "finance", 2); var queued = authorize(ready);
         assertThatThrownBy(() -> jdbc.update("UPDATE budget_adjustment_operation SET review_version=2 WHERE tenant_id=? AND id=?", tenant, queued.command().id().toString())).isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc.update("UPDATE budget_adjustment_operation SET active_request_id=NULL WHERE tenant_id=? AND id=?", tenant, queued.command().id().toString())).isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc.update("UPDATE budget_adjustment_operation SET authorized_by='other' WHERE tenant_id=? AND id=?", tenant, queued.command().id().toString())).isInstanceOf(DataIntegrityViolationException.class);
-        assertThat(upgrade.migrate().migrationsExecuted).isZero(); assertThat(upgrade.validateWithResult().validationSuccessful).isTrue();
     }
 
     @Test void workersUseShortTransactionsAndReadNeverAutomaticallyAuthorizes() {

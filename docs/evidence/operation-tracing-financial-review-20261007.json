@@ -1,0 +1,112 @@
+{
+  "recordedAt": "2026-10-07T15:24:39.381558+00:00",
+  "taskId": "O01",
+  "status": "FINANCIAL_REVIEW_STAGE_PASSED_O01_OPEN",
+  "sourceBaseCommit": "806271e5478f5cf92ba246e166be25e90840880f",
+  "sourceHashes": {
+    "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentCheckWorker.java": "668f3d284a27b747f2038917fa366c4968d3575eaf463ae8e2c0b7d1aa273846",
+    "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentExecutionWorker.java": "a14068551e7d58353a4add534485308409868d4cc264fb1ee5e09658653183ed",
+    "agentflow-server/src/main/java/io/agentflow/budget/BudgetAdjustmentReviewWorker.java": "d4c4dd9932b0d49e2d404e69a9cf9a3175c00781f54caaab9c8af7598ae169ec",
+    "agentflow-server/src/main/java/io/agentflow/budget/JdbcBudgetAdjustmentCheckRepository.java": "94e263dc32970bc29e7a3cc2ed9abe11e3cf13fee3a04c19d6a7ac1dba4beb05",
+    "agentflow-server/src/main/java/io/agentflow/budget/JdbcBudgetAdjustmentOperationRepository.java": "5c9e6519c785108b90b0f7cff2e1ca08dfa6c449b6ae5b0e901b49069c88b7fa",
+    "agentflow-server/src/main/java/io/agentflow/budget/JdbcBudgetAdjustmentReviewRepository.java": "1eec3f5e5b053255a74bb7d1a52a95ab7b1ba9770c74bc3f4813da491ae08b3b",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceDisbursementReturnWorker.java": "d162b52e75c53994de00b67648934ec7ba2bdc34a8becb980f7ebde23eaacbb0",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentReviewWorker.java": "4437b64720d1c2645d81dd5f7726cc2acc04d86bf44d3a01671ff230a926d613",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRepaymentWorker.java": "b393f40c465800c77ea5e464df4a25f42a722c23488c8bad94e9c2648aeee730",
+    "agentflow-server/src/main/java/io/agentflow/expense/AdvanceRequestCheckWorker.java": "92d500305cf14e328dba62dd8eb05c0d4eb10e2d8768125d3b8155bc93926243",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePaymentReturnWorker.java": "f2effd8d470e795fec7bf160644b0c38a317b7eed8d404fb69e56a7988e78030",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePlanCheckWorker.java": "293c5a8905a1e6f047684151633a77ae7068dd1ff94d99b9d9eb9889d9ee26a2",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcAdvanceRepaymentCheckRepository.java": "4e950bb5e00808b86e5e2a1f3007b0d9decef4aaae4ff419831438f18947e923",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcAdvanceRequestCheckRepository.java": "3e3c6b6abcdab6cc6fe7f6f500f2274e9630a27940d18b1551f30899cf0cfb12",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcDisbursementReturnCheckRepository.java": "b597bc50cc858ae64f2ec6c59d9ec41fbf96337034c16075fdcf14fb22e91add",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpensePaymentReturnCheckRepository.java": "875510a344782aa4bdc626613664dcf7b2cb78f0fe9c8fed99c808c200667312",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpensePlanCheckRepository.java": "d5f830ed4febe0fc25968bd19eb57011f610ff69936dc99553544a1421502bf0",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcRepaymentReviewCheckRepository.java": "5a9fd224483a8cf8b9a86b1b864ec001cca109c4a9c94b427d189caf67be56de",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcVoucherReversalCheckRepository.java": "7ee5f4cd82631852fde38cd142689d020e56463414e1a329bbc63545ecc62cec",
+    "agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalWorker.java": "e47c0788dd0c3daf368978f2f25bfc783979ae70a9fa756e59c4d26f77b59cc2",
+    "agentflow-server/src/main/java/io/agentflow/procurement/JdbcProcurementPaymentCheckRepository.java": "0ae37475ff15136d7bc5aacb069f8905629b78f16cc1145ce00974ca511762c5",
+    "agentflow-server/src/main/java/io/agentflow/procurement/ProcurementPaymentCheckWorker.java": "b2c8728aabfd1e6649c3726d897b1120e9f256e6cdb2ce603aafde6965376313",
+    "agentflow-server/src/test/java/io/agentflow/budget/BudgetAdjustmentExecutionPersistenceTest.java": "c3aa39bd7412af097eb44bcda74bd43c8b780182e9e8da0525d016c995e17d32",
+    "agentflow-server/src/test/java/io/agentflow/budget/BudgetAdjustmentFinanceWorkflowTest.java": "476d59a7a14fec6a1aca358a0771e3152075f2eb646f57c5ae06fd0583016eae",
+    "agentflow-server/src/main/resources/db/migration/V125__financial_review_origin_traces.sql": "14e32928d3c995a526e1c1eceae4763e94f2cd5f28489dbc30d01b5a91b37f1e",
+    "agentflow-server/src/test/java/io/agentflow/observability/FinancialReviewWorkerTraceTest.java": "6183e68743829a6d9f096c7e6b323f887c4c2d4312812b26e64afa14e931bd3c",
+    "scripts/check-financial-review-trace-runtime.py": "33d7ef3b1f43c79046e30e62f15e73863814123a9e3e35b2622ea026c82ed4a8",
+    "scripts/check-definition-diagram-runtime.py": "e23f3ba8e72e1e29922d9027a542ba025f542f691a97876970eefeac8934da01",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7",
+    "scripts/check-agent-trace-runtime.py": "ac736d5fe00b636419d185d7d69e4a66adfefebc244fe2d9931e4b9aecd19a66",
+    "scripts/check-operation-trace-runtime.py": "8d0da2af3281f9372c970acebb65871f1c53a9d9e99d95cf82f48ec777b37dc9",
+    "scripts/payment-due-dates-support/CompareH2Schema.java": "4e92f585f39d6ce6a43bd400a31216179e8b7f15f5f676abd80b5fb7b12a0a3b",
+    "agentflow-server/src/main/java/io/agentflow/observability/DiagnosticContext.java": "ae93629262febc126657711a0306aa0a334f381e8002813b129d1d09b82e5004",
+    "agentflow-server/src/main/java/io/agentflow/finance/FinanceGatewayClient.java": "4380d649a3a0b93fb369c75afec409e281efd24d5200a11115b3c9007b8484b1"
+  },
+  "jar": "/fyoung/tmp/agentflow-remaining-20260928/o01-financial-review-server.jar",
+  "jarSha256": "567819e4b2b4dfe761e1e237530cfbc7099777c9382f8e92e3b0c83918e656f9",
+  "redTests": 14,
+  "scopeUniqueTests": 662,
+  "testReportNote": "662 个唯一服务端用例。首轮 661 项通过，1 项旧候选相等断言预期 traceId=null；改为验证仓储重建后保留原诊断来源，相关 17 项复测通过。保留首次失败及复测日志，不声称单次 662 项绿灯。",
+  "runtime": {
+    "status": "PASS",
+    "jarSha256": "567819e4b2b4dfe761e1e237530cfbc7099777c9382f8e92e3b0c83918e656f9",
+    "previousJarSha256": "d369949781f14ed5be6ee401ff8dcfdc5868e13fbcc70b7e6cd21356afd2914d",
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "tables": 280,
+        "newNullableColumns": 11,
+        "populatedQueueTypes": 3
+      },
+      {
+        "name": "origin-recovery-and-replay",
+        "queueTypes": 3,
+        "legacyGatewayCounts": {
+          "PRECHECK": 2,
+          "REVIEW": 1,
+          "OPERATION": 1
+        },
+        "currentGatewayCounts": {
+          "PRECHECK": 2,
+          "REVIEW": 1,
+          "OPERATION": 1
+        },
+        "originalKeyReplays": 6,
+        "commands": 2,
+        "duplicateCommands": 0
+      },
+      {
+        "name": "independent-restore",
+        "tables": 280,
+        "sameAuthorizedDetails": 6,
+        "resentRequests": 0
+      }
+    ],
+    "boots": 8,
+    "businessHttpRequests": 109,
+    "responseTraces": 147,
+    "gatewayRequests": 18
+  },
+  "workerCount": 11,
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/o01-financial-review-verified/manifest.json",
+  "archiveSha256": "8489c7d96b03d64d1d3b727025e4641ee4f825e9ad1c26b8e0cdac42274d429c",
+  "review": {
+    "mode": "SELF_REVIEW",
+    "unresolvedFindingsInStage": [],
+    "independentReview": false
+  },
+  "scope": [
+    "11 queues persist origin in the original insertion transaction; workers restore before claim and clean up after failure",
+    "Source values do not change input JSON, financial commands, stable identifiers or authorization",
+    "Fixed package verifies 11 nullable schema additions; three populated budget queue types recover original identities"
+  ],
+  "remaining": [
+    "15 other worker chains",
+    "Direct scheduler chains",
+    "Trusted business/process/task identifiers",
+    "Browser and PostgreSQL gates",
+    "Real enterprise integration"
+  ]
+}

@@ -1,5 +1,7 @@
 package io.agentflow.budget;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,16 +27,18 @@ public class BudgetAdjustmentReviewWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Budget review worker must run outside a database transaction");
         for (var candidate : reviews.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "budget-adjustment-review", candidate.id().toString()).open()) {
                 try {
-                    var source = claimed.input().source();
-                    var result = ledger.read(source.tenantId(), source.round().targetDigest(), source.round().content().ledgerRequest(source.employeeId()));
-                    service.finish(claimed, result, Instant.now());
-                } catch (RuntimeException failed) {
-                    service.fail(claimed, Instant.now()); LOG.error("Budget review failed, errorCode={}, reviewId={}", "REVIEW_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failed) { LOG.error("Budget review worker failed, errorCode={}, reviewId={}", "REVIEW_WORKER_FAILURE", candidate.id()); }
+                    var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var source = claimed.input().source();
+                        var result = ledger.read(source.tenantId(), source.round().targetDigest(), source.round().content().ledgerRequest(source.employeeId()));
+                        service.finish(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) {
+                        service.fail(claimed, Instant.now()); LOG.error("Budget review failed, errorCode={}, reviewId={}", "REVIEW_FAILURE", candidate.id());
+                    }
+                } catch (RuntimeException failed) { LOG.error("Budget review worker failed, errorCode={}, reviewId={}", "REVIEW_WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
 }

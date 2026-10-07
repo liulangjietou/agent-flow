@@ -79,6 +79,7 @@ class BudgetAdjustmentFinanceWorkflowTest {
     private final Map<UUID, String> commandBytes = new ConcurrentHashMap<>();
     private final Map<UUID, BudgetAdjustmentObservation> accepted = new ConcurrentHashMap<>();
     private BiFunction<String, JsonNode, String> responder;
+    private final java.util.List<String> traceHeaders = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
         registry.add("agentflow.attachments.directory", DIRECTORY::toString);
@@ -132,6 +133,48 @@ class BudgetAdjustmentFinanceWorkflowTest {
     }
     @AfterEach void settle() { actors.clear(); responder = this::normal; configuration.setEnabled(true); configuration.getTenants().get("demo").setEndpoint(ENDPOINT); reviewWorker.poll(); executionWorker.poll(); }
     @AfterAll static void closeServer() { SERVER.stop(0); }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"PRECHECK", "REVIEW", "OPERATION"})
+    void originalRequestTraceSurvivesEachQueueAndReplay(String kind) throws Exception {
+        UUID id = kind.equals("PRECHECK") ? create() : approved();
+        if (kind.equals("OPERATION")) queueAndRead(id);
+        String endpoint = switch (kind) {
+            case "PRECHECK" -> path(id) + "/prechecks";
+            case "REVIEW" -> financePath(id) + "/reviews";
+            default -> financePath(id) + "/authorizations";
+        };
+        var body = switch (kind) {
+            case "PRECHECK" -> queueInput(id);
+            case "REVIEW" -> reviewInput(id);
+            default -> authorizeInput(id, view(id, "finance"));
+        };
+        String user = kind.equals("PRECHECK") ? "alice" : "finance", key = UUID.randomUUID().toString();
+        var response = send(endpoint, user, key, body); var receipt = ok(response, 202);
+        String origin = response.getHeader("X-Trace-Id");
+        var replay = send(endpoint, user, key, body);
+        assertThat(replay.getContentAsString()).isEqualTo(response.getContentAsString());
+        assertThat(replay.getHeader("X-Trace-Id")).isNotEqualTo(origin);
+        traceHeaders.clear();
+        try (var outer = new io.agentflow.observability.DiagnosticContext(UUID.randomUUID().toString(), "caller").open()) {
+            var context = org.slf4j.MDC.getCopyOfContextMap();
+            switch (kind) {
+                case "PRECHECK" -> worker.poll();
+                case "REVIEW" -> reviewWorker.poll();
+                default -> executionWorker.poll();
+            }
+            assertThat(org.slf4j.MDC.getCopyOfContextMap()).isEqualTo(context);
+        }
+        assertThat(traceHeaders).isNotEmpty().allSatisfy(trace -> assertThat(trace).isEqualTo(origin));
+        String table = switch (kind) {
+            case "PRECHECK" -> "budget_adjustment_check_job";
+            case "REVIEW" -> "budget_adjustment_review";
+            default -> "budget_adjustment_operation";
+        };
+        String identity = receipt.path(kind.equals("PRECHECK") ? "id" : kind.equals("REVIEW") ? "reviewId" : "operationId").asText();
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM " + table + " WHERE tenant_id='demo' AND id=?", String.class, identity)).isEqualTo(origin);
+        assertThat(org.slf4j.MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
 
     @Test void actualApprovalReadAndExplicitAuthorizationApplyExactlyTheCurrentTwoSidedLedger() throws Exception {
         UUID id = approved(); assertThat(calls.get("budget-adjustment-command")).isNull();
@@ -575,6 +618,7 @@ class BudgetAdjustmentFinanceWorkflowTest {
             server.createContext("/finance/", exchange -> {
                 var active = ACTIVE.get(); String operation = exchange.getRequestURI().getPath().substring("/finance/".length());
                 active.calls.computeIfAbsent(operation, key -> new AtomicInteger()).incrementAndGet();
+                active.traceHeaders.add(String.valueOf(exchange.getRequestHeaders().getFirst("X-Trace-Id")));
                 var request = active.json.read(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8), JsonNode.class);
                 byte[] bytes = active.responder.apply(operation, request).getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().set("Content-Type", "application/json"); exchange.sendResponseHeaders(200, bytes.length);

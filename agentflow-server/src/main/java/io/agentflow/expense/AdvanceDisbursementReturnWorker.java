@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.finance.AdvanceDisbursementReturnPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,14 +26,16 @@ public class AdvanceDisbursementReturnWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Disbursement worker must execute outside a database transaction");
         for (var candidate : checks.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "disbursement-return-check", candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input(); service.finish(claimed, port.query(input.tenantId(), input.targetDigest(), input.request()), Instant.now());
-                } catch (RuntimeException failure) {
-                    service.fail(claimed, Instant.now()); LOG.error("Disbursement return read failed, errorCode={}, checkId={}", "DISBURSEMENT_RETURN_READ_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failure) { LOG.error("Disbursement return worker failed, errorCode={}, checkId={}", "DISBURSEMENT_RETURN_WORKER_FAILURE", candidate.id()); }
+                    var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var input = claimed.input(); service.finish(claimed, port.query(input.tenantId(), input.targetDigest(), input.request()), Instant.now());
+                    } catch (RuntimeException failure) {
+                        service.fail(claimed, Instant.now()); LOG.error("Disbursement return read failed, errorCode={}, checkId={}", "DISBURSEMENT_RETURN_READ_FAILURE", candidate.id());
+                    }
+                } catch (RuntimeException failure) { LOG.error("Disbursement return worker failed, errorCode={}, checkId={}", "DISBURSEMENT_RETURN_WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
 }

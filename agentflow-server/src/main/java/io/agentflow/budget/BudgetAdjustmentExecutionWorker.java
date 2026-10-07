@@ -1,5 +1,7 @@
 package io.agentflow.budget;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,16 +27,18 @@ public class BudgetAdjustmentExecutionWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Budget execution worker must run outside a database transaction");
         for (var candidate : operations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "budget-adjustment-operation", candidate.id().toString()).open()) {
                 try {
-                    var result = claimed.status() == BudgetAdjustmentOperation.Status.EXECUTING
-                            ? gateway.execute(claimed.command()) : gateway.query(claimed.command());
-                    service.finish(claimed, result, Instant.now());
-                } catch (RuntimeException failed) {
-                    service.fail(claimed, Instant.now()); LOG.error("Budget execution failed, errorCode={}, operationId={}", "EXECUTION_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failed) { LOG.error("Budget execution worker failed, errorCode={}, operationId={}", "EXECUTION_WORKER_FAILURE", candidate.id()); }
+                    var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var result = claimed.status() == BudgetAdjustmentOperation.Status.EXECUTING
+                                ? gateway.execute(claimed.command()) : gateway.query(claimed.command());
+                        service.finish(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) {
+                        service.fail(claimed, Instant.now()); LOG.error("Budget execution failed, errorCode={}, operationId={}", "EXECUTION_FAILURE", candidate.id());
+                    }
+                } catch (RuntimeException failed) { LOG.error("Budget execution worker failed, errorCode={}, operationId={}", "EXECUTION_WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
 }

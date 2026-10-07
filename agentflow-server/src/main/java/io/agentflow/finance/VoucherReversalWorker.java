@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -23,14 +25,16 @@ public class VoucherReversalWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Voucher reversal worker must execute outside a database transaction");
         for (var candidate : checks.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "voucher-reversal-check", candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input(); service.finish(claimed, port.query(input.tenantId(), input.targetDigest(), input.request()), Instant.now());
-                } catch (RuntimeException failure) {
-                    service.fail(claimed, Instant.now()); LOG.error("Voucher reversal read failed, errorCode={}, checkId={}", "VOUCHER_REVERSAL_READ_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failure) { LOG.error("Voucher reversal worker failed, errorCode={}, checkId={}", "VOUCHER_REVERSAL_WORKER_FAILURE", candidate.id()); }
+                    var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var input = claimed.input(); service.finish(claimed, port.query(input.tenantId(), input.targetDigest(), input.request()), Instant.now());
+                    } catch (RuntimeException failure) {
+                        service.fail(claimed, Instant.now()); LOG.error("Voucher reversal read failed, errorCode={}, checkId={}", "VOUCHER_REVERSAL_READ_FAILURE", candidate.id());
+                    }
+                } catch (RuntimeException failure) { LOG.error("Voucher reversal worker failed, errorCode={}, checkId={}", "VOUCHER_REVERSAL_WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
 }

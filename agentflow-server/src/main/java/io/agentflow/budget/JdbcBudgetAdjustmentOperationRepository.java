@@ -1,5 +1,7 @@
 package io.agentflow.budget;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.FinanceResult;
@@ -42,10 +44,10 @@ public class JdbcBudgetAdjustmentOperationRepository {
         var consumed = review.consume(command, command.authorizedAt());
         try {
             jdbc.update("""
-                    INSERT INTO budget_adjustment_operation(tenant_id,id,request_id,application_id,employee_id,request_version,authorized_by,review_id,review_version,
+                    INSERT INTO budget_adjustment_operation(trace_id,tenant_id,id,request_id,application_id,employee_id,request_version,authorized_by,review_id,review_version,
                     command_json,command_digest,state_json,version,status,attempts,created_at,updated_at,next_attempt_at,active_request_id)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?, ?,1,'QUEUED',0,?,?,?,?)
-                    """, source.tenantId(), command.id().toString(), source.requestId().toString(), source.applicationId().toString(), source.employeeId(), source.approvedRequestVersion(),
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?, ?,1,'QUEUED',0,?,?,?,?)
+                    """, DiagnosticContext.capture().traceId(), source.tenantId(), command.id().toString(), source.requestId().toString(), source.applicationId().toString(), source.employeeId(), source.approvedRequestVersion(),
                     command.authorizedBy(), reviewId.toString(), review.version(), json.write(command), command.digest(), json.write(value),
                     timestamp(value.createdAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()), source.requestId().toString());
         } catch (DuplicateKeyException duplicate) { throw new DomainException("BUDGET_ADJUSTMENT_ALREADY_AUTHORIZED", "Approved budget request already has an original active adjustment command"); }
@@ -101,10 +103,10 @@ public class JdbcBudgetAdjustmentOperationRepository {
     /** 一批十个原标识，安全结束的旧指令永不被重新领取。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM budget_adjustment_operation WHERE retired_version IS NULL AND
+                SELECT tenant_id,id,trace_id FROM budget_adjustment_operation WHERE retired_version IS NULL AND
                 ((status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?) OR (status IN ('EXECUTING','QUERYING') AND lease_until<=?))
                 ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), timestamp(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
     }
     /** 结束证明引用当前已停止的安全修订，任何失败都回滚释放独占。 */
     @Transactional(propagation = Propagation.MANDATORY)
@@ -175,5 +177,8 @@ public class JdbcBudgetAdjustmentOperationRepository {
      * 扫描候选不携带台账金额或审批正文。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }

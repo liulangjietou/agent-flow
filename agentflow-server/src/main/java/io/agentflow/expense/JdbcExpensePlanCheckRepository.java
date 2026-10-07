@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import org.springframework.dao.DuplicateKeyException;
@@ -33,10 +35,10 @@ public class JdbcExpensePlanCheckRepository {
         if (job.status() != ExpensePlanCheck.Status.QUEUED) throw conflict();
         try {
             jdbc.update("""
-                    INSERT INTO expense_plan_check_job(tenant_id,id,plan_id,application_id,employee_id,application_version,
+                    INSERT INTO expense_plan_check_job(trace_id,tenant_id,id,plan_id,application_id,employee_id,application_version,
                     plan_version,attempt_no,input_json,state_json,version,status,active_plan_id,created_at)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?)
-                    """, input.tenantId(), input.id().toString(), input.planId().toString(), input.applicationId().toString(), input.employeeId(),
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?)
+                    """, DiagnosticContext.capture().traceId(), input.tenantId(), input.id().toString(), input.planId().toString(), input.applicationId().toString(), input.employeeId(),
                     input.applicationVersion(), input.planVersion(), input.attempt(), json.write(input), json.write(job), input.planId().toString(), Timestamp.from(job.createdAt()));
         } catch (DuplicateKeyException duplicate) { throw new DomainException("EXPENSE_PLAN_CHECK_ACTIVE", "Expense plan already has an active precheck"); }
         append(job);
@@ -82,9 +84,9 @@ public class JdbcExpensePlanCheckRepository {
     /** 只读取十项；过期运行用于记录超时，不重复发送旧任务。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM expense_plan_check_job WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
+                SELECT tenant_id,id,trace_id FROM expense_plan_check_job WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
                 ORDER BY created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), Timestamp.from(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), Timestamp.from(now));
     }
     /** 历史只按单据归属查询，使用有界稳定游标。 */
     public List<ExpensePlanCheck> list(String tenant, UUID planId, UUID before, int limit) {
@@ -123,5 +125,8 @@ public class JdbcExpensePlanCheckRepository {
      * 扫描项不复制敏感快照，领取后在锁内重新读取。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }
