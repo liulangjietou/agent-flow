@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
-import { api } from '../api'
+import { api, type ApiError } from '../api'
 import ExpenseProjectOwners from './ExpenseProjectOwners.vue'
 import ExpensePriorControlFacts from './ExpensePriorControlFacts.vue'
 import { expenseError, moneyLabel, type ExpenseDetail } from '../expenses'
@@ -9,11 +9,15 @@ import { initiatorContextLabel } from '../initiatorContext'
 import InitiatorAppointmentPicker from './InitiatorAppointmentPicker.vue'
 import AdvanceOffsetSuggestion from './AdvanceOffsetSuggestion.vue'
 import type { AdvanceOffsetSuggestion as OffsetSuggestion } from '../advanceOffsetSuggestion'
+import { invoiceOccupationLabel, type InvoiceConflict } from '../invoiceWallet'
 
 const props = defineProps<{ detail: ExpenseDetail; scopeKey: string; timeZone: string; locked: boolean }>()
 const emit = defineEmits<{ submitted: [applicationId: string]; busy: [value: boolean]; offsets: [suggestion: OffsetSuggestion]; checked: []; locate: [finding: PrecheckView['findings'][number]] }>()
 const appointment = ref(''), accountingDate = ref(''), options = ref<PrecheckOptions | null>(null), result = ref<PrecheckView | null>(null)
 const reading = ref(false), saving = ref(false), confirm = ref(false), error = ref(''), requiresRefresh = ref(false)
+const submissionConflicts = ref<InvoiceConflict[]>([])
+const currentConflicts = computed(() => result.value?.job.applicationVersion === props.detail.applicationVersion
+  && result.value.job.financialVersion === props.detail.financialVersion ? result.value.invoiceConflicts ?? [] : [])
 let epoch = 0, controller: AbortController | null = null, poll: ReturnType<typeof setTimeout> | undefined, expiry: ReturnType<typeof setTimeout> | undefined, pollUntil = 0
 const blocked = computed(() => props.locked || saving.value)
 const ready = computed(() => usablePrecheck(result.value, props.detail, appointment.value, accountingDate.value))
@@ -35,7 +39,7 @@ function locate(finding: PrecheckView['findings'][number]) { if (canLocate(findi
 /** 所有预检读取有界，迟到的旧账号、旧单据及超时结果不能恢复提交入口。 */
 async function load(jobId?: string, focusOwner?: Element) {
   stop(); const version = epoch, request = new AbortController(); controller = request
-  options.value = null; result.value = null; error.value = ''; reading.value = true; confirm.value = false
+  options.value = null; result.value = null; error.value = ''; submissionConflicts.value = []; reading.value = true; confirm.value = false
   const timeout = setTimeout(() => {
     if (version !== epoch) return
     stop(); reading.value = false; error.value = '费用预检状态读取超时，请刷新。'
@@ -85,19 +89,25 @@ function prepare() { if (!blocked.value && !reading.value && !requiresRefresh.va
 async function submit() {
   if (!confirm.value || blocked.value || reading.value || requiresRefresh.value || !currentReady() || !result.value) return
   const version = epoch, id = props.detail.id
-  saving.value = true; emit('busy', true); error.value = ''
+  saving.value = true; emit('busy', true); error.value = ''; submissionConflicts.value = []
   try {
     const receipt = await api.submitExpense(id, { applicationVersion: props.detail.applicationVersion, financialVersion: props.detail.financialVersion, precheckId: result.value.job.id })
     if (version !== epoch) return
     if (receipt.reportId !== id || receipt.applicationId !== props.detail.applicationId) throw new Error('Receipt mismatch')
     confirm.value = false; requiresRefresh.value = true; saving.value = false; emit('busy', false); emit('submitted', receipt.applicationId)
-  } catch (cause) { if (version === epoch) { error.value = expenseError(cause); requiresRefresh.value = true; confirm.value = false } }
+  } catch (cause) {
+    if (version === epoch) {
+      const failure = cause as ApiError
+      error.value = precheckIssues[failure.code] ?? expenseError(cause); requiresRefresh.value = true; confirm.value = false
+      if (failure.status === 409 && ['INVOICE_OCCUPIED', 'RESOURCES_CHANGED'].includes(failure.code)) submissionConflicts.value = failure.details?.invoiceConflicts ?? []
+    }
+  }
   finally { if (version === epoch) { saving.value = false; emit('busy', false) } }
 }
 watch(() => [appointment.value, accountingDate.value], () => { confirm.value = false })
 watch(() => result.value ? `${result.value.job.id}:${result.value.job.status}` : '', (value, old) => { if (value && value !== old) emit('checked') })
 watch(() => [props.scopeKey, props.detail.id, props.detail.applicationVersion, props.detail.financialVersion], () => {
-  stop(); appointment.value = ''; accountingDate.value = ''; options.value = null; result.value = null; saving.value = false; emit('busy', false); requiresRefresh.value = false
+  stop(); appointment.value = ''; accountingDate.value = ''; options.value = null; result.value = null; submissionConflicts.value = []; error.value = ''; saving.value = false; emit('busy', false); requiresRefresh.value = false
   if (props.scopeKey) void load()
 }, { immediate: true, flush: 'sync' })
 onUnmounted(() => { stop(); emit('busy', false) })
@@ -113,6 +123,7 @@ onUnmounted(() => { stop(); emit('busy', false) })
     <p v-if="options?.destination" class="submission-help">本次财务查询目标：{{ options.destination }}</p>
     <p v-if="options && !options.enabled" class="submission-error">{{ issue(options.unavailableCode) }}</p>
     <p v-if="error" class="submission-error" role="alert">{{ error }}</p>
+    <ul v-if="submissionConflicts.length" class="submission-error" aria-label="本次提交的发票占用冲突"><li v-for="conflict in submissionConflicts" :key="`${conflict.lineNo}:${conflict.invoiceId}`">第 {{ conflict.lineNo }} 行 · {{ invoiceOccupationLabel(conflict.occupation) }}</li></ul>
     <div class="submission-toolbar"><button type="button" class="secondary" :disabled="blocked || reading || active || requiresRefresh || !options?.enabled" @click="queue">开始费用预检</button><button type="button" class="quiet" :disabled="blocked || reading" @click="pollUntil = Date.now() + 90_000; load()">刷新预检结果</button></div>
     <p v-if="reading" class="submission-help" role="status">正在核对最新预检状态…</p>
     <article v-if="result" class="precheck-result" aria-label="本次预检结果">
@@ -120,6 +131,7 @@ onUnmounted(() => { stop(); emit('busy', false) })
       <p class="submission-help">{{ initiatorContextLabel(result.initiator) }} · 会计日期 {{ result.accountingDate }}</p>
       <p v-if="!result.usable && !active" class="submission-error">{{ issue(result.unavailableCode) }}</p>
       <ul v-if="result.findings.length"><li v-for="(finding, index) in result.findings" :key="index">{{ finding.lineNo ? `第 ${finding.lineNo} 行 · ` : '' }}{{ precheckStages[finding.stage] ?? '检查结果' }}：{{ issue(finding.code) }}<small>核对码 {{ finding.code }}</small><button v-if="canLocate(finding)" type="button" class="quiet finding-action" :aria-label="`去处理第 ${finding.lineNo} 行`" @click="locate(finding)">去处理</button></li></ul>
+      <ul v-if="currentConflicts.length" aria-label="当前发票占用来源"><li v-for="conflict in currentConflicts" :key="`${conflict.lineNo}:${conflict.invoiceId}`">第 {{ conflict.lineNo }} 行 · {{ invoiceOccupationLabel(conflict.occupation) }}</li></ul>
       <p v-if="result.budgetExceptionPolicy" class="submission-help">预算政策 {{ result.budgetExceptionPolicy.reference }} 允许申请例外。此时预算尚未冻结；正式提交后如需例外，将由独立预算负责人审批，批准后仍须实际预算确认。</p>
       <template v-if="result.preview"><div class="preview-amounts"><div><small>核定含税额</small><strong>{{ moneyLabel(result.preview.approvedGross) }}</strong></div><div><small>借款抵扣</small><strong>{{ moneyLabel(result.preview.offsetTotal) }}</strong></div><div><small>应付余额</small><strong>{{ moneyLabel(result.preview.payable) }}</strong></div></div><p class="submission-help">收款账户 {{ result.preview.maskedAccount }} · 汇率日期 {{ result.rateDate }}<br />有效至 {{ result.validUntil ? new Date(result.validUntil).toLocaleString('zh-CN') : '待核对' }}；正式提交仍会复核有效性。</p></template>
       <details v-if="result.projectOwners" class="policy-sources"><summary>核对本次项目负责人</summary><p>正式提交时核对当前资格并固定责任；申请人兼任负责人时按本次任职上溯直接主管。</p><ExpenseProjectOwners :source="result.projectOwners" /></details>

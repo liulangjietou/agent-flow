@@ -6622,6 +6622,93 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     @Test
+    void invoiceConflictReferencesAreCurrentAuthorizedReadsAndNeverChangeFrozenPrecheckEvidence() throws Exception {
+        var winner = fixture(true); var rejected = fixture(true); var report = rejected.report();
+        UUID checked = precheck(report); var originalCheck = prechecks.find("demo", checked).orElseThrow();
+        var input = submitInput(report, checked); submit(winner.report());
+        String businessNo = app(winner.report()).businessNo();
+        var before = current(report).state(); var invoiceBefore = invoices.find("demo", rejected.invoice()).orElseThrow().state();
+        var failedResponse = send(path(report) + "/submit", "alice", input);
+        assertThat(failedResponse.getHeader("Cache-Control")).isEqualTo("no-store");
+        var failure = ok(failedResponse, 409);
+        assertThat(failure.path("code").asText()).isEqualTo("RESOURCES_CHANGED");
+        assertThat(failure.at("/details/invoiceConflicts/0/occupation/expense/businessNo").asText()).isEqualTo(businessNo);
+        var conflict = failure.at("/details/invoiceConflicts/0");
+        assertThat(conflict.path("lineNo").asInt()).isEqualTo(1);
+        assertThat(conflict.path("invoiceId").asText()).isEqualTo(rejected.invoice().toString());
+        assertThat(conflict.at("/occupation/status").asText()).isEqualTo("OCCUPIED");
+        assertThat(conflict.at("/occupation/expense/reportId").asText()).isEqualTo(winner.report().id().toString());
+        var walletView = ok(read("/api/v1/invoices/" + rejected.invoice(), "alice"), 200);
+        assertThat(walletView.path("occupation").asText()).isEqualTo("AVAILABLE");
+        assertThat(walletView.at("/activeClaim/expense/businessNo").asText()).isEqualTo(businessNo);
+        var precheckView = ok(read(path(report) + "/prechecks/" + checked, "alice"), 200);
+        assertThat(precheckView.path("invoiceConflicts").get(0)).isEqualTo(conflict);
+        assertThat(prechecks.find("demo", checked).orElseThrow()).isEqualTo(originalCheck);
+        assertThat(current(report).state()).isEqualTo(before);
+        assertThat(invoices.find("demo", rejected.invoice()).orElseThrow().state()).isEqualTo(invoiceBefore);
+        assertThat(tasks(report)).isEmpty();
+        for (String other : List.of("bob", "admin")) {
+            assertThat(read("/api/v1/invoices/" + rejected.invoice(), other).getStatus()).isEqualTo(404);
+            assertThat(read(path(report) + "/prechecks/" + checked, other).getStatus()).isEqualTo(404);
+            assertThat(send(path(report) + "/submit", other, input).getContentAsString()).doesNotContain(businessNo);
+        }
+        ok(send(path(winner.report()) + "/withdraw", "alice", lifecycleInput(winner.report())), 200);
+        ok(send(path(winner.report()) + "/cancel", "alice", lifecycleInput(winner.report())), 200);
+        assertThat(ok(read("/api/v1/invoices/" + rejected.invoice(), "alice"), 200).hasNonNull("activeClaim")).isFalse();
+        assertThat(ok(read(path(report) + "/prechecks/" + checked, "alice"), 200).path("invoiceConflicts")).isEmpty();
+        assertThat(prechecks.find("demo", checked).orElseThrow()).isEqualTo(originalCheck);
+    }
+
+    @Test
+    void invoiceOccupationLookupHidesSensitiveReferencesFromOtherEmployeesAndAdministrators() throws Exception {
+        hideBusinessDetails = true; var winner = fixture(true); submit(winner.report());
+        var source = invoices.find("demo", winner.invoice()).orElseThrow(); var business = app(winner.report());
+        for (String user : List.of("bob", "admin", "manager")) {
+            UUID duplicate = duplicateWalletInvoice(source, new Actor("demo", user, Set.of("EMPLOYEE")));
+            var detail = ok(read("/api/v1/invoices/" + duplicate, user), 200);
+            assertThat(detail.at("/activeClaim/status").asText()).isEqualTo("OCCUPIED");
+            assertThat(detail.at("/activeClaim").hasNonNull("expense")).isFalse();
+            assertThat(detail.toString()).doesNotContain(business.businessNo(), business.id().toString(), winner.report().id().toString(), winner.invoice().toString());
+        }
+        var otherTenant = new Actor("invoice-other-tenant", "alice", Set.of("ADMIN"));
+        UUID other = duplicateWalletInvoice(source, otherTenant); actors.set(otherTenant);
+        try { assertThat(json.write(wallet.get(other))).doesNotContain("activeClaim", business.businessNo(), winner.report().id().toString()); }
+        finally { actors.clear(); }
+    }
+
+    @Test
+    void consumedAndMissingRoundReferencesNeverTurnCanonicalClaimsIntoAvailableInvoices() throws Exception {
+        var winner = fixture(true); var duplicate = fixture(true); submit(winner.report());
+        var invoice = invoices.find("demo", winner.invoice()).orElseThrow(); long version = invoice.version();
+        invoice.consume(version, invoice.use(), Instant.now()); invoices.update(invoice, version, "fixture", "FIXTURE_CONSUME");
+        var detail = ok(read("/api/v1/invoices/" + duplicate.invoice(), "alice"), 200);
+        assertThat(detail.at("/activeClaim/status").asText()).isEqualTo("CONSUMED");
+        assertThat(detail.at("/activeClaim/expense/businessNo").asText()).isEqualTo(app(winner.report()).businessNo());
+        // 合成缺失轮次用于验证历史互斥事实仍保留；报销单本身继续受数据库外键约束。
+        jdbc.update("UPDATE invoice_active_claim SET round_no=99 WHERE tenant_id='demo' AND invoice_id=?", winner.invoice().toString());
+        try {
+            var unavailable = ok(read("/api/v1/invoices/" + duplicate.invoice(), "alice"), 200);
+            assertThat(unavailable.at("/activeClaim/status").asText()).isEqualTo("CONSUMED");
+            assertThat(unavailable.at("/activeClaim").hasNonNull("expense")).isFalse();
+            assertThat(unavailable.toString()).doesNotContain(winner.report().id().toString(), app(winner.report()).businessNo());
+        } finally { jdbc.update("UPDATE invoice_active_claim SET round_no=1 WHERE tenant_id='demo' AND invoice_id=?", winner.invoice().toString()); }
+    }
+
+    private UUID duplicateWalletInvoice(Invoice source, Actor owner) throws Exception {
+        byte[] bytes = ("%PDF-1.7\nsynthetic-conflict-" + UUID.randomUUID() + "\n%%EOF").getBytes(StandardCharsets.UTF_8);
+        actors.set(owner);
+        try {
+            UUID id = wallet.reserve(new InvoiceWalletService.UploadInput("占用查询合成票.pdf", (long) bytes.length,
+                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)), InvoiceOriginal.Format.PDF)).id();
+            wallet.upload(id, new ByteArrayInputStream(bytes));
+            var invoice = invoices.find(owner.tenantId(), id).orElseThrow(); var facts = source.facts();
+            invoice.verified(invoice.version(), new Invoice.VerifiedFacts(facts.key(), facts.legalEntityId(), facts.gross(), facts.tax(),
+                    facts.issueDate(), invoice.originalDigest(), facts.reference(), facts.verifiedAt(), facts.validUntil()));
+            invoices.update(invoice, 1, owner.userId(), "FIXTURE_VERIFY"); return id;
+        } finally { actors.clear(); }
+    }
+
+    @Test
     void duplicateSubmissionAttemptsAreRecordedAfterRollbackOncePerRequest() throws Exception {
         var winner = fixture(true); var rejected = fixture(true); var report = rejected.report();
         UUID checked = precheck(report); var input = submitInput(report, checked);

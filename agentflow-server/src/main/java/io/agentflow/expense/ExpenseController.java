@@ -37,14 +37,16 @@ public class ExpenseController {
     private final ExpenseReductionService reductions;
     private final ExpenseAllowancePreparation allowances;
     private final ExpenseSubmissionRejections rejections;
+    private final InvoiceOccupationQueries occupations;
 
     /** 财务写入继续使用平台请求幂等及实际认证主体。 */
     public ExpenseController(ExpenseDraftService drafts, IdempotencyExecutor idempotency, ExpenseSubmissionService submissions,
             ExpenseApprovalService approvals, ExpenseLifecycleService lifecycle, ExpenseReductionService reductions, ExpenseAllowancePreparation allowances,
-            ExpenseSubmissionRejections rejections) {
+            ExpenseSubmissionRejections rejections, InvoiceOccupationQueries occupations) {
         this.drafts = drafts; this.idempotency = idempotency; this.submissions = submissions; this.approvals = approvals; this.lifecycle = lifecycle; this.reductions = reductions;
         this.allowances = allowances;
         this.rejections = rejections;
+        this.occupations = occupations;
     }
 
     /** 创建草稿，只绑定可用的已发布费用流程。 */
@@ -73,6 +75,14 @@ public class ExpenseController {
             try { rejections.record(id, request, http.getHeader("Idempotency-Key"), failure); }
             catch (RuntimeException recordingFailure) {
                 LOG.error("Expense submission rejection recording failed, errorCode={}, reportId={}", "EXPENSE_REPORTING_RECORD_FAILED", id, recordingFailure);
+            }
+            if (InvoiceOccupationConflict.matches(failure)) {
+                java.util.List<InvoiceOccupationQueries.Conflict> conflicts = java.util.List.of();
+                try { conflicts = occupations.conflicts(id); }
+                catch (RuntimeException lookupFailure) {
+                    LOG.error("Expense invoice conflict lookup failed, errorCode={}, reportId={}", "INVOICE_CONFLICT_READ_FAILED", id, lookupFailure);
+                }
+                throw new InvoiceOccupationConflict(failure, conflicts);
             }
             throw failure;
         }

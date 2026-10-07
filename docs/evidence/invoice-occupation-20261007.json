@@ -1,0 +1,137 @@
+{
+  "recordedAt": "2026-10-07T21:49:17.250777+00:00",
+  "taskId": "U06",
+  "status": "IMPLEMENTED_LOCAL_FIXED_PACKAGE_BROWSER_POSTGRES_PENDING",
+  "sourceBaseCommit": "af4ce60767cc7aa1a7a19dbc7b9f409eeb374c57",
+  "requirements": [
+    {
+      "documentId": "05",
+      "lines": [
+        213,
+        218
+      ]
+    }
+  ],
+  "rootCause": "现有唯一占用和拒绝规则仅输出通用错误；票夹展示每份上传原件状态，未投影同票号的当前授权占用来源。",
+  "sourceHashes": {
+    "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java": "fdb78cd82f855678c36cce8154c926ba7371329c5968deb00a3b6eefde237ee2",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseController.java": "979ea12d6c984bfb89dc5d04da4755d2f45bfe75907e102f7c87d5b32a44e1ff",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckService.java": "8715c37eecf5e49b7aea461969bed874ae4d67dfd10b4a4fa5733a0a5392cb7a",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSubmissionRejections.java": "9cb808ce2b580e8b1c03691966ddc582d74de0768ffc7c2a1850ad599e14a59f",
+    "agentflow-server/src/main/java/io/agentflow/expense/InvoiceOccupationConflict.java": "9ba342f4e09fd17a7a39a045fe5476868ab4cad1a80969a6646bea3636552d49",
+    "agentflow-server/src/main/java/io/agentflow/expense/InvoiceOccupationQueries.java": "65b3b65833ce621b04a4e9a38479bbdee4dbf87a80e8085a1b95c1b133959e46",
+    "agentflow-server/src/main/java/io/agentflow/expense/InvoiceWalletService.java": "af7c6dc3e6ce2142d0216c83a0d63bca9fd92cc53e3775b35a7bef1582dd1561",
+    "agentflow-server/src/main/resources/api/openapi.json": "6e25adc474c0c451ee09aa986bfdbd625b5dfd400cf193026b1c67d9e8a49216",
+    "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java": "4fd14d410b08e7f18b27debb0065bf13baf2a3efe5ccd0d41f03099ea5e636da",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+    "agentflow-web/scripts/test-requests.mjs": "cf0a8d7eb108abd300df4c4aafb49a05a5e7139b3b9decda49ba80d8a75786e2",
+    "agentflow-web/src/api.ts": "5220afa22602a28ee2a57be54079bbd154c0fbf3920d360896aad215ff0762d5",
+    "agentflow-web/src/components/ExpenseSubmission.vue": "35cc7d7f274d732693aaebbc1fbb69e316c453c14f4b78d0f9451fd30fce952d",
+    "agentflow-web/src/components/InvoiceDetail.vue": "97d6a97e708da976f792b7405a664ef1e1348bb21a71141fe63c96dffbaad4ea",
+    "agentflow-web/src/components/InvoiceWallet.vue": "2c4331d4dc84d99a68ebd99eed6c51ed54d2f307382948dffb17ecc11d81db0f",
+    "agentflow-web/src/expenseDraft.ts": "4defc9b03f0c401804ecf3ee04bfc85df2d8054870f1e82b001a13ebcf890eeb",
+    "agentflow-web/src/invoiceWallet.ts": "1820cf05e0673db0003e682d25e2706cef46b2bdc6f949433dd5e5661b0ca232",
+    "agentflow-web/tests/invoice-occupation.test.mjs": "3328b42f1ff5360089ef9df72c7610b4a8ce107d02f95372fad8860ec727514c",
+    "scripts/check-invoice-occupation.py": "b4a28686dc04d94107975f8acc6f48f5069c963433c7378306adfd0e9ca4e567"
+  },
+  "inputManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/u06-input-hashes.json",
+    "sha256": "dba8a2adbfa6ab1c8674ea78e619cdcc589f588648efc3abec1edf8e32e187fe",
+    "files": 2608
+  },
+  "red": {
+    "javaHttp": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/u06-java-red.log",
+      "failed": 1,
+      "expected": 409,
+      "actual": 422
+    },
+    "web": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/u06-web-red.log",
+      "failed": 3
+    },
+    "selection": {
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/u06-web-selection-red.log",
+      "failed": 2
+    }
+  },
+  "java": {
+    "scopedPassed": 415,
+    "newCases": 3,
+    "aggregateUniquePassed": 5319,
+    "fullRerun": false,
+    "evidence": "/fyoung/tmp/agentflow-remaining-20260928/u06-java-aggregate.json",
+    "sha256": "e336277c277237068c9afc944bbd537f8f71f07585a43df05914eb2a96d5f545",
+    "runtime": "Amazon Corretto 17.0.16 arm64"
+  },
+  "web": {
+    "passed": 1519,
+    "failed": 0,
+    "skipped": 0,
+    "fullLog": "/fyoung/tmp/agentflow-remaining-20260928/u06-web-final.log",
+    "sha256": "1347382d3f04a7a569b3778295c2185480067194bd60dec8961bd89bb396c8bc",
+    "typeCheckAndBuild": "PASS"
+  },
+  "openapi": {
+    "status": "PASS",
+    "operations": 396,
+    "schemas": 871,
+    "requestExamples": 129
+  },
+  "fixedPackage": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/u06-server.jar",
+    "sha256": "b32d989ec1c9a251d916b90166c3068ffcea1309c0cb536632ca5a6db8527699",
+    "runtimeDirectory": "/fyoung/tmp/agentflow-remaining-20260928/u06-occupation-runtime-a",
+    "runtimeEvidence": {
+      "status": "PASS",
+      "legacyJarSha256": "72c14062217d6ccc0085345656e16357a168011d5f2b86c2ecea5ac1cb0fcddf",
+      "fixedJarSha256": "b32d989ec1c9a251d916b90166c3068ffcea1309c0cb536632ca5a6db8527699",
+      "checkerSha256": "b4a28686dc04d94107975f8acc6f48f5069c963433c7378306adfd0e9ca4e567",
+      "sharedCheckerSha256": "38478ee9d7550251985ec8ca08789536ebaaaeb88590048b67cfb9e60baa4734",
+      "upgrade": {
+        "preservedTables": 281,
+        "preservedRows": 332,
+        "newMigrations": 0
+      },
+      "runtimeBoots": 4,
+      "httpRequests": 74,
+      "oldFieldsUnchanged": true,
+      "immutableFindingsUnchanged": true,
+      "failedSubmissionDoesNotChangeReports": true,
+      "identityIsolation": true,
+      "currentClaimRemovedAfterRelease": true,
+      "forceRestartPreservedFacts": true,
+      "sameFailedRequestRefreshedAuthorization": true,
+      "modelRequests": 0,
+      "browserRun": false,
+      "postgresRun": false,
+      "realEnterpriseServices": false
+    }
+  },
+  "compatibility": [
+    "原错误码保留，已确认的发票竞争在回滚后返回 409 与 no-store；其他资源错误分类保持。",
+    "新字段仅为当前授权读模型，不进入原预检、金融资源、业务幂等回执或数据库迁移。",
+    "原 occupation/use 保持每份发票原值；activeClaim 补充同票号互斥来源，缺少引用不代表未占用。",
+    "原单原轮次占用继续由既有提交逻辑迁移或替换；当前来源提示不会替代提交时唯一约束。"
+  ],
+  "review": {
+    "method": "manual call-chain, diff, privacy, rollback, read-model and replay review",
+    "findings": []
+  },
+  "retainedFailures": [
+    "一个合成缺失报销单夹具被数据库外键正确拒绝，改为缺失轮次夹具后重跑；没有删除或放宽外键。",
+    "自定义页面测试渲染器最初缺少节点兄弟关系和 Document/ShadowRoot 边界，完善夹具后身份切换断言通过，未以此修改业务权限。",
+    "第一次完整前端命令未将新文件加入既有显式清单，保留该 1514 项记录；登记新测试并补充两个选票/列表失败测试后，最终完整执行 1519 项。"
+  ],
+  "archive": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/u06-invoice-occupation-verified-20261007",
+    "manifestSha256": "f6a33a58beddd0a00aa03d7c4f47fae8712315bedbea27b0244e3f2ce9363481",
+    "files": 58
+  },
+  "remaining": [
+    "真实浏览器、键盘、触屏和辅助设备验收",
+    "PostgreSQL 与最终目标环境门禁",
+    "V03 余下原始规范核对",
+    "E15 远端 PR/CI 交付"
+  ]
+}

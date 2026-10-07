@@ -88,6 +88,9 @@ class OpenApiContractTest {
         // ResponseEntity<String> 的真实 JSON 来自业务 DTO，不能把它描述为普通字符串。
         var types = java.util.Map.ofEntries(
                 java.util.Map.entry("ExpenseSplitRoutingView", io.agentflow.expense.ExpenseSplitRoutingQueries.View.class),
+                java.util.Map.entry("InvoiceOccupationReference", io.agentflow.expense.InvoiceOccupationQueries.ExpenseReference.class),
+                java.util.Map.entry("InvoiceOccupationView", io.agentflow.expense.InvoiceOccupationQueries.View.class),
+                java.util.Map.entry("ExpenseInvoiceConflict", io.agentflow.expense.InvoiceOccupationQueries.Conflict.class),
                 java.util.Map.entry("ExpenseSplitSnapshot", io.agentflow.expense.ExpenseSplitRoutingSnapshot.class),
                 java.util.Map.entry("ExpenseSplitConfiguration", io.agentflow.expense.ExpenseSplitRiskPolicy.Configuration.class),
                 java.util.Map.entry("ExpenseSplitRule", io.agentflow.expense.ExpenseSplitRiskPolicy.Rule.class),

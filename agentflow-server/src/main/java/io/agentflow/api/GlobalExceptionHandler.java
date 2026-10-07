@@ -23,6 +23,16 @@ import io.agentflow.observability.RequestTrace;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    /** 发票竞争在回滚后返回当前授权来源；禁止缓存包含业务单号的错误响应。 */
+    @ExceptionHandler(io.agentflow.expense.InvoiceOccupationConflict.class)
+    public org.springframework.http.ResponseEntity<Map<String, Object>> handleInvoiceOccupation(
+            io.agentflow.expense.InvoiceOccupationConflict exception, HttpServletRequest request) {
+        Map<String, Object> response = new java.util.LinkedHashMap<>(handleDomain(exception, request).getBody());
+        response.put("details", Map.of("invoiceConflicts", exception.conflicts()));
+        return org.springframework.http.ResponseEntity.status(HttpStatus.CONFLICT)
+                .cacheControl(org.springframework.http.CacheControl.noStore()).body(response);
+    }
+
     /** 引擎乐观锁或数据库已回滚的并发事务统一返回冲突；无关数据库异常保留原错误。 */
     @ExceptionHandler({FlowableOptimisticLockingException.class, SQLTransactionRollbackException.class})
     public org.springframework.http.ResponseEntity<Map<String, Object>> handleConcurrency(

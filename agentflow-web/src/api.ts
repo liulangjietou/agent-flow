@@ -66,7 +66,7 @@ import type { FieldErrors, FormSchema } from './formSchema'
 import type { AttachmentInput, AttachmentMetadata, AttachmentOptions } from './attachments'
 import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseFilter, PriorRequestItem, AdvanceItem, ExpenseCommand, ExpenseTaskCommand, ExpenseReduction, ExpenseReceipt } from './expenses'
 import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, PrecheckInput, PrecheckView, InvoiceItem } from './expenseDraft'
-import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob } from './invoiceWallet'
+import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob, InvoiceConflict } from './invoiceWallet'
 import type { AdvanceRequestItem, AdvanceDetail, AdvanceCreate, AdvanceRevise, AdvanceReceipt, AdvanceVersions, AdvanceCheckOptions, AdvanceCheckInput, AdvanceCheckView } from './advanceRequest'
 import type { ProcurementPaymentItem, ProcurementDetail, ProcurementCreate, ProcurementRevise, ProcurementReceipt, ProcurementVersions, ProcurementCheckOptions, ProcurementCheckInput, ProcurementCheckView } from './procurementPayment'
 import type { BudgetAdjustmentItem, BudgetAdjustmentDetail, BudgetAdjustmentCreate, BudgetAdjustmentRevise, BudgetAdjustmentReceipt, BudgetAdjustmentVersions, BudgetAdjustmentCheckOptions, BudgetAdjustmentCheckInput, BudgetAdjustmentCheckView } from './budgetAdjustment'
@@ -97,7 +97,7 @@ export function bindAuthenticationActor(actor: Actor | null) {
   writeRequests.setActor(actor)
 }
 
-export interface ApiError { status: number; code: string; message: string; details?: { fieldErrors?: FieldErrors; definitionErrors?: string[] } }
+export interface ApiError { status: number; code: string; message: string; details?: { fieldErrors?: FieldErrors; definitionErrors?: string[]; invoiceConflicts?: InvoiceConflict[] } }
 /** 当前设计的模拟输入。@author owlzhangfq@gmail.com */
 export interface SimulationInput { graph: Graph; formSchema: FormSchema | null; values: Record<string, unknown>; splitRoutingAmount?: import('./expenses').Money }
 /** 仅使用设计器测试填写内容的字段权限预览。@author owlzhangfq@gmail.com */

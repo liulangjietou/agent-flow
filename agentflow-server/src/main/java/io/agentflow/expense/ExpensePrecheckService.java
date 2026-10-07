@@ -41,19 +41,21 @@ public class ExpensePrecheckService {
     private final ExpensePrecheckResources resources;
     private final ExpensePolicyConfiguration policyConfiguration;
     private final ExpensePrecheckObservations observations;
+    private final InvoiceOccupationQueries occupations;
     private final int timeoutSeconds;
 
     /** 身份检查不复用管理员读取权限，所有外部事实由独立执行器获取。 */
     public ExpensePrecheckService(CurrentActor actors, ExpenseReportRepository reports, ApprovalApplicationFacade applications,
             ApplicationRepository applicationRepository, OrganizationInitiatorDirectory initiators, FinanceGatewayConfiguration configuration,
             JdbcExpensePrecheckRepository jobs, ExpensePrecheckResources resources, ExpensePolicyConfiguration policyConfiguration,
-            ExpensePrecheckObservations observations,
+            ExpensePrecheckObservations observations, InvoiceOccupationQueries occupations,
             @Value("${agentflow.expenses.precheck-timeout-seconds:300}") int timeoutSeconds) {
         if (timeoutSeconds < 15 || timeoutSeconds > 900) throw new IllegalArgumentException("Expense precheck timeout must be between 15 and 900 seconds");
         this.actors = actors; this.reports = reports; this.applications = applications; this.applicationRepository = applicationRepository;
         this.initiators = initiators; this.configuration = configuration; this.jobs = jobs; this.resources = resources; this.timeoutSeconds = timeoutSeconds;
         this.policyConfiguration = policyConfiguration;
         this.observations = observations;
+        this.occupations = occupations;
     }
 
     /** 返回实际目标和双版本，不把配置可用解释为费用已经通过。 */
@@ -95,7 +97,9 @@ public class ExpensePrecheckService {
                 evidence == null ? null : evidence.rateDate(), evidence == null ? null : evidence.validUntil(),
                 evidence == null ? null : ExpenseResponse.FinancialRound.from(evidence.preview()), job.result() == null ? List.of() : job.result().findings(),
                 evidence == null ? null : evidence.priorControls(), evidence == null ? null : evidence.budget().exceptionPolicy(),
-                evidence == null ? null : evidence.projectOwners());
+                evidence == null ? null : evidence.projectOwners(),
+                job.input().applicationVersion() == applications.requireApplicant(report.applicationId()).version()
+                        && job.input().financialVersion() == report.version() ? occupations.conflicts(report) : List.of());
     }
 
     /** 历史分页只列轻量状态，不在一页内复制多份完整费用明细。 */
@@ -233,7 +237,8 @@ public class ExpensePrecheckService {
     public record View(Summary job, boolean usable, String unavailableCode, InitiatorContext initiator, LocalDate accountingDate,
             LocalDate rateDate, Instant validUntil, ExpenseResponse.FinancialRound preview, List<Finding> findings,
             List<ExpensePriorControlAssessment> priorControls, io.agentflow.finance.BudgetExceptionPolicy budgetExceptionPolicy,
-            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) ExpenseProjectOwners projectOwners) { }
+            @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL) ExpenseProjectOwners projectOwners,
+            List<InvoiceOccupationQueries.Conflict> invoiceConflicts) { }
     /**
      * 下一页游标只能用于本人当前单据。
      * @author owlzhangfq@gmail.com

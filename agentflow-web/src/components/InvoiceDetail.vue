@@ -3,7 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { fileDigest, fileSize } from '../attachments'
 import { moneyLabel } from '../expenses'
-import { invoiceError, invoiceIssue, occupationStatuses, verificationStatuses, type InvoiceItem, type InvoiceWalletOptions } from '../invoiceWallet'
+import { invoiceError, invoiceIssue, invoiceOccupationLabel, occupationStatuses, verificationStatuses, type InvoiceItem, type InvoiceWalletOptions } from '../invoiceWallet'
 import InvoiceUploader from './InvoiceUploader.vue'
 import InvoiceVerification from './InvoiceVerification.vue'
 import InvoiceExtraction from './InvoiceExtraction.vue'
@@ -59,12 +59,13 @@ const dateLabel = (value: string) => new Date(value).toLocaleString('zh-CN')
     <p v-if="loading" class="invoice-help" role="status">正在核对本人票据…</p><p v-if="error" class="invoice-error" role="alert">{{ error }}</p>
     <template v-if="item">
       <h3>{{ item.original.filename }}</h3><p class="invoice-help">{{ item.original.format }} · {{ fileSize(item.original.size) }} · {{ dateLabel(item.original.createdAt) }} 保存</p>
-      <div class="invoice-states"><span>原件：{{ item.original.status === 'READY' ? '已保存' : item.original.status === 'FAILED' ? '待恢复上传' : '等待上传' }}</span><span>查验：{{ verificationStatuses[item.verification] }}</span><span>占用：{{ occupationStatuses[item.occupation] }}</span></div>
+      <div class="invoice-states"><span>原件：{{ item.original.status === 'READY' ? '已保存' : item.original.status === 'FAILED' ? '待恢复上传' : '等待上传' }}</span><span>查验：{{ verificationStatuses[item.verification] }}</span><span>占用：{{ occupationStatuses[item.activeClaim?.status ?? item.occupation] }}</span></div>
       <button v-if="item.original.status === 'READY'" type="button" class="secondary" :disabled="loading || downloading" @click="download">{{ downloading ? '下载中…' : '下载发票原件' }}</button>
       <p v-if="item.failureCode" class="invoice-error">{{ invoiceIssue(item.failureCode) }}</p>
       <dl v-if="item.facts" class="invoice-facts"><div><dt>发票号码</dt><dd>{{ item.facts.key.number }}</dd></div><div><dt>发票代码</dt><dd>{{ item.facts.key.code ?? '数电票不适用' }}</dd></div><div><dt>含税金额</dt><dd>{{ moneyLabel(item.facts.gross) }}</dd></div><div><dt>票面税额</dt><dd>{{ moneyLabel(item.facts.tax) }}</dd></div><div><dt>开票日期</dt><dd>{{ item.facts.issueDate }}</dd></div><div><dt>查验事实有效至</dt><dd>{{ dateLabel(item.facts.validUntil) }}</dd></div></dl>
       <p v-if="item.facts && item.verification !== 'VERIFIED'" class="invoice-help">上方保留历史已确认票面；当前查验未通过，不能据此新增报销占用。</p>
-      <p v-if="item.use" class="invoice-help">关联报销 {{ item.use.reportId }} · 第 {{ item.use.roundNo }} 轮 · 第 {{ item.use.lineNo }} 行</p>
+      <p v-if="item.activeClaim" class="invoice-help">票号当前{{ invoiceOccupationLabel(item.activeClaim) }}</p>
+      <p v-else-if="item.use" class="invoice-help">关联报销来源暂不可用 · 第 {{ item.use.roundNo }} 轮 · 第 {{ item.use.lineNo }} 行</p>
       <InvoiceUploader v-if="item.original.status !== 'READY'" :scope-key="scopeKey" :options="options" :restore-id="item.id" :locked="locked || loading" @uploaded="emit('uploaded', $event)" @busy="actionBusy = $event" />
       <template v-else>
         <InvoiceExtraction :item="item" :scope-key="scopeKey" :refresh-version="verificationRefresh" :locked="locked || loading || actionBusy" @busy="extractionBusy = $event" @dirty="extractionDirty = $event" />

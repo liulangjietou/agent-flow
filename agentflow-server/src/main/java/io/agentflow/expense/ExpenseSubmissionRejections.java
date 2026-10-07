@@ -34,9 +34,7 @@ public class ExpenseSubmissionRejections {
     /** 必须在原业务事务结束后调用；单条自动提交写入使唯一冲突不会污染调用方事务。 */
     @Transactional(propagation = Propagation.NEVER)
     public void record(UUID reportId, ExpenseSubmissionService.Input request, String key, DomainException failure) {
-        boolean duplicate = OCCUPIED.equals(failure.code()) || "RESOURCES_CHANGED".equals(failure.code())
-                && failure.getCause() instanceof DomainException original && OCCUPIED.equals(original.code());
-        if (!duplicate) return;
+        if (!InvoiceOccupationConflict.matches(failure)) return;
         var actor = actors.actor();
         var checked = prechecks.find(actor.tenantId(), request.precheckId()).orElseThrow(() -> new IllegalStateException("Original rejected precheck is unavailable"));
         var input = checked.input();

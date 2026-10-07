@@ -33,17 +33,19 @@ public class InvoiceWalletService {
     private final InvoiceRepository invoices;
     private final JdbcInvoiceOriginalRepository originals;
     private final InvoiceOriginalFiles files;
+    private final InvoiceOccupationQueries occupations;
     private final TransactionTemplate transaction;
     private final long maximumBytes;
     private final int maximumUploads;
 
     /** 个人配额独立于申请附件配额，已发布原件始终保留。 */
     public InvoiceWalletService(CurrentActor actors, InvoiceRepository invoices, JdbcInvoiceOriginalRepository originals,
-            InvoiceOriginalFiles files, PlatformTransactionManager transactions,
+            InvoiceOriginalFiles files, InvoiceOccupationQueries occupations, PlatformTransactionManager transactions,
             @Value("${agentflow.invoices.max-wallet-bytes:1073741824}") long maximumBytes,
             @Value("${agentflow.invoices.max-wallet-uploads:1000}") int maximumUploads) {
         if (maximumBytes < files.maxFileBytes() || maximumUploads < 1 || maximumUploads > 100000) throw new IllegalArgumentException("Invalid invoice wallet capacity");
         this.actors = actors; this.invoices = invoices; this.originals = originals; this.files = files;
+        this.occupations = occupations;
         this.transaction = new TransactionTemplate(transactions); this.maximumBytes = maximumBytes; this.maximumUploads = maximumUploads;
     }
 
@@ -84,7 +86,8 @@ public class InvoiceWalletService {
     /** 当前原件和票面只对本人开放，管理员没有个人票夹明文豁免。 */
     public Item get(UUID id) {
         var original = owned(id);
-        return item(original, invoices.find(original.tenantId(), id).orElseThrow(InvoiceWalletService::notFound));
+        var invoice = invoices.find(original.tenantId(), id).orElseThrow(InvoiceWalletService::notFound);
+        return item(original, invoice, occupations.wallet(List.of(invoice)).get(id));
     }
 
     /** 下载完整性经过核对的原件，不以内联格式执行内容。 */
@@ -107,7 +110,8 @@ public class InvoiceWalletService {
         } catch (IllegalArgumentException invalid) { throw new DomainException("INVALID_INVOICE_QUERY", "Invoice pagination parameters are invalid"); }
         var actor = actors.actor(); var entries = originals.list(actor.tenantId(), actor.userId(), before, limit + 1);
         int count = Math.min(limit, entries.size());
-        return new Page(entries.subList(0, count).stream().map(entry -> item(entry.original(), entry.invoice())).toList(),
+        var visible = entries.subList(0, count); var claims = occupations.wallet(visible.stream().map(entry -> entry.invoice()).toList());
+        return new Page(visible.stream().map(entry -> item(entry.original(), entry.invoice(), claims.get(entry.invoice().id()))).toList(),
                 entries.size() > count ? entries.get(count - 1).invoice().id() : null);
     }
 
@@ -117,8 +121,8 @@ public class InvoiceWalletService {
     }
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Invoice original not found"); }
     private static OriginalMetadata metadata(InvoiceOriginal value) { return new OriginalMetadata(value.id(), value.filename(), value.size(), value.sha256(), value.format(), value.status(), value.createdAt()); }
-    private static Item item(InvoiceOriginal original, Invoice value) {
-        return new Item(value.id(), value.version(), metadata(original), value.verification(), value.occupation(), value.facts(), value.use(), value.failureCode(), value.checkedAt());
+    private static Item item(InvoiceOriginal original, Invoice value, InvoiceOccupationQueries.View claim) {
+        return new Item(value.id(), value.version(), metadata(original), value.verification(), value.occupation(), value.facts(), value.use(), value.failureCode(), value.checkedAt(), claim);
     }
 
     /**
@@ -143,7 +147,7 @@ public class InvoiceWalletService {
      * @author owlzhangfq@gmail.com
      */
     public record Item(UUID id, long version, OriginalMetadata original, Invoice.Verification verification, Invoice.Occupation occupation,
-                       Invoice.VerifiedFacts facts, ExpenseUse use, String failureCode, Instant checkedAt) { }
+                       Invoice.VerifiedFacts facts, ExpenseUse use, String failureCode, Instant checkedAt, InvoiceOccupationQueries.View activeClaim) { }
     /**
      * 固定发票身份排序的游标，不代表总数量或上传时间顺序。
      * @author owlzhangfq@gmail.com

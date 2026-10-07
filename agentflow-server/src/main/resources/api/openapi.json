@@ -18231,7 +18231,7 @@
             }
           },
           "409": {
-            "description": "双版本冲突、预算结果待对账、台账已终结、目标变化或幂等冲突。不得换键盲目重试。",
+            "description": "当前并发冲突。已确认的发票占用竞争保留 INVOICE_OCCUPIED 或 RESOURCES_CHANGED 错误码，并在 details.invoiceConflicts 中返回当前授权的最小来源；禁止缓存。",
             "content": {
               "application/json": {
                 "schema": {
@@ -57492,6 +57492,12 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "invoiceConflicts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExpenseInvoiceConflict"
+                }
               }
             }
           }
@@ -64506,6 +64512,17 @@
                 "type": "null"
               }
             ]
+          },
+          "activeClaim": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InvoiceOccupationView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "按规范化票号读取的当前占用；另一份 AVAILABLE 上传原件也可能存在此占用。不改变原件自身 occupation 或 use。"
           }
         },
         "required": [
@@ -65207,6 +65224,13 @@
               }
             ],
             "description": "由可信目录和实际费用分摊生成的项目全集；旧预检可以缺失，正式提交仍核对原预检和负责人资格。"
+          },
+          "invoiceConflicts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExpenseInvoiceConflict"
+            },
+            "description": "仅在预检双版本仍匹配当前草稿时展示当前费用行的占用冲突；每次读取重查权限，与不可变 findings 分开。"
           }
         },
         "required": [
@@ -96636,6 +96660,85 @@
             "maximum": 1000000
           }
         }
+      },
+      "InvoiceOccupationReference": {
+        "type": "object",
+        "description": "每次读取复核原报销轮次详情权限后返回的最小来源，管理员仍受敏感字段约束。",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "roundNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "lineNo": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "businessNo",
+          "roundNo",
+          "lineNo"
+        ]
+      },
+      "InvoiceOccupationView": {
+        "type": "object",
+        "description": "同租户已确认票号的实时互斥事实；expense 省略或为空时仅可展示通用占用提示，包含采购和不可读历史来源。该视图不写入预检、金融资源或幂等回执。",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "OCCUPIED",
+              "CONSUMED"
+            ]
+          },
+          "expense": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InvoiceOccupationReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "ExpenseInvoiceConflict": {
+        "type": "object",
+        "properties": {
+          "lineNo": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "invoiceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "occupation": {
+            "$ref": "#/components/schemas/InvoiceOccupationView"
+          }
+        },
+        "required": [
+          "lineNo",
+          "invoiceId",
+          "occupation"
+        ]
       }
     }
   }

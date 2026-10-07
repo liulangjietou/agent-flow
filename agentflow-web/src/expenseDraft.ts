@@ -2,7 +2,7 @@ import type { ExpenseProjectOwners } from './expenseProjectApproval'
 import type { PriorAssessment } from './expensePriorControl'
 import type { Definition } from './api'
 import type { InitiatorContext } from './initiatorContext'
-import type { InvoiceItem } from './invoiceWallet'
+import type { InvoiceItem, InvoiceConflict } from './invoiceWallet'
 export type { InvoiceItem } from './invoiceWallet'
 import { amountMinor, type ExpenseContent, type ExpenseDetail, type ExpenseLine, type ExpenseVersions, type FinancialRound, type Money } from './expenses.js'
 import { extractionMatches, type ExtractionDetail } from './invoiceExtraction.js'
@@ -26,6 +26,7 @@ export interface PrecheckView {
   budgetExceptionPolicy?: { reference: string } | null
   priorControls?: PriorAssessment[] | null
   projectOwners?: ExpenseProjectOwners | null
+  invoiceConflicts?: InvoiceConflict[]
   findings: Array<{ stage: string; lineNo: number | null; nature: 'REJECTED' | 'UNAVAILABLE'; code: string }>
 }
 
@@ -33,6 +34,7 @@ export const expenseUnits: Record<ExpenseLine['unit'], string> = { ITEM: '项', 
 export const precheckStatuses: Record<PrecheckSummary['status'], string> = { QUEUED: '等待检查', RUNNING: '正在检查', READY: '检查完成', BLOCKED: '费用检查未通过', UNAVAILABLE: '检查未完成' }
 export const precheckStages: Record<string, string> = { INPUT: '填报内容', CATALOG: '财务主数据', ACCOUNT: '收款账户', INVOICE: '发票', RATE: '汇率', POLICY: '费用标准', RESOURCES: '额度与借款', BUDGET: '预算', CONTEXT: '单据与任职', SYSTEM: '预检服务' }
 export const precheckIssues: Record<string, string> = {
+  INVOICE_OCCUPIED: '发票已被占用或核销，请核对当前占用来源后调整票据',
   EXPENSE_PROJECT_OWNER_UNAVAILABLE: '项目缺少有效负责人，请联系主数据管理员补全后重新检查',
   EXPENSE_PROJECT_APPROVAL_REQUIRED: '当前流程缺少固定的项目负责人会签，请选择支持项目审批的发布版本',
   EXPENSE_PROJECT_PRECHECK_REQUIRED: '请重新预检，取得本次项目负责人依据后再提交',
@@ -135,8 +137,11 @@ export function usablePrecheck(view: PrecheckView | null, detail: ExpenseDetail,
 export function nextExpenseRound(detail: ExpenseDetail): number { return detail.applicationStatus === 'DRAFT' ? detail.roundNo : detail.roundNo + 1 }
 
 export function invoiceSelectable(item: InvoiceItem, legalEntityId: string, reportId?: string, now = Date.now()): boolean {
+  const claim = item.activeClaim
+  const claimAvailable = !claim || claim.status === 'OCCUPIED' && !!reportId && claim.expense?.reportId === reportId
   return item.original.status === 'READY' && item.verification === 'VERIFIED' && !!item.facts && item.facts.legalEntityId === legalEntityId
-    && Date.parse(item.facts.validUntil) > now && (item.occupation === 'AVAILABLE' || item.occupation === 'OCCUPIED' && !!reportId && item.use?.reportId === reportId)
+    && Date.parse(item.facts.validUntil) > now && claimAvailable
+    && (item.occupation === 'AVAILABLE' || item.occupation === 'OCCUPIED' && !!reportId && item.use?.reportId === reportId)
 }
 
 export type InvoiceFillField = 'GROSS_AMOUNT' | 'CURRENCY'

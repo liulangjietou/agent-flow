@@ -2,11 +2,23 @@ import type { Money } from './expenses.js'
 
 export type InvoiceFormat = 'PDF' | 'OFD' | 'PNG' | 'JPEG' | 'XML'
 export interface InvoiceOriginal { id: string; filename: string; size: number; sha256: string; format: InvoiceFormat; status: 'UPLOADING' | 'READY' | 'FAILED'; createdAt: string }
+export interface InvoiceOccupationView {
+  status: 'OCCUPIED' | 'CONSUMED'
+  expense?: { reportId: string; applicationId: string; businessNo: string; roundNo: number; lineNo: number } | null
+}
+export interface InvoiceConflict { lineNo: number; invoiceId: string; occupation: InvoiceOccupationView }
 export interface InvoiceItem {
   id: string; version: number; original: InvoiceOriginal
   verification: 'PENDING' | 'VERIFIED' | 'FAILED'; occupation: 'AVAILABLE' | 'OCCUPIED' | 'CONSUMED'
   facts: null | { key: { type: string; code: string | null; number: string }; legalEntityId: string; gross: Money; tax: Money; issueDate: string; originalDigest: string; reference: string; verifiedAt: string; validUntil: string }
   use: null | { reportId: string; roundNo: number; lineNo: number }; failureCode: string | null; checkedAt: string | null
+  activeClaim?: InvoiceOccupationView | null
+}
+/** 来源只使用服务端当前授权结果，缺少单号时不以内部标识推测归属。 */
+export function invoiceOccupationLabel(claim: InvoiceOccupationView): string {
+  const status = claim.status === 'CONSUMED' ? '已核销' : '已占用', expense = claim.expense
+  return expense ? `${status} · 报销单 ${expense.businessNo} · 第 ${expense.roundNo} 轮 · 第 ${expense.lineNo} 行`
+    : `${status} · 占用来源无权查看或暂不可用，请联系财务核对`
 }
 export interface InvoiceUploadInput { filename: string; size: number; sha256: string; format: InvoiceFormat }
 export interface InvoiceWalletOptions { enabled: boolean; maxFileBytes: number; maxWalletBytes: number; maxWalletUploads: number; formats: InvoiceFormat[] }
