@@ -1,5 +1,7 @@
 package io.agentflow.notification;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import java.io.ByteArrayInputStream;
@@ -92,4 +94,19 @@ class SmtpNotificationTransportTest {
     private static MimeMessage mail(String raw) throws Exception {
         return new MimeMessage(Session.getInstance(new Properties()), new ByteArrayInputStream(raw.getBytes(StandardCharsets.US_ASCII)));
     }
+
+    @Test void sourceTraceUsesMailHeaderWithoutReplacingStableMessageIdentity() throws Exception {
+        String trace = UUID.randomUUID().toString();
+        try (var smtp = new LocalSmtpServer(LocalSmtpServer.Mode.ACCEPT)) {
+            var target = target(smtp.port(), Security.DEMO_PLAIN, false); var delivery = delivery(target);
+            try (var scope = new DiagnosticContext(trace, "demo").open()) {
+                assertThat(transport.send(target, delivery).result()).isEqualTo(Result.ACCEPTED);
+            }
+            var message = mail(smtp.messages.get(0));
+            assertThat(message.getHeader(DiagnosticContext.HEADER, null)).isEqualTo(trace);
+            assertThat(message.getMessageID()).contains(delivery.id().toString()).doesNotContain(trace);
+            assertThat(message.getContent().toString()).doesNotContain(trace);
+        }
+    }
+
 }

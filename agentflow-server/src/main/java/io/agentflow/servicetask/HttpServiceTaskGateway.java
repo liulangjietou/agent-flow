@@ -1,5 +1,7 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
@@ -68,6 +70,7 @@ public class HttpServiceTaskGateway implements ServiceTaskGateway {
         byte[] bytes = json.write(payload).getBytes(StandardCharsets.UTF_8);
         if (bytes.length > MAX_REQUEST_BYTES) return unavailable(ServiceTaskOperation.Failure.INVALID_RESPONSE);
         var request = HttpRequest.newBuilder(destination.baseUri().resolve(query ? "query" : "execute")).timeout(destination.timeout())
+                .header(DiagnosticContext.HEADER, DiagnosticContext.capture().traceId())
                 .header("Content-Type", "application/json; charset=utf-8").header("Accept", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofByteArray(bytes));
         if (!query) request.header("Idempotency-Key", command.id().toString());

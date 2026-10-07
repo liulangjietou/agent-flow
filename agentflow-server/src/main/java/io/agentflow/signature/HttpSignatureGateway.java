@@ -1,5 +1,7 @@
 package io.agentflow.signature;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.storage.LocalDocumentStore;
@@ -152,7 +154,8 @@ public class HttpSignatureGateway implements SignatureGateway {
     }
     private HttpRequest.Builder request(SignatureGatewayConfiguration.Declaration selected, String path, String contentType, Duration timeout) {
         var destination = selected.destination();
-        var request = HttpRequest.newBuilder(destination.endpoint().resolve(path)).timeout(timeout).header("Content-Type", contentType).header("Accept", "application/json");
+        var request = HttpRequest.newBuilder(destination.endpoint().resolve(path)).timeout(timeout).header(DiagnosticContext.HEADER, DiagnosticContext.capture().traceId())
+                .header("Content-Type", contentType).header("Accept", "application/json");
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
         return request;
     }

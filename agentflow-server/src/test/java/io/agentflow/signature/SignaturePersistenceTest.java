@@ -35,7 +35,7 @@ class SignaturePersistenceTest {
 
     @BeforeEach void setup() {
         var source = new DriverManagerDataSource("jdbc:h2:mem:signature-persistence-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", "");
-        migrate(source, "111"); jdbc = new JdbcTemplate(source); repository = repository(source);
+        migrate(source, "latest"); jdbc = new JdbcTemplate(source); repository = repository(source);
         tx = new TransactionTemplate(new DataSourceTransactionManager(source)); queued = seed(jdbc);
     }
 

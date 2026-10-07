@@ -1,5 +1,7 @@
 package io.agentflow.notification;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.jdbc.JdbcTimestampPrecision;
@@ -34,10 +36,10 @@ public class JdbcNotificationDeliveryStore {
                 target == null ? null : target.id(), target == null ? null : target.digest(), message.createdAt(), pending(message.createdAt()));
         jdbc.update("""
                 INSERT INTO notification_dispatch
-                (id,tenant_id,recipient_id,inbox_id,channel,consent_generation,status,created_at,updated_at,binding_id,destination_digest,version,next_attempt_at)
-                VALUES (?,?,?,?,?,?,'PENDING',?,?,?,?,1,?)
+                (id,tenant_id,recipient_id,inbox_id,channel,consent_generation,status,created_at,updated_at,binding_id,destination_digest,version,next_attempt_at,trace_id)
+                VALUES (?,?,?,?,?,?,'PENDING',?,?,?,?,1,?,?)
                 """, value.id().toString(), value.tenantId(), value.recipient(), value.inboxId().toString(), channel.name(), generation,
-                stamp(value.createdAt()), stamp(value.createdAt()), value.bindingId(), value.destinationDigest(), stamp(value.createdAt()));
+                stamp(value.createdAt()), stamp(value.createdAt()), value.bindingId(), value.destinationDigest(), stamp(value.createdAt()), DiagnosticContext.capture().traceId());
         history(value, null, null);
     }
 
@@ -55,12 +57,12 @@ public class JdbcNotificationDeliveryStore {
     }
 
     /** 到期租约只进入结果未知；一次最多处理十项，避免单次轮询无界增长。 */
-    public List<UUID> due(Instant now) {
-        return jdbc.queryForList("""
-                SELECT id FROM notification_dispatch
+    public List<Candidate> due(Instant now) {
+        return jdbc.query("""
+                SELECT tenant_id,id,trace_id FROM notification_dispatch
                 WHERE (status IN ('PENDING','RETRY_WAIT') AND next_attempt_at<=?) OR (status='IN_FLIGHT' AND lease_until<=?)
                 ORDER BY updated_at,id LIMIT 10
-                """, String.class, stamp(now), stamp(now)).stream().map(UUID::fromString).toList();
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), stamp(now), stamp(now));
     }
 
     /** 后台按内部标识读取身份；公开查询必须使用带本人范围的 get。 */
@@ -147,4 +149,6 @@ public class JdbcNotificationDeliveryStore {
     private static Timestamp stamp(Instant value) { return value == null ? null : Timestamp.from(persistedTime(value)); }
     private static Instant time(ResultSet row, String column) throws SQLException { var value = row.getTimestamp(column); return value == null ? null : value.toInstant(); }
 
+    /** 调度身份与诊断来源分开于消息正文保存。 */
+    public record Candidate(String tenantId, UUID id, String traceId) { }
 }

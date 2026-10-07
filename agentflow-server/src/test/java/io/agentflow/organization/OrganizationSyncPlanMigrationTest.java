@@ -32,7 +32,7 @@ class OrganizationSyncPlanMigrationTest {
         try {
             tx.executeWithoutResult(ignored -> {
                 organization.initialize(actor); organization.createPerson(actor, "subject", "旧人员", true, true);
-                sync.register(new OrganizationSyncSource("tenant", "hr", 0, 1, null, "admin", at)); sync.create(batch);
+                sync.register(new OrganizationSyncSource("tenant", "hr", 0, 1, null, "admin", at)); createV109(jdbc, json, batch);
                 batch.start(1, at.plusSeconds(1), at.plusSeconds(30)); sync.update(batch, 1);
                 batch.receive(2, new OrganizationSyncDelta("hr", 0, 1, List.of(), List.of(new OrganizationSyncDelta.Person(
                         new OrganizationSyncKey(OrganizationSyncKey.Kind.PERSON, "source-person"), "subject", "来源人员", true, true)), List.of()), at.plusSeconds(2)); sync.update(batch, 2);
@@ -49,5 +49,17 @@ class OrganizationSyncPlanMigrationTest {
             for (String table : List.of("organization_sync_plan", "organization_sync_application")) assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class)).isZero();
             assertThat(Flyway.configure().dataSource(data).target("110").load().migrate().migrationsExecuted).isZero();
         } finally { jdbc.execute("SHUTDOWN"); }
+    }
+
+    private void createV109(JdbcTemplate jdbc, JsonUtil json, OrganizationSyncBatch batch) {
+        var context = batch.context();
+        jdbc.update("""
+                INSERT INTO organization_sync_batch(tenant_id,id,source_key,after_revision,requested_by,status,version,
+                    pending_tenant_id,context_json,state_json,created_at)
+                VALUES(?,?,?,?,?,'QUEUED',1,?,?,?,?)
+                """, context.tenantId(), context.id().toString(), context.sourceKey(), context.afterRevision(), context.requestedBy(),
+                context.tenantId(), json.write(context), json.write(batch.state()), java.sql.Timestamp.from(context.createdAt()));
+        jdbc.update("INSERT INTO organization_sync_transition(tenant_id,batch_id,batch_version,status,state_json) VALUES(?,?,1,'QUEUED',?)",
+                context.tenantId(), context.id().toString(), json.write(batch.state()));
     }
 }

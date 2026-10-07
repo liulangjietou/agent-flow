@@ -1,5 +1,7 @@
 package io.agentflow.signature;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +17,7 @@ import java.time.Clock;
 @Service
 public class SignatureWorker {
     private static final Logger LOG = LoggerFactory.getLogger(SignatureWorker.class);
+    private static final String TRACE_SOURCE = "signature";
     private final JdbcSignatureOperationRepository operations;
     private final JdbcSignatureEvidenceRepository evidence;
     private final SignatureOperationService service;
@@ -33,12 +36,14 @@ public class SignatureWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Signature worker must run outside a transaction");
         for (var candidate : operations.due(clock.instant())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claim = service.claim(candidate.tenantId(), candidate.id(), clock.instant()); if (claim == null) continue;
-                dispatch(claim);
-            } catch (RuntimeException failure) {
-                // 不记录异常原文，避免第三方响应或凭据进入日志；持久租约保留恢复方向。
-                LOG.error("Signature worker failed, errorCode={}, operationId={}", "SIGNATURE_WORKER_FAILURE", candidate.id());
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString()).open()) {
+                try {
+                    var claim = service.claim(candidate.tenantId(), candidate.id(), clock.instant()); if (claim == null) continue;
+                    dispatch(claim);
+                } catch (RuntimeException failure) {
+                    // 不记录异常原文，避免第三方响应或凭据进入日志；持久租约保留恢复方向。
+                    LOG.error("Signature worker failed, errorCode={}, operationId={}", "SIGNATURE_WORKER_FAILURE", candidate.id());
+                }
             }
         }
     }

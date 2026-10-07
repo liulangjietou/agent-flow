@@ -1,5 +1,7 @@
 package io.agentflow.finance.callback;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import java.sql.Timestamp;
@@ -44,11 +46,11 @@ public class JdbcPaymentCallbackRepository {
         var input = value.input(); var signal = input.signal(); var id = signal.authorizationId().toString();
         jdbc.update("""
                 INSERT INTO payment_callback(tenant_id,id,event_id,payload_digest,target_digest,payment_kind,authorization_id,command_digest,source_revision,
-                    employee_payment_id,supplier_payment_id,version,status,received_at,updated_at,next_attempt_at,failures)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,1,'RECEIVED',?,?,?,0)
+                    employee_payment_id,supplier_payment_id,version,status,received_at,updated_at,next_attempt_at,failures,trace_id)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,1,'RECEIVED',?,?,?,0,?)
                 """, signal.tenantId(), value.id().toString(), input.eventId(), input.payloadDigest(), input.targetDigest(), signal.kind().name(), id,
                 signal.commandDigest(), signal.sourceRevision(), signal.kind() == PaymentCallbackVerifier.Kind.EMPLOYEE ? id : null,
-                signal.kind() == PaymentCallbackVerifier.Kind.SUPPLIER ? id : null, timestamp(value.receivedAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()));
+                signal.kind() == PaymentCallbackVerifier.Kind.SUPPLIER ? id : null, timestamp(value.receivedAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()), DiagnosticContext.capture().traceId());
         append(value);
     }
     /** 只推进处理状态；事件身份、原始摘要及付款来源不允许变更。 */
@@ -67,8 +69,8 @@ public class JdbcPaymentCallbackRepository {
     }
     /** 每批只取十个标识，单条失败不会无界占用线程或加载财务数据。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id FROM payment_callback WHERE next_attempt_at<=? ORDER BY next_attempt_at,received_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now));
+        return jdbc.query("SELECT tenant_id,id,trace_id FROM payment_callback WHERE next_attempt_at<=? ORDER BY next_attempt_at,received_at,id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
     }
     /** 以本租户真实旧行作游标，有界查询不会混入其他租户的事件。 */
     public List<PaymentCallback> page(String tenant, int limit, UUID beforeId) {
@@ -105,5 +107,5 @@ public class JdbcPaymentCallbackRepository {
      * 调度不加载回调正文和资金明细。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
 }

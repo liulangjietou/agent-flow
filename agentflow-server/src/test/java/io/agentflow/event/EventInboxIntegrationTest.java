@@ -1,5 +1,7 @@
 package io.agentflow.event;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
@@ -276,7 +278,7 @@ class EventInboxIntegrationTest {
     private EventInboxItem state(UUID id) { return inbox.get("demo", id); }
     private EventInboxRepository inboxTarget() { return org.springframework.test.util.AopTestUtils.getUltimateTargetObject(inbox); }
     private List<EventInboxItem> history(UUID id) { return inbox.history("demo", id, 100, null); }
-    private EventInboxRepository.Candidate candidate(UUID id) { return new EventInboxRepository.Candidate("demo", id); }
+    private EventInboxRepository.Candidate candidate(UUID id) { return new EventInboxRepository.Candidate("demo", id, null); }
     private void process(UUID id, Instant now) { service.process(candidate(id), now); }
     private List<org.flowable.task.api.Task> tasksFor(String id) { return tasks.createTaskQuery().processVariableValueEquals("applicationId", id).list(); }
     private JsonNode application(String id) throws Exception { return read("/api/v1/applications/" + id, "alice"); }
@@ -285,4 +287,21 @@ class EventInboxIntegrationTest {
     }
     private String token(String user) { return "Bearer " + auth.login("demo", user, "demo").token(); }
     private int auditCount(String app) { return jdbc.queryForObject("SELECT count(*) FROM audit_event WHERE application_id=? AND action='EVENT_RECEIVED'", Integer.class, app); }
+
+    @Test void tracePersistsFromSignedReceptionToProcessAudit() throws Exception {
+        String key = contract(), app = waiting(key), event = UUID.randomUUID().toString(); var signal = signal(app, key);
+        var response = mvc.perform(request(json.write(signal), event, Instant.now())).andExpect(status().isAccepted()).andReturn().getResponse();
+        String trace = response.getHeader(DiagnosticContext.HEADER);
+        UUID id = UUID.fromString(json.read(response.getContentAsString(), JsonNode.class).path("id").asText());
+        assertThat(DiagnosticContext.validTrace(trace)).isTrue();
+        assertThat(jdbc.queryForMap("SELECT * FROM event_inbox WHERE id=?", id.toString())).containsEntry("TRACE_ID", trace);
+        var worker = new EventInboxWorker(inbox, service); worker.poll(); worker.poll();
+        assertThat(state(id).status()).isEqualTo(EventInboxItem.Status.CONSUMED);
+        assertThat(jdbc.queryForList("SELECT payload_json FROM audit_event WHERE application_id=? AND action='EVENT_RECEIVED'", String.class, app))
+                .extracting(value -> json.map(value).get("traceId")).containsExactly(trace);
+        assertThat(receive(signal, event)).isEqualTo(id);
+        assertThat(jdbc.queryForMap("SELECT * FROM event_inbox WHERE id=?", id.toString())).containsEntry("TRACE_ID", trace);
+        assertThat(org.slf4j.MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+
 }

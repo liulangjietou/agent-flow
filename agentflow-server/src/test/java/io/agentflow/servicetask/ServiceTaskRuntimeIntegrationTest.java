@@ -1,5 +1,7 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.DomainException;
@@ -386,4 +388,20 @@ class ServiceTaskRuntimeIntegrationTest {
     private String token(String user) { return "Bearer " + auth.login("demo", user, "demo").token(); }
     private int operationCount(String id) { return jdbc.queryForObject("SELECT count(*) FROM service_task_operation WHERE tenant_id='demo' AND application_id=?", Integer.class, id); }
     private int audits(String id, String action) { return jdbc.queryForObject("SELECT count(*) FROM audit_event WHERE application_id=? AND action=?", Integer.class, id, action); }
+
+    @Test void tracePersistsThroughQueueAndWorkerIntoFollowingServiceNode() throws Exception {
+        String id = draft("service1", "service2", "review");
+        var response = mvc.perform(post("/api/v1/applications/" + id + "/submit").header("Authorization", token("alice"))
+                .contentType(MediaType.APPLICATION_JSON).content(json.write(Map.of("expectedVersion", 1))))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        String trace = response.getHeader(DiagnosticContext.HEADER);
+        assertThat(DiagnosticContext.validTrace(trace)).isTrue();
+        assertThat(jdbc.queryForMap("SELECT * FROM service_task_operation WHERE application_id=?", id)).containsEntry("TRACE_ID", trace);
+        for (int i = 0; i < 5; i++) worker.poll();
+        assertThat(tasksFor(id)).hasSize(1); assertThat(provider.effects).hasValue(2);
+        assertThat(provider.traceIds).containsExactly(trace, trace);
+        assertThat(jdbc.queryForList("SELECT trace_id FROM service_task_operation WHERE application_id=?", String.class, id)).containsExactly(trace, trace);
+        assertThat(org.slf4j.MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+
 }

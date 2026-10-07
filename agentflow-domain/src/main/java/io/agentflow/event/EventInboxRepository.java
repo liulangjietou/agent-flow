@@ -27,5 +27,5 @@ public interface EventInboxRepository {
     /** 处理历史按真实版本倒序返回 limit+1 条。 */
     List<EventInboxItem> history(String tenantId, UUID id, int limit, Long beforeVersion);
     /** @author owlzhangfq@gmail.com */
-    record Candidate(String tenantId, UUID id) { }
+    record Candidate(String tenantId, UUID id, String traceId) { }
 }

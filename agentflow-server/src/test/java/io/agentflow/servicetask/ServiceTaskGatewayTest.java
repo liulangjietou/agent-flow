@@ -1,5 +1,7 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import io.agentflow.common.JsonUtil;
@@ -133,4 +135,14 @@ class ServiceTaskGatewayTest {
     private void assertFailure(ServiceTaskGateway.Result result, ServiceTaskOperation.Failure failure) {
         assertThat(result).isInstanceOfSatisfying(ServiceTaskGateway.Unavailable.class, value -> assertThat(value.failure()).isEqualTo(failure));
     }
+
+    @Test void sourceTraceUsesHeaderWithoutReplacingCommandIdentity() {
+        String trace = UUID.randomUUID().toString();
+        try (var scope = new DiagnosticContext(trace, "demo").open()) {
+            executeAndReadOnlyQueryShareOriginalIdentityWithoutResendingInput();
+        }
+        assertThat(provider.traceIds).containsExactly(trace, trace);
+        assertThat(provider.calls).allSatisfy(call -> assertThat(call.request().toString()).doesNotContain(trace));
+    }
+
 }

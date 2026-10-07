@@ -1,5 +1,7 @@
 package io.agentflow.signature;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.approval.JdbcApplicationRepository;
 import io.agentflow.auth.DeferredActorAuthentication;
 import io.agentflow.auth.DeferredActorAuthentication.Kind;
@@ -62,7 +64,7 @@ class SignatureWorkerIntegrationTest {
     @BeforeEach void setup() throws Exception {
         provider = new SignatureHttpFixture(directory.resolve("files"));
         var source = new DriverManagerDataSource("jdbc:h2:mem:signature-worker-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", "");
-        Flyway.configure().dataSource(source).target("113").load().migrate();
+        Flyway.configure().dataSource(source).load().migrate();
         jdbc = new JdbcTemplate(source); manager = new DataSourceTransactionManager(source); tx = new TransactionTemplate(manager);
         operations = proxy(new JdbcSignatureOperationRepository(jdbc, JSON)); logins = proxy(new JdbcSignatureLoginRepository(jdbc));
         evidence = proxy(new JdbcSignatureEvidenceRepository(jdbc, JSON, operations, provider.verifier)); audit = proxy(new SignatureAudit(jdbc, JSON));
@@ -293,4 +295,18 @@ class SignatureWorkerIntegrationTest {
         var factory = new ProxyFactory(target); factory.setProxyTargetClass(true);
         factory.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource())); return (T) factory.getProxy();
     }
+
+    @Test void tracePersistsThroughRecoveryAndIndependentArtifactCollection() {
+        String trace = UUID.randomUUID().toString();
+        try (var scope = new DiagnosticContext(trace, "tenant-a").open()) { queue(); }
+        assertThat(jdbc.queryForMap("SELECT * FROM signature_operation")).containsEntry("TRACE_ID", trace);
+        provider.mode = SignatureHttpFixture.Mode.DROP; worker.poll();
+        assertThat(stored().status()).isEqualTo(SignatureOperation.Status.UNKNOWN);
+        provider.clock.now = stored().nextAttemptAt(); provider.mode = SignatureHttpFixture.Mode.NORMAL; worker.poll(); worker.poll();
+        assertThat(stored().status()).isEqualTo(SignatureOperation.Status.SIGNED);
+        assertThat(provider.traceIds).containsExactly(trace, trace, trace, trace);
+        assertThat(jdbc.queryForMap("SELECT * FROM signature_operation")).containsEntry("TRACE_ID", trace);
+        assertThat(org.slf4j.MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+
 }

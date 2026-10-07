@@ -1,5 +1,7 @@
 package io.agentflow.notification;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.organization.OrganizationPerson;
@@ -188,7 +190,7 @@ class NotificationDeliveryIntegrationTest {
         bind(target()); var value = enqueue(ALICE); var claim = deliveries.claim(value.id(), Instant.now());
         assertThat(deliveries.claim(value.id(), claim.delivery().progress().leaseUntil())).isNull();
         var unknown = get(value); assertThat(unknown.progress().status()).isEqualTo(Status.UNKNOWN);
-        assertThat(store.due(Instant.now().plusSeconds(5000))).doesNotContain(value.id());
+        assertThat(store.due(Instant.now().plusSeconds(5000))).extracting(JdbcNotificationDeliveryStore.Candidate::id).doesNotContain(value.id());
         assertThat(deliveries.finish(claim.delivery(), Outcome.accepted(), Instant.now())).isFalse();
         assertThatThrownBy(() -> deliveries.retry(ALICE, value.id(), unknown.progress().version(), false, "核实后重试", Instant.now()))
                 .isInstanceOfSatisfying(DomainException.class, e -> assertThat(e.code()).isEqualTo("NOTIFICATION_DUPLICATE_ACK_REQUIRED"));
@@ -268,4 +270,22 @@ class NotificationDeliveryIntegrationTest {
     private java.util.List<String> events(NotificationDelivery value) { return jdbc.queryForList("SELECT status FROM notification_delivery_event WHERE delivery_id=? ORDER BY version", String.class, value.id().toString()); }
     private SmtpNotificationTransport smtpTarget() { return AopTestUtils.getUltimateTargetObject(smtp); }
     private InboxMessage message(Actor actor) { return new InboxMessage(UUID.randomUUID(), actor.tenantId(), actor.userId(), UUID.randomUUID(), "敏感标题", "BUSINESS-SECRET", InboxMessage.Kind.COMMENT_MENTIONED, "manager", null, null, 1, Instant.now(), null, "敏感正文只存站内"); }
+
+    @Test void tracePersistsToMailWhileWorkerRestoresCallerContext() throws Exception {
+        String trace = UUID.randomUUID().toString();
+        try (var server = new LocalSmtpServer(LocalSmtpServer.Mode.ACCEPT)) {
+            bind(SmtpNotificationTransportTest.target(server.port(), NotificationDeliveryConfiguration.Security.DEMO_PLAIN, false));
+            NotificationDelivery delivery;
+            try (var scope = new DiagnosticContext(trace, "demo").open()) { delivery = enqueue(ALICE); }
+            assertThat(jdbc.queryForMap("SELECT * FROM notification_dispatch WHERE id=?", delivery.id().toString())).containsEntry("TRACE_ID", trace);
+            worker.runOnce(); worker.runOnce();
+            assertThat(get(delivery).progress().status()).isEqualTo(Status.ACCEPTED);
+            assertThat(server.messages).hasSize(1);
+            var message = new jakarta.mail.internet.MimeMessage(jakarta.mail.Session.getInstance(new java.util.Properties()),
+                    new java.io.ByteArrayInputStream(server.messages.get(0).getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
+            assertThat(message.getHeader(DiagnosticContext.HEADER, null)).isEqualTo(trace);
+            assertThat(org.slf4j.MDC.getCopyOfContextMap()).isNullOrEmpty();
+        }
+    }
+
 }

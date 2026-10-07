@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
  * @author owlzhangfq@gmail.com
  */
 final class OrganizationSyncTestSource implements AutoCloseable {
+    final java.util.List<String> traceIds = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final HttpServer server;
     private final ExecutorService executor = Executors.newFixedThreadPool(4);
     final List<Call> calls = new CopyOnWriteArrayList<>();
@@ -35,6 +36,7 @@ final class OrganizationSyncTestSource implements AutoCloseable {
             try {
                 var query = Arrays.stream(exchange.getRequestURI().getRawQuery().split("&")).map(part -> part.split("=", 2))
                         .collect(Collectors.toMap(pair -> decoded(pair[0]), pair -> decoded(pair[1])));
+                traceIds.add(exchange.getRequestHeaders().getFirst("X-Trace-Id"));
                 calls.add(new Call(exchange.getRequestMethod(), exchange.getRequestURI().getPath(), query,
                         exchange.getRequestHeaders().getFirst("Authorization"), new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)));
                 Mode selected = mode; entered.countDown();

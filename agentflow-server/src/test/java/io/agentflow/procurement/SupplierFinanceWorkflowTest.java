@@ -897,7 +897,7 @@ class SupplierFinanceWorkflowTest {
         ok(mvc.perform(PaymentCallbackTestRequests.request(event, body)).andReturn().getResponse(), 202);
         var callback = callbackRecords.byEvent("demo", event).orElseThrow();
         ok(mvc.perform(PaymentCallbackTestRequests.request(event, body)).andReturn().getResponse(), 202);
-        callbacks.process(new JdbcPaymentCallbackRepository.Candidate("demo", callback.id()), Instant.now()); pollBank(payment);
+        callbacks.process(new JdbcPaymentCallbackRepository.Candidate("demo", callback.id(), null), Instant.now()); pollBank(payment);
         assertThat(bankPayments.find("demo", payment).orElseThrow().settleable()).isTrue();
         assertThat(settlementView(payment).path("completion")).isEqualTo(before.path("completion"));
         assertThat(settlements.find("demo", settlement).orElseThrow().status()).isEqualTo(SupplierPayableSettlementOperation.Status.SETTLED);

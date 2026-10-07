@@ -1,5 +1,7 @@
 package io.agentflow.organization;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import java.sql.ResultSet;
@@ -85,12 +87,12 @@ public class JdbcOrganizationSyncRepository {
         try {
             int inserted = jdbc.update("""
                     INSERT INTO organization_sync_batch(tenant_id,id,source_key,after_revision,requested_by,retry_of,status,version,
-                        pending_tenant_id,context_json,state_json,created_at)
-                    SELECT s.tenant_id,?,s.source_key,s.applied_revision,?,?,'QUEUED',1,s.tenant_id,?,?,?
+                        pending_tenant_id,context_json,state_json,created_at,trace_id)
+                    SELECT s.tenant_id,?,s.source_key,s.applied_revision,?,?,'QUEUED',1,s.tenant_id,?,?,?,?
                     FROM organization_sync_source s WHERE s.tenant_id=? AND s.source_key=? AND s.applied_revision=?
                       AND (CAST(? AS VARCHAR(36)) IS NULL OR EXISTS(SELECT 1 FROM organization_sync_batch old
                         WHERE old.tenant_id=s.tenant_id AND old.id=? AND old.source_key=s.source_key AND old.status IN ('FAILED','CANCELLED')))
-                    """, id(context.id()), context.requestedBy(), id(context.retryOf()), json.write(context), json.write(batch.state()), Timestamp.from(context.createdAt()),
+                    """, id(context.id()), context.requestedBy(), id(context.retryOf()), json.write(context), json.write(batch.state()), Timestamp.from(context.createdAt()), DiagnosticContext.capture().traceId(),
                     context.tenantId(), context.sourceKey(), context.afterRevision(), id(context.retryOf()), id(context.retryOf()));
             changed(inserted);
         } catch (DuplicateKeyException duplicate) {
@@ -136,9 +138,9 @@ public class JdbcOrganizationSyncRepository {
     /** 已接收数据等待管理员，不会由后台重复拉取。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM organization_sync_batch WHERE status='QUEUED' OR (status='FETCHING' AND lease_until<=?)
+                SELECT tenant_id,id,trace_id FROM organization_sync_batch WHERE status='QUEUED' OR (status='FETCHING' AND lease_until<=?)
                 ORDER BY created_at,id LIMIT ?
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), uuid(row.getString("id"))), Timestamp.from(now), SCAN_LIMIT);
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), uuid(row.getString("id")), row.getString("trace_id")), Timestamp.from(now), SCAN_LIMIT);
     }
 
     /** 状态检查只读取活动批次标识，不加载完整来源正文。 */
@@ -262,7 +264,7 @@ public class JdbcOrganizationSyncRepository {
      * 调度扫描不返回目录正文。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
     /**
      * 批次索引展示原游标、状态及具名发起者。
      * @author owlzhangfq@gmail.com

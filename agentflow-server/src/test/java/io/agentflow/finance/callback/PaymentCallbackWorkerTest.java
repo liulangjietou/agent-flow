@@ -14,8 +14,8 @@ import static org.mockito.Mockito.*;
 class PaymentCallbackWorkerTest {
     @Test void unavailableRecordDoesNotStarveOtherCandidates() {
         var store = mock(JdbcPaymentCallbackRepository.class); var service = mock(PaymentCallbackService.class);
-        var first = new JdbcPaymentCallbackRepository.Candidate("demo", UUID.randomUUID());
-        var second = new JdbcPaymentCallbackRepository.Candidate("demo", UUID.randomUUID());
+        var first = new JdbcPaymentCallbackRepository.Candidate("demo", UUID.randomUUID(), null);
+        var second = new JdbcPaymentCallbackRepository.Candidate("demo", UUID.randomUUID(), null);
         var input = new PaymentCallbackVerifier.Verified("evt_1", "a".repeat(64), "b".repeat(64),
                 new PaymentCallbackVerifier.Signal(1, "payment.changed", "demo", PaymentCallbackVerifier.Kind.EMPLOYEE, UUID.randomUUID(), "c".repeat(64), 1));
         when(store.due(any())).thenReturn(List.of(first, second));

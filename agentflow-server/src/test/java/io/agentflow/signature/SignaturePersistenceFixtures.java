@@ -81,4 +81,25 @@ final class SignaturePersistenceFixtures {
         return new SignatureReceipt(request.id(), request.digest(), status == SignatureReceipt.Status.NOT_FOUND ? 0 : revision, status, time,
                 status == SignatureReceipt.Status.NOT_FOUND ? null : "provider-signature-1", terminal ? time : null, artifacts);
     }
+    /** 固定 V111—V123 的旧行格式，迁移验收不能调用依赖最新列的创建方法。 */
+    static void createLegacyOperation(JdbcTemplate db, SignatureOperation operation) {
+        var input = operation.input(); var request = input.request(); var source = request.source();
+        db.update("""
+                INSERT INTO signature_operation(tenant_id,id,application_id,round_no,request_digest,target_digest,input_json,state_json,
+                    version,status,attempts,authorized_at,updated_at,next_attempt_at,poll_at,active_guard)
+                VALUES(?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?,?,1)
+                """, request.tenantId(), request.id().toString(), source.applicationId().toString(), source.roundNo(), request.digest(), input.targetDigest(),
+                JSON.write(input), JSON.write(operation), legacyTime(request.authorization().authorizedAt()), legacyTime(operation.updatedAt()),
+                legacyTime(operation.nextAttemptAt()), legacyTime(operation.nextAttemptAt()));
+        for (var document : request.documents()) db.update("""
+                INSERT INTO signature_source_document(tenant_id,operation_id,application_id,round_no,attachment_id,original_content_id,
+                    field_path,filename,byte_size,sha256,original_status) VALUES(?,?,?,?,?,?,?,?,?,?,'READY')
+                """, request.tenantId(), request.id().toString(), source.applicationId().toString(), source.roundNo(), document.attachmentId().toString(),
+                document.contentId().toString(), document.fieldPath(), document.filename(), document.size(), document.sha256());
+        db.update("INSERT INTO signature_operation_revision(tenant_id,operation_id,version,state_json,occurred_at) VALUES(?,?,1,?,?)",
+                request.tenantId(), request.id().toString(), JSON.write(operation), legacyTime(operation.updatedAt()));
+    }
+    private static java.sql.Timestamp legacyTime(java.time.Instant value) {
+        return java.sql.Timestamp.from(value.truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+    }
 }

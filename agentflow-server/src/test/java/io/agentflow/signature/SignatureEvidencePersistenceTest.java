@@ -49,7 +49,7 @@ class SignatureEvidencePersistenceTest {
 
     @BeforeEach void setup() {
         var source = new DriverManagerDataSource("jdbc:h2:mem:signature-evidence-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
-        SignaturePersistenceFixtures.migrate(source, "112"); jdbc = new JdbcTemplate(source); operations = SignaturePersistenceFixtures.repository(source);
+        SignaturePersistenceFixtures.migrate(source, "latest"); jdbc = new JdbcTemplate(source); operations = SignaturePersistenceFixtures.repository(source);
         evidence = repository(source); tx = new TransactionTemplate(new DataSourceTransactionManager(source));
         SignaturePersistenceFixtures.seed(jdbc, input.request()); var queued = SignatureOperation.queue(input, NOW); sent = queued.claim(NOW, SignaturePersistenceFixtures.LEASE);
         tx.executeWithoutResult(ignored -> { operations.create(queued); operations.update(sent); });
@@ -137,7 +137,7 @@ class SignatureEvidencePersistenceTest {
         try {
             SignaturePersistenceFixtures.migrate(source, "111"); SignaturePersistenceFixtures.seed(db, input.request());
             var ops = SignaturePersistenceFixtures.repository(source); var transactions = new TransactionTemplate(new DataSourceTransactionManager(source));
-            transactions.executeWithoutResult(ignored -> { ops.create(SignatureOperation.queue(input, NOW)); ops.update(sent); });
+            transactions.executeWithoutResult(ignored -> { SignaturePersistenceFixtures.createLegacyOperation(db, SignatureOperation.queue(input, NOW)); ops.update(sent); });
             var before = new LinkedHashMap<String, List<Map<String, Object>>>();
             try (var connection = source.getConnection(); var tables = connection.getMetaData().getTables(null, connection.getSchema(), "%", new String[]{"TABLE"})) {
                 while (tables.next()) {
@@ -165,7 +165,7 @@ class SignatureEvidencePersistenceTest {
         db.execute("SHUTDOWN");
         var reopened = new DriverManagerDataSource(restoredUrl, "sa", ""); var reopenedDb = new JdbcTemplate(reopened);
         try {
-            assertThat(Flyway.configure().dataSource(reopened).target("112").load().validateWithResult().validationSuccessful).isTrue();
+            assertThat(Flyway.configure().dataSource(reopened).load().validateWithResult().validationSuccessful).isTrue();
             assertThat(repository(reopened).find("tenant-a", input.request().id(), verified.evidence().digest())).contains(verified);
             reopenedDb.update("UPDATE signature_receipt_evidence SET receipt_digest=?", "f".repeat(64));
             assertThat(evidence.find("tenant-a", input.request().id(), verified.evidence().digest())).contains(verified);
@@ -190,4 +190,5 @@ class SignatureEvidencePersistenceTest {
         assertThat(value).startsWith("jdbc:h2:file:./data/agentflow"); return value.replace("./data/agentflow", path.toString());
     }
     private static String literal(Path path) { return path.toAbsolutePath().toString().replace("'", "''"); }
+
 }

@@ -27,7 +27,7 @@ class SignatureDatabaseRecoveryTest {
     @Test void reopeningAndIndependentRestoreRetainOriginalClaimsAndPartialFileAcknowledgements() {
         String url = fileUrl(temporary.resolve("source"));
         var source = new DriverManagerDataSource(url, "sa", "");
-        var jdbc = new JdbcTemplate(source); migrate(source, "111");
+        var jdbc = new JdbcTemplate(source); migrate(source, "latest");
         var repository = repository(source); var tx = new TransactionTemplate(new DataSourceTransactionManager(source));
         var queued = seed(jdbc); var missingResponse = seed(jdbc);
         tx.executeWithoutResult(ignored -> { repository.create(queued); repository.create(missingResponse); });
@@ -47,7 +47,7 @@ class SignatureDatabaseRecoveryTest {
 
         var reopened = new DriverManagerDataSource(url, "sa", "");
         var reopenedJdbc = new JdbcTemplate(reopened); var reopenedRepository = repository(reopened);
-        assertThat(Flyway.configure().dataSource(reopened).target("111").load().validateWithResult().validationSuccessful).isTrue();
+        assertThat(Flyway.configure().dataSource(reopened).load().validateWithResult().validationSuccessful).isTrue();
         assertThat(reopenedRepository.find("tenant-a", queued.input().request().id())).contains(fetching);
         assertThat(reopenedRepository.find("tenant-a", missingResponse.input().request().id())).contains(unconfirmed);
         assertThat(reopenedRepository.resultFiles(fetching)).isEqualTo(files);
@@ -58,7 +58,7 @@ class SignatureDatabaseRecoveryTest {
         try {
             restoredJdbc.execute("RUNSCRIPT FROM '" + literal(dump) + "'");
             var restoredRepository = repository(restored); var restoredTx = new TransactionTemplate(new DataSourceTransactionManager(restored));
-            assertThat(Flyway.configure().dataSource(restored).target("111").load().validateWithResult().validationSuccessful).isTrue();
+            assertThat(Flyway.configure().dataSource(restored).load().validateWithResult().validationSuccessful).isTrue();
             for (int index = 0; index < tables.size(); index++) {
                 assertThat(restoredJdbc.queryForList("SELECT * FROM " + tables.get(index))).as(tables.get(index)).containsExactlyInAnyOrderElementsOf(snapshot.get(index));
             }

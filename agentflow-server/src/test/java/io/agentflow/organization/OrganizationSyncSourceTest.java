@@ -1,5 +1,7 @@
 package io.agentflow.organization;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentflow.common.JsonUtil;
 import java.time.Duration;
@@ -94,4 +96,13 @@ class OrganizationSyncSourceTest {
     }
 
     private HttpOrganizationSyncSource.Result read() { return source.read(context, Instant.now().plusSeconds(5)); }
+
+    @Test void sourceTraceUsesHeaderWithoutChangingCursorOrSendingLocalFacts() {
+        String trace = UUID.randomUUID().toString();
+        try (var scope = new DiagnosticContext(trace, "tenant").open()) {
+            readsOnlyFixedSourceAndAppliedCursorWithoutSendingLocalOrganizationFacts();
+        }
+        assertThat(fixture.traceIds).containsExactly(trace);
+    }
+
 }

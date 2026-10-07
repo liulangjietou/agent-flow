@@ -1,5 +1,7 @@
 package io.agentflow.event;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "agentflow.events.worker-enabled", havingValue = "true", matchIfMissing = true)
 public class EventInboxWorker {
     private static final Logger LOG = LoggerFactory.getLogger(EventInboxWorker.class);
+    private static final String TRACE_SOURCE = "event-inbox";
     private final EventInboxRepository inbox;
     private final EventInboxService service;
     /** 每条消息由独立短事务处理，单条失败不阻断整批。 */
@@ -24,14 +27,16 @@ public class EventInboxWorker {
     public void poll() {
         for (var candidate : inbox.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            Long version = null;
-            try {
-                version = inbox.get(candidate.tenantId(), candidate.id()).version();
-                service.process(candidate, Instant.now());
-            } catch (RuntimeException failure) {
-                LOG.error("Event processing failed, errorCode={}, eventInboxId={}", "EVENT_PROCESSING_FAILED", candidate.id());
-                try { if (version != null) service.failed(candidate, version, Instant.now()); }
-                catch (RuntimeException unavailable) { LOG.error("Event recovery failed, errorCode={}, eventInboxId={}", "EVENT_RECOVERY_UNAVAILABLE", candidate.id()); }
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString()).open()) {
+                Long version = null;
+                try {
+                    version = inbox.get(candidate.tenantId(), candidate.id()).version();
+                    service.process(candidate, Instant.now());
+                } catch (RuntimeException failure) {
+                    LOG.error("Event processing failed, errorCode={}, eventInboxId={}", "EVENT_PROCESSING_FAILED", candidate.id());
+                    try { if (version != null) service.failed(candidate, version, Instant.now()); }
+                    catch (RuntimeException unavailable) { LOG.error("Event recovery failed, errorCode={}, eventInboxId={}", "EVENT_RECOVERY_UNAVAILABLE", candidate.id()); }
+                }
             }
         }
     }

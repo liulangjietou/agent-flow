@@ -1,5 +1,7 @@
 package io.agentflow.finance.callback;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "agentflow.payment-callbacks.worker-enabled", havingValue = "true", matchIfMissing = true)
 public class PaymentCallbackWorker {
     private static final Logger LOG = LoggerFactory.getLogger(PaymentCallbackWorker.class);
+    private static final String TRACE_SOURCE = "payment-callback";
     private final JdbcPaymentCallbackRepository callbacks;
     private final PaymentCallbackService service;
     /** 收件箱和业务短事务由独立服务编排。 */
@@ -25,15 +28,17 @@ public class PaymentCallbackWorker {
     public void poll() {
         for (var candidate : callbacks.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            Long version = null;
-            try {
-                version = callbacks.get(candidate.tenantId(), candidate.id()).version();
-                service.process(candidate, Instant.now());
-            }
-            catch (RuntimeException failure) {
-                LOG.error("Payment callback processing failed, errorCode={}, callbackId={}", "CALLBACK_PROCESSING_FAILED", candidate.id());
-                try { if (version != null) service.failed(candidate, version, Instant.now()); }
-                catch (RuntimeException unavailable) { LOG.error("Payment callback recovery failed, errorCode={}, callbackId={}", "CALLBACK_RECOVERY_UNAVAILABLE", candidate.id()); }
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString()).open()) {
+                Long version = null;
+                try {
+                    version = callbacks.get(candidate.tenantId(), candidate.id()).version();
+                    service.process(candidate, Instant.now());
+                }
+                catch (RuntimeException failure) {
+                    LOG.error("Payment callback processing failed, errorCode={}, callbackId={}", "CALLBACK_PROCESSING_FAILED", candidate.id());
+                    try { if (version != null) service.failed(candidate, version, Instant.now()); }
+                    catch (RuntimeException unavailable) { LOG.error("Payment callback recovery failed, errorCode={}, callbackId={}", "CALLBACK_RECOVERY_UNAVAILABLE", candidate.id()); }
+                }
             }
         }
     }

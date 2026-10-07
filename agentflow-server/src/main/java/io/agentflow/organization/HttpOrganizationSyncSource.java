@@ -1,5 +1,7 @@
 package io.agentflow.organization;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.io.ByteArrayOutputStream;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -43,6 +45,7 @@ public final class HttpOrganizationSyncSource {
         long timeout = Math.min(destination.timeout().toMillis(), remaining); if (timeout <= 0) return failed(Failure.SOURCE_TIMEOUT);
         String query = "changes?tenantId=" + encoded(context.tenantId()) + "&sourceKey=" + encoded(context.sourceKey()) + "&afterRevision=" + context.afterRevision();
         var request = HttpRequest.newBuilder(destination.baseUri().resolve(query)).timeout(Duration.ofMillis(timeout))
+                .header(DiagnosticContext.HEADER, DiagnosticContext.capture().traceId())
                 .header("Accept", "application/json").GET();
         if (!destination.token().isEmpty()) request.header("Authorization", "Bearer " + destination.token());
         var future = client.sendAsync(request.build(), response -> new BoundedBody());

@@ -1,5 +1,7 @@
 package io.agentflow.notification;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentflow.common.JsonUtil;
 import java.time.Clock;
@@ -145,4 +147,17 @@ class WeComNotificationTransportTest {
         @Override public Clock withZone(ZoneId zone) { return this; }
         @Override public Instant instant() { return now; }
     }
+
+    @Test void sourceTraceCoversTokenAndMessageWithoutChangingMessageBody() throws Exception {
+        String trace = java.util.UUID.randomUUID().toString();
+        try (var server = new LocalWeComServer()) {
+            var target = target(server); var transport = new WeComNotificationTransport(json);
+            try (var scope = new DiagnosticContext(trace, "demo").open()) {
+                assertThat(transport.send(target)).isEqualTo(Outcome.accepted());
+            }
+            assertThat(server.traceIds).containsExactly(trace, trace);
+            assertThat(server.messages.get(0).body()).doesNotContain(trace);
+        }
+    }
+
 }

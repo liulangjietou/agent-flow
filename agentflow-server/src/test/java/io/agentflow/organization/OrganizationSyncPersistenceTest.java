@@ -46,7 +46,7 @@ class OrganizationSyncPersistenceTest {
 
     @BeforeEach void setup() {
         var data = new DriverManagerDataSource("jdbc:h2:mem:organization-sync-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", "");
-        Flyway.configure().dataSource(data).target("109").load().migrate(); jdbc = new JdbcTemplate(data);
+        Flyway.configure().dataSource(data).load().migrate(); jdbc = new JdbcTemplate(data);
         var manager = new DataSourceTransactionManager(data); tx = new TransactionTemplate(manager);
         var proxy = new ProxyFactory(new JdbcOrganizationSyncRepository(jdbc, json));
         proxy.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource())); sync = (JdbcOrganizationSyncRepository) proxy.getProxy();

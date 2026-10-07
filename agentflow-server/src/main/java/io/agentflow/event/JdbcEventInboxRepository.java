@@ -1,5 +1,7 @@
 package io.agentflow.event;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import java.sql.Timestamp;
@@ -40,10 +42,10 @@ public class JdbcEventInboxRepository implements EventInboxRepository {
         var signal = item.input().signal();
         jdbc.update("""
                 INSERT INTO event_inbox(tenant_id,id,source_key,event_id,application_id,contract_key,contract_version,input_json,
-                    version,status,received_at,updated_at,next_attempt_at,failures)
-                VALUES(?,?,?,?,?,?,?,?,1,'RECEIVED',?,?,?,0)
+                    version,status,received_at,updated_at,next_attempt_at,failures,trace_id)
+                VALUES(?,?,?,?,?,?,?,?,1,'RECEIVED',?,?,?,0,?)
                 """, signal.tenantId(), item.id().toString(), signal.sourceKey(), item.input().eventId(), signal.applicationId().toString(),
-                signal.contractKey(), signal.contractVersion(), json.write(item.input()), timestamp(item.receivedAt()), timestamp(item.updatedAt()), timestamp(item.nextAttemptAt()));
+                signal.contractKey(), signal.contractVersion(), json.write(item.input()), timestamp(item.receivedAt()), timestamp(item.updatedAt()), timestamp(item.nextAttemptAt()), DiagnosticContext.capture().traceId());
         append(item);
     }
     @Override @Transactional(propagation = Propagation.MANDATORY)
@@ -58,8 +60,8 @@ public class JdbcEventInboxRepository implements EventInboxRepository {
         if (changed != 1) throw conflict(); append(item);
     }
     @Override public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id FROM event_inbox WHERE next_attempt_at<=? ORDER BY next_attempt_at,received_at,id LIMIT ?",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), BATCH_SIZE);
+        return jdbc.query("SELECT tenant_id,id,trace_id FROM event_inbox WHERE next_attempt_at<=? ORDER BY next_attempt_at,received_at,id LIMIT ?",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), BATCH_SIZE);
     }
     @Override public List<EventInboxItem> page(String tenantId, int limit, UUID beforeId) {
         if (beforeId == null) return jdbc.query("SELECT * FROM event_inbox WHERE tenant_id=? ORDER BY received_at DESC,id DESC LIMIT ?", row(), tenantId, limit + 1);

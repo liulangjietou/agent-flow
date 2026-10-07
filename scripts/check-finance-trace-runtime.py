@@ -157,11 +157,11 @@ def queue_wave(runtime, sources, fixture, prepared):
     return {"queues": wave, "requests": requests, "prepared": prepared}
 
 
-def probe(runtime, idp, label):
+def probe(runtime, idp, label, queue_tables=None):
     """停服后的只读数据库检查，保留所有原输入及命令列。"""
     assert runtime.process.poll() is not None
     source = runtime.directory / "FinanceQueueProbe.java"
-    tables = ",".join(json.dumps(value[0]) for value in TABLES.values())
+    tables = ",".join(json.dumps(value[0]) for value in (TABLES if queue_tables is None else queue_tables).values())
     source.write_text("""import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentflow.common.JsonUtil;
 import java.sql.*;

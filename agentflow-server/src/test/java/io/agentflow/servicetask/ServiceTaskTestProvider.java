@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @author owlzhangfq@gmail.com
  */
 public final class ServiceTaskTestProvider implements AutoCloseable {
+    final java.util.List<String> traceIds = new java.util.concurrent.CopyOnWriteArrayList<>();
     final Map<UUID, ServiceTaskCommand> commands = new ConcurrentHashMap<>();
     final Map<UUID, ServiceTaskObservation> observations = new ConcurrentHashMap<>();
     final List<Call> calls = new CopyOnWriteArrayList<>();
@@ -55,6 +56,7 @@ public final class ServiceTaskTestProvider implements AutoCloseable {
     private void handle(HttpExchange exchange) throws IOException {
         String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
         JsonNode request = json.read(body, JsonNode.class); String path = exchange.getRequestURI().getPath();
+        traceIds.add(exchange.getRequestHeaders().getFirst("X-Trace-Id"));
         calls.add(new Call(path, request, exchange.getRequestHeaders().getFirst("Idempotency-Key"), exchange.getRequestHeaders().getFirst("Authorization")));
         exchange.getResponseHeaders().set("Content-Type", "application/json");
         if (mode == Mode.REDIRECT) { exchange.getResponseHeaders().set("Location", endpoint() + "redirect-target"); exchange.sendResponseHeaders(302, -1); exchange.close(); return; }

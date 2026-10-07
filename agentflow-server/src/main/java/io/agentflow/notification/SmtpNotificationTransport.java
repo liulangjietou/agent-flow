@@ -1,5 +1,7 @@
 package io.agentflow.notification;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import jakarta.mail.AuthenticationFailedException;
 import jakarta.mail.Message;
 import jakarta.mail.MessagingException;
@@ -42,6 +44,7 @@ public class SmtpNotificationTransport {
             message.setSubject(SUBJECT, "UTF-8");
             message.setText(NotificationMessageText.text(destination.publicUrl()), "UTF-8");
             message.setSentDate(Date.from(delivery.createdAt()));
+            message.setHeader(DiagnosticContext.HEADER, DiagnosticContext.capture().traceId());
             message.saveChanges();
             message.setHeader("Message-ID", "<agentflow-notification-" + delivery.id() + "@"
                     + server.from().substring(server.from().lastIndexOf('@') + 1) + ">");

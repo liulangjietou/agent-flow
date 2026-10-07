@@ -1,5 +1,7 @@
 package io.agentflow.notification;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.agentflow.common.JsonUtil;
 import java.io.ByteArrayOutputStream;
@@ -108,6 +110,7 @@ public class WeComNotificationTransport {
 
     private JsonNode request(URI uri, String body, boolean sending) {
         var builder = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(REQUEST_TIMEOUT_SECONDS))
+                .header(DiagnosticContext.HEADER, DiagnosticContext.capture().traceId())
                 .header("Accept", "application/json");
         if (body == null) builder.GET();
         else builder.header("Content-Type", "application/json; charset=utf-8").POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));

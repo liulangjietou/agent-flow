@@ -14,6 +14,7 @@ import java.util.concurrent.Executors;
  * @author owlzhangfq@gmail.com
  */
 final class LocalWeComServer implements AutoCloseable {
+    final java.util.List<String> traceIds = new java.util.concurrent.CopyOnWriteArrayList<>();
     static final String TOKEN = "{\"errcode\":0,\"access_token\":\"fixture-token\",\"expires_in\":7200}";
     static final String ACCEPT = "{\"errcode\":0,\"errmsg\":\"ok\",\"msgid\":\"fixture-message\"}";
     final ConcurrentLinkedQueue<Reply> tokenReplies = new ConcurrentLinkedQueue<>();
@@ -30,6 +31,7 @@ final class LocalWeComServer implements AutoCloseable {
     String baseUrl() { return "http://127.0.0.1:" + server.getAddress().getPort(); }
     private void handle(HttpExchange exchange) throws IOException {
         try (exchange) {
+            traceIds.add(exchange.getRequestHeaders().getFirst("X-Trace-Id"));
             var request = new Request(exchange.getRequestMethod(), exchange.getRequestURI().getRawQuery(),
                     new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             String path = exchange.getRequestURI().getPath(); Reply response;

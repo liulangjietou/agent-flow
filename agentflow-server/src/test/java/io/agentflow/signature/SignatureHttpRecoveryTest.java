@@ -35,7 +35,7 @@ class SignatureHttpRecoveryTest {
     @Test void lostResponseAndPairedRestoreKeepOneSubmissionAndRecoverPublishedButUnacknowledgedResults() throws Exception {
         Path sourceFiles = temporary.resolve("source-files"); String sourceUrl = fileUrl(temporary.resolve("source-db"));
         try (var provider = new SignatureHttpFixture(sourceFiles)) {
-            var initial = harness(sourceUrl); Flyway.configure().dataSource(initial.jdbc().getDataSource()).target("112").load().migrate();
+            var initial = harness(sourceUrl); Flyway.configure().dataSource(initial.jdbc().getDataSource()).load().migrate();
             SignaturePersistenceFixtures.seed(initial.jdbc(), provider.input.request());
             var queued = SignatureOperation.queue(provider.input, NOW); var sent = queued.claim(NOW, Duration.ofSeconds(15));
             initial.tx().executeWithoutResult(ignored -> { initial.operations().create(queued); initial.operations().update(sent); });
@@ -67,7 +67,7 @@ class SignatureHttpRecoveryTest {
                 var restored = harness(fileUrl(temporary.resolve("restored-db")));
                 try {
                     restored.jdbc().execute("RUNSCRIPT FROM '" + literal(script) + "'");
-                    assertThat(Flyway.configure().dataSource(restored.jdbc().getDataSource()).target("112").load().validateWithResult().validationSuccessful).isTrue();
+                    assertThat(Flyway.configure().dataSource(restored.jdbc().getDataSource()).load().validateWithResult().validationSuccessful).isTrue();
                     var originalProof = restored.evidence().find("tenant-a", provider.input.request().id(), observation.verified().evidence().digest()).orElseThrow();
                     assertThat(originalProof).isEqualTo(observation.verified());
                     var restoredClaim = restored.operations().find("tenant-a", provider.input.request().id()).orElseThrow(); assertThat(restoredClaim).isEqualTo(fetching);

@@ -1,5 +1,7 @@
 package io.agentflow.organization;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 @Service
 public final class OrganizationSyncWorker {
     private static final Logger LOG = LoggerFactory.getLogger(OrganizationSyncWorker.class);
+    private static final String TRACE_SOURCE = "organization-sync";
     private final JdbcOrganizationSyncRepository batches;
     private final OrganizationSyncService service;
     private final HttpOrganizationSyncSource source;
@@ -25,14 +28,16 @@ public final class OrganizationSyncWorker {
     public void poll() {
         for (var candidate : batches.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claim = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
-                if (claim == null || !service.sendable(claim, Instant.now())) continue;
-                var result = source.read(claim.context(), claim.leaseUntil());
-                service.finish(claim, result, Instant.now());
-            } catch (RuntimeException failure) {
-                LOG.error("Organization synchronization failed, errorCode={}, batchId={}, exceptionType={}",
-                        "WORKER_FAILURE", candidate.id(), failure.getClass().getSimpleName());
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString()).open()) {
+                try {
+                    var claim = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
+                    if (claim == null || !service.sendable(claim, Instant.now())) continue;
+                    var result = source.read(claim.context(), claim.leaseUntil());
+                    service.finish(claim, result, Instant.now());
+                } catch (RuntimeException failure) {
+                    LOG.error("Organization synchronization failed, errorCode={}, batchId={}, exceptionType={}",
+                            "WORKER_FAILURE", candidate.id(), failure.getClass().getSimpleName());
+                }
             }
         }
     }

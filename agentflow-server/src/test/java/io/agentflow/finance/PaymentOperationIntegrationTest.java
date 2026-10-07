@@ -596,7 +596,7 @@ class PaymentOperationIntegrationTest {
         assertThat(response.getStatus()).isEqualTo(202); assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
         return callbackRecords.byEvent("demo", event).orElseThrow();
     }
-    private static JdbcPaymentCallbackRepository.Candidate candidate(PaymentCallback callback) { return new JdbcPaymentCallbackRepository.Candidate("demo", callback.id()); }
+    private static JdbcPaymentCallbackRepository.Candidate candidate(PaymentCallback callback) { return new JdbcPaymentCallbackRepository.Candidate("demo", callback.id(), null); }
 
     @Test void financeRetirementWhileAccountReadIsInFlightPreventsLateWorkerFromSending() throws Exception {
         var job = job(); var id = job.input().command().id(); var entered = new CountDownLatch(1); var release = new CountDownLatch(1);
@@ -1310,4 +1310,21 @@ class PaymentOperationIntegrationTest {
      */
     @TestConfiguration(proxyBeanMethods = false)
     static class ListenerConfiguration { @Bean FailureListener paymentFailureListener() { return new FailureListener(); } }
+
+    @Test void tracePersistsCallbackWithoutOverwritingOriginalPaymentTrace() throws Exception {
+        var payment = job(); worker.poll(); var paymentId = payment.input().command().id();
+        String originalTrace = jdbc.queryForObject("SELECT trace_id FROM payment_operation WHERE id=?", String.class, paymentId.toString());
+        String event = "evt_" + UUID.randomUUID();
+        var response = mvc.perform(PaymentCallbackTestRequests.request(event, callbackBody(payment, 1))).andReturn().getResponse();
+        assertThat(response.getStatus()).isEqualTo(202); String trace = response.getHeader(DiagnosticContext.HEADER);
+        var callback = callbackRecords.byEvent("demo", event).orElseThrow();
+        assertThat(DiagnosticContext.validTrace(trace)).isTrue(); assertThat(trace).isNotEqualTo(originalTrace);
+        assertThat(jdbc.queryForMap("SELECT * FROM payment_callback WHERE id=?", callback.id().toString())).containsEntry("TRACE_ID", trace);
+        var callbackWorker = new PaymentCallbackWorker(callbackRecords, callbacks); callbackWorker.poll(); worker.poll(); callbackWorker.poll();
+        assertThat(callbackRecords.get("demo", callback.id()).status()).isEqualTo(PaymentCallback.Status.QUERY_QUEUED);
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM payment_operation WHERE id=?", String.class, paymentId.toString())).isEqualTo(originalTrace);
+        assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isEqualTo(1);
+        assertThat(org.slf4j.MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+
 }

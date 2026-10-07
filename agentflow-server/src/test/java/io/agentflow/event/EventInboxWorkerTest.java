@@ -14,7 +14,7 @@ import static org.mockito.Mockito.*;
 class EventInboxWorkerTest {
     @Test void aBrokenRecordDoesNotPreventTheNextEventFromBeingProcessed() {
         var store = mock(EventInboxRepository.class); var service = mock(EventInboxService.class);
-        var first = new EventInboxRepository.Candidate("demo", UUID.randomUUID()); var second = new EventInboxRepository.Candidate("demo", UUID.randomUUID());
+        var first = new EventInboxRepository.Candidate("demo", UUID.randomUUID(), null); var second = new EventInboxRepository.Candidate("demo", UUID.randomUUID(), null);
         when(store.due(any())).thenReturn(List.of(first, second));
         when(store.get(first.tenantId(), first.id())).thenThrow(new IllegalStateException("private-record-content"));
         var input = new ReceivedEvent("evt", "a".repeat(64), 1, new EventSignal(1, "demo", "erp", "GoodsAccepted", UUID.randomUUID(), 1, "wait", "accepted", 1));

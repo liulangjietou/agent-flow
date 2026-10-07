@@ -29,7 +29,7 @@ class SignatureLoginMigrationTest {
     @Test void upgradePreservesEveryExistingTableAndReferenceSurvivesSessionCleanupAndDatabaseRestore() throws Exception {
         var source = new DriverManagerDataSource("jdbc:h2:mem:signature-login-migration-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         var jdbc = new JdbcTemplate(source); migrate(source, "112"); var queued = seed(jdbc); var operations = repository(source);
-        var tx = new TransactionTemplate(new DataSourceTransactionManager(source)); tx.executeWithoutResult(ignored -> operations.create(queued));
+        var tx = new TransactionTemplate(new DataSourceTransactionManager(source)); tx.executeWithoutResult(ignored -> createLegacyOperation(jdbc, queued));
         String primary = UUID.randomUUID().toString(), browserSession = UUID.randomUUID().toString();
         jdbc.update("INSERT INTO AF_HTTP_SESSION VALUES(?,?,1,2,1800,1800002,'alice')", primary, browserSession);
         jdbc.update("INSERT INTO AF_HTTP_SESSION_ATTRIBUTES VALUES(?,'fixture',?)", primary, new byte[]{1, 2, 3});

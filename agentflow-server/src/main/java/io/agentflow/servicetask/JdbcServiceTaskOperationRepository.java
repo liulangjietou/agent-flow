@@ -1,5 +1,7 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -34,11 +36,11 @@ public class JdbcServiceTaskOperationRepository {
         jdbc.update("""
                 INSERT INTO service_task_operation(tenant_id,id,application_id,round_no,process_instance_id,execution_id,node_id,
                 operation_key,operation_version,contract_digest,target_digest,command_digest,input_json,state_json,version,status,attempts,
-                created_at,updated_at,next_attempt_at,progress,poll_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?,'PENDING',?)
+                created_at,updated_at,next_attempt_at,progress,poll_at,trace_id)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?,'PENDING',?,?)
                 """, command.tenantId(), command.id().toString(), binding.applicationId().toString(), binding.roundNo(), binding.processInstanceId(), binding.executionId(), binding.nodeId(),
                 command.contract().key(), command.contract().version(), command.contract().digest(), input.targetDigest(), command.digest(), json.write(input), json.write(operation),
-                timestamp(operation.createdAt()), timestamp(operation.updatedAt()), timestamp(operation.nextAttemptAt()), timestamp(operation.nextAttemptAt()));
+                timestamp(operation.createdAt()), timestamp(operation.updatedAt()), timestamp(operation.nextAttemptAt()), timestamp(operation.nextAttemptAt()), DiagnosticContext.capture().traceId());
         append(operation);
     }
 
@@ -109,8 +111,8 @@ public class JdbcServiceTaskOperationRepository {
 
     /** 扫描仅返回标识，暂停任务通过 poll_at 退避，不能占住队列头部。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id FROM service_task_operation WHERE poll_at<=? AND progress='PENDING' ORDER BY poll_at,created_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now));
+        return jdbc.query("SELECT tenant_id,id,trace_id FROM service_task_operation WHERE poll_at<=? AND progress='PENDING' ORDER BY poll_at,created_at,id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
     }
 
     private RowMapper<Stored> row() {
@@ -145,5 +147,5 @@ public class JdbcServiceTaskOperationRepository {
     /** @author owlzhangfq@gmail.com */
     public record Stored(ServiceTaskOperation operation, Progress progress, Instant progressedAt) { }
     /** @author owlzhangfq@gmail.com */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
 }

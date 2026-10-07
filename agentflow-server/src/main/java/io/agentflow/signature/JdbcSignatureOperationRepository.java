@@ -1,5 +1,7 @@
 package io.agentflow.signature;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -49,11 +51,11 @@ public class JdbcSignatureOperationRepository {
         }
         jdbc.update("""
                 INSERT INTO signature_operation(tenant_id,id,application_id,round_no,request_digest,target_digest,input_json,state_json,
-                version,status,attempts,authorized_at,updated_at,next_attempt_at,poll_at,active_guard)
-                VALUES(?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?,?,1)
+                version,status,attempts,authorized_at,updated_at,next_attempt_at,poll_at,active_guard,trace_id)
+                VALUES(?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?,?,1,?)
                 """, request.tenantId(), request.id().toString(), source.applicationId().toString(), source.roundNo(), request.digest(), input.targetDigest(),
                 json.write(input), json.write(operation), timestamp(request.authorization().authorizedAt()), timestamp(operation.updatedAt()),
-                timestamp(operation.nextAttemptAt()), timestamp(operation.nextAttemptAt()));
+                timestamp(operation.nextAttemptAt()), timestamp(operation.nextAttemptAt()), DiagnosticContext.capture().traceId());
         for (var document : request.documents()) insertSource(request, document);
         append(operation);
     }
@@ -126,8 +128,8 @@ public class JdbcSignatureOperationRepository {
 
     /** 后台只扫描到期身份；查询、发送和文件下载都必须另行取得新的持久领取。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id FROM signature_operation WHERE poll_at<=? AND active_guard=1 ORDER BY poll_at,tenant_id,id LIMIT ?",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), DUE_LIMIT);
+        return jdbc.query("SELECT tenant_id,id,trace_id FROM signature_operation WHERE poll_at<=? AND active_guard=1 ORDER BY poll_at,tenant_id,id LIMIT ?",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), DUE_LIMIT);
     }
 
     /** 读取固定原操作的连续历史；旧状态的结果文件尚未分配时不能套用最新文件清单。 */
@@ -231,7 +233,7 @@ public class JdbcSignatureOperationRepository {
      * 调度扫描仅暴露租户和原操作号，不携带原件或签署身份。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) { }
 
     /**
      * 已保存状态来自当前领取下的存储确认；后续下载仍须核对实际文件字节。

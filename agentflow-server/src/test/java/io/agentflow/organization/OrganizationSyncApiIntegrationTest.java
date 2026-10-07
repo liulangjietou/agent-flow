@@ -1,5 +1,7 @@
 package io.agentflow.organization;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentflow.auth.AuthService;
@@ -295,4 +297,21 @@ class OrganizationSyncApiIntegrationTest {
      * @author owlzhangfq@gmail.com
      */
     private record Exchange(String method, String template, String path, int status, String rawRequest, JsonNode response, String cacheControl, String replayed) { }
+
+    @Test void tracePersistsFromAuthorizedQueueToReadOnlySource() throws Exception {
+        var response = mvc.perform(post(API + "/batches").header("Authorization", "Bearer " + token)
+                .header("Idempotency-Key", UUID.randomUUID().toString()).contentType(MediaType.APPLICATION_JSON).content(queueBody(0)))
+                .andReturn().getResponse();
+        assertThat(response.getStatus()).isEqualTo(202);
+        String trace = response.getHeader(DiagnosticContext.HEADER);
+        String id = json.read(response.getContentAsString(), JsonNode.class).path("id").asText();
+        assertThat(DiagnosticContext.validTrace(trace)).isTrue();
+        assertThat(jdbc.queryForMap("SELECT * FROM organization_sync_batch WHERE id=?", id)).containsEntry("TRACE_ID", trace);
+        worker.poll(); worker.poll();
+        assertThat(read("/batches/" + id, 200).at("/state/status").asText()).isEqualTo("RECEIVED");
+        assertThat(fixture.traceIds).containsExactly(trace);
+        assertThat(count("organization_person")).isZero();
+        assertThat(org.slf4j.MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+
 }

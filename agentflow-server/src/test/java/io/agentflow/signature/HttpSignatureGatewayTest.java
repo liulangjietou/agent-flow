@@ -1,5 +1,7 @@
 package io.agentflow.signature;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.storage.LocalDocumentStore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -224,4 +226,15 @@ class HttpSignatureGatewayTest {
             @Override public void onComplete() { response.onComplete(); }
         };
     }
+
+    @Test void sourceTraceCoversSubmitQueryAndArtifactWithoutChangingSignedIdentity() throws Exception {
+        String trace = java.util.UUID.randomUUID().toString();
+        try (var scope = new DiagnosticContext(trace, "tenant-a").open()) {
+            multipartContainsExactFrozenOriginalsAndQueryContainsOnlyTheOriginalIdentity();
+            collectsIndependentVerifiedBytesAndReusesAnUnacknowledgedFileWithoutCurrentConfiguration();
+        }
+        assertThat(fixture.traceIds).containsExactly(trace, trace, trace);
+        assertThat(fixture.requests).allSatisfy(call -> assertThat(new String(call.body(), StandardCharsets.UTF_8)).doesNotContain(trace));
+    }
+
 }

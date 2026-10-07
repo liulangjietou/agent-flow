@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.*;
  * @author owlzhangfq@gmail.com
  */
 final class SignatureHttpFixture implements AutoCloseable {
+    final java.util.List<String> traceIds = new java.util.concurrent.CopyOnWriteArrayList<>();
     final java.security.KeyPair key = keyPair();
     final SignatureProfile profile = profile(key);
     final SignatureGatewayConfiguration configuration = new SignatureGatewayConfiguration();
@@ -104,6 +105,7 @@ final class SignatureHttpFixture implements AutoCloseable {
         try {
             byte[] body = exchange.getRequestBody().readNBytes(Math.toIntExact(SignatureRequest.MAX_TOTAL_BYTES) + 128 * 1024);
             String path = exchange.getRequestURI().getPath();
+            traceIds.add(exchange.getRequestHeaders().getFirst("X-Trace-Id"));
             requests.add(new Captured(path, exchange.getRequestHeaders().getFirst("Content-Type"), exchange.getRequestHeaders().getFirst("Authorization"),
                     exchange.getRequestHeaders().getFirst("Idempotency-Key"), body));
             assertThat(exchange.getRequestMethod()).isEqualTo("POST");
