@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api } from '../api'
 import ExpenseProjectOwners from './ExpenseProjectOwners.vue'
 import ExpensePriorControlFacts from './ExpensePriorControlFacts.vue'
@@ -11,7 +11,7 @@ import AdvanceOffsetSuggestion from './AdvanceOffsetSuggestion.vue'
 import type { AdvanceOffsetSuggestion as OffsetSuggestion } from '../advanceOffsetSuggestion'
 
 const props = defineProps<{ detail: ExpenseDetail; scopeKey: string; timeZone: string; locked: boolean }>()
-const emit = defineEmits<{ submitted: [applicationId: string]; busy: [value: boolean]; offsets: [suggestion: OffsetSuggestion]; checked: [] }>()
+const emit = defineEmits<{ submitted: [applicationId: string]; busy: [value: boolean]; offsets: [suggestion: OffsetSuggestion]; checked: []; locate: [finding: PrecheckView['findings'][number]] }>()
 const appointment = ref(''), accountingDate = ref(''), options = ref<PrecheckOptions | null>(null), result = ref<PrecheckView | null>(null)
 const reading = ref(false), saving = ref(false), confirm = ref(false), error = ref(''), requiresRefresh = ref(false)
 let epoch = 0, controller: AbortController | null = null, poll: ReturnType<typeof setTimeout> | undefined, expiry: ReturnType<typeof setTimeout> | undefined, pollUntil = 0
@@ -25,8 +25,15 @@ function currentReady() {
   return usable
 }
 function issue(code: string | null) { return code ? precheckIssues[code] ?? '请核对本项信息或联系财务后重新检查' : '' }
+/** 只有当前保存版本的逐行结果可回到编辑位置，整单和旧版结果不猜测目标。 */
+function canLocate(finding: PrecheckView['findings'][number]) {
+  return !!result.value && !blocked.value && !reading.value && !active.value && !requiresRefresh.value && props.detail.editable
+    && result.value.job.applicationVersion === props.detail.applicationVersion && result.value.job.financialVersion === props.detail.financialVersion
+    && result.value.findings.includes(finding) && props.detail.content.lines.some(line => line.lineNo === finding.lineNo)
+}
+function locate(finding: PrecheckView['findings'][number]) { if (canLocate(finding)) emit('locate', finding) }
 /** 所有预检读取有界，迟到的旧账号、旧单据及超时结果不能恢复提交入口。 */
-async function load(jobId?: string) {
+async function load(jobId?: string, focusOwner?: Element) {
   stop(); const version = epoch, request = new AbortController(); controller = request
   options.value = null; result.value = null; error.value = ''; reading.value = true; confirm.value = false
   const timeout = setTimeout(() => {
@@ -46,9 +53,16 @@ async function load(jobId?: string) {
       if (version !== epoch || !result.value) return
       result.value = { ...result.value, usable: false, unavailableCode: 'FACTS_EXPIRED' }; confirm.value = false
     }, Math.max(0, Math.min(Date.parse(view.validUntil) - Date.now(), 2_147_483_647)))
-    if (active.value && id && Date.now() < pollUntil) poll = setTimeout(() => void load(id), 2_000)
+    if (active.value && id && Date.now() < pollUntil) poll = setTimeout(() => void load(id, focusOwner), 2_000)
   } catch (cause) { if (version === epoch) error.value = (cause as { status?: number }).status ? expenseError(cause) : '单据或预检状态已变化，请重新打开单据后核对。' }
   finally { clearTimeout(timeout); if (version === epoch) { reading.value = false; controller = null } }
+  // 只接续本人本次预检的焦点；历史读取、账号切换和用户已离开的控件都不触发跳转。
+  if (focusOwner) await nextTick(() => {
+    const current = result.value
+    if (!current || version !== epoch || document.activeElement !== focusOwner || current.job.id !== jobId) return
+    const finding = current.findings.find(item => item.nature === 'REJECTED' && canLocate(item))
+    if (finding) locate(finding)
+  })
 }
 async function queue() {
   if (blocked.value || reading.value || active.value || requiresRefresh.value || !options.value?.enabled) return
@@ -56,14 +70,14 @@ async function queue() {
   if (!appointment.value || !accountingDate.value) { error.value = '请选择本次任职和会计日期。'; return }
   const available = options.value
   if (!available.targetDigest) return
-  const version = epoch, id = props.detail.id
+  const version = epoch, id = props.detail.id, focusOwner = typeof document === 'undefined' ? undefined : document.activeElement ?? undefined
   saving.value = true; emit('busy', true); confirm.value = false
   try {
     const receipt = await api.queueExpensePrecheck(id, { applicationVersion: props.detail.applicationVersion, financialVersion: props.detail.financialVersion,
       initiatorAppointmentId: appointment.value, accountingDate: accountingDate.value, targetDigest: available.targetDigest })
     if (version !== epoch) return
     pollUntil = Date.now() + 90_000
-    saving.value = false; emit('busy', false); await load(receipt.id)
+    saving.value = false; emit('busy', false); await load(receipt.id, focusOwner)
   } catch (cause) { if (version === epoch) { error.value = precheckIssues[(cause as { code?: string }).code ?? ''] ?? expenseError(cause); requiresRefresh.value = true } }
   finally { if (version === epoch) { saving.value = false; emit('busy', false) } }
 }
@@ -105,7 +119,7 @@ onUnmounted(() => { stop(); emit('busy', false) })
       <div class="result-heading"><strong>{{ precheckStatuses[result.job.status] }}</strong><small>第 {{ result.job.attempt }} 次检查</small></div>
       <p class="submission-help">{{ initiatorContextLabel(result.initiator) }} · 会计日期 {{ result.accountingDate }}</p>
       <p v-if="!result.usable && !active" class="submission-error">{{ issue(result.unavailableCode) }}</p>
-      <ul v-if="result.findings.length"><li v-for="(finding, index) in result.findings" :key="index">{{ finding.lineNo ? `第 ${finding.lineNo} 行 · ` : '' }}{{ precheckStages[finding.stage] ?? '检查结果' }}：{{ issue(finding.code) }}<small>核对码 {{ finding.code }}</small></li></ul>
+      <ul v-if="result.findings.length"><li v-for="(finding, index) in result.findings" :key="index">{{ finding.lineNo ? `第 ${finding.lineNo} 行 · ` : '' }}{{ precheckStages[finding.stage] ?? '检查结果' }}：{{ issue(finding.code) }}<small>核对码 {{ finding.code }}</small><button v-if="canLocate(finding)" type="button" class="quiet finding-action" :aria-label="`去处理第 ${finding.lineNo} 行`" @click="locate(finding)">去处理</button></li></ul>
       <p v-if="result.budgetExceptionPolicy" class="submission-help">预算政策 {{ result.budgetExceptionPolicy.reference }} 允许申请例外。此时预算尚未冻结；正式提交后如需例外，将由独立预算负责人审批，批准后仍须实际预算确认。</p>
       <template v-if="result.preview"><div class="preview-amounts"><div><small>核定含税额</small><strong>{{ moneyLabel(result.preview.approvedGross) }}</strong></div><div><small>借款抵扣</small><strong>{{ moneyLabel(result.preview.offsetTotal) }}</strong></div><div><small>应付余额</small><strong>{{ moneyLabel(result.preview.payable) }}</strong></div></div><p class="submission-help">收款账户 {{ result.preview.maskedAccount }} · 汇率日期 {{ result.rateDate }}<br />有效至 {{ result.validUntil ? new Date(result.validUntil).toLocaleString('zh-CN') : '待核对' }}；正式提交仍会复核有效性。</p></template>
       <details v-if="result.projectOwners" class="policy-sources"><summary>核对本次项目负责人</summary><p>正式提交时核对当前资格并固定责任；申请人兼任负责人时按本次任职上溯直接主管。</p><ExpenseProjectOwners :source="result.projectOwners" /></details>
@@ -120,6 +134,7 @@ onUnmounted(() => { stop(); emit('busy', false) })
 </template>
 
 <style scoped>
+.finding-action{color:var(--deep);font-size:12px;margin-top:6px}.finding-action:focus-visible{outline:3px solid var(--teal);outline-offset:3px}
 .policy-sources{font-size:12px;line-height:1.8;overflow-wrap:anywhere}.policy-sources summary{cursor:pointer;color:var(--deep)}.policy-sources summary:focus-visible{outline:3px solid var(--teal);outline-offset:2px}.policy-sources li+li{margin-top:10px}
 .expense-submission{border-top:2px solid var(--teal);margin-top:28px;padding-top:24px}.submission-heading,.result-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}.submission-heading h3{font-size:19px;margin:7px 0}.submission-heading>span{font:12px 'DM Mono',monospace;color:var(--deep)}.submission-help{color:var(--muted);font-size:12px;line-height:1.9}.expense-submission>label{display:grid;gap:8px;font-size:12px;max-width:260px}.expense-submission input{padding:10px;border:1px solid var(--line);border-radius:7px;font:inherit;background:#fff;width:100%;min-width:0}.submission-error{font-size:12px;color:var(--red);line-height:1.8}.submission-toolbar{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}.precheck-result{border:1px solid var(--line);border-radius:12px;padding:20px;background:var(--paper);margin:20px 0}.result-heading strong{font-size:14px}.result-heading small{font-size:11px;color:var(--muted)}.precheck-result ul{padding-left:18px;font-size:12px;line-height:1.8}.precheck-result li small{display:block;color:var(--muted);font-size:10px}.preview-amounts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px;margin-top:18px}.preview-amounts small{display:block;font-size:11px;color:var(--muted);margin-bottom:9px}.preview-amounts strong{font:14px 'DM Mono',monospace;overflow-wrap:anywhere;line-height:1.8}.submit-confirmation{border:1px solid var(--teal);border-radius:10px;padding:18px;background:#f1faf7;font-size:12px;line-height:1.9}@media(max-width:600px){.preview-amounts{grid-template-columns:1fr}.precheck-result{padding:14px}}
 </style>

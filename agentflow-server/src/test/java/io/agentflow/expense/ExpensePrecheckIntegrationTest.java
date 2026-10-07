@@ -26,6 +26,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint;
@@ -683,6 +685,33 @@ class ExpensePrecheckIntegrationTest {
         var view = tree(read(fixture.report(), "/prechecks/" + ready, "alice"));
         assertThat(view.path("usable").asBoolean()).isFalse();
         assertThat(view.path("unavailableCode").asText()).isEqualTo("RESOURCES_CHANGED");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"DENIED", "REQUIRES_EXCEPTION"})
+    void localPolicyGuardKeepsTheOriginalLineNumberWithoutReservingOrCallingBudget(String decision) throws Exception {
+        var report = report(new ExpenseContent(entity, ExpenseContent.Type.DAILY, "逐行制度反馈",
+                List.of(line(3, "OFFICE", List.of(), null), line(7, "OFFICE", List.of(), null)), List.of()));
+        var before = report.state();
+        RESPONDER.set((operation, request) -> {
+            if (!operation.equals("expense-policy") || request.at("/data/line/lineNo").asInt() != 7) return normal(operation, request);
+            var input = json.read(request.path("data").toString(), ExpensePolicyPort.Request.class);
+            var amount = input.exchangeRate().convert(input.line().claimedGross());
+            var assessment = new ExpensePolicyPort.Assessment(new ExpensePolicySnapshot(UUID.randomUUID(), 1, amount,
+                    money("0", "CNY"), ExpensePolicySnapshot.Decision.valueOf(decision), "synthetic-tax", "synthetic-policy"),
+                    input.exchangeRate().convert(input.line().claimedTax()), false, Instant.now().plusSeconds(600));
+            return json.write(Map.of("contractVersion", 1, "tenantId", request.path("tenantId").asText(),
+                    "requestId", request.path("requestId").asText(), "outcome", "SUCCESS", "data", assessment));
+        });
+        UUID id = enqueue(report); worker.poll();
+        String code = decision.equals("DENIED") ? "EXPENSE_POLICY_DENIED" : "EXPENSE_EXCEPTION_REASON_REQUIRED";
+        assertThat(job(id).status()).isEqualTo(Status.BLOCKED);
+        assertThat(job(id).result().findings()).containsExactly(new Finding(Stage.INPUT, 7, Nature.REJECTED, code));
+        var response = tree(read(report, "/prechecks/" + id, "alice"));
+        assertThat(response.path("findings").get(0).path("lineNo").asInt()).isEqualTo(7);
+        assertThat(count("budget-precheck")).isZero();
+        assertThat(reports.find("demo", report.id()).orElseThrow().state()).isEqualTo(before);
+        assertThat(applications.findById("demo", report.applicationId()).orElseThrow().status()).isEqualTo(ApplicationStatus.DRAFT);
     }
 
     private Fixture fixture(boolean withResources) throws Exception {

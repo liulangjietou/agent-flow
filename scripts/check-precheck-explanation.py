@@ -356,7 +356,7 @@ class SnapshotH2 {
     return result
 
 
-def setup(runtime, sources):
+def setup(runtime, sources, template_version=1):
     """所有费用、组织、票据和在审申请均通过旧安装包公开接口创建。"""
     runtime.call("POST", "/organization/initialize", {}, "admin", 201)
     unit = runtime.call("POST", "/organization/units", {"kind": "LEGAL_ENTITY", "name": "解释验收法人", "active": True}, "admin", 201)
@@ -367,9 +367,9 @@ def setup(runtime, sources):
     appointment = runtime.call("POST", "/organization/appointments", {"personId": person["id"], "departmentId": department["id"], "positionId": position["id"], "active": True}, "admin", 201)
     finance = runtime.call("POST", "/organization/people", {"subject": "finance", "displayName": "解释验收审批人", "active": True, "approvalEligible": True}, "admin", 201)
     runtime.call("POST", "/organization/appointments", {"personId": finance["id"], "departmentId": department["id"], "positionId": position["id"], "active": True}, "admin", 201)
-    draft = runtime.call("POST", "/process-templates/expense-report/copy", {"key": "explanation-expense", "name": "解释验收报销", "templateVersion": 1}, "admin")
+    draft = runtime.call("POST", "/process-templates/expense-report/copy", {"key": "explanation-expense", "name": "解释验收报销", "templateVersion": template_version}, "admin")
     for node in draft["graph"]["nodes"]:
-        if node["type"] == "USER_TASK":
+        if node["type"] == "USER_TASK" and node["properties"].get("expenseStage") != "PROJECT_REVIEW":
             node["properties"]["assigneeRule"] = "role:ORG_PERSON_" + finance["id"]
     draft = runtime.call("PUT", "/process-definitions/" + draft["id"], {"name": draft["name"], "graph": draft["graph"], "formSchema": draft["formSchema"], "notificationTexts": draft.get("notificationTexts", {}), "expectedRevision": draft["revision"]}, "admin")
     definition = runtime.call("POST", "/process-definitions/" + draft["id"] + "/publish?expectedRevision=" + str(draft["revision"]), {"changeNote": "本地合成费用预检解释验收"}, "admin")

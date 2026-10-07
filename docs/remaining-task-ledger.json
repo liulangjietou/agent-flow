@@ -1,28 +1,28 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-07T19:49:54.172030+00:00",
+  "recordedAt": "2026-10-07T20:30:06.923499+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 38,
+    "knownOpenTaskCount": 39,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 20,
+      "LOCAL_DEVELOPMENT": 21,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 38,
+    "projectRemainingLowerBound": 39,
     "completionPercentage": null,
     "notes": [
-      "38 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "39 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
     ],
     "localDeliveryBreakdown": {
-      "recordedAt": "2026-10-07T19:49:54.172030+00:00",
+      "recordedAt": "2026-10-07T20:30:06.923499+00:00",
       "implementationRemaining": {
         "count": 0,
         "taskIds": [],
@@ -51,12 +51,13 @@
           "O01"
         ]
       },
-      "note": "20 OPEN local targets: 18 implemented awaiting applicable browser/PostgreSQL gates; W02 and U01 awaiting browser/devices. V03 audit remains incomplete.",
+      "note": "21 OPEN local targets: 18 implemented awaiting applicable browser/PostgreSQL gates; W02, U01 and U02 awaiting browser/devices. V03 audit remains incomplete.",
       "implementedAwaitingBrowserVerification": {
-        "count": 2,
+        "count": 3,
         "taskIds": [
           "W02",
-          "U01"
+          "U01",
+          "U02"
         ]
       }
     }
@@ -2336,7 +2337,7 @@
           ]
         }
       ],
-      "observed": "最终固定包 cd6b0a45 已验证：5,309 个唯一 Java 用例经四类测试夹具修复后全部通过；1,493 个前端独立用例、49 项工具测试、构建、作者检查和 396 操作 OpenAPI 通过。281 表非空升级/独立恢复及 11 项系统自检通过。浏览器、PostgreSQL、完整条款核对和目标部署验收仍待完成。",
+      "observed": "此前 5309 项 Java 全量与修复范围组合已通过；U02 追加 440 项范围回归，去重后 5311 项。当前前端 1498 项全部通过。新固定包 c3c28f84 验证费用纠错、281 表原值保持和重启。浏览器、PostgreSQL、完整条款核对和目标部署仍待完成；其他既有运行证据保留各自原包范围。",
       "references": [
         {
           "path": "docs/postgres-release-gate.md",
@@ -2375,8 +2376,9 @@
       "localAutomatedGate": {
         "status": "PASS",
         "evidence": "docs/evidence/local-regression-gate-20261007.json",
-        "javaUniqueCases": 5309,
-        "webUniqueCases": 1493
+        "javaUniqueCases": 5311,
+        "webUniqueCases": 1498,
+        "scopeSupplement": "docs/evidence/expense-feedback-20261007.json"
       }
     },
     {
@@ -3103,6 +3105,45 @@
       "acceptance": "节点边界及连线拐点经校验后保存和发布为有效 BPMN DI，Flowable 能读取原图形信息；兼容旧草稿且不改变条件、分支顺序或语义差异。",
       "dependsOn": [],
       "implementationStatus": "IMPLEMENTED_LOCAL_FIXED_PACKAGE_BROWSER_POSTGRES_PENDING"
+    },
+    {
+      "id": "U02",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "工作台交互",
+      "status": "OPEN",
+      "title": "费用逐行预检纠错与实时分摊反馈",
+      "sourceRefs": [
+        {
+          "documentId": "01",
+          "section": "§4 费用报销页面",
+          "lines": [
+            105,
+            114
+          ]
+        },
+        {
+          "documentId": "01",
+          "section": "原型演示路径",
+          "lines": [
+            135,
+            138
+          ]
+        }
+      ],
+      "observed": "两项后端、两项初始前端及一项自动焦点行为先失败后修复。440 项 Java 范围回归、1498 项前端测试及构建通过；固定包 58 次 HTTP、281 表升级原值保持和强退恢复通过。真实浏览器/辅助设备待补验。",
+      "references": [
+        {
+          "path": "docs/evidence/expense-feedback-20261007.json",
+          "line": 1
+        },
+        {
+          "path": "docs/expense-feedback.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "原稳定行号可定位说明或删除按钮，新预检阻断自动定位但不抢走已移动焦点；历史/旧版本/已删行/锁定/切换账号不误跳，定位不执行写操作；分摊差额用整数分实时反馈。",
+      "dependsOn": [],
+      "implementationStatus": "IMPLEMENTED_LOCAL_FIXED_PACKAGE_BROWSER_PENDING"
     }
   ],
   "sourceSectionIndex": [
@@ -4269,15 +4310,15 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "V02",
-    "status": "LOCAL_AUTOMATED_GATE_PASSED_REQUIREMENT_AUDIT_CONTINUES",
-    "recordedAt": "2026-10-07T19:49:54.172030+00:00",
-    "knownOpenTaskCount": 38,
-    "evidence": "docs/evidence/local-regression-gate-20261007.json"
+    "taskId": "U02",
+    "status": "LOCAL_IMPLEMENTATION_VERIFIED_REQUIREMENT_AUDIT_CONTINUES",
+    "recordedAt": "2026-10-07T20:30:06.923499+00:00",
+    "knownOpenTaskCount": 39,
+    "evidence": "docs/evidence/expense-feedback-20261007.json"
   },
   "localMainIntegration": {
-    "verifiedThroughCommit": "600f52e67ef7a1d59a0af64149917911a734ca69",
-    "mergeCommit": "600f52e67ef7a1d59a0af64149917911a734ca69",
+    "verifiedThroughCommit": "2eb6652f478e5e1fac8edd2d9811c54c2ee02d8c",
+    "mergeCommit": "2eb6652f478e5e1fac8edd2d9811c54c2ee02d8c",
     "originMainFetchedAtMerge": "2ac75649c026501460a59464d80f9a48ddf6ecd7",
     "remotePush": false,
     "note": "Local main was verified at this source base before the current commit. This stage is ready for authorized fast-forward integration; remote delivery remains gated."

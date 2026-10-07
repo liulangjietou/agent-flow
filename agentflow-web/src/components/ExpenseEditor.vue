@@ -4,7 +4,7 @@ import { api } from '../api'
 import { DefinitionSelection } from '../definitionSelection'
 import type { DefinitionCatalogItem } from '../definitionCatalog'
 import { expenseError, expenseTypes, type ExpenseDetail } from '../expenses'
-import { emptyExpense, expenseContent, expenseDefinition, expenseDrafts, newExpenseLine, type ExpenseDraftState, type FinanceCatalog } from '../expenseDraft'
+import { emptyExpense, expenseContent, expenseDefinition, expenseDrafts, newExpenseLine, type ExpenseDraftState, type FinanceCatalog, type PrecheckView } from '../expenseDraft'
 import DefinitionPicker from './DefinitionPicker.vue'
 import ExpenseLineEditor from './ExpenseLineEditor.vue'
 import ExpenseFundingPicker from './ExpenseFundingPicker.vue'
@@ -30,6 +30,12 @@ const sessionKey = computed(() => props.initial?.id ?? '')
 const dirty = computed(() => JSON.stringify(state.value.content) !== state.value.baseline || !state.value.detail && !!state.value.businessNo.trim())
 const blocked = computed(() => props.locked || saving.value || childBusy.value || assistBusy.value || assistantLocked.value || state.value.requiresRefresh)
 const entity = computed(() => catalog.value?.legalEntities.find(value => value.id === state.value.content.legalEntityId))
+const lineEditors = ref<Array<{ lineNo: number; focusFinding: (code: string) => void }>>([])
+/** 按稳定行号定位当前已保存草稿，删除行、脏内容及写入锁定都不能借用旧预检。 */
+function locateFinding(finding: PrecheckView['findings'][number]) {
+  if (blocked.value || dirty.value) return
+  lineEditors.value.find(editor => editor.lineNo === finding.lineNo)?.focusFinding(finding.code)
+}
 let epoch = 0, controller: AbortController | null = null, leaving = false
 function preserve() { expenseDrafts.put(props.scopeKey, sessionKey.value, state.value) }
 function stop() { epoch++; controller?.abort(); controller = null; selection.clear() }
@@ -161,7 +167,7 @@ onUnmounted(() => { if (!leaving) preserve(); stop(); unsubscribe(); emit('busy'
         <div class="editor-basics"><label class="title-field">报销标题<input v-model="state.content.title" maxlength="256" required /></label><label>费用法人<select v-model="state.content.legalEntityId" :disabled="!!state.content.lines.length || !!state.content.advanceOffsets.length" required><option value="" disabled>请选择法人</option><option v-if="state.content.legalEntityId && !entity" :value="state.content.legalEntityId">原法人当前不可用</option><option v-for="legalEntity in catalog.legalEntities" :key="legalEntity.id" :value="legalEntity.id">{{ legalEntity.name }} · {{ legalEntity.baseCurrency }}</option></select></label><label>费用类型<select v-model="state.content.type"><option v-for="(label, value) in expenseTypes" :key="value" :value="value">{{ label }}</option></select></label></div>
         <p v-if="state.content.lines.length || state.content.advanceOffsets.length" class="editor-help">修改法人前，请先移除费用行和借款引用，避免混入另一法人的成本归属。</p>
         <p v-if="entity" class="editor-help">{{ entity.paperReceiptRequired ? '该法人要求提交纸质原件，后续需在收单节点签收。' : '该法人当前不要求纸质原件签收。' }}</p>
-        <ExpenseLineEditor v-for="(line, index) in state.content.lines" :key="line.lineNo" v-model="state.content.lines[index]!" :catalog="catalog" :legal-entity-id="state.content.legalEntityId" :report-type="state.content.type" :scope-key="scopeKey" :locked="!!blocked" @remove="state.content.lines.splice(index, 1)" />
+        <ExpenseLineEditor v-for="(line, index) in state.content.lines" ref="lineEditors" :key="line.lineNo" v-model="state.content.lines[index]!" :catalog="catalog" :legal-entity-id="state.content.legalEntityId" :report-type="state.content.type" :scope-key="scopeKey" :locked="!!blocked" @remove="state.content.lines.splice(index, 1)" />
         <button type="button" class="secondary" :disabled="blocked || !entity || state.content.lines.length >= 200" @click="addLine">＋ 添加费用行</button>
         <ExpenseInvoiceAssist v-model="state.content" :scope-key="scopeKey" :report-id="state.detail?.id" :locked="!!locked || saving || childBusy || loading || assistantLocked || state.requiresRefresh" @busy="assistBusy = $event" />
         <ExpenseFundingPicker v-model="state.content" :scope-key="scopeKey" :report-id="state.detail?.id" :base-currency="entity?.baseCurrency ?? ''" :locked="!!blocked" />
@@ -170,7 +176,7 @@ onUnmounted(() => { if (!leaving) preserve(); stop(); unsubscribe(); emit('busy'
     </form>
     <ExpenseDraftAssistPanel v-if="state.detail && catalog" :scope-key="scopeKey" :report="state.detail" :catalog="catalog" :application-dirty="dirty" :locked="!!locked || saving || childBusy || assistBusy || explanationLocked || loading || state.requiresRefresh" @busy="draftAssistBusy = $event" @dirty="draftAssistDirty = $event" @fill="applyDraftAssist" />
     <p v-else-if="!state.detail" class="editor-help">保存费用草稿后，可按行程生成费用行、类别和分摊建议。</p>
-    <ExpenseSubmission v-if="state.detail?.editable && !dirty && !state.requiresRefresh && entity" :detail="state.detail" :scope-key="scopeKey" :time-zone="entity.timeZone" :locked="!!locked || saving || assistBusy || assistantLocked" @busy="childBusy = $event" @submitted="submitted" @offsets="applyOffsets" @checked="explanationRefresh++" />
+    <ExpenseSubmission v-if="state.detail?.editable && !dirty && !state.requiresRefresh && entity" :detail="state.detail" :scope-key="scopeKey" :time-zone="entity.timeZone" :locked="!!locked || saving || assistBusy || assistantLocked" @busy="childBusy = $event" @submitted="submitted" @offsets="applyOffsets" @checked="explanationRefresh++" @locate="locateFinding" />
     <p v-else-if="state.detail && dirty" class="editor-help">请先保存当前修改，再执行费用预检或提交。</p>
     <PrecheckExplanationPanel v-if="state.detail" :report-id="state.detail.id" :scope-key="scopeKey" :application-version="state.detail.applicationVersion" :financial-version="state.detail.financialVersion" :editable="state.detail.editable" :application-dirty="dirty" :refresh-version="explanationRefresh" :locked="!!locked || saving || childBusy || assistBusy || draftLocked || loading || state.requiresRefresh" @busy="explanationBusy = $event" @dirty="explanationDirty = $event" />
   </section>

@@ -126,6 +126,7 @@ public class ExpensePrecheckEvaluator {
         try { projectOwners = ExpenseProjectOwners.from(catalog, report.content()); }
         catch (DomainException invalid) { throw rejected(Stage.CATALOG, null, invalid.code()); }
         try { report.freeze(input.financialVersion(), input.roundNo(), entity.baseCurrency(), account.snapshot(), assessments, input.employeeId(), Instant.now()); }
+        catch (ExpenseReport.LineFailure invalid) { throw rejected(Stage.INPUT, invalid.lineNo(), invalid.code()); }
         catch (DomainException invalid) { throw rejected(Stage.INPUT, null, invalid.code()); }
         ExpenseSubmissionResources.Plan resourcePlan;
         try { resourcePlan = new ExpenseSubmissionResources().plan(report, loaded, Instant.now()); resources.requireClaimsAvailable(input.tenantId(), resourcePlan); }

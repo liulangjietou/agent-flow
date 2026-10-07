@@ -1,0 +1,142 @@
+{
+  "recordedAt": "2026-10-07T20:30:06.923499+00:00",
+  "taskId": "U02",
+  "status": "IMPLEMENTED_LOCAL_FIXED_PACKAGE_BROWSER_PENDING",
+  "sourceBaseCommit": "2eb6652f478e5e1fac8edd2d9811c54c2ee02d8c",
+  "sourceHashes": {
+    "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseReport.java": "dae8fdd60463d737157950f4d3e63a017990ff8a0c58bf765c6f7deaf47a7891",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePrecheckEvaluator.java": "9b797e68153a0deed4b6f3a33e892659158eb4c86c38919e32bb6afd212b7cd9",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpensePrecheckIntegrationTest.java": "1c419346e007b9a6b302cf8526db9caf940efcdac5f0a031dd6f58bd9f4bf0f9",
+    "agentflow-web/scripts/test-requests.mjs": "f36473c143d489b408108ce98b20b86a735b1ee3213b1242837f2dfeff5d7176",
+    "agentflow-web/src/components/ExpenseEditor.vue": "c5407013a848f321682108e6422bbb68f38b495f355f2512081d9b22bc59013e",
+    "agentflow-web/src/components/ExpenseLineEditor.vue": "88c740caa0effd95e3e83f72a50b130c775072854d4c1934d47c77104e49c2bb",
+    "agentflow-web/src/components/ExpenseSubmission.vue": "346672cda4773e9f4783d597b150ca2486a4cb0b02e82ea6e709fa6ef246f59a",
+    "agentflow-web/src/expenseDraft.ts": "63ecb2f08e31f71e07c0ccc2d0ae8129a5dee010ee775807a4fe81a2b35607e0",
+    "scripts/check-precheck-explanation.py": "38478ee9d7550251985ec8ca08789536ebaaaeb88590048b67cfb9e60baa4734",
+    "agentflow-web/tests/expense-feedback.test.mjs": "a32c59bc4977e89255c46e97668b4ff614427e9e02558c4dd41d2c3710b12e57",
+    "scripts/check-expense-feedback-runtime.py": "45bc4f8d9573eeb41439e172493c6ef0350bf7f5ad500f3ea11d56e4ac9740de"
+  },
+  "inputManifest": "/fyoung/tmp/agentflow-remaining-20260928/u02-input-hashes.json",
+  "inputManifestSha256": "95b0714975321e3459b0c2ee031fe64f5b04cb16798e66115a7b61b66d3ea71a",
+  "requirements": [
+    {
+      "documentId": "01",
+      "lines": [
+        105,
+        114
+      ]
+    },
+    {
+      "documentId": "01",
+      "lines": [
+        135,
+        138
+      ]
+    }
+  ],
+  "rootCause": "Line policy guards lost the original line number when converted to a whole-report finding. The expense UI lacked live allocation feedback and a current-result focus path; its reason-message key differed from the domain code.",
+  "ownership": "The expense aggregate retains the failed original line without duplicating domain validation. The precheck evaluator preserves it in the existing Finding contract. Vue components own draft feedback and focus only.",
+  "red": {
+    "javaBehaviorFailures": 2,
+    "initialWebBehaviorFailures": 2,
+    "automaticFocusBehaviorFailures": 1,
+    "evidence": [
+      "/fyoung/tmp/agentflow-remaining-20260928/u02-red",
+      "/fyoung/tmp/agentflow-remaining-20260928/u02-autofocus-red"
+    ]
+  },
+  "validation": {
+    "javaScopeCases": 440,
+    "javaFailures": 0,
+    "javaSkipped": 0,
+    "webFullPassed": 1498,
+    "webFullSkipped": 0,
+    "finalFocusScopeLog": "/fyoung/tmp/agentflow-remaining-20260928/u02-final-focus-scope.log",
+    "typescriptAndBuild": "PASS",
+    "javaAggregation": {
+      "baselineCases": 5309,
+      "uniqueCasesAfterScope": 5311,
+      "newCases": 2,
+      "note": "440 scoped cases replace their existing identities; the full Java suite was not rerun."
+    },
+    "openapi": {
+      "operations": 396,
+      "schemas": 868,
+      "requestExamples": 129
+    },
+    "capture": {
+      "responses": 79,
+      "successfulWrites": 37,
+      "operations": [
+        "GET /api/v1/organization/synchronization",
+        "GET /api/v1/organization/synchronization/batches",
+        "GET /api/v1/organization/synchronization/batches/{id}",
+        "GET /api/v1/organization/synchronization/batches/{id}/plans",
+        "GET /api/v1/organization/synchronization/batches/{id}/transitions",
+        "GET /api/v1/organization/synchronization/plans/{planId}",
+        "POST /api/v1/organization/synchronization/batches",
+        "POST /api/v1/organization/synchronization/batches/{id}/apply",
+        "POST /api/v1/organization/synchronization/batches/{id}/cancel",
+        "POST /api/v1/organization/synchronization/batches/{id}/preflight",
+        "POST /api/v1/organization/synchronization/batches/{id}/retry"
+      ]
+    },
+    "captureBoundary": "Historical local HTTP fixtures validate client parsing; no corporate HR service was contacted.",
+    "runtime": {
+      "status": "PASS",
+      "legacyJarSha256": "cd6b0a45cc4ae8f5cc992e96f66b667dad06cb767edacf13a406acaa156850ff",
+      "fixedJarSha256": "c3c28f841337d515b95fb09bc8560536ec076986f008a70019320869d5c87ed8",
+      "checkerSha256": "45bc4f8d9573eeb41439e172493c6ef0350bf7f5ad500f3ea11d56e4ac9740de",
+      "sharedCheckerSha256": "38478ee9d7550251985ec8ca08789536ebaaaeb88590048b67cfb9e60baa4734",
+      "upgrade": {
+        "preservedTables": 281,
+        "preservedRows": 245,
+        "newMigrations": 0
+      },
+      "runtimeBoots": 4,
+      "httpRequests": 58,
+      "originalBlockedResultPreserved": true,
+      "newBlockedOriginalLineNumbers": [
+        7,
+        7
+      ],
+      "correctedReadyWithoutSubmission": true,
+      "forceRestartPreservedFacts": true,
+      "financialWrites": 0,
+      "modelRequests": 0,
+      "browserRun": false,
+      "postgresRun": false
+    }
+  },
+  "retainedHarnessFailures": [
+    "Initial runtime setup used template v1 instead of reading current v7; the server correctly rejected the stale template version.",
+    "The next setup overwrote the protected project-owner rule; the server correctly rejected the altered template.",
+    "The third runtime assertion expected a null lineNo key; the existing API correctly omitted null fields. The actual absent old line number was then verified.",
+    "The first capture-enabled frontend run supplied the runtime fixture with 24 writes instead of the designated backend fixture with 37 writes. Both are retained; the final complete frontend run uses the designated fixture.",
+    "DOM fixture snapshots, whitespace selection and accounting-date selection were corrected before their behavioral assertions. Final TypeScript checking required an explicit nullable result guard."
+  ],
+  "jar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/u02-server.jar",
+    "sha256": "c3c28f841337d515b95fb09bc8560536ec076986f008a70019320869d5c87ed8"
+  },
+  "webAssets": {
+    "index.html": "be7465b725a61b9dcc29f0495f6945d47cf5397ed5ae4d6fee9d4b0d4a76c2ac",
+    "assets/index-DHEEj_h2.css": "3bb2e03ae211394a439e53344ea3809267699dd703ca3135c6c829058fcd7452",
+    "assets/index-BOjebVVa.js": "6bd192d58063ecfb42426e7d615f79aadec698afbe269be05482f9b85cd5c00a"
+  },
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/u02-feedback-verified-20261007",
+  "archiveFiles": 115,
+  "archiveManifestSha256": "bb4e3e5f8959fd15fcf1be88cda5d7b7586f8054d205ee117dc1474cff9c9cdb",
+  "review": {
+    "mode": "manual",
+    "security": "Stable original line identity is retained only in the authorized existing precheck view. No additional financial data, privileges or write action is introduced.",
+    "maintenance": "The original domain guard remains authoritative; focus uses component refs, current versions and existing request epochs.",
+    "testAdequacy": "Actual parent-child Vue templates, precise large amounts, input updates, deleted lines, stale results, lock, scope switch, fresh async polling and user-moved focus are exercised."
+  },
+  "boundaries": [
+    "Browser, touch and assistive-device verification remain pending. Component tests are not a browser run.",
+    "The fixed package uses isolated H2 and synthetic loopback finance. PostgreSQL, Docker and corporate systems were not attempted.",
+    "The backend package and frontend assets are separate artifacts. No database migration was added.",
+    "Remote push, PR and CI remain gated by V02/E15. V03 continues to audit unaccounted original clauses."
+  ]
+}

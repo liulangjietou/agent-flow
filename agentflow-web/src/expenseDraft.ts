@@ -50,7 +50,8 @@ export const precheckIssues: Record<string, string> = {
   EXPENSE_LEGAL_ENTITY_MISMATCH: '所选任职与费用法人不一致', EXPENSE_PRECHECK_ACTIVE: '已有检查正在执行，请刷新当前结果',
   INVOICE_NOT_VERIFIED: '发票尚未通过查验', INVOICE_EXPIRED: '发票查验已过期', INVOICE_ORIGINAL_NOT_READY: '发票原件尚未上传完成',
   ALLOCATION_UNBALANCED: '成本分摊之和须等于含税金额', INSUFFICIENT_AVAILABLE_AMOUNT: '可用额度或借款余额不足',
-  BUDGET_INSUFFICIENT: '预算余额不足', EXPENSE_POLICY_DENIED: '不符合当前费用标准', EXPENSE_EXCEPTION_REQUIRED: '超标费用需要填写说明'
+  BUDGET_INSUFFICIENT: '预算余额不足', EXPENSE_POLICY_DENIED: '制度禁止报销此项费用，请核对并移除此行',
+  EXPENSE_EXCEPTION_REASON_REQUIRED: '超标费用需要填写说明', EXPENSE_EXCEPTION_REQUIRED: '超标费用需要填写说明'
 }
 
 /** 完整费用字段契约与后端一致，选错通用流程时不创建不适用的草稿。 */

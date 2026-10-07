@@ -66,7 +66,9 @@ public final class ExpenseReport {
         var approved = new ArrayList<ExpenseRound.ApprovedLine>();
         for (var line : content.lines()) {
             var fact = assessments.get(line.lineNo());
-            var frozenLine = freezeLine(line, fact, baseCurrency);
+            ExpenseRound.FrozenLine frozenLine;
+            try { frozenLine = freezeLine(line, fact, baseCurrency); }
+            catch (DomainException failure) { throw new LineFailure(line.lineNo(), failure); }
             original.add(frozenLine);
             approved.add(new ExpenseRound.ApprovedLine(line.lineNo(), frozenLine.claimedBase(), frozenLine.deductibleTaxBase(),
                     CostAllocation.apportion(line.allocations(), frozenLine.claimedBase())));
@@ -150,6 +152,21 @@ public final class ExpenseReport {
         }
         // 制度与可抵扣额已经按本位币核定，不能再次乘汇率。
         return new ExpenseRound.FrozenLine(line, fact, gross, fact.deductibleTax());
+    }
+
+    /**
+     * 保留单行冻结失败的位置，预检可定位原行而不重复实现领域校验。
+     * @author owlzhangfq@gmail.com
+     */
+    public static final class LineFailure extends DomainException {
+        private final int lineNo;
+        private LineFailure(int lineNo, DomainException cause) {
+            super(cause.code(), cause.getMessage());
+            this.lineNo = lineNo;
+            initCause(cause);
+        }
+        /** 返回原费用行号，不按列表位置重新编号。 */
+        public int lineNo() { return lineNo; }
     }
 
     private static void validateReduction(ExpenseRound.ApprovedLine before, Reduction reduction) {
