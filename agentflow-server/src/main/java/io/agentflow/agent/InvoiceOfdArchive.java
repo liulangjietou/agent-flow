@@ -32,13 +32,19 @@ final class InvoiceOfdArchive {
     private static final int MAX_PATH_DEPTH = 32;
     private static final int BUFFER_BYTES = 8192;
     private final Map<String, byte[]> contents;
+    private final ExpansionBudget budget;
 
-    private InvoiceOfdArchive(Map<String, byte[]> contents) {
+    private InvoiceOfdArchive(Map<String, byte[]> contents, ExpansionBudget budget) {
         this.contents = Map.copyOf(contents);
+        this.budget = budget;
     }
 
     /** 完整读取并核对包内每个文件，不按不可信 ZIP 名称访问宿主文件。 */
     static InvoiceOfdArchive read(Path source) throws IOException {
+        return read(source, new ExpansionBudget());
+    }
+
+    private static InvoiceOfdArchive read(Path source, ExpansionBudget budget) throws IOException {
         if (!Files.isRegularFile(source, LinkOption.NOFOLLOW_LINKS)) throw invalid();
         long size = Files.size(source);
         if (size < 1 || size > InvoiceVerificationPort.Request.MAX_ORIGINAL_BYTES) throw invalid();
@@ -46,14 +52,12 @@ final class InvoiceOfdArchive {
         var directories = new HashSet<String>(); directories.add("");
         var declaredNames = new HashSet<String>();
         var canonicalNames = new HashMap<String, String>();
-        long total = 0;
-        int count = 0;
         try (var zip = new ZipFile(source.toFile())) {
             var entries = zip.entries();
             byte[] buffer = new byte[BUFFER_BYTES];
             while (entries.hasMoreElements()) {
                 var entry = entries.nextElement();
-                if (++count > MAX_ENTRIES || (entry.getMethod() != ZipEntry.STORED && entry.getMethod() != ZipEntry.DEFLATED)) throw invalid();
+                if (++budget.entries > MAX_ENTRIES || (entry.getMethod() != ZipEntry.STORED && entry.getMethod() != ZipEntry.DEFLATED)) throw invalid();
                 String name = archiveName(entry);
                 if (!declaredNames.add(name)) throw invalid();
                 registerPath(name, entry.isDirectory(), contents.keySet(), directories, canonicalNames);
@@ -67,8 +71,8 @@ final class InvoiceOfdArchive {
                 try (var input = zip.getInputStream(entry)) {
                     int length;
                     while ((length = input.read(buffer)) != -1) {
-                        total += length;
-                        if ((long) output.size() + length > MAX_ENTRY_BYTES || total > MAX_EXPANDED_BYTES) throw invalid();
+                        budget.bytes += length;
+                        if ((long) output.size() + length > MAX_ENTRY_BYTES || budget.bytes > MAX_EXPANDED_BYTES) throw invalid();
                         output.write(buffer, 0, length); crc.update(buffer, 0, length);
                     }
                 }
@@ -78,7 +82,17 @@ final class InvoiceOfdArchive {
             }
         } catch (IllegalArgumentException malformedName) { throw invalid(); }
         if (!contents.containsKey("OFD.xml")) throw invalid();
-        return new InvoiceOfdArchive(contents);
+        return new InvoiceOfdArchive(contents, budget);
+    }
+
+    /** 嵌套原件仍经 ZipFile 中央目录及 CRC 检查；只写一个私有临时容器，不展开不可信文件名。 */
+    InvoiceOfdArchive nested(byte[] source) throws IOException {
+        if (source.length < 1 || source.length > InvoiceVerificationPort.Request.MAX_ORIGINAL_BYTES) throw invalid();
+        Path file = Files.createTempFile("agentflow-ofd-seal-", ".ofd");
+        try {
+            Files.write(file, source, StandardOpenOption.TRUNCATE_EXISTING);
+            return read(file, budget);
+        } finally { Files.deleteIfExists(file); }
     }
 
     Set<String> files() { return contents.keySet(); }
@@ -178,4 +192,10 @@ final class InvoiceOfdArchive {
     }
 
     private static IOException invalid() { return new IOException("OFD archive is invalid, ambiguous or exceeds its limits"); }
+
+    /** 正文与所有嵌套容器累计计算解压量及条目数，不能通过每层重新读包重置额度。 */
+    private static final class ExpansionBudget {
+        private long bytes;
+        private int entries;
+    }
 }

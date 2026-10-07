@@ -54,7 +54,12 @@ final class InvoiceOfdDocument {
 
     /** 绘制复用同一次预检的 DOM 和预算，不在下游重新放宽 XML 解析设置。 */
     static Contents read(InvoiceOfdArchive archive) throws IOException {
-        var xml = new XmlFiles(archive);
+        return read(archive, new XmlBudget());
+    }
+
+    /** 正文与嵌套章复用同一 XML 预算，单次读取的 DOM 继续由对应包独占。 */
+    static Contents read(InvoiceOfdArchive archive, XmlBudget budget) throws IOException {
+        var xml = new XmlFiles(archive, budget);
         for (String file : archive.files()) {
             if (file.toLowerCase(Locale.ROOT).endsWith(".xml")) xml.read(file);
         }
@@ -271,17 +276,16 @@ final class InvoiceOfdDocument {
     private static final class XmlFiles {
         private final InvoiceOfdArchive archive;
         private final Map<String, Document> documents = new HashMap<>();
-        private int bytes;
-        private int elements;
+        private final XmlBudget budget;
         private String namespace;
 
-        private XmlFiles(InvoiceOfdArchive archive) { this.archive = archive; }
+        private XmlFiles(InvoiceOfdArchive archive, XmlBudget budget) { this.archive = archive; this.budget = budget; }
 
         private Document read(String file) throws IOException {
             if (documents.containsKey(file)) return documents.get(file);
             int length = archive.size(file);
-            bytes += length;
-            if (length > MAX_XML_BYTES || bytes > MAX_TOTAL_XML_BYTES) throw invalid();
+            budget.bytes += length;
+            if (length > MAX_XML_BYTES || budget.bytes > MAX_TOTAL_XML_BYTES) throw invalid();
             var factory = DocumentBuilderFactory.newDefaultInstance();
             factory.setNamespaceAware(true); factory.setXIncludeAware(false); factory.setExpandEntityReferences(false);
             try (var source = archive.open(file)) {
@@ -303,7 +307,7 @@ final class InvoiceOfdDocument {
                 var pending = new ArrayDeque<Element>(); pending.add(document.getDocumentElement());
                 while (!pending.isEmpty()) {
                     Element element = pending.removeFirst();
-                    if (++elements > MAX_ELEMENTS || element.getAttributes().getLength() > MAX_ATTRIBUTES
+                    if (++budget.elements > MAX_ELEMENTS || element.getAttributes().getLength() > MAX_ATTRIBUTES
                             || element.hasAttributeNS(XMLConstants.XML_NS_URI, "base")
                             || "http://www.w3.org/2001/XInclude".equals(element.getNamespaceURI())) throw invalid();
                     // 不改写 DOM 或原件；显式拒绝混用两个版本，避免下游引用与图元采用不同解释。
@@ -332,6 +336,12 @@ final class InvoiceOfdDocument {
      * @author owlzhangfq@gmail.com
      */
     record Template(String file, String zOrder) { }
+
+    /** 同一来源的 XML 累计读取预算；嵌套文档不能重置字节或节点计数。 */
+    static final class XmlBudget {
+        private int bytes;
+        private int elements;
+    }
 
     /**
      * 渲染期间持有已预检内容；访问仍受原来的包内路径及 XML 总预算约束。

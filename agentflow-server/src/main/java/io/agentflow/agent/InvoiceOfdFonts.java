@@ -54,13 +54,18 @@ final class InvoiceOfdFonts implements Closeable {
 
     /** 按已解析的包内文件缓存；集合字体仍须与文档指定的 PostScript 名称精确匹配。 */
     InvoiceOfdFont embedded(String file, String name) throws IOException {
+        return embedded(archive, file, name);
+    }
+
+    /** 嵌套章的同名文件有不同身份，但共用字体数量、字节额度和关闭生命周期。 */
+    InvoiceOfdFont embedded(InvoiceOfdArchive source, String file, String name) throws IOException {
         requireOpen();
-        var key = new Source(true, file, name);
+        var key = new Source(source, file, name);
         var cached = loaded.get(key);
         if (cached != null) return cached;
-        reserve(archive.size(file));
+        reserve(source.size(file));
         byte[] bytes;
-        try (var input = archive.open(file)) { bytes = input.readAllBytes(); }
+        try (var input = source.open(file)) { bytes = input.readAllBytes(); }
         String face = bytes.length >= Integer.BYTES && ByteBuffer.wrap(bytes).getInt() == COLLECTION_TAG ? name : null;
         return remember(key, bytes, face);
     }
@@ -70,7 +75,7 @@ final class InvoiceOfdFonts implements Closeable {
         requireOpen();
         Mapping mapping = deployed.get(new Declaration(name, bold, italic));
         if (mapping == null) throw new IOException("OFD deployed font mapping is absent");
-        var key = new Source(false, mapping.file().toString(), mapping.face());
+        var key = new Source(null, mapping.file().toString(), mapping.face());
         var cached = loaded.get(key);
         if (cached != null) return cached;
         if (loaded.size() >= MAX_LOADED_FONTS) throw limitExceeded();
@@ -190,5 +195,5 @@ final class InvoiceOfdFonts implements Closeable {
      * 包内文件与部署文件使用独立身份；不同资源 ID 可共享同一字体实例。
      * @author owlzhangfq@gmail.com
      */
-    private record Source(boolean embedded, String file, String face) { }
+    private record Source(InvoiceOfdArchive archive, String file, String face) { }
 }

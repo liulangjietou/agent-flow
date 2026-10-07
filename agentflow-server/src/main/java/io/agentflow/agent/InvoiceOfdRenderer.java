@@ -9,13 +9,13 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.PathIterator;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
@@ -34,6 +34,7 @@ import static io.agentflow.agent.InvoiceOfdXml.*;
  */
 final class InvoiceOfdRenderer {
     private static final double PIXELS_PER_MM = 144.0 / 25.4;
+    private static final int MAX_SEAL_DEPTH = 4;
     private static final int MAX_OBJECTS = 20_000;
     private static final int MAX_LAYER_PAINTS = 20_000;
     private static final int MAX_SEGMENTS = 1_000_000;
@@ -50,9 +51,13 @@ final class InvoiceOfdRenderer {
     private int blockDepth;
     private long liveGroupPixels;
     private long totalGroupPixels;
+    private long totalPagePixels;
+    private long totalStampPixels;
+    private final InvoiceOfdDocument.XmlBudget xmlBudget = new InvoiceOfdDocument.XmlBudget();
+    private final Map<InvoiceOfdSeal.Picture, DocumentData> nestedDocuments = new IdentityHashMap<>();
     private final Set<Element> activeComposites = Collections.newSetFromMap(new IdentityHashMap<>());
     private final InvoiceOfdClips clips = new InvoiceOfdClips();
-    private final Map<String, List<Element>> layerCache = new HashMap<>();
+    private final Map<Element, List<Element>> layerCache = new IdentityHashMap<>();
 
     private InvoiceOfdRenderer() { }
 
@@ -63,15 +68,13 @@ final class InvoiceOfdRenderer {
 
     /** 字体清单必须来自可信部署配置，不能取自 OFD 内容；同次调用的各文档和页面共享字体所有者。 */
     static List<byte[]> render(InvoiceOfdArchive archive, Path fontCatalog) throws IOException {
-        var contents = InvoiceOfdDocument.read(archive);
-        inspectDrawingScope(contents);
-        var annotations = InvoiceOfdAnnotations.read(archive, contents);
         var renderer = new InvoiceOfdRenderer();
+        var document = renderer.document(archive);
         var result = new ArrayList<byte[]>();
         int bytes = 0;
         try (var fonts = InvoiceOfdFonts.open(archive, fontCatalog)) {
-            for (var page : contents.pages()) {
-                byte[] image = renderer.page(archive, contents, page, MAX_PNG_BYTES - bytes, fonts, annotations.getOrDefault(page, List.of()));
+            for (var page : document.contents().pages()) {
+                byte[] image = renderer.page(document, page, MAX_PNG_BYTES - bytes, fonts);
                 bytes += image.length;
                 result.add(image);
             }
@@ -79,11 +82,21 @@ final class InvoiceOfdRenderer {
         return List.copyOf(result);
     }
 
-    /** 尚未实现的签章等文档特征在入口拒绝，批注由独立索引检查后完整叠加。 */
+    private DocumentData document(InvoiceOfdArchive archive) throws IOException {
+        var contents = InvoiceOfdDocument.read(archive, xmlBudget);
+        inspectDrawingScope(contents);
+        for (var page : contents.pages()) {
+            totalPagePixels += (long) pixels(page.width()) * pixels(page.height());
+            if (totalPagePixels > MAX_TOTAL_PIXELS) throw invalid();
+        }
+        return new DocumentData(archive, contents, InvoiceOfdAnnotations.read(archive, contents), InvoiceOfdSignatures.read(archive, contents));
+    }
+
+    /** 页面、批注和签章必须属于明确支持的形状，不允许遗漏未知绘制内容。 */
     private static void inspectDrawingScope(InvoiceOfdDocument.Contents contents) throws IOException {
         Element ofd = contents.root("OFD.xml", "OFD");
         shape(ofd, Set.of("Version", "DocType"), Set.of("DocBody"));
-        for (Element body : children(ofd)) shape(body, Set.of(), Set.of("DocInfo", "DocRoot"));
+        for (Element body : children(ofd)) shape(body, Set.of(), Set.of("DocInfo", "DocRoot", "Signatures"));
         var documents = new HashSet<String>();
         var pageFiles = new HashSet<String>();
         long pixels = 0;
@@ -130,35 +143,80 @@ final class InvoiceOfdRenderer {
         }
     }
 
-    private byte[] page(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents,
-                        InvoiceOfdDocument.Page page, int remainingBytes, InvoiceOfdFonts fonts,
-                        List<InvoiceOfdAnnotations.Appearance> annotations) throws IOException {
+    private byte[] page(DocumentData document, InvoiceOfdDocument.Page page,
+                        int remainingBytes, InvoiceOfdFonts fonts) throws IOException {
         var image = new BufferedImage(pixels(page.width()), pixels(page.height()), BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = image.createGraphics();
         try {
-            var scopes = new InvoiceOfdResources.Scopes(archive, contents, page.documentFile(), fonts);
             graphics.setColor(Color.WHITE);
             graphics.fillRect(0, 0, image.getWidth(), image.getHeight());
-            // 显式页面裁剪使复合图元的离屏表面始终受真实输出像素范围约束。
             graphics.setClip(0, 0, image.getWidth(), image.getHeight());
             graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
             graphics.scale(PIXELS_PER_MM, PIXELS_PER_MM);
+            paintPage(graphics, document, page, fonts, 0, new InvoiceOfdColors.ProfileBudget());
+            return png(image, remainingBytes);
+        } finally { graphics.dispose(); image.flush(); }
+    }
+
+    /** 正文页与嵌套章共用矢量绘制；这里只裁剪和绘制，不填白底或重新分配整页位图。 */
+    private void paintPage(Graphics2D parent, DocumentData document, InvoiceOfdDocument.Page page,
+                           InvoiceOfdFonts fonts, int sealDepth, InvoiceOfdColors.ProfileBudget profileBudget) throws IOException {
+        Graphics2D graphics = (Graphics2D) parent.create();
+        try {
+            graphics.clip(new Rectangle2D.Double(0, 0, page.width(), page.height()));
             graphics.translate(-page.x(), -page.y());
+            var scopes = new InvoiceOfdResources.Scopes(document.archive(), document.contents(), page.documentFile(), fonts, profileBudget);
             var resources = scopes.page(page.file());
-            var layers = layers(contents, page.file());
+            var layers = layers(document.contents(), page.file());
             // 每种类型先模板后正文；模板作为整体处于其引用指定的类型中。
             for (String type : LAYER_ORDER) {
                 for (var template : page.templates()) if (type.equals(template.zOrder())) {
                     var templateResources = scopes.page(template.file());
-                    var templateLayers = layers(contents, template.file());
+                    var templateLayers = layers(document.contents(), template.file());
                     for (String innerType : LAYER_ORDER) paintLayers(graphics, templateLayers, templateResources, innerType);
                 }
                 paintLayers(graphics, layers, resources, type);
             }
-            paintAnnotations(graphics, annotations, resources);
-            return png(image, remainingBytes);
-        } finally { graphics.dispose(); image.flush(); }
+            paintStamps(graphics, document, page, fonts, sealDepth, profileBudget);
+            paintAnnotations(graphics, document.annotations().getOrDefault(page, List.of()), resources);
+        } finally { graphics.dispose(); }
+    }
+
+    private void paintStamps(Graphics2D parent, DocumentData document, InvoiceOfdDocument.Page page,
+                             InvoiceOfdFonts fonts, int sealDepth, InvoiceOfdColors.ProfileBudget profileBudget) throws IOException {
+        for (var stamp : document.stamps().getOrDefault(page, List.of())) {
+            if (++objects > MAX_OBJECTS) throw invalid();
+            Graphics2D graphics = (Graphics2D) parent.create();
+            try {
+                var box = stamp.boundary();
+                graphics.clip(box);
+                graphics.translate(box.x, box.y);
+                if (stamp.clip() != null) graphics.clip(stamp.clip());
+                if (stamp.picture().format().equals("OFD")) {
+                    if (sealDepth >= MAX_SEAL_DEPTH) throw invalid();
+                    DocumentData nested = nestedDocuments.get(stamp.picture());
+                    if (nested == null) {
+                        nested = document(document.archive().nested(stamp.picture().bytes()));
+                        // 单个印章图像没有选择页的语义；多页章必须整份拒绝，不能默认丢弃后页。
+                        if (nested.contents().pages().size() != 1) throw invalid();
+                        nestedDocuments.put(stamp.picture(), nested);
+                    }
+                    var nestedPage = nested.contents().pages().get(0);
+                    graphics.scale(box.width / nestedPage.width(), box.height / nestedPage.height());
+                    paintPage(graphics, nested, nestedPage, fonts, sealDepth + 1, profileBudget);
+                } else {
+                    try (var source = new ByteArrayInputStream(stamp.picture().bytes())) {
+                        BufferedImage image = InvoiceOfdImages.read(source, stamp.picture().format());
+                        try {
+                            totalStampPixels += (long) image.getWidth() * image.getHeight();
+                            if (totalStampPixels > MAX_TOTAL_PIXELS) throw invalid();
+                            graphics.drawImage(image, AffineTransform.getScaleInstance(box.width / image.getWidth(), box.height / image.getHeight()), null);
+                        } finally { image.flush(); }
+                    }
+                }
+            } finally { graphics.dispose(); }
+        }
     }
 
     private void paintAnnotations(Graphics2D parent, List<InvoiceOfdAnnotations.Appearance> annotations,
@@ -177,10 +235,11 @@ final class InvoiceOfdRenderer {
     }
 
     private List<Element> layers(InvoiceOfdDocument.Contents contents, String file) throws IOException {
-        var cached = layerCache.get(file);
+        Element root = contents.root(file, "Page");
+        var cached = layerCache.get(root);
         if (cached != null) return cached;
-        Element content = child(contents.root(file, "Page"), "Content", false);
-        if (content == null) { layerCache.put(file, List.of()); return List.of(); }
+        Element content = child(root, "Content", false);
+        if (content == null) { layerCache.put(root, List.of()); return List.of(); }
         shape(content, Set.of(), Set.of("Layer"));
         List<Element> layers = children(content);
         for (Element layer : layers) {
@@ -188,8 +247,8 @@ final class InvoiceOfdRenderer {
             if (layer.hasAttribute("ID")) id(layer, "ID");
             if (!LAYER_ORDER.contains(layerType(layer))) throw invalid();
         }
-        layerCache.put(file, List.copyOf(layers));
-        return layerCache.get(file);
+        layerCache.put(root, List.copyOf(layers));
+        return layerCache.get(root);
     }
 
     private void paintLayers(Graphics2D graphics, List<Element> layers, InvoiceOfdResources resources, String type) throws IOException {
@@ -338,4 +397,9 @@ final class InvoiceOfdRenderer {
             return bytes.toByteArray();
         } finally { writer.dispose(); }
     }
+    /** 每个容器拥有自己的 DOM/资源身份，所有容器仍共享本次渲染累计额度。 */
+    private record DocumentData(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents,
+                                Map<InvoiceOfdDocument.Page, List<InvoiceOfdAnnotations.Appearance>> annotations,
+                                Map<InvoiceOfdDocument.Page, List<InvoiceOfdSignatures.Stamp>> stamps) { }
+
 }

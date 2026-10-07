@@ -1,0 +1,169 @@
+{
+  "status": "BOUNDED_OFD_SIGNATURE_APPEARANCES_VERIFIED_PUBLIC_A01_PENDING",
+  "recordedAt": "2026-10-07T11:38:16.274749+00:00",
+  "baseCommit": "e9198ae80c3d61b31a32a86730753a843b532410",
+  "red": {
+    "tests": 9,
+    "errors": 6,
+    "reason": "All appearances including no-appearance signatures were rejected by the existing drawing scope"
+  },
+  "initialGreenCorrection": "Transparency assertion expected a blue background beyond the fixture path extent; corrected the fixture, no production fix for this assertion",
+  "tests": {
+    "io.agentflow.agent.InvoiceDocumentProcessTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdAnnotationsTest": {
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdArchiveTest": {
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCffDataTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCidFontTest": {
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCompatibilityTest": {
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdCompositeTest": {
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDeployedFontsTest": {
+      "tests": 15,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDocumentTest": {
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdDrawingTest": {
+      "tests": 18,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdFontTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdInspectorTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdPathTest": {
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdRendererTest": {
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdResultTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdSignaturesTest": {
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoiceOfdTemplateTest": {
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoicePdfInspectorTest": {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "io.agentflow.agent.InvoicePdfSourceTest": {
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "coverage": [
+    "SES v1 standalone seal and signed value; SES v4 signed value",
+    "Page mapping, repeated appearances, local clipping, PNG alpha and whole-worker later-stamp failure",
+    "Transparent nested single-page OFD, independent DOM/font source identities, four-level nesting",
+    "Shared archive entries, XML byte/node, fonts, objects, paths, page pixels and ICC budgets",
+    "DER definite length, trailing/truncated/deep/unsupported payload rejection; no image-byte scanning"
+  ],
+  "sourceSha256": {
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdArchive.java": "915f979b7bf4b62cf667b22d23dd3d05ede40230f9a6cf6fdfd95d49d385a876",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdDocument.java": "7065a2ad713aa1de3ffebe9d4a75c0d0adc3b18eb0d209849c3e5beb73d4b00c",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdFonts.java": "e62a448d051571c4f8aedfdf56047a3b26eb66eed7f6bd7caf4f49c8e631ffa6",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdRenderer.java": "33efb4d1d203b9d50ce3188f96a29e5c7ad858f9a71a84788299d3939f26da66",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdResources.java": "f456a51d7bd14713fd597b7ddd1f98372fa9b6628bc6e67dd90d571e45f164f6",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdRendererTest.java": "fa573bf4f15e27c3efbcc4da359450aa042289e442ce249de9a153ef5c12d1c2",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdImages.java": "bc43147e00f38884a078ee45db606832152cd286074654adcc89bb6526514367",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdSeal.java": "5454c0e37a0a3dce8743c4cc7f434dac66679ce8ab0c26fe39cdf04fc93592f0",
+    "agentflow-server/src/main/java/io/agentflow/agent/InvoiceOfdSignatures.java": "e58a3026786ce9ce6ec79136ff8b170f8bf185c43a5238ca8d049267a344c19a",
+    "agentflow-server/src/test/java/io/agentflow/agent/InvoiceOfdSignaturesTest.java": "e6e0a084364b40bcbaf5e62181b1f264e025d9f86436b5d66eb2c6730a12c858"
+  },
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/a01-signatures-verified/manifest.json",
+    "sha256": "d24764b8007e2b85ec91c8d6dccbd17fd7992435a6a6cadabd612aedf804e974",
+    "files": 52
+  },
+  "boundaries": {
+    "cryptographicSignatureVerification": false,
+    "sesVersions": [
+      1,
+      4
+    ],
+    "nestedMultiPageSeal": "Whole-source rejection; no first-page truncation",
+    "publicSourceRendering": "Additional original metadata and position compatibility failures are recorded for Task 3",
+    "publicOfdExtraction": false,
+    "fixedPackageVerified": false,
+    "browserVerified": false,
+    "postgresqlVerified": false
+  },
+  "sources": [
+    "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-gm/src/main/java/org/ofdrw/gm/ses/v1/SES_ESPictrueInfo.java",
+    "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-gm/src/main/java/org/ofdrw/gm/ses/v4/SES_Signature.java",
+    "https://raw.githubusercontent.com/ofdrw/ofdrw/2.4.0/ofdrw-core/src/main/java/org/ofdrw/core/signatures/appearance/StampAnnot.java"
+  ]
+}

@@ -7,9 +7,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-import javax.imageio.ImageIO;
-import javax.imageio.stream.MemoryCacheImageInputStream;
 import org.w3c.dom.Element;
 import static io.agentflow.agent.InvoiceOfdXml.*;
 
@@ -18,8 +15,6 @@ import static io.agentflow.agent.InvoiceOfdXml.*;
  * @author owlzhangfq@gmail.com
  */
 final class InvoiceOfdResources {
-    private static final long MAX_IMAGE_PIXELS = 20_000_000;
-    private static final int MAX_IMAGE_SIDE = 12_000;
     private static final Map<String, String> GROUPS = Map.of("Fonts", "Font", "ColorSpaces", "ColorSpace", "DrawParams", "DrawParam", "MultiMedias", "MultiMedia", "CompositeGraphicUnits", "CompositeGraphicUnit");
     private final InvoiceOfdArchive archive;
     private final Map<Long, Resource> resources = new HashMap<>();
@@ -75,39 +70,16 @@ final class InvoiceOfdResources {
         Element location = child(definition, "FontFile", false);
         // 包内字体存在但无效时直接失败，不能用部署字体掩盖缺件、截断或错误字形。
         var font = location == null ? fontSession.deployed(name, bold, italic)
-                : fontSession.embedded(archive.file(resource.base(), text(location).trim()), name);
+                : fontSession.embedded(archive, archive.file(resource.base(), text(location).trim()), name);
         fonts.put(id, font);
         return font;
     }
 
     BufferedImage image(long id) throws IOException {
-        Resource resource = resource(id, "MultiMedia"); Element definition = resource.element();
-        String file = imageFile(resource);
-        try (var input = archive.open(file); var stream = new MemoryCacheImageInputStream(input)) {
-            var readers = ImageIO.getImageReaders(stream);
-            if (!readers.hasNext()) throw invalid();
-            var reader = readers.next();
-            try {
-                String format = reader.getFormatName().toUpperCase(java.util.Locale.ROOT);
-                if (!Set.of("PNG", "JPEG").contains(format)) throw invalid();
-                if (definition.hasAttribute("Format")) {
-                    String declared = definition.getAttribute("Format").toUpperCase(java.util.Locale.ROOT);
-                    if (declared.equals("JPG")) declared = "JPEG";
-                    if (!declared.equals(format)) throw invalid();
-                }
-                reader.setInput(stream, true, true);
-                var warned = new AtomicBoolean();
-                reader.addIIOReadWarningListener((source, warning) -> warned.set(true));
-                int width = reader.getWidth(0), height = reader.getHeight(0);
-                if (width < 1 || height < 1 || width > MAX_IMAGE_SIDE || height > MAX_IMAGE_SIDE || (long) width * height > MAX_IMAGE_PIXELS) throw invalid();
-                BufferedImage result = reader.read(0);
-                // JPEG 等解码器会对截断数据仅告警并交出部分像素，这仍属于整页失败。
-                if (result == null || warned.get()) {
-                    if (result != null) result.flush();
-                    throw invalid();
-                }
-                return result;
-            } finally { reader.dispose(); }
+        Resource resource = resource(id, "MultiMedia");
+        Element definition = resource.element();
+        try (var input = archive.open(imageFile(resource))) {
+            return InvoiceOfdImages.read(input, definition.hasAttribute("Format") ? definition.getAttribute("Format") : null);
         }
     }
 
@@ -166,12 +138,17 @@ final class InvoiceOfdResources {
         private final InvoiceOfdDocument.Contents contents;
         private final String documentFile;
         private final InvoiceOfdFonts fontSession;
-        private final InvoiceOfdColors.ProfileBudget profileBudget = new InvoiceOfdColors.ProfileBudget();
+        private final InvoiceOfdColors.ProfileBudget profileBudget;
         private final Map<String, InvoiceOfdResources> pages = new HashMap<>();
 
         Scopes(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents, String documentFile, InvoiceOfdFonts fontSession) {
+            this(archive, contents, documentFile, fontSession, new InvoiceOfdColors.ProfileBudget());
+        }
+
+        Scopes(InvoiceOfdArchive archive, InvoiceOfdDocument.Contents contents, String documentFile,
+               InvoiceOfdFonts fontSession, InvoiceOfdColors.ProfileBudget profileBudget) {
             this.archive = archive; this.contents = contents; this.documentFile = documentFile;
-            this.fontSession = fontSession;
+            this.fontSession = fontSession; this.profileBudget = profileBudget;
         }
 
         InvoiceOfdResources page(String file) throws IOException {
