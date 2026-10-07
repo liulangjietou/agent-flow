@@ -1,0 +1,52 @@
+{
+  "status": "LOCAL_IMPLEMENTATION_AND_COMPONENT_TESTS_PASSED_BROWSER_PENDING",
+  "recordedAt": "2026-10-07T13:01:54.330119+00:00",
+  "baselineCommit": "6cfd4d57ab78f7deca9188a15364a9ee89ecb371",
+  "sourceSha256": {
+    "agentflow-web/src/App.vue": "e2c92733c278ed9fa5762c040bc434ff0294c93c3ea83b78a1f5973da6f56cd5",
+    "agentflow-web/src/components/WorkspaceTabs.vue": "571fe30ae30a2b4ca68a57066f587201dfc89d2743081087bcb80d058be599ff",
+    "agentflow-web/src/components/ApplicationRecord.vue": "f751090b72df56645c81cb1c9132613f5a040be788cc4a05e2a742d425e3cc9f",
+    "agentflow-web/scripts/test-requests.mjs": "e5248f44ba751d8ca11af00c5a929038af4ee2474dd5817d805b5b6c571bf484",
+    "agentflow-web/tests/workspace-tabs.test.mjs": "ddeb78651fab2c7ae692611db2c3d745ed1945e2d79c24a8b57aff8db181b183",
+    "agentflow-web/tests/signature-panel.test.mjs": "b33d44207260d3c8350c8b3bd5b8f62e1a990469e57919873a001aed429a9c26"
+  },
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/u01-tabs-verified/manifest.json",
+    "sha256": "5bc55fad57e17c75ea220a561c3d108b70b829ed71679fdb21ef82572df38e9c"
+  },
+  "red": {
+    "tests": 3,
+    "failures": 3
+  },
+  "green": {
+    "interactionTests": 7,
+    "scopeTests": 126,
+    "failures": 0,
+    "typecheck": "PASSED",
+    "build": "PASSED",
+    "openapi": {
+      "result": "PASS",
+      "operations": 396,
+      "schemas": 867,
+      "requestExamples": 129
+    },
+    "countsOverlap": true
+  },
+  "testFixtureAdjustment": "The actual signature-panel VNode traversal now enters component subtrees created by slots; original authorization and pending-write assertions remain unchanged.",
+  "primaryReference": {
+    "url": "https://www.w3.org/WAI/ARIA/apg/patterns/tabs/",
+    "retrievedAt": "2026-10-07",
+    "usedFor": "Manual keyboard activation because panel data loads on demand; roles and bidirectional IDs"
+  },
+  "review": {
+    "kind": "self-review",
+    "unresolvedKnownFindings": 0
+  },
+  "boundaries": {
+    "browserVerified": false,
+    "screenReaderVerified": false,
+    "backendChanged": false,
+    "migrationChanged": false,
+    "remotePushOrPr": false
+  }
+}

@@ -163,7 +163,10 @@ test('真实申请详情向电子签传递原轮次和恢复锁，所有关闭�
   api.application = async () => application(); api.applicationRounds = async () => [source()]
   const props = reactive({ applicationId: APP, userId: 'alice', scopeKey: 'record-signature-scope', commentRefreshVersion: 0, pendingWrites: [], recoveryError: '' })
   const root = { children: [] }, app = renderer.createApp({ ...RenderedRecord, setup: (_, ctx) => RenderedRecord.setup(props, ctx) }, { ...props })
-  const nodes = vnode => !vnode || typeof vnode !== 'object' ? [] : [vnode, ...(Array.isArray(vnode.children) ? vnode.children.flatMap(nodes) : [])]
+  // 历史面板通过真实页签组件的插槽挂载，沿实际组件子树核对原电子签参数和锁。
+  const nodes = vnode => !vnode || typeof vnode !== 'object' ? [] : [vnode,
+    ...(Array.isArray(vnode.children) ? vnode.children.flatMap(nodes) : []),
+    ...(vnode.component?.subTree ? nodes(vnode.component.subTree) : [])]
   const signature = () => nodes(app._instance.subTree).find(node => node.props?.rounds && node.props?.onDirty && node.props?.onBusy)
   try {
     app.mount(root); await settle(); button({ root }, '电子签').props.onClick(); await settle()

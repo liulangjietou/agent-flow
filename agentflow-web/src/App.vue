@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WorkspaceTabs from './components/WorkspaceTabs.vue'
 import AccountMappingManager from './components/AccountMappingManager.vue'
 import { mappingDrafts } from './accountMappingDrafts'
 import ExpenseConfigurationManager from './components/ExpenseConfigurationManager.vue'
@@ -176,6 +177,7 @@ const activeApplication = ref<Application | null>(null)
 const detailError = ref('')
 const detailLoading = ref(false)
 const taskDetailPanel = ref<HTMLElement | null>(null)
+const operationStatus = ref<HTMLElement | null>(null)
 const assistRefresh = ref(0)
 const taskTab = ref<'detail' | 'compare' | 'timeline' | 'audit' | 'comments' | 'assist'>('detail')
 const commentRefresh = ref(0)
@@ -573,13 +575,25 @@ function expenseTaskChanged() {
 }
 async function performAction(input: TaskActionInput) {
   if (!activeTask.value || busy.value || writesBlocked.value) return
+  const scope = actorScope.value, taskId = activeTask.value.taskId
+  let showResult = false
   busy.value = true
   try {
-    const result = await api.taskAction(activeTask.value.taskId, input)
+    const result = await api.taskAction(taskId, input)
+    if (actorScope.value !== scope || activeTask.value?.taskId !== taskId) return
     activeTask.value = null; activeApplication.value = null
-    await refreshWorkspace(); notice.value = `${taskActionLabels[input.action]}已完成，申请状态：${statusLabel(result.applicationStatus)}`
-  } catch (error) { notice.value = errorMessage(error) }
-  finally { busy.value = false }
+    await refreshWorkspace()
+    if (actorScope.value !== scope || activeTask.value) return
+    notice.value = `${taskActionLabels[input.action]}已完成，申请状态：${statusLabel(result.applicationStatus)}`
+    showResult = true
+  } catch (error) {
+    if (actorScope.value === scope && activeTask.value?.taskId === taskId) { notice.value = errorMessage(error); showResult = true }
+  } finally {
+    busy.value = false
+    await nextTick()
+    if (showResult && actorScope.value === scope && page.value === 'workbench'
+      && (!activeTask.value || activeTask.value.taskId === taskId)) operationStatus.value?.focus({ preventScroll: true })
+  }
 }
 /** 人员变更后重读原任务版本，不能沿旧名单继续批准或自动重提。 */
 async function performMembershipChange(input: CountersignInput, view: CountersignView) {
@@ -1528,7 +1542,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
       <main ref="workspace" class="main" tabindex="-1">
         <header><div class="header-location"><WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :can-cashier="canCashier" :can-configure-finance="canConfigureFinance" :can-read-financial-reports="canReadFinancialReports" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="requestLogout" /><div class="crumb">当前空间 <strong>/</strong> {{ page === 'expense-reports' ? '费用财务报表' : page === 'account-mappings' ? '科目映射' : page === 'expense-configuration' ? '费用制度' : page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'organization' ? '组织与人员' : page === 'proxies' ? '审批代理' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'assist' ? 'Agent 助理' : page === 'cashier' ? '出纳付款' : page === 'expense' ? '财务申请' : page === 'applications' ? '申请记录' : '审批工作台' }}</div></div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
         <div v-if="sessionExpired" class="session-notice" role="alert"><div><strong>需要恢复企业会话</strong><p>会话需要恢复。请在新窗口登录原账号，再恢复当前会话；本页的草稿和未确认操作会保留。</p><p v-if="notice">{{ notice }}</p></div><button class="secondary" @click="reopenEnterpriseLogin">重新登录</button><button class="secondary" :disabled="busy" @click="restoreEnterpriseSession">恢复当前会话</button></div>
-        <div v-if="notice && !sessionExpired" class="toast" role="status">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
+        <div v-if="notice && !sessionExpired" ref="operationStatus" class="toast" role="status" tabindex="-1">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
         <section v-if="page === 'workbench'" class="content">
           <div class="page-heading"><div><p class="eyebrow">{{ today }}</p><h2>今天，先处理重要的事。</h2><p class="subhead">当前有 <strong>{{ taskCount ?? '—' }}</strong> 项可处理的审批任务。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
@@ -1539,7 +1553,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
               <div v-if="taskQueueView === 'board'" class="board-return"><button type="button" class="quiet" @click="taskQueuePanel?.focusTask(activeTask?.taskId)">↑ 返回待办看板</button></div>
               <div v-if="activeTask" class="detail-body">
                 <div class="detail-top"><div><span class="status-chip">● {{ activeApplication ? statusLabel(activeApplication.status) : '待处理' }}</span><h3>{{ activeApplication?.title ?? activeTask.taskName }}</h3><p>{{ activeApplication?.businessNo ?? activeTask.taskName }} · 任务创建于 {{ dateLabel(activeTask.createdAt) }}</p></div></div>
-                <div class="tabs"><button v-for="tab in [{ key: 'detail', label: '申请详情' }, { key: 'compare', label: '内容对比' }, { key: 'timeline', label: '时间线' }, { key: 'audit', label: '审计记录' }, { key: 'comments', label: '协作评论' }, { key: 'assist', label: 'Agent 摘要' }]" :key="tab.key" :class="{ active: taskTab === tab.key }" @click="taskTab = tab.key as typeof taskTab">{{ tab.label }}</button></div>
+                <WorkspaceTabs :id-base="`task-${activeTask.taskId}`" label="待办详情" variant="task" :model-value="taskTab" :tabs="[{ key: 'detail', label: '申请详情' }, { key: 'compare', label: '内容对比' }, { key: 'timeline', label: '时间线' }, { key: 'audit', label: '审计记录' }, { key: 'comments', label: '协作评论' }, { key: 'assist', label: 'Agent 摘要' }]" @update:model-value="taskTab = $event as typeof taskTab">
                 <div v-if="taskTab === 'detail'" class="detail-content">
                   <p v-if="detailError" class="inline-error">{{ detailError }}</p>
                   <template v-else-if="activeApplication"><div class="facts"><div><small>申请人</small><strong>{{ activeApplication.createdBy }}</strong></div><div><small>流程版本</small><strong>{{ activeApplication.processKey }} / v{{ activeApplication.definitionVersion }}</strong></div><div><small>当前任务</small><strong>{{ activeTask.taskName }}</strong></div><div><small>审批轮次</small><strong>第 {{ activeApplication.roundNo }} 轮</strong></div></div><ExpenseDetail v-if="activeApplication.businessReference?.type === 'EXPENSE'" :report-id="activeApplication.businessReference.id" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :task-id="activeTask.taskId" :locked="busy || writesBlocked" @changed="expenseTaskChanged"><template #restricted><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template></ExpenseDetail><ExpensePlanDetail v-else-if="activeApplication.businessReference?.type === 'EXPENSE_PLAN'" :plan-id="activeApplication.businessReference.id" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :locked="busy || writesBlocked" @changed="expenseTaskChanged"><template #restricted><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template></ExpensePlanDetail><AdvanceRequestDetail v-else-if="activeApplication.businessReference?.type === 'ADVANCE_REQUEST'" :request-id="activeApplication.businessReference.id" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :locked="busy || writesBlocked" @changed="expenseTaskChanged"><template #restricted><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template></AdvanceRequestDetail><ProcurementPaymentDetail v-else-if="activeApplication.businessReference?.type === 'PROCUREMENT_PAYMENT'" :request-id="activeApplication.businessReference.id" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :locked="busy || writesBlocked" @changed="expenseTaskChanged"><template #restricted><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template></ProcurementPaymentDetail><BudgetAdjustmentDetail v-else-if="activeApplication.businessReference?.type === 'BUDGET_ADJUSTMENT'" :request-id="activeApplication.businessReference.id" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :locked="busy || writesBlocked" @changed="expenseTaskChanged"><template #restricted><FormFields :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template></BudgetAdjustmentDetail><FormFields v-else :schema="activeApplication.formSchema" :model-value="activeApplication.payload" :attachment-context="{ applicationId: activeApplication.id, scopeKey: actorScope }" readonly /></template>
@@ -1551,6 +1565,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                 <div v-else-if="taskTab === 'audit'" class="audit-list"><ApplicationHistory :application-id="activeTask.applicationId" mode="audit" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
                 <div v-else-if="taskTab === 'assist'" class="timeline-full"><AssistRunRecords v-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :round-no="activeApplication.roundNo" :task-id="activeTask.taskId" :locked="busy || writesBlocked" :refresh-version="assistRefresh" /><p v-else class="unavailable">请先刷新并加载当前申请。</p></div>
                 <ApplicationComments v-else-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :status="activeApplication.status" :round-no="activeApplication.roundNo" :locked="busy || writesBlocked || !!detailError" :refresh-version="commentRefresh" @posted="commentRefresh++" @refresh-application="selectTask(activeTask)" />
+                </WorkspaceTabs>
                 <TaskDeadlineStatus :due-at="activeTask.dueAt" />
                 <TaskActions :key="actorScope + ':' + activeTask.taskId" :task="activeTask" :scope-key="actorScope" :locked="busy || writesBlocked || !activeApplication || !!detailError" @execute="performAction" @membership="performMembershipChange" @refresh="expenseTaskChanged" />
               </div>

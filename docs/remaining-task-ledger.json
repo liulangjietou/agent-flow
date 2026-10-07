@@ -1,28 +1,28 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-07T12:55:03.157751+00:00",
+  "recordedAt": "2026-10-07T13:01:54.330119+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 35,
+    "knownOpenTaskCount": 36,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 17,
+      "LOCAL_DEVELOPMENT": 18,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 35,
+    "projectRemainingLowerBound": 36,
     "completionPercentage": null,
     "notes": [
-      "35 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "36 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
     ],
     "localDeliveryBreakdown": {
-      "recordedAt": "2026-10-07T12:47:31.059239+00:00",
+      "recordedAt": "2026-10-07T12:57:12.253309+00:00",
       "implementationRemaining": {
         "count": 0,
         "taskIds": []
@@ -48,11 +48,12 @@
           "F15"
         ]
       },
-      "note": "Breakdown of the 17 OPEN local delivery targets; V03 discovered the missing W02 interactions. Environment waiting is not counted twice.",
+      "note": "Breakdown of the 18 OPEN local delivery targets; W02 and U01 were confirmed from original UI requirements during V03. No double counting.",
       "implementedAwaitingBrowserVerification": {
-        "count": 1,
+        "count": 2,
         "taskIds": [
-          "W02"
+          "W02",
+          "U01"
         ]
       }
     }
@@ -2856,6 +2857,33 @@
       "acceptance": "鼠标/触屏端口拖线与属性连线共用规则；画布限定删除和方向键移动，连续移动可一步撤销，Ctrl+Y 可重做；一进一出删除保持条件接续；点击插入接续并移动后继，网关添加分支，默认分支最后且支持排序；只读与切换过程不写入。真实浏览器另验收。",
       "dependsOn": [],
       "implementationStatus": "PASSED_BROWSER_PENDING"
+    },
+    {
+      "id": "U01",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "工作台交互",
+      "status": "OPEN",
+      "title": "详情页签语义、键盘切换与审批结果焦点",
+      "sourceRefs": [
+        {
+          "documentId": "01",
+          "section": "§6 无障碍和键盘",
+          "lines": [
+            158,
+            165
+          ]
+        }
+      ],
+      "observed": "两处真实模板和审批完成焦点先复现三项失败；共享手动激活页签和原动作结果焦点已接通。7 项交互与相关范围 126 项、类型检查/构建/OpenAPI 通过；电子签原轮次和锁保持。真实浏览器/辅助设备待补验。",
+      "references": [
+        {
+          "path": "docs/evidence/workspace-tabs-20261007.json",
+          "line": 1
+        }
+      ],
+      "acceptance": "两个实际入口具备稳定唯一 ID、tablist/tab/tabpanel、aria-selected/controls/labelledby；单个 Tab 入口、方向键/Home/End 焦点移动、Enter/Space 明确激活、禁用时保持；未激活面板不请求数据。审批动作结束聚焦可读结果且不抢走新会话/新页面焦点；真实浏览器另验收。",
+      "dependsOn": [],
+      "implementationStatus": "PASSED_BROWSER_PENDING"
     }
   ],
   "sourceSectionIndex": [
@@ -4019,17 +4047,17 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "W02",
+    "taskId": "U01",
     "status": "LOCAL_IMPLEMENTATION_AND_COMPONENT_TESTS_PASSED_BROWSER_PENDING",
-    "recordedAt": "2026-10-07T12:55:03.157751+00:00",
-    "evidence": "docs/evidence/designer-interactions-20261007.json",
-    "knownOpenTaskCount": 35
+    "recordedAt": "2026-10-07T13:01:54.330119+00:00",
+    "evidence": "docs/evidence/workspace-tabs-20261007.json",
+    "knownOpenTaskCount": 36
   },
   "localMainIntegration": {
-    "verifiedThroughCommit": "fa5a1b26e26f31fb548941944b325402876f5872",
-    "mergeCommit": "fa5a1b26e26f31fb548941944b325402876f5872",
+    "verifiedThroughCommit": "6cfd4d57ab78f7deca9188a15364a9ee89ecb371",
+    "mergeCommit": "6cfd4d57ab78f7deca9188a15364a9ee89ecb371",
     "originMainFetchedAtMerge": "2ac75649c026501460a59464d80f9a48ddf6ecd7",
     "remotePush": false,
-    "note": "A01 fixed-package closure is merged locally at user request. V01 runtime and contracts now pass; only its browser gate remains. V03 original-clause audit continues. No remote delivery."
+    "note": "V01 runtime evidence and W02 completed interactions have been merged locally. U01 completed tabs and focus are ready for the next local fast-forward. Browser, PostgreSQL and external delivery gates remain."
   }
 }
