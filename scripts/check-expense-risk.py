@@ -46,7 +46,8 @@ def stage(name, **facts):
 class IdentityProvider:
     """编译现有合成身份夹具；不接触外部 IdP、现有应用进程或真实凭据。"""
 
-    def __init__(self, java, directory, jar, bob_approver=False):
+    def __init__(self, java, directory, jar, bob_approver=False, financial_reporting=False):
+        assert not (bob_approver and financial_reporting), "Choose one explicit fixture role profile"
         self.process = None
         libraries, classes = directory / "libraries", directory / "classes"
         libraries.mkdir(); classes.mkdir()
@@ -70,7 +71,8 @@ class IdentityProvider:
         metadata = directory / "idp.json"
         with (directory / "idp.log").open("x") as log:
             self.process = subprocess.Popen([java, "-Djava.io.tmpdir=/fyoung/tmp", "-cp", classpath,
-                "io.agentflow.auth.ExpenseRiskOidcFixture", str(metadata), *(["bob-approver"] if bob_approver else [])], stdout=log, stderr=subprocess.STDOUT)
+                "io.agentflow.auth.ExpenseRiskOidcFixture", str(metadata),
+                *(["financial-reporting"] if financial_reporting else ["bob-approver"] if bob_approver else [])], stdout=log, stderr=subprocess.STDOUT)
         try:
             wait_for(lambda: (self.process.poll(), metadata.exists()), lambda item: item == (None, True), 35)
         except BaseException:
@@ -248,7 +250,7 @@ class Client:
             return value
 
     def lose_response(self, path, body, key, expected, user="manager"):
-        """接收上游完整成功回执后切断 TCP；随后只能使用原始正文和原键恢复。"""
+        """接收上游完整回执后切断 TCP；随后只能使用原始正文和原键恢复。"""
         request = self.request("POST", path, body, user, key, None)
         self.sessions[user][1].add_cookie_header(request)
         observed = {}
@@ -261,7 +263,11 @@ class Client:
             def do_POST(self):
                 try:
                     assert self.rfile.read(int(self.headers["Content-Length"])) == request.data
-                    with build_opener(ProxyHandler({})).open(request, timeout=25) as upstream:
+                    try:
+                        upstream = build_opener(ProxyHandler({})).open(request, timeout=25)
+                    except HTTPError as error:
+                        upstream = error
+                    with upstream:
                         observed.update(status=upstream.status, response=json.loads(upstream.read()))
                     assert observed["status"] == expected
                 except Exception as error:

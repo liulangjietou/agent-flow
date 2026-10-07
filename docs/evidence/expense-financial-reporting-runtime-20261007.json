@@ -1,0 +1,123 @@
+{
+  "status": "LOCAL_FIXED_RUNTIME_VERIFIED_FINAL_REVIEW_PENDING",
+  "baseCommit": "f094f94a96617a4d4bedb4b5a24f6f7d104f403f",
+  "runtime": {
+    "status": "PASSED",
+    "startedAt": "2026-10-07T11:06:47.515957+00:00",
+    "beforeSha256": "cf7b8815deda4fd4c42de938a9322d94e7b70bf9289bfaeebebda2c01b73a331",
+    "afterSha256": "3cc9e82e2d32a774516431b1c01482e3e53629d5b93b55ccba15908ffccb598a",
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-v120-upgrade",
+        "oldTables": 278,
+        "oldRows": 359,
+        "changedOldTables": [
+          "flyway_schema_history"
+        ]
+      },
+      {
+        "name": "failed-submission-crash-original-key-and-attempts",
+        "recorded": 1,
+        "prechecks": 1,
+        "privateLaterVerificationExcluded": true
+      },
+      {
+        "name": "original-rounds-payment-and-current-resources",
+        "paymentCommands": 1,
+        "planConsumed": "40.00",
+        "planExecutionRate": 0.4,
+        "loanOutstanding": "300.00",
+        "unknownSeparatedFromFailure": true
+      },
+      {
+        "name": "independent-paired-restore",
+        "tables": 280,
+        "rows": 1029,
+        "schemaStatements": 2228,
+        "originalDatabaseUnchanged": true,
+        "originalTaskContinued": true,
+        "originalRejectionPreserved": true
+      }
+    ],
+    "finishedAt": "2026-10-07T11:07:43.973976+00:00",
+    "httpRecords": 285,
+    "providerCalls": 90,
+    "boots": 5,
+    "ownedProcessesStopped": true
+  },
+  "runtimeDirectory": "/fyoung/tmp/agentflow-remaining-20260928/f15-runtime-20261007f",
+  "httpContracts": {
+    "result": "PASS",
+    "responses": 282,
+    "requests": 90,
+    "beforeResponses": 58,
+    "binaryResponses": 3
+  },
+  "frontendActualResponses": {
+    "result": "PASS",
+    "reports": 16,
+    "denied": 4,
+    "invalid": 0,
+    "submittedAcrossSnapshots": 43,
+    "sourceSha256": "5482d849625e7788d0a7fe3064e1f171f1f79b54fd3b85f32ba14d270e2e3664",
+    "contractSha256": "c870f3758eabceeae16b7f90cd49ad7f2fab23eca2a08e030d6141aebac896ae",
+    "output": "/fyoung/tmp/agentflow-financial-parser-oFpqkJ"
+  },
+  "harnessCorrections": [
+    {
+      "directory": "/fyoung/tmp/agentflow-remaining-20260928/f15-runtime-20261007",
+      "reason": "Synthetic success verification timestamp preceded prior rejection",
+      "productionFix": false
+    },
+    {
+      "directory": "/fyoung/tmp/agentflow-remaining-20260928/f15-runtime-20261007b",
+      "reason": "Same original requires fresh verification before canonical duplicate check",
+      "productionFix": false
+    },
+    {
+      "directory": "/fyoung/tmp/agentflow-remaining-20260928/f15-runtime-20261007c",
+      "reason": "Synthetic invoice map indexes original digests",
+      "productionFix": false
+    },
+    {
+      "directory": "/fyoung/tmp/agentflow-remaining-20260928/f15-runtime-20261007d",
+      "reason": "Await actual settlement and payment voucher before observing absence of external calls",
+      "productionFix": false
+    },
+    {
+      "directory": "/fyoung/tmp/agentflow-remaining-20260928/f15-runtime-20261007e",
+      "reason": "Synthetic reversal completedAt exceeded observedAt; each reversal revision must remain immutable",
+      "productionFix": false
+    }
+  ],
+  "sourceSha256": {
+    "scripts/check-expense-prior-controls.py": "b4cc7d61a5cba38c8b47549374bfe400250884b854431c25e36e0445745e9e58",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-expense-financial-reporting.py": "ead6061be11bbb62564b08e013a6a8136924d39fa9bd2a90ecdf430163eea0b9",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/payment-due-dates-support/CompareH2Schema.java": "4e92f585f39d6ce6a43bd400a31216179e8b7f15f5f676abd80b5fb7b12a0a3b",
+    "scripts/fixtures/ExpenseRiskOidcFixture.java": "2f9952710952fb955b3d227070e82cf890f58c6fe9f8a4374445e7de4aebabee",
+    "agentflow-server/src/test/java/io/agentflow/auth/OidcTestProvider.java": "d0bc33ab2d51ca5622edc7bde153ea71f8cb597c9f74ab56912b8522f3b4027b",
+    "agentflow-web/scripts/check-expense-prior-contracts.mjs": "90ba0e495ef60a7ccce4258b1be7db8f145c6329bf398ede253afee009afc349",
+    "agentflow-web/scripts/check-expense-financial-responses.mjs": "66438e684286b0231414e9edae86b3f464074522230492f122ba81cc0ff25e45"
+  },
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/f15-runtime-verified/manifest.json",
+    "sha256": "f5ad64f6b8f2f2926395ddea5f4f58e8bc1c7ef3471beb03de2c123f63a8d40d",
+    "files": 134
+  },
+  "fixedJar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/financial-reporting-server-task3.jar",
+    "sha256": "3cc9e82e2d32a774516431b1c01482e3e53629d5b93b55ccba15908ffccb598a"
+  },
+  "boundaries": {
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "enterpriseSystemsVerified": false,
+    "remoteDelivered": false
+  }
+}
