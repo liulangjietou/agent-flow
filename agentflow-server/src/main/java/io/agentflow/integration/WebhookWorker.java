@@ -65,10 +65,26 @@ public class WebhookWorker {
 
     private DiagnosticContext context(JdbcWebhookStore.Delivery delivery) {
         String trace = null;
-        try { trace = json.read(delivery.body(), JsonNode.class).path("traceId").asText(); }
+        Integer originalRound = null;
+        String task = null;
+        try {
+            var envelope = json.read(delivery.body(), JsonNode.class);
+            trace = envelope.path("traceId").asText();
+            var payload = envelope.path("payload");
+            var round = payload.path("roundNo");
+            // 只有匹配持久化租户和申请的原信封，才能提供轮次及任务事实。
+            if (delivery.tenantId().equals(envelope.path("tenantId").asText())
+                    && delivery.applicationId().toString().equals(payload.path("applicationId").asText())
+                    && round.isIntegralNumber() && round.canConvertToInt() && round.intValue() > 0) {
+                originalRound = round.intValue();
+                if (payload.path("taskId").isTextual()) task = payload.path("taskId").textValue();
+            }
+        }
         catch (RuntimeException ignored) { /* 旧记录没有可读追踪字段时，只补诊断关联，不重建原签名正文。 */ }
         if (!DiagnosticContext.validTrace(trace)) trace = DiagnosticContext.legacyId("webhook-event", delivery.tenantId(), delivery.eventId());
         // 租户只信任已持久化索引，不能从事件正文覆盖授权范围。
-        return new DiagnosticContext(trace, delivery.tenantId());
+        var context = new DiagnosticContext(trace, delivery.tenantId());
+        var business = store.businessContext(delivery, originalRound).orElse(null);
+        return business == null ? context : context.withBusiness(business.businessNo(), business.processInstanceId(), task);
     }
 }

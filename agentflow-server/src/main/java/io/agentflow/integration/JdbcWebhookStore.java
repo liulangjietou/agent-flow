@@ -9,6 +9,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -48,6 +49,16 @@ public class JdbcWebhookStore {
                 WHERE (status IN ('PENDING','RETRY_WAIT') AND next_attempt_at<=?) OR (status='IN_FLIGHT' AND lease_until<=?)
                 ORDER BY updated_at,id LIMIT 10
                 """, (row, index) -> UUID.fromString(row.getString("id")), timestamp(now), timestamp(now));
+    }
+
+    /** 按投递索引读取本租户业务号；原信封轮次缺失时不借用申请的当前轮次。 */
+    public Optional<BusinessContext> businessContext(Delivery delivery, Integer originalRound) {
+        return jdbc.query("""
+                SELECT a.business_no,r.process_instance_id FROM approval_application a
+                LEFT JOIN approval_submission_round r ON r.tenant_id=a.tenant_id AND r.application_id=a.id AND r.round_no=?
+                WHERE a.tenant_id=? AND a.id=?
+                """, (row, index) -> new BusinessContext(row.getString("business_no"), row.getString("process_instance_id")),
+                originalRound, delivery.tenantId(), delivery.applicationId().toString()).stream().findFirst();
     }
 
     /** 独立短事务领取；过期尝试标记为结果未知，禁止把连接断开误记为失败未送达。 */
@@ -192,4 +203,7 @@ public class JdbcWebhookStore {
      * @author owlzhangfq@gmail.com
      */
     public record RetryRequest(String requestedBy, Instant requestedAt, String previousStatus, long previousVersion) { }
+
+    /** 已匹配本租户申请的诊断投影，不对外暴露或写回签名正文。 */
+    public record BusinessContext(String businessNo, String processInstanceId) { }
 }

@@ -1,0 +1,93 @@
+{
+  "recordedAt": "2026-10-07T17:59:13.233100+00:00",
+  "taskId": "O01",
+  "status": "WEBHOOK_BUSINESS_IDENTIFIERS_PASSED_O01_OPEN",
+  "sourceBaseCommit": "f569ebc80a225b1d1709897ebb647efef8d006aa",
+  "sourceHashes": {
+    "agentflow-server/src/main/java/io/agentflow/integration/ApprovalWebhookEvents.java": "495e2cac4c110aa6c98dd0b2f667afc8d8aa2727651e47713637594f9a8a332d",
+    "agentflow-server/src/main/java/io/agentflow/integration/JdbcWebhookStore.java": "0d081c2a235b3d8a6a87e267c1d7ddf23828c924dabad1e28021654651b6ca95",
+    "agentflow-server/src/main/java/io/agentflow/integration/WebhookWorker.java": "e77a43e413b41660c7e5c200e9628cdbc7e26273cb08fabca56f5b2ee7329311",
+    "agentflow-server/src/main/java/io/agentflow/observability/DiagnosticContext.java": "6b96270018883e0ba95a5d07988af9a233d1819bb10d259c2188fac59694b108",
+    "agentflow-server/src/test/java/io/agentflow/integration/WebhookBusinessTraceTest.java": "2dfe81afc8138c05a66d3933764fed892865eb07b031f50975819854bb8aad0c",
+    "agentflow-server/src/test/java/io/agentflow/integration/WebhookIntegrationTest.java": "0771f7c8dfc87109ff615c846eb968906fb2591d78c225233e9e00139b81ca25",
+    "agentflow-server/src/test/java/io/agentflow/integration/WebhookMigrationTest.java": "fca4da2a1fab7311e037940e8f9177df4150bfa5845b0e0fe4945090eb57dd8a",
+    "agentflow-server/src/test/java/io/agentflow/integration/WebhookRetryAfterTest.java": "026238962ff07272080da5c886284f58d1da46882f26f8d2a1b41833dd1bde40",
+    "agentflow-server/src/test/java/io/agentflow/integration/WebhookTransportTest.java": "2773e0dee7c838d75f2ed25ee592b3cbdddd26c09e656339f191d00ce872eb3c",
+    "agentflow-server/src/test/java/io/agentflow/integration/WebhookWorkerTraceTest.java": "bbdac7583f8b27ac6fc0d136eebef8a9afd8760c281b384bf602c14760b35cb5",
+    "agentflow-server/src/test/java/io/agentflow/observability/DiagnosticContextTest.java": "fb3f3ea7475f621c3479e604f514e158542fec2c5d7be8fd7491e5bc47005311",
+    "scripts/check-agent-trace-runtime.py": "ac736d5fe00b636419d185d7d69e4a66adfefebc244fe2d9931e4b9aecd19a66",
+    "scripts/check-approval-business-trace-runtime.py": "6db136efdcb51f48ba283c0bd809d8f80fc55af409f2f7ffa2cad377d57c322b",
+    "scripts/check-definition-diagram-runtime.py": "e23f3ba8e72e1e29922d9027a542ba025f542f691a97876970eefeac8934da01",
+    "scripts/check-direct-scheduler-trace-runtime.py": "1106e52f512003599f7db388ce433149a6c03b2090b1dad1f1863de4edd08da4",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-operation-trace-runtime.py": "8d0da2af3281f9372c970acebb65871f1c53a9d9e99d95cf82f48ec777b37dc9",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7",
+    "scripts/check-webhook-business-trace-runtime.py": "46befe83120d0ac10896636e296a9f6d600e3b19ff096466fa68b7ec18d125f8"
+  },
+  "jar": "/fyoung/tmp/agentflow-remaining-20260928/o01-webhook-business-server.jar",
+  "jarSha256": "723cf032b9e673831622aa9eecfd0670fd6e2386c5b4a1d6630d02e007eea0a4",
+  "redTests": 9,
+  "reproducedBehaviorFailures": 8,
+  "scopeUniqueTests": 57,
+  "scopeRootTestClasses": 7,
+  "testScope": {
+    "tests": 57,
+    "suites": {
+      "WebhookBusinessTraceTest": 9,
+      "WebhookWorkerTraceTest": 1,
+      "WebhookIntegrationTest": 13,
+      "WebhookTransportTest": 6,
+      "WebhookRetryAfterTest": 17,
+      "WebhookMigrationTest": 1,
+      "DiagnosticContextTest": 10
+    }
+  },
+  "runtime": {
+    "status": "PASS",
+    "database": "H2",
+    "jarSha256": "723cf032b9e673831622aa9eecfd0670fd6e2386c5b4a1d6630d02e007eea0a4",
+    "previousJarSha256": "2157fb147ce8e55a5fb4b26d1d6f0bebb84a81f2d5a5264c10cf1e2f67d31821",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "realExternalSystemsVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "tables": 281,
+        "unchangedBodies": 4
+      },
+      {
+        "name": "cross-round-kill-and-retry",
+        "applications": 2,
+        "rounds": 4,
+        "businessContextsVerified": 8,
+        "originalKeyReplays": 6,
+        "unchangedSignedBodies": 8,
+        "receivedRequests": 9
+      },
+      {
+        "name": "independent-restore",
+        "tables": 281,
+        "sameAuthorizedDetails": 10,
+        "resentRequests": 0
+      }
+    ],
+    "boots": 6,
+    "businessHttpRequests": 221
+  },
+  "fixedRuntimeEvidence": "/fyoung/tmp/agentflow-remaining-20260928/o01-webhook-business-runtime-20261007a/evidence.json",
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/o01-webhook-business-verified",
+  "archiveFiles": 112,
+  "archiveManifestSha256": "7d32643ba0e1a7bec5e9e7a9a47acb64ede8bb4ef88fa8dda45927d7b00b4ec3",
+  "boundaries": [
+    "业务号只读取投递索引对应的本租户申请；实例与任务只接受租户、申请和整数原轮次均匹配的原信封。",
+    "原轮次缺失不借当前实例；正文不合法或索引错配时保留可信业务号，未知实例和任务保持空值，旧正文仍用稳定追踪号。",
+    "不重写事件体、签名、投递状态、目标摘要或重试租约；没有数据库迁移或对外字段变化。",
+    "8 个行为失败复现经修复后，57 个相关用例通过；固定包 6 次启动、两张申请四个轮次、8 组业务上下文核对通过。",
+    "8 份原签名正文保持一致，实际接收 9 次，其中一条在接收后强退，再以同事件重试并标记原尝试结果未知；这次可预期重送不冒称恰好一次。",
+    "原键重放 6 次，两次 281 表快照保持，10 份授权详情独立恢复一致、恢复无重发。",
+    "固定包原始 businessHttpRequests 字段 221 包含演示登录请求；此处将其报告为全部实际 HTTP 请求，不作为纯业务接口计数。",
+    "财务复核、供应商、报销恢复及直接调度业务标识继续开发；浏览器、PostgreSQL、真实企业系统和远端交付门禁保留，O01 保持 OPEN。"
+  ]
+}
