@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AccountingPeriodPort;
 import io.agentflow.finance.BudgetConsumptionReversalOperation;
@@ -41,36 +43,42 @@ public class ExpenseResourceAdjustmentWorker {
     private void prepare() {
         for (var candidate : preparations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = preparing.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-resource-preparation", candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input(); var result = periods.period(candidate.tenantId(), input.basis().consumption().input().targetDigest(), input.periodRequest());
-                    preparing.finish(claimed, result, Instant.now());
-                } catch (RuntimeException failed) { preparing.fail(claimed, Instant.now()); log("ADJUSTMENT_PREPARATION_FAILURE", candidate.id(), failed); }
-            } catch (RuntimeException failed) { log("ADJUSTMENT_PREPARATION_WORKER_FAILURE", candidate.id(), failed); }
+                    var claimed = preparing.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var input = claimed.input(); var result = periods.period(candidate.tenantId(), input.basis().consumption().input().targetDigest(), input.periodRequest());
+                        preparing.finish(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) { preparing.fail(claimed, Instant.now()); log("ADJUSTMENT_PREPARATION_FAILURE", candidate.id(), failed); }
+                } catch (RuntimeException failed) { log("ADJUSTMENT_PREPARATION_WORKER_FAILURE", candidate.id(), failed); }
+            }
         }
     }
     private void budget() {
         for (var candidate : budgets.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = budgetExecution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "budget-consumption-reversal", candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input(); var result = claimed.status() == BudgetConsumptionReversalOperation.Status.EXECUTING
-                            ? budgetPort.execute(input.targetDigest(), input.command()) : budgetPort.query(input.targetDigest(), input.command());
-                    budgetExecution.finish(claimed, result, Instant.now());
-                } catch (RuntimeException failed) { budgetExecution.fail(claimed, Instant.now()); log("ADJUSTMENT_BUDGET_DISPATCH_FAILURE", candidate.id(), failed); }
-            } catch (RuntimeException failed) { log("ADJUSTMENT_BUDGET_WORKER_FAILURE", candidate.id(), failed); }
+                    var claimed = budgetExecution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var input = claimed.input(); var result = claimed.status() == BudgetConsumptionReversalOperation.Status.EXECUTING
+                                ? budgetPort.execute(input.targetDigest(), input.command()) : budgetPort.query(input.targetDigest(), input.command());
+                        budgetExecution.finish(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) { budgetExecution.fail(claimed, Instant.now()); log("ADJUSTMENT_BUDGET_DISPATCH_FAILURE", candidate.id(), failed); }
+                } catch (RuntimeException failed) { log("ADJUSTMENT_BUDGET_WORKER_FAILURE", candidate.id(), failed); }
+            }
         }
     }
     private void resources() {
         for (var candidate : adjustments.ready()) {
             if (Thread.currentThread().isInterrupted()) return;
-            try { resourceExecution.apply(candidate); }
-            catch (DomainException problem) {
-                try { if (!"CONCURRENCY_CONFLICT".equals(problem.code())) resourceExecution.block(candidate, problem.code()); }
-                catch (RuntimeException failed) { log("ADJUSTMENT_RESOURCE_BLOCK_FAILURE", candidate.id(), failed); }
-            } catch (RuntimeException failed) { log("ADJUSTMENT_RESOURCE_FAILURE", candidate.id(), failed); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-resource-adjustment", candidate.id().toString()).open()) {
+                try { resourceExecution.apply(candidate); }
+                catch (DomainException problem) {
+                    try { if (!"CONCURRENCY_CONFLICT".equals(problem.code())) resourceExecution.block(candidate, problem.code()); }
+                    catch (RuntimeException failed) { log("ADJUSTMENT_RESOURCE_BLOCK_FAILURE", candidate.id(), failed); }
+                } catch (RuntimeException failed) { log("ADJUSTMENT_RESOURCE_FAILURE", candidate.id(), failed); }
+            }
         }
     }
     private static void log(String code, java.util.UUID id, RuntimeException failure) {

@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,36 +38,40 @@ public class VoucherReversalExecutionWorker {
     private void prepare() {
         for (var candidate : preparations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = preparing.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "voucher-reversal-preparation", candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input(); var command = input.source().command(); var original = originalPort.query(input.targetDigest(), command);
-                    FinanceResult<AccountingPeriodPort.OpenPeriod> period = new FinanceResult.Unavailable<>(FinanceResult.Failure.INVALID_RESPONSE);
-                    if (original instanceof FinanceResult.Success<VoucherObservation> success && success.value().status() == VoucherObservation.Status.POSTED
-                            && input.source().matchesOriginal(success.value())) {
-                        period = periods.period(command.tenantId(), input.targetDigest(), new AccountingPeriodPort.Request(command.legalEntityId(), command.totals().gross().currency(), input.accountingDate()));
+                    var claimed = preparing.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var input = claimed.input(); var command = input.source().command(); var original = originalPort.query(input.targetDigest(), command);
+                        FinanceResult<AccountingPeriodPort.OpenPeriod> period = new FinanceResult.Unavailable<>(FinanceResult.Failure.INVALID_RESPONSE);
+                        if (original instanceof FinanceResult.Success<VoucherObservation> success && success.value().status() == VoucherObservation.Status.POSTED
+                                && input.source().matchesOriginal(success.value())) {
+                            period = periods.period(command.tenantId(), input.targetDigest(), new AccountingPeriodPort.Request(command.legalEntityId(), command.totals().gross().currency(), input.accountingDate()));
+                        }
+                        preparing.finish(claimed, original, period, Instant.now());
+                    } catch (RuntimeException failure) {
+                        preparing.fail(claimed, Instant.now()); LOG.error("Reversal preparation failed, errorCode={}, preparationId={}", "REVERSAL_PREPARATION_FAILURE", candidate.id());
                     }
-                    preparing.finish(claimed, original, period, Instant.now());
-                } catch (RuntimeException failure) {
-                    preparing.fail(claimed, Instant.now()); LOG.error("Reversal preparation failed, errorCode={}, preparationId={}", "REVERSAL_PREPARATION_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failure) { LOG.error("Reversal preparation worker failed, errorCode={}, preparationId={}", "REVERSAL_PREPARATION_WORKER_FAILURE", candidate.id()); }
+                } catch (RuntimeException failure) { LOG.error("Reversal preparation worker failed, errorCode={}, preparationId={}", "REVERSAL_PREPARATION_WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
     private void execute() {
         for (var candidate : operations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "voucher-reversal-operation", candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input(); var result = claimed.status() == VoucherReversalOperation.Status.POSTING ? port.post(input.targetDigest(), input.command()) : port.query(input.targetDigest(), input.command());
-                    execution.finish(claimed, result, Instant.now());
-                } catch (RuntimeException failed) {
-                    var reason = failed instanceof DomainException domain && "VOUCHER_REVERSAL_EVIDENCE_EXPIRED".equals(domain.code())
-                            ? VoucherReversalOperation.Failure.EVIDENCE_EXPIRED : VoucherReversalOperation.Failure.INTERNAL_ERROR;
-                    execution.fail(claimed, reason, Instant.now()); LOG.error("Reversal dispatch failed, errorCode={}, reversalId={}", reason, candidate.id());
-                }
-            } catch (RuntimeException failure) { LOG.error("Reversal execution worker failed, errorCode={}, reversalId={}", "REVERSAL_EXECUTION_WORKER_FAILURE", candidate.id()); }
+                    var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var input = claimed.input(); var result = claimed.status() == VoucherReversalOperation.Status.POSTING ? port.post(input.targetDigest(), input.command()) : port.query(input.targetDigest(), input.command());
+                        execution.finish(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) {
+                        var reason = failed instanceof DomainException domain && "VOUCHER_REVERSAL_EVIDENCE_EXPIRED".equals(domain.code())
+                                ? VoucherReversalOperation.Failure.EVIDENCE_EXPIRED : VoucherReversalOperation.Failure.INTERNAL_ERROR;
+                        execution.fail(claimed, reason, Instant.now()); LOG.error("Reversal dispatch failed, errorCode={}, reversalId={}", reason, candidate.id());
+                    }
+                } catch (RuntimeException failure) { LOG.error("Reversal execution worker failed, errorCode={}, reversalId={}", "REVERSAL_EXECUTION_WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
 }

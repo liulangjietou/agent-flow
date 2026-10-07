@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,17 +29,19 @@ public class ExpenseArchiveWorker {
         var candidates = archives.candidates(cursor); if (candidates.isEmpty()) cursor = null;
         for (var candidate : candidates) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var manifest = service.prepare(candidate.tenantId(), candidate.reportId());
-                if (manifest != null) { files.verify(manifest); service.complete(manifest); }
-            } catch (DomainException blocked) {
-                try { service.block(candidate.tenantId(), candidate.reportId(), blocked.code()); }
-                catch (RuntimeException failed) { log(candidate, failed); }
-            } catch (RuntimeException failed) { log(candidate, failed); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-archive", candidate.reportId().toString()).open()) {
+                try {
+                    var manifest = service.prepare(candidate.tenantId(), candidate.reportId());
+                    if (manifest != null) { files.verify(manifest); service.complete(manifest); }
+                } catch (DomainException blocked) {
+                    try { service.block(candidate.tenantId(), candidate.reportId(), blocked.code()); }
+                    catch (RuntimeException failed) { log(candidate, failed); }
+                } catch (RuntimeException failed) { log(candidate, failed); }
+            }
             cursor = candidate;
         }
     }
     private static void log(JdbcExpenseArchiveRepository.Candidate candidate, RuntimeException failed) {
-        LOG.error("Expense archive failed, errorCode={}, reportId={}", failed instanceof DomainException problem ? problem.code() : "ARCHIVE_FAILURE", candidate.reportId(), failed);
+        LOG.error("Expense archive failed, errorCode={}, reportId={}", failed instanceof DomainException problem ? problem.code() : "ARCHIVE_FAILURE", candidate.reportId());
     }
 }

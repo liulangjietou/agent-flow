@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,18 +32,22 @@ public class ExpenseSettlementWorker {
         if (candidates.isEmpty()) recoveryCursor = null;
         for (var candidate : candidates) {
             if (Thread.currentThread().isInterrupted()) return;
-            try { registration.recover(candidate); }
-            catch (RuntimeException failed) { log(candidate.reportId(), failed); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-settlement-recovery", candidate.kind() + ":" + candidate.id()).open()) {
+                try { registration.recover(candidate); }
+                catch (RuntimeException failed) { log(candidate.reportId(), failed); }
+            }
             recoveryCursor = candidate;
         }
         for (var candidate : settlements.pending()) {
             if (Thread.currentThread().isInterrupted()) return;
-            try { execution.consume(candidate); }
-            catch (DomainException problem) {
-                try { if (!"CONCURRENCY_CONFLICT".equals(problem.code())) execution.block(candidate, problem.code()); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-settlement", candidate.reportId().toString()).open()) {
+                try { execution.consume(candidate); }
+                catch (DomainException problem) {
+                    try { if (!"CONCURRENCY_CONFLICT".equals(problem.code())) execution.block(candidate, problem.code()); }
+                    catch (RuntimeException failed) { log(candidate.reportId(), failed); }
+                }
                 catch (RuntimeException failed) { log(candidate.reportId(), failed); }
             }
-            catch (RuntimeException failed) { log(candidate.reportId(), failed); }
         }
     }
     private static void log(java.util.UUID id, RuntimeException failed) {

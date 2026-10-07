@@ -2904,7 +2904,7 @@
           ]
         }
       ],
-      "observed": "请求/Webhook、六类 Agent、八类财务、六类核心集成、十一类财务复核及九类供应商队列已补齐来源。最新 356 个范围用例及固定包 8 次启动通过；剩余六个工作器、直接定时链路及业务号/实例/任务标识继续接线，O01 保持 OPEN。",
+      "observed": "既有请求、Agent、财务、核心集成、供应商队列及六个报销恢复工作器已补齐来源；最新 402 个唯一范围用例和固定包 8 次启动通过，十列升级及 280 表恢复通过。继续六处直接定时入口和可信业务号/实例/任务标识，O01 保持 OPEN。",
       "references": [
         {
           "path": "docs/superpowers/plans/2026-10-07-operation-tracing.md",
@@ -2932,6 +2932,10 @@
         },
         {
           "path": "docs/evidence/operation-tracing-supplier-20261007.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/operation-tracing-expense-recovery-20261007.json",
           "line": 1
         }
       ],
@@ -2961,6 +2965,10 @@
       "supplierStage": {
         "status": "PASSED_LOCAL_FIXED_PACKAGE_WITH_EXPLICIT_SCOPE",
         "evidence": "docs/evidence/operation-tracing-supplier-20261007.json"
+      },
+      "expenseRecoveryStage": {
+        "status": "PASSED_LOCAL_FIXED_PACKAGE_WITH_EXPLICIT_SCOPE",
+        "evidence": "docs/evidence/operation-tracing-expense-recovery-20261007.json"
       }
     },
     {
@@ -4164,16 +4172,16 @@
   },
   "latestProgress": {
     "taskId": "O01",
-    "status": "SUPPLIER_VERIFIED_REMAINING_WORKERS_IN_PROGRESS",
-    "recordedAt": "2026-10-07T15:39:45.517828+00:00",
+    "status": "EXPENSE_RECOVERY_VERIFIED_SCHEDULERS_IN_PROGRESS",
+    "recordedAt": "2026-10-07T16:23:20.149449+00:00",
     "knownOpenTaskCount": 38,
-    "evidence": "docs/evidence/operation-tracing-supplier-20261007.json"
+    "evidence": "docs/evidence/operation-tracing-expense-recovery-20261007.json"
   },
   "localMainIntegration": {
-    "verifiedThroughCommit": "2b48da7e81ca09e50123ba573a95e67cd1e8770d",
-    "mergeCommit": "2b48da7e81ca09e50123ba573a95e67cd1e8770d",
+    "verifiedThroughCommit": "2c96345a910756039a92dec921991a9f76d60164",
+    "mergeCommit": "2c96345a910756039a92dec921991a9f76d60164",
     "originMainFetchedAtMerge": "2ac75649c026501460a59464d80f9a48ddf6ecd7",
     "remotePush": false,
-    "note": "Verified supplier stage is ready for local fast-forward; all delivery gates remain."
+    "note": "Verified expense recovery source snapshot is ready for local fast-forward; remote and environment gates remain."
   }
 }

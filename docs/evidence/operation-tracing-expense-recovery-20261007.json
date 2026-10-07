@@ -1,0 +1,131 @@
+{
+  "recordedAt": "2026-10-07T16:23:20.149449+00:00",
+  "taskId": "O01",
+  "status": "EXPENSE_RECOVERY_STAGE_PASSED_O01_OPEN",
+  "sourceBaseCommit": "2c96345a910756039a92dec921991a9f76d60164",
+  "sourceHashes": {
+    "agentflow-server/src/main/java/io/agentflow/approval/process/ExpenseBudgetReviewRecovery.java": "76baf0c5214f55aa6aac2f332716dc073be6fc88bb53433790349ba94d7511bd",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseArchiveWorker.java": "36a1117171835ab2b9dfbf756122fba61d231cb2b87c2420f213b4d8ee4ebccd",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetReviewWorker.java": "e1eb191016bab5555c783746712dc844778728e5bae6d0539dc95360e6595114",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentFinance.java": "86490e1ad40ec552707bb3ea0b35a1622119c0923135064819a3004dce2a50b4",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpensePartialAdjustmentWorker.java": "72519cafa2472e15e6389f116d3dc1d0ae32d385f147ee07a5e763ff75bd7c7a",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseResourceAdjustmentWorker.java": "0e3aed4e4913e28d1b68f09a3dae7a8f1618aae32a242b43925d843ff620cc9c",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSettlementWorker.java": "ffab182d7d665fd5ca779314e389416c6346ebb3befb33457446d54343ec2132",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseArchiveRepository.java": "e41b927a16b81c068200b81f04e9d1c5db5b2a0baeae30d85bd06a24f6854be5",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseBudgetReviewRepository.java": "8651502c5187cf6309da4830efc04171a9a79d281f5ea95e5f7d7c41e854e6c9",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpensePartialAdjustmentRepository.java": "8dffa4aefb3436e2ab36c0c18a79b2e24fd86a11cda4ae1fa6522222021634dc",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpensePartialPreparationRepository.java": "c2e10ea643b7dd9101df7b638246643574dbd4cc3a2f2273c1d5b80f4a47164c",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseResourceAdjustmentPreparationRepository.java": "aa9f819158af65c2c6a06dcd44c78b7a59e1f754bf0ef195efb5c3b2615eaa2c",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseResourceAdjustmentRepository.java": "f5cf99371138bceb24c7e127a489f8eb3a047b675ecd5b443972672fbfe97e0f",
+    "agentflow-server/src/main/java/io/agentflow/expense/JdbcExpenseSettlementRepository.java": "2fd56f153601594404a884a39d7c7b82c10d92e98e9b553a7e248cb6db160908",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcBudgetConsumptionReversalRepository.java": "967be5b7d409e5d8c1a014cff1b23c578fa2a391a7f0b5ba047c55efc5778058",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcVoucherReversalOperationRepository.java": "e22f0694ca62c2d6df12127a61f7c8ddf42d47aa958581a7c868c0907a77034b",
+    "agentflow-server/src/main/java/io/agentflow/finance/JdbcVoucherReversalPreparationRepository.java": "a297fce0424e235f1cfe3e5155af4fb113b0b12206781c158a480935392c7237",
+    "agentflow-server/src/main/java/io/agentflow/finance/VoucherReversalExecutionWorker.java": "3a46ba8f6723fdbb8f0c45ada15691dafcd4db7e87961cc4f3688cf4836951f8",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseBudgetReviewMigrationTest.java": "f465cf5d1b62e0e11d791e07df9eb67bd237e8689a6cc7691396ce5d240f940e",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseBudgetReviewPersistenceTest.java": "831b0b65c83735b0eacb4e2f9b946990264270cb9df0cd826cb446ab0051b2bf",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java": "97e2a28f9cbd23de2f69ea1ed068d758510cfd3fafff46af971b0e83eb986c46",
+    "agentflow-server/src/main/resources/db/migration/V127__expense_recovery_origin_traces.sql": "91d5d835ca460562042c84030f39b9bec9f722fc627ac4e9b216616d81cc86d0",
+    "agentflow-server/src/test/java/io/agentflow/observability/ExpenseRecoveryWorkerTraceTest.java": "973aeef731938ccb4c42e9364cc9d8da8fa506b777930971ceb291ab0ceb745b",
+    "scripts/check-expense-recovery-trace-runtime.py": "4b352579102724c05405185dc883c2433883dc940794042527d811b60998689d",
+    "scripts/fixtures/ExpenseRecoveryPeer.py": "0e93194a3a0ca8d0dd104bd28cd90de38abacb7ca3a2318bb5a715e1b0c6e353",
+    "scripts/check-finance-trace-runtime.py": "e51559254bc3135b139f0cdaa1412ff6747fbd23eb1891671834251aa888e215",
+    "scripts/check-expense-financial-reporting.py": "ead6061be11bbb62564b08e013a6a8136924d39fa9bd2a90ecdf430163eea0b9",
+    "scripts/check-expense-prior-controls.py": "b4cc7d61a5cba38c8b47549374bfe400250884b854431c25e36e0445745e9e58",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7",
+    "scripts/check-agent-trace-runtime.py": "ac736d5fe00b636419d185d7d69e4a66adfefebc244fe2d9931e4b9aecd19a66",
+    "scripts/check-operation-trace-runtime.py": "8d0da2af3281f9372c970acebb65871f1c53a9d9e99d95cf82f48ec777b37dc9",
+    "scripts/payment-due-dates-support/CompareH2Schema.java": "4e92f585f39d6ce6a43bd400a31216179e8b7f15f5f676abd80b5fb7b12a0a3b",
+    "agentflow-server/src/main/java/io/agentflow/observability/DiagnosticContext.java": "ae93629262febc126657711a0306aa0a334f381e8002813b129d1d09b82e5004",
+    "agentflow-server/src/main/java/io/agentflow/finance/FinanceGatewayClient.java": "4380d649a3a0b93fb369c75afec409e281efd24d5200a11115b3c9007b8484b1"
+  },
+  "jar": "/fyoung/tmp/agentflow-remaining-20260928/o01-expense-recovery-server.jar",
+  "jarSha256": "4549dbd4f242433de3590fc45f6d117fc237a2d069b12515f6c163b48bbb8e77",
+  "redTests": 26,
+  "scopeUniqueTests": 402,
+  "runtime": {
+    "status": "PASS",
+    "database": "H2",
+    "previousJarSha256": "c868bfa233bf44e0372475babfcb3ab09b8d7fe2ec9d16b6776b05dc0339f944",
+    "jarSha256": "4549dbd4f242433de3590fc45f6d117fc237a2d069b12515f6c163b48bbb8e77",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "realFinancialSystemsVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "tables": 280,
+        "newNullableColumns": 10,
+        "populatedQueueTypes": 4
+      },
+      {
+        "name": "origin-recovery-and-replay",
+        "legacyGatewayCounts": {
+          "PREPARATION": 2,
+          "OPERATION": 1
+        },
+        "currentGatewayCounts": {
+          "PREPARATION": 2,
+          "OPERATION": 1
+        },
+        "originalKeyReplays": 8,
+        "commands": 20,
+        "duplicateCommands": 0
+      },
+      {
+        "name": "independent-restore",
+        "tables": 280,
+        "sameAuthorizedDetails": 10,
+        "resentRequests": 0
+      }
+    ],
+    "boots": 8,
+    "gatewayRequests": 154,
+    "responseTraces": 446,
+    "businessHttpRequests": 343
+  },
+  "workerCount": 6,
+  "executionPaths": 15,
+  "newNullableColumns": 10,
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/o01-expense-recovery-verified/manifest.json",
+  "archiveSha256": "a5e08ebc16a1de531e8ca35168c1ee6e645521a504d4e695ecfed98bbc489f78",
+  "review": {
+    "mode": "SELF_REVIEW",
+    "independentReview": false,
+    "resolvedFindings": [
+      "Partial budget/accrual scan could claim a replacement authorization under the old origin",
+      "Budget review scan could process a newly authorized budget under the original scan origin"
+    ]
+  },
+  "scope": [
+    "Six expense recovery workers restore original persisted origins before claim, downstream calls, local completion and error handling",
+    "Separate partial-adjustment authorizations retain distinct origins; mutable roots compare scanned command identity under the original lock",
+    "Settlement recovery inherits original payment/voucher origins; archive inherits the persisted settlement; exception logging excludes private messages",
+    "V127 leaves historical origins empty and preserves domain inputs and command digests; fixed package populates four of ten migrated table types"
+  ],
+  "fixtureCorrections": [
+    "Attempt a: synthetic reversal preparation used reason instead of the existing comment field; corrected request fixture only.",
+    "Attempt b: reversal lines are the existing protocol top-level data.lines, not a serialized command property; corrected synthetic receiver only.",
+    "Attempt c: finance could not read a budget review before reaching its financial node; corrected the synthetic read to use the authorized original applicant.",
+    "Attempt d: completed schema/origin/replay checks, then the independent verifier lacked a client login; added applicant and finance logins before authorized detail comparison."
+  ],
+  "remaining": [
+    "Six direct scheduler entry points",
+    "Trusted business/process/task identifiers",
+    "Browser and PostgreSQL gates",
+    "Real enterprise integration"
+  ],
+  "independentCommandAudit": {
+    "totalCommandIds": 36,
+    "commandsPerOperation": {
+      "budget-command": 16,
+      "voucher-command": 12,
+      "payment-command": 6,
+      "voucher-reversal-command": 2
+    },
+    "maxSendsPerCommand": 1,
+    "source": "o01-expense-recovery-runtime-20261007e/finance-traces.json"
+  }
+}

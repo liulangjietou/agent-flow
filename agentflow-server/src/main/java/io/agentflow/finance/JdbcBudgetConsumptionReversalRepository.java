@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.ExpenseResourceAdjustment;
@@ -33,10 +35,10 @@ public class JdbcBudgetConsumptionReversalRepository {
                 (row, index) -> json.read(row.getString("state_json"), ExpenseResourceAdjustment.class), tenant, command.adjustmentId().toString()).stream().findFirst().orElseThrow(JdbcBudgetConsumptionReversalRepository::conflict);
         if (!adjustment.input().budget().equals(input) || adjustment.status() != ExpenseResourceAdjustment.Status.WAITING_BUDGET || adjustment.version() != 1) throw conflict();
         jdbc.update("""
-                INSERT INTO budget_consumption_reversal_operation(tenant_id,id,consumption_id,consumed_version,input_json,command_digest,state_json,
+                INSERT INTO budget_consumption_reversal_operation(trace_id,tenant_id,id,consumption_id,consumed_version,input_json,command_digest,state_json,
                 version,status,attempts,created_at,updated_at,next_attempt_at)
-                VALUES(?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?)
-                """, tenant, command.id().toString(), command.source().id().toString(), input.consumedVersion(), json.write(input), command.digest(), json.write(value),
+                VALUES(?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?)
+                """, DiagnosticContext.capture().traceId(), tenant, command.id().toString(), command.source().id().toString(), input.consumedVersion(), json.write(input), command.digest(), json.write(value),
                 timestamp(value.createdAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()));
         append(value);
     }
@@ -77,10 +79,10 @@ public class JdbcBudgetConsumptionReversalRepository {
     /** 未知按持久退避查询，租约超时不得被扫描器改成首次发送。 */
     public List<Candidate> due(Instant at) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM budget_consumption_reversal_operation
+                SELECT tenant_id,id,trace_id FROM budget_consumption_reversal_operation
                 WHERE (status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?) OR (status IN ('EXECUTING','QUERYING') AND lease_until<=?)
                 ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(at), timestamp(at));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(at), timestamp(at));
     }
     private RowMapper<BudgetConsumptionReversalOperation> row() {
         return (row, index) -> {
@@ -108,5 +110,8 @@ public class JdbcBudgetConsumptionReversalRepository {
      * 扫描只传固定租户和命令编号。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }

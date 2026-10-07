@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.slf4j.Logger;
@@ -27,12 +29,14 @@ public class ExpenseBudgetReviewWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Budget review worker must start outside a transaction");
         for (var candidate : reviews.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try { recovery.recover(candidate); }
-            catch (RuntimeException failure) {
-                LOG.error("Budget review recovery failed, errorCode={}, reportId={}", "RECOVERY_FAILURE", candidate.reportId());
-                try { recovery.defer(candidate); }
-                catch (RuntimeException deferred) {
-                    LOG.error("Budget review reschedule failed, errorCode={}, reportId={}", "RESCHEDULE_FAILURE", candidate.reportId());
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-budget-review", candidate.reportId() + ":" + candidate.roundNo()).open()) {
+                try { recovery.recover(candidate); }
+                catch (RuntimeException failure) {
+                    LOG.error("Budget review recovery failed, errorCode={}, reportId={}", "RECOVERY_FAILURE", candidate.reportId());
+                    try { recovery.defer(candidate); }
+                    catch (RuntimeException deferred) {
+                        LOG.error("Budget review reschedule failed, errorCode={}, reportId={}", "RESCHEDULE_FAILURE", candidate.reportId());
+                    }
                 }
             }
         }

@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.BudgetConsumptionReductionOperation;
 import io.agentflow.finance.BudgetConsumptionReductionPort;
@@ -44,47 +46,55 @@ public class ExpensePartialAdjustmentWorker {
     private void prepare() {
         for (var candidate : preparations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = preparing.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
-                try { preparing.finish(claimed, reader.read(claimed), Instant.now()); }
-                catch (RuntimeException failed) { preparing.fail(claimed, Instant.now()); log("PARTIAL_PREPARATION_READ_FAILURE", candidate.id(), failed); }
-            } catch (RuntimeException failed) { log("PARTIAL_PREPARATION_WORKER_FAILURE", candidate.id(), failed); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-partial-preparation", candidate.id().toString()).open()) {
+                try {
+                    var claimed = preparing.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try { preparing.finish(claimed, reader.read(claimed), Instant.now()); }
+                    catch (RuntimeException failed) { preparing.fail(claimed, Instant.now()); log("PARTIAL_PREPARATION_READ_FAILURE", candidate.id(), failed); }
+                } catch (RuntimeException failed) { log("PARTIAL_PREPARATION_WORKER_FAILURE", candidate.id(), failed); }
+            }
         }
     }
     private void budget() {
         for (var candidate : adjustments.dueBudget(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = finance.claimBudget(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-partial-budget", candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input(); var result = claimed.status() == BudgetConsumptionReductionOperation.Status.EXECUTING
-                            ? budgets.execute(input.targetDigest(), input.command()) : budgets.query(input.targetDigest(), input.command());
-                    finance.finishBudget(claimed, result, Instant.now());
-                } catch (RuntimeException failed) { finance.failBudget(claimed, Instant.now()); log("PARTIAL_BUDGET_DISPATCH_FAILURE", candidate.id(), failed); }
-            } catch (RuntimeException failed) { log("PARTIAL_BUDGET_WORKER_FAILURE", candidate.id(), failed); }
+                    var claimed = finance.claimBudget(candidate.tenantId(), candidate.id(), candidate.operationId(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var input = claimed.input(); var result = claimed.status() == BudgetConsumptionReductionOperation.Status.EXECUTING
+                                ? budgets.execute(input.targetDigest(), input.command()) : budgets.query(input.targetDigest(), input.command());
+                        finance.finishBudget(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) { finance.failBudget(claimed, Instant.now()); log("PARTIAL_BUDGET_DISPATCH_FAILURE", candidate.id(), failed); }
+                } catch (RuntimeException failed) { log("PARTIAL_BUDGET_WORKER_FAILURE", candidate.id(), failed); }
+            }
         }
     }
     private void accrual() {
         for (var candidate : adjustments.dueAccrual(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = finance.claimAccrual(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-partial-accrual", candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input(); var result = claimed.status() == ExpenseAccrualReductionOperation.Status.POSTING
-                            ? accruals.post(input.targetDigest(), input.command()) : accruals.query(input.targetDigest(), input.command());
-                    finance.finishAccrual(claimed, result, Instant.now());
-                } catch (RuntimeException failed) { finance.failAccrual(claimed, Instant.now()); log("PARTIAL_ACCRUAL_DISPATCH_FAILURE", candidate.id(), failed); }
-            } catch (RuntimeException failed) { log("PARTIAL_ACCRUAL_WORKER_FAILURE", candidate.id(), failed); }
+                    var claimed = finance.claimAccrual(candidate.tenantId(), candidate.id(), candidate.operationId(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var input = claimed.input(); var result = claimed.status() == ExpenseAccrualReductionOperation.Status.POSTING
+                                ? accruals.post(input.targetDigest(), input.command()) : accruals.query(input.targetDigest(), input.command());
+                        finance.finishAccrual(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) { finance.failAccrual(claimed, Instant.now()); log("PARTIAL_ACCRUAL_DISPATCH_FAILURE", candidate.id(), failed); }
+                } catch (RuntimeException failed) { log("PARTIAL_ACCRUAL_WORKER_FAILURE", candidate.id(), failed); }
+            }
         }
     }
     private void completeResources() {
         for (var candidate : adjustments.ready()) {
             if (Thread.currentThread().isInterrupted()) return;
-            try { resources.apply(candidate); }
-            catch (DomainException changed) {
-                try { if (!"CONCURRENCY_CONFLICT".equals(changed.code())) resources.block(candidate, changed.code()); }
-                catch (RuntimeException failed) { log("PARTIAL_RESOURCE_BLOCK_FAILURE", candidate.id(), failed); }
-            } catch (RuntimeException failed) { log("PARTIAL_RESOURCE_FAILURE", candidate.id(), failed); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "expense-partial-adjustment", candidate.id().toString()).open()) {
+                try { resources.apply(candidate); }
+                catch (DomainException changed) {
+                    try { if (!"CONCURRENCY_CONFLICT".equals(changed.code())) resources.block(candidate, changed.code()); }
+                    catch (RuntimeException failed) { log("PARTIAL_RESOURCE_BLOCK_FAILURE", candidate.id(), failed); }
+                } catch (RuntimeException failed) { log("PARTIAL_RESOURCE_FAILURE", candidate.id(), failed); }
+            }
         }
     }
     private static void log(String code, UUID id, RuntimeException failure) {

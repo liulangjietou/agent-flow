@@ -126,6 +126,7 @@ class ExpenseSubmissionIntegrationTest {
     private ExpensePaymentReturnPort.Status expenseReturnStatus = ExpensePaymentReturnPort.Status.CONFIRMED;
     private long expenseReturnRevision = 1;
     private List<ExpensePaymentReturnPort.ReturnItem> expenseReturnRows = List.of();
+    private final java.util.List<java.util.Map<String, String>> recoveryTraceCalls = new java.util.concurrent.CopyOnWriteArrayList<>();
     private int partialBudgetWrites;
     private int partialBudgetQueries;
     private int partialAccrualWrites;
@@ -5564,6 +5565,125 @@ class ExpenseSubmissionIntegrationTest {
         } finally { notificationPreferences.revise(actor, notificationPreferences.get(actor).version(), preference.emailEnabled(), preference.enterpriseImEnabled()); }
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"REVERSAL_PREPARATION", "REVERSAL", "RESOURCE_PREPARATION", "RESOURCE_BUDGET"})
+    void queuedRecoveryOriginSurvivesFinanceHttp(String kind) throws Exception {
+        MockHttpServletResponse response; String table; UUID id; String operation;
+        if (kind.startsWith("REVERSAL")) {
+            var report = paidExpense(); var original = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+            if (kind.equals("REVERSAL_PREPARATION")) {
+                response = send(executionPath(report, original) + "/preparations", "finance", executionPreparation(report, original));
+                id = UUID.fromString(ok(response, 202).path("preparationId").asText()); table = "voucher_reversal_preparation"; operation = "accounting-period";
+            } else {
+                var ready = prepareExecution(report);
+                response = send(executionPath(report, original) + "/authorizations", "finance", executionAuthorization(report, ready));
+                id = UUID.fromString(ok(response, 202).path("reversalId").asText()); table = "voucher_reversal_operation"; operation = "voucher-reversal-command";
+            }
+        } else {
+            var report = resourceAdjustmentReport();
+            if (kind.equals("RESOURCE_PREPARATION")) {
+                response = send(path(report) + "/resource-adjustment/preparations", "finance", resourcePreparationInput(report));
+                id = UUID.fromString(ok(response, 202).path("preparationId").asText()); table = "expense_resource_adjustment_preparation"; operation = "accounting-period";
+            } else {
+                var ready = prepareResourceWorkflow(report);
+                response = send(path(report) + "/resource-adjustment/authorizations", "finance", resourceAuthorizationInput(report, ready));
+                id = UUID.fromString(ok(response, 202).path("adjustmentId").asText()); table = "budget_consumption_reversal_operation"; operation = "budget-consumption-reversal-command";
+            }
+        }
+        String origin = response.getHeader("X-Trace-Id"); recoveryTraceCalls.clear();
+        runRecoveryWorker(kind.startsWith("REVERSAL") ? reversalExecutionWorker::poll : resourceWorker::poll);
+        assertRecoveryGateway(origin, operation);
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM " + table + " WHERE tenant_id='demo' AND id=?", String.class, id.toString())).isEqualTo(origin);
+        if (kind.equals("RESOURCE_BUDGET")) assertThat(jdbc.queryForObject("SELECT trace_id FROM expense_resource_adjustment WHERE tenant_id='demo' AND id=?", String.class, id.toString())).isEqualTo(origin);
+    }
+
+    @Test void partialWorkerKeepsIndependentAuthorizationOrigins() throws Exception {
+        var initial = partialAdjustment(); String rootOrigin = UUID.randomUUID().toString();
+        try (var scope = new io.agentflow.observability.DiagnosticContext(rootOrigin, "demo").open()) {
+            tx().executeWithoutResult(status -> partialAdjustments.create(initial));
+        }
+        var report = reports.find("demo", initial.input().basis().reportId()).orElseThrow(); var origins = new java.util.ArrayList<String>();
+        for (var side : ExpensePartialAdjustmentPreparation.Side.values()) {
+            var current = partialAdjustments.find("demo", initial.id()).orElseThrow(); String preparingOrigin = UUID.randomUUID().toString();
+            ExpensePartialAdjustmentPreparation preparation;
+            try (var scope = new io.agentflow.observability.DiagnosticContext(preparingOrigin, "demo").open()) { preparation = registerPartialPreparation(current, side); }
+            recoveryTraceCalls.clear(); runRecoveryWorker(partialWorker::poll); assertRecoveryGateway(preparingOrigin, "accounting-period");
+            var ready = partialPreparations.find("demo", preparation.input().id()).orElseThrow();
+            assertThat(ready.status()).isEqualTo(ExpensePartialAdjustmentPreparation.Status.READY);
+            assertThat(jdbc.queryForObject("SELECT trace_id FROM expense_partial_adjustment_preparation WHERE tenant_id='demo' AND id=?", String.class, preparation.input().id().toString())).isEqualTo(preparingOrigin);
+            var input = partialSourceInput(report); input.put("adjustmentId", initial.id()); input.put("adjustmentVersion", current.version());
+            input.put("preparationId", ready.input().id()); input.put("preparationVersion", ready.version()); input.put("comment", "确认独立授权来源");
+            var response = send(path(report) + "/partial-adjustments/authorizations", "finance", input); ok(response, 202);
+            String origin = response.getHeader("X-Trace-Id"); origins.add(origin); recoveryTraceCalls.clear();
+            runRecoveryWorker(partialWorker::poll);
+            assertRecoveryGateway(origin, side == ExpensePartialAdjustmentPreparation.Side.BUDGET ? "budget-consumption-reduction-command" : "expense-accrual-reduction-command");
+            var after = partialAdjustments.find("demo", initial.id()).orElseThrow();
+            var operationId = side == ExpensePartialAdjustmentPreparation.Side.BUDGET ? after.budget().input().command().id() : after.accrual().input().command().id();
+            assertThat(jdbc.queryForObject("SELECT trace_id FROM expense_partial_adjustment_operation WHERE tenant_id='demo' AND id=?", String.class, operationId.toString())).isEqualTo(origin);
+        }
+        assertThat(origins).hasSize(2).doesNotHaveDuplicates().doesNotContain(rootOrigin);
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM expense_partial_adjustment WHERE tenant_id='demo' AND id=?", String.class, initial.id().toString())).isEqualTo(rootOrigin);
+        assertThat(partialAdjustments.find("demo", initial.id()).orElseThrow().completion()).isNotNull();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(ExpensePartialAdjustmentPreparation.Side.class)
+    void stalePartialScanCannotDispatchAReplacementAuthorization(ExpensePartialAdjustmentPreparation.Side side) throws Exception {
+        var queued = queuedPartialAdjustment(partialAdjustment());
+        var stale = (side == ExpensePartialAdjustmentPreparation.Side.BUDGET ? partialAdjustments.dueBudget(Instant.now()) : partialAdjustments.dueAccrual(Instant.now()))
+                .stream().filter(value -> value.id().equals(queued.id())).findFirst().orElseThrow();
+        if (side == ExpensePartialAdjustmentPreparation.Side.BUDGET) {
+            var claimed = partialFinance.claimBudget("demo", queued.id(), adjustmentTime()); var command = claimed.input().command();
+            partialFinance.finishBudget(claimed, new FinanceResult.Success<>(new BudgetConsumptionReductionObservation(command.id(), queued.id(), command.digest(),
+                    BudgetConsumptionReductionObservation.Status.REJECTED, adjustmentTime(), null, BudgetConsumptionReductionObservation.Rejection.ACCOUNTING_PERIOD_CLOSED)), adjustmentTime());
+        } else {
+            var claimed = partialFinance.claimAccrual("demo", queued.id(), adjustmentTime()); var command = claimed.input().command();
+            partialFinance.finishAccrual(claimed, new FinanceResult.Success<>(new ExpenseAccrualReductionObservation(command.id(), queued.id(), command.digest(),
+                    ExpenseAccrualReductionObservation.Status.FAILED, 1, adjustmentTime(), "synthetic-refusal", null, ExpenseAccrualReductionObservation.Rejection.ACCOUNTING_PERIOD_CLOSED)), adjustmentTime());
+        }
+        var current = partialAdjustments.find("demo", queued.id()).orElseThrow();
+        var preparation = registerPartialPreparation(current, side); partialWorker.poll();
+        var ready = partialPreparations.find("demo", preparation.input().id()).orElseThrow();
+        String replacementOrigin = UUID.randomUUID().toString();
+        try (var scope = new io.agentflow.observability.DiagnosticContext(replacementOrigin, "demo").open()) {
+            authorizePartialPreparation(partialAdjustments.find("demo", queued.id()).orElseThrow(), ready);
+        }
+        var scans = org.mockito.Mockito.mock(JdbcExpensePartialAdjustmentRepository.class);
+        if (side == ExpensePartialAdjustmentPreparation.Side.BUDGET) org.mockito.Mockito.when(scans.dueBudget(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(stale));
+        else org.mockito.Mockito.when(scans.dueAccrual(org.mockito.ArgumentMatchers.any())).thenReturn(List.of(stale));
+        var worker = new ExpensePartialAdjustmentWorker(scans, partialFinance, partialBudgetPort, partialAccrualPort, partialAdjustmentExecution,
+                org.mockito.Mockito.mock(JdbcExpensePartialPreparationRepository.class), partialPreparing, partialReader);
+        recoveryTraceCalls.clear(); worker.poll();
+        assertThat(recoveryTraceCalls).as("旧扫描不应以旧来源领取新授权").isEmpty();
+        var after = partialAdjustments.find("demo", queued.id()).orElseThrow();
+        assertThat(side == ExpensePartialAdjustmentPreparation.Side.BUDGET ? after.budget().status().name() : after.accrual().status().name()).isEqualTo("QUEUED");
+        partialWorker.poll();
+        assertRecoveryGateway(replacementOrigin, side == ExpensePartialAdjustmentPreparation.Side.BUDGET ? "budget-consumption-reduction-command" : "expense-accrual-reduction-command");
+    }
+
+    @Test void archiveWorkerUsesOriginalSettlementOrigin() throws Exception {
+        var report = archiveReadyExpense(); var original = settlements.find("demo", report.id()).orElseThrow();
+        String origin = jdbc.queryForObject("SELECT trace_id FROM payment_operation WHERE tenant_id='demo' AND id=?", String.class, original.input().payment().operationId().toString());
+        var repository = org.mockito.Mockito.mock(JdbcExpenseArchiveRepository.class);
+        org.mockito.Mockito.when(repository.candidates(org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> archives.candidates(null).stream().filter(item -> item.reportId().equals(report.id())).toList());
+        var files = org.mockito.Mockito.mock(ExpenseArchiveFiles.class); var observed = new java.util.ArrayList<String>();
+        org.mockito.Mockito.doAnswer(invocation -> { observed.add(org.slf4j.MDC.get("traceId")); archiveFiles.verify(invocation.getArgument(0)); return null; }).when(files).verify(org.mockito.ArgumentMatchers.any());
+        runRecoveryWorker(new ExpenseArchiveWorker(repository, archiveService, files)::poll);
+        assertThat(observed).containsExactly(origin);
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM expense_settlement WHERE tenant_id='demo' AND report_id=?", String.class, report.id().toString())).isEqualTo(origin);
+        assertThat(archives.find("demo", report.id(), 1).orElseThrow().archive()).isNotNull();
+    }
+
+    private void runRecoveryWorker(Runnable work) {
+        try (var outer = new io.agentflow.observability.DiagnosticContext(UUID.randomUUID().toString(), "foreign-tenant").open()) {
+            var previous = org.slf4j.MDC.getCopyOfContextMap(); work.run(); assertThat(org.slf4j.MDC.getCopyOfContextMap()).isEqualTo(previous);
+        }
+        assertThat(org.slf4j.MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+    private void assertRecoveryGateway(String origin, String operation) {
+        assertThat(recoveryTraceCalls).filteredOn(value -> value.get("operation").equals(operation)).extracting(value -> value.get("trace")).contains(origin);
+    }
+
     @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(longs = {123, 789})
     void externalReversalRegistrationPreservesNanosecondEvidenceAndStillNotifies(long nanos) throws Exception {
         var report = paidExpense(); var original = reversedVoucher(report, VoucherCommand.Kind.EXPENSE_ACCRUAL);
@@ -6866,6 +6986,8 @@ class ExpenseSubmissionIntegrationTest {
             var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext("/finance/", exchange -> {
                 var test = ACTIVE.get(); var request = test.json.read(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8), JsonNode.class);
+                test.recoveryTraceCalls.add(Map.of("operation", exchange.getRequestURI().getPath().substring("/finance/".length()),
+                        "trace", String.valueOf(exchange.getRequestHeaders().getFirst("X-Trace-Id"))));
                 Object result = test.data(exchange.getRequestURI().getPath().substring("/finance/".length()), request.path("data"));
                 byte[] body = test.json.write(Map.of("contractVersion", 1, "tenantId", request.path("tenantId").asText(), "requestId", request.path("requestId").asText(), "outcome", "SUCCESS", "data", result)).getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().set("Content-Type", "application/json"); exchange.sendResponseHeaders(200, body.length);

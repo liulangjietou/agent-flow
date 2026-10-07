@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.jdbc.JdbcTimestampPrecision;
@@ -41,9 +43,9 @@ public class JdbcExpensePartialPreparationRepository {
         if (!value.equals(ExpensePartialAdjustmentPreparation.queue(input)) || !adjustments.find(basis.tenantId(), original.id()).filter(original::equals).isPresent()) throw conflict();
         adjustments.dispatchSource(original);
         jdbc.update("""
-                INSERT INTO expense_partial_adjustment_preparation(tenant_id,id,adjustment_id,adjustment_version,report_id,side,requested_by,input_json,state_json,version,status,active_slot,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,1,'QUEUED',1,?,?)
-                """, basis.tenantId(), input.id().toString(), original.id().toString(), original.version(), basis.reportId().toString(), input.side().name(), input.requestedBy(),
+                INSERT INTO expense_partial_adjustment_preparation(trace_id,tenant_id,id,adjustment_id,adjustment_version,report_id,side,requested_by,input_json,state_json,version,status,active_slot,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,1,'QUEUED',1,?,?)
+                """, DiagnosticContext.capture().traceId(), basis.tenantId(), input.id().toString(), original.id().toString(), original.version(), basis.reportId().toString(), input.side().name(), input.requestedBy(),
                 json.write(input), json.write(value), timestamp(input.requestedAt()), timestamp(value.updatedAt()));
         append(value);
     }
@@ -92,8 +94,8 @@ public class JdbcExpensePartialPreparationRepository {
     }
     /** 到期租约与新排队各有确定持久身份，单批最多十笔。 */
     public List<Candidate> due(Instant at) {
-        return jdbc.query("SELECT tenant_id,id FROM expense_partial_adjustment_preparation WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(at));
+        return jdbc.query("SELECT tenant_id,id,trace_id FROM expense_partial_adjustment_preparation WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(at));
     }
     private ExpensePartialAdjustmentPreparation locked(ExpensePartialAdjustmentPreparation next) {
         var input = next.input(); var basis = input.adjustment().input().basis(); reports.lock(basis.tenantId(), basis.reportId());
@@ -162,5 +164,8 @@ public class JdbcExpensePartialPreparationRepository {
      * 扫描候选仅携带租户和准备编号。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }

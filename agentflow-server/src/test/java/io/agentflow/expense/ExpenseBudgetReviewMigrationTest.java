@@ -25,7 +25,9 @@ class ExpenseBudgetReviewMigrationTest {
         var oldReports = jdbc.queryForList("SELECT * FROM expense_report"); var oldBudgets = jdbc.queryForList("SELECT * FROM budget_operation");
         var flyway = Flyway.configure().dataSource(source).load(); flyway.migrate();
         assertThat(jdbc.queryForList("SELECT * FROM expense_report")).isEqualTo(oldReports);
-        assertThat(jdbc.queryForList("SELECT * FROM budget_operation")).isEqualTo(oldBudgets);
+        // 新增诊断列允许为空，升级仍须逐字保留全部旧业务列。
+        assertThat(jdbc.queryForList("SELECT " + String.join(",", oldBudgets.get(0).keySet()) + " FROM budget_operation")).isEqualTo(oldBudgets);
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM budget_operation", String.class)).isNull();
         // 原测试只核对预算任务表，没有每轮人工例外的持久来源和状态。
         assertThat(jdbc.queryForList("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA='PUBLIC' AND TABLE_NAME IN ('EXPENSE_BUDGET_REVIEW','EXPENSE_BUDGET_REVIEW_REVISION')", String.class))
                 .containsExactlyInAnyOrder("EXPENSE_BUDGET_REVIEW", "EXPENSE_BUDGET_REVIEW_REVISION");

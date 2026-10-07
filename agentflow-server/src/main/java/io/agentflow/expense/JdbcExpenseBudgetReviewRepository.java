@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -43,12 +45,12 @@ public class JdbcExpenseBudgetReviewRepository {
         if (value.version() != 1 || value.status() != ExpenseBudgetReview.Status.WAITING_BUDGET) throw conflict();
         requireSources(value); var input = value.input();
         int inserted = jdbc.update("""
-                INSERT INTO expense_budget_review(tenant_id,report_id,application_id,employee_id,round_no,submitted_financial_version,
+                INSERT INTO expense_budget_review(trace_id,tenant_id,report_id,application_id,employee_id,round_no,submitted_financial_version,
                     precheck_id,original_operation_id,target_digest,budget_node_id,policy_reference,version,status,input_json,state_json,
                     submitted_at,updated_at,next_check_at)
-                SELECT ?,?,?,?,?,?,?,?,?,?,?,1,'WAITING_BUDGET',?,?,?,?,?
+                SELECT ?,?,?,?,?,?,?,?,?,?,?,?,1,'WAITING_BUDGET',?,?,?,?,?
                 FROM approval_application WHERE tenant_id=? AND id=? AND status='IN_APPROVAL' AND round_no=?
-                """, input.tenantId(), input.reportId().toString(), input.applicationId().toString(), input.employeeId(), input.roundNo(),
+                """, DiagnosticContext.capture().traceId(), input.tenantId(), input.reportId().toString(), input.applicationId().toString(), input.employeeId(), input.roundNo(),
                 input.submittedFinancialVersion(), input.precheckId().toString(), input.originalOperationId().toString(), input.targetDigest(),
                 input.budgetNodeId(), policy(value), json.write(input), json.write(value), Timestamp.from(value.submittedAt()), Timestamp.from(value.updatedAt()),
                 Timestamp.from(value.updatedAt()), input.tenantId(), input.applicationId().toString(), input.roundNo());
@@ -79,7 +81,7 @@ public class JdbcExpenseBudgetReviewRepository {
     /** 只扫描已有预算终态或等待系统通过的当前轮次，调度延后防止早期节点饥饿。 */
     public List<Candidate> due(Instant at) {
         return jdbc.query("""
-                SELECT r.tenant_id,r.report_id,r.application_id,r.round_no FROM expense_budget_review r
+                SELECT r.tenant_id,r.report_id,r.application_id,r.round_no,b.id AS operation_id,COALESCE(b.trace_id,r.trace_id) AS trace_id FROM expense_budget_review r
                 JOIN approval_application a ON a.tenant_id=r.tenant_id AND a.id=r.application_id AND a.round_no=r.round_no
                 JOIN budget_operation b ON b.tenant_id=r.tenant_id AND b.id=COALESCE(r.authorized_operation_id,r.original_operation_id)
                 WHERE a.status='IN_APPROVAL' AND r.next_check_at<=? AND
@@ -87,7 +89,7 @@ public class JdbcExpenseBudgetReviewRepository {
                     (r.status='CONFIRMED' AND r.budget_node_id IS NOT NULL AND r.automatic_audit_id IS NULL AND r.authorized_operation_id IS NULL))
                 ORDER BY r.next_check_at,r.tenant_id,r.report_id,r.round_no LIMIT 10
                 """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("report_id")),
-                        UUID.fromString(row.getString("application_id")), row.getInt("round_no")), Timestamp.from(at));
+                        UUID.fromString(row.getString("application_id")), row.getInt("round_no"), row.getString("trace_id"), UUID.fromString(row.getString("operation_id"))), Timestamp.from(at));
     }
 
     /** 轮询时刻不是业务事实，不为尚未到达的原生节点追加虚假的审批修订。 */
@@ -176,5 +178,10 @@ public class JdbcExpenseBudgetReviewRepository {
      * 后台扫描只持有身份，进入申请锁后重新核对真实状态。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID reportId, UUID applicationId, int roundNo) { }
+    public record Candidate(String tenantId, UUID reportId, UUID applicationId, int roundNo, String traceId, UUID operationId) {
+        /** 显式恢复旧身份时保留兼容入口，持久扫描始终携带原操作。 */
+        public Candidate(String tenantId, UUID reportId, UUID applicationId, int roundNo, String traceId) { this(tenantId, reportId, applicationId, roundNo, traceId, null); }
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID reportId, UUID applicationId, int roundNo) { this(tenantId, reportId, applicationId, roundNo, null, null); }
+    }
 }

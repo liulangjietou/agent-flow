@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.jdbc.JdbcTimestampPrecision;
@@ -52,10 +54,10 @@ public class JdbcExpensePartialAdjustmentRepository {
         if (!basis.equals(ExpensePartialAdjustmentBasis.from(basis.funding(), previous))) throw conflict();
         requireUsedReturns(basis);
         jdbc.update("""
-                INSERT INTO expense_partial_adjustment(tenant_id,id,report_id,round_no,sequence_no,settlement_version,consumption_id,consumed_version,
+                INSERT INTO expense_partial_adjustment(trace_id,tenant_id,id,report_id,round_no,sequence_no,settlement_version,consumption_id,consumed_version,
                 accrual_id,accrual_version,previous_id,previous_version,input_json,state_json,version,status,active_report_id,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'WAITING_FINANCE',?,?,?)
-                """, basis.tenantId(), value.id().toString(), basis.reportId().toString(), financial.settlement().input().source().roundNo(), sequence(basis),
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'WAITING_FINANCE',?,?,?)
+                """, DiagnosticContext.capture().traceId(), basis.tenantId(), value.id().toString(), basis.reportId().toString(), financial.settlement().input().source().roundNo(), sequence(basis),
                 financial.settlement().version(), financial.consumption().input().command().id().toString(), financial.consumption().version(),
                 financial.accrual().input().command().id().toString(), financial.accrual().version(), basis.previous() == null ? null : basis.previous().id().toString(),
                 basis.previous() == null ? null : basis.previous().version(), json.write(input), json.write(value), basis.reportId().toString(), timestamp(input.createdAt()), timestamp(value.updatedAt()));
@@ -210,8 +212,8 @@ public class JdbcExpensePartialAdjustmentRepository {
     public List<Candidate> dueAccrual(Instant at) { return due("accrual", at); }
     /** 两侧成功后独立扫描本地完成，数据库异常或重启不会再次发送已成功命令。 */
     public List<Candidate> ready() {
-        return jdbc.query("SELECT tenant_id,id,report_id,version FROM expense_partial_adjustment WHERE status='READY' AND completed_at IS NULL AND retired_at IS NULL ORDER BY updated_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), UUID.fromString(row.getString("report_id")), row.getLong("version")));
+        return jdbc.query("SELECT tenant_id,id,report_id,version,trace_id FROM expense_partial_adjustment WHERE status='READY' AND completed_at IS NULL AND retired_at IS NULL ORDER BY updated_at,id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), UUID.fromString(row.getString("report_id")), row.getLong("version"), row.getString("trace_id")));
     }
     /** 调用方持有原报销锁；只读拒绝不标记事务回滚，使应用服务能够原子停止失效队列。 */
     public ExpenseAdjustmentFundingSource dispatchSource(ExpensePartialAdjustment value) {
@@ -225,10 +227,14 @@ public class JdbcExpensePartialAdjustmentRepository {
         return sources.current(value.input().basis().funding());
     }
     private List<Candidate> due(String side, Instant at) {
-        return jdbc.query("SELECT tenant_id,id,report_id,version FROM expense_partial_adjustment WHERE retired_at IS NULL AND ((" + side + "_status IN ('QUEUED','UNKNOWN') AND " + side
-                + "_next_at<=?) OR (" + side + "_status IN ('EXECUTING','POSTING','QUERYING') AND " + side + "_lease_until<=?)) ORDER BY updated_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), UUID.fromString(row.getString("report_id")), row.getLong("version")), timestamp(at), timestamp(at));
+        // 预算与会计分别授权，后台来源必须读取当前指令的登记记录，不能沿用调整创建请求。
+        return jdbc.query("SELECT a.tenant_id,a.id,a.report_id,a.version,o.trace_id,a." + side + "_operation_id AS operation_id FROM expense_partial_adjustment a "
+                + "LEFT JOIN expense_partial_adjustment_operation o ON o.tenant_id=a.tenant_id AND o.adjustment_id=a.id AND o.id=a." + side + "_operation_id "
+                + "WHERE a.retired_at IS NULL AND ((a." + side + "_status IN ('QUEUED','UNKNOWN') AND a." + side
+                + "_next_at<=?) OR (a." + side + "_status IN ('EXECUTING','POSTING','QUERYING') AND a." + side + "_lease_until<=?)) ORDER BY a.updated_at,a.id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), UUID.fromString(row.getString("report_id")), row.getLong("version"), row.getString("trace_id"), UUID.fromString(row.getString("operation_id"))), timestamp(at), timestamp(at));
     }
+
     private void save(ExpensePartialAdjustment value) {
         var basis = value.input().basis(); var budget = value.budget(); var accrual = value.accrual();
         int changed = jdbc.update("""
@@ -247,7 +253,7 @@ public class JdbcExpensePartialAdjustmentRepository {
         boolean budget = side.equals("BUDGET");
         var id = budget ? value.budget().input().command().id() : value.accrual().input().command().id();
         Object input = budget ? value.budget().input() : value.accrual().input();
-        jdbc.update("INSERT INTO expense_partial_adjustment_operation(tenant_id,id,adjustment_id,side,adjustment_version,input_json,authorization_source_json,created_at) VALUES(?,?,?,?,?,?,?,?)",
+        jdbc.update("INSERT INTO expense_partial_adjustment_operation(trace_id,tenant_id,id,adjustment_id,side,adjustment_version,input_json,authorization_source_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)", DiagnosticContext.capture().traceId(),
                 value.input().basis().tenantId(), id.toString(), value.id().toString(), side, value.version(), json.write(input), json.write(source), timestamp(value.updatedAt()));
     }
     private void requireUsedReturns(ExpensePartialAdjustmentBasis basis) {
@@ -357,5 +363,10 @@ public class JdbcExpensePartialAdjustmentRepository {
      * 工作器只传租户、报销和当前修订，账务内容由实际状态恢复。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, UUID reportId, long version) { }
+    public record Candidate(String tenantId, UUID id, UUID reportId, long version, String traceId, UUID operationId) {
+        /** 本地资源完成没有外部指令身份。 */
+        public Candidate(String tenantId, UUID id, UUID reportId, long version, String traceId) { this(tenantId, id, reportId, version, traceId, null); }
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id, UUID reportId, long version) { this(tenantId, id, reportId, version, null, null); }
+    }
 }

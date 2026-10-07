@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.ExpensePartialAdjustmentGuard;
@@ -37,9 +39,9 @@ public class JdbcVoucherReversalPreparationRepository {
             partialAdjustments.requireWholeAllowed(input.source().command().tenantId(), input.source().command().binding().businessId());
         }
         jdbc.update("""
-                INSERT INTO voucher_reversal_preparation(tenant_id,id,operation_id,original_version,requested_by,input_json,state_json,version,status,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,1,'QUEUED',?,?)
-                """, input.source().command().tenantId(), input.id().toString(), input.source().command().id().toString(), input.originalVersion(),
+                INSERT INTO voucher_reversal_preparation(trace_id,tenant_id,id,operation_id,original_version,requested_by,input_json,state_json,version,status,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?,?,1,'QUEUED',?,?)
+                """, DiagnosticContext.capture().traceId(), input.source().command().tenantId(), input.id().toString(), input.source().command().id().toString(), input.originalVersion(),
                 input.requestedBy(), json.write(input), json.write(value), timestamp(input.requestedAt()), timestamp(value.updatedAt()));
         append(value);
     }
@@ -61,8 +63,8 @@ public class JdbcVoucherReversalPreparationRepository {
     }
     /** 每次只领取有限数量，并由应用服务处理超时旧租约。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id FROM voucher_reversal_preparation WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now));
+        return jdbc.query("SELECT tenant_id,id,trace_id FROM voucher_reversal_preparation WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
     }
     private RowMapper<VoucherReversalPreparation> row() {
         return (row, index) -> {
@@ -84,5 +86,8 @@ public class JdbcVoucherReversalPreparationRepository {
      * 扫描只携带租户与任务标识。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }

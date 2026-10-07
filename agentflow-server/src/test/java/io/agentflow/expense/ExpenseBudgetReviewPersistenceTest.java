@@ -27,6 +27,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * 真实 JDBC 复核每轮不可变来源、并发版本与事务回滚；原生任务编排由后续流程测试验证。
@@ -53,6 +55,66 @@ class ExpenseBudgetReviewPersistenceTest {
         reports = new JdbcExpenseReportRepository(jdbc, json); prechecks = new JdbcExpensePrecheckRepository(jdbc, json);
         controls = new JdbcExpenseSubmissionControlRepository(jdbc, json); operations = new JdbcBudgetOperationRepository(jdbc, json);
         occupations = new JdbcBudgetOccupationRepository(jdbc, json); reviews = repository();
+    }
+
+    @Test void budgetRecoveryFollowsAuthorizedOperationInsteadOfSubmissionThread() {
+        String submitted = UUID.randomUUID().toString(), authorized = UUID.randomUUID().toString(); ExpenseBudgetReview initial;
+        try (var scope = new io.agentflow.observability.DiagnosticContext(submitted, TENANT).open()) { initial = fixture(); }
+        var refused = finish(initial, false); var required = initial.observe(refused, NOW.plusSeconds(2)); tx.executeWithoutResult(status -> reviews.update(required));
+        UUID audit = UUID.randomUUID(); var approved = required.authorize(refused, UUID.randomUUID(), "budget-task", "owner", audit, NOW.plusSeconds(3));
+        try (var scope = new io.agentflow.observability.DiagnosticContext(authorized, TENANT).open()) {
+            tx.executeWithoutResult(status -> { audit(required, audit, "budget-task", "owner", "APPROVE", NOW.plusSeconds(3)); register(approved, refused); reviews.update(approved); });
+        }
+        tx.executeWithoutResult(status -> {
+            var queued = operations.find(TENANT, approved.authorizedOperationId()).orElseThrow(); var claimed = queued.claim(NOW.plusSeconds(3), Duration.ofSeconds(15)); operations.update(claimed);
+            var command = claimed.input().command();
+            var result = claimed.complete(new FinanceResult.Success<>(new BudgetObservation(command.id(), command.digest(), BudgetObservation.Status.APPLIED, 1L, "ledger-2", NOW.plusSeconds(4), null)), NOW.plusSeconds(4));
+            assertThat(result.status()).isEqualTo(BudgetOperation.Status.APPLIED); operations.update(result);
+        });
+        assertThat(reviews.due(NOW.plusSeconds(5))).hasSize(1);
+        var recovery = org.mockito.Mockito.mock(io.agentflow.approval.process.ExpenseBudgetReviewRecovery.class); var observed = new java.util.ArrayList<String>();
+        org.mockito.Mockito.doAnswer(invocation -> { observed.add(org.slf4j.MDC.get("traceId")); return null; }).when(recovery).recover(org.mockito.ArgumentMatchers.any());
+        new ExpenseBudgetReviewWorker(repository(), recovery).poll();
+        assertThat(observed).containsExactly(authorized);
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM expense_budget_review WHERE tenant_id=? AND report_id=? AND round_no=1", String.class, TENANT, initial.input().reportId().toString())).isEqualTo(submitted);
+    }
+
+    @Test void staleBudgetRecoveryCannotAdvanceAReplacementAuthorization() {
+        var initial = fixture(); var refused = finish(initial, false);
+        var stale = reviews.due(NOW.plusSeconds(2)).get(0);
+        var required = initial.observe(refused, NOW.plusSeconds(2)); tx.executeWithoutResult(status -> reviews.update(required));
+        UUID audit = UUID.randomUUID(); var approved = required.authorize(refused, UUID.randomUUID(), "budget-task", "owner", audit, NOW.plusSeconds(3));
+        tx.executeWithoutResult(status -> { audit(required, audit, "budget-task", "owner", "APPROVE", NOW.plusSeconds(3)); register(approved, refused); reviews.update(approved); });
+        tx.executeWithoutResult(status -> {
+            var queued = operations.find(TENANT, approved.authorizedOperationId()).orElseThrow(); var claimed = queued.claim(NOW.plusSeconds(3), Duration.ofSeconds(15)); operations.update(claimed);
+            var command = claimed.input().command();
+            operations.update(claimed.complete(new FinanceResult.Success<>(new BudgetObservation(command.id(), command.digest(), BudgetObservation.Status.APPLIED,
+                    1L, "replacement-ledger", NOW.plusSeconds(4), null)), NOW.plusSeconds(4)));
+        });
+        var application = mock(io.agentflow.approval.model.Application.class);
+        when(application.id()).thenReturn(initial.input().applicationId()); when(application.tenantId()).thenReturn(TENANT);
+        when(application.status()).thenReturn(io.agentflow.approval.model.ApplicationStatus.IN_APPROVAL); when(application.roundNo()).thenReturn(1);
+        when(application.runtimeDefinitionId()).thenReturn("original-definition");
+        var applications = mock(io.agentflow.approval.repository.ApplicationRepository.class);
+        when(applications.findById(TENANT, application.id())).thenReturn(java.util.Optional.of(application));
+        var completion = mock(io.agentflow.approval.process.ApprovalCompletionService.class);
+        when(completion.lockForProgress(application)).thenReturn(new io.agentflow.approval.SubprocessExecutionLocks.LockedPath(List.of(application),
+                io.agentflow.approval.SubprocessExecutionLocks.AncestorState.ACTIVE));
+        var round = mock(io.agentflow.approval.model.SubmissionRound.class);
+        when(round.processInstanceId()).thenReturn("original-instance"); when(round.status()).thenReturn(io.agentflow.approval.model.SubmissionRound.Status.IN_APPROVAL);
+        var rounds = mock(io.agentflow.approval.repository.SubmissionRoundRepository.class);
+        when(rounds.findByRound(TENANT, application.id(), 1)).thenReturn(java.util.Optional.of(round));
+        var runtime = mock(org.flowable.engine.RuntimeService.class, RETURNS_DEEP_STUBS);
+        var instance = runtime.createProcessInstanceQuery().processInstanceId("original-instance").singleResult();
+        when(instance.getTenantId()).thenReturn(TENANT); when(instance.getProcessDefinitionId()).thenReturn("original-definition");
+        var outcomes = mock(ExpenseBudgetOutcomeHandler.class);
+        var recovery = new io.agentflow.approval.process.ExpenseBudgetReviewRecovery(applications, rounds, reviews, operations, outcomes, completion,
+                mock(io.agentflow.approval.process.ExpenseBudgetReviewProgress.class), runtime, mock(io.agentflow.approval.process.SubprocessProgressService.class),
+                mock(io.agentflow.notification.ApprovalNotificationService.class));
+        recovery.recover(stale);
+        verifyNoInteractions(outcomes);
+        recovery.recover(reviews.due(NOW.plusSeconds(5)).get(0));
+        verify(outcomes).completed(any());
     }
 
     @Test void restoredRecordKeepsOriginalSourcesAndDatabaseRejectsAnotherReportOperation() {

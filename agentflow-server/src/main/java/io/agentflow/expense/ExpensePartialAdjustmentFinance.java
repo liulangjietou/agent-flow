@@ -34,8 +34,13 @@ public class ExpensePartialAdjustmentFinance {
 
     /** 只有新写入检查当前资格与原来源，未知结果和过期租约沿用原编号查询。 */
     @Transactional
-    public BudgetConsumptionReductionOperation claimBudget(String tenant, UUID id, Instant at) {
-        var current = locked(tenant, id); if (current == null || current.budget() == null) return null;
+    public BudgetConsumptionReductionOperation claimBudget(String tenant, UUID id, Instant at) { return claimBudget(tenant, id, null, at); }
+
+    /** 锁内核对扫描时的原指令；重新授权后由下一轮候选携带新来源领取。 */
+    @Transactional
+    public BudgetConsumptionReductionOperation claimBudget(String tenant, UUID id, UUID expectedOperation, Instant at) {
+        var current = locked(tenant, id); if (current == null || current.budget() == null
+                || expectedOperation != null && !expectedOperation.equals(current.budget().input().command().id())) return null;
         var operation = current.budget(); var now = time(at);
         if (operation.expired(now)) { saveBudget(current.withBudget(operation.expire(now), now)); return null; }
         if (operation.running() || operation.nextAttemptAt() == null || operation.nextAttemptAt().isAfter(now)) return null;
@@ -49,8 +54,13 @@ public class ExpensePartialAdjustmentFinance {
 
     /** ERP 的授权、到期与租约独立于预算，另一侧成功不能重新生成本侧命令。 */
     @Transactional
-    public ExpenseAccrualReductionOperation claimAccrual(String tenant, UUID id, Instant at) {
-        var current = locked(tenant, id); if (current == null || current.accrual() == null) return null;
+    public ExpenseAccrualReductionOperation claimAccrual(String tenant, UUID id, Instant at) { return claimAccrual(tenant, id, null, at); }
+
+    /** 锁内核对扫描时的原指令；重新授权后由下一轮候选携带新来源领取。 */
+    @Transactional
+    public ExpenseAccrualReductionOperation claimAccrual(String tenant, UUID id, UUID expectedOperation, Instant at) {
+        var current = locked(tenant, id); if (current == null || current.accrual() == null
+                || expectedOperation != null && !expectedOperation.equals(current.accrual().input().command().id())) return null;
         var operation = current.accrual(); var now = time(at);
         if (operation.expired(now)) { saveAccrual(current.withAccrual(operation.expire(now), now)); return null; }
         if (operation.running() || operation.nextAttemptAt() == null || operation.nextAttemptAt().isAfter(now)) return null;

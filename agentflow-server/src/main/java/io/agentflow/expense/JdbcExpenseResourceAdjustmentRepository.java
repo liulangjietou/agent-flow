@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.BudgetConsumptionReversalOperation;
@@ -45,9 +47,9 @@ public class JdbcExpenseResourceAdjustmentRepository {
         if (!value.equals(ExpenseResourceAdjustment.begin(value.input())) || prepared.version() != preparationVersion
                 || !prepared.authorizedInput().equals(value.input())) throw conflict();
         jdbc.update("""
-                INSERT INTO expense_resource_adjustment(tenant_id,id,report_id,round_no,preparation_version,input_json,state_json,version,status,
-                active_report_id,resources_reversed,created_at,updated_at) VALUES(?,?,?,?,?,?,?,1,'WAITING_BUDGET',?,FALSE,?,?)
-                """, basis.tenantId(), value.id().toString(), basis.reportId().toString(), basis.settlement().input().source().roundNo(), preparationVersion,
+                INSERT INTO expense_resource_adjustment(trace_id,tenant_id,id,report_id,round_no,preparation_version,input_json,state_json,version,status,
+                active_report_id,resources_reversed,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,'WAITING_BUDGET',?,FALSE,?,?)
+                """, DiagnosticContext.capture().traceId(), basis.tenantId(), value.id().toString(), basis.reportId().toString(), basis.settlement().input().source().roundNo(), preparationVersion,
                 json.write(value.input()), json.write(value), basis.reportId().toString(), Timestamp.from(value.createdAt()), Timestamp.from(value.updatedAt()));
         append(value);
     }
@@ -105,8 +107,8 @@ public class JdbcExpenseResourceAdjustmentRepository {
     }
     /** 工作器只扫描预算已确认、资源尚未完成的有界候选。 */
     public List<Candidate> ready() {
-        return jdbc.query("SELECT tenant_id,id,report_id,version FROM expense_resource_adjustment WHERE status='READY' ORDER BY updated_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), UUID.fromString(row.getString("report_id")), row.getLong("version")));
+        return jdbc.query("SELECT tenant_id,id,report_id,version,trace_id FROM expense_resource_adjustment WHERE status='READY' ORDER BY updated_at,id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), UUID.fromString(row.getString("report_id")), row.getLong("version"), row.getString("trace_id")));
     }
     /** 结束证明引用准确的前后状态，读取时再次校验独立身份。 */
     public Optional<ExpenseResourceAdjustment> revision(String tenant, UUID id, long version) {
@@ -184,5 +186,8 @@ public class JdbcExpenseResourceAdjustmentRepository {
      * 调度只传原报销定位与乐观版本。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, UUID reportId, long version) { }
+    public record Candidate(String tenantId, UUID id, UUID reportId, long version, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id, UUID reportId, long version) { this(tenantId, id, reportId, version, null); }
+    }
 }

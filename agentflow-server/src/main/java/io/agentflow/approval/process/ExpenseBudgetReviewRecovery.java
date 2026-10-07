@@ -64,8 +64,10 @@ public class ExpenseBudgetReviewRecovery {
             throw new DomainException("EXPENSE_BUDGET_TASK_CONTEXT_CHANGED", "Budget recovery no longer matches the original process instance");
         }
         var review = reviews.find(candidate.tenantId(), candidate.reportId(), candidate.roundNo()).orElseThrow();
-        var operation = operations.find(candidate.tenantId(), review.authorizedOperationId()==null
-                ? review.input().originalOperationId() : review.authorizedOperationId()).orElseThrow();
+        var operationId = review.authorizedOperationId()==null ? review.input().originalOperationId() : review.authorizedOperationId();
+        // 人工授权可以替换原预算指令；旧扫描不推进或延后新指令，由新候选恢复其真实来源。
+        if (candidate.operationId()!=null && !candidate.operationId().equals(operationId)) return;
+        var operation = operations.find(candidate.tenantId(), operationId).orElseThrow();
         if (operation.terminal()) outcomes.completed(new BudgetOperationCompleted(operation));
         // 复用结果处理可能已把再次拒绝的轮次退回，不能继续推进内存里的旧申请。
         application = applications.findById(candidate.tenantId(), candidate.applicationId()).orElseThrow();

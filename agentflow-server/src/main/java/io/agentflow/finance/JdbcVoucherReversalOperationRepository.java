@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.ExpensePartialAdjustmentGuard;
@@ -46,10 +48,10 @@ public class JdbcVoucherReversalOperationRepository {
                 || !originals.find(original.tenantId(), original.id()).filter(source::equals).isPresent()) throw conflict();
         try {
             jdbc.update("""
-                    INSERT INTO voucher_reversal_operation(tenant_id,id,operation_id,original_version,preparation_version,input_json,command_digest,state_json,
+                    INSERT INTO voucher_reversal_operation(trace_id,tenant_id,id,operation_id,original_version,preparation_version,input_json,command_digest,state_json,
                     version,status,attempts,highest_revision,created_at,updated_at,next_attempt_at,active_operation_id)
-                    VALUES(?,?,?,?,?,?,?,?,1,'QUEUED',0,0,?,?,?,?)
-                    """, original.tenantId(), command.id().toString(), original.id().toString(), input.originalVersion(), prepared.version(), json.write(input), command.digest(), json.write(value),
+                    VALUES(?,?,?,?,?,?,?,?,?,1,'QUEUED',0,0,?,?,?,?)
+                    """, DiagnosticContext.capture().traceId(), original.tenantId(), command.id().toString(), original.id().toString(), input.originalVersion(), prepared.version(), json.write(input), command.digest(), json.write(value),
                     timestamp(value.createdAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()), original.id().toString());
         } catch (DuplicateKeyException duplicate) { throw new DomainException("VOUCHER_REVERSAL_OPERATION_EXISTS", "The original voucher already has an immutable reversal command"); }
         append(value);
@@ -112,9 +114,9 @@ public class JdbcVoucherReversalOperationRepository {
     /** 每批十项，过期领取交给状态机转为原编号查询。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM voucher_reversal_operation WHERE retired_at IS NULL AND ((status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
+                SELECT tenant_id,id,trace_id FROM voucher_reversal_operation WHERE retired_at IS NULL AND ((status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
                 OR (status IN ('POSTING','QUERYING') AND lease_until<=?)) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), timestamp(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
     }
     private RowMapper<VoucherReversalOperation> row() {
         return (row, index) -> {
@@ -159,5 +161,8 @@ public class JdbcVoucherReversalOperationRepository {
      * 扫描不读取完整会计或支付内容。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }

@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import java.sql.Timestamp;
@@ -35,11 +37,11 @@ public class JdbcExpenseResourceAdjustmentPreparationRepository {
         var input = value.input(); var basis = input.basis(); partialAdjustments.requireWholeAllowed(basis.tenantId(), basis.reportId());
         sources.requireCurrent(basis); var payment = basis.paymentVoucher();
         jdbc.update("""
-                INSERT INTO expense_resource_adjustment_preparation(tenant_id,id,report_id,settlement_version,consumption_id,consumed_version,
+                INSERT INTO expense_resource_adjustment_preparation(trace_id,tenant_id,id,report_id,settlement_version,consumption_id,consumed_version,
                 accrual_reversal_id,payment_returns_version,payment_voucher_id,payment_voucher_version,payment_voucher_reversal_id,requested_by,
                 input_json,state_json,version,status,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?)
-                """, basis.tenantId(), input.id().toString(), basis.reportId().toString(), basis.settlement().version(), basis.consumption().input().command().id().toString(),
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',?,?)
+                """, DiagnosticContext.capture().traceId(), basis.tenantId(), input.id().toString(), basis.reportId().toString(), basis.settlement().version(), basis.consumption().input().command().id().toString(),
                 basis.consumption().version(), basis.accrualReversal().id().toString(), basis.paymentReturns() == null ? null : basis.paymentReturns().version(),
                 payment == null ? null : payment.input().command().id().toString(), payment == null ? null : payment.version(),
                 basis.paymentVoucherReversal() == null ? null : basis.paymentVoucherReversal().id().toString(), input.requestedBy(), json.write(input), json.write(value),
@@ -76,8 +78,8 @@ public class JdbcExpenseResourceAdjustmentPreparationRepository {
     }
     /** 到期读取有界扫描，运行中任务只在租约过期时恢复。 */
     public List<Candidate> due(Instant at) {
-        return jdbc.query("SELECT tenant_id,id FROM expense_resource_adjustment_preparation WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(at));
+        return jdbc.query("SELECT tenant_id,id,trace_id FROM expense_resource_adjustment_preparation WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(at));
     }
     private RowMapper<ExpenseResourceAdjustmentPreparation> row() {
         return (row, index) -> {
@@ -108,5 +110,8 @@ public class JdbcExpenseResourceAdjustmentPreparationRepository {
      * 调度索引不携带金额或原件正文。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }
