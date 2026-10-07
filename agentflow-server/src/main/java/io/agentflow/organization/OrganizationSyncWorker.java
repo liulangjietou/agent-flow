@@ -32,6 +32,7 @@ public final class OrganizationSyncWorker {
                 try {
                     var claim = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
                     if (claim == null || !service.sendable(claim, Instant.now())) continue;
+                    LOG.info("Integration execution started, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
                     var result = source.read(claim.context(), claim.leaseUntil());
                     service.finish(claim, result, Instant.now());
                 } catch (RuntimeException failure) {

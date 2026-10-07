@@ -28,10 +28,12 @@ public class PaymentCallbackWorker {
     public void poll() {
         for (var candidate : callbacks.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString()).open()) {
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 Long version = null;
                 try {
                     version = callbacks.get(candidate.tenantId(), candidate.id()).version();
+                    LOG.info("Integration execution started, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
                     service.process(candidate, Instant.now());
                 }
                 catch (RuntimeException failure) {

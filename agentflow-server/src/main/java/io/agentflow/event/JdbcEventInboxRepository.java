@@ -60,8 +60,18 @@ public class JdbcEventInboxRepository implements EventInboxRepository {
         if (changed != 1) throw conflict(); append(item);
     }
     @Override public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id,trace_id FROM event_inbox WHERE next_attempt_at<=? ORDER BY next_attempt_at,received_at,id LIMIT ?",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), BATCH_SIZE);
+        return jdbc.query("""
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no FROM event_inbox q
+                LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+                WHERE q.next_attempt_at<=? ORDER BY q.next_attempt_at,q.received_at,q.id LIMIT ?
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no")), timestamp(now), BATCH_SIZE);
+    }
+    /** 原收件已由 get 核对索引和信封后才读取原轮次，不在全队列扫描中解析信封。 */
+    @Override public Optional<String> findProcessInstance(EventInboxItem item) {
+        var signal = item.input().signal();
+        return jdbc.query("SELECT process_instance_id FROM approval_submission_round WHERE tenant_id=? AND application_id=? AND round_no=?",
+                (row, index) -> row.getString("process_instance_id"), signal.tenantId(), signal.applicationId().toString(), signal.roundNo()).stream().findFirst();
     }
     @Override public List<EventInboxItem> page(String tenantId, int limit, UUID beforeId) {
         if (beforeId == null) return jdbc.query("SELECT * FROM event_inbox WHERE tenant_id=? ORDER BY received_at DESC,id DESC LIMIT ?", row(), tenantId, limit + 1);

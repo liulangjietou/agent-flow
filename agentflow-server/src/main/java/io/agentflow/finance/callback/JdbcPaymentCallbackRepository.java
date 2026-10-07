@@ -69,8 +69,17 @@ public class JdbcPaymentCallbackRepository {
     }
     /** 每批只取十个标识，单条失败不会无界占用线程或加载财务数据。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id,trace_id FROM payment_callback WHERE next_attempt_at<=? ORDER BY next_attempt_at,received_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
+        return jdbc.query("""
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM payment_callback q
+                LEFT JOIN payment_authorization employee ON q.payment_kind='EMPLOYEE' AND employee.tenant_id=q.tenant_id AND employee.id=q.employee_payment_id
+                LEFT JOIN supplier_payment_authorization supplier ON q.payment_kind='SUPPLIER' AND supplier.tenant_id=q.tenant_id AND supplier.id=q.supplier_payment_id
+                LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id
+                    AND a.id=CASE q.payment_kind WHEN 'EMPLOYEE' THEN employee.application_id WHEN 'SUPPLIER' THEN supplier.application_id END
+                LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id
+                    AND s.round_no=CASE q.payment_kind WHEN 'EMPLOYEE' THEN employee.round_no WHEN 'SUPPLIER' THEN supplier.round_no END
+                WHERE q.next_attempt_at<=? ORDER BY q.next_attempt_at,q.received_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now));
     }
     /** 以本租户真实旧行作游标，有界查询不会混入其他租户的事件。 */
     public List<PaymentCallback> page(String tenant, int limit, UUID beforeId) {
@@ -107,5 +116,8 @@ public class JdbcPaymentCallbackRepository {
      * 调度不加载回调正文和资金明细。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 原业务事实不存在时保持空值，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
+    }
 }

@@ -111,8 +111,13 @@ public class JdbcServiceTaskOperationRepository {
 
     /** 扫描仅返回标识，暂停任务通过 poll_at 退避，不能占住队列头部。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id,trace_id FROM service_task_operation WHERE poll_at<=? AND progress='PENDING' ORDER BY poll_at,created_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
+        return jdbc.query("""
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,CASE WHEN a.id IS NOT NULL THEN q.process_instance_id ELSE NULL END AS process_instance_id
+                FROM service_task_operation q
+                LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+                WHERE q.poll_at<=? AND q.progress='PENDING' ORDER BY q.poll_at,q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now));
     }
 
     private RowMapper<Stored> row() {
@@ -147,5 +152,8 @@ public class JdbcServiceTaskOperationRepository {
     /** @author owlzhangfq@gmail.com */
     public record Stored(ServiceTaskOperation operation, Progress progress, Instant progressedAt) { }
     /** @author owlzhangfq@gmail.com */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 原业务事实不存在时保持空值，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
+    }
 }

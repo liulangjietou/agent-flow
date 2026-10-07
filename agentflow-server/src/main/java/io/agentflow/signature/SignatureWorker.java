@@ -36,9 +36,11 @@ public class SignatureWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Signature worker must run outside a transaction");
         for (var candidate : operations.due(clock.instant())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString()).open()) {
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claim = service.claim(candidate.tenantId(), candidate.id(), clock.instant()); if (claim == null) continue;
+                    LOG.info("Integration execution started, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
                     dispatch(claim);
                 } catch (RuntimeException failure) {
                     // 不记录异常原文，避免第三方响应或凭据进入日志；持久租约保留恢复方向。

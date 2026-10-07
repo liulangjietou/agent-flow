@@ -128,8 +128,13 @@ public class JdbcSignatureOperationRepository {
 
     /** 后台只扫描到期身份；查询、发送和文件下载都必须另行取得新的持久领取。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id,trace_id FROM signature_operation WHERE poll_at<=? AND active_guard=1 ORDER BY poll_at,tenant_id,id LIMIT ?",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), DUE_LIMIT);
+        return jdbc.query("""
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM signature_operation q
+                LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+                LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=q.round_no
+                WHERE q.poll_at<=? AND q.active_guard=1 ORDER BY q.poll_at,q.tenant_id,q.id LIMIT ?
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), timestamp(now), DUE_LIMIT);
     }
 
     /** 读取固定原操作的连续历史；旧状态的结果文件尚未分配时不能套用最新文件清单。 */
@@ -233,7 +238,10 @@ public class JdbcSignatureOperationRepository {
      * 调度扫描仅暴露租户和原操作号，不携带原件或签署身份。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId) {
+        /** 原业务事实不存在时保持空值，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null); }
+    }
 
     /**
      * 已保存状态来自当前领取下的存储确认；后续下载仍须核对实际文件字节。

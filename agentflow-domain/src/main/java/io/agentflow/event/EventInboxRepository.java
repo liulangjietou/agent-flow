@@ -22,10 +22,15 @@ public interface EventInboxRepository {
     void update(EventInboxItem item);
     /** 有界选取到期标识，单条处理不占用整个队列。 */
     List<Candidate> due(Instant now);
+    /** 按已读取并验证的原收件信封寻找原实例，缺失时不回退到当前轮次。 */
+    Optional<String> findProcessInstance(EventInboxItem item);
     /** 以同租户原行作游标，返回 limit+1 条。 */
     List<EventInboxItem> page(String tenantId, int limit, UUID beforeId);
     /** 处理历史按真实版本倒序返回 limit+1 条。 */
     List<EventInboxItem> history(String tenantId, UUID id, int limit, Long beforeVersion);
     /** @author owlzhangfq@gmail.com */
-    record Candidate(String tenantId, UUID id, String traceId) { }
+    record Candidate(String tenantId, UUID id, String traceId, String businessNo) {
+        /** 原业务事实不存在时保持空值。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null); }
+    }
 }

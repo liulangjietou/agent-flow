@@ -33,10 +33,12 @@ public class NotificationDeliveryWorker {
     public void runOnce() {
         for (var candidate : store.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString()).open()) {
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), candidate.taskId()).open()) {
                 try {
                     var claimed = deliveries.claim(candidate.id(), Instant.now());
                     if (claimed == null) continue;
+                    LOG.info("Integration execution started, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
                     var outcome = switch (claimed.delivery().channel()) {
                         case EMAIL -> smtp.send(claimed.destination(), claimed.delivery());
                         case ENTERPRISE_IM -> wecom.send(claimed.destination());

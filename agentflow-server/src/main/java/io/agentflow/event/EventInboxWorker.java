@@ -27,17 +27,32 @@ public class EventInboxWorker {
     public void poll() {
         for (var candidate : inbox.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString()).open()) {
+            var origin = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), null, null);
+            try (var trace = origin.open()) {
                 Long version = null;
                 try {
-                    version = inbox.get(candidate.tenantId(), candidate.id()).version();
-                    service.process(candidate, Instant.now());
-                } catch (RuntimeException failure) {
-                    LOG.error("Event processing failed, errorCode={}, eventInboxId={}", "EVENT_PROCESSING_FAILED", candidate.id());
-                    try { if (version != null) service.failed(candidate, version, Instant.now()); }
-                    catch (RuntimeException unavailable) { LOG.error("Event recovery failed, errorCode={}, eventInboxId={}", "EVENT_RECOVERY_UNAVAILABLE", candidate.id()); }
-                }
+                    var item = inbox.get(candidate.tenantId(), candidate.id());
+                    version = item.version();
+                    String instance = candidate.businessNo() == null ? null : inbox.findProcessInstance(item).orElse(null);
+                    try (var business = origin.withBusiness(candidate.businessNo(), instance, null).open()) {
+                        process(candidate, version);
+                    }
+                } catch (RuntimeException failure) { failed(candidate, version); }
             }
         }
+    }
+
+    private void process(EventInboxRepository.Candidate candidate, long version) {
+        try {
+            LOG.info("Integration execution started, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
+            service.process(candidate, Instant.now());
+        } catch (RuntimeException failure) { failed(candidate, version); }
+    }
+
+    private void failed(EventInboxRepository.Candidate candidate, Long version) {
+        LOG.error("Event processing failed, errorCode={}, eventInboxId={}", "EVENT_PROCESSING_FAILED", candidate.id());
+        try { if (version != null) service.failed(candidate, version, Instant.now()); }
+        catch (RuntimeException unavailable) { LOG.error("Event recovery failed, errorCode={}, eventInboxId={}", "EVENT_RECOVERY_UNAVAILABLE", candidate.id()); }
     }
 }

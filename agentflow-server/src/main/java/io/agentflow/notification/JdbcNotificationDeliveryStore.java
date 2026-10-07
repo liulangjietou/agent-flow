@@ -59,10 +59,16 @@ public class JdbcNotificationDeliveryStore {
     /** 到期租约只进入结果未知；一次最多处理十项，避免单次轮询无界增长。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM notification_dispatch
-                WHERE (status IN ('PENDING','RETRY_WAIT') AND next_attempt_at<=?) OR (status='IN_FLIGHT' AND lease_until<=?)
-                ORDER BY updated_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), stamp(now), stamp(now));
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id,
+                    CASE WHEN a.id IS NOT NULL THEN n.task_id ELSE NULL END AS task_id
+                FROM notification_dispatch q
+                LEFT JOIN notification_inbox n ON n.tenant_id=q.tenant_id AND n.id=q.inbox_id AND n.recipient_id=q.recipient_id
+                LEFT JOIN approval_application a ON a.tenant_id=n.tenant_id AND a.id=n.application_id
+                LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=n.round_no
+                WHERE (q.status IN ('PENDING','RETRY_WAIT') AND q.next_attempt_at<=?) OR (q.status='IN_FLIGHT' AND q.lease_until<=?)
+                ORDER BY q.updated_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id"), row.getString("task_id")), stamp(now), stamp(now));
     }
 
     /** 后台按内部标识读取身份；公开查询必须使用带本人范围的 get。 */
@@ -150,5 +156,8 @@ public class JdbcNotificationDeliveryStore {
     private static Instant time(ResultSet row, String column) throws SQLException { var value = row.getTimestamp(column); return value == null ? null : value.toInstant(); }
 
     /** 调度身份与诊断来源分开于消息正文保存。 */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId, String taskId) {
+        /** 原业务事实不存在时保持空值，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null, null); }
+    }
 }

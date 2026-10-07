@@ -30,9 +30,11 @@ public class ServiceTaskWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Service task worker must run outside a transaction");
         for (var candidate : operations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString()).open()) {
+            try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), null).open()) {
                 try {
                     var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    LOG.info("Integration execution started, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
                     try {
                         var result = claimed.status() == ServiceTaskOperation.Status.EXECUTING ? gateway.execute(claimed.input()) : gateway.query(claimed.input());
                         service.finish(claimed, result, Instant.now());
