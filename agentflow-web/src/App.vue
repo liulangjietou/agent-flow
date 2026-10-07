@@ -108,7 +108,8 @@ import type { RiskPolicy } from './api'
 import { describeBranch, branchTooltip } from './conditionPresentation'
 import { editQuickGraph, type QuickCommand } from './quickDesigner'
 import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNode, type DesignerDeadline } from './designerGraph'
-import { arrangeNodes, routeEdges, graphBounds, fittedViewport, clampZoom, zoomedScroll, draggedPosition, CANVAS_PADDING, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, type Point } from './designerLayout'
+import { connectCanvasGraph, insertCanvasGraph, deleteCanvasNode, orderCanvasBranches, CANVAS_KEY_STEP, CANVAS_LARGE_KEY_STEP } from './designerEditing'
+import { arrangeNodes, routeEdges, graphBounds, fittedViewport, clampZoom, zoomedScroll, draggedPosition, nodeRectangle, CANVAS_PADDING, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, type Point } from './designerLayout'
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
 import EnterpriseLogoutDialog from './components/EnterpriseLogoutDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
@@ -271,6 +272,9 @@ const canvasBounds = computed(() => graphBounds(nodes.value, routedEdges.value))
 const stageSize = computed(() => ({ width: Math.max(canvasSize.value.width / canvasZoom.value, canvasBounds.value.right + CANVAS_PADDING * 2),
   height: Math.max(canvasSize.value.height / canvasZoom.value, canvasBounds.value.bottom + CANVAS_PADDING * 2) }))
 let stopNodeDrag: (() => void) | null = null
+let stopConnectionDrag: (() => void) | null = null
+let canvasNudge: { nodeId: string; key: string; shift: boolean } | null = null
+const connectionPreview = ref<{ sourceId: string; x1: number; y1: number; x2: number; y2: number } | null>(null)
 const palette: Array<{ type: NodeType; label: string; icon: string }> = [
   { type: 'USER_TASK', label: '人工审批', icon: '人' },
   { type: 'COPY', label: '抄送', icon: '抄' },
@@ -323,8 +327,8 @@ function snapshot() { return JSON.stringify({ key: definitionKey.value, name: de
 function remember() { history.value.push(snapshot()); if (history.value.length > 50) history.value.shift(); future.value = [] }
 // 首次保存前的撤销快照可能尚无标识；已落库草稿的身份不能随内容撤销。
 function restore(raw: string) { const value = JSON.parse(raw); definitionRiskPolicy.value = copyRiskPolicy(value.riskPolicy); conditionLanguageVersion.value = value.conditionLanguageVersion ?? 1; if (!definitionId.value) definitionKey.value = value.key; definitionName.value = value.name; nodes.value = value.nodes; edges.value = value.edges; definitionFormSchema.value = cloneSchema(value.formSchema ?? null); definitionNotificationTexts.value = copyNotificationTexts(value.notificationTexts) }
-function undo() { if (editorLocked.value) return; stopNodeDrag?.(); const value = history.value.pop(); if (value) { future.value.push(snapshot()); restore(value) } }
-function redo() { if (editorLocked.value) return; stopNodeDrag?.(); const value = future.value.pop(); if (value) { history.value.push(snapshot()); restore(value) } }
+function undo() { if (editorLocked.value) return; cancelCanvasInteraction(); const value = history.value.pop(); if (value) { future.value.push(snapshot()); restore(value) } }
+function redo() { if (editorLocked.value) return; cancelCanvasInteraction(); const value = future.value.pop(); if (value) { history.value.push(snapshot()); restore(value) } }
 function resetEditor() { history.value = []; future.value = []; selectedEdgeId.value = ''; connectionTarget.value = ''; clearValidation(true) }
 function graphPayload(): Graph {
   return {
@@ -827,11 +831,11 @@ async function publishDraft() {
     notice.value = `流程${statusLabel(published.status)}，版本 v${published.version}，发布记录已保存。`
   } catch (error) { autosave.pause(error); publicationError.value = errorMessage(error); notice.value = publicationError.value } finally { busy.value = false }
 }
-function selectNode(node: FlowNode) { selectedId.value = node.id; selectedEdgeId.value = ''; connectionTarget.value = '' }
-function selectEdge(edge: GraphEdge) { selectedEdgeId.value = edge.id; selectedId.value = '' }
+function selectNode(node: FlowNode) { if (selectedId.value !== node.id) endCanvasNudge(); selectedId.value = node.id; selectedEdgeId.value = ''; connectionTarget.value = '' }
+function selectEdge(edge: GraphEdge) { endCanvasNudge(); selectedEdgeId.value = edge.id; selectedId.value = ''; canvas.value?.focus({ preventScroll: true }) }
 function moveNode(event: PointerEvent, node: FlowNode) {
-  if (editorLocked.value || event.button !== 0) return
-  stopNodeDrag?.()
+  if (editorLocked.value || !canManageDefinitions.value || event.button !== 0) return
+  cancelCanvasInteraction(); selectNode(node)
   const viewport = canvas.value
   if (!viewport) return
   const target = event.currentTarget as HTMLElement
@@ -862,15 +866,18 @@ function moveNode(event: PointerEvent, node: FlowNode) {
   window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
   window.addEventListener('pointercancel', up); target.addEventListener('lostpointercapture', up)
 }
+/** 面板点击与拖放共用草稿编辑，只有点击插入才重接原后继。 */
 function addNode(type: NodeType, position?: Point) {
-  if (editorLocked.value) return
-  remember(); const base = selectedNode.value; const id = `${type.toLowerCase()}-${crypto.randomUUID()}`
-  nodes.value.push({ id, name: palette.find(item => item.type === type)?.label ?? '节点', type, x: position?.x ?? (base?.x ?? 160) + 180, y: position?.y ?? (base?.y ?? 140) + 80, assigneeRule: '' })
-  if (base && base.type !== 'END' && !['EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(base.type)) {
-    const old = edges.value.find(edge => edge.source === base.id)
-    if (old) old.source = id
-    edges.value.push({ id: `edge-${crypto.randomUUID()}`, source: base.id, target: id, condition: '', defaultBranch: false })
+  if (editorLocked.value || !canManageDefinitions.value) return
+  cancelCanvasInteraction()
+  const base = selectedNode.value, id = `${type.toLowerCase()}-${crypto.randomUUID()}`
+  const added = { id, name: palette.find(item => item.type === type)?.label ?? '节点', type,
+    x: position?.x ?? (base?.x ?? 160) + 180, y: position?.y ?? (base?.y ?? 140), assigneeRule: '' }
+  if (!position && base && ['EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(base.type)) {
+    added.y += edges.value.filter(edge => edge.source === base.id).length * 90
   }
+  const result = insertCanvasGraph(nodes.value, edges.value, base?.id ?? '', added, `edge-${crypto.randomUUID()}`, !!position)
+  remember(); nodes.value = result.nodes; edges.value = result.edges
   selectedId.value = id; selectedEdgeId.value = ''
 }
 /** 快速模式只提交同一图的编辑结果，不持有另一份流程或绕过发布校验。 */
@@ -1004,24 +1011,94 @@ function clearMergeEdge() {
   if (editorLocked.value || !canManageDefinitions.value || !selectedEdge.value) return
   remember(); selectedEdge.value.condition = ''; selectedEdge.value.defaultBranch = false
 }
+/** 属性和指针连线统一进入此处，一次成功只保存一份撤销快照。 */
+function connectCanvasNodes(source: string, target: string) {
+  if (editorLocked.value || !canManageDefinitions.value) return false
+  const result = connectCanvasGraph(nodes.value, edges.value, source, target, `edge-${crypto.randomUUID()}`)
+  if (!result) return false
+  endCanvasNudge(); remember(); edges.value = result; connectionTarget.value = ''
+  return true
+}
 function connectNode() {
-  const node = selectedNode.value
-  if (editorLocked.value || !node || node.type === 'END' || !connectionTarget.value || edges.value.some(edge => edge.source === node.id && edge.target === connectionTarget.value)) return
-  remember()
-  if (!['EXCLUSIVE_GATEWAY', 'PARALLEL_GATEWAY'].includes(node.type)) edges.value = edges.value.filter(edge => edge.source !== node.id)
-  edges.value.push({ id: `edge-${crypto.randomUUID()}`, source: node.id, target: connectionTarget.value, condition: '', defaultBranch: false }); connectionTarget.value = ''
+  if (selectedNode.value) connectCanvasNodes(selectedNode.value.id, connectionTarget.value)
 }
 function toggleDefault(edge: GraphEdge) {
-  if (editorLocked.value) return
+  if (editorLocked.value || !canManageDefinitions.value) return
   remember(); const enable = !edge.defaultBranch
   edges.value.filter(item => item.source === edge.source).forEach(item => { item.defaultBranch = enable && item.id === edge.id })
   if (enable) edge.condition = ''
+  const branches = edges.value.filter(item => item.source === edge.source)
+  edges.value = orderCanvasBranches(edges.value, edge.source, [...branches.filter(item => !item.defaultBranch), ...branches.filter(item => item.defaultBranch)])
+}
+/** 默认分支仅作兜底，其余分支可明确调整求值先后。 */
+function moveCanvasBranch(id: string, direction: -1 | 1) {
+  if (editorLocked.value || !canManageDefinitions.value) return
+  const edge = edges.value.find(item => item.id === id)
+  if (!edge || edge.defaultBranch) return
+  const branches = edges.value.filter(item => item.source === edge.source && !item.defaultBranch)
+  const index = branches.findIndex(item => item.id === id), other = index + direction
+  if (other < 0 || other >= branches.length) return
+  ;[branches[index], branches[other]] = [branches[other]!, branches[index]!]
+  remember(); edges.value = orderCanvasBranches(edges.value, edge.source, [...branches, ...edges.value.filter(item => item.source === edge.source && item.defaultBranch)])
 }
 function deleteSelected() {
-  if (editorLocked.value) return
-  if (selectedNode.value && selectedNode.value.type !== 'START') { remember(); const id = selectedNode.value.id; nodes.value = nodes.value.filter(node => node.id !== id); edges.value = edges.value.filter(edge => edge.source !== id && edge.target !== id); selectedId.value = '' }
-  else if (selectedEdge.value) { remember(); edges.value = edges.value.filter(edge => edge.id !== selectedEdgeId.value); selectedEdgeId.value = '' }
+  if (editorLocked.value || !canManageDefinitions.value) return
+  cancelCanvasInteraction()
+  if (selectedNode.value && selectedNode.value.type !== 'START') {
+    const result = deleteCanvasNode(nodes.value, edges.value, selectedNode.value.id)
+    remember(); nodes.value = result.nodes; edges.value = result.edges; selectedId.value = ''
+  } else if (selectedEdge.value) {
+    remember(); edges.value = edges.value.filter(edge => edge.id !== selectedEdgeId.value); selectedEdgeId.value = ''
+  }
 }
+/** 鼠标与触屏共用指针捕获；取消、失焦或草稿切换均不提交半条连线。 */
+function beginConnection(event: PointerEvent, node: FlowNode) {
+  if (editorLocked.value || !canManageDefinitions.value || event.button !== 0 || node.type === 'END') return
+  cancelCanvasInteraction()
+  const viewport = canvas.value
+  if (!viewport) return
+  selectNode(node)
+  const target = event.currentTarget as HTMLElement, scope = definitionId.value, graph = nodes.value
+  const rect = nodeRectangle(node), x = rect.x + rect.width, y = rect.y + rect.height / 2
+  connectionPreview.value = { sourceId: node.id, x1: x, y1: y, x2: x, y2: y }
+  const current = () => !editorLocked.value && canManageDefinitions.value && nodes.value === graph && definitionId.value === scope && page.value === 'designer' && designerMode.value === 'advanced'
+  const move = (next: PointerEvent) => {
+    if (next.pointerId !== event.pointerId) return
+    if (!current()) { stopConnectionDrag?.(); return }
+    const bounds = viewport.getBoundingClientRect()
+    if (next.clientX > bounds.right - 24) viewport.scrollLeft += 14
+    else if (next.clientX < bounds.left + 24) viewport.scrollLeft -= 14
+    if (next.clientY > bounds.bottom - 24) viewport.scrollTop += 14
+    else if (next.clientY < bounds.top + 24) viewport.scrollTop -= 14
+    connectionPreview.value = { sourceId: node.id, x1: x, y1: y,
+      x2: (next.clientX - bounds.left + viewport.scrollLeft) / canvasZoom.value,
+      y2: (next.clientY - bounds.top + viewport.scrollTop) / canvasZoom.value }
+  }
+  const up = (next: PointerEvent) => {
+    if (next.pointerId !== event.pointerId) return
+    const candidate = document.elementFromPoint(next.clientX, next.clientY)?.closest<HTMLElement>('.flow-node[data-node-id]')
+    const id = candidate && viewport.contains(candidate) ? candidate.dataset.nodeId : undefined
+    const allowed = current()
+    stopConnectionDrag?.()
+    if (allowed && id) connectCanvasNodes(node.id, id)
+  }
+  const cancel = (next: PointerEvent) => { if (next.pointerId === event.pointerId) stopConnectionDrag?.() }
+  const blur = () => stopConnectionDrag?.()
+  stopConnectionDrag = () => {
+    connectionPreview.value = null; window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up)
+    window.removeEventListener('blur', blur)
+    window.removeEventListener('pointercancel', cancel); target.removeEventListener('lostpointercapture', cancel)
+    if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId)
+    stopConnectionDrag = null
+  }
+  target.setPointerCapture(event.pointerId)
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', up)
+  window.addEventListener('blur', blur)
+  window.addEventListener('pointercancel', cancel); target.addEventListener('lostpointercapture', cancel)
+}
+/** 松键或焦点改变结束连续微调，不生成额外撤销记录。 */
+function endCanvasNudge() { canvasNudge = null }
+function cancelCanvasInteraction() { stopNodeDrag?.(); stopConnectionDrag?.(); endCanvasNudge() }
 function onDrop(event: DragEvent) {
   const type = event.dataTransfer?.getData('node-type') as NodeType
   const viewport = canvas.value
@@ -1034,7 +1111,7 @@ function onDrop(event: DragEvent) {
 async function changeCanvasZoom(delta: number) {
   const viewport = canvas.value
   if (!viewport) return
-  stopNodeDrag?.()
+  cancelCanvasInteraction()
   const next = clampZoom(canvasZoom.value + delta)
   const position = zoomedScroll({ width: viewport.clientWidth, height: viewport.clientHeight, left: viewport.scrollLeft, top: viewport.scrollTop }, canvasZoom.value, next)
   canvasZoom.value = next
@@ -1046,7 +1123,7 @@ async function fitCanvas(quiet = false) {
   await nextTick()
   const viewport = canvas.value
   if (!viewport) return
-  stopNodeDrag?.()
+  cancelCanvasInteraction()
   const fit = fittedViewport(canvasBounds.value, viewport.clientWidth, viewport.clientHeight)
   canvasZoom.value = fit.zoom
   await nextTick()
@@ -1056,7 +1133,7 @@ async function fitCanvas(quiet = false) {
 async function autoLayout() {
   if (editorLocked.value || !canManageDefinitions.value) return
   try {
-    stopNodeDrag?.()
+    cancelCanvasInteraction()
     const result = arrangeNodes(nodes.value, edges.value, branchDescription)
     if (result.nodes.some((node, index) => node.x !== nodes.value[index]?.x || node.y !== nodes.value[index]?.y)) { remember(); nodes.value = result.nodes }
     await fitCanvas(true)
@@ -1064,9 +1141,30 @@ async function autoLayout() {
   } catch (error) { canvasMessage.value = errorMessage(error) }
 }
 function keyHandler(event: KeyboardEvent) {
-  if (page.value !== 'designer' || editorLocked.value || ['INPUT', 'TEXTAREA', 'SELECT'].includes((event.target as HTMLElement).tagName)) return
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo() }
-  if (['Delete', 'Backspace'].includes(event.key)) { event.preventDefault(); if (designerMode.value === 'advanced') deleteSelected(); else notice.value = '请使用步骤配置中的删除按钮，以便核对分支内的删除范围。' }
+  if (event.key === 'Escape') { cancelCanvasInteraction(); return }
+  const target = event.target as HTMLElement
+  if (page.value !== 'designer' || editorLocked.value || !canManageDefinitions.value || event.isComposing
+    || target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return
+  if (event.metaKey || event.ctrlKey) {
+    if (event.key.toLowerCase() === 'z' || (!event.metaKey && event.key.toLowerCase() === 'y')) {
+      event.preventDefault(); cancelCanvasInteraction()
+      event.key.toLowerCase() === 'y' || event.shiftKey ? redo() : undo()
+    }
+    return
+  }
+  if (designerMode.value !== 'advanced' || !canvas.value?.contains(target) || event.altKey) return
+  if (['Delete', 'Backspace'].includes(event.key)) { event.preventDefault(); deleteSelected(); return }
+  const direction: Record<string, Point> = { ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 } }
+  const delta = direction[event.key], node = selectedNode.value
+  if (!delta || !node) return
+  event.preventDefault()
+  const step = event.shiftKey ? CANVAS_LARGE_KEY_STEP : CANVAS_KEY_STEP
+  const position = { x: Math.max(12, node.x + delta.x * step), y: Math.max(20, node.y + delta.y * step) }
+  if (node.x === position.x && node.y === position.y) return
+  if (!canvasNudge || !event.repeat || canvasNudge.nodeId !== node.id || canvasNudge.key !== event.key || canvasNudge.shift !== event.shiftKey) {
+    remember(); canvasNudge = { nodeId: node.id, key: event.key, shift: event.shiftKey }
+  }
+  node.x = position.x; node.y = position.y
 }
 /** 表单只依赖当前选中的完整发布配置；切换选择立即取消旧读取。 */
 async function selectApplicationDefinition(id: string) {
@@ -1127,7 +1225,7 @@ watch(actorScope, () => { restoredDefinition.clear(); applicationSelection.clear
 
 watch([actorScope, page], () => { catalogOpen.value = false }, { flush: 'sync' })
 watch(actor, () => { editorSession.value++; autosave.reset(); pendingDraftCheckpoint = null; confirmation.cancel(); publicationOpen.value = false; publicationNote.value = ''; publicationError.value = '' }, { flush: 'sync' })
-watch([actor, editorSession, page, editorLocked], () => stopNodeDrag?.(), { flush: 'sync' })
+watch([actor, editorLocked, canManageDefinitions, editorSession, designerMode, page], () => cancelCanvasInteraction(), { flush: 'sync' })
 watch(editorSession, () => { canvasMessage.value = '缩放只改变视图，自动布局可撤销。'; void fitCanvas(true) })
 watch(canvas, (element, _previous, onCleanup) => {
   if (!element) return
@@ -1397,7 +1495,7 @@ onMounted(async () => {
   }
   await loadAuthentication()
 })
-onBeforeUnmount(() => { clearValidation(true); taskCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); stopNodeDrag?.(); confirmation.dispose() })
+onBeforeUnmount(() => { clearValidation(true); taskCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); cancelCanvasInteraction(); confirmation.dispose() })
 onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload); window.removeEventListener('agentflow:authentication-required', authenticationRequired) })
 </script>
 
@@ -1502,7 +1600,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
           <div class="designer-mode-switch" role="group" aria-label="设计模式"><button type="button" :aria-pressed="designerMode === 'quick'" @click="designerMode = 'quick'">快速步骤</button><button type="button" :aria-pressed="designerMode === 'advanced'" @click="designerMode = 'advanced'">高级画布</button><span>两种视图编辑同一流程，切换不会更改规则。</span></div>
           <QuickDesigner v-if="designerMode === 'quick'" :graph="quickGraph" :form-schema="definitionFormSchema" :selected-node="selectedId" :selected-edge="selectedEdgeId" :locked="editorLocked || !canManageDefinitions" :scope-key="canManageDefinitions ? draftScope : ''" :invalid-nodes="validationNodeIds" :simulated-nodes="simulationResult?.path ?? []" :simulated-edges="simulationResult?.edgeIds ?? []" @command="editQuick" @select-node="id => { const node = nodes.find(item => item.id === id); if (node) selectNode(node) }" @select-edge="id => { const edge = edges.find(item => item.id === id); if (edge) selectEdge(edge) }" @before-change="remember" @node="patchQuickNode" @responsibilities="patchResponsibilities" @policy="patchApprovalPolicy" @service-task="patchServiceTask" @event-contract="patchEventContract" @subprocess="patchSubprocess" @deadline="patchQuickDeadline" @expense-stage="patchExpenseStage" @expense-self-approval="patchExpenseSelfApproval" @expense-duplicate-approval="patchExpenseDuplicateApproval" @expense-split-rule="patchExpenseSplitRule" @expense-split-gateway="patchExpenseSplitGateway" @edge="patchQuickEdge" @default-branch="toggleDefault" @advanced="designerMode = 'advanced'" />
           <div v-else class="designer-layout">
-            <aside class="palette"><h4>节点</h4><p>点击添加，再配置连线</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>选中节点可拖动。右侧配置审批人和下一节点；选中连线可编辑条件或删除。</p><p>支持指定账号或角色审批。发布前会检查当前身份源中是否有可审批人员。</p></div></aside>
+            <aside class="palette"><h4>节点</h4><p>点击插入或拖到画布</p><button v-for="item in palette" :key="item.type" :disabled="editorLocked || !canManageDefinitions" :draggable="!editorLocked && canManageDefinitions" @dragstart="event => event.dataTransfer?.setData('node-type', item.type)" @click="addNode(item.type)"><span>{{ item.icon }}</span>{{ item.label }}<b>＋</b></button><div class="palette-tip"><strong>设计器提示</strong><p>拖动端口连接下一节点，也可在右侧选择。画布内方向键移动，Shift 加大步长，Delete 删除，Esc 取消连线。</p><p>支持指定账号或角色审批。发布前会检查当前身份源中是否有可审批人员。</p></div></aside>
             <div class="canvas-wrap">
               <div class="canvas-toolbar"><span class="canvas-title" :title="definitionName">{{ definitionName }}</span><div class="canvas-tools" aria-label="画布视图操作">
                 <button type="button" aria-label="缩小画布" title="缩小画布" :disabled="canvasZoom <= MIN_ZOOM" @click="changeCanvasZoom(-ZOOM_STEP)">−</button>
@@ -1511,18 +1609,19 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                 <button type="button" @click="fitCanvas()">适应画布</button>
                 <button v-if="canManageDefinitions" type="button" :disabled="editorLocked || !nodes.length" @click="autoLayout">自动布局</button>
               </div></div>
-              <div ref="canvas" class="canvas" tabindex="0" aria-label="流程画布，可滚动查看节点与连线" @dragover.prevent @drop.prevent="onDrop">
+              <div ref="canvas" class="canvas" tabindex="0" aria-label="流程画布，可滚动查看节点与连线" @keyup="endCanvasNudge" @focusout="endCanvasNudge" @dragover.prevent @drop.prevent="onDrop">
                 <div class="canvas-sizer" :style="{ width: `${stageSize.width * canvasZoom}px`, height: `${stageSize.height * canvasZoom}px` }">
                   <div class="canvas-stage" :style="{ width: `${stageSize.width}px`, height: `${stageSize.height}px`, transform: `scale(${canvasZoom})` }">
                     <svg class="edges" :viewBox="`0 0 ${stageSize.width} ${stageSize.height}`">
                       <defs><marker id="flow-arrow" markerWidth="7" markerHeight="7" refX="7" refY="3.5" orient="auto"><polygon points="0 0, 7 3.5, 0 7" fill="context-stroke" /></marker></defs>
+                      <path v-if="connectionPreview" class="connection-preview" :d="`M${connectionPreview.x1},${connectionPreview.y1} L${connectionPreview.x2},${connectionPreview.y2}`" />
                       <g v-for="route in routedEdges" :key="route.edge.id">
                         <path class="edge-hit" :d="route.path" @click.stop="selectEdge(route.edge)" />
                         <path :d="route.path" :data-edge-id="route.edge.id" marker-end="url(#flow-arrow)" :class="{ selected: selectedEdgeId === route.edge.id, simulated: simulationResult?.edgeIds.includes(route.edge.id) }" @click.stop="selectEdge(route.edge)" />
                         <text v-if="route.text" :x="route.label.x" :y="route.label.y" class="edge-label" @click.stop="selectEdge(route.edge)">{{ route.text }}<title>{{ branchTitle(route.edge) }}</title></text>
                       </g>
                     </svg>
-                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'SERVICE_TASK' ? '服' : node.type === 'SUB_PROCESS' ? '子' : node.type === 'EVENT_WAIT' ? '事' : node.type === 'TIMER_WAIT' ? '时' : node.type === 'COPY' ? '抄' : node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ isCountersignMode(node.approvalMode) ? approvalPolicyLabel(node.approvalMode, node.approvalPercentage) + ' · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port"></i></button>
+                    <button v-for="node in nodes" :key="node.id" class="flow-node" :data-node-id="node.id" :class="[node.type === 'EXCLUSIVE_GATEWAY' ? 'condition' : node.type.toLowerCase(), { selected: selectedId === node.id, dragging: dragging === node.id, invalid: validationNodeIds.includes(node.id), simulated: simulationResult?.path.includes(node.id) }]" :style="{ left: `${node.x}px`, top: `${node.y}px` }" @pointerdown="event => canManageDefinitions && moveNode(event, node)" @focus="selectNode(node)" @click.stop="selectNode(node)"><span class="node-icon">{{ node.type === 'SERVICE_TASK' ? '服' : node.type === 'SUB_PROCESS' ? '子' : node.type === 'EVENT_WAIT' ? '事' : node.type === 'TIMER_WAIT' ? '时' : node.type === 'COPY' ? '抄' : node.type === 'PARALLEL_GATEWAY' ? '＋' : node.type === 'EXCLUSIVE_GATEWAY' ? '◇' : node.type === 'START' ? '▶' : node.type === 'END' ? '●' : '人' }}</span><strong>{{ node.name }}</strong><small v-if="node.type === 'USER_TASK'">{{ isCountersignMode(node.approvalMode) ? approvalPolicyLabel(node.approvalMode, node.approvalPercentage) + ' · ' : '' }}{{ assigneeLabel(node.assigneeRule) }}</small><i v-if="node.type !== 'END'" class="port" aria-hidden="true" @pointerdown.stop.prevent="event => beginConnection(event, node)" @click.stop></i></button>
                   </div>
                 </div>
               </div>
@@ -1541,7 +1640,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
               <DefinitionExpenseSplitRisk :node-id="selectedNode.id" :graph="quickGraph" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @rule="patchExpenseSplitRule" @gateway="patchExpenseSplitGateway" />
               <DefinitionExpenseStage v-if="selectedNode.type === 'USER_TASK'" :model-value="selectedNode.originalProperties?.expenseStage" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchExpenseStage(selectedNode.id, $event)" />
                 <DefinitionDeadline v-if="selectedNode.type === 'USER_TASK'" :key="selectedNode.id" v-model="selectedNode.deadline" :scope-key="canManageDefinitions ? draftScope : ''" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" />
-                <p v-if="selectedNode.type === 'PARALLEL_GATEWAY'" class="field-help">并行拆分会同时进入所有出线，汇合等待全部入线到达。请用并行网关成对连接，可嵌套；分支条件请另加条件网关。</p><p v-if="isExclusiveMerge(selectedNode.id)" class="field-help">条件汇合：选中的路径到达后直接继续，不等待未选中的路径。</p><div v-if="selectedNode.type === 'EXCLUSIVE_GATEWAY' && !isExclusiveMerge(selectedNode.id)" class="branch-editor"><strong>分支条件</strong><p class="field-help">例如 amount &gt; 5000。每个分支网关只有一条默认分支。</p><div v-for="edge in edges.filter(item => item.source === selectedNode?.id)" :key="edge.id" class="branch-item"><small>→ {{ nodes.find(node => node.id === edge.target)?.name }}</small><p class="field-help" :title="branchTitle(edge)">{{ branchDescription(edge) || '尚未配置条件' }}</p><div class="branch"><input v-model="edge.condition" :disabled="edge.defaultBranch" :aria-label="`分支条件 ${edge.id}`" :placeholder="edge.defaultBranch ? '默认分支无需条件' : '如 amount > 5000'" @focus="remember" /><button :class="{ default: edge.defaultBranch }" type="button" @click="toggleDefault(edge)">{{ edge.defaultBranch ? '取消默认' : '设为默认' }}</button></div></div></div>
+                <p v-if="selectedNode.type === 'PARALLEL_GATEWAY'" class="field-help">并行拆分会同时进入所有出线，汇合等待全部入线到达。请用并行网关成对连接，可嵌套；分支条件请另加条件网关。</p><p v-if="isExclusiveMerge(selectedNode.id)" class="field-help">条件汇合：选中的路径到达后直接继续，不等待未选中的路径。</p><div v-if="selectedNode.type === 'EXCLUSIVE_GATEWAY' && !isExclusiveMerge(selectedNode.id)" class="branch-editor"><strong>分支条件</strong><p class="field-help">例如 amount &gt; 5000。每个分支网关只有一条默认分支。</p><div v-for="edge in edges.filter(item => item.source === selectedNode?.id)" :key="edge.id" class="branch-item"><small>→ {{ nodes.find(node => node.id === edge.target)?.name }}</small><p class="field-help" :title="branchTitle(edge)">{{ branchDescription(edge) || '尚未配置条件' }}</p><div class="branch-order"><button type="button" :disabled="edge.defaultBranch || edges.filter(item => item.source === edge.source && !item.defaultBranch)[0]?.id === edge.id" :aria-label="`上移分支 ${edge.id}`" @click="moveCanvasBranch(edge.id, -1)">上移</button><button type="button" :disabled="edge.defaultBranch || edges.filter(item => item.source === edge.source && !item.defaultBranch).slice(-1)[0]?.id === edge.id" :aria-label="`下移分支 ${edge.id}`" @click="moveCanvasBranch(edge.id, 1)">下移</button></div><div class="branch"><input v-model="edge.condition" :disabled="edge.defaultBranch" :aria-label="`分支条件 ${edge.id}`" :placeholder="edge.defaultBranch ? '默认分支无需条件' : '如 amount > 5000'" @focus="remember" /><button :class="{ default: edge.defaultBranch }" type="button" @click="toggleDefault(edge)">{{ edge.defaultBranch ? '取消默认' : '设为默认' }}</button></div></div></div>
                 <template v-if="selectedNode.type !== 'END'"><label>连线到<select v-model="connectionTarget"><option value="">选择下一节点</option><option v-for="node in nodes.filter(item => item.id !== selectedNode?.id && item.type !== 'START')" :key="node.id" :value="node.id">{{ node.name }}</option></select></label><button class="secondary connect-button" :disabled="!connectionTarget" @click="connectNode">添加连线</button></template><button class="delete-button" :disabled="selectedNode.type === 'START'" @click="deleteSelected">删除节点</button>
               </template>
               <template v-else-if="selectedEdge"><div class="inspector-head"><div><p class="eyebrow">EDGE PROPERTY</p><h3>连线条件</h3></div></div><template v-if="nodes.find(node => node.id === selectedEdge?.source)?.type === 'PARALLEL_GATEWAY' || isExclusiveMerge(selectedEdge.source)"><p class="field-help">{{ isExclusiveMerge(selectedEdge.source) ? '条件汇合后直接继续' : '并行连线全部执行' }}，不设置条件或默认分支。</p><button v-if="selectedEdge.condition || selectedEdge.defaultBranch" class="secondary" @click="clearMergeEdge">清除条件及默认设置</button></template><ConditionEditor v-else-if="!selectedEdge.defaultBranch" :key="selectedEdge.id" :model-value="selectedEdge.condition" :language-version="conditionLanguageVersion" :form-schema="definitionFormSchema" :disabled="editorLocked || !canManageDefinitions" @before-change="remember" @update:model-value="patchQuickEdge(selectedEdge.id, $event)" /><p v-else class="field-help">其他条件均不满足时进入默认分支。</p><button v-if="nodes.find(node => node.id === selectedEdge?.source)?.type === 'EXCLUSIVE_GATEWAY' && !isExclusiveMerge(selectedEdge.source)" class="secondary" @click="toggleDefault(selectedEdge)">{{ selectedEdge.defaultBranch ? '取消默认分支' : '设为默认分支' }}</button><button class="delete-button" @click="deleteSelected">删除连线</button></template>

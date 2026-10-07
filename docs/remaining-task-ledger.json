@@ -1,28 +1,28 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-07T12:45:33.717433+00:00",
+  "recordedAt": "2026-10-07T12:55:03.157751+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 34,
+    "knownOpenTaskCount": 35,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 16,
+      "LOCAL_DEVELOPMENT": 17,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 34,
+    "projectRemainingLowerBound": 35,
     "completionPercentage": null,
     "notes": [
-      "34 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "35 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
     ],
     "localDeliveryBreakdown": {
-      "recordedAt": "2026-10-07T12:31:45.411017+00:00",
+      "recordedAt": "2026-10-07T12:47:31.059239+00:00",
       "implementationRemaining": {
         "count": 0,
         "taskIds": []
@@ -48,7 +48,13 @@
           "F15"
         ]
       },
-      "note": "This is a breakdown of the 16 OPEN local delivery tasks, not additional tasks or new completion claims."
+      "note": "Breakdown of the 17 OPEN local delivery targets; V03 discovered the missing W02 interactions. Environment waiting is not counted twice.",
+      "implementedAwaitingBrowserVerification": {
+        "count": 1,
+        "taskIds": [
+          "W02"
+        ]
+      }
     }
   },
   "requirements": [
@@ -2823,6 +2829,33 @@
       "dependsOn": [
         "V02"
       ]
+    },
+    {
+      "id": "W02",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "流程能力",
+      "status": "OPEN",
+      "title": "高级设计器拖线、键盘与图编辑交互补齐",
+      "sourceRefs": [
+        {
+          "documentId": "01",
+          "section": "§4 流程设计器",
+          "lines": [
+            61,
+            95
+          ]
+        }
+      ],
+      "observed": "实际函数和模板先复现 8/9 失败；交互、坐标漂移与窗口失焦修复后 14 项交互和相关范围 86 项通过，类型检查/构建/OpenAPI 通过。鼠标/触屏指针夹具通过，真实浏览器和触屏设备仍待补验。",
+      "references": [
+        {
+          "path": "docs/evidence/designer-interactions-20261007.json",
+          "line": 1
+        }
+      ],
+      "acceptance": "鼠标/触屏端口拖线与属性连线共用规则；画布限定删除和方向键移动，连续移动可一步撤销，Ctrl+Y 可重做；一进一出删除保持条件接续；点击插入接续并移动后继，网关添加分支，默认分支最后且支持排序；只读与切换过程不写入。真实浏览器另验收。",
+      "dependsOn": [],
+      "implementationStatus": "PASSED_BROWSER_PENDING"
     }
   ],
   "sourceSectionIndex": [
@@ -3986,11 +4019,11 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "V01",
-    "status": "FIXED_RUNTIME_AND_CONTRACTS_PASSED_BROWSER_PENDING",
-    "recordedAt": "2026-10-07T12:45:33.717433+00:00",
-    "evidence": "docs/evidence/invoice-model-runtime-20261007.json",
-    "knownOpenTaskCount": 34
+    "taskId": "W02",
+    "status": "LOCAL_IMPLEMENTATION_AND_COMPONENT_TESTS_PASSED_BROWSER_PENDING",
+    "recordedAt": "2026-10-07T12:55:03.157751+00:00",
+    "evidence": "docs/evidence/designer-interactions-20261007.json",
+    "knownOpenTaskCount": 35
   },
   "localMainIntegration": {
     "verifiedThroughCommit": "fa5a1b26e26f31fb548941944b325402876f5872",

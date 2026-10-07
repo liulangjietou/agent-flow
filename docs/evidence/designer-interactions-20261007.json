@@ -1,0 +1,50 @@
+{
+  "status": "LOCAL_IMPLEMENTATION_AND_COMPONENT_TESTS_PASSED_BROWSER_PENDING",
+  "recordedAt": "2026-10-07T12:55:03.157751+00:00",
+  "baselineCommit": "95d67c2aaa23bf233e705342c8e5fa80949add8a",
+  "sourceSha256": {
+    "agentflow-web/src/App.vue": "fd9eb2e460d74fad5e13d15fc674f40fc111031351fa88c87f578cf32c2f3875",
+    "agentflow-web/src/designerEditing.ts": "8c681afb59eb191f52682fdc6f63df1d6ff45db0338f368f1cf19b850570fc33",
+    "agentflow-web/src/designerCanvas.css": "1f6e9646ff7af6b377854fc68a1106b33faab8ae9dc7f55ecfee32799fc70532",
+    "agentflow-web/scripts/test-requests.mjs": "7c884a8d7a8c670c36ab83a3d63752dc3e45a453dddc953243d9b809492a6bdb",
+    "agentflow-web/tests/designer-interactions.test.mjs": "21ca4c818d9afff01622856e47299673831cff2d28ae1d2e170a9bc9a3067cb4",
+    "agentflow-web/src/designerGraph.ts": "1947e36e95ed8c7fe596c6f902c7e05715b462c03d467a5d8bdfa82f7fd48c00",
+    "agentflow-web/src/designerLayout.ts": "0cddeac9611a6392563e4dc181dbe5ded5c6f8d6293dcecfe6dc1466d9cece5d"
+  },
+  "archiveManifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/w02-interactions-verified/manifest.json",
+    "sha256": "03fa122608e20c3a1a510fceccb8a3a07849cc425834beb110aefb2a1b23bc06"
+  },
+  "red": {
+    "originalTests": 9,
+    "originalFailures": 8,
+    "coordinateBoundaryFailures": 1,
+    "windowBlurFailures": 1,
+    "harnessAttempt": "w02-red.log failed before tests because the test file path was wrong; w02-red2.log is the valid original RED"
+  },
+  "green": {
+    "interactionTests": 14,
+    "scopeTests": 86,
+    "failures": 0,
+    "typecheck": "PASSED",
+    "build": "PASSED",
+    "openapi": {
+      "result": "PASS",
+      "operations": 396,
+      "schemas": 867,
+      "requestExamples": 129
+    },
+    "countsOverlap": true
+  },
+  "review": {
+    "kind": "self-review",
+    "unresolvedKnownFindings": 0
+  },
+  "boundaries": {
+    "browserVerified": false,
+    "realTouchDeviceVerified": false,
+    "backendChanged": false,
+    "migrationChanged": false,
+    "remotePushOrPr": false
+  }
+}
