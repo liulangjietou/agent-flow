@@ -2904,7 +2904,7 @@
           ]
         }
       ],
-      "observed": "API、Flowable 创建及审批审计已关联授权业务号和实际实例/任务；260 个唯一用例通过，最终固定包 6 次启动及 281 表恢复通过。继续其余后台原业务标识，O01 保持 OPEN。",
+      "observed": "审批及六类 Agent 执行已关联可信业务标识。Agent 阶段 249 项回归、7 次固定包启动、12 次模型调用和 281 表恢复通过；财务、集成及直接调度业务标识继续接通，O01 保持 OPEN。",
       "references": [
         {
           "path": "docs/superpowers/plans/2026-10-07-operation-tracing.md",
@@ -2944,6 +2944,10 @@
         },
         {
           "path": "docs/evidence/operation-tracing-approval-business-20261007.json",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/operation-tracing-agent-business-20261007.json",
           "line": 1
         }
       ],
@@ -2985,6 +2989,10 @@
       "approvalBusinessStage": {
         "status": "PASSED_LOCAL_FIXED_PACKAGE_WITH_EXPLICIT_SCOPE",
         "evidence": "docs/evidence/operation-tracing-approval-business-20261007.json"
+      },
+      "agentBusinessStage": {
+        "status": "PASSED_LOCAL_FIXED_PACKAGE_WITH_EXPLICIT_SCOPE",
+        "evidence": "docs/evidence/operation-tracing-agent-business-20261007.json"
       }
     },
     {

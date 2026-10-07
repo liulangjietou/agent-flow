@@ -75,9 +75,12 @@ public class JdbcDraftAssistRunRepository implements DraftAssistRunRepository {
     /** 待执行与超时记录有界扫描；历史建议不重复执行。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM agent_draft_assist_run
-                WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), Timestamp.from(now));
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no FROM agent_draft_assist_run q
+                LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+                WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until<=?)
+                ORDER BY q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no")), Timestamp.from(now));
     }
 
     /** 同申请排队前在申请锁内检查，避免不同幂等键产生同时执行的建议。 */
@@ -129,7 +132,10 @@ public class JdbcDraftAssistRunRepository implements DraftAssistRunRepository {
      * 工作扫描只返回不透明标识。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo) {
+        /** 没有业务关联的历史调用保持缺失事实，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null); }
+    }
     /**
      * 申请人索引不含任何提示或表单正文。
      * @author owlzhangfq@gmail.com

@@ -29,10 +29,12 @@ public class AssistWorker {
         for (var candidate : jobs.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
             try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
-                    TRACE_SOURCE, candidate.runId().toString()).open()) {
+                    TRACE_SOURCE, candidate.runId().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), candidate.taskId()).open()) {
                 try {
                     var job = execution.claim(candidate.tenantId(), candidate.runId(), Instant.now());
                     if (job == null) continue;
+                    LOG.info("Agent execution claimed, errorCode={}, runId={}", "NONE", candidate.runId());
                     AssistSuggestion suggestion = null; AssistRun.Failure failure = null;
                     try { suggestion = model.generate(AssistConfiguration.PROMPT_VERSION, job.sources()); }
                     catch (AssistModelPort.ModelFailure modelFailure) { failure = modelFailure.failure(); }

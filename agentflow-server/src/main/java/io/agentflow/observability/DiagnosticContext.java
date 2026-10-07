@@ -35,6 +35,11 @@ public record DiagnosticContext(String traceId, String tenantId, String business
         return new DiagnosticContext(currentIdOr(UUID.randomUUID().toString()), tenantId, businessNo, processInstanceId, taskId);
     }
 
+    /** 将原已授权持久执行的业务定位组合到恢复上下文，不从当前线程补齐缺失字段。 */
+    public DiagnosticContext withBusiness(String businessNo, String processInstanceId, String taskId) {
+        return new DiagnosticContext(traceId, tenantId, businessNo, processInstanceId, taskId);
+    }
+
     /** 在同事务审计和事件之间保留请求来源；旧调用没有请求时沿用事件标识。 */
     public static String currentIdOr(String fallback) {
         String current = MDC.get(TRACE_ID);

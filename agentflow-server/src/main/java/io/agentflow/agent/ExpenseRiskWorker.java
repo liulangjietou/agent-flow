@@ -33,10 +33,12 @@ public class ExpenseRiskWorker {
         for (var candidate : runs.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
             try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
-                    TRACE_SOURCE, candidate.id().toString()).open()) {
+                    TRACE_SOURCE, candidate.id().toString())
+                    .withBusiness(candidate.businessNo(), candidate.processInstanceId(), candidate.taskId()).open()) {
                 try {
                     var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
                     if (context == null) continue;
+                    LOG.info("Agent execution claimed, errorCode={}, runId={}", "NONE", candidate.id());
                     try { if (!service.sendable(context, Instant.now())) continue; }
                     catch (DomainException unavailable) {
                         // 发送检查事务已回滚；独立失败事务不能被其 rollback-only 标记一起撤销。

@@ -102,9 +102,15 @@ public class JdbcExpenseRiskRepository {
     /** 扫描队列或已到期租约；运行中未到期的请求不会被另一个进程重领。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM agent_expense_risk_run WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
-                ORDER BY created_at,id LIMIT ?
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), Timestamp.from(now), BATCH_SIZE);
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id,
+                    CASE WHEN a.id IS NOT NULL THEN q.task_id ELSE NULL END AS task_id
+                FROM agent_expense_risk_run q
+                LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+                LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=q.round_no
+                WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until<=?)
+                ORDER BY q.created_at,q.id LIMIT ?
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id"), row.getString("task_id")), Timestamp.from(now), BATCH_SIZE);
     }
 
     /** 索引限于已授权的主单原轮次，不返回对照单标识、认证引用或模型正文。 */
@@ -164,7 +170,10 @@ public class JdbcExpenseRiskRepository {
      * 后台候选只携带定位，不携带身份凭据或业务材料。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo, String processInstanceId, String taskId) {
+        /** 没有业务关联的历史调用保持缺失事实，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null, null, null); }
+    }
     /**
      * 主单已授权轮次的轻量历史，不泄露对照单信息。
      * @author owlzhangfq@gmail.com

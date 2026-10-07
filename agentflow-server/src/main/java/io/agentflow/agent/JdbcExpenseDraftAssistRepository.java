@@ -86,9 +86,12 @@ public class JdbcExpenseDraftAssistRepository {
     /** 扫描有界队列，运行中记录仅在原租约过期后进入结算候选。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM agent_expense_draft_run WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
-                ORDER BY created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), Timestamp.from(now));
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no FROM agent_expense_draft_run q
+                LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+                WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until<=?)
+                ORDER BY q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no")), Timestamp.from(now));
     }
 
     /** 列表只返回版本和状态，行程、目录、模型正文在本人详情入口读取。 */
@@ -131,7 +134,10 @@ public class JdbcExpenseDraftAssistRepository {
      * 队列扫描不读取或暴露原模型内容。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo) {
+        /** 没有业务关联的历史调用保持缺失事实，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null); }
+    }
     /**
      * 历史索引保留原双版本，不把确认状态解释为已保存费用。
      * @author owlzhangfq@gmail.com

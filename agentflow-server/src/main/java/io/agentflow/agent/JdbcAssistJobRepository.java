@@ -43,11 +43,16 @@ public class JdbcAssistJobRepository {
     /** 有界扫描待执行与租约过期记录；普通只读历史不进入执行队列。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT j.tenant_id,j.run_id,j.trace_id FROM agent_assist_job j
+                SELECT j.tenant_id,j.run_id,j.trace_id,a.business_no,s.process_instance_id,
+                    CASE WHEN a.id IS NOT NULL THEN j.task_id ELSE NULL END AS task_id
+                FROM agent_assist_job j
                 JOIN agent_assist_run r ON r.tenant_id=j.tenant_id AND r.id=j.run_id
+                LEFT JOIN approval_application a ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+                LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=r.round_no
                 WHERE r.status='QUEUED' OR (r.status='RUNNING' AND j.lease_until<=?)
                 ORDER BY r.created_at,j.run_id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("run_id")), row.getString("trace_id")), Timestamp.from(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("run_id")),
+                row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id"), row.getString("task_id")), Timestamp.from(now));
     }
 
     /** 单个运行只有一个领取/结算者；必须在调用方事务内使用。 */
@@ -73,5 +78,8 @@ public class JdbcAssistJobRepository {
      * 扫描结果不包含业务正文或模型凭据。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID runId, String traceId) { }
+    public record Candidate(String tenantId, UUID runId, String traceId, String businessNo, String processInstanceId, String taskId) {
+        /** 没有业务关联的历史调用保持缺失事实，不借用当前线程。 */
+        public Candidate(String tenantId, UUID runId, String traceId) { this(tenantId, runId, traceId, null, null, null); }
+    }
 }

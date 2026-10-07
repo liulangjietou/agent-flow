@@ -86,9 +86,12 @@ public class JdbcPrecheckExplanationRepository {
     /** 每次最多十项，运行中仅在租约过期后再次扫描。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id,trace_id FROM agent_precheck_explanation_run WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?)
-                ORDER BY created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), Timestamp.from(now));
+                SELECT q.tenant_id,q.id,q.trace_id,a.business_no FROM agent_precheck_explanation_run q
+                LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+                WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until<=?)
+                ORDER BY q.created_at,q.id LIMIT 10
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")),
+                row.getString("trace_id"), row.getString("business_no")), Timestamp.from(now));
     }
 
     /** 页面历史只读索引，原始内容仅在单条详情中返回本人。 */
@@ -129,7 +132,10 @@ public class JdbcPrecheckExplanationRepository {
      * 队列扫描仅提供定位键。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id, String traceId) { }
+    public record Candidate(String tenantId, UUID id, String traceId, String businessNo) {
+        /** 没有业务关联的历史调用保持缺失事实，不借用当前线程。 */
+        public Candidate(String tenantId, UUID id, String traceId) { this(tenantId, id, traceId, null); }
+    }
     /**
      * 轻量索引不携带模型文本与费用内容。
      * @author owlzhangfq@gmail.com

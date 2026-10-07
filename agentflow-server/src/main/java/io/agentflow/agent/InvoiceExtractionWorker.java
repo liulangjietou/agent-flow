@@ -33,6 +33,7 @@ public class InvoiceExtractionWorker {
                 try {
                     var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
                     if (context == null) continue;
+                    LOG.info("Agent execution claimed, errorCode={}, runId={}", "NONE", candidate.id());
                     InvoiceExtractionSuggestion suggestion = null; InvoiceExtractionRun.Failure failure = null;
                     try { suggestion = extraction.generate(context); }
                     catch (AssistModelPort.ModelFailure rejected) {
