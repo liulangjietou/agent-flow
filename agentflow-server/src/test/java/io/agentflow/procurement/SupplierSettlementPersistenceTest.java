@@ -87,7 +87,7 @@ class SupplierSettlementPersistenceTest {
                 System.getenv().getOrDefault("AGENTFLOW_SUPPLIER_SETTLEMENT_USER", "sa"), System.getenv().getOrDefault("AGENTFLOW_SUPPLIER_SETTLEMENT_PASSWORD", ""));
         schema = "supplier_settlement_" + UUID.randomUUID().toString().replace("-", ""); new JdbcTemplate(dataSource).execute("CREATE SCHEMA \"" + schema + "\""); dataSource.setSchema(schema);
         var migration = Flyway.configure().dataSource(dataSource).defaultSchema(schema); if (target != null) migration.target(target); migration.load().migrate();
-        jdbc = new JdbcTemplate(dataSource); manager = new DataSourceTransactionManager(dataSource); tx = new TransactionTemplate(manager);
+        jdbc = target == null ? new JdbcTemplate(dataSource) : new SupplierMigrationJdbcTemplate(dataSource); manager = new DataSourceTransactionManager(dataSource); tx = new TransactionTemplate(manager);
         procurements = new JdbcProcurementPaymentRepository(jdbc, json);
         // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。
         var returnGuard = target == null ? new SupplierPayableReturnGuard(jdbc) : mock(SupplierPayableReturnGuard.class);

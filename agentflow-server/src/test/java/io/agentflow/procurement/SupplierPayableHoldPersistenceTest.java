@@ -71,7 +71,7 @@ class SupplierPayableHoldPersistenceTest {
         schema = "supplier_hold_" + UUID.randomUUID().toString().replace("-", "");
         new JdbcTemplate(source).execute("CREATE SCHEMA \"" + schema + "\""); source.setSchema(schema); dataSource = source;
         var migration = Flyway.configure().dataSource(source).defaultSchema(schema); if (target != null) migration.target(target);
-        migration.load().migrate(); jdbc = new JdbcTemplate(source);
+        migration.load().migrate(); jdbc = target == null ? new JdbcTemplate(source) : new SupplierMigrationJdbcTemplate(source);
         var manager = new DataSourceTransactionManager(source); tx = new TransactionTemplate(manager);
         requests = new JdbcProcurementPaymentRepository(jdbc, json);
         // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。

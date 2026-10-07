@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import java.sql.Date;
@@ -42,9 +44,9 @@ public class JdbcSupplierAdjustmentPreparationRepository {
         if (jdbc.queryForObject("SELECT COUNT(*) FROM supplier_payable_adjustment_operation WHERE tenant_id=? AND active_payment_id=?", Integer.class, tenant, paymentId.toString()) != 0) throw occupied();
         try {
             jdbc.update("""
-                    INSERT INTO supplier_adjustment_preparation(tenant_id,id,payment_id,return_version,finance_actor,accounting_date,input_json,state_json,
-                    version,status,attempts,created_at,updated_at,next_attempt_at,active_payment_id) VALUES(?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?,?)
-                    """, tenant, input.id().toString(), paymentId.toString(), ledger.version(), input.financeActor(), Date.valueOf(input.accountingDate()), json.write(input), json.write(value),
+                    INSERT INTO supplier_adjustment_preparation(trace_id,tenant_id,id,payment_id,return_version,finance_actor,accounting_date,input_json,state_json,
+                    version,status,attempts,created_at,updated_at,next_attempt_at,active_payment_id) VALUES(?,?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?,?)
+                    """, DiagnosticContext.capture().traceId(), tenant, input.id().toString(), paymentId.toString(), ledger.version(), input.financeActor(), Date.valueOf(input.accountingDate()), json.write(input), json.write(value),
                     timestamp(input.requestedAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()), paymentId.toString());
         } catch (DuplicateKeyException duplicate) { throw occupied(); }
         append(value);
@@ -89,9 +91,9 @@ public class JdbcSupplierAdjustmentPreparationRepository {
     /** 有界扫描只暴露领取标识，旧租约恢复仍沿用原输入。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM supplier_adjustment_preparation WHERE (status='QUEUED' AND next_attempt_at<=?)
+                SELECT tenant_id,id,trace_id FROM supplier_adjustment_preparation WHERE (status='QUEUED' AND next_attempt_at<=?)
                 OR (status='RUNNING' AND lease_until<=?) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), timestamp(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
     }
 
     private SupplierAdjustmentPreparation restore(ResultSet row, int index) throws SQLException {
@@ -131,5 +133,8 @@ public class JdbcSupplierAdjustmentPreparationRepository {
      * 后台不在扫描结果展开原付款资料。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }

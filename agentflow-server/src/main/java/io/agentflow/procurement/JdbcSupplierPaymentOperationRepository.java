@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.PaymentObservation;
@@ -47,10 +49,10 @@ public class JdbcSupplierPaymentOperationRepository {
                 || !value.equals(SupplierPaymentOperation.queue(command, value.createdAt()))) throw conflict();
         try {
             jdbc.update("""
-                    INSERT INTO supplier_payment_operation(tenant_id,id,execution_request_id,execution_request_version,hold_version,command_json,command_digest,state_json,
+                    INSERT INTO supplier_payment_operation(trace_id,tenant_id,id,execution_request_id,execution_request_version,hold_version,command_json,command_digest,state_json,
                     version,status,attempts,dispatches,highest_revision,created_at,updated_at,next_attempt_at)
-                    VALUES(?,?,?,?,?,?,?,?,1,'QUEUED',0,0,0,?,?,?)
-                    """, command.tenantId(), command.id().toString(), input.id().toString(), request.version(), original.version(), json.write(command), command.digest(), json.write(value),
+                    VALUES(?,?,?,?,?,?,?,?,?,1,'QUEUED',0,0,0,?,?,?)
+                    """, DiagnosticContext.capture().traceId(), command.tenantId(), command.id().toString(), input.id().toString(), request.version(), original.version(), json.write(command), command.digest(), json.write(value),
                     timestamp(value.createdAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()));
         } catch (DuplicateKeyException duplicate) { throw new DomainException("SUPPLIER_PAYMENT_ALREADY_REGISTERED", "Original supplier authorization already has an immutable bank command"); }
         append(value);
@@ -166,9 +168,9 @@ public class JdbcSupplierPaymentOperationRepository {
     /** 仅扫描到期队列或租约；已到账、查无和争议等待后续明确处理。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM supplier_payment_operation WHERE (status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
+                SELECT tenant_id,id,trace_id FROM supplier_payment_operation WHERE (status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
                 OR (status IN ('CHECKING','SENDING','QUERYING') AND lease_until<=?) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), timestamp(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
     }
 
     private SupplierPaymentOperation restore(ResultSet row, int index) throws SQLException {
@@ -198,5 +200,8 @@ public class JdbcSupplierPaymentOperationRepository {
      * 不带金额和账户的后台扫描标识。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }

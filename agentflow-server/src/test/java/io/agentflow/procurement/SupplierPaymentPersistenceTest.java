@@ -89,7 +89,7 @@ class SupplierPaymentPersistenceTest {
                 System.getenv().getOrDefault("AGENTFLOW_SUPPLIER_PAYMENT_USER", "sa"), System.getenv().getOrDefault("AGENTFLOW_SUPPLIER_PAYMENT_PASSWORD", ""));
         schema = "supplier_payment_" + UUID.randomUUID().toString().replace("-", ""); new JdbcTemplate(dataSource).execute("CREATE SCHEMA \"" + schema + "\""); dataSource.setSchema(schema);
         var migration = Flyway.configure().dataSource(dataSource).defaultSchema(schema); if (target != null) migration.target(target); migration.load().migrate();
-        jdbc = new JdbcTemplate(dataSource); manager = new DataSourceTransactionManager(dataSource); tx = new TransactionTemplate(manager);
+        jdbc = target == null ? new JdbcTemplate(dataSource) : new SupplierMigrationJdbcTemplate(dataSource); manager = new DataSourceTransactionManager(dataSource); tx = new TransactionTemplate(manager);
         procurements = new JdbcProcurementPaymentRepository(jdbc, json);
         // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。
         var returnGuard = target == null ? new SupplierPayableReturnGuard(jdbc) : mock(SupplierPayableReturnGuard.class);
@@ -473,10 +473,13 @@ class SupplierPaymentPersistenceTest {
         var wrong = SupplierPaymentReturnCheck.queue(new SupplierPaymentReturnCheck.Input(UUID.randomUUID(), tenant, payment.command().targetDigest(), payment.version() - 1, request, "finance", time));
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> returnChecks.create(wrong))).isInstanceOf(DomainException.class);
         var queued = SupplierPaymentReturnCheck.queue(new SupplierPaymentReturnCheck.Input(UUID.randomUUID(), tenant, payment.command().targetDigest(), payment.version(), request, "finance", time));
-        tx.executeWithoutResult(status -> returnChecks.create(queued));
+        String sourceTrace = UUID.randomUUID().toString();
+        try (var scope = new io.agentflow.observability.DiagnosticContext(sourceTrace, tenant).open()) {
+            tx.executeWithoutResult(status -> returnChecks.create(queued));
+        }
         var duplicate = SupplierPaymentReturnCheck.queue(new SupplierPaymentReturnCheck.Input(UUID.randomUUID(), tenant, payment.command().targetDigest(), payment.version(), request, "finance", time));
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> returnChecks.create(duplicate))).isInstanceOf(DataIntegrityViolationException.class);
-        assertThat(returnChecks.due(time)).contains(new JdbcSupplierPaymentReturnCheckRepository.Candidate(tenant, queued.input().id()));
+        assertThat(returnChecks.due(time)).contains(new JdbcSupplierPaymentReturnCheckRepository.Candidate(tenant, queued.input().id(), sourceTrace));
         assertThat(returnChecks.find("other", queued.input().id())).isEmpty();
     }
 

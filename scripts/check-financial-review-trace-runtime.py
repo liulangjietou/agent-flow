@@ -221,7 +221,8 @@ def finish(runtime, wave):
     return result
 
 
-def probe(runtime, h2, label):
+def probe(runtime, h2, label, tables=None):
+    tables = MIGRATED if tables is None else tables
     assert runtime.process.poll() is not None
     source, output = runtime.directory / 'ReviewQueueProbe.java', runtime.directory / (label + '-queues.tsv')
     if not source.exists():
@@ -244,8 +245,8 @@ class ReviewQueueProbe {
 }''')
     with (runtime.directory / (label + '-probe.log')).open('x') as log:
         subprocess.run([runtime.java, '-Djava.io.tmpdir=/fyoung/tmp', '--class-path', str(h2), str(source),
-            str(runtime.directory / 'data/agentflow'), str(output), ','.join(MIGRATED)], check=True, stdout=log, stderr=subprocess.STDOUT, timeout=40)
-    rows = {table: {} for table in MIGRATED}
+            str(runtime.directory / 'data/agentflow'), str(output), ','.join(tables)], check=True, stdout=log, stderr=subprocess.STDOUT, timeout=40)
+    rows = {table: {} for table in tables}
     for line in output.read_text().splitlines():
         table, identity, field, value = line.split('\t'); rows[table].setdefault(identity, {})[field] = None if value == '-' else base64.b64decode(value).decode()
     save(runtime.directory / (label + '-queues.json'), rows)

@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import java.sql.ResultSet;
@@ -39,10 +41,10 @@ public class JdbcSupplierPaymentExecutionRepository {
                 || !value.equals(SupplierPaymentExecutionRequest.queue(input.id(), original, input.cashier(), input.debitReference(), input.debitVersion(), value.createdAt()))) throw conflict();
         try {
             jdbc.update("""
-                    INSERT INTO supplier_payment_execution_request(tenant_id,id,authorization_id,hold_version,cashier_id,input_json,state_json,
+                    INSERT INTO supplier_payment_execution_request(trace_id,tenant_id,id,authorization_id,hold_version,cashier_id,input_json,state_json,
                     version,status,attempts,created_at,updated_at,next_attempt_at,active_authorization_id)
-                    VALUES(?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?,?)
-                    """, input.tenantId(), input.id().toString(), input.authorizationId().toString(), input.holdVersion(), input.cashier(), json.write(input), json.write(value),
+                    VALUES(?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?,?,?)
+                    """, DiagnosticContext.capture().traceId(), input.tenantId(), input.id().toString(), input.authorizationId().toString(), input.holdVersion(), input.cashier(), json.write(input), json.write(value),
                     timestamp(value.createdAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()), input.authorizationId().toString());
         } catch (DuplicateKeyException duplicate) { throw new DomainException("SUPPLIER_PAYMENT_EXECUTION_PENDING", "Original supplier authorization already has a cashier execution owner"); }
         append(value);
@@ -93,9 +95,9 @@ public class JdbcSupplierPaymentExecutionRepository {
     /** 有界扫描只返回任务标识，不在队列列表中输出账户选择。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM supplier_payment_execution_request WHERE (status='QUEUED' AND next_attempt_at<=?)
+                SELECT tenant_id,id,trace_id FROM supplier_payment_execution_request WHERE (status='QUEUED' AND next_attempt_at<=?)
                 OR (status='RUNNING' AND lease_until<=?) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), timestamp(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
     }
 
     private SupplierPaymentExecutionRequest restore(ResultSet row, int index) throws SQLException {
@@ -133,5 +135,8 @@ public class JdbcSupplierPaymentExecutionRepository {
      * 后台扫描不加载供应商或财务正文。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }

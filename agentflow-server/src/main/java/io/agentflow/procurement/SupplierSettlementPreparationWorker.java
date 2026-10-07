@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,14 +30,16 @@ public class SupplierSettlementPreparationWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Supplier settlement preparation must run outside a database transaction");
         for (var candidate : preparations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-settlement-preparation", candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input(); var result = reader.read(input.payment().command(), input.accountingDate()); execution.finish(claimed, result, Instant.now());
-                } catch (RuntimeException failed) {
-                    execution.fail(claimed, Instant.now()); LOG.error("Supplier settlement preparation failed, errorCode={}, preparationId={}", "SUPPLIER_SETTLEMENT_READ_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failed) { LOG.error("Supplier settlement preparation worker failed, errorCode={}, preparationId={}", "SUPPLIER_SETTLEMENT_PREPARATION_FAILURE", candidate.id()); }
+                    var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var input = claimed.input(); var result = reader.read(input.payment().command(), input.accountingDate()); execution.finish(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) {
+                        execution.fail(claimed, Instant.now()); LOG.error("Supplier settlement preparation failed, errorCode={}, preparationId={}", "SUPPLIER_SETTLEMENT_READ_FAILURE", candidate.id());
+                    }
+                } catch (RuntimeException failed) { LOG.error("Supplier settlement preparation worker failed, errorCode={}, preparationId={}", "SUPPLIER_SETTLEMENT_PREPARATION_FAILURE", candidate.id()); }
+            }
         }
     }
 }

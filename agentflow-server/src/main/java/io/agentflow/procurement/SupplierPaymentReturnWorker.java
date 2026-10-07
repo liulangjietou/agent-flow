@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,13 +29,15 @@ public class SupplierPaymentReturnWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Supplier return reads must execute outside a database transaction");
         for (var candidate : checks.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
-                try { service.finish(claimed, gateway.query(claimed.input().request()), Instant.now()); }
-                catch (RuntimeException failure) {
-                    service.fail(claimed, Instant.now()); LOG.error("Supplier return read failed, errorCode={}, checkId={}", "SUPPLIER_PAYMENT_RETURN_READ_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failure) { LOG.error("Supplier return worker failed, errorCode={}, checkId={}", "SUPPLIER_PAYMENT_RETURN_WORKER_FAILURE", candidate.id()); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-payment-return", candidate.id().toString()).open()) {
+                try {
+                    var claimed = service.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try { service.finish(claimed, gateway.query(claimed.input().request()), Instant.now()); }
+                    catch (RuntimeException failure) {
+                        service.fail(claimed, Instant.now()); LOG.error("Supplier return read failed, errorCode={}, checkId={}", "SUPPLIER_PAYMENT_RETURN_READ_FAILURE", candidate.id());
+                    }
+                } catch (RuntimeException failure) { LOG.error("Supplier return worker failed, errorCode={}, checkId={}", "SUPPLIER_PAYMENT_RETURN_WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
 }

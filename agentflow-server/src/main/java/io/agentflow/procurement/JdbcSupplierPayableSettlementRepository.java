@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import java.sql.ResultSet;
@@ -48,10 +50,10 @@ public class JdbcSupplierPayableSettlementRepository {
                 || !value.equals(SupplierPayableSettlementOperation.queue(command, value.createdAt()))) throw conflict();
         try {
             jdbc.update("""
-                    INSERT INTO supplier_payable_settlement_operation(tenant_id,id,preparation_version,payment_id,payment_version,reservation_id,command_json,command_digest,state_json,
+                    INSERT INTO supplier_payable_settlement_operation(trace_id,tenant_id,id,preparation_version,payment_id,payment_version,reservation_id,command_json,command_digest,state_json,
                     version,status,attempts,dispatches,highest_revision,created_at,updated_at,next_attempt_at,active_payment_id)
-                    VALUES(?,?,?,?,?,?,?,?,?,1,'QUEUED',0,0,0,?,?,?,?)
-                    """, command.tenantId(), command.id().toString(), preparation.version(), command.payment().id().toString(), command.paymentVersion(), reservation.id().toString(),
+                    VALUES(?,?,?,?,?,?,?,?,?,?,1,'QUEUED',0,0,0,?,?,?,?)
+                    """, DiagnosticContext.capture().traceId(), command.tenantId(), command.id().toString(), preparation.version(), command.payment().id().toString(), command.paymentVersion(), reservation.id().toString(),
                     json.write(command), command.digest(), json.write(value), timestamp(value.createdAt()), timestamp(value.updatedAt()), timestamp(value.nextAttemptAt()), command.payment().id().toString());
         } catch (DuplicateKeyException duplicate) { throw new DomainException("SUPPLIER_SETTLEMENT_PENDING", "Original bank payment already has an active settlement command"); }
         append(value);
@@ -194,21 +196,21 @@ public class JdbcSupplierPayableSettlementRepository {
     /** 恢复扫描排除已结束尝试；状态未知只能由领域领取原号查询。 */
     public List<Candidate> due(Instant now) {
         return jdbc.query("""
-                SELECT tenant_id,id FROM supplier_payable_settlement_operation WHERE retired_version IS NULL AND ((status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
+                SELECT tenant_id,id,trace_id FROM supplier_payable_settlement_operation WHERE retired_version IS NULL AND ((status IN ('QUEUED','UNKNOWN') AND next_attempt_at<=?)
                 OR (status IN ('CHECKING','SETTLING','QUERYING') AND lease_until<=?)) ORDER BY COALESCE(next_attempt_at,lease_until),created_at,id LIMIT 10
-                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now), timestamp(now));
+                """, (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now), timestamp(now));
     }
 
     /** ERP 已确认但本地暂等银行复核时，只补原占用完成，不再调用任何结算写入。 */
     public List<Candidate> awaitingLocalCompletion() {
         return jdbc.query("""
-                SELECT o.tenant_id,o.id FROM supplier_payable_settlement_operation o
+                SELECT o.tenant_id,o.id,o.trace_id FROM supplier_payable_settlement_operation o
                 JOIN procurement_payable_reservation r ON r.tenant_id=o.tenant_id AND r.id=o.reservation_id
                 JOIN supplier_payment_operation b ON b.tenant_id=o.tenant_id AND b.id=o.payment_id
                 WHERE o.status='SETTLED' AND o.retired_version IS NULL AND r.version=1 AND b.status='SUCCEEDED'
                 AND NOT (%s)
                 ORDER BY o.updated_at,o.id LIMIT 10
-                """.formatted(SupplierPayableReturnGuard.BLOCKED_SQL), (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))));
+                """.formatted(SupplierPayableReturnGuard.BLOCKED_SQL), (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")));
     }
     private SupplierPayableSettlementOperation restore(ResultSet row, int index) throws SQLException {
         var value = json.read(row.getString("state_json"), SupplierPayableSettlementOperation.class); var command = value.command();
@@ -248,5 +250,8 @@ public class JdbcSupplierPayableSettlementRepository {
      * 后台扫描只返回结算身份。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }

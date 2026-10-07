@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,14 +29,16 @@ public class SupplierPaymentExecutionWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Supplier cashier preparation must run outside a database transaction");
         for (var candidate : requests.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-payment-execution", candidate.id().toString()).open()) {
                 try {
-                    var result = reader.read(execution.authorization(claimed), claimed.input().cashier()); execution.finish(claimed, result, Instant.now());
-                } catch (RuntimeException failed) {
-                    execution.fail(claimed, Instant.now()); LOG.error("Supplier cashier preparation failed, errorCode={}, requestId={}", "SUPPLIER_EXECUTION_READ_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failed) { LOG.error("Supplier cashier worker failed, errorCode={}, requestId={}", "SUPPLIER_EXECUTION_WORKER_FAILURE", candidate.id()); }
+                    var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var result = reader.read(execution.authorization(claimed), claimed.input().cashier()); execution.finish(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) {
+                        execution.fail(claimed, Instant.now()); LOG.error("Supplier cashier preparation failed, errorCode={}, requestId={}", "SUPPLIER_EXECUTION_READ_FAILURE", candidate.id());
+                    }
+                } catch (RuntimeException failed) { LOG.error("Supplier cashier worker failed, errorCode={}, requestId={}", "SUPPLIER_EXECUTION_WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
 }

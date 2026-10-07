@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,15 +29,17 @@ public class SupplierPayableReviewWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Supplier payable review worker must execute outside a database transaction");
         for (var candidate : reviews.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-payable-review", candidate.id().toString()).open()) {
                 try {
-                    var source = claimed.input().source().reservation().source(); var round = source.round();
-                    var result = gateway.payable(source.tenantId(), round.targetDigest(), round.payable().request()); execution.finish(claimed, result, Instant.now());
-                } catch (RuntimeException failed) {
-                    execution.fail(claimed, Instant.now()); LOG.error("Supplier payable review failed, errorCode={}, reviewId={}", "REVIEW_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failed) { LOG.error("Supplier payable review worker failed, errorCode={}, reviewId={}", "REVIEW_WORKER_FAILURE", candidate.id()); }
+                    var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var source = claimed.input().source().reservation().source(); var round = source.round();
+                        var result = gateway.payable(source.tenantId(), round.targetDigest(), round.payable().request()); execution.finish(claimed, result, Instant.now());
+                    } catch (RuntimeException failed) {
+                        execution.fail(claimed, Instant.now()); LOG.error("Supplier payable review failed, errorCode={}, reviewId={}", "REVIEW_FAILURE", candidate.id());
+                    }
+                } catch (RuntimeException failed) { LOG.error("Supplier payable review worker failed, errorCode={}, reviewId={}", "REVIEW_WORKER_FAILURE", candidate.id()); }
+            }
         }
     }
 }

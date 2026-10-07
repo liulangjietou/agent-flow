@@ -87,6 +87,7 @@ class SupplierFinanceWorkflowTest {
     private UUID financeAppointment;
     private UUID cashierAppointment;
     private BiFunction<String, JsonNode, String> responder;
+    private final java.util.List<String> traceHeaders = new java.util.concurrent.CopyOnWriteArrayList<>();
     private int returnRevision = 1;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
@@ -181,6 +182,109 @@ class SupplierFinanceWorkflowTest {
     }
     @AfterAll static void closeServer() { SERVER.stop(0); }
 
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"REVIEW", "HOLD", "REQUEST", "PAYMENT", "SETTLEMENT_PREPARATION", "SETTLEMENT", "RETURN", "ADJUSTMENT_PREPARATION", "ADJUSTMENT"})
+    void queuedSupplierOriginSurvivesActualHttpAndDerivedOperations(String kind) throws Exception {
+        UUID parent; String endpoint, actor = "finance"; Map<String, Object> body;
+        if (kind.equals("REVIEW") || kind.equals("HOLD")) {
+            parent = approved();
+            if (kind.equals("HOLD")) queueAndRead(parent);
+            endpoint = financePath(parent) + (kind.equals("REVIEW") ? "/reviews" : "/authorizations");
+            body = kind.equals("REVIEW") ? reviewInput(parent) : authorizeInput(parent, view(parent, "finance"));
+        } else if (kind.equals("REQUEST") || kind.equals("PAYMENT")) {
+            parent = authorizedHold(approved()); actor = "cashier";
+            endpoint = cashierPath(parent) + "/actions"; body = executeInput(cashierView(parent));
+        } else {
+            parent = paidBank();
+            if (kind.startsWith("ADJUSTMENT")) {
+                registerFunds(parent); endpoint = adjustmentPreparePath(parent); body = adjustmentInput(adjustmentView(parent));
+            } else if (kind.equals("RETURN")) {
+                endpoint = returnPath(parent) + "/checks"; body = returnQuery(returnView(parent));
+            } else { endpoint = settlementPreparePath(parent); body = settlementInput(settlementView(parent)); }
+        }
+        String key = UUID.randomUUID().toString(); var response = send(endpoint, actor, key, body); var receipt = ok(response, 202);
+        String origin = response.getHeader("X-Trace-Id");
+        var replay = send(endpoint, actor, key, body);
+        assertThat(replay.getContentAsString()).isEqualTo(response.getContentAsString());
+        assertThat(replay.getHeader("X-Trace-Id")).isNotEqualTo(origin);
+        UUID id = UUID.fromString(receipt.path(switch (kind) {
+            case "REVIEW" -> "reviewId"; case "HOLD" -> "authorizationId"; case "RETURN" -> "checkId"; default -> "preparationId";
+        }).asText());
+        if (kind.equals("PAYMENT")) { pollSupplierTrace("REQUEST", id); id = parent; }
+        if (kind.equals("SETTLEMENT")) pollSupplierTrace("SETTLEMENT_PREPARATION", id);
+        if (kind.equals("ADJUSTMENT")) pollSupplierTrace("ADJUSTMENT_PREPARATION", id);
+        traceHeaders.clear();
+        try (var outer = new io.agentflow.observability.DiagnosticContext(UUID.randomUUID().toString(), "caller").open()) {
+            var before = org.slf4j.MDC.getCopyOfContextMap(); pollSupplierTrace(kind, id);
+            assertThat(org.slf4j.MDC.getCopyOfContextMap()).isEqualTo(before);
+        }
+        assertThat(traceHeaders).isNotEmpty().allSatisfy(trace -> assertThat(trace).isEqualTo(origin));
+        String table = switch (kind) {
+            case "REVIEW" -> "supplier_payable_review"; case "HOLD" -> "supplier_payable_hold_operation";
+            case "REQUEST" -> "supplier_payment_execution_request"; case "PAYMENT" -> "supplier_payment_operation";
+            case "SETTLEMENT_PREPARATION" -> "supplier_settlement_preparation"; case "SETTLEMENT" -> "supplier_payable_settlement_operation";
+            case "RETURN" -> "supplier_payment_return_check"; case "ADJUSTMENT_PREPARATION" -> "supplier_adjustment_preparation";
+            default -> "supplier_payable_adjustment_operation";
+        };
+        assertThat(jdbc.queryForObject("SELECT trace_id FROM " + table + " WHERE tenant_id='demo' AND id=?", String.class, id.toString())).isEqualTo(origin);
+        assertThat(org.slf4j.MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+
+    /** 只缩小扫描范围，候选内容仍来自真实仓储，避免测试自己伪造追踪来源。 */
+    private void pollSupplierTrace(String kind, UUID id) {
+        switch (kind) {
+            case "ADJUSTMENT_PREPARATION" -> {
+                var candidates = org.mockito.Mockito.mock(JdbcSupplierAdjustmentPreparationRepository.class);
+                org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenAnswer(ignored -> adjustmentPreparations.due(Instant.now()).stream().filter(value -> value.id().equals(id)).toList());
+                new SupplierAdjustmentPreparationWorker(candidates, adjustmentPreparation, adjustmentReader).poll();
+            }
+            case "ADJUSTMENT" -> {
+                var candidates = org.mockito.Mockito.mock(JdbcSupplierPayableAdjustmentRepository.class);
+                org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenAnswer(ignored -> adjustments.due(Instant.now()).stream().filter(value -> value.id().equals(id)).toList());
+                org.mockito.Mockito.when(candidates.awaitingLocalCompletion()).thenAnswer(ignored -> adjustments.awaitingLocalCompletion().stream().filter(value -> value.id().equals(id)).toList());
+                org.mockito.Mockito.when(candidates.find("demo", id)).thenAnswer(ignored -> adjustments.find("demo", id));
+                new SupplierAdjustmentWorker(candidates, adjustmentExecution, adjustmentReader, adjustmentPort, returnPort, adjustmentCompletion).poll();
+            }
+            case "HOLD" -> {
+                var candidates = org.mockito.Mockito.mock(JdbcSupplierPayableHoldRepository.class);
+                org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenAnswer(ignored -> holds.due(Instant.now()).stream().filter(value -> value.id().equals(id)).toList());
+                new SupplierPayableHoldWorker(candidates, holdService, holdPort).poll();
+            }
+            case "REVIEW" -> {
+                var candidates = org.mockito.Mockito.mock(JdbcSupplierPayableReviewRepository.class);
+                org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenAnswer(ignored -> payableReviews.due(Instant.now()).stream().filter(value -> value.id().equals(id)).toList());
+                new SupplierPayableReviewWorker(candidates, reviewService, payablePort).poll();
+            }
+            case "REQUEST" -> {
+                var candidates = org.mockito.Mockito.mock(JdbcSupplierPaymentExecutionRepository.class);
+                org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenAnswer(ignored -> cashierRequests.due(Instant.now()).stream().filter(value -> value.id().equals(id)).toList());
+                new SupplierPaymentExecutionWorker(candidates, cashierPreparation, bankReader).poll();
+            }
+            case "RETURN" -> {
+                var candidates = org.mockito.Mockito.mock(JdbcSupplierPaymentReturnCheckRepository.class);
+                org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenAnswer(ignored -> returnChecks.due(Instant.now()).stream().filter(value -> value.id().equals(id)).toList());
+                new SupplierPaymentReturnWorker(candidates, returnService, returnPort).poll();
+            }
+            case "PAYMENT" -> {
+                var candidates = org.mockito.Mockito.mock(JdbcSupplierPaymentOperationRepository.class);
+                org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenAnswer(ignored -> bankPayments.due(Instant.now()).stream().filter(value -> value.id().equals(id)).toList());
+                new SupplierPaymentWorker(candidates, bankService, bankReader, bankPort).poll();
+            }
+            case "SETTLEMENT_PREPARATION" -> {
+                var candidates = org.mockito.Mockito.mock(JdbcSupplierSettlementPreparationRepository.class);
+                org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenAnswer(ignored -> settlementPreparations.due(Instant.now()).stream().filter(value -> value.id().equals(id)).toList());
+                new SupplierSettlementPreparationWorker(candidates, settlementPreparation, settlementReader).poll();
+            }
+            case "SETTLEMENT" -> {
+                var candidates = org.mockito.Mockito.mock(JdbcSupplierPayableSettlementRepository.class);
+                org.mockito.Mockito.when(candidates.due(org.mockito.ArgumentMatchers.any())).thenAnswer(ignored -> settlements.due(Instant.now()).stream().filter(value -> value.id().equals(id)).toList());
+                org.mockito.Mockito.when(candidates.awaitingLocalCompletion()).thenAnswer(ignored -> settlements.awaitingLocalCompletion().stream().filter(value -> value.id().equals(id)).toList());
+                new SupplierSettlementWorker(candidates, settlementExecution, settlementReader, settlementPort).poll();
+            }
+            default -> throw new IllegalArgumentException("Unknown synthetic supplier queue");
+        }
+    }
 
     @Test void supplierPaymentResultNotifiesOriginalParticipantsWithoutCopyingFinancialFields() throws Exception {
         UUID id = paidBank(); var payment = bankPayments.find("demo", id).orElseThrow();
@@ -1976,6 +2080,7 @@ class SupplierFinanceWorkflowTest {
             server.createContext("/finance/", exchange -> {
                 var active = ACTIVE.get(); String operation = exchange.getRequestURI().getPath().substring("/finance/".length());
                 active.calls.computeIfAbsent(operation, key -> new AtomicInteger()).incrementAndGet();
+                active.traceHeaders.add(String.valueOf(exchange.getRequestHeaders().getFirst("X-Trace-Id")));
                 var request = active.json.read(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8), JsonNode.class);
                 byte[] bytes = active.responder.apply(operation, request).getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().set("Content-Type", "application/json"); exchange.sendResponseHeaders(200, bytes.length);

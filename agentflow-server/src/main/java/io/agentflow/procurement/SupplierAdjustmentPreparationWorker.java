@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,14 +30,16 @@ public class SupplierAdjustmentPreparationWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Supplier adjustment preparation must run outside a database transaction");
         for (var candidate : preparations.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-adjustment-preparation", candidate.id().toString()).open()) {
                 try {
-                    var input = claimed.input(); execution.finish(claimed, reader.read(input.source(), input.accountingDate()), Instant.now());
-                } catch (RuntimeException failed) {
-                    execution.fail(claimed, Instant.now()); LOG.error("Supplier adjustment preparation failed, errorCode={}, preparationId={}", "SUPPLIER_ADJUSTMENT_READ_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failed) { LOG.error("Supplier adjustment preparation worker failed, errorCode={}, preparationId={}", "SUPPLIER_ADJUSTMENT_PREPARATION_FAILURE", candidate.id()); }
+                    var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        var input = claimed.input(); execution.finish(claimed, reader.read(input.source(), input.accountingDate()), Instant.now());
+                    } catch (RuntimeException failed) {
+                        execution.fail(claimed, Instant.now()); LOG.error("Supplier adjustment preparation failed, errorCode={}, preparationId={}", "SUPPLIER_ADJUSTMENT_READ_FAILURE", candidate.id());
+                    }
+                } catch (RuntimeException failed) { LOG.error("Supplier adjustment preparation worker failed, errorCode={}, preparationId={}", "SUPPLIER_ADJUSTMENT_PREPARATION_FAILURE", candidate.id()); }
+            }
         }
     }
 }

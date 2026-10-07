@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,23 +31,27 @@ public class SupplierSettlementWorker {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Supplier settlement execution must run outside a database transaction");
         for (var candidate : settlements.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
-            try {
-                var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-settlement", candidate.id().toString()).open()) {
                 try {
-                    if (claimed.status() == SupplierPayableSettlementOperation.Status.CHECKING) {
-                        var command = claimed.command(); var result = reader.read(command.payment(), command.period().request().accountingDate());
-                        claimed = execution.ready(claimed, result, Instant.now()); if (claimed == null) continue;
-                        claimed.requireSendAt(Instant.now()); execution.finish(claimed, gateway.settle(claimed.command(), claimed.evidence()), Instant.now());
-                    } else execution.finish(claimed, gateway.query(claimed.command()), Instant.now());
-                } catch (RuntimeException failed) {
-                    execution.fail(claimed, Instant.now()); LOG.error("Supplier settlement dispatch failed, errorCode={}, operationId={}", "SUPPLIER_SETTLEMENT_DISPATCH_FAILURE", candidate.id());
-                }
-            } catch (RuntimeException failed) { LOG.error("Supplier settlement worker failed, errorCode={}, operationId={}", "SUPPLIER_SETTLEMENT_WORKER_FAILURE", candidate.id()); }
+                    var claimed = execution.claim(candidate.tenantId(), candidate.id(), Instant.now()); if (claimed == null) continue;
+                    try {
+                        if (claimed.status() == SupplierPayableSettlementOperation.Status.CHECKING) {
+                            var command = claimed.command(); var result = reader.read(command.payment(), command.period().request().accountingDate());
+                            claimed = execution.ready(claimed, result, Instant.now()); if (claimed == null) continue;
+                            claimed.requireSendAt(Instant.now()); execution.finish(claimed, gateway.settle(claimed.command(), claimed.evidence()), Instant.now());
+                        } else execution.finish(claimed, gateway.query(claimed.command()), Instant.now());
+                    } catch (RuntimeException failed) {
+                        execution.fail(claimed, Instant.now()); LOG.error("Supplier settlement dispatch failed, errorCode={}, operationId={}", "SUPPLIER_SETTLEMENT_DISPATCH_FAILURE", candidate.id());
+                    }
+                } catch (RuntimeException failed) { LOG.error("Supplier settlement worker failed, errorCode={}, operationId={}", "SUPPLIER_SETTLEMENT_WORKER_FAILURE", candidate.id()); }
+            }
         }
         for (var candidate : settlements.awaitingLocalCompletion()) {
             if (Thread.currentThread().isInterrupted()) return;
-            try { execution.completeLocal(candidate.tenantId(), candidate.id(), Instant.now()); }
-            catch (RuntimeException failed) { LOG.error("Supplier local settlement completion failed, errorCode={}, operationId={}", "SUPPLIER_SETTLEMENT_COMPLETION_FAILURE", candidate.id()); }
+            try (var scope = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), "supplier-settlement", candidate.id().toString()).open()) {
+                try { execution.completeLocal(candidate.tenantId(), candidate.id(), Instant.now()); }
+                catch (RuntimeException failed) { LOG.error("Supplier local settlement completion failed, errorCode={}, operationId={}", "SUPPLIER_SETTLEMENT_COMPLETION_FAILURE", candidate.id()); }
+            }
         }
     }
 }

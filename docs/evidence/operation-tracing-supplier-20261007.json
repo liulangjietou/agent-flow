@@ -1,0 +1,123 @@
+{
+  "recordedAt": "2026-10-07T15:39:45.517828+00:00",
+  "taskId": "O01",
+  "status": "SUPPLIER_STAGE_PASSED_O01_OPEN",
+  "sourceBaseCommit": "2b48da7e81ca09e50123ba573a95e67cd1e8770d",
+  "sourceHashes": {
+    "agentflow-server/src/main/java/io/agentflow/procurement/JdbcSupplierAdjustmentPreparationRepository.java": "67310a212d9c0b52e50fc0bd11916f472ff6c9b640236264da2ccc2c7a20de2c",
+    "agentflow-server/src/main/java/io/agentflow/procurement/JdbcSupplierPayableAdjustmentRepository.java": "ec28926c3a62e0f5ef68a0e6af4773ec2fcfd06dc571f28f963a43b2cbc59375",
+    "agentflow-server/src/main/java/io/agentflow/procurement/JdbcSupplierPayableHoldRepository.java": "651237f34effc200931a1d381696fb45463c4adff20e43a41f03c02c9b4ac00e",
+    "agentflow-server/src/main/java/io/agentflow/procurement/JdbcSupplierPayableReviewRepository.java": "deec0306f269b1def075b83b68a114c4a12b77267bd494857797ff875464eb87",
+    "agentflow-server/src/main/java/io/agentflow/procurement/JdbcSupplierPayableSettlementRepository.java": "95e510ff9cd2f13ff62b28a549494d3887f01726fd277232ad9215bd205522f8",
+    "agentflow-server/src/main/java/io/agentflow/procurement/JdbcSupplierPaymentExecutionRepository.java": "11e3fc5c56e424de5b418c0eba1e7bff58aba1884d75b2e14ddc96c4b6b1fda4",
+    "agentflow-server/src/main/java/io/agentflow/procurement/JdbcSupplierPaymentOperationRepository.java": "39ad77389591af7bdbe1d41fd277eafed883cb9982bb12a04650c62b16632040",
+    "agentflow-server/src/main/java/io/agentflow/procurement/JdbcSupplierPaymentReturnCheckRepository.java": "1773b9d7ce5579a16ae85062a780241c96261470de1da8145c82f754f791dad4",
+    "agentflow-server/src/main/java/io/agentflow/procurement/JdbcSupplierSettlementPreparationRepository.java": "0deb07481ff4b80e1fb745ee4f5fe7c647e4ef4e595b8784ee5b5004063c7c2e",
+    "agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentPreparationWorker.java": "0b5f92a252aa2bb64d573e905e0b79478c3292ad8ecb5a6d76e35c026f0552ac",
+    "agentflow-server/src/main/java/io/agentflow/procurement/SupplierAdjustmentWorker.java": "4c0a785635c6d23c53cd9fda91fe8bfe8923c674a6fd729680d46ddbab263fd5",
+    "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableHoldWorker.java": "4406e8f31f1f8603a38c5b2eb5ab86e8fed192b6ceabc206e65e531bc0bc9bab",
+    "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPayableReviewWorker.java": "bfa4854607b7da636cc3a69b6132aa4b425266c31914045a670e4bd9f69df5ba",
+    "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentExecutionWorker.java": "2db4107f0444b40f4dfaf97d3ceae1323d2e647f127129ad66f82c6b23469ee2",
+    "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentReturnWorker.java": "d0b12f2c6289d50daa7d686779e81ac8c726c1f4f95f86505b8f4459c43c9599",
+    "agentflow-server/src/main/java/io/agentflow/procurement/SupplierPaymentWorker.java": "3c756d10b662353646be16793d76a481865cc56fabdfa016356d591a727b494b",
+    "agentflow-server/src/main/java/io/agentflow/procurement/SupplierSettlementPreparationWorker.java": "77fb5d3de35edb2b0d87194bf113424520146dfa5d466a6705e71ffe123e8211",
+    "agentflow-server/src/main/java/io/agentflow/procurement/SupplierSettlementWorker.java": "cc2a61b662815ba0b14d1cf97518042a3a4b1f37c24ef24a7a673a83bfed20c8",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierAdjustmentPersistenceTest.java": "148f37078dd050c7d9048373939d8009ffc9770b4885e156bd61b465b84777a0",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierFinanceWorkflowTest.java": "c10c13f4151f702418d5a3cc3c6044597137623bc319c46845e0dd5f408dce44",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierPayableHoldPersistenceTest.java": "90fea1338bb0ce872aad200e9fe23f4b2e9f16557d065f12ad9b3eb1fd593391",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierPayableReviewPersistenceTest.java": "b928bd0ff12ceb61600e0a89f2bcbef8c7e57aabad92006dce9d1613895f548c",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierPaymentPersistenceTest.java": "e42b7b298ea749cd1114423c8eae6c2cb41545b50ff43f173cfaf64ec0109a09",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierSettlementPersistenceTest.java": "952b0da8c0308041d3bd5d7639564c69661f9426e8906ac28f0efc0db1c27d9a",
+    "scripts/check-financial-review-trace-runtime.py": "5798a05a289bd0ef68e3d650081627884a78fab4755943bd3a3b744365edceef",
+    "agentflow-server/src/main/resources/db/migration/V126__supplier_origin_traces.sql": "83a38f62e79e2e8ccff27a211bd7e4c98c20e27b48ad2b74eabf8061d675d80e",
+    "agentflow-server/src/test/java/io/agentflow/observability/SupplierWorkerTraceTest.java": "caabb1597c4d4666ea153d4993ed9427490bb6c1a12a6026100876ebd3d50aa2",
+    "agentflow-server/src/test/java/io/agentflow/procurement/SupplierMigrationJdbcTemplate.java": "5e93920bdad4acb11ec26468a750506e9d14cc6241e3009f9599c8cd499a0cbb",
+    "scripts/check-supplier-trace-runtime.py": "fa956326451bf3fa417363e5a8167da710806c81241908fa2617d00be391c6ed",
+    "scripts/fixtures/SupplierTracePeer.py": "fb888ac7e44bbf1e296e54bb0a826f4085167311c89f1799a62f4d531cb47205",
+    "scripts/check-definition-diagram-runtime.py": "e23f3ba8e72e1e29922d9027a542ba025f542f691a97876970eefeac8934da01",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7",
+    "scripts/check-agent-trace-runtime.py": "ac736d5fe00b636419d185d7d69e4a66adfefebc244fe2d9931e4b9aecd19a66",
+    "scripts/check-operation-trace-runtime.py": "8d0da2af3281f9372c970acebb65871f1c53a9d9e99d95cf82f48ec777b37dc9",
+    "scripts/payment-due-dates-support/CompareH2Schema.java": "4e92f585f39d6ce6a43bd400a31216179e8b7f15f5f676abd80b5fb7b12a0a3b",
+    "agentflow-server/src/main/java/io/agentflow/observability/DiagnosticContext.java": "ae93629262febc126657711a0306aa0a334f381e8002813b129d1d09b82e5004",
+    "agentflow-server/src/main/java/io/agentflow/finance/FinanceGatewayClient.java": "4380d649a3a0b93fb369c75afec409e281efd24d5200a11115b3c9007b8484b1"
+  },
+  "jar": "/fyoung/tmp/agentflow-remaining-20260928/o01-supplier-trace-server.jar",
+  "jarSha256": "c868bfa233bf44e0372475babfcb3ab09b8d7fe2ec9d16b6776b05dc0339f944",
+  "redTests": 20,
+  "scopeUniqueTests": 356,
+  "runtime": {
+    "status": "PASS",
+    "jarSha256": "c868bfa233bf44e0372475babfcb3ab09b8d7fe2ec9d16b6776b05dc0339f944",
+    "previousJarSha256": "567819e4b2b4dfe761e1e237530cfbc7099777c9382f8e92e3b0c83918e656f9",
+    "database": "H2",
+    "browserVerified": false,
+    "postgresqlVerified": false,
+    "checks": [
+      {
+        "name": "nonempty-upgrade",
+        "tables": 280,
+        "newNullableColumns": 9,
+        "populatedQueueTypes": 7
+      },
+      {
+        "name": "origin-recovery-and-replay",
+        "parentQueueTypes": 6,
+        "derivedQueueTypes": 3,
+        "legacyGatewayCounts": {
+          "REVIEW": 1,
+          "HOLD": 1,
+          "REQUEST": 7,
+          "RETURN": 1,
+          "SETTLEMENT_PREPARATION": 7,
+          "ADJUSTMENT_PREPARATION": 8
+        },
+        "currentGatewayCounts": {
+          "REVIEW": 1,
+          "HOLD": 1,
+          "REQUEST": 9,
+          "RETURN": 1,
+          "SETTLEMENT_PREPARATION": 9,
+          "ADJUSTMENT_PREPARATION": 8
+        },
+        "originalKeyReplays": 12,
+        "commands": 22,
+        "duplicateCommands": 0
+      },
+      {
+        "name": "independent-restore",
+        "tables": 280,
+        "sameAuthorizedDetails": 12,
+        "resentRequests": 0
+      }
+    ],
+    "boots": 8,
+    "businessHttpRequests": 376,
+    "responseTraces": 420,
+    "gatewayRequests": 140
+  },
+  "workerCount": 9,
+  "completionEntrances": 2,
+  "archive": "/fyoung/tmp/agentflow-remaining-20260928/o01-supplier-trace-verified/manifest.json",
+  "archiveSha256": "40d7134fd76c7baf2f8a87328ba77604675aca19e3da43c096f61c9cfef06f22",
+  "review": {
+    "mode": "SELF_REVIEW",
+    "unresolvedFindingsInStage": [],
+    "independentReview": false
+  },
+  "scope": [
+    "9 queues persist origin in the original transaction; 9 workers and 2 local completion entrances restore before claim/read",
+    "Request identity survives preparation and derived payment/settlement/adjustment operations; inputs, command digests and authorization remain unchanged",
+    "Legacy migration fixtures preserve pre-V126 SQL; fixed package verifies old empty origins without writing them back"
+  ],
+  "fixtureCorrection": "First runtime attempt correctly rejected a synthetic 10-minute bank-return validity window; final fixture uses 4 minutes within the existing 5-minute maximum. No product validation was relaxed.",
+  "remaining": [
+    "6 other worker chains",
+    "Direct scheduler chains",
+    "Trusted business/process/task identifiers",
+    "Browser and PostgreSQL gates",
+    "Real enterprise integration"
+  ]
+}

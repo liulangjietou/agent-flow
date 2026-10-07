@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.observability.DiagnosticContext;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import java.sql.ResultSet;
@@ -40,10 +42,10 @@ public class JdbcSupplierPayableReviewRepository {
                 || !approved.equals(sources.derive(source.tenantId(), source.requestId()))) throw conflict();
         try {
             jdbc.update("""
-                    INSERT INTO supplier_payable_review(tenant_id,id,request_id,application_id,employee_id,round_no,application_version,request_version,reservation_id,
+                    INSERT INTO supplier_payable_review(trace_id,tenant_id,id,request_id,application_id,employee_id,round_no,application_version,request_version,reservation_id,
                     requested_by,requested_at,input_json,state_json,version,status,attempts,updated_at,active_request_id)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?)
-                    """, source.tenantId(), input.id().toString(), source.requestId().toString(), source.applicationId().toString(), source.employeeId(), source.round().roundNo(),
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'QUEUED',0,?,?)
+                    """, DiagnosticContext.capture().traceId(), source.tenantId(), input.id().toString(), source.requestId().toString(), source.applicationId().toString(), source.employeeId(), source.round().roundNo(),
                     approved.approval().applicationVersion(), approved.approvedRequestVersion(), reservation.id().toString(), input.requestedBy(), timestamp(input.requestedAt()),
                     json.write(input), json.write(value), timestamp(value.updatedAt()), source.requestId().toString());
         } catch (DuplicateKeyException duplicate) { throw new DomainException("SUPPLIER_PAYABLE_REVIEW_PENDING", "The current finance actor already has a pending payable review"); }
@@ -80,8 +82,8 @@ public class JdbcSupplierPayableReviewRepository {
 
     /** 单批最多十条原标识，只有只读队列和过期读取租约参与恢复。 */
     public List<Candidate> due(Instant now) {
-        return jdbc.query("SELECT tenant_id,id FROM supplier_payable_review WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY requested_at,id LIMIT 10",
-                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id"))), timestamp(now));
+        return jdbc.query("SELECT tenant_id,id,trace_id FROM supplier_payable_review WHERE status='QUEUED' OR (status='RUNNING' AND lease_until<=?) ORDER BY requested_at,id LIMIT 10",
+                (row, index) -> new Candidate(row.getString("tenant_id"), UUID.fromString(row.getString("id")), row.getString("trace_id")), timestamp(now));
     }
 
     private SupplierPayableReview restore(ResultSet row, int index) throws SQLException {
@@ -119,5 +121,8 @@ public class JdbcSupplierPayableReviewRepository {
      * 后台候选只包含租户与原读取标识。
      * @author owlzhangfq@gmail.com
      */
-    public record Candidate(String tenantId, UUID id) { }
+    public record Candidate(String tenantId, UUID id, String traceId) {
+        /** 旧候选缺来源时由工作器建立稳定诊断作用域。 */
+        public Candidate(String tenantId, UUID id) { this(tenantId, id, null); }
+    }
 }
