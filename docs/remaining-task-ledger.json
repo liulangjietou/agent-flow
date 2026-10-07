@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-07T20:54:13.432562+00:00",
+  "recordedAt": "2026-10-07T20:59:56.540155+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -2416,7 +2416,7 @@
           ]
         }
       ],
-      "observed": "本次已建立 00–05 来源摘要、307 操作库存和已确认缺口；尚未逐条关闭所有界面细节、键盘/触屏/无障碍、非功能约束及每条验收断言。",
+      "observed": "已有 114 个条款单元逐项对应原文、当前源码、明确测试断言及执行记录；Java 关联保留的 5311 项去重组合结果，前端关联 U04 的 1512 项完整通过记录。仍需核对其余规范及核减原因粒度；视觉/设备和目标环境验收保持开放。",
       "references": [
         {
           "path": "docs/product-goal-gap-audit.md",
@@ -2425,10 +2425,26 @@
         {
           "path": "docs/remaining-implementation-plan.md",
           "line": 1
+        },
+        {
+          "path": "docs/evidence/requirement-clause-audit-20261007.json",
+          "line": 1
+        },
+        {
+          "path": "docs/remaining-requirement-audit.md",
+          "line": 1
         }
       ],
       "acceptance": "对尚未证明的每条规范补到代码/准确测试/真实运行证据或已授权调整；发现新缺口追加稳定编号，不能把检索无命中或有类名当成完成证明。",
-      "dependsOn": []
+      "dependsOn": [],
+      "clauseAudit": {
+        "status": "PARTIAL_CLAUSE_AUDIT_LOCAL_ASSERTIONS_VERIFIED",
+        "verifiedClauseUnits": 114,
+        "javaUnits": 85,
+        "webUnits": 29,
+        "completeInventory": false,
+        "evidence": "docs/evidence/requirement-clause-audit-20261007.json"
+      }
     },
     {
       "id": "E01",
