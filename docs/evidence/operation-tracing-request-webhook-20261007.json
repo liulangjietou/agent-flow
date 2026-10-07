@@ -1,0 +1,147 @@
+{
+  "taskId": "O01",
+  "stage": "REQUEST_WEBHOOK",
+  "status": "PASSED_LOCAL_STAGE_O01_REMAINS_OPEN",
+  "recordedAt": "2026-10-07T13:26:49.332199+00:00",
+  "sourceBaseCommit": "f9eef1ba29b34bda01f0824ea40803269b9fffe7",
+  "sourceHashes": {
+    "agentflow-server/src/main/java/io/agentflow/api/GlobalExceptionHandler.java": "670c88ff527ba8ef530ceee4e15d67a0ca2ac4f6237d314624b0bb54a4766a77",
+    "agentflow-server/src/main/java/io/agentflow/approval/JdbcApplicationAuditAdapter.java": "6523d66970bb828cbb1e247053e4bb55d1cf32986f7e1ca88c6a3e5a9fd816c2",
+    "agentflow-server/src/main/java/io/agentflow/approval/process/JdbcTaskAuditAdapter.java": "d9bfcaa989b6ae03695a90845d7fc548895875e339434e4d4cde0fb4982fc822",
+    "agentflow-server/src/main/java/io/agentflow/auth/AuthenticationConfiguration.java": "cdc84e6e228cdd6dfe2c817befde64f8687769b0dfdd1290087954f1149071f3",
+    "agentflow-server/src/main/java/io/agentflow/auth/BearerAuthFilter.java": "d6eb7e2dd70712a9945be301ce799af5b0fb143e66249c97e035fb9748f89607",
+    "agentflow-server/src/main/java/io/agentflow/config/WebConfig.java": "9dbadcef023c32cfce30ac945235980aceb2547d7d63de626f54f1956c69bf9b",
+    "agentflow-server/src/main/java/io/agentflow/expense/ExpenseArchiveController.java": "6dad2f8734230b11a8dc7b8767d381f405d566fd163b10541a5bdb74d71ed51b",
+    "agentflow-server/src/main/java/io/agentflow/integration/ApprovalWebhookEvents.java": "495e2cac4c110aa6c98dd0b2f667afc8d8aa2727651e47713637594f9a8a332d",
+    "agentflow-server/src/main/java/io/agentflow/integration/HttpWebhookTransport.java": "a44586767d38ad682c5d25edc80ef79ed76cb97952942e49cb46edd7fd1c2a1b",
+    "agentflow-server/src/main/java/io/agentflow/integration/WebhookWorker.java": "70a66a28852230f3915d491ab6c144c6e8a4fef5e78e387b25978a565b38d318",
+    "agentflow-server/src/main/resources/application.yml": "4e28176d0996cec5b4dc4c5cc5388472c5aa7cd0202192edda3f359998f3d957",
+    "agentflow-server/src/test/java/io/agentflow/auth/OidcAuthenticationIntegrationTest.java": "6ec2ce38a954ee010e4e987ecce22ec826b9d3a20687786ac6aebe7a97c5c7f5",
+    "agentflow-server/src/test/java/io/agentflow/integration/WebhookIntegrationTest.java": "0771f7c8dfc87109ff615c846eb968906fb2591d78c225233e9e00139b81ca25",
+    "agentflow-server/src/test/java/io/agentflow/integration/WebhookTransportTest.java": "2773e0dee7c838d75f2ed25ee592b3cbdddd26c09e656339f191d00ce872eb3c",
+    "agentflow-server/src/main/java/io/agentflow/observability/DiagnosticContext.java": "dae9a00b68dc944ef24f41fbbb30402f995945415bcb4023bb432be2f3775b72",
+    "agentflow-server/src/main/java/io/agentflow/observability/RequestTrace.java": "eb2d0c6339242e876a86eacb7db2a2d3e83fab2c3af7d6edb3cf3e2674fad38a",
+    "agentflow-server/src/main/java/io/agentflow/observability/RequestTraceFilter.java": "0355c95b759e9cfd5461b567702988a2df27054fb6bd8c767af278f6be4f9e92",
+    "agentflow-server/src/test/java/io/agentflow/api/RequestTraceIntegrationTest.java": "9abb4e9ad19cbdf7b6dd1d3660ee6d743c37fed762dfd9f0b53c1dccb4d0e58b",
+    "agentflow-server/src/test/java/io/agentflow/expense/ExpenseArchiveTraceTest.java": "a0479439fa7e624846e026470e747cbc1359ec2ab6f10147cb46dc7aa6c4e829",
+    "agentflow-server/src/test/java/io/agentflow/integration/WebhookWorkerTraceTest.java": "bbdac7583f8b27ac6fc0d136eebef8a9afd8760c281b384bf602c14760b35cb5",
+    "agentflow-server/src/test/java/io/agentflow/observability/DiagnosticContextTest.java": "12b51a5b330183e825374ef70e8afbe74f60e5a63b78e4067eacc42ac7a580ae",
+    "scripts/check-operation-trace-runtime.py": "8d0da2af3281f9372c970acebb65871f1c53a9d9e99d95cf82f48ec777b37dc9",
+    "scripts/check-expense-split-routing.py": "fbddcd8aedf5b469dd17d1d690b8e208adf50277e0856ea4c514e4e7f3daea07",
+    "scripts/check-expense-risk.py": "b5d7d2deadd10d1e05849f435920700d22fc747a1b41e4703d79a6ab8b389066",
+    "scripts/check-precheck-explanation.py": "2a1049ddbedb14c5d522e1610179a1269313e3fdee7500ca30c35736d39a96e7"
+  },
+  "manifest": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/o01-request-webhook-verified/manifest.json",
+    "sha256": "2ea60c3589e83f1ec353cfb87662214503d5d34cf442715d6b406f1c8a86d701"
+  },
+  "jar": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/o01-request-webhook-server.jar",
+    "sha256": "6e457ab9934077a67b166ba515fe73fc1bd99316c5caabe95652fa74f2d9a313"
+  },
+  "reproduction": {
+    "requestTests": 5,
+    "requestFailures": 5,
+    "requestErrors": 0,
+    "boundaryTests": 7,
+    "boundaryFailures": 1,
+    "boundaryErrors": 0,
+    "cause": "Unrelated error UUIDs and event IDs; archive output executes on another thread without diagnostic context"
+  },
+  "validation": {
+    "scopedTests": 134,
+    "failures": 0,
+    "errors": 0,
+    "classes": [
+      {
+        "class": "io.agentflow.expense.ExpenseArchiveTraceTest",
+        "tests": 1
+      },
+      {
+        "class": "io.agentflow.config.WebCorsIntegrationTest",
+        "tests": 4
+      },
+      {
+        "class": "io.agentflow.auth.MetricsScrapeAuthenticationTest",
+        "tests": 3
+      },
+      {
+        "class": "io.agentflow.auth.OidcAuthenticationIntegrationTest",
+        "tests": 19
+      },
+      {
+        "class": "io.agentflow.integration.WebhookWorkerTraceTest",
+        "tests": 1
+      },
+      {
+        "class": "io.agentflow.integration.WebhookIntegrationTest",
+        "tests": 13
+      },
+      {
+        "class": "io.agentflow.integration.WebhookRetryAfterTest",
+        "tests": 17
+      },
+      {
+        "class": "io.agentflow.integration.WebhookTransportTest",
+        "tests": 6
+      },
+      {
+        "class": "io.agentflow.integration.WebhookMigrationTest",
+        "tests": 1
+      },
+      {
+        "class": "io.agentflow.observability.DiagnosticContextTest",
+        "tests": 5
+      },
+      {
+        "class": "io.agentflow.system.MetricsScrapeIntegrationTest",
+        "tests": 3
+      },
+      {
+        "class": "io.agentflow.api.RequestTraceIntegrationTest",
+        "tests": 4
+      },
+      {
+        "class": "io.agentflow.api.RequestBindingContractTest",
+        "tests": 8
+      },
+      {
+        "class": "io.agentflow.api.OpenApiContractTest",
+        "tests": 7
+      },
+      {
+        "class": "io.agentflow.approval.LifecycleAuditIntegrationTest",
+        "tests": 12
+      },
+      {
+        "class": "io.agentflow.approval.IdempotencyIntegrationTest",
+        "tests": 30
+      }
+    ],
+    "package": "PASSED",
+    "fixedRuntime": {
+      "boots": 6,
+      "httpRecords": 187,
+      "responsesWithServerTrace": 178,
+      "receivedRequests": 3,
+      "upgradeTablesUnchanged": 280,
+      "restoreTablesUnchanged": 280,
+      "outcomeUnknownThenDelivered": true,
+      "sameEventBodyTraceAfterCrash": true,
+      "existingApplicationUnchanged": true,
+      "syntheticPrivateBodyAbsentFromLogs": true
+    }
+  },
+  "selfReview": {
+    "scope": "Changed request, auth/error, audit, webhook and streaming boundaries",
+    "unresolvedFindingsInThisStage": []
+  },
+  "remaining": [
+    "Other persisted Agent and worker chains",
+    "Trusted businessNo, processInstanceId and taskId binding",
+    "PostgreSQL verification",
+    "Original V03 audit and existing delivery gates"
+  ],
+  "remotePush": false,
+  "pullRequest": null
+}

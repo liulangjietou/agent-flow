@@ -54,6 +54,38 @@ class WebhookIntegrationTest {
     @MockitoSpyBean JdbcWebhookStore store;
 
     @Test
+    void requestTraceSurvivesStoredOutboxReloadAndRetryWithoutChangingTheOriginalEvent() throws Exception {
+        String app = draft();
+        var response = mvc.perform(post("/api/v1/applications/" + app + "/submit")
+                        .header("Authorization", token("alice")).header("Idempotency-Key", UUID.randomUUID().toString())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":1}"))
+                .andExpect(status().isOk()).andReturn().getResponse();
+        String trace = response.getHeader("X-Trace-Id");
+        assertThat(trace).isNotBlank();
+        var id = deliveries(app).get(0);
+        var stored = store.get("demo", id);
+        assertThat(json.read(stored.body(), JsonNode.class).path("traceId").asText()).isEqualTo(trace);
+        assertThat(json.read(jdbc.queryForObject("SELECT payload_json FROM audit_event WHERE application_id=? AND action='SUBMIT'", String.class, app),
+                JsonNode.class).path("traceId").asText()).isEqualTo(trace);
+        doReturn(List.of(id)).when(store).due(any());
+        var received = new ArrayList<Map<String, String>>();
+        WebhookTransport transport = (target, event, body) -> {
+            assertThat(event).isEqualTo(stored.eventId());
+            assertThat(body).isEqualTo(stored.body());
+            received.add(org.slf4j.MDC.getCopyOfContextMap());
+            return DeliveryProgress.Outcome.http(received.size() == 1 ? 503 : 204);
+        };
+        new WebhookWorker(store, targets, transport, json).poll();
+        jdbc.update("UPDATE webhook_delivery SET next_attempt_at=CURRENT_TIMESTAMP WHERE id=?", id.toString());
+        // 新 worker 从 SQL 记录恢复，不继承请求线程的内存。
+        new WebhookWorker(store, targets, transport, json).poll();
+        assertThat(received).hasSize(2).allSatisfy(context -> {
+            assertThat(context).containsEntry("traceId", trace).containsEntry("tenantId", "demo");
+        });
+        assertThat(org.slf4j.MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+
+    @Test
     void submittedAndApprovedEventsShareAuditIdentityAndExcludePrivateBodies() throws Exception {
         String app = draft();
         assertThat(deliveries(app)).isEmpty();
@@ -167,7 +199,7 @@ class WebhookIntegrationTest {
         var worker = new WebhookWorker(store, targets, (target, event, body) -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
             calls.add(event + body); return DeliveryProgress.Outcome.http(calls.size() == 1 ? 503 : 204);
-        });
+        }, json);
         worker.poll(); var failed = store.get("demo", id);
         assertThat(failed.progress().status()).isEqualTo(DeliveryProgress.Status.RETRY_WAIT);
         jdbc.update("UPDATE webhook_delivery SET next_attempt_at=CURRENT_TIMESTAMP WHERE id=?", id.toString());
@@ -181,7 +213,7 @@ class WebhookIntegrationTest {
         UUID id = enqueue("demo"); doReturn(List.of(id)).when(store).due(any());
         jdbc.update("UPDATE webhook_delivery SET destination_digest=? WHERE id=?", "0".repeat(64), id.toString());
         WebhookTransport transport = mock(WebhookTransport.class);
-        new WebhookWorker(store, targets, transport).poll(); verifyNoInteractions(transport);
+        new WebhookWorker(store, targets, transport, json).poll(); verifyNoInteractions(transport);
         assertThat(store.get("demo", id).progress().errorCode()).isEqualTo("TARGET_CHANGED");
         write(ROOT + "/deliveries/" + id + "/retry", "admin", Map.of("expectedVersion", 3), UUID.randomUUID().toString(), 409);
     }

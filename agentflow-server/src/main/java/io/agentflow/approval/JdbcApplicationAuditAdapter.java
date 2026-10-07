@@ -3,6 +3,7 @@ package io.agentflow.approval;
 import io.agentflow.approval.service.ApplicationAuditPort;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.integration.ApprovalWebhookEvents;
+import io.agentflow.observability.DiagnosticContext;
 import java.time.Instant;
 import java.sql.Timestamp;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -34,6 +35,7 @@ public class JdbcApplicationAuditAdapter implements ApplicationAuditPort {
         String eventId = UUID.randomUUID().toString();
         Instant occurredAt = Instant.now();
         Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("traceId", DiagnosticContext.currentIdOr(eventId));
         payload.put("action", operation.action().name());
         payload.put("actor", operation.actor());
         payload.put("applicationId", operation.applicationId().toString());

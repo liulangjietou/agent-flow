@@ -3,6 +3,7 @@ package io.agentflow.integration;
 import io.agentflow.approval.service.ApplicationAuditPort.ApplicationOperation;
 import io.agentflow.approval.service.TaskAuditPort.TaskOperation;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -96,7 +97,7 @@ public class ApprovalWebhookEvents {
         Map<String, Object> event = new LinkedHashMap<>();
         event.put("eventId", eventId); event.put("eventType", type); event.put("tenantId", tenant);
         event.put("aggregateType", aggregateType); event.put("aggregateId", aggregateId); event.put("aggregateVersion", version);
-        event.put("occurredAt", occurredAt); event.put("traceId", traceId); event.put("payloadVersion", 1); event.put("payload", payload);
+        event.put("occurredAt", occurredAt); event.put("traceId", DiagnosticContext.currentIdOr(traceId)); event.put("payloadVersion", 1); event.put("payload", payload);
         String body = json.write(event);
         for (var target : enabled) store.append(tenant, target, eventId, type, applicationId, version, body, occurredAt);
     }

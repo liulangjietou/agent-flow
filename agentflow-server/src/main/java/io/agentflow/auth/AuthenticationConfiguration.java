@@ -6,7 +6,7 @@ import io.agentflow.event.EventIngressVerifier;
 import io.agentflow.signature.SignatureCallbackVerifier;
 import java.time.Instant;
 import java.util.Map;
-import java.util.UUID;
+import io.agentflow.observability.RequestTrace;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -65,7 +65,7 @@ public class AuthenticationConfiguration {
                     response.setStatus(403);
                     response.setContentType("application/json;charset=UTF-8");
                     response.getWriter().write(json.write(Map.of("code", "CSRF_INVALID", "message", "Refresh the session before retrying",
-                            "traceId", UUID.randomUUID().toString(), "path", request.getRequestURI())));
+                            "traceId", RequestTrace.id(request), "path", request.getRequestURI())));
                 }))
                 .oauth2Login(login -> login.clientRegistrationRepository(repository)
                         .authorizedClientRepository(new DiscardingAuthorizedClientRepository()).loginPage(home)

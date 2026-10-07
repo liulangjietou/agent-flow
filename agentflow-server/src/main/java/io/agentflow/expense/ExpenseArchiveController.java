@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.observability.DiagnosticContext;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -29,8 +30,12 @@ public class ExpenseArchiveController {
     @GetMapping("/api/v1/expense-reports/{id}/archive/content")
     public ResponseEntity<StreamingResponseBody> download(@PathVariable UUID id, @RequestParam Map<String, String> parameters) {
         var entry = workspace.download(id, parameters); int round = entry.archive().manifest().source().roundNo();
+        var trace = DiagnosticContext.capture();
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).contentType(MediaType.parseMediaType("application/zip"))
                 .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename("expense-" + id + "-round-" + round + ".zip").build().toString())
-                .header("X-Content-Type-Options", "nosniff").body(output -> files.write(entry, output));
+                .header("X-Content-Type-Options", "nosniff").body(output -> {
+                    // 流式响应在另一线程执行，仅携带诊断上下文，不复制认证主体。
+                    try (var scope = trace.open()) { files.write(entry, output); }
+                });
     }
 }

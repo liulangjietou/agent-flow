@@ -15,7 +15,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import java.sql.SQLTransactionRollbackException;
 import java.util.Map;
-import java.util.UUID;
+import io.agentflow.observability.RequestTrace;
 
 /**
  * 将领域错误转换为稳定的 API 错误契约。
@@ -88,7 +88,7 @@ public class GlobalExceptionHandler {
             String message, HttpServletRequest request) {
         return org.springframework.http.ResponseEntity.badRequest().body(Map.of(
                 "code", "INVALID_REQUEST", "message", message,
-                "traceId", UUID.randomUUID().toString(), "path", request.getRequestURI()));
+                "traceId", RequestTrace.id(request), "path", request.getRequestURI()));
     }
 
     /** 处理领域规则错误。 */
@@ -184,6 +184,6 @@ public class GlobalExceptionHandler {
         };
         return org.springframework.http.ResponseEntity.status(status).body(Map.of(
                 "code", exception.code(), "message", exception.getMessage(),
-                "traceId", UUID.randomUUID().toString(), "path", request.getRequestURI()));
+                "traceId", RequestTrace.id(request), "path", request.getRequestURI()));
     }
 }

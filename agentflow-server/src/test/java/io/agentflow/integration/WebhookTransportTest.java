@@ -19,6 +19,27 @@ import static org.assertj.core.api.Assertions.*;
  */
 class WebhookTransportTest {
     @Test
+    void realHttpPropagatesOnlyOpaqueTraceAndKeepsTheOriginalSignature() throws Exception {
+        var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        var headers = new java.util.concurrent.atomic.AtomicReference<com.sun.net.httpserver.Headers>();
+        String body = "{\"synthetic\":true}";
+        server.createContext("/trace", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            headers.set(exchange.getRequestHeaders());
+            exchange.sendResponseHeaders(204, -1); exchange.close();
+        });
+        server.start();
+        String trace = java.util.UUID.randomUUID().toString();
+        try (var scope = new io.agentflow.observability.DiagnosticContext(trace, "private-tenant").open()) {
+            assertThat(new HttpWebhookTransport().send(target(server, "/trace"), "event-1", body).success()).isTrue();
+            assertThat(headers.get().getFirst("X-Trace-Id")).isEqualTo(trace);
+            assertThat(headers.get().getFirst("X-Tenant-Id")).isNull();
+            assertThat(headers.get().getFirst("webhook-signature")).isEqualTo(HttpWebhookTransport.signature(new byte[32],
+                    "event-1", headers.get().getFirst("webhook-timestamp"), body));
+        } finally { server.stop(0); }
+    }
+
+    @Test
     void receiverRetryAfterPreventsAnEarlyAutomaticRetry() throws Exception {
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/limited", exchange -> {

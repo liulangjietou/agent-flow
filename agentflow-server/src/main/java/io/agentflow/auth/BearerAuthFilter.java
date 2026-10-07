@@ -4,6 +4,7 @@ import io.agentflow.signature.SignatureCallbackVerifier;
 
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.Actor;
+import io.agentflow.observability.RequestTrace;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -90,7 +91,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
             response.setContentType("application/json;charset=UTF-8");
             response.getWriter().write(jsonUtil.write(Map.of(
                     "code", "UNAUTHENTICATED", "message", exception.getMessage(),
-                    "traceId", java.util.UUID.randomUUID().toString(), "path", request.getRequestURI())));
+                    "traceId", RequestTrace.id(request), "path", request.getRequestURI())));
             return;
         } catch (DataAccessException unavailable) {
             response.setStatus(HttpServletResponse.SC_SERVICE_UNAVAILABLE);
@@ -98,10 +99,11 @@ public class BearerAuthFilter extends OncePerRequestFilter {
             response.setHeader("Cache-Control", "no-store");
             response.getWriter().write(jsonUtil.write(Map.of("code", "AUTHENTICATION_UNAVAILABLE",
                     "message", "Authentication storage is unavailable; retry later",
-                    "traceId", java.util.UUID.randomUUID().toString(), "path", request.getRequestURI())));
+                    "traceId", RequestTrace.id(request), "path", request.getRequestURI())));
             return;
         }
-        try {
+        RequestTrace.authenticated(request, actor.tenantId());
+        try (var scope = RequestTrace.context(request).open()) {
             currentActor.set(actor);
             // 仅认证后缓存完整原始字节，业务写接口用它核对重试；不以固定前缀代替真实 body。
             boolean fileUpload = HttpMethod.PUT.matches(request.getMethod()) && (request.getRequestURI()

@@ -1,5 +1,8 @@
 package io.agentflow.integration;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import io.agentflow.common.JsonUtil;
+import io.agentflow.observability.DiagnosticContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,10 +21,11 @@ public class WebhookWorker {
     private final JdbcWebhookStore store;
     private final WebhookTargets targets;
     private final WebhookTransport transport;
+    private final JsonUtil json;
 
     /** worker 通过独立存储 bean 的事务代理领取与确认。 */
-    public WebhookWorker(JdbcWebhookStore store, WebhookTargets targets, WebhookTransport transport) {
-        this.store = store; this.targets = targets; this.transport = transport;
+    public WebhookWorker(JdbcWebhookStore store, WebhookTargets targets, WebhookTransport transport, JsonUtil json) {
+        this.store = store; this.targets = targets; this.transport = transport; this.json = json;
     }
 
     /** 每批最多十条，单条异常不阻塞其他投递；日志不输出远端响应或密钥。 */
@@ -29,19 +33,42 @@ public class WebhookWorker {
     public void poll() {
         for (var id : store.due(Instant.now())) {
             if (Thread.currentThread().isInterrupted()) return;
+            try (var candidate = new DiagnosticContext(DiagnosticContext.legacyId("webhook-delivery", "", id.toString()), null).open()) {
+                try {
+                    var delivery = store.claim(id, Instant.now());
+                    if (delivery != null && delivery.progress().status() == DeliveryProgress.Status.IN_FLIGHT) deliver(delivery);
+                } catch (RuntimeException failure) {
+                    // 领取失败时尚未读取可信租户；日志不输出底层异常正文。
+                    LOG.error("Webhook claim failed, errorCode={}, deliveryId={}", "WORKER_FAILURE", id);
+                }
+            }
+        }
+    }
+
+    private void deliver(JdbcWebhookStore.Delivery delivery) {
+        try (var scope = context(delivery).open()) {
             try {
-                var delivery = store.claim(id, Instant.now());
-                if (delivery == null || delivery.progress().status() != DeliveryProgress.Status.IN_FLIGHT) continue;
                 var target = targets.find(delivery.tenantId(), delivery.targetId()).orElse(null);
                 DeliveryProgress.Outcome outcome;
                 if (target == null || !target.enabled()) outcome = DeliveryProgress.Outcome.failed("TARGET_UNAVAILABLE", false);
                 else if (!target.digest().equals(delivery.destinationDigest())) outcome = DeliveryProgress.Outcome.failed("TARGET_CHANGED", false);
                 else outcome = transport.send(target, delivery.eventId(), delivery.body());
-                store.finish(delivery, outcome, Instant.now());
+                boolean recorded = store.finish(delivery, outcome, Instant.now());
+                LOG.info("Webhook attempt completed, errorCode={}, deliveryId={}, eventId={}, attempt={}, recorded={}",
+                        outcome.errorCode() == null ? "NONE" : outcome.errorCode(), delivery.id(), delivery.eventId(), delivery.progress().attempts(), recorded);
             } catch (RuntimeException failure) {
-                // 未确认结果保留租约，由后续领取标记为未知；异常内容可能含部署地址，禁止直接记录。
-                LOG.error("Webhook delivery failed, errorCode={}, deliveryId={}", "WORKER_FAILURE", id);
+                // 未确认结果保留租约；在原上下文内记录分类，禁止输出正文和密钥。
+                LOG.error("Webhook delivery failed, errorCode={}, deliveryId={}", "WORKER_FAILURE", delivery.id());
             }
         }
+    }
+
+    private DiagnosticContext context(JdbcWebhookStore.Delivery delivery) {
+        String trace = null;
+        try { trace = json.read(delivery.body(), JsonNode.class).path("traceId").asText(); }
+        catch (RuntimeException ignored) { /* 旧记录没有可读追踪字段时，只补诊断关联，不重建原签名正文。 */ }
+        if (!DiagnosticContext.validTrace(trace)) trace = DiagnosticContext.legacyId("webhook-event", delivery.tenantId(), delivery.eventId());
+        // 租户只信任已持久化索引，不能从事件正文覆盖授权范围。
+        return new DiagnosticContext(trace, delivery.tenantId());
     }
 }

@@ -72,6 +72,15 @@ class OidcAuthenticationIntegrationTest {
     @AfterAll static void closeProvider() { provider.close(); }
     @BeforeEach void reset() { provider.mode = "valid"; provider.subject = "employee-42"; provider.tenant = "external"; }
 
+    @Test void csrfFailureUsesTheSameTraceAsItsResponseHeader() throws Exception {
+        var response = mvc.perform(post("/api/v1/auth/logout")).andExpect(status().isForbidden())
+                .andExpect(jsonPath("code").value("CSRF_INVALID")).andReturn().getResponse();
+        String trace = response.getHeader("X-Trace-Id");
+        assertThat(trace).isNotBlank();
+        assertThat(json.read(response.getContentAsString(), JsonNode.class).path("traceId").asText()).isEqualTo(trace);
+        assertThat(org.slf4j.MDC.getCopyOfContextMap()).isNullOrEmpty();
+    }
+
     @Test void callbackPostUsesSignatureWhileManagementStillRequiresSessionAndCsrf() throws Exception {
         String path = io.agentflow.finance.callback.PaymentCallbackVerifier.PATH;
         mvc.perform(post(path).contentType("application/json").content("{}"))

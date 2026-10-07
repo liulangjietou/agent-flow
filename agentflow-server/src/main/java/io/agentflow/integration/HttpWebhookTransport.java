@@ -1,5 +1,6 @@
 package io.agentflow.integration;
 
+import io.agentflow.observability.DiagnosticContext;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import javax.crypto.Mac;
@@ -26,11 +27,13 @@ public class HttpWebhookTransport implements WebhookTransport {
     public DeliveryProgress.Outcome send(WebhookTargets.Destination target, String eventId, String body) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Webhook transport must run outside a transaction");
         String timestamp = Long.toString(Instant.now().getEpochSecond());
-        HttpRequest request = HttpRequest.newBuilder(target.uri()).timeout(Duration.ofSeconds(5))
+        var builder = HttpRequest.newBuilder(target.uri()).timeout(Duration.ofSeconds(5))
                 .header("Content-Type", "application/json; charset=utf-8").header("User-Agent", "AgentFlow-Webhook/1")
                 .header("webhook-id", eventId).header("webhook-timestamp", timestamp)
-                .header("webhook-signature", signature(target.key(), eventId, timestamp, body))
-                .POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build();
+                .header("webhook-signature", signature(target.key(), eventId, timestamp, body));
+        // 只传播不透明标识；租户和业务详情沿用既有签名正文契约，不复制进诊断头。
+        builder.header(DiagnosticContext.HEADER, DiagnosticContext.capture().traceId());
+        HttpRequest request = builder.POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8)).build();
         var future = client.sendAsync(request, HttpResponse.BodyHandlers.discarding());
         try {
             var response = future.get(6, TimeUnit.SECONDS);

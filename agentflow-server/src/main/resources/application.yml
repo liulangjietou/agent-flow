@@ -86,6 +86,10 @@ agentflow:
   web:
     allowed-origin: ${AGENTFLOW_WEB_ORIGIN:http://localhost:5173}
 
+logging:
+  pattern:
+    level: "%5p traceId=%X{traceId:-} tenantId=%X{tenantId:-}"
+
 management:
   prometheus:
     metrics:
