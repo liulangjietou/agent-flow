@@ -2,11 +2,10 @@ spring:
   application:
     name: agentflow-server
   datasource:
-    # 外部操作紧随事务提交；关闭延迟写入及区块复用，避免强退恢复丢失已提交事实。
-    url: ${AGENTFLOW_DATASOURCE_URL:jdbc:h2:file:./data/agentflow;DB_CLOSE_ON_EXIT=FALSE;WRITE_DELAY=0;REUSE_SPACE=FALSE}
-    username: ${AGENTFLOW_DATASOURCE_USERNAME:sa}
-    password: ${AGENTFLOW_DATASOURCE_PASSWORD:}
-    driver-class-name: ${AGENTFLOW_DATASOURCE_DRIVER:org.h2.Driver}
+    url: ${AGENTFLOW_DATASOURCE_URL:jdbc:postgresql://localhost:5432/agentflow}
+    username: ${AGENTFLOW_DATASOURCE_USERNAME:root}
+    password: ${AGENTFLOW_DATASOURCE_PASSWORD:123456}
+    driver-class-name: ${AGENTFLOW_DATASOURCE_DRIVER:org.postgresql.Driver}
   flyway:
     enabled: true
     locations: classpath:db/migration
@@ -48,7 +47,6 @@ agentflow:
     precheck-worker-enabled: ${AGENTFLOW_EXPENSE_PRECHECK_WORKER_ENABLED:true}
     precheck-timeout-seconds: ${AGENTFLOW_EXPENSE_PRECHECK_TIMEOUT_SECONDS:300}
   invoices:
-    ofd-font-catalog: ${AGENTFLOW_INVOICE_OFD_FONT_CATALOG:}
     extraction-worker-enabled: ${AGENTFLOW_INVOICE_EXTRACTION_WORKER_ENABLED:true}
     verification-worker-enabled: ${AGENTFLOW_INVOICE_VERIFICATION_WORKER_ENABLED:true}
     max-wallet-bytes: ${AGENTFLOW_INVOICE_MAX_WALLET_BYTES:1073741824}
@@ -85,10 +83,6 @@ agentflow:
       enabled: ${AGENTFLOW_OIDC_BACKCHANNEL_LOGOUT:false}
   web:
     allowed-origin: ${AGENTFLOW_WEB_ORIGIN:http://localhost:5173}
-
-logging:
-  pattern:
-    level: "%5p traceId=%X{traceId:-} tenantId=%X{tenantId:-} businessNo=%X{businessNo:-} processInstanceId=%X{processInstanceId:-} taskId=%X{taskId:-}"
 
 management:
   prometheus:
