@@ -4,6 +4,48 @@ const { api, bindAuthenticationActor, writeRequests } = await import(process.env
 globalThis.localStorage = { getItem: () => 'stale-demo-token' }
 const enterprise = { mode: 'OIDC', loginUrl: '/api/v1/auth/oidc/authorize/enterprise', csrfHeader: 'X-CSRF-TOKEN', csrfToken: 'masked-csrf-one' }
 
+test('演示登录密码错误提示凭据错误，不提示会话失效', async () => {
+  globalThis.fetch = async () => Response.json({ mode: 'DEMO' })
+  await api.authOptions()
+  const credentials = { tenantId: 'demo', username: 'admin', password: 'wrong-password' }
+  let sent
+  globalThis.fetch = async (url, init) => {
+    sent = { url, ...init }
+    return Response.json({ code: 'UNAUTHENTICATED', message: 'Invalid credentials' }, { status: 401 })
+  }
+  await assert.rejects(api.login(credentials), error => {
+    assert.equal(error.status, 401)
+    assert.equal(error.code, 'UNAUTHENTICATED')
+    assert.equal(error.message, '用户名或密码错误，请重新输入。')
+    return true
+  })
+  assert.ok(sent.url.endsWith('/auth/login'))
+  assert.equal(sent.method, 'POST')
+  assert.deepEqual(JSON.parse(sent.body), credentials)
+  assert.equal(writeRequests.pending().length, 0)
+  const successfulLogin = { token: 'new-demo-token', user: { tenantId: 'demo', userId: 'admin', roles: ['ADMIN'] } }
+  globalThis.fetch = async (_url, init) => {
+    assert.equal(JSON.parse(init.body).password, 'demo')
+    return Response.json(successfulLogin)
+  }
+  assert.deepEqual(await api.login({ ...credentials, password: 'demo' }), successfulLogin)
+})
+
+test('演示登录后读取身份失败仍提示会话失效', async () => {
+  globalThis.fetch = async () => Response.json({ mode: 'DEMO' })
+  await api.authOptions()
+  globalThis.fetch = async () => Response.json({ code: 'UNAUTHENTICATED', message: 'Token is invalid or expired' }, { status: 401 })
+  await assert.rejects(api.me(), error => error.status === 401 && error.message === '登录已失效，请重新登录。')
+})
+
+test('演示登录服务连接失败保留连接错误提示', async () => {
+  globalThis.fetch = async () => Response.json({ mode: 'DEMO' })
+  await api.authOptions()
+  globalThis.fetch = async () => { throw new TypeError('connection refused') }
+  await assert.rejects(api.login({ tenantId: 'demo', username: 'admin', password: 'demo' }),
+    error => error.code === 'NETWORK_ERROR' && error.message === '无法连接服务，请稍后重试。')
+})
+
 test('企业模式不发送旧演示令牌，写请求携带内存中的 CSRF 和当前页面身份', async () => {
   globalThis.fetch = async () => Response.json(enterprise)
   await api.authOptions()

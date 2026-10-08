@@ -74,8 +74,14 @@ public class ExpenseRevocationService {
         return voucher != null && !voucher.neverSent() ? Issue.EXPENSE_REVOCATION_VOUCHER_STARTED : null;
     }
 
-    /** 只公开稳定阻断分类，不向页面返回金融命令、目标或外部凭据。 */
+    /**
+     * 只公开稳定阻断分类，不向页面返回金融命令、目标或外部凭据。
+     * @author owlzhangfq@gmail.com
+     */
     public record Availability(boolean allowed, Issue unavailable) { }
-    /** P0 自动撤销止于任何发送尝试，失败和查无都保留给财务原操作核对。 */
+    /**
+     * P0 自动撤销止于任何发送尝试，失败和查无都保留给财务原操作核对。
+     * @author owlzhangfq@gmail.com
+     */
     public enum Issue { EXPENSE_REVOCATION_VOUCHER_STARTED, EXPENSE_REVOCATION_SETTLEMENT_STARTED }
 }
