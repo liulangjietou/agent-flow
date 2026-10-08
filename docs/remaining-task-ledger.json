@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-08T02:43:21.522555+00:00",
+  "recordedAt": "2026-10-08T03:00:28.926866+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -2419,7 +2419,7 @@
           ]
         }
       ],
-      "observed": "132 个条款单元对应原文、源码和准确执行断言；历史排序、分页、保留及事务外通知投递证据补齐。余下规范和环境门禁仍开放。",
+      "observed": "133 个条款单元对应原文、源码和准确执行断言；typed 财务结果与严格协议边界补充证据，余下规范及环境门禁仍开放。",
       "references": [
         {
           "path": "docs/product-goal-gap-audit.md",
@@ -2442,8 +2442,8 @@
       "dependsOn": [],
       "clauseAudit": {
         "status": "PARTIAL_CLAUSE_AUDIT_LOCAL_ASSERTIONS_VERIFIED",
-        "verifiedClauseUnits": 132,
-        "javaUnits": 96,
+        "verifiedClauseUnits": 133,
+        "javaUnits": 97,
         "webUnits": 36,
         "completeInventory": false,
         "evidence": "docs/evidence/requirement-clause-audit-20261007.json"
@@ -4553,9 +4553,9 @@
   "latestProgress": {
     "taskId": "V03",
     "status": "CLAUSE_AUDIT_CONTINUES",
-    "recordedAt": "2026-10-08T02:43:21.522555+00:00",
+    "recordedAt": "2026-10-08T03:00:28.926866+00:00",
     "knownOpenTaskCount": 44,
-    "verifiedClauseUnits": 132
+    "verifiedClauseUnits": 133
   },
   "localMainIntegration": {
     "verifiedThroughCommit": "ea0b0791dbaf4f9f412620021d801640e2f65fde",

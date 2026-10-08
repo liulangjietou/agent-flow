@@ -1,8 +1,8 @@
 {
-  "recordedAt": "2026-10-08T02:43:21.428407+00:00",
+  "recordedAt": "2026-10-08T02:57:32.025961+00:00",
   "taskId": "V03",
   "status": "PARTIAL_CLAUSE_AUDIT_LOCAL_ASSERTIONS_VERIFIED",
-  "sourceBaseCommit": "6bff0b5268db6fc318707ddb76ada946416583e5",
+  "sourceBaseCommit": "5de80ab14a90ecd3415dde3ee28826f80811779e",
   "requirements": [
     {
       "id": "00",
@@ -10553,13 +10553,106 @@
           "text": "一个审批动作的本地事务包含：读取申请与任务投影、校验租户/当前任务/SoD、调用聚合完成动作、写审计事件、写 outbox；Flowable task completion 与业务写入共用数据源的可行性列为 P，必须由 PoC 验证。外部预算、支付、通知和 Agent 模型调用不在本地原子事务内。"
         }
       ]
+    },
+    {
+      "id": "R133",
+      "requirement": "财务端口以 Java 17 sealed/record 明确区分成功、业务拒绝和不可用；未知原因、跨租户/请求身份及协议错误不能变为成功，事务内不调用外部。",
+      "sources": [
+        [
+          "02",
+          209,
+          252
+        ],
+        [
+          "05",
+          593,
+          593
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/finance/FinanceResult.java",
+          "sha256": "21f1a5664a2f73bd3cecdb063a4b2df406297d12b6ea35e1846fedd18bd0a7fa"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/finance/FinanceGatewayClient.java",
+          "sha256": "4380d649a3a0b93fb369c75afec409e281efd24d5200a11115b3c9007b8484b1"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/finance/FinanceGatewayClientTest.java",
+          "sha256": "415143fe2671f53fcd9b3518b6327433acb7ec630763667830f9730c27af6a41",
+          "method": "businessRejectionIsDistinctFromUnavailableAndUnknownRemoteReasons",
+          "line": 194,
+          "executedCases": [
+            {
+              "class": "io.agentflow.finance.FinanceGatewayClientTest",
+              "name": "businessRejectionIsDistinctFromUnavailableAndUnknownRemoteReasons",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/finance/FinanceGatewayClientTest.java",
+          "sha256": "415143fe2671f53fcd9b3518b6327433acb7ec630763667830f9730c27af6a41",
+          "method": "envelopesRejectCrossTenantNonceProtocolAndUnknownOutcomeFields",
+          "line": 177,
+          "executedCases": [
+            {
+              "class": "io.agentflow.finance.FinanceGatewayClientTest",
+              "name": "envelopesRejectCrossTenantNonceProtocolAndUnknownOutcomeFields",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/finance/FinanceGatewayClientTest.java",
+          "sha256": "415143fe2671f53fcd9b3518b6327433acb7ec630763667830f9730c27af6a41",
+          "method": "noExternalCallsRunInsideDatabaseTransactionsOrWhenDisabled",
+          "line": 168,
+          "executedCases": [
+            {
+              "class": "io.agentflow.finance.FinanceGatewayClientTest",
+              "name": "noExternalCallsRunInsideDatabaseTransactionsOrWhenDisabled",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [
+        "E03",
+        "E04",
+        "E05",
+        "E06",
+        "E07"
+      ],
+      "sourceText": [
+        {
+          "documentId": "02",
+          "lines": [
+            209,
+            252
+          ],
+          "text": "外部端口的结果用 `sealed` + `record` 表达全部可能结果，业务失败不靠异常或 `null` 传递：\n\n```java\n/** 预算冻结结果：sealed 限定全部可能结果 */\npublic sealed interface BudgetFreezeResult\n        permits BudgetFreezeResult.Frozen, BudgetFreezeResult.Insufficient, BudgetFreezeResult.Unavailable {\n\n    /** 冻结成功，externalRef 为预算系统返回的冻结单号 */\n    record Frozen(String externalRef) implements BudgetFreezeResult {}\n\n    /** 预算不足，按刚性/柔性规则自动退回或增加审批节点 */\n    record Insufficient(Money available) implements BudgetFreezeResult {}\n\n    /** 预算系统不可用，由 outbox 重试，不改变审批状态 */\n    record Unavailable(String reason) implements BudgetFreezeResult {}\n}\n\n/** 金额值对象：定点十进制 + 币种；精度超过币种最小单位时直接拒绝，不静默舍入 */\npublic record Money(BigDecimal amount, Currency currency) {\n    public Money {\n        Objects.requireNonNull(amount, \"amount\");\n        Objects.requireNonNull(currency, \"currency\");\n        if (amount.scale() > currency.getDefaultFractionDigits()) {\n            throw new IllegalArgumentException(\"amount scale exceeds currency minor unit: \" + amount);\n        }\n        amount = amount.setScale(currency.getDefaultFractionDigits());\n    }\n}\n```\n\nJava 17 下用 `instanceof` 模式匹配处理 sealed 结果：\n\n```java\nBudgetFreezeResult result = budgetSystemPort.freeze(command);\nif (result instanceof BudgetFreezeResult.Frozen frozen) {\n    occupation.markFrozen(frozen.externalRef());\n} else if (result instanceof BudgetFreezeResult.Insufficient insufficient) {\n    occupation.markFreezeFailed(insufficient.available());\n} else if (result instanceof BudgetFreezeResult.Unavailable unavailable) {\n    throw new DependencyUnavailableException(unavailable.reason());\n}\n```\n\n注意：Java 17 编译器不检查这种 if-else 链是否覆盖了全部子类型。新增结果类型时，必须同步修改所有调用方，并补单元测试覆盖新分支。升级到 Java 21 后可以改用 switch 模式匹配，由编译器做穷尽检查。"
+        },
+        {
+          "documentId": "05",
+          "lines": [
+            593,
+            593
+          ],
+          "text": "以上端口的 `*Result` 类型统一用 Java 17 的 `sealed interface` + `record` 定义（如冻结结果分为成功、预算不足、系统不可用），`Money` 等值对象用 `record`，写法和限制见 02 §11。"
+        }
+      ]
     }
   ],
   "boundaries": [
     "条款行是一项可检查行为的定位，不作为新增顶层任务，也不据此计算项目完成比例。",
     "Java 方法引用与 U07 更新后的 5334 个组合去重结果匹配；本次只重跑审批生命周期、凭证、预算、费用、审计和契约相关范围，其他结果保留原来源。前端引用匹配 U07 通知补充完整 1528 项成功记录。",
     "前端组件和处理器测试不等于真实键盘、屏幕阅读器、触屏或视觉验收，U01/W02/V01 门禁保持。",
-    "这里只记录已经细化到断言的 132 个条款单元；未声称覆盖全部原始规范。剩余章节条款仍在 V03 核对。",
+    "这里只记录已经细化到断言的 133 个条款单元；未声称覆盖全部原始规范。剩余章节条款仍在 V03 核对。",
     "PostgreSQL、Docker、真实企业来源、浏览器和远端交付未执行。"
   ],
   "completeRequirementInventory": false,
