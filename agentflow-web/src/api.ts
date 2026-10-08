@@ -453,7 +453,7 @@ async function request<T>(path: string, init: RequestInit = {}, format: 'json' |
       TENANT_ALREADY_INITIALIZED: '当前租户已完成初始化，请重新读取原记录，不能再次创建。',
       INITIALIZATION_PERSON_CHANGED: '已有管理员人员信息已变化或已停用，请重新读取并在组织与人员中核对。',
       INITIALIZATION_CHANNEL_CHANGED: '所选通知渠道的绑定已变化或不可用，请重新读取并核对通知选择。',
-      UNAUTHENTICATED: '登录已失效，请重新登录。',
+      UNAUTHENTICATED: path === '/auth/login' ? '用户名或密码错误，请重新输入。' : '登录已失效，请重新登录。',
       FORM_VALIDATION_FAILED: '部分表单字段未通过校验，请按提示修改。',
       INVALID_RISK_POLICY: '风险规则配置无效，请核对唯一标识、公开说明、等级和条件。',
       INVALID_SUBMISSION_RISK: '风险规则的标识、公开说明或等级不合法。',
