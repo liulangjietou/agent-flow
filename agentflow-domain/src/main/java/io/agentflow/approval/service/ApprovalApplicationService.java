@@ -142,6 +142,16 @@ public class ApprovalApplicationService {
         return application;
     }
 
+    /** 财务撤销追加当前申请状态和审计，已经完成的批准轮次不被改写。 */
+    public Application revoke(String tenantId, UUID id, long expectedVersion, String actor, String comment) {
+        var application = get(tenantId, id);
+        var previousStatus = application.status();
+        application.revoke(expectedVersion);
+        repository.update(application, expectedVersion);
+        recordApplicationOperation(application, actor, ApplicationAuditPort.Action.REVOKE, previousStatus, null, comment);
+        return application;
+    }
+
     /** 系统业务结论退回当前轮次，仍需精确终止对应实例并保存真实系统操作者。 */
     public Application returnToApplicant(String tenantId, UUID id, long expectedVersion, String actor, String comment) {
         Application application = get(tenantId, id); ApplicationStatus previousStatus = application.status();

@@ -18,7 +18,7 @@ let requestSequence = 0
 const isAudit = computed(() => props.mode === 'audit')
 const heading = computed(() => isAudit.value ? '操作审计' : '审批轨迹')
 const actionOptions = [
-  ['CREATE', '创建草稿'], ['EXPENSE_REDUCE', '费用核减'], ['REVISE', '修改申请'], ['SUBMIT', '提交申请'], ['WITHDRAW', '撤回申请'], ['CANCEL', '作废申请'],
+  ['CREATE', '创建草稿'], ['EXPENSE_REDUCE', '费用核减'], ['REVISE', '修改申请'], ['SUBMIT', '提交申请'], ['WITHDRAW', '撤回申请'], ['CANCEL', '作废申请'], ['REVOKE', '财务撤销已批准报销'],
   ['CLAIM', '领取任务'], ['RELEASE', '释放任务'], ['TRANSFER', '转交任务'], ['DELEGATE', '委派任务'], ['RESOLVE', '回交任务'],
   ['INSTANCE_PAUSE', '暂停审批'], ['INSTANCE_RESUME', '恢复审批'], ['INSTANCE_TERMINATE', '终止审批'],
   ['TIMER_ELAPSED', '定时等待已到期'], ['TIMER_FAILED', '定时推进失败'], ['TIMER_RETRY', '重试原定时等待'],

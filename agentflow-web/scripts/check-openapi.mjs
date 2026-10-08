@@ -11,6 +11,11 @@ const ajv = new Ajv2020({ strict: false, allErrors: true })
 addFormats(ajv)
 ajv.addFormat('binary', true)
 ajv.addSchema({ $id: 'agentflow', components: spec.components })
+// 已批准撤销必须传输 REVOKED；不能沿用仅容纳撤回、作废的旧回执状态枚举。
+const revocationReceiptSchema = spec.paths['/api/v1/expense-reports/{id}/revoke'].post.responses['200'].content['application/json'].schema
+const revocationReceipt = { reportId: randomUUID(), applicationId: randomUUID(), applicationVersion: 7, financialVersion: 4, status: 'REVOKED' }
+validate(revocationReceiptSchema, revocationReceipt)
+for (const status of ['CANCELLED', 'WITHDRAWN', 'APPROVED']) assert.equal(validator(revocationReceiptSchema)({ ...revocationReceipt, status }), false)
 // 报表保留显式空样本与未知历史，汇总金额不受单笔上限约束。
 const financialReportSchema = { $ref: '#/components/schemas/ExpenseFinancialReport' }
 validate(financialReportSchema, financialReportFixture())

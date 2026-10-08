@@ -246,6 +246,16 @@ public final class Application {
         version++;
     }
 
+    /** 财务撤销已经批准的业务申请；原批准轮次及内容保留，不能再次提交。 */
+    public void revoke(long expectedVersion) {
+        checkVersion(expectedVersion);
+        if (status != ApplicationStatus.APPROVED) {
+            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only an approved application can be revoked");
+        }
+        status = ApplicationStatus.REVOKED;
+        version++;
+    }
+
     /** 作废未在审批中的申请，保留内容与原轮次并进入不可重提的终态。 */
     public void cancel(long expectedVersion) {
         checkVersion(expectedVersion);

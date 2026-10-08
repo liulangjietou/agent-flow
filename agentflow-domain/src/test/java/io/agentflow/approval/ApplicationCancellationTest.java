@@ -40,6 +40,27 @@ class ApplicationCancellationTest {
         assertThat(value.version()).isEqualTo(7);
     }
 
+    @ParameterizedTest
+    @EnumSource(ApplicationStatus.class)
+    void revocationOnlyClosesApprovedApplicationAndKeepsTheOriginalRound(ApplicationStatus status) {
+        var value = application(status);
+        if (status != ApplicationStatus.APPROVED) {
+            assertThatThrownBy(() -> value.revoke(7)).isInstanceOf(DomainException.class).extracting("code").isEqualTo("DOMAIN_RULE_VIOLATION");
+            assertThat(value.status()).isEqualTo(status);
+            assertThat(value.version()).isEqualTo(7);
+            return;
+        }
+        assertThatThrownBy(() -> value.revoke(6)).isInstanceOf(DomainException.class).extracting("code").isEqualTo("CONCURRENCY_CONFLICT");
+        value.revoke(7);
+        assertThat(value.status()).isEqualTo(ApplicationStatus.REVOKED);
+        assertThat(value.version()).isEqualTo(8);
+        assertThat(value.roundNo()).isEqualTo(2);
+        assertThat(value.definitionVersion()).isEqualTo(3);
+        assertThat(value.payload()).isEqualTo(Map.of("amount", "6000.01"));
+        assertThatThrownBy(() -> value.submit(8)).isInstanceOf(DomainException.class);
+        assertThatThrownBy(() -> value.revise(8, "不能覆盖", Map.of())).isInstanceOf(DomainException.class);
+    }
+
     @Test
     void staleCancellationCannotOverwriteAChangedApplication() {
         var value = application(ApplicationStatus.DRAFT);

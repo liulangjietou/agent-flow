@@ -6,8 +6,8 @@ import { expenseError, moneyLabel, previewReduction, reductionReasons, type Expe
 
 const props = defineProps<{ detail: ExpenseDetail; workflow: ExpenseWorkflow; scopeKey: string; locked?: boolean }>()
 const emit = defineEmits<{ changed: []; busy: [value: boolean]; refresh: []; preview: [value: ExpenseReductionPreview | null]; returnMissing: [value: ExpenseReturnRequest] }>()
-type Action = 'RECEIVE' | 'REDUCE' | 'WITHDRAW' | 'CANCEL'
-const labels: Record<Action, string> = { RECEIVE: '确认原件签收', REDUCE: '确认财务核减', WITHDRAW: '确认撤回审批', CANCEL: '确认作废费用单' }
+type Action = 'RECEIVE' | 'REDUCE' | 'WITHDRAW' | 'CANCEL' | 'REVOKE'
+const labels: Record<Action, string> = { RECEIVE: '确认原件签收', REDUCE: '确认财务核减', WITHDRAW: '确认撤回审批', CANCEL: '确认作废费用单', REVOKE: '确认撤销已批准报销' }
 const pending = ref<Action | null>(null), comment = ref(''), reason = ref<ReductionReason | ''>(''), inputs = ref<ReductionLine[]>([])
 const selectedProxy = ref('')
 const receivedOriginals = ref<string[]>([])
@@ -21,7 +21,7 @@ const saving = ref(false), error = ref(''), requiresRefresh = ref(false)
 const formElement = ref<HTMLFormElement | null>(null)
 let epoch = 0
 const allowed = computed(() => ({ RECEIVE: props.workflow.task?.canReceive === true, REDUCE: props.workflow.task?.canReduce === true && !!props.detail.financialRound,
-  WITHDRAW: props.workflow.canWithdraw, CANCEL: props.workflow.canCancel }))
+  WITHDRAW: props.workflow.canWithdraw, CANCEL: props.workflow.canCancel, REVOKE: props.workflow.revocation?.allowed === true }))
 const blocked = computed(() => props.locked || saving.value || requiresRefresh.value)
 const reduction = computed(() => {
   if (pending.value !== 'REDUCE') return { preview: null, issue: '' }
@@ -88,9 +88,12 @@ async function execute() {
   try {
     const result = action === 'RECEIVE' ? await api.receiveExpense(id, taskId!, input)
       : action === 'REDUCE' ? await api.reduceExpense(id, taskId!, { ...input, reasonCode, lines })
-      : action === 'WITHDRAW' ? await api.withdrawExpense(id, input) : await api.cancelExpense(id, input)
+      : action === 'WITHDRAW' ? await api.withdrawExpense(id, input)
+      : action === 'REVOKE' ? await api.revokeExpense(id, input) : await api.cancelExpense(id, input)
     if (generation !== epoch) return
     if (result.reportId !== id || result.applicationId !== props.detail.applicationId) throw new Error('Expense receipt mismatch')
+    if (action === 'REVOKE' && (!('status' in result) || result.status !== 'REVOKED'
+        || result.applicationVersion !== input.applicationVersion + 1 || result.financialVersion !== input.financialVersion)) throw new Error('Expense revocation receipt mismatch')
     requiresRefresh.value = true; reset(); saving.value = false; emit('changed')
   } catch (cause) {
     if (generation !== epoch) return
@@ -100,13 +103,15 @@ async function execute() {
 </script>
 
 <template>
-  <section class="expense-actions" aria-label="费用操作" v-if="Object.values(allowed).some(Boolean) || error">
+  <section class="expense-actions" aria-label="费用操作" v-if="Object.values(allowed).some(Boolean) || workflow.revocation?.unavailable || error">
     <p v-if="error" class="expense-error" role="alert">{{ error }}</p>
+    <p v-if="workflow.revocation?.unavailable" class="expense-error">{{ expenseError({ code: workflow.revocation.unavailable }) }}</p>
     <div v-if="!pending" class="action-row">
       <button v-if="allowed.RECEIVE" class="primary" :disabled="blocked" @click="prepare('RECEIVE')">确认原件签收</button>
       <button v-if="allowed.REDUCE" class="secondary" :disabled="blocked" @click="prepare('REDUCE')">核减费用</button>
       <button v-if="allowed.WITHDRAW" class="secondary" :disabled="blocked" @click="prepare('WITHDRAW')">撤回审批</button>
       <button v-if="allowed.CANCEL" class="return" :disabled="blocked" @click="prepare('CANCEL')">作废费用单</button>
+      <button v-if="allowed.REVOKE" class="return" :disabled="blocked" @click="prepare('REVOKE')">撤销已批准报销</button>
     </div>
     <form v-else ref="formElement" @submit.prevent="execute">
       <h4>{{ labels[pending] }}</h4>
@@ -120,6 +125,7 @@ async function execute() {
       </template>
       <p v-if="pending === 'WITHDRAW'">撤回会停止本轮待办，保留现有占用供补正。重新提交将开始新一轮审批。</p>
       <p v-if="pending === 'CANCEL'">作废后不能再编辑或提交。已预留资金将安排释放，原内容和历史记录保留。</p>
+      <p v-if="pending === 'REVOKE'">确认不再报销后，此单进入已撤销状态，不能编辑或重提。发票、事前额度和借款预留释放；预算等待外部释放确认。原批准轮次及财务记录保留。</p>
       <template v-if="(pending === 'RECEIVE' || pending === 'REDUCE') && proxyOptions.length">
         <label>办理身份<select v-model="selectedProxy" :disabled="blocked" :required="workflow.task?.canActDirectly === false">
           <option v-if="workflow.task?.canActDirectly !== false" value="">以本人审批职责办理</option>
@@ -148,7 +154,7 @@ async function execute() {
         <p v-if="reductionIssue" class="expense-error" role="status">{{ reductionIssue }}</p>
       </template>
       <label>操作说明<textarea v-model="comment" rows="3" maxlength="2000" :disabled="blocked" required /></label>
-      <div class="action-row"><button type="button" class="secondary" :disabled="saving" @click="cancel">取消</button><button :class="pending === 'CANCEL' ? 'return' : 'primary'" :disabled="blocked || (pending === 'REDUCE' && !!reductionIssue) || (pending === 'RECEIVE' && !!missingOriginals.length)">{{ saving ? '正在提交…' : labels[pending] }}</button></div>
+      <div class="action-row"><button type="button" class="secondary" :disabled="saving" @click="cancel">取消</button><button :class="pending === 'CANCEL' || pending === 'REVOKE' ? 'return' : 'primary'" :disabled="blocked || (pending === 'REDUCE' && !!reductionIssue) || (pending === 'RECEIVE' && !!missingOriginals.length)">{{ saving ? '正在提交…' : labels[pending] }}</button></div>
     </form>
     <button v-if="requiresRefresh" type="button" class="secondary" :disabled="saving || locked" @click="emit('refresh')">刷新费用状态</button>
   </section>

@@ -123,6 +123,10 @@ public record VoucherOperation(Input input, long version, Status status, int att
     }
 
     public boolean running() { return status == Status.POSTING || status == Status.QUERYING; }
+    /** 首次领取前才能保证从未发送；即使后来权威查无，也不抹去已经尝试外发的事实。 */
+    public boolean neverSent() {
+        return attempts == 0 && (status == Status.QUEUED || status == Status.EXPIRED || status == Status.VOIDED);
+    }
     public boolean expired(Instant now) { return running() && !leaseUntil.isAfter(now); }
     /** 待对账、冲销和读取中的既有凭证不能作为新的付款授权依据。 */
     public boolean usablePosted() { return status == Status.POSTED && reversalId == null; }

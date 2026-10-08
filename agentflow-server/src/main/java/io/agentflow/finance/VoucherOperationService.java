@@ -58,6 +58,15 @@ public class VoucherOperationService {
         var claimed = current.claim(now, lease); complete(current, claimed); return claimed.running() ? claimed : null;
     }
 
+    /** 业务撤销只停用从未领取的原命令；发送或查询历史存在时必须转原操作对账。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void voidUnsent(VoucherOperation operation, Instant now) {
+        var command = operation.input().command();
+        var current = currentVersion(command.tenantId(), command.id(), operation.version());
+        if (!current.neverSent()) throw new DomainException("EXPENSE_REVOCATION_VOUCHER_STARTED", "Voucher execution has already started");
+        if (current.status() == VoucherOperation.Status.QUEUED) complete(current, current.voidBeforeSend(time(now)));
+    }
+
     /** 有效领取结果和事件同事务落地，事件消费者失败会回滚本地确认，再通过原操作查询恢复。 */
     @Transactional
     public void finish(VoucherOperation claimed, FinanceResult<VoucherObservation> result, Instant now) {

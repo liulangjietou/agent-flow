@@ -6571,7 +6571,8 @@
                 "SUBPROCESS_COMPLETED",
                 "SUBPROCESS_STOPPED",
                 "SELF_APPROVAL_ESCALATED",
-                "AUTO_PASSED_DUPLICATE"
+                "AUTO_PASSED_DUPLICATE",
+                "REVOKE"
               ]
             }
           },
@@ -9982,7 +9983,8 @@
                 "INVOICE_EXTRACTION_DISMISS",
                 "EXPENSE_REQUEST_CLOSED",
                 "SELF_APPROVAL_ESCALATED",
-                "AUTO_PASSED_DUPLICATE"
+                "AUTO_PASSED_DUPLICATE",
+                "REVOKE"
               ]
             }
           },
@@ -11523,7 +11525,8 @@
                 "INVOICE_EXTRACTION_DISMISS",
                 "EXPENSE_REQUEST_CLOSED",
                 "SELF_APPROVAL_ESCALATED",
-                "AUTO_PASSED_DUPLICATE"
+                "AUTO_PASSED_DUPLICATE",
+                "REVOKE"
               ]
             }
           },
@@ -53043,6 +53046,163 @@
           }
         ]
       }
+    },
+    "/api/v1/expense-reports/{id}/revoke": {
+      "post": {
+        "operationId": "revokeExpenseReport",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "财务撤销已批准未外发报销",
+        "description": "当前独立财务须具备原轮次完整字段权限和同法人有效任职。APPROVED 且从未尝试凭证外发、没有付款授权或核销时，固定双版本和原幂等键撤销；保留原批准轮次与财务快照，释放本地预留并登记预算 RELEASE。准备中的只读查询不能继续登记凭证；未知、失败、查无或已发送凭证必须走原对账及冲回，不能直接撤销。预算排队不代表外部已释放。",
+        "x-access": "具备原轮次完整财务字段权限及当前法人任职的独立 FINANCE，不能为申请人",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseRevocationReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本冲突、预算结果待对账、台账已终结、目标变化或幂等冲突。不得换键盲目重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseLifecycleInput"
+              },
+              "example": {
+                "applicationVersion": 1,
+                "financialVersion": 1,
+                "comment": "确认当前操作原因"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -66121,6 +66281,17 @@
                 "type": "null"
               }
             ]
+          },
+          "revocation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExpenseRevocationAvailability"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "已批准报销且当前身份具备独立财务能力时才返回。旧响应可能缺字段；缺少不代表可撤销。"
           }
         },
         "required": [
@@ -96739,6 +96910,66 @@
           "invoiceId",
           "occupation"
         ]
+      },
+      "ExpenseRevocationAvailability": {
+        "type": "object",
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "unavailable": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "EXPENSE_REVOCATION_VOUCHER_STARTED",
+              "EXPENSE_REVOCATION_SETTLEMENT_STARTED",
+              null
+            ]
+          }
+        },
+        "required": [
+          "allowed"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseRevocationReceipt": {
+        "type": "object",
+        "properties": {
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "REVOKED"
+            ]
+          }
+        },
+        "required": [
+          "reportId",
+          "applicationId",
+          "applicationVersion",
+          "financialVersion",
+          "status"
+        ],
+        "additionalProperties": false
       }
     }
   }

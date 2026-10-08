@@ -220,6 +220,14 @@ public class ApprovalApplicationFacade {
         return service.cancel(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
     }
 
+    /** 财务业务服务已在同一事务核对原轮次权限和外发边界；此入口不直接暴露 HTTP。 */
+    @Transactional
+    public Application revokeBusiness(UUID id, long expectedVersion, String comment, BusinessReference reference) {
+        var actor = currentActor.actor();
+        requireWriteBinding(executionLocks.lock(service.get(actor.tenantId(), id)), java.util.Objects.requireNonNull(reference));
+        return service.revoke(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
+    }
+
     /** 内部财务结果使用明确系统身份退回，不冒用申请人或某个人工审批任务。 */
     @Transactional
     public Application returnBusiness(String tenant, UUID id, long expectedVersion, BusinessReference reference, String actor, String comment) {

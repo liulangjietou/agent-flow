@@ -32,6 +32,7 @@ public class ApprovalWebhookEvents {
             case SUBMIT -> "ApplicationSubmitted";
             case WITHDRAW -> "ApplicationWithdrawn";
             case CANCEL -> "ApplicationCancelled";
+            case REVOKE -> "ApplicationRevoked";
             case RETURN -> "ApplicationReturned";
             case TIMER_ELAPSED -> "TimerWaitElapsed";
             case TIMER_FAILED -> "TimerWaitFailed";

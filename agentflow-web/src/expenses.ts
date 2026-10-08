@@ -58,8 +58,10 @@ export interface ReductionLine { lineNo: number; approvedGross: string; approved
 export interface ExpenseTaskCommand extends ExpenseCommand { proxyId?: string }
 export interface ExpenseReduction extends ExpenseTaskCommand { lines: ReductionLine[]; reasonCode: ReductionReason }
 export interface ExpenseReceipt extends ExpenseVersions { reportId: string; applicationId: string }
+export interface ExpenseRevocationReceipt extends ExpenseReceipt { status: 'REVOKED' }
 export interface ExpenseWorkflow extends ExpenseReceipt {
   roundNo: number; canWithdraw: boolean; canCancel: boolean
+  revocation?: { allowed: boolean; unavailable: string | null } | null
   paper: null | { roundNo: number; required: boolean; received: boolean; receivedBy: string | null; receivedAt: string | null; proxyUse?: ApprovalProxyUse | null }
   budget: { ledgerStatus: string | null; confirmedCurrent: boolean; operationId: string | null; operationStatus: string | null; issue: string | null }
   task: null | { taskId: string; stage: 'BUSINESS' | 'PROJECT_REVIEW' | 'PRIOR_REQUEST_REVIEW' | 'BUDGET_REVIEW' | 'RECEIPT' | 'FINANCE_REVIEW' | 'FINANCE_RECHECK'; canApprove?: boolean; approvalUnavailable?: string | null; canReceive: boolean; canReduce: boolean; reductionUnavailable: string | null; canActDirectly?: boolean; proxyOptions?: ApprovalProxyOption[] }
@@ -128,6 +130,8 @@ export type ExpenseReductionPreview = ReturnType<typeof previewReduction>
 export function expenseError(cause: unknown): string {
   const failure = cause as { status?: number; code?: string }
   const messages: Record<string, string> = {
+    EXPENSE_REVOCATION_VOUCHER_STARTED: '凭证已开始外发，请先由财务核对原凭证并办理冲回，不能直接撤销。',
+    EXPENSE_REVOCATION_SETTLEMENT_STARTED: '已登记付款或核销，请通过原付款及资源调整入口办理，不能直接撤销。',
     ALLOWANCE_RECALCULATION_REQUIRED: '补贴制度或行程已变化，请刷新费用标准、重新计算后保存。',
     ALLOWANCE_CALCULATION_MISMATCH: '补贴金额、天数和税额必须使用系统计算值，且不能关联发票。',
     ALLOWANCE_ITINERARY_REQUIRED: '补贴必须填写完整的行程起止日期。',

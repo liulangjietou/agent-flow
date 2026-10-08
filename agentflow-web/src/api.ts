@@ -64,7 +64,7 @@ import type { PaymentCallbackPage, PaymentCallbackDetail, PaymentCallbackView } 
 import { readEventDirectory, readEventVersions, readEventOption, readEventContract, readEventContractHistory, readEventInboxItem, readEventInboxPage, readEventInboxHistory, readEventWaits, validateEventMutation, type EventDirectory, type EventVersions, type EventOption, type EventContract, type EventContractHistory, type EventPublication, type EventAvailabilityInput, type EventInboxItem, type EventInboxPage, type EventInboxHistory, type EventRetryInput, type EventWaitView } from './events.js'
 import type { FieldErrors, FormSchema } from './formSchema'
 import type { AttachmentInput, AttachmentMetadata, AttachmentOptions } from './attachments'
-import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseFilter, PriorRequestItem, AdvanceItem, ExpenseCommand, ExpenseTaskCommand, ExpenseReduction, ExpenseReceipt } from './expenses'
+import type { ExpenseDetail, ExpenseWorkflow, ExpensePage, ExpenseItem, ExpenseFilter, PriorRequestItem, AdvanceItem, ExpenseCommand, ExpenseTaskCommand, ExpenseReduction, ExpenseReceipt, ExpenseRevocationReceipt } from './expenses'
 import type { FinanceCatalog, ExpenseCreate, ExpenseRevise, PrecheckOptions, PrecheckInput, PrecheckView, InvoiceItem } from './expenseDraft'
 import type { InvoiceOriginal, InvoiceUploadInput, InvoiceWalletOptions, InvoiceVerificationOptions, InvoiceVerificationInput, InvoiceVerificationJob, InvoiceConflict } from './invoiceWallet'
 import type { AdvanceRequestItem, AdvanceDetail, AdvanceCreate, AdvanceRevise, AdvanceReceipt, AdvanceVersions, AdvanceCheckOptions, AdvanceCheckInput, AdvanceCheckView } from './advanceRequest'
@@ -855,6 +855,7 @@ export const api = {
   reduceExpense: (id: string, taskId: string, input: ExpenseReduction) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/tasks/${encodeURIComponent(taskId)}/reduce`, 'POST', '确认财务核减', input),
   withdrawExpense: (id: string, input: ExpenseCommand) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/withdraw`, 'POST', '撤回费用审批', input),
   cancelExpense: (id: string, input: ExpenseCommand) => write<ExpenseReceipt>(`/expense-reports/${encodeURIComponent(id)}/cancel`, 'POST', '作废费用单', input),
+  revokeExpense: (id: string, input: ExpenseCommand) => write<ExpenseRevocationReceipt>(`/expense-reports/${encodeURIComponent(id)}/revoke`, 'POST', '撤销已批准报销', input),
   definitionCopyRecipients: (signal?: AbortSignal) => request<AssigneeOption[]>('/process-definitions/copy-options', { signal }),
   copySnapshot: (applicationId: string, round: number, signal?: AbortSignal) => request<CopySnapshot>(`/copies/${applicationId}/rounds/${round}`, { signal }),
   copyAttachment: (applicationId: string, id: string, round: number, signal?: AbortSignal) => request<AttachmentMetadata>(`/copies/${applicationId}/rounds/${round}/attachments/${id}`, { signal }),

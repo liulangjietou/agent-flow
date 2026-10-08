@@ -51,6 +51,37 @@ function mount(Component = Actions, report = detail(), flow = workflow(), initia
     async open() { this.button('核减费用').props.onClick(); await tick() } }
 }
 
+test('已批准撤销在实际模板中显示影响和确认，外发阻断只有财务可见', async () => {
+  const flow = { ...workflow(), task: null, revocation: { allowed: true, unavailable: null } }
+  const p = mount(Actions, { ...detail(), applicationStatus: 'APPROVED' }, flow)
+  try {
+    p.button('撤销已批准报销').props.onClick(); await tick()
+    assert.match(text(p.root), /不能编辑或重提/); assert.match(text(p.root), /预算等待外部释放确认/)
+    assert.match(text(p.root), /原批准轮次及财务记录保留/)
+    p.props.workflow.revocation = { allowed: false, unavailable: 'EXPENSE_REVOCATION_VOUCHER_STARTED' }; await tick()
+    assert.equal(nodes(p.root).some(node => node.tag === 'form'), false)
+    assert.match(text(p.root), /凭证已开始外发/)
+    p.props.workflow.revocation = null; await tick()
+    assert.doesNotMatch(text(p.root), /凭证已开始外发|撤销已批准报销/)
+  } finally { p.close() }
+})
+
+test('已撤销报销明确显示终态，保留金额历史但不再提示等待付款核销', async () => {
+  const report = { ...detail(), applicationStatus: 'REVOKED' }, flow = { ...workflow(), task: null }
+  const p = mount(Detail, report, flow, { reportId: 'report', applicationId: 'app', version: 2, scopeKey: 'tenant:finance', locked: false })
+  const names = vnode => !vnode ? [] : [vnode.type?.name, ...(vnode.component ? names(vnode.component.subTree) : []),
+    ...(Array.isArray(vnode.children) ? vnode.children.flatMap(names) : [])]
+  try {
+    await tick(); await tick()
+    assert.match(text(p.root), /已撤销.*不会再付款或核销/)
+    assert.match(text(p.root), /原申报合计/); assert.match(text(p.root), /当前核定合计/)
+    const children = names(p.instance().$.subTree)
+    assert.equal(children.includes('FinancePaymentStatus'), false)
+    assert.equal(children.includes('ExpenseSettlementStatus'), false)
+    assert.equal(children.filter(name => name === 'VoucherStatus').length, 1)
+  } finally { p.close() }
+})
+
 test('核减输入即时提示增额与税额越界，未填原因说明不允许提交且不写请求', async () => {
   let writes = 0; api.reduceExpense = async () => { writes++; throw new Error('Unexpected write') }
   const p = mount()

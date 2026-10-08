@@ -5,7 +5,7 @@ const { default: Actions } = await import(process.env.AGENTFLOW_TEST_EXPENSEACTI
 const { default: Detail } = await import(process.env.AGENTFLOW_TEST_EXPENSEDETAIL)
 const { default: Workspace } = await import(process.env.AGENTFLOW_TEST_EXPENSEWORKSPACE)
 const { api } = await import(process.env.AGENTFLOW_TEST_API)
-const originals = { receiveExpense: api.receiveExpense, reduceExpense: api.reduceExpense, withdrawExpense: api.withdrawExpense, cancelExpense: api.cancelExpense,
+const originals = { receiveExpense: api.receiveExpense, reduceExpense: api.reduceExpense, withdrawExpense: api.withdrawExpense, cancelExpense: api.cancelExpense, revokeExpense: api.revokeExpense,
   expenseReport: api.expenseReport, expenseWorkflow: api.expenseWorkflow, expenseReports: api.expenseReports, expenseRequests: api.expenseRequests, employeeAdvances: api.employeeAdvances }
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })
 const money = value => ({ value, currency: 'CNY' })
@@ -25,6 +25,59 @@ function panel(Component = Actions, initial = { scopeKey: 'demo/alice', detail: 
 
 const proxy = id => ({ proxyId: id, revision: 1, definitionId: 'published', principalId: id, principal: id,
   startsAt: new Date(Date.now() - 60_000).toISOString(), endsAt: new Date(Date.now() + 60_000).toISOString() })
+
+test('已批准报销撤销须当前财务能力和人工确认，固定双版本且不调用作废', async () => {
+  const calls = []; api.revokeExpense = async (...args) => { calls.push(args); return { ...receipt(), financialVersion: 5, status: 'REVOKED' } }
+  api.cancelExpense = async () => { assert.fail('撤销不得改走草稿作废') }
+  const p = panel()
+  try {
+    Object.assign(p.props.workflow, { canWithdraw: false, canCancel: false, task: null, revocation: { allowed: true, unavailable: null } })
+    p.state.prepare('REVOKE'); assert.equal(p.state.pending, 'REVOKE'); assert.equal(calls.length, 0)
+    await p.state.execute(); assert.equal(calls.length, 0); assert.match(p.state.error, /说明/)
+    p.state.comment = '  已确认不再报销  '; await p.state.execute()
+    assert.deepEqual(calls, [['report', { applicationVersion: 2, financialVersion: 5, comment: '已确认不再报销' }]])
+    assert.deepEqual(p.events, ['changed'])
+  } finally { p.close() }
+})
+
+test('撤销确认期间失去权限或凭证开始外发须立即清除意图', async () => {
+  let calls = 0; api.revokeExpense = async () => { calls++; return receipt() }; const p = panel()
+  try {
+    p.props.workflow.revocation = { allowed: true, unavailable: null }
+    p.state.prepare('REVOKE'); p.state.comment = '旧撤销意见'; assert.equal(p.state.pending, 'REVOKE')
+    p.props.workflow.revocation = { allowed: false, unavailable: 'EXPENSE_REVOCATION_VOUCHER_STARTED' }
+    assert.equal(p.state.pending, null); assert.equal(p.state.comment, '')
+    p.state.prepare('REVOKE'); await p.state.execute(); assert.equal(calls, 0)
+  } finally { p.close() }
+})
+
+test('撤销未知结果不能重复发送，迟到回执不能刷新另一个账号', async () => {
+  let resolve, calls = 0
+  api.revokeExpense = () => { calls++; return new Promise(done => { resolve = done }) }
+  const p = panel()
+  try {
+    p.props.workflow.revocation = { allowed: true, unavailable: null }
+    p.state.prepare('REVOKE'); p.state.comment = '原账号确认'; const first = p.state.execute(); await p.state.execute()
+    assert.equal(calls, 1)
+    p.props.scopeKey = 'tenant/other'; resolve({ ...receipt(), financialVersion: 5, status: 'REVOKED' }); await first
+    assert.deepEqual(p.events, []); assert.equal(p.state.pending, null); assert.equal(p.state.comment, '')
+    api.revokeExpense = async () => { calls++; throw { code: 'REQUEST_TIMEOUT' } }
+    p.state.prepare('REVOKE'); p.state.comment = '当前确认'; await p.state.execute(); await p.state.execute()
+    assert.equal(calls, 2); assert.equal(p.state.requiresRefresh, true); assert.match(p.state.error, /恢复/)
+  } finally { p.close() }
+})
+
+test('撤销回执必须证明当前申请递增且财务版本未改，错误回执不宣告成功', async () => {
+  for (const returned of [{ ...receipt(), status: 'REVOKED' }, { ...receipt(), financialVersion: 5, status: 'CANCELLED' },
+    { ...receipt(), financialVersion: 5, applicationVersion: 4, status: 'REVOKED' }]) {
+    api.revokeExpense = async () => returned; const p = panel()
+    try {
+      p.props.workflow.revocation = { allowed: true, unavailable: null }
+      p.state.prepare('REVOKE'); p.state.comment = '财务确认'; await p.state.execute()
+      assert.deepEqual(p.events, []); assert.equal(p.state.requiresRefresh, true)
+    } finally { p.close() }
+  }
+})
 
 test('代理签收和核减必须固定本次原审批人，多项依据不能静默选择', async () => {
   for (const [action, method] of [['RECEIVE', 'receiveExpense'], ['REDUCE', 'reduceExpense']]) {

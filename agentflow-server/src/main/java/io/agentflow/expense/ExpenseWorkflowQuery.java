@@ -39,16 +39,18 @@ public class ExpenseWorkflowQuery {
     private final ExpenseLifecycleService lifecycle;
     private final FlowableApprovalProxyAccess proxies;
     private final ExpenseApprovalService approvals;
+    private final ExpenseRevocationService revocations;
 
     /** 沿用完整明细读取权限，隐藏或脱敏审批人不能从控制查询旁路取得财务事实。 */
     public ExpenseWorkflowQuery(CurrentActor actors, ExpenseDraftService drafts, ExpenseReportRepository reports,
             ApprovalApplicationFacade applications, JdbcExpenseSubmissionControlRepository controls, JdbcBudgetOccupationRepository budgets,
             JdbcBudgetOperationRepository operations, FlowableTaskAuthorization tasks, ExpenseLifecycleService lifecycle,
-            FlowableApprovalProxyAccess proxies, ExpenseApprovalService approvals) {
+            FlowableApprovalProxyAccess proxies, ExpenseApprovalService approvals, ExpenseRevocationService revocations) {
         this.actors = actors; this.drafts = drafts; this.reports = reports; this.applications = applications; this.controls = controls;
         this.budgets = budgets; this.operations = operations; this.tasks = tasks; this.lifecycle = lifecycle;
         this.proxies = proxies;
         this.approvals = approvals;
+        this.revocations = revocations;
     }
 
     /** 一个数据库快照内读取纸件、预算与版本；页面在未知结果期间只能刷新，不生成假成功。 */
@@ -91,7 +93,7 @@ public class ExpenseWorkflowQuery {
                         control.receipt() == null ? null : control.receipt().receivedBy(), control.receipt() == null ? null : control.receipt().receivedAt(),
                         control.receipt() == null ? null : control.receipt().proxyUse()),
                 new Budget(budget == null ? null : budget.status(), confirmed, operation == null ? null : operation.input().command().id(),
-                        operation == null ? null : operation.status(), issue), options);
+                        operation == null ? null : operation.status(), issue), options, revocations.availability(application, report));
     }
 
     /**
@@ -99,7 +101,7 @@ public class ExpenseWorkflowQuery {
      * @author owlzhangfq@gmail.com
      */
     public record View(UUID reportId, UUID applicationId, long applicationVersion, long financialVersion, int roundNo,
-                       boolean canWithdraw, boolean canCancel, Paper paper, Budget budget, TaskOptions task) { }
+                       boolean canWithdraw, boolean canCancel, Paper paper, Budget budget, TaskOptions task, ExpenseRevocationService.Availability revocation) { }
     /**
      * 原件签收绑定显示的审批轮次，不误称下一轮已签收。
      * @author owlzhangfq@gmail.com

@@ -38,15 +38,17 @@ public class ExpenseController {
     private final ExpenseAllowancePreparation allowances;
     private final ExpenseSubmissionRejections rejections;
     private final InvoiceOccupationQueries occupations;
+    private final ExpenseRevocationService revocations;
 
     /** 财务写入继续使用平台请求幂等及实际认证主体。 */
     public ExpenseController(ExpenseDraftService drafts, IdempotencyExecutor idempotency, ExpenseSubmissionService submissions,
             ExpenseApprovalService approvals, ExpenseLifecycleService lifecycle, ExpenseReductionService reductions, ExpenseAllowancePreparation allowances,
-            ExpenseSubmissionRejections rejections, InvoiceOccupationQueries occupations) {
+            ExpenseSubmissionRejections rejections, InvoiceOccupationQueries occupations, ExpenseRevocationService revocations) {
         this.drafts = drafts; this.idempotency = idempotency; this.submissions = submissions; this.approvals = approvals; this.lifecycle = lifecycle; this.reductions = reductions;
         this.allowances = allowances;
         this.rejections = rejections;
         this.occupations = occupations;
+        this.revocations = revocations;
     }
 
     /** 创建草稿，只绑定可用的已发布费用流程。 */
@@ -112,6 +114,12 @@ public class ExpenseController {
     @PostMapping("/{id}/cancel")
     public ResponseEntity<String> cancel(@PathVariable UUID id, @Valid @RequestBody ExpenseLifecycleService.Input request, HttpServletRequest http) {
         return idempotency.execute(http, HttpStatus.OK, () -> lifecycle.change(id, request, true));
+    }
+
+    /** 财务确认撤销已批准但尚未外发的本轮报销；回执和资源释放在同一幂等事务内。 */
+    @PostMapping("/{id}/revoke")
+    public ResponseEntity<String> revoke(@PathVariable UUID id, @Valid @RequestBody ExpenseLifecycleService.Input request, HttpServletRequest http) {
+        return idempotency.execute(http, HttpStatus.OK, () -> revocations.revoke(id, request));
     }
 
     /**

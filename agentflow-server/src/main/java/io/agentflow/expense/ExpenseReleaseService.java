@@ -36,7 +36,8 @@ public class ExpenseReleaseService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void release(Application application, String actor, Instant now) {
         if (application.businessReference() == null || application.businessReference().type() != BusinessReference.Type.EXPENSE) return;
-        if (application.status() != ApplicationStatus.REJECTED && application.status() != ApplicationStatus.CANCELLED) {
+        if (application.status() != ApplicationStatus.REJECTED && application.status() != ApplicationStatus.CANCELLED
+                && application.status() != ApplicationStatus.REVOKED) {
             throw new DomainException("EXPENSE_RELEASE_NOT_ALLOWED", "Only rejected or cancelled expense reports release reservations");
         }
         UUID id = application.businessReference().id(); reports.lock(application.tenantId(), id);

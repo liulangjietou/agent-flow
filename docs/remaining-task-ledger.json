@@ -1,35 +1,35 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-07T21:49:17.250777+00:00",
+  "recordedAt": "2026-10-08T00:19:55.138983+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
   "counting": {
     "unit": "可独立验收的交付目标；同功能的代码、API、页面和范围测试合算一项。",
-    "knownOpenTaskCount": 43,
+    "knownOpenTaskCount": 44,
     "byKind": {
-      "LOCAL_DEVELOPMENT": 25,
+      "LOCAL_DEVELOPMENT": 26,
       "LOCAL_VERIFICATION": 3,
       "EXTERNAL_ACCEPTANCE": 15
     },
     "completeInventory": false,
-    "projectRemainingLowerBound": 43,
+    "projectRemainingLowerBound": 44,
     "completionPercentage": null,
     "notes": [
-      "43 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
+      "44 是当前已编号待办，不是已证明的全项目精确剩余总数。V03 未完成，核对仍可能发现遗漏。",
       "本地实现与真实企业联调分别验收；彼此依赖不合并为虚假的已完成。",
       "OFD 图元、单个端点、数据库迁移和单条测试不分别膨胀计数。",
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
     ],
     "localDeliveryBreakdown": {
-      "recordedAt": "2026-10-07T21:49:17.250777+00:00",
+      "recordedAt": "2026-10-08T00:19:55.138983+00:00",
       "implementationRemaining": {
         "count": 0,
         "taskIds": [],
         "qualification": "Only already confirmed implementation gaps; V03 may identify additional gaps."
       },
       "implementedAwaitingBrowserAndPostgresVerification": {
-        "count": 19,
+        "count": 20,
         "taskIds": [
           "A01",
           "A02",
@@ -49,10 +49,11 @@
           "F15",
           "W03",
           "O01",
-          "U06"
+          "U06",
+          "U07"
         ]
       },
-      "note": "25 OPEN local targets: 19 implemented awaiting applicable browser/PostgreSQL gates; W02 and U01-U05 awaiting browser/devices. V03 inventory remains incomplete.",
+      "note": "26 OPEN local targets: 20 implemented awaiting applicable browser/PostgreSQL gates; W02 and U01-U05 awaiting browser/devices. V03 inventory remains incomplete.",
       "implementedAwaitingBrowserVerification": {
         "count": 6,
         "taskIds": [
@@ -2341,7 +2342,7 @@
           ]
         }
       ],
-      "observed": "U06 415 项 Java 范围、1519 项完整前端、构建和 OpenAPI 通过；组合去重 Java 5319 项。新固定包占用提示、旧事实保持、原失败请求恢复和强退恢复通过。浏览器、PostgreSQL 与目标部署仍待验。",
+      "observed": "U07 486 项 Java 范围、1525 项完整前端与固定包升级/强退恢复通过；Java 组合去重 5333。原批准证据、金融边界和原键恢复保持。浏览器、PostgreSQL 与最终部署仍待验。",
       "references": [
         {
           "path": "docs/postgres-release-gate.md",
@@ -2380,10 +2381,10 @@
       "localAutomatedGate": {
         "status": "PASS",
         "evidence": "docs/evidence/local-regression-gate-20261007.json",
-        "javaUniqueCases": 5319,
-        "webUniqueCases": 1519,
-        "scopeSupplement": "docs/evidence/invoice-occupation-20261007.json",
-        "webScopeSupplement": "docs/evidence/invoice-occupation-20261007.json"
+        "javaUniqueCases": 5333,
+        "webUniqueCases": 1525,
+        "scopeSupplement": "docs/evidence/approved-expense-revocation-20261007.json",
+        "webScopeSupplement": "docs/evidence/approved-expense-revocation-20261007.json"
       }
     },
     {
@@ -2418,7 +2419,7 @@
           ]
         }
       ],
-      "observed": "120 个条款单元已对应原文、源码、明确测试及执行记录；U06 实时占用提示已补齐，待办筛选与分页另有精确断言映射。完整条款清单和视觉/设备、目标环境验收仍开放。",
+      "observed": "125 个条款单元对应原文、源码、明确断言及执行记录；U07 已批撤销缺口补齐，原全员会签与业务写边界已有实现和测试。完整清单、视觉/设备和目标环境验收继续开放。",
       "references": [
         {
           "path": "docs/product-goal-gap-audit.md",
@@ -2441,9 +2442,9 @@
       "dependsOn": [],
       "clauseAudit": {
         "status": "PARTIAL_CLAUSE_AUDIT_LOCAL_ASSERTIONS_VERIFIED",
-        "verifiedClauseUnits": 120,
-        "javaUnits": 88,
-        "webUnits": 32,
+        "verifiedClauseUnits": 125,
+        "javaUnits": 91,
+        "webUnits": 34,
         "completeInventory": false,
         "evidence": "docs/evidence/requirement-clause-audit-20261007.json"
       }
@@ -3319,6 +3320,53 @@
         }
       ],
       "acceptance": "票夹、预检和正式提交竞争响应展示当前可读占用单号；受限来源、跨租户与历史来源缺失不得泄露标识，不改写原预检与金融资源事实。",
+      "dependsOn": [],
+      "implementationStatus": "IMPLEMENTED_LOCAL_FIXED_PACKAGE_BROWSER_POSTGRES_PENDING"
+    },
+    {
+      "id": "U07",
+      "kind": "LOCAL_DEVELOPMENT",
+      "group": "费用生命周期",
+      "status": "OPEN",
+      "title": "已批准未外发报销的财务撤销",
+      "sourceRefs": [
+        {
+          "documentId": "05",
+          "section": "撤回、作废、撤销规则",
+          "lines": [
+            182,
+            191
+          ]
+        },
+        {
+          "documentId": "05",
+          "section": "报销接口与终态资源释放",
+          "lines": [
+            403,
+            403
+          ]
+        },
+        {
+          "documentId": "05",
+          "section": "验收",
+          "lines": [
+            626,
+            626
+          ]
+        }
+      ],
+      "observed": "真实 HTTP、页面、回执枚举和终态模板先失败后修复。486 项 Java 范围、1525 项完整前端、类型检查、构建、契约和固定包升级/强退恢复通过；浏览器及 PostgreSQL 待补验。",
+      "references": [
+        {
+          "path": "docs/evidence/approved-expense-revocation-20261007.json",
+          "line": 1
+        },
+        {
+          "path": "docs/approved-expense-revocation.md",
+          "line": 1
+        }
+      ],
+      "acceptance": "当前独立财务具备原轮次完整字段权限及法人任职方可确认；双版本和原幂等键保护状态、审计与资源释放；已发送/未知凭证、付款或核销阻断；原批准证据保持。",
       "dependsOn": [],
       "implementationStatus": "IMPLEMENTED_LOCAL_FIXED_PACKAGE_BROWSER_POSTGRES_PENDING"
     }
@@ -4487,15 +4535,15 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "U06",
+    "taskId": "U07",
     "status": "LOCAL_IMPLEMENTATION_VERIFIED_REQUIREMENT_AUDIT_CONTINUES",
-    "recordedAt": "2026-10-07T21:49:17.250777+00:00",
-    "knownOpenTaskCount": 43,
-    "evidence": "docs/evidence/invoice-occupation-20261007.json"
+    "recordedAt": "2026-10-08T00:19:55.138983+00:00",
+    "knownOpenTaskCount": 44,
+    "evidence": "docs/evidence/approved-expense-revocation-20261007.json"
   },
   "localMainIntegration": {
-    "verifiedThroughCommit": "af4ce60767cc7aa1a7a19dbc7b9f409eeb374c57",
-    "mergeCommit": "af4ce60767cc7aa1a7a19dbc7b9f409eeb374c57",
+    "verifiedThroughCommit": "ea0b0791dbaf4f9f412620021d801640e2f65fde",
+    "mergeCommit": "ea0b0791dbaf4f9f412620021d801640e2f65fde",
     "originMainFetchedAtMerge": "2ac75649c026501460a59464d80f9a48ddf6ecd7",
     "remotePush": false,
     "note": "Local main was verified at this source base before the current commit. This stage is ready for authorized fast-forward integration; remote delivery remains gated."

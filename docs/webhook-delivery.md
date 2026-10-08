@@ -29,6 +29,7 @@ agentflow:
 | ApplicationSubmitted | 一轮审批提交成功，包括重提 |
 | ApplicationWithdrawn | 审批中申请撤回成功 |
 | ApplicationCancelled | 允许作废的申请作废成功 |
+| ApplicationRevoked | 独立财务撤销已批准且未外发的报销，原批准轮次保留；事件只带本次状态变化 |
 | TaskActionAccepted | 实际任务动作成功，包括认领、释放、转办、委派、回交、同意、退回、驳回 |
 | ApplicationApproved | 申请真实转为 APPROVED |
 | ApplicationReturned | 申请真实转为 RETURNED |

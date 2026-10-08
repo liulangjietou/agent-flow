@@ -177,6 +177,9 @@ class ExpenseSubmissionIntegrationTest {
     @Autowired ExpenseArchiveFiles archiveFiles;
     @Autowired ExpenseSettlementWorker settlementWorker;
     @Autowired ExpenseSettlementService settlementService;
+    @Autowired ExpenseRevocationService revocations;
+    @Autowired AccountingPeriodPort revocationPeriods;
+    @Autowired AccountMappingPort revocationMappings;
     @Autowired ExpenseSettlementRegistration settlementRegistration;
     @Autowired org.springframework.context.ApplicationEventPublisher applicationEvents;
     @Autowired io.agentflow.notification.ExpenseSettlementNotificationAccess settlementNotificationAccess;
@@ -1289,6 +1292,41 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     @Test
+    void approvedUnsentExpenseRevocationReleasesReservationsOnceAndPreservesApprovalEvidence() throws Exception {
+        var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "合成撤销部门", entity, null, true);
+        var position = organization.createUnit(admin, OrganizationUnit.Kind.POSITION, "合成撤销岗位", entity, null, true);
+        organization.createAppointment(admin, finance, department.id(), position.id(), true);
+        var fixture = fixture(true); var report = fixture.report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200);
+        var original = current(report).state(); var approved = app(report); var input = lifecycleInput(report); String key = UUID.randomUUID().toString();
+        var originalRound = jdbc.queryForMap("SELECT * FROM approval_submission_round WHERE tenant_id='demo' AND application_id=? AND round_no=1", report.applicationId().toString());
+        assertThat(ok(read(path(report) + "/workflow", "finance"), 200).path("revocation").path("allowed").asBoolean()).isTrue();
+        var response = send(path(report) + "/revoke", "finance", key, input);
+        var receipt = ok(response, 200);
+        assertThat(receipt.path("status").asText()).isEqualTo("REVOKED");
+        assertThat(app(report).status()).isEqualTo(ApplicationStatus.REVOKED);
+        assertThat(app(report).version()).isEqualTo(approved.version() + 1);
+        assertThat(current(report).state()).isEqualTo(original);
+        assertThat(tasks(report)).isEmpty();
+        assertThat(invoices.find("demo", fixture.invoice()).orElseThrow().occupation()).isEqualTo(Invoice.Occupation.AVAILABLE);
+        assertThat(requests.find("demo", fixture.prior()).orElseThrow().balance(1).available()).isEqualTo(money("200"));
+        assertThat(advances.find("demo", fixture.advance()).orElseThrow().balance().available()).isEqualTo(money("200"));
+        var release = occupations.find("demo", report.id()).orElseThrow().pendingOperationId();
+        assertThat(operations.find("demo", release).orElseThrow().input().command().action()).isEqualTo(BudgetCommand.Action.RELEASE);
+        assertThat(ok(send(path(report) + "/revoke", "finance", key, input), 200)).isEqualTo(receipt);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='REVOKE'", Integer.class, report.applicationId().toString())).isEqualTo(1);
+        assertThat(jdbc.queryForMap("SELECT * FROM approval_submission_round WHERE tenant_id='demo' AND application_id=? AND round_no=1", report.applicationId().toString())).isEqualTo(originalRound);
+        assertThat(ok(read("/api/v1/applications/" + report.applicationId() + "/audit?action=REVOKE", "finance"), 200).path("items")).hasSize(1);
+        voucherPreparationWorker.poll(); voucherWorker.poll();
+        budgetStatus = BudgetObservation.Status.PENDING; drive(release);
+        assertThat(operations.find("demo", release).orElseThrow().status()).isEqualTo(BudgetOperation.Status.UNKNOWN);
+        assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.FROZEN);
+        budgetStatus = BudgetObservation.Status.APPLIED; drive(release);
+        assertThat(voucherWrites).isZero();
+        assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.RELEASED);
+        assertCode(send(path(report) + "/revoke", "finance", lifecycleInput(report)), "DOMAIN_RULE_VIOLATION");
+    }
+
+    @Test
     void rejectionDuringUnknownFreezeReleasesLocalResourcesThenQueriesBeforeExternalRelease() throws Exception {
         var fixture = fixture(true); var report = fixture.report(); submit(report);
         budgetStatus = BudgetObservation.Status.PENDING; budgetWorker.poll();
@@ -1306,6 +1344,104 @@ class ExpenseSubmissionIntegrationTest {
         drive(release);
         assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.RELEASED);
         assertThat(app(report).status()).isEqualTo(ApplicationStatus.REJECTED); assertThat(writes).isEqualTo(2);
+    }
+
+    @Test
+    void revocationRequiresCurrentIndependentFinanceAndBothVersions() throws Exception {
+        var fixture = fixture(true); var report = fixture.report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200);
+        var before = applicationRow(report); var input = lifecycleInput(report);
+        for (String actor : List.of("alice", "manager", "finance")) {
+            assertThat(ok(read(path(report) + "/workflow", actor), 200).hasNonNull("revocation")).isFalse();
+            assertThat(send(path(report) + "/revoke", actor, input).getStatus()).isEqualTo(403);
+        }
+        assertThat(send(path(report) + "/revoke", "admin", input).getStatus()).isEqualTo(403);
+        assertThat(send(path(report) + "/revoke", "bob", input).getStatus()).isEqualTo(404);
+        var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "撤销财务部门", entity, null, true);
+        var position = organization.createUnit(admin, OrganizationUnit.Kind.POSITION, "撤销财务岗位", entity, null, true);
+        var appointed = organization.createAppointment(admin, finance, department.id(), position.id(), true);
+        for (String version : List.of("applicationVersion", "financialVersion")) {
+            var stale = new HashMap<>(input); stale.put(version, ((Number) input.get(version)).longValue() - 1);
+            assertCode(send(path(report) + "/revoke", "finance", stale), "CONCURRENCY_CONFLICT");
+        }
+        var injected = new HashMap<>(input); injected.put("proxyId", UUID.randomUUID());
+        assertThat(send(path(report) + "/revoke", "finance", injected).getStatus()).isEqualTo(400);
+        var blank = new HashMap<>(input); blank.put("comment", " ");
+        assertThat(send(path(report) + "/revoke", "finance", blank).getStatus()).isEqualTo(400);
+        organization.updateAppointment(admin, appointed.id(), false, appointed.revision());
+        assertThat(send(path(report) + "/revoke", "finance", input).getStatus()).isEqualTo(403);
+        assertThat(applicationRow(report)).isEqualTo(before);
+        assertThat(invoices.find("demo", fixture.invoice()).orElseThrow().occupation()).isEqualTo(Invoice.Occupation.OCCUPIED);
+        assertThat(occupations.find("demo", report.id()).orElseThrow().pendingOperationId()).isNull();
+    }
+
+    @Test
+    void revocationAndUnsentVoucherRetirementRollBackTogetherAndNeverDispatchAfterCommit() throws Exception {
+        var report = paymentReportBeforeVoucher(); voucherPreparationWorker.poll();
+        var operation = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+        var original = applicationRow(report); var budget = occupations.find("demo", report.id()).orElseThrow();
+        var input = new ExpenseLifecycleService.Input(app(report).version(), current(report).version(), "财务撤销");
+        assertThatThrownBy(() -> asFinance(() -> tx().execute(status -> {
+            revocations.revoke(report.id(), input); throw new IllegalStateException("Synthetic revocation rollback");
+        }))).hasMessageContaining("Synthetic revocation rollback");
+        assertThat(applicationRow(report)).isEqualTo(original);
+        assertThat(voucherOperations.find("demo", operation.input().command().id()).orElseThrow()).isEqualTo(operation);
+        assertThat(occupations.find("demo", report.id()).orElseThrow()).isEqualTo(budget);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='REVOKE'", Integer.class, report.applicationId().toString())).isZero();
+        ok(send(path(report) + "/revoke", "finance", input), 200);
+        assertThat(voucherOperations.find("demo", operation.input().command().id()).orElseThrow().status()).isEqualTo(VoucherOperation.Status.VOIDED);
+        assertThat(voucherExecution.claim("demo", operation.input().command().id(), Instant.now())).isNull();
+        voucherWorker.poll(); assertThat(voucherWrites).isZero();
+    }
+
+    @Test
+    void claimedUnknownAndPreviouslySentNotFoundVouchersCannotBeRevokedOrReleaseResources() throws Exception {
+        var report = paymentReportBeforeVoucher(); voucherPreparationWorker.poll();
+        var operation = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
+        var claimed = voucherExecution.claim("demo", operation.input().command().id(), Instant.now());
+        assertThat(claimed.status()).isEqualTo(VoucherOperation.Status.POSTING);
+        var before = applicationRow(report); var budget = occupations.find("demo", report.id()).orElseThrow();
+        assertCode(send(path(report) + "/revoke", "finance", lifecycleInput(report)), "EXPENSE_REVOCATION_VOUCHER_STARTED");
+        voucherExecution.fail(claimed, VoucherOperation.Failure.TIMEOUT, Instant.now());
+        assertCode(send(path(report) + "/revoke", "finance", lifecycleInput(report)), "EXPENSE_REVOCATION_VOUCHER_STARTED");
+        var unknown = voucherOperations.find("demo", operation.input().command().id()).orElseThrow();
+        var querying = voucherExecution.claim("demo", operation.input().command().id(), unknown.nextAttemptAt());
+        var absent = new VoucherObservation(operation.input().command().id(), operation.input().command().digest(), VoucherObservation.Status.NOT_FOUND,
+                0L, querying.updatedAt(), null, null, null, null, null, null, null, null);
+        voucherExecution.finish(querying, new FinanceResult.Success<>(absent), querying.updatedAt());
+        var notFound = voucherOperations.find("demo", operation.input().command().id()).orElseThrow();
+        tx().execute(status -> voucherExecution.resend("demo", operation.input().command().id(), notFound.version(), notFound.updatedAt()));
+        assertCode(send(path(report) + "/revoke", "finance", lifecycleInput(report)), "EXPENSE_REVOCATION_VOUCHER_STARTED");
+        assertThat(ok(read(path(report) + "/workflow", "finance"), 200).path("revocation").path("allowed").asBoolean()).isFalse();
+        assertThat(applicationRow(report)).isEqualTo(before);
+        assertThat(occupations.find("demo", report.id()).orElseThrow()).isEqualTo(budget);
+    }
+
+    @Test
+    void lateReadOnlyPreparationCannotRegisterVoucherAfterRevocation() throws Exception {
+        var report = paymentReportBeforeVoucher(); var source = voucherSources.reference(app(report));
+        var queued = voucherPreparations.latest(source).orElseThrow();
+        var work = voucherPreparationService.claim("demo", queued.input().id(), Instant.now());
+        var period = (FinanceResult.Success<AccountingPeriodPort.OpenPeriod>) revocationPeriods.period("demo", queued.input().targetDigest(), work.source().periodRequest());
+        var mapping = (FinanceResult.Success<AccountMappingPort.Mapping>) revocationMappings.mapping("demo", queued.input().targetDigest(), work.preparation().mappingRequest());
+        var command = work.source().prepare(queued.input().id(), period.value(), mapping.value(), Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+        ok(send(path(report) + "/revoke", "finance", lifecycleInput(report)), 200);
+        assertThatThrownBy(() -> voucherPreparationService.finish(work.preparation(), command, null, Instant.now()))
+                .isInstanceOf(io.agentflow.common.DomainException.class).extracting("code").isEqualTo("VOUCHER_SOURCE_CHANGED");
+        voucherPreparationService.finish(work.preparation(), null, VoucherPreparation.Result.voided(), Instant.now());
+        assertThat(voucherPreparations.find("demo", queued.input().id()).orElseThrow().status()).isEqualTo(VoucherPreparation.Status.VOIDED);
+        assertThat(voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL)).isEmpty();
+        assertThat(voucherWrites).isZero();
+    }
+
+    @Test
+    void postedVoucherAndPaymentAuthorizationKeepTheirOriginalReconciliationPath() throws Exception {
+        var report = paymentReport(); var before = applicationRow(report);
+        assertCode(send(path(report) + "/revoke", "finance", lifecycleInput(report)), "EXPENSE_REVOCATION_VOUCHER_STARTED");
+        var id = authorizePayment(report); var authorization = paymentAuthorizations.find("demo", id).orElseThrow();
+        assertCode(send(path(report) + "/revoke", "finance", lifecycleInput(report)), "EXPENSE_REVOCATION_SETTLEMENT_STARTED");
+        assertThat(paymentAuthorizations.find("demo", id).orElseThrow()).isEqualTo(authorization);
+        assertThat(applicationRow(report)).isEqualTo(before);
+        assertThat(occupations.find("demo", report.id()).orElseThrow().status()).isEqualTo(BudgetOccupation.Status.FROZEN);
     }
 
     @Test
@@ -6950,11 +7086,19 @@ class ExpenseSubmissionIntegrationTest {
     private MockHttpServletResponse act(ExpenseReport report, String user, String action) throws Exception { return send("/api/v1/tasks/" + task(report).getId() + "/actions", user, Map.of("action", action, "comment", "合成决策", "expectedVersion", app(report).version())); }
     private Task task(ExpenseReport report) { return tasks(report).get(0); }
     private List<Task> tasks(ExpenseReport report) { return tasks.createTaskQuery().processVariableValueEquals("applicationId", report.applicationId().toString()).list(); }
+    private Map<String, Object> applicationRow(ExpenseReport report) { return jdbc.queryForMap("SELECT * FROM approval_application WHERE tenant_id='demo' AND id=?", report.applicationId().toString()); }
     private Application app(ExpenseReport report) { return applications.findById("demo", report.applicationId()).orElseThrow(); }
     private ExpenseReport current(ExpenseReport report) { return reports.find("demo", report.id()).orElseThrow(); }
     private String path(ExpenseReport report) { return "/api/v1/expense-reports/" + report.id(); }
     private String voucherPath(ExpenseReport report) { return "/api/v1/applications/" + report.applicationId() + "/vouchers"; }
     private String paymentPath(ExpenseReport report) { return "/api/v1/applications/" + report.applicationId() + "/payments"; }
+    private ExpenseReport paymentReportBeforeVoucher() throws Exception {
+        var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "撤销验收部门", entity, null, true);
+        var position = organization.createUnit(admin, OrganizationUnit.Kind.POSITION, "撤销验收岗位", entity, null, true);
+        organization.createAppointment(admin, finance, department.id(), position.id(), true);
+        var report = fixture(false).report(); enterFinance(report); ok(act(report, "finance", "APPROVE"), 200);
+        return report;
+    }
     private ExpenseReport paymentReport() throws Exception { return paymentReport(false); }
     private ExpenseReport paymentReport(boolean resources) throws Exception {
         var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "合成付款部门", entity, null, true);

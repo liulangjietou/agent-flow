@@ -42,7 +42,8 @@ public class ExpenseBudgetOutcomeHandler {
         var report = reports.find(command.tenantId(), position.reportId()).orElseThrow();
         var application = applications.findById(command.tenantId(), report.applicationId()).orElseThrow();
         var review = reviews.completed(operation);
-        if (application.status() == ApplicationStatus.REJECTED || application.status() == ApplicationStatus.CANCELLED) {
+        if (application.status() == ApplicationStatus.REJECTED || application.status() == ApplicationStatus.CANCELLED
+                || application.status() == ApplicationStatus.REVOKED) {
             // 释放本身被外部明确拒绝时保留结果供处理，不自动生成无限的新释放命令。
             if (command.action() == BudgetCommand.Action.FREEZE || command.action() == BudgetCommand.Action.ADJUST) {
                 releases.releaseBudget(command.tenantId(), report.id(), operation.updatedAt());

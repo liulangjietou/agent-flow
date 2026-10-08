@@ -1,0 +1,240 @@
+{
+  "recordedAt": "2026-10-08T00:19:55.138983+00:00",
+  "taskId": "U07",
+  "status": "IMPLEMENTED_LOCAL_FIXED_PACKAGE_BROWSER_POSTGRES_PENDING",
+  "sourceBaseCommit": "ea0b0791dbaf4f9f412620021d801640e2f65fde",
+  "requirements": [
+    {
+      "documentId": "05",
+      "lines": [
+        182,
+        191
+      ]
+    },
+    {
+      "documentId": "05",
+      "lines": [
+        403,
+        403
+      ]
+    },
+    {
+      "documentId": "05",
+      "lines": [
+        626,
+        626
+      ]
+    }
+  ],
+  "implementation": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/approval/model/Application.java",
+      "sha256": "609ed6d9b62b44a3d323aea917c4abca57b5fd2c87db8531cba607a5036f92b7"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/approval/service/ApplicationAuditPort.java",
+      "sha256": "6525a981aec92ae7832b758825cde07e3adbe99bdd7d006ab5ddc4745b2e7570"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/approval/service/ApprovalApplicationService.java",
+      "sha256": "825a29e65f102a7424f8a78927575b88175bc0ca1c99836db966d900023c445a"
+    },
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/finance/VoucherOperation.java",
+      "sha256": "cbc53e09c92597fa49719cdb6600e340e09997ea44e79cb487d847af43bd3174"
+    },
+    {
+      "path": "agentflow-domain/src/test/java/io/agentflow/approval/ApplicationCancellationTest.java",
+      "sha256": "c9cba6491bc3a316822a2534e32e3f71087b8bf71a958662d137f43fec110a3d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java",
+      "sha256": "f4b2db2bd0b5471b799d77b9b40598d1f1486be6c4f39a1e353947f6f2d8059d"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/history/HistoryQueryParameters.java",
+      "sha256": "aa1e1bcaf79fbd0edc1d600a928dbe2dcf80b0155016f5496c0777a493a566d3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/operations/AuditSearchParameters.java",
+      "sha256": "67d374e96cecc263699579993252c8b7d21e0e3b8877541a92b3aba026eff4d2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseBudgetOutcomeHandler.java",
+      "sha256": "89c76f6fc0ce24840dcb1a998f082cb0134a707f4c66c00a8408b5e85b956d45"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseController.java",
+      "sha256": "fa2a5946be0b57357e32c1745c041a6271729c84322a50b82c932f703f0aeae2"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseReleaseService.java",
+      "sha256": "62e76a6faa4363524c046d6de70cd37c851b69b2041f5932924864b19c2181b3"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseRevocationService.java",
+      "sha256": "d82efaf868fc772b9492084ce38094f26d290b3ee341984147da238fd93d5424"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseWorkflowQuery.java",
+      "sha256": "c5eff5f57480e593aa753d50f859f6205c0ecedec8bf11cd85ec8c7f4d7c9a07"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherOperationService.java",
+      "sha256": "27d045797f72cce937075eb6a5b47a8e50f54f733bb11e2a6caf0c9badc58730"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/integration/ApprovalWebhookEvents.java",
+      "sha256": "67d3029068ed81fb3b76a3215c59c3e2800ea1fd14f7d442eda84a71b750bda5"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "5b895f048e7ebfce930995d704304b625fe0079a07f87cd0a7968b4db9cddfe8"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/api/OpenApiContractTest.java",
+      "sha256": "4bb14704e5a927639c2d28e5d2cece9be5e92dbd5b3f3ae124a56deb8c5b95be"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+      "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693"
+    },
+    {
+      "path": "agentflow-web/scripts/check-openapi.mjs",
+      "sha256": "2b12259e06a57dc62ba01a404e1e2850a0b55b5866f4064388337f65eb85b6f3"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "b0f27f19a170b7898e74c72bdf42bb64b6d1d109a8104c253cd38cd62c33a26e"
+    },
+    {
+      "path": "agentflow-web/src/components/ApplicationHistory.vue",
+      "sha256": "145177767e380280a16ba4c0e672d5a41f1d5b9e8cc9236e5bfcea2a6053650a"
+    },
+    {
+      "path": "agentflow-web/src/components/AuditSearch.vue",
+      "sha256": "e2e2772d3c50e511cb4df92a2e1193d2ded39eb3a5bde54bb67016a57753eabe"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseActions.vue",
+      "sha256": "79f93d4484bf3c10f2497faa46feca034d3372344e40dc3553a08b2c6a7c58d4"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseDetail.vue",
+      "sha256": "e84d44ec49e93d05c8c35a6fb03d5c922c4ca10dba6a19e0e530de7533e852d6"
+    },
+    {
+      "path": "agentflow-web/src/expenses.ts",
+      "sha256": "d082bb847041b706591da2aa32b5a47bae36012119e68b5e5423cd76788f8a69"
+    },
+    {
+      "path": "agentflow-web/tests/expense-actions.test.mjs",
+      "sha256": "50fb5f831ab785110e178ca15f20b55713408b7e60c18704fe33e11d8e9b150d"
+    },
+    {
+      "path": "agentflow-web/tests/expense-review.test.mjs",
+      "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0"
+    },
+    {
+      "path": "scripts/check-approved-expense-revocation.py",
+      "sha256": "92d0a75b78d5424e7dfc985dc2ab0c4be036eccd562596ac3fa8f244a66ccdd3"
+    }
+  ],
+  "redEvidence": [
+    "u07-java-red.log",
+    "u07-web-red.log",
+    "u07-openapi-receipt-red.log",
+    "u07-web-terminal-red.log"
+  ],
+  "java": {
+    "scopeCases": 486,
+    "newCases": 14,
+    "aggregateUniquePassed": 5333,
+    "fullRerun": false,
+    "contractSupplement": {
+      "cases": 7,
+      "report": "/fyoung/tmp/agentflow-remaining-20260928/u07-contract-final-verified/TEST-io.agentflow.api.OpenApiContractTest.xml",
+      "reportSha256": "532e43854358ec1380c37dba5e7e053dec969287de5b00e90b797a6ba01031b7",
+      "log": "/fyoung/tmp/agentflow-remaining-20260928/u07-package-final.log",
+      "logSha256": "92d0909dfbabe2bdfbd47b34b7ab1fbd1015f8d74ef2323af40b1f335fc4a457",
+      "reason": "Response enum corrected after broader regression; only contract input changed."
+    },
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/u07-java-green.log",
+    "logSha256": "37a1d2d94433df3cb0c6ee317c03992470707d183c117676fa2c9ec0ccc92fcb"
+  },
+  "web": {
+    "scopeCases": 35,
+    "uniquePassed": 1525,
+    "failed": 0,
+    "skipped": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/u07-web-final.log",
+    "logSha256": "35c3562ebf1def933f1e8e64a9d9af8d9c0c75d5502e9b2b7c06a021dcf1678c",
+    "typeAndBuild": "PASS",
+    "buildLog": "/fyoung/tmp/agentflow-remaining-20260928/u07-web-build-final.log"
+  },
+  "openApi": {
+    "operations": 397,
+    "schemas": 873,
+    "requestExamples": 130,
+    "status": "PASS",
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/u07-openapi-final.log",
+    "actualRuntimeResponses": {
+      "status": "PASS",
+      "validatedActualResponses": 10
+    },
+    "actualResponseCheckerSha256": "ff2e2bb435806b1cbbf8679e25fdae829b94752c40c935520dc9165d79ae65c8"
+  },
+  "fixedPackage": {
+    "status": "PASS",
+    "legacyJarSha256": "b32d989ec1c9a251d916b90166c3068ffcea1309c0cb536632ca5a6db8527699",
+    "fixedJarSha256": "c714c7cfed8a0915886c30dea0c31f9ad7381a06c4814e89c4a442d7c97b6770",
+    "checkerSha256": "92d0a75b78d5424e7dfc985dc2ab0c4be036eccd562596ac3fa8f244a66ccdd3",
+    "sharedCheckerSha256": "38478ee9d7550251985ec8ca08789536ebaaaeb88590048b67cfb9e60baa4734",
+    "financeCheckerSha256": "bbfc0e9d8e3b0ae574f0f0cffb9b8524d1018c7abe7049d3c576e2f7aa7d5abe",
+    "upgrade": {
+      "preservedTables": 281,
+      "preservedRows": 381,
+      "newMigrations": 0
+    },
+    "runtimeBoots": 4,
+    "httpRequests": 73,
+    "originalApprovalPreserved": true,
+    "idempotentRevocation": true,
+    "invoiceReleased": true,
+    "externalBudgetReleaseConfirmed": true,
+    "financialSnapshotPreserved": true,
+    "originalFilePreserved": true,
+    "voucherWrites": 0
+  },
+  "rules": [
+    "P0 财务直接确认沿用原轮次完整字段权限、同法人当前任职和职责分离；申请人、普通审批人、受限管理员均无旁路。",
+    "申请从 APPROVED 变为 REVOKED，财务版本、已完成批准轮次、正文、金额和审计历史保持原值；单独追加 REVOKE 申请审计。",
+    "任何凭证发送尝试、未知、查无后重发、付款授权或结算依据存在时阻断；准备阶段只读查询和从未发送的原凭证不能在撤销后外发。",
+    "现有付款授权以已过账凭证为前提，因此 P0 可撤销范围内没有付款授权；已有授权走原对账及冲回，不自动作废。",
+    "发票、事前额度及借款预留沿原资源事务释放；预算只登记 RELEASE，真实确认前仍显示 FROZEN，强退后原幂等请求回放不重做。",
+    "撤销界面显示影响并人工确认，失权和旧账号回执隔离；未知结果锁定原操作，终态保留金额但不继续付款核销办理。"
+  ],
+  "review": {
+    "method": "manual call-chain, authorization, transaction, concurrency boundary, contract, replay and terminal-state review",
+    "findings": []
+  },
+  "retainedFailures": [
+    "固定包验收首轮传入过时模板 v5，被真实模板版本守卫以 409 拒绝；改为读取旧安装包公开目录的实际版本，未放宽守卫。",
+    "第二轮升级保持检查通过后，脚本误要求可选空字段 unavailable 显式存在；按公开契约兼容缺字段后重跑，产品权限判断保持。",
+    "第三轮已验证升级、预算释放和凭证准备停用，但脚本将 resendOriginal 写为 resend；按原代码及响应字段纠正后完整重跑，未改动产品接口。",
+    "额外严格响应校验发现共享夹具将 fixtureActor 写入原始响应引用；验收脚本返回独立副本并重新生成原生 HTTP 证据后全部响应 schema 校验通过。",
+    "契约复查发现旧生命周期回执不能容纳 REVOKED；响应 schema 真实失败后单独新增仅 REVOKED 的撤销回执，旧撤回与作废枚举保持。",
+    "撤销终态页面此前仍显示付款及核销办理区；真实模板测试先失败，修正后 35 项范围及 1525 项完整前端重跑通过。"
+  ],
+  "archive": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/u07-approved-expense-revocation-verified-20261007",
+    "manifestSha256": "493747ec164e1f8f0ecec2fe99ad031b5a5c5bcb5124e8fb5cb8a6a5ba26b8be",
+    "files": 91
+  },
+  "remaining": [
+    "真实浏览器、键盘、触屏和辅助设备验收",
+    "PostgreSQL 与最终目标环境门禁",
+    "V03 余下原始规范核对",
+    "E15 远端 PR/CI 交付"
+  ]
+}

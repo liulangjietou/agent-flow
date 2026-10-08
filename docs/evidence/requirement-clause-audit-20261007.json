@@ -1,8 +1,8 @@
 {
-  "recordedAt": "2026-10-07T21:47:06.407870+00:00",
+  "recordedAt": "2026-10-08T00:19:55.026169+00:00",
   "taskId": "V03",
   "status": "PARTIAL_CLAUSE_AUDIT_LOCAL_ASSERTIONS_VERIFIED",
-  "sourceBaseCommit": "af4ce60767cc7aa1a7a19dbc7b9f409eeb374c57",
+  "sourceBaseCommit": "ea0b0791dbaf4f9f412620021d801640e2f65fde",
   "requirements": [
     {
       "id": "00",
@@ -82,7 +82,7 @@
         },
         {
           "path": "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java",
-          "sha256": "e8afd5f97fce454b7cfb5c6c5bce025646e5611fdf5ce93599cfafc63054a74b"
+          "sha256": "f4b2db2bd0b5471b799d77b9b40598d1f1486be6c4f39a1e353947f6f2d8059d"
         }
       ],
       "testWitnesses": [
@@ -152,7 +152,7 @@
       "implementation": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java",
-          "sha256": "e8afd5f97fce454b7cfb5c6c5bce025646e5611fdf5ce93599cfafc63054a74b"
+          "sha256": "f4b2db2bd0b5471b799d77b9b40598d1f1486be6c4f39a1e353947f6f2d8059d"
         }
       ],
       "testWitnesses": [
@@ -292,11 +292,11 @@
       "implementation": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/approval/model/Application.java",
-          "sha256": "1c8a67d9d4f607e0bebe7818ff35285428762808fc79d06068e84013d4fd3346"
+          "sha256": "609ed6d9b62b44a3d323aea917c4abca57b5fd2c87db8531cba607a5036f92b7"
         },
         {
           "path": "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java",
-          "sha256": "e8afd5f97fce454b7cfb5c6c5bce025646e5611fdf5ce93599cfafc63054a74b"
+          "sha256": "f4b2db2bd0b5471b799d77b9b40598d1f1486be6c4f39a1e353947f6f2d8059d"
         }
       ],
       "testWitnesses": [
@@ -832,7 +832,7 @@
       "implementation": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/approval/model/Application.java",
-          "sha256": "1c8a67d9d4f607e0bebe7818ff35285428762808fc79d06068e84013d4fd3346"
+          "sha256": "609ed6d9b62b44a3d323aea917c4abca57b5fd2c87db8531cba607a5036f92b7"
         },
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseReport.java",
@@ -973,7 +973,7 @@
       "implementation": [
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/approval/model/Application.java",
-          "sha256": "1c8a67d9d4f607e0bebe7818ff35285428762808fc79d06068e84013d4fd3346"
+          "sha256": "609ed6d9b62b44a3d323aea917c4abca57b5fd2c87db8531cba607a5036f92b7"
         },
         {
           "path": "agentflow-domain/src/main/java/io/agentflow/expense/ExpenseReport.java",
@@ -1029,9 +1029,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "reductionRequiresActualFinancialTaskAuthorityStrictFieldsAndCurrentDoubleVersions",
-          "line": 1972,
+          "line": 2108,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -1163,7 +1163,7 @@
         },
         {
           "path": "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java",
-          "sha256": "e8afd5f97fce454b7cfb5c6c5bce025646e5611fdf5ce93599cfafc63054a74b"
+          "sha256": "f4b2db2bd0b5471b799d77b9b40598d1f1486be6c4f39a1e353947f6f2d8059d"
         }
       ],
       "testWitnesses": [
@@ -1489,6 +1489,11 @@
           "03",
           29,
           29
+        ],
+        [
+          "05",
+          627,
+          627
         ]
       ],
       "implementation": [
@@ -1552,6 +1557,14 @@
             29
           ],
           "text": "- 金额使用十进制定点值和明确币种，不使用浮点；时间统一 ISO-8601 UTC 存储和传输。"
+        },
+        {
+          "documentId": "05",
+          "lines": [
+            627,
+            627
+          ],
+          "text": "- [ ] 外币行按提交日汇率快照折算，后续汇率变化不影响已提交金额。"
         }
       ]
     },
@@ -1573,7 +1586,7 @@
       "implementation": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java",
-          "sha256": "e8afd5f97fce454b7cfb5c6c5bce025646e5611fdf5ce93599cfafc63054a74b"
+          "sha256": "f4b2db2bd0b5471b799d77b9b40598d1f1486be6c4f39a1e353947f6f2d8059d"
         },
         {
           "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskAuthorization.java",
@@ -1740,7 +1753,7 @@
         },
         {
           "path": "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java",
-          "sha256": "e8afd5f97fce454b7cfb5c6c5bce025646e5611fdf5ce93599cfafc63054a74b"
+          "sha256": "f4b2db2bd0b5471b799d77b9b40598d1f1486be6c4f39a1e353947f6f2d8059d"
         }
       ],
       "testWitnesses": [
@@ -2789,7 +2802,7 @@
       "implementation": [
         {
           "path": "agentflow-web/src/components/ExpenseActions.vue",
-          "sha256": "444b87f20f2ebfeb16e7ed6449959f32d6e73fc71cf418915c18d9bbd1b0a221"
+          "sha256": "79f93d4484bf3c10f2497faa46feca034d3372344e40dc3553a08b2c6a7c58d4"
         }
       ],
       "testWitnesses": [
@@ -3620,9 +3633,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "formalSubmissionReplaysOnceAndRequiresExplicitReceiptThenActualBudgetFreeze",
-          "line": 1148,
+          "line": 1151,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -3633,9 +3646,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "differentConcurrentRequestKeysStillCreateOnlyOneRoundAndOneBudgetCommand",
-          "line": 1205,
+          "line": 1208,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -3646,9 +3659,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "optionalPaperSkipsReceiptButOtherBudgetRejectionsCannotPassFinanceOrPretendToBeInsufficient",
-          "line": 1219,
+          "line": 1222,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -3708,15 +3721,15 @@
       "implementation": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseWorkflowQuery.java",
-          "sha256": "ba718045d31be2cb58827f5eff1c183355dd121fc5d66d6387378a70918bdfd0"
+          "sha256": "c5eff5f57480e593aa753d50f859f6205c0ecedec8bf11cd85ec8c7f4d7c9a07"
         }
       ],
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "expenseWorkflowShowsRealControlsAcrossSubmissionReceiptReductionAndBudgetConfirmation",
-          "line": 2146,
+          "line": 2282,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -3727,9 +3740,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "expenseWorkflowRetainsSensitiveFieldAndCurrentTaskBoundaries",
-          "line": 2176,
+          "line": 2312,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -3786,9 +3799,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "financialReductionAdjustsReservationsRoutesAndBudgetWithoutReplacingTheSubmission",
-          "line": 1406,
+          "line": 1542,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -3863,9 +3876,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "zeroReductionReleasesLocalUsesButStillRequiresConfirmedBudgetAdjustment",
-          "line": 1442,
+          "line": 1578,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -3925,9 +3938,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "sealedArchiveContainsOriginalBytesAndStableEvidenceWithoutRepeatingFinancialEffects",
-          "line": 2206,
+          "line": 2342,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -3938,9 +3951,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "xmlInvoiceIsConsumedAndArchivedWithoutReencodingItsOriginal",
-          "line": 2229,
+          "line": 2365,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -3984,9 +3997,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "archiveWaitsForBothSettlementAndPaymentVoucher",
-          "line": 2191,
+          "line": 2327,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -3997,9 +4010,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "missingOrDamagedOriginalBlocksArchiveAndDownloadWithoutReplacingFrozenReceipt",
-          "line": 2243,
+          "line": 2379,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -4048,9 +4061,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "archiveAccessAlwaysUsesOriginalRoundFieldsAndCurrentIdentity",
-          "line": 2278,
+          "line": 2414,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -4106,9 +4119,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "applicantCannotWithdrawOnceTheRoundHasEnteredFinancialReview",
-          "line": 1232,
+          "line": 1235,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -4119,9 +4132,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "pendingBudgetRollsBackLateResubmissionIncludingEngineRoundAndResourceVersions",
-          "line": 1246,
+          "line": 1249,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -4349,9 +4362,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "advanceOffsetSuggestionUsesVerifiedGrossAndPaidDateWithoutReservingFunds",
-          "line": 6525,
+          "line": 6661,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -4625,9 +4638,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "expenseSelfApprovalUsesSupervisorOfSelectedAppointment",
-          "line": 653,
+          "line": 656,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -4638,9 +4651,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "expenseSelfApprovalWithoutSuperiorRollsBackSubmissionAndFinancialState",
-          "line": 688,
+          "line": 691,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -4697,9 +4710,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "adjacentExpenseApprovalPassesAcrossActualTemplateAmountGateWithAuditedSource",
-          "line": 289,
+          "line": 292,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -4832,9 +4845,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "paymentApiSeparatesFinanceCashierAndApplicantThroughRealApprovalAndBankQueue",
-          "line": 1675,
+          "line": 1811,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -4845,9 +4858,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "paymentReplayRechecksCurrentPersonnelAndCashierDirectoryScopeBeforeReturningReceipt",
-          "line": 1718,
+          "line": 1854,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -4904,9 +4917,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "cashierUnknownPaymentQueriesOriginalNumberAndResendsOnlyAfterAuthoritativeNotFound",
-          "line": 1738,
+          "line": 1874,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -4968,9 +4981,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "reviewedAccountNeedsExplicitNewFinanceAuthorizationAndIndependentCashierBeforeSettlementAndArchive",
-          "line": 1850,
+          "line": 1986,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -5434,7 +5447,7 @@
         },
         {
           "path": "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java",
-          "sha256": "e8afd5f97fce454b7cfb5c6c5bce025646e5611fdf5ce93599cfafc63054a74b"
+          "sha256": "f4b2db2bd0b5471b799d77b9b40598d1f1486be6c4f39a1e353947f6f2d8059d"
         }
       ],
       "testWitnesses": [
@@ -6612,7 +6625,7 @@
       "implementation": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/integration/ApprovalWebhookEvents.java",
-          "sha256": "495e2cac4c110aa6c98dd0b2f667afc8d8aa2727651e47713637594f9a8a332d"
+          "sha256": "67d3029068ed81fb3b76a3215c59c3e2800ea1fd14f7d442eda84a71b750bda5"
         },
         {
           "path": "agentflow-server/src/main/java/io/agentflow/integration/WebhookWorker.java",
@@ -7557,7 +7570,7 @@
       "implementation": [
         {
           "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherOperationService.java",
-          "sha256": "ee2377ecae967e7ae0d494adce6af206615123dcf24b7a0cf390957cf0c6b54d"
+          "sha256": "27d045797f72cce937075eb6a5b47a8e50f54f733bb11e2a6caf0c9badc58730"
         }
       ],
       "testWitnesses": [
@@ -7680,7 +7693,7 @@
         },
         {
           "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherOperationService.java",
-          "sha256": "ee2377ecae967e7ae0d494adce6af206615123dcf24b7a0cf390957cf0c6b54d"
+          "sha256": "27d045797f72cce937075eb6a5b47a8e50f54f733bb11e2a6caf0c9badc58730"
         }
       ],
       "testWitnesses": [
@@ -7921,9 +7934,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "duplicateSubmissionAttemptsAreRecordedAfterRollbackOncePerRequest",
-          "line": 6712,
+          "line": 6848,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -7934,9 +7947,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "duplicateOfSameUploadedInvoiceIsRecordedDespiteItsChangedVersionAndConcurrentReplay",
-          "line": 6732,
+          "line": 6868,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -7947,9 +7960,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "financialReportCountsOnlyReadableRoundAttemptsAndExcludesLaterPrivateVerification",
-          "line": 6761,
+          "line": 6897,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -7960,9 +7973,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "financialReportSeparatesUnknownBacklogAndRetainsFirstArrivalAfterReversal",
-          "line": 6787,
+          "line": 6923,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -7973,9 +7986,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "rejectionRecordingFailurePreservesTheOriginalBusinessErrorAndRollback",
-          "line": 6816,
+          "line": 6952,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -8158,15 +8171,15 @@
       "implementation": [
         {
           "path": "agentflow-web/src/expenses.ts",
-          "sha256": "127ab04d48daf05caa88f9fb0c4a784dc0433566fd6deac61fb0e3d38aad3ad8"
+          "sha256": "d082bb847041b706591da2aa32b5a47bae36012119e68b5e5423cd76788f8a69"
         },
         {
           "path": "agentflow-web/src/components/ExpenseActions.vue",
-          "sha256": "444b87f20f2ebfeb16e7ed6449959f32d6e73fc71cf418915c18d9bbd1b0a221"
+          "sha256": "79f93d4484bf3c10f2497faa46feca034d3372344e40dc3553a08b2c6a7c58d4"
         },
         {
           "path": "agentflow-web/src/components/ExpenseDetail.vue",
-          "sha256": "f7e46cc9d57ec4ba0ba196277d91b1ac0792cd6b5dea39dd87f3e3a1a2868b6e"
+          "sha256": "e84d44ec49e93d05c8c35a6fb03d5c922c4ca10dba6a19e0e530de7533e852d6"
         },
         {
           "path": "agentflow-web/src/App.vue",
@@ -8176,45 +8189,45 @@
       "testWitnesses": [
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
           "case": "核减输入即时提示增额与税额越界，未填原因说明不允许提交且不写请求",
-          "line": 54
+          "line": 85
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
           "case": "财务详情顶部固定的四项金额同步未保存核减，取消恢复当前已确认金额",
-          "line": 189
+          "line": 220
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
           "case": "实际 App 审批入口在费用仍未保存时拒绝批准，不调用接口也不清空原任务",
-          "line": 214
+          "line": 245
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
           "case": "核减预览以稳定行号合并未改行，大额一分与只减税额均不发生浮点舍入",
-          "line": 222
-        },
-        {
-          "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
-          "case": "核减结果未确认时取消表单仍保持审批锁，当前费用版本刷新后才解除",
-          "line": 238
-        },
-        {
-          "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
-          "case": "实际父页面接线禁止审批与加签且保持核减可编辑，旧身份任务版本回调不能解锁新任务",
           "line": 253
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "case": "核减结果未确认时取消表单仍保持审批锁，当前费用版本刷新后才解除",
+          "line": 269
+        },
+        {
+          "path": "agentflow-web/tests/expense-review.test.mjs",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "case": "实际父页面接线禁止审批与加签且保持核减可编辑，旧身份任务版本回调不能解锁新任务",
+          "line": 284
+        },
+        {
+          "path": "agentflow-web/tests/expense-review.test.mjs",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
           "case": "业务审批人无法读取敏感费用时完成受限读取仍解除加载锁，不以完整财务权限代替任务授权",
-          "line": 310
+          "line": 341
         }
       ],
       "status": "LOCAL_COMPONENT_TEST_PASSED_BROWSER_PENDING",
@@ -8489,11 +8502,11 @@
       "implementation": [
         {
           "path": "agentflow-web/src/components/ExpenseActions.vue",
-          "sha256": "444b87f20f2ebfeb16e7ed6449959f32d6e73fc71cf418915c18d9bbd1b0a221"
+          "sha256": "79f93d4484bf3c10f2497faa46feca034d3372344e40dc3553a08b2c6a7c58d4"
         },
         {
           "path": "agentflow-web/src/components/ExpenseDetail.vue",
-          "sha256": "f7e46cc9d57ec4ba0ba196277d91b1ac0792cd6b5dea39dd87f3e3a1a2868b6e"
+          "sha256": "e84d44ec49e93d05c8c35a6fb03d5c922c4ca10dba6a19e0e530de7533e852d6"
         },
         {
           "path": "agentflow-web/src/components/TaskActions.vue",
@@ -8507,27 +8520,27 @@
       "testWitnesses": [
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
           "case": "收单必须逐项核对纸质材料，缺失项阻止签收并预填退回且不直接写入",
-          "line": 116
+          "line": 147
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
           "case": "全部纸质材料勾选后才能签收，取消再打开与版本变化不能继承上次确认",
-          "line": 139
+          "line": 170
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
           "case": "缺件预填进入真实退回表单并允许修改，确认前不执行；旧上下文和现有人工意见不能被覆盖",
-          "line": 157
+          "line": 188
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
           "case": "缺件从真实费用详情转交，父待办在下次渲染前后复核上下文，不把迟到草稿带入新任务",
-          "line": 287
+          "line": 318
         }
       ],
       "status": "LOCAL_COMPONENT_TEST_PASSED_BROWSER_PENDING",
@@ -9093,9 +9106,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "reductionPersistsDifferentLineReasonsAsOneAtomicAdjustment",
-          "line": 1997,
+          "line": 2133,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -9106,9 +9119,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "invalidLineReasonTypesCannotCreateAnyFinancialAdjustment",
-          "line": 2025,
+          "line": 2161,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -9119,9 +9132,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "legacyReductionInputUsesCommonReasonAndOldSnapshotsKeepTheirJsonShape",
-          "line": 2038,
+          "line": 2174,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -9180,29 +9193,29 @@
       "implementation": [
         {
           "path": "agentflow-web/src/components/ExpenseActions.vue",
-          "sha256": "444b87f20f2ebfeb16e7ed6449959f32d6e73fc71cf418915c18d9bbd1b0a221"
+          "sha256": "79f93d4484bf3c10f2497faa46feca034d3372344e40dc3553a08b2c6a7c58d4"
         },
         {
           "path": "agentflow-web/src/components/ExpenseDetail.vue",
-          "sha256": "f7e46cc9d57ec4ba0ba196277d91b1ac0792cd6b5dea39dd87f3e3a1a2868b6e"
+          "sha256": "e84d44ec49e93d05c8c35a6fb03d5c922c4ca10dba6a19e0e530de7533e852d6"
         },
         {
           "path": "agentflow-web/src/expenses.ts",
-          "sha256": "127ab04d48daf05caa88f9fb0c4a784dc0433566fd6deac61fb0e3d38aad3ad8"
+          "sha256": "d082bb847041b706591da2aa32b5a47bae36012119e68b5e5423cd76788f8a69"
         }
       ],
       "testWitnesses": [
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
           "case": "逐行核减必须各自填写原因，不同原因一次提交且未修改行不要求原因",
-          "line": 72
+          "line": 103
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "8f3c0859875f87189867f2ee9f33b1e9c67659f3d82b8736337784c53cb14a5a",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
           "case": "核减历史逐行显示原因，旧行记录使用原统一原因且不补写历史",
-          "line": 102
+          "line": 133
         }
       ],
       "status": "LOCAL_COMPONENT_TEST_PASSED_BROWSER_PENDING",
@@ -9259,9 +9272,9 @@
       "testWitnesses": [
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "invoiceConflictReferencesAreCurrentAuthorizedReadsAndNeverChangeFrozenPrecheckEvidence",
-          "line": 6625,
+          "line": 6761,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -9272,9 +9285,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "invoiceOccupationLookupHidesSensitiveReferencesFromOtherEmployeesAndAdministrators",
-          "line": 6663,
+          "line": 6799,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -9285,9 +9298,9 @@
         },
         {
           "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
-          "sha256": "4492bf647dcbae70c66e48e1bce59c05b22b7c4ad1b3ca6d8943d92924b07827",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
           "method": "consumedAndMissingRoundReferencesNeverTurnCanonicalClaimsIntoAvailableInvoices",
-          "line": 6680,
+          "line": 6816,
           "executedCases": [
             {
               "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
@@ -9506,7 +9519,7 @@
         },
         {
           "path": "agentflow-web/src/api.ts",
-          "sha256": "5220afa22602a28ee2a57be54079bbd154c0fbf3920d360896aad215ff0762d5"
+          "sha256": "b0f27f19a170b7898e74c72bdf42bb64b6d1d109a8104c253cd38cd62c33a26e"
         }
       ],
       "testWitnesses": [
@@ -9557,28 +9570,474 @@
           "text": "- 空态、加载态、错误态、无权限、版本冲突、重复处理和外部依赖超时必须有可执行的下一步。"
         }
       ]
+    },
+    {
+      "id": "R121",
+      "requirement": "独立财务撤销批准后未外发报销，双版本、资源释放及审计同事务；已发送、未知、查无重发和已登记付款阻断，原批准及财务证据保留。",
+      "sources": [
+        [
+          "05",
+          182,
+          191
+        ],
+        [
+          "05",
+          403,
+          403
+        ],
+        [
+          "05",
+          626,
+          626
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseRevocationService.java",
+          "sha256": "d82efaf868fc772b9492084ce38094f26d290b3ee341984147da238fd93d5424"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseReleaseService.java",
+          "sha256": "62e76a6faa4363524c046d6de70cd37c851b69b2041f5932924864b19c2181b3"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/finance/VoucherOperationService.java",
+          "sha256": "27d045797f72cce937075eb6a5b47a8e50f54f733bb11e2a6caf0c9badc58730"
+        },
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/approval/model/Application.java",
+          "sha256": "609ed6d9b62b44a3d323aea917c4abca57b5fd2c87db8531cba607a5036f92b7"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
+          "method": "approvedUnsentExpenseRevocationReleasesReservationsOnceAndPreservesApprovalEvidence",
+          "line": 1295,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+              "name": "approvedUnsentExpenseRevocationReleasesReservationsOnceAndPreservesApprovalEvidence",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
+          "method": "revocationRequiresCurrentIndependentFinanceAndBothVersions",
+          "line": 1350,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+              "name": "revocationRequiresCurrentIndependentFinanceAndBothVersions",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
+          "method": "revocationAndUnsentVoucherRetirementRollBackTogetherAndNeverDispatchAfterCommit",
+          "line": 1378,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+              "name": "revocationAndUnsentVoucherRetirementRollBackTogetherAndNeverDispatchAfterCommit",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
+          "method": "claimedUnknownAndPreviouslySentNotFoundVouchersCannotBeRevokedOrReleaseResources",
+          "line": 1397,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+              "name": "claimedUnknownAndPreviouslySentNotFoundVouchersCannotBeRevokedOrReleaseResources",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
+          "method": "lateReadOnlyPreparationCannotRegisterVoucherAfterRevocation",
+          "line": 1420,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+              "name": "lateReadOnlyPreparationCannotRegisterVoucherAfterRevocation",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+          "sha256": "afc78e0ebf90c78b03924f1c99bfc21f4b2efd9f460de1a0acd66321661b3693",
+          "method": "postedVoucherAndPaymentAuthorizationKeepTheirOriginalReconciliationPath",
+          "line": 1437,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+              "name": "postedVoucherAndPaymentAuthorizationKeepTheirOriginalReconciliationPath",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [
+        "U07"
+      ],
+      "sourceText": [
+        {
+          "documentId": "05",
+          "lines": [
+            182,
+            191
+          ],
+          "text": "### 3.4 撤回、作废、撤销规则\n\n| 动作 | 允许条件 | 副作用 |\n|---|---|---|\n| 撤回 withdraw | `IN_APPROVAL` 且当前节点**不是**单据签收/财务审核/财务复核（Q：是否放宽） | 终止实例；发票占用、预算冻结、冲销预留**保留**，申请人可修改后重提 |\n| 作废 cancel | `DRAFT` / `RETURNED` / `WITHDRAWN` | 释放发票、预算、冲销预留 |\n| 撤销 revoke | `APPROVED` 且结算状态在 `PAYING` 之前；需财务角色或申请人发起后财务确认 | 作废付款授权；释放发票、预算、冲销；已推送凭证生成冲销凭证（P1，P0 阻断并转人工） |\n| 驳回 reject | 审批人，必填原因 | 同作废的释放动作 |\n\n付款提交后不能撤销，只能走红冲/退款流程（P1）。"
+        },
+        {
+          "documentId": "05",
+          "lines": [
+            403,
+            403
+          ],
+          "text": "| POST | `/api/v1/expense-reports/{id}/revoke` | 已批撤销（财务权限） |"
+        },
+        {
+          "documentId": "05",
+          "lines": [
+            626,
+            626
+          ],
+          "text": "- [ ] 驳回/作废/撤销后发票、预算、事前额度、借款预留全部释放。"
+        }
+      ]
+    },
+    {
+      "id": "R122",
+      "requirement": "撤销明确影响并经人工确认，当前能力变更清除旧意图；双版本与原请求恢复、迟到回执隔离，不把作废当作撤销成功。",
+      "sources": [
+        [
+          "05",
+          188,
+          191
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-web/src/components/ExpenseActions.vue",
+          "sha256": "79f93d4484bf3c10f2497faa46feca034d3372344e40dc3553a08b2c6a7c58d4"
+        },
+        {
+          "path": "agentflow-web/src/expenses.ts",
+          "sha256": "d082bb847041b706591da2aa32b5a47bae36012119e68b5e5423cd76788f8a69"
+        },
+        {
+          "path": "agentflow-web/src/api.ts",
+          "sha256": "b0f27f19a170b7898e74c72bdf42bb64b6d1d109a8104c253cd38cd62c33a26e"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-web/tests/expense-actions.test.mjs",
+          "sha256": "50fb5f831ab785110e178ca15f20b55713408b7e60c18704fe33e11d8e9b150d",
+          "case": "已批准报销撤销须当前财务能力和人工确认，固定双版本且不调用作废",
+          "line": 29
+        },
+        {
+          "path": "agentflow-web/tests/expense-actions.test.mjs",
+          "sha256": "50fb5f831ab785110e178ca15f20b55713408b7e60c18704fe33e11d8e9b150d",
+          "case": "撤销确认期间失去权限或凭证开始外发须立即清除意图",
+          "line": 43
+        },
+        {
+          "path": "agentflow-web/tests/expense-actions.test.mjs",
+          "sha256": "50fb5f831ab785110e178ca15f20b55713408b7e60c18704fe33e11d8e9b150d",
+          "case": "撤销未知结果不能重复发送，迟到回执不能刷新另一个账号",
+          "line": 54
+        },
+        {
+          "path": "agentflow-web/tests/expense-actions.test.mjs",
+          "sha256": "50fb5f831ab785110e178ca15f20b55713408b7e60c18704fe33e11d8e9b150d",
+          "case": "撤销回执必须证明当前申请递增且财务版本未改，错误回执不宣告成功",
+          "line": 70
+        }
+      ],
+      "status": "LOCAL_COMPONENT_TEST_PASSED_BROWSER_PENDING",
+      "remainingAcceptanceTaskIds": [
+        "U07"
+      ],
+      "sourceText": [
+        {
+          "documentId": "05",
+          "lines": [
+            188,
+            191
+          ],
+          "text": "| 撤销 revoke | `APPROVED` 且结算状态在 `PAYING` 之前；需财务角色或申请人发起后财务确认 | 作废付款授权；释放发票、预算、冲销；已推送凭证生成冲销凭证（P1，P0 阻断并转人工） |\n| 驳回 reject | 审批人，必填原因 | 同作废的释放动作 |\n\n付款提交后不能撤销，只能走红冲/退款流程（P1）。"
+        }
+      ]
+    },
+    {
+      "id": "R123",
+      "requirement": "全员会签为每人建立待办，全部同意后批准；任一否定结论结束所有剩余待办，重提不改写旧轮次。",
+      "sources": [
+        [
+          "00",
+          89,
+          89
+        ],
+        [
+          "02",
+          275,
+          275
+        ],
+        [
+          "03",
+          429,
+          429
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/definition/FlowableDefinitionDeploymentAdapter.java",
+          "sha256": "acf6e53e0525eaf5a260803799ec8e13d0626cbbc2c31752d41becdf3d67c6bb"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableCountersignMembers.java",
+          "sha256": "e09a9d249362d96b4d8e9c0fa79f6937b954948e6d7127322d221b1fb6b4ff6c"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/approval/process/FlowableTaskFacade.java",
+          "sha256": "c79cab1faee16f6a1afe3cbd444487699ab33e116dd50a4661ad40bde30c2deb"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/approval/process/ApprovalCompletionService.java",
+          "sha256": "55f87a2b5357024fd665b9f24b4d7429e0bf7158c1e62556dc6b8d832572e73f"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/approval/CountersignIntegrationTest.java",
+          "sha256": "d096e53323a92f48a8bcccea34aecddc7d6a5914d1d3a5e0f5dbb7a3e71cd8af",
+          "method": "createsOneTaskForEachMemberAndWaitsForAllApprovals",
+          "line": 54,
+          "executedCases": [
+            {
+              "class": "io.agentflow.approval.CountersignIntegrationTest",
+              "name": "createsOneTaskForEachMemberAndWaitsForAllApprovals",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/approval/CountersignIntegrationTest.java",
+          "sha256": "d096e53323a92f48a8bcccea34aecddc7d6a5914d1d3a5e0f5dbb7a3e71cd8af",
+          "method": "negativeConclusionTerminatesEveryRemainingTask",
+          "line": 117,
+          "executedCases": [
+            {
+              "class": "io.agentflow.approval.CountersignIntegrationTest",
+              "name": "negativeConclusionTerminatesEveryRemainingTask(String)[1]",
+              "status": "PASS"
+            },
+            {
+              "class": "io.agentflow.approval.CountersignIntegrationTest",
+              "name": "negativeConclusionTerminatesEveryRemainingTask(String)[2]",
+              "status": "PASS"
+            },
+            {
+              "class": "io.agentflow.approval.CountersignIntegrationTest",
+              "name": "negativeConclusionTerminatesEveryRemainingTask(String)[3]",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [
+        "V02"
+      ],
+      "sourceText": [
+        {
+          "documentId": "00",
+          "lines": [
+            89,
+            89
+          ],
+          "text": "- 全员会签已确认并实现：全部同意才通过，任一驳回结束整轮，详见 26；其他会签策略、已批撤销等边界继续确认；"
+        },
+        {
+          "documentId": "02",
+          "lines": [
+            275,
+            275
+          ],
+          "text": "5. 会签已确认 `all`：全部同意才通过，任一驳回结束整轮；实现与固定责任约束见 26。自审批、组织代理、加签、已批撤销等未确认边界仍待明确。"
+        },
+        {
+          "documentId": "03",
+          "lines": [
+            429,
+            429
+          ],
+          "text": "- [x] 首期全员会签：全部同意才通过，任一驳回结束整轮；实现见 26。"
+        }
+      ]
+    },
+    {
+      "id": "R124",
+      "requirement": "结构化报销由业务入口统一校验与提交，通用创建、修改、提交、撤回及作废不能旁路双版本和资源编排。",
+      "sources": [
+        [
+          "05",
+          406,
+          406
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java",
+          "sha256": "f4b2db2bd0b5471b799d77b9b40598d1f1486be6c4f39a1e353947f6f2d8059d"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseDraftService.java",
+          "sha256": "0b2a773796bf3b61c705c06fc38a1ad402e1d5a817eb643bcfa9db38cc055262"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseController.java",
+          "sha256": "fa2a5946be0b57357e32c1745c041a6271729c84322a50b82c932f703f0aeae2"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseDraftIntegrationTest.java",
+          "sha256": "7a546a50afe4868053ae047ab9aa7282294d1bf3de0c3da3e3522dd4b78c7fc5",
+          "method": "genericCreateSubmitReviseWithdrawAndCancelCannotBypassTheBusinessBoundary",
+          "line": 135,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseDraftIntegrationTest",
+              "name": "genericCreateSubmitReviseWithdrawAndCancelCannotBypassTheBusinessBoundary",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseDraftIntegrationTest.java",
+          "sha256": "7a546a50afe4868053ae047ab9aa7282294d1bf3de0c3da3e3522dd4b78c7fc5",
+          "method": "eachVersionMustMatchAndNoFailedRevisionLeavesAPartialApplicationChange",
+          "line": 121,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseDraftIntegrationTest",
+              "name": "eachVersionMustMatchAndNoFailedRevisionLeavesAPartialApplicationChange",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [],
+      "sourceText": [
+        {
+          "documentId": "05",
+          "lines": [
+            406,
+            406
+          ],
+          "text": "结构化单据**只**通过自己的 submit 入口提交；该入口内部复用 `ApplicationSubmissionService`，授权规则与 `/applications/{id}/submit` 相同。`/applications/{id}/submit` 对 `businessType=EXPENSE` 返回 422 `USE_BUSINESS_ENDPOINT`，避免两个入口出现两套校验。"
+        }
+      ]
+    },
+    {
+      "id": "R125",
+      "requirement": "撤销终态保留原申报和核定金额历史，不再进入付款核销办理；预算释放按实际确认状态显示。",
+      "sources": [
+        [
+          "05",
+          151,
+          151
+        ],
+        [
+          "05",
+          188,
+          191
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-web/src/components/ExpenseDetail.vue",
+          "sha256": "e84d44ec49e93d05c8c35a6fb03d5c922c4ca10dba6a19e0e530de7533e852d6"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-web/tests/expense-review.test.mjs",
+          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "case": "已撤销报销明确显示终态，保留金额历史但不再提示等待付款核销",
+          "line": 69
+        }
+      ],
+      "status": "LOCAL_COMPONENT_TEST_PASSED_BROWSER_PENDING",
+      "remainingAcceptanceTaskIds": [
+        "U07"
+      ],
+      "sourceText": [
+        {
+          "documentId": "05",
+          "lines": [
+            151,
+            151
+          ],
+          "text": "| `REVOKED` | 否 | 是 | 已批撤销；仅在付款**未提交**前允许 |"
+        },
+        {
+          "documentId": "05",
+          "lines": [
+            188,
+            191
+          ],
+          "text": "| 撤销 revoke | `APPROVED` 且结算状态在 `PAYING` 之前；需财务角色或申请人发起后财务确认 | 作废付款授权；释放发票、预算、冲销；已推送凭证生成冲销凭证（P1，P0 阻断并转人工） |\n| 驳回 reject | 审批人，必填原因 | 同作废的释放动作 |\n\n付款提交后不能撤销，只能走红冲/退款流程（P1）。"
+        }
+      ]
     }
   ],
   "boundaries": [
     "条款行是一项可检查行为的定位，不作为新增顶层任务，也不据此计算项目完成比例。",
-    "Java 方法引用与 U06 更新后的 5319 个组合去重结果匹配；U06 只重跑票据与费用相关范围，其他结果保留原来源。前端引用匹配 U06 完整 1519 项成功记录。",
+    "Java 方法引用与 U07 更新后的 5333 个组合去重结果匹配；本次只重跑审批生命周期、凭证、预算、费用、审计和契约相关范围，其他结果保留原来源。前端引用匹配 U07 完整 1525 项成功记录。",
     "前端组件和处理器测试不等于真实键盘、屏幕阅读器、触屏或视觉验收，U01/W02/V01 门禁保持。",
-    "这里只记录已经细化到断言的 120 个条款单元；未声称覆盖全部原始规范。剩余章节条款仍在 V03 核对。",
+    "这里只记录已经细化到断言的 125 个条款单元；未声称覆盖全部原始规范。剩余章节条款仍在 V03 核对。",
     "PostgreSQL、Docker、真实企业来源、浏览器和远端交付未执行。"
   ],
   "completeRequirementInventory": false,
   "executionEvidence": {
     "java": {
-      "path": "/fyoung/tmp/agentflow-remaining-20260928/u06-java-aggregate.json",
-      "sha256": "e336277c277237068c9afc944bbd537f8f71f07585a43df05914eb2a96d5f545",
-      "uniquePassed": 5319,
-      "scopeRerunCases": 415,
-      "fullRerun": false
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/u07-java-aggregate.json",
+      "sha256": "33c5274e5bf70eb553f6ce776022fa94f73182760b930740d12c131ba587c2f7",
+      "uniquePassed": 5333,
+      "scopeRerunCases": 486,
+      "fullRerun": false,
+      "contractSupplement": {
+        "cases": 7,
+        "report": "/fyoung/tmp/agentflow-remaining-20260928/u07-contract-final-verified/TEST-io.agentflow.api.OpenApiContractTest.xml",
+        "reportSha256": "532e43854358ec1380c37dba5e7e053dec969287de5b00e90b797a6ba01031b7",
+        "log": "/fyoung/tmp/agentflow-remaining-20260928/u07-package-final.log",
+        "logSha256": "92d0909dfbabe2bdfbd47b34b7ab1fbd1015f8d74ef2323af40b1f335fc4a457",
+        "reason": "Response enum corrected after broader regression; only contract input changed."
+      }
     },
     "web": {
-      "path": "/fyoung/tmp/agentflow-remaining-20260928/u06-web-final.log",
-      "sha256": "1347382d3f04a7a569b3778295c2185480067194bd60dec8961bd89bb396c8bc",
-      "uniquePassed": 1519,
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/u07-web-final.log",
+      "sha256": "35c3562ebf1def933f1e8e64a9d9af8d9c0c75d5502e9b2b7c06a021dcf1678c",
+      "uniquePassed": 1525,
       "failed": 0,
       "skipped": 0
     }
@@ -9600,7 +10059,8 @@
         "W02",
         "V02",
         "U05",
-        "U06"
+        "U06",
+        "U07"
       ],
       "next": "现有模板和 CSS 只能证明实现存在，不能替代实际浏览器、触屏或辅助设备。"
     },
