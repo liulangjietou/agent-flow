@@ -1,9 +1,6 @@
 package io.agentflow.servicetask;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.util.PropertyPlaceholderHelper;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,18 +8,19 @@ import java.sql.DriverManager;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
+import static io.agentflow.support.H2FileDatabases.fileUrl;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 /**
- * 使用实际默认文件库配置和独立进程，验证提交成功后立即退出仍能恢复原领取事实。
+ * 使用显式 H2 文件库配置和独立进程，验证提交成功后立即退出仍能恢复原领取事实。
  * @author owlzhangfq@gmail.com
  */
 class ServiceTaskFileDurabilityTest {
     @Test
-    void committedClaimSurvivesImmediateProcessExitWithDefaultFileDatabaseSettings() throws Exception {
+    void committedClaimSurvivesImmediateProcessExitWithExplicitFileDatabaseSettings() throws Exception {
         Path directory = Files.createTempDirectory("agentflow-service-durability-");
-        String url = defaultFileUrl(directory.resolve("claim"));
+        String url = fileUrl(directory.resolve("claim"));
         try (var connection = DriverManager.getConnection(url, "sa", ""); var statement = connection.createStatement()) {
             statement.execute("CREATE TABLE durable_claim(id INT PRIMARY KEY, version INT)");
         }
@@ -46,7 +44,7 @@ class ServiceTaskFileDurabilityTest {
             statement.execute("CHECKPOINT");
             statement.execute("CHECKPOINT");
         }
-        String url = defaultFileUrl(database);
+        String url = fileUrl(database);
         commitAndCrash(directory, url, "UPDATE durable_claim SET version=2 WHERE id=1 AND version=1");
         assertCommittedClaim(url);
     }
@@ -75,16 +73,6 @@ class ServiceTaskFileDurabilityTest {
             assertThat(rows.next()).isTrue();
             assertThat(rows.getInt(1)).as("committed claim after immediate process exit").isEqualTo(2);
         }
-    }
-
-    /** 两类文件库测试读取安装包默认值，仅替换隔离库路径，不另行补写持久性参数。 */
-    static String defaultFileUrl(Path file) {
-        var yaml = new YamlPropertiesFactoryBean();
-        yaml.setResources(new ClassPathResource("application.yml"));
-        String configured = yaml.getObject().getProperty("spring.datasource.url");
-        String defaultUrl = new PropertyPlaceholderHelper("${", "}", ":", '\\', true).replacePlaceholders(configured, key -> null);
-        assertThat(defaultUrl).startsWith("jdbc:h2:file:./data/agentflow");
-        return defaultUrl.replace("./data/agentflow", file.toString());
     }
 
     /**

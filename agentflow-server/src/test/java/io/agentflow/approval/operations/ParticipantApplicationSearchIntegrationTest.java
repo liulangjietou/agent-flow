@@ -14,6 +14,8 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 class ParticipantApplicationSearchIntegrationTest {
     private static final String PATH = "/api/v1/applications/search";
+    private static final Instant SEED_CREATED_AT = Instant.parse("2020-01-01T00:00:00Z");
     @Autowired MockMvc mvc;
     @Autowired JsonUtil json;
     @Autowired JdbcTemplate jdbc;
@@ -189,7 +192,9 @@ class ParticipantApplicationSearchIntegrationTest {
 
     private String seed(String tenant, String user, String title) {
         String id = UUID.randomUUID().toString();
-        jdbc.update("INSERT INTO approval_application (id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,created_at,updated_at) VALUES (?,?,?,'search',1,?,?,'not-json','DRAFT',0,1,TIMESTAMP '2020-01-01 00:00:00',TIMESTAMP '2020-01-01 00:00:00')", id, tenant, "SEARCH-" + id, user, title);
+        // 日期筛选使用 UTC；显式绑定同一时间点，避免 SQL 字面量随 JVM 本地时区漂移。
+        jdbc.update("INSERT INTO approval_application (id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,created_at,updated_at) VALUES (?,?,?,'search',1,?,?,'not-json','DRAFT',0,1,?,?)",
+                id, tenant, "SEARCH-" + id, user, title, Timestamp.from(SEED_CREATED_AT), Timestamp.from(SEED_CREATED_AT));
         return id;
     }
     private String draft(String assignee) throws Exception {

@@ -3,22 +3,20 @@ package io.agentflow.signature;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.util.PropertyPlaceholderHelper;
 
 import java.nio.file.Path;
 import java.util.List;
 
 import static io.agentflow.signature.SignaturePersistenceFixtures.*;
+import static io.agentflow.support.H2FileDatabases.fileUrl;
 import static org.assertj.core.api.Assertions.*;
 
 /**
- * 使用实际默认 H2 文件库参数重开和独立 SQL 恢复，只验证数据库事实，不宣称文件字节或外部签署已验收。
+ * 使用显式 H2 文件库参数重开和独立 SQL 恢复，只验证数据库事实，不宣称文件字节或外部签署已验收。
  * @author owlzhangfq@gmail.com
  */
 class SignatureDatabaseRecoveryTest {
@@ -86,12 +84,5 @@ class SignatureDatabaseRecoveryTest {
         } finally { restoredJdbc.execute("SHUTDOWN"); reopenedJdbc.execute("SHUTDOWN"); }
     }
 
-    private String fileUrl(Path path) {
-        var yaml = new YamlPropertiesFactoryBean(); yaml.setResources(new ClassPathResource("application.yml"));
-        String value = new PropertyPlaceholderHelper("${", "}", ":", '\\', true)
-                .replacePlaceholders(yaml.getObject().getProperty("spring.datasource.url"), key -> null);
-        assertThat(value).startsWith("jdbc:h2:file:./data/agentflow");
-        return value.replace("./data/agentflow", path.toString());
-    }
     private static String literal(Path path) { return path.toAbsolutePath().toString().replace("'", "''"); }
 }
