@@ -1,5 +1,7 @@
 # AgentFlow 系统使用手册
 
+员工填报和审批办理的分步图文说明、Word/PDF 下载及配套截图，见[员工与审批者图文操作手册](employee-approver-manual/README.md)。
+
 本文面向申请人、审批人、流程管理员、财务、出纳和部署维护人员，按“安装 → 首次配置 → 发起 → 审批 → 财务执行 → 查询与恢复”的顺序说明系统用法。
 
 源码核对日期：**2026-10-08**。核对基线：[`a7230ded`](https://github.com/liulangjietou/agent-flow/tree/a7230ded299e1b1c5772ca35c5f6cc276b75fa7d)。本文中的菜单、演示身份、配置默认值和操作规则均以该基线为依据。其他专题文档保留了分阶段记录，阅读其中“尚未完成”等段落时应结合日期与[当前任务台账](remaining-task-ledger.md)判断。

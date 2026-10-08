@@ -9,8 +9,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.aop.framework.ProxyFactory;
-import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -18,7 +16,6 @@ import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.util.PropertyPlaceholderHelper;
 
 import javax.sql.DataSource;
 import java.nio.file.Path;
@@ -29,6 +26,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import static io.agentflow.signature.SignatureVerificationFixtures.*;
+import static io.agentflow.support.H2FileDatabases.fileUrl;
 import static org.assertj.core.api.Assertions.*;
 
 /**
@@ -183,11 +181,6 @@ class SignatureEvidencePersistenceTest {
         var proxy = new ProxyFactory(new JdbcSignatureEvidenceRepository(new JdbcTemplate(source), JSON, SignaturePersistenceFixtures.repository(source), new SignatureReceiptVerifier(MAPPER)));
         proxy.addAdvice(new TransactionInterceptor(new DataSourceTransactionManager(source), new AnnotationTransactionAttributeSource()));
         return (JdbcSignatureEvidenceRepository) proxy.getProxy();
-    }
-    private String fileUrl(Path path) {
-        var yaml = new YamlPropertiesFactoryBean(); yaml.setResources(new ClassPathResource("application.yml"));
-        String value = new PropertyPlaceholderHelper("${", "}", ":", '\\', true).replacePlaceholders(yaml.getObject().getProperty("spring.datasource.url"), key -> null);
-        assertThat(value).startsWith("jdbc:h2:file:./data/agentflow"); return value.replace("./data/agentflow", path.toString());
     }
     private static String literal(Path path) { return path.toAbsolutePath().toString().replace("'", "''"); }
 
