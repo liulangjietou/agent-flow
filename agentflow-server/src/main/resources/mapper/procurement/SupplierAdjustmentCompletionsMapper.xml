@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.procurement.mapper.SupplierAdjustmentCompletionsMapper">
+    <select id="create" resultType="Integer">
+        SELECT COUNT(*) FROM supplier_payable_adjustment_operation o
+        JOIN supplier_payment_operation b ON b.tenant_id=o.tenant_id AND b.id=o.payment_id
+        JOIN supplier_payment_returns f ON f.tenant_id=o.tenant_id AND f.payment_id=o.payment_id
+        WHERE o.tenant_id=#{tenantId} AND o.id=#{id} AND o.version=#{version} AND o.status='ADJUSTED' AND o.retired_version IS NULL
+            AND o.completed_version IS NULL AND o.active_payment_id=o.payment_id
+            AND o.command_json=#{stateJson} AND o.command_digest=#{digest} AND o.state_json=#{expectedStateJson}
+            AND b.version=#{expectedVersion} AND b.state_json=#{stateJson8} AND b.command_json=#{commandJson} AND b.command_digest=#{commandDigest} AND b.status IN ('SUCCEEDED','REVERSED')
+            AND f.version=#{version11} AND f.state_json=#{stateJson12}
+    </select>
+
+    <insert id="create2">
+        INSERT INTO supplier_adjustment_completion(tenant_id,operation_id,operation_version,payment_id,payment_version,bank_status,reservation_id,
+            before_return_version,return_version,accounted_entry_count,proof_json,completed_at) VALUES(#{tenantId},#{operationId},#{operationVersion},#{paymentId},#{paymentVersion},#{bankStatus},#{reservationId},#{beforeReturnVersion},#{returnVersion},#{accountedEntryCount},#{proofJson},#{completedAt})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT c.*,o.state_json AS operation_json,b.state_json AS bank_json,
+            prior.state_json AS before_json,afterward.state_json AS after_json
+        FROM supplier_adjustment_completion c
+        JOIN supplier_payable_adjustment_revision o ON o.tenant_id=c.tenant_id AND o.operation_id=c.operation_id AND o.version=c.operation_version
+        JOIN supplier_payment_revision b ON b.tenant_id=c.tenant_id AND b.operation_id=c.payment_id AND b.version=c.payment_version
+        JOIN supplier_payment_returns_revision prior ON prior.tenant_id=c.tenant_id AND prior.payment_id=c.payment_id AND prior.version=c.before_return_version
+        JOIN supplier_payment_returns_revision afterward ON afterward.tenant_id=c.tenant_id AND afterward.payment_id=c.payment_id AND afterward.version=c.return_version
+         WHERE c.tenant_id=#{tenant} AND c.operation_id=#{operationId}
+    </select>
+
+    <select id="history" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT c.*,o.state_json AS operation_json,b.state_json AS bank_json,
+            prior.state_json AS before_json,afterward.state_json AS after_json
+        FROM supplier_adjustment_completion c
+        JOIN supplier_payable_adjustment_revision o ON o.tenant_id=c.tenant_id AND o.operation_id=c.operation_id AND o.version=c.operation_version
+        JOIN supplier_payment_revision b ON b.tenant_id=c.tenant_id AND b.operation_id=c.payment_id AND b.version=c.payment_version
+        JOIN supplier_payment_returns_revision prior ON prior.tenant_id=c.tenant_id AND prior.payment_id=c.payment_id AND prior.version=c.before_return_version
+        JOIN supplier_payment_returns_revision afterward ON afterward.tenant_id=c.tenant_id AND afterward.payment_id=c.payment_id AND afterward.version=c.return_version
+         WHERE c.tenant_id=#{tenant} AND c.payment_id=#{paymentId} ORDER BY c.return_version
+    </select>
+</mapper>

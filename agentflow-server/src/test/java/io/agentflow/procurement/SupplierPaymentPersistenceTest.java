@@ -1,36 +1,29 @@
 package io.agentflow.procurement;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import io.agentflow.approval.JdbcApplicationRepository;
-import io.agentflow.common.DomainException;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
+import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.FinanceJsonConfiguration;
 import io.agentflow.expense.InvoiceKey;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.FinanceResult;
+import io.agentflow.finance.JdbcFinanceReceiptCreditRepository;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.PaymentAccountsPort;
 import io.agentflow.finance.PaymentObservation;
 import io.agentflow.finance.PaymentPersonnel;
-import io.agentflow.finance.JdbcFinanceReceiptCreditRepository;
 import io.agentflow.organization.InitiatorContext;
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,12 +36,23 @@ import org.springframework.transaction.annotation.AnnotationTransactionAttribute
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 真实数据库验证出纳意图、唯一银行命令及崩溃恢复，网关替身只验证协议和事务边界。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SupplierPaymentPersistenceTest {
@@ -90,12 +94,38 @@ class SupplierPaymentPersistenceTest {
         schema = "supplier_payment_" + UUID.randomUUID().toString().replace("-", ""); new JdbcTemplate(dataSource).execute("CREATE SCHEMA \"" + schema + "\""); dataSource.setSchema(schema);
         var migration = Flyway.configure().dataSource(dataSource).defaultSchema(schema); if (target != null) migration.target(target); migration.load().migrate();
         jdbc = target == null ? new JdbcTemplate(dataSource) : new SupplierMigrationJdbcTemplate(dataSource); manager = new DataSourceTransactionManager(dataSource); tx = new TransactionTemplate(manager);
-        procurements = new JdbcProcurementPaymentRepository(jdbc, json);
+        procurements = new JdbcProcurementPaymentRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper.ProcurementPaymentRepositoryMapper
+                                        .class), json);
         // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。
-        var returnGuard = target == null ? new SupplierPayableReturnGuard(jdbc) : mock(SupplierPayableReturnGuard.class);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc), returnGuard, new JdbcSupplierAdjustmentCompletions(jdbc, json));
-        approvedSources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), procurements, reservations, returnGuard);
-        authorizations = new JdbcSupplierPaymentAuthorizationRepository(jdbc, json, approvedSources); holds = new JdbcSupplierPayableHoldRepository(jdbc, json, authorizations);
+        var returnGuard = target == null ? new SupplierPayableReturnGuard(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierPayableReturnGuardMapper.class)) : mock(SupplierPayableReturnGuard.class);
+        reservations = new JdbcProcurementPayableReservationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .ProcurementPayableReservationRepositoryMapper.class), json, procurements, new JdbcProcurementInvoiceClaims(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .ProcurementInvoiceClaimsMapper.class)),
+                        returnGuard,
+                        new JdbcSupplierAdjustmentCompletions(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierAdjustmentCompletionsMapper.class), json));
+        approvedSources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.approval.mapper.ApplicationRepositoryMapper
+                                                .class), json), procurements, reservations, returnGuard);
+        authorizations = new JdbcSupplierPaymentAuthorizationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentAuthorizationRepositoryMapper.class), json, approvedSources); holds = new JdbcSupplierPayableHoldRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper.SupplierPayableHoldRepositoryMapper
+                                        .class), json, authorizations);
         var personnel = mock(PaymentPersonnel.class);
         doAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
@@ -104,16 +134,44 @@ class SupplierPaymentPersistenceTest {
         }).when(personnel).requireEligible(eq(tenant), anyString(), eq(entity));
         holdService = proxy(new SupplierPayableHoldService(approvedSources, authorizations, holds, personnel, 30, event -> { }));
         sources = new SupplierPaymentSources(approvedSources, authorizations, holds, personnel);
-        requests = new JdbcSupplierPaymentExecutionRepository(jdbc, json, holds);
-        payments = new JdbcSupplierPaymentOperationRepository(jdbc, json, requests, holds, authorizations);
+        requests = new JdbcSupplierPaymentExecutionRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentExecutionRepositoryMapper.class), json, holds);
+        payments = new JdbcSupplierPaymentOperationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentOperationRepositoryMapper.class), json, requests, holds, authorizations);
         preparation = proxy(new SupplierPaymentExecutionService(sources, requests, payments, event -> { }, 30)); bank = proxy(new SupplierPaymentService(sources, payments, event -> { }, 30));
-        returnLedgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json));
-        returnChecks = new JdbcSupplierPaymentReturnCheckRepository(jdbc, json);
-        returnRegistrations = new JdbcSupplierPaymentReturnRepository(jdbc, json, returnLedgers, returnChecks, payments, new JdbcFinanceReceiptCreditRepository(jdbc));
+        returnLedgers = new JdbcSupplierPaymentReturnsRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentReturnsRepositoryMapper.class), json, payments, new SupplierPayableReturnGuard(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierPayableReturnGuardMapper.class)),
+                        new JdbcSupplierAdjustmentCompletions(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierAdjustmentCompletionsMapper.class), json));
+        returnChecks = new JdbcSupplierPaymentReturnCheckRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentReturnCheckRepositoryMapper.class), json);
+        returnRegistrations = new JdbcSupplierPaymentReturnRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentReturnRepositoryMapper.class), json, returnLedgers, returnChecks, payments, new JdbcFinanceReceiptCreditRepository(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.finance.mapper
+                                                .FinanceReceiptCreditRepositoryMapper.class)));
         returnActor = mock(CurrentActor.class); when(returnActor.actor()).thenReturn(new Actor(tenant, "finance", Set.of("FINANCE")));
         returnAccess = mock(SupplierSettlementAccess.class);
         var returnSources = new SupplierPaymentReturnSources(sources, payments, new SupplierSettlementSources(sources, approvedSources, payments, personnel, returnGuard));
-        returnService = proxy(new SupplierPaymentReturnService(returnActor, returnAccess, returnSources, returnChecks, returnLedgers, returnRegistrations, jdbc, json, org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class)));
+        returnService = proxy(new SupplierPaymentReturnService(returnActor, returnAccess, returnSources, returnChecks, returnLedgers, returnRegistrations,
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierPaymentReturnServiceMapper.class), json, org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class)));
     }
 
     @Test void cashierChoiceRegistrationAndAllBankRevisionsSurviveRepositoryRecreation() {
@@ -122,8 +180,14 @@ class SupplierPaymentPersistenceTest {
         assertThat(requests.owner(tenant, id)).isPresent(); assertThat(payments.find("other", id)).isEmpty(); assertThat(requests.owner("other", id)).isEmpty();
         assertThat(payments.revision(tenant, id, 1)).contains(queued); assertThat(requests.revision(tenant, request.input().id(), 1)).contains(request);
         var sending = sending(queued); bank.finish(sending, new FinanceResult.Success<>(paid(sending.command(), sending.updatedAt())), sending.updatedAt());
-        var reopenedRequests = new JdbcSupplierPaymentExecutionRepository(jdbc, json, holds);
-        var reopened = new JdbcSupplierPaymentOperationRepository(jdbc, json, reopenedRequests, holds, authorizations);
+        var reopenedRequests = new JdbcSupplierPaymentExecutionRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentExecutionRepositoryMapper.class), json, holds);
+        var reopened = new JdbcSupplierPaymentOperationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentOperationRepositoryMapper.class), json, reopenedRequests, holds, authorizations);
         var restored = reopened.find(tenant, id).orElseThrow(); assertThat(restored.settleable()).isTrue(); assertThat(restored.command()).isEqualTo(queued.command());
         assertThat(restored.version()).isEqualTo(4); assertThat(restored.dispatches()).isEqualTo(1);
         assertThat(reopened.revision(tenant, id, 3)).contains(sending); assertThat(count("supplier_payment_revision")).isEqualTo(4);
@@ -145,7 +209,10 @@ class SupplierPaymentPersistenceTest {
         var original = payments.revision(tenant, id, 4).orElseThrow().observation(); var decision = decision(before);
         assertThat(payments.resolutionHistory(tenant, id)).isEqualTo(new SupplierPaymentOperation.ResolutionHistory(original, null, true));
         var after = tx.execute(status -> payments.resolve(decision));
-        var reopened = new JdbcSupplierPaymentOperationRepository(jdbc, json, requests, holds, authorizations);
+        var reopened = new JdbcSupplierPaymentOperationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentOperationRepositoryMapper.class), json, requests, holds, authorizations);
         assertThat(reopened.latestResolution(tenant, id)).contains(decision); assertThat(reopened.latestResolution("other", id)).isEmpty();
         assertThat(reopened.find(tenant, id)).contains(after); assertThat(after.settleable()).isTrue(); assertThat(after.command()).isEqualTo(command);
         assertThat(after.dispatches()).isEqualTo(before.dispatches()); assertThat(reopened.revision(tenant, id, before.version())).contains(before);
@@ -157,12 +224,16 @@ class SupplierPaymentPersistenceTest {
 
     @Test void decisionInsertFailureRollsBackClearedDisputeAndResultRevision() {
         var before = disputedPayment(); var decision = decision(before);
-        jdbc.execute("ALTER TABLE supplier_payment_dispute_resolution ADD CONSTRAINT reject_test_supplier_resolution CHECK (outcome<>'SUCCEEDED')");
+        jdbc.execute(
+                "ALTER TABLE supplier_payment_dispute_resolution ADD CONSTRAINT"
+                        + " reject_test_supplier_resolution CHECK (outcome<>'SUCCEEDED')");
         assertThatThrownBy(() -> tx.execute(status -> payments.resolve(decision))).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(payments.find(tenant, before.command().id())).contains(before);
         assertThat(payments.revision(tenant, before.command().id(), decision.resolvedVersion())).isEmpty();
         assertThat(count("supplier_payment_dispute_resolution")).isZero();
-        jdbc.execute("ALTER TABLE supplier_payment_dispute_resolution DROP CONSTRAINT reject_test_supplier_resolution");
+        jdbc.execute(
+                "ALTER TABLE supplier_payment_dispute_resolution DROP CONSTRAINT"
+                        + " reject_test_supplier_resolution");
         assertThat(tx.execute(status -> payments.resolve(decision)).settleable()).isTrue();
     }
 
@@ -180,13 +251,21 @@ class SupplierPaymentPersistenceTest {
 
     @Test void missingHistoricalRevisionPreventsResolutionAndCorruptedDecisionIsRejected() {
         var before = disputedPayment(); var decision = decision(before); var id = before.command().id();
-        var original = jdbc.queryForObject("SELECT state_json FROM supplier_payment_revision WHERE tenant_id=? AND operation_id=? AND version=4", String.class, tenant, id.toString());
-        jdbc.update("DELETE FROM supplier_payment_revision WHERE tenant_id=? AND operation_id=? AND version=4", tenant, id.toString());
+        var original = jdbc.queryForObject(
+                        "SELECT state_json FROM supplier_payment_revision WHERE tenant_id=? AND"
+                                + " operation_id=? AND version=4", String.class, tenant, id.toString());
+        jdbc.update(
+                "DELETE FROM supplier_payment_revision WHERE tenant_id=? AND operation_id=? AND"
+                        + " version=4", tenant, id.toString());
         assertThatThrownBy(() -> tx.execute(status -> payments.resolve(decision))).isInstanceOf(DomainException.class);
         assertThat(payments.find(tenant, id)).contains(before);
-        jdbc.update("INSERT INTO supplier_payment_revision(tenant_id,operation_id,version,state_json) VALUES(?,?,4,?)", tenant, id.toString(), original);
+        jdbc.update(
+                "INSERT INTO supplier_payment_revision(tenant_id,operation_id,version,state_json)"
+                        + " VALUES(?,?,4,?)", tenant, id.toString(), original);
         tx.executeWithoutResult(status -> payments.resolve(decision));
-        jdbc.update("UPDATE supplier_payment_dispute_resolution SET resolved_by='another-finance' WHERE tenant_id=?", tenant);
+        jdbc.update(
+                "UPDATE supplier_payment_dispute_resolution SET resolved_by='another-finance' WHERE"
+                        + " tenant_id=?", tenant);
         assertThatThrownBy(() -> payments.latestResolution(tenant, id)).isInstanceOf(DomainException.class);
     }
 
@@ -217,7 +296,10 @@ class SupplierPaymentPersistenceTest {
 
     @Test void preparationRevisionFailureRollsBackBothBankRegistrationAndReadyMarker() {
         var request = register(confirmed()); var claimed = preparation.claim(tenant, request.input().id(), at());
-        jdbc.update("INSERT INTO supplier_payment_execution_revision(tenant_id,execution_request_id,version,state_json) VALUES(?,?,3,?)", tenant, request.input().id().toString(), json.write(claimed));
+        jdbc.update(
+                "INSERT INTO"
+                    + " supplier_payment_execution_revision(tenant_id,execution_request_id,version,state_json)"
+                    + " VALUES(?,?,3,?)", tenant, request.input().id().toString(), json.write(claimed));
         assertThatThrownBy(() -> preparation.finish(claimed, evidence(authorization(request), at()), at())).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(requests.find(tenant, request.input().id())).contains(claimed); assertThat(count("supplier_payment_operation")).isZero(); assertThat(count("supplier_payment_revision")).isZero();
         assertThat(holds.find(tenant, request.input().authorizationId()).orElseThrow().status()).isEqualTo(SupplierPayableHoldOperation.Status.HELD);
@@ -341,18 +423,29 @@ class SupplierPaymentPersistenceTest {
 
     @Test void databaseRejectsReadyWithoutRegistrationAndForeignSourceRevisions() {
         var request = register(confirmed()); var claimed = preparation.claim(tenant, request.input().id(), at());
-        assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payment_execution_request SET status='READY',lease_until=NULL,registered_authorization_id=authorization_id WHERE tenant_id=? AND id=?", tenant, request.input().id().toString()))
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE supplier_payment_execution_request SET"
+                                            + " status='READY',lease_until=NULL,registered_authorization_id=authorization_id"
+                                            + " WHERE tenant_id=? AND id=?", tenant, request.input().id().toString()))
                 .isInstanceOf(DataIntegrityViolationException.class);
         preparation.finish(claimed, evidence(authorization(request), at()), at());
-        assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payment_operation SET hold_version=999 WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payment_operation SET execution_request_version=999 WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE supplier_payment_operation SET hold_version=999"
+                                                + " WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE supplier_payment_operation SET"
+                                            + " execution_request_version=999 WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
         var other = register(confirmed());
-        assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payment_operation SET execution_request_id=? WHERE tenant_id=?", other.input().id().toString(), tenant)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE supplier_payment_operation SET"
+                                                + " execution_request_id=? WHERE tenant_id=?", other.input().id().toString(), tenant)).isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test void corruptedCommandOrHeadersFailClosedAndRevisionAppendFailureRollsBackClaim() {
         var payment = prepared(register(confirmed())); var id = payment.command().id();
-        jdbc.update("INSERT INTO supplier_payment_revision(tenant_id,operation_id,version,state_json) VALUES(?,?,2,?)", tenant, id.toString(), json.write(payment));
+        jdbc.update(
+                "INSERT INTO supplier_payment_revision(tenant_id,operation_id,version,state_json)"
+                        + " VALUES(?,?,2,?)", tenant, id.toString(), json.write(payment));
         assertThatThrownBy(() -> bank.claim(tenant, id, at())).isInstanceOf(DataIntegrityViolationException.class); assertThat(payments.find(tenant, id)).contains(payment);
         jdbc.update("UPDATE supplier_payment_operation SET command_digest=? WHERE tenant_id=? AND id=?", "e".repeat(64), tenant, id.toString());
         assertThatThrownBy(() -> payments.find(tenant, id)).isInstanceOf(IllegalStateException.class).hasMessageContaining("inconsistent");
@@ -405,8 +498,29 @@ class SupplierPaymentPersistenceTest {
         var check = returnCheck(payment, "finance", 2, returnFunds("one", "20", clock()));
         var before = returnLedgers.find(tenant, id).orElseThrow(); var decision = returnDecision(check);
         var after = tx.execute(status -> returnRegistrations.register(decision, before.version(), check.version()));
-        var reopened = new JdbcSupplierPaymentReturnRepository(jdbc, json, new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json)),
-                new JdbcSupplierPaymentReturnCheckRepository(jdbc, json), payments, new JdbcFinanceReceiptCreditRepository(jdbc));
+        var reopened = new JdbcSupplierPaymentReturnRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentReturnRepositoryMapper.class),
+                        json,
+                        new JdbcSupplierPaymentReturnsRepository(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierPaymentReturnsRepositoryMapper.class), json, payments, new SupplierPayableReturnGuard(
+                                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                                io.agentflow.procurement.mapper
+                                                        .SupplierPayableReturnGuardMapper.class)),
+                                new JdbcSupplierAdjustmentCompletions(
+                                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                                io.agentflow.procurement.mapper
+                                                        .SupplierAdjustmentCompletionsMapper.class), json)),
+                new JdbcSupplierPaymentReturnCheckRepository(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierPaymentReturnCheckRepositoryMapper.class), json), payments, new JdbcFinanceReceiptCreditRepository(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.finance.mapper
+                                                .FinanceReceiptCreditRepositoryMapper.class)));
         assertThat(reopened.history(tenant, id)).containsExactly(decision); assertThat(reopened.history("other", id)).isEmpty();
         assertThat(returnLedgers.find(tenant, id)).contains(after); assertThat(returnLedgers.find("other", id)).isEmpty();
         assertThat(returnChecks.find(tenant, check.input().id()).orElseThrow().status()).isEqualTo(SupplierPaymentReturnCheck.Status.RESOLVED);
@@ -414,7 +528,9 @@ class SupplierPaymentPersistenceTest {
         assertThat(payments.find(tenant, id)).contains(payment); assertThat(payments.firstSuccessfulRevision(tenant, id)).contains(payment);
         assertThat(reservations.find(tenant, payment.command().holdCommand().authorization().source().reservation().id()).orElseThrow().held()).isTrue();
         assertThat(count("supplier_payment_return_registration")).isEqualTo(1); assertThat(count("finance_receipt_credit")).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT voucher_reference FROM finance_receipt_credit WHERE tenant_id=?", String.class, tenant)).isNull();
+        assertThat(jdbc.queryForObject(
+                                "SELECT voucher_reference FROM finance_receipt_credit WHERE"
+                                        + " tenant_id=?", String.class, tenant)).isNull();
         assertThat(decision.receipt().observedAt().getNano() % 1000).isNotZero();
     }
 
@@ -437,7 +553,9 @@ class SupplierPaymentPersistenceTest {
         var payment = returnedSource(); var check = returnCheck(payment, "finance", 2,
                 returnFunds("one", "20", clock()), returnFunds("two", "10", clock()));
         var before = returnLedgers.find(tenant, payment.command().id()).orElseThrow();
-        jdbc.execute("ALTER TABLE finance_receipt_credit ADD CONSTRAINT reject_test_second_return CHECK (transaction_reference<>'return-two')");
+        jdbc.execute(
+                "ALTER TABLE finance_receipt_credit ADD CONSTRAINT reject_test_second_return CHECK"
+                        + " (transaction_reference<>'return-two')");
         assertThatThrownBy(() -> registerReturn(check, returnDecision(check))).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(returnLedgers.find(tenant, payment.command().id())).contains(before); assertThat(returnChecks.find(tenant, check.input().id())).contains(check);
         assertThat(count("finance_receipt_credit")).isZero(); assertThat(count("supplier_payment_return_registration")).isZero();
@@ -528,7 +646,9 @@ class SupplierPaymentPersistenceTest {
         assertThat(result.registrationId()).isNotNull(); assertThat(count("finance_receipt_credit")).isEqualTo(1);
         assertThat(returnLedgers.find(tenant, payment.command().id()).orElseThrow().totalReturned()).isEqualTo(money("20"));
         assertThat(payments.find(tenant, payment.command().id())).contains(payment);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE tenant_id=? AND action LIKE 'SUPPLIER_PAYMENT_RETURN_%'", Integer.class, tenant)).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM audit_event WHERE tenant_id=? AND action LIKE"
+                                        + " 'SUPPLIER_PAYMENT_RETURN_%'", Integer.class, tenant)).isEqualTo(2);
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> worker.poll())).isInstanceOf(IllegalStateException.class);
     }
 
@@ -553,7 +673,9 @@ class SupplierPaymentPersistenceTest {
     @Test void returnRegistrationAndAuditFailureRollBackTheEntireFinancialDecision() {
         var payment = returnedSource(); var check = checkedReturn(payment, returnFunds("audit", "20", clock())); var input = returnInput(payment, check);
         var before = returnLedgers.find(tenant, payment.command().id()).orElseThrow();
-        jdbc.execute("ALTER TABLE audit_event ADD CONSTRAINT reject_supplier_return_audit CHECK (action<>'SUPPLIER_PAYMENT_RETURN_REGISTER')");
+        jdbc.execute(
+                "ALTER TABLE audit_event ADD CONSTRAINT reject_supplier_return_audit CHECK"
+                        + " (action<>'SUPPLIER_PAYMENT_RETURN_REGISTER')");
         assertThatThrownBy(() -> returnService.register(payment.command().id(), input)).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(returnChecks.find(tenant, check.input().id())).contains(check); assertThat(returnLedgers.find(tenant, payment.command().id())).contains(before);
         assertThat(count("finance_receipt_credit")).isZero(); assertThat(count("supplier_payment_return_registration")).isZero();
@@ -682,12 +804,18 @@ class SupplierPaymentPersistenceTest {
         var payable = payable(request); var catalog = new FinanceCatalog("alice", "v1", now.plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(entity, "法人", "CNY", false, "v1", "Asia/Shanghai")), List.of(), List.of(), List.of(), List.of());
         var initiator = new InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1, entity, "法人", UUID.randomUUID(), "部门", UUID.randomUUID(), "岗位");
         return tx.execute(status -> {
-            jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,?,?,'fixture',1,'alice','采购付款','{}','DRAFT',1,1,'PROCUREMENT_PAYMENT',?)",
+            jdbc.update(
+                            "INSERT INTO"
+                                + " approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)"
+                                + " VALUES(?,?,?,'fixture',1,'alice','采购付款','{}','DRAFT',1,1,'PROCUREMENT_PAYMENT',?)",
                     request.applicationId().toString(), tenant, ref, request.id().toString());
             procurements.create(request, "alice"); request.freeze(1, 1, catalog, "a".repeat(64), payable, initiator, now); procurements.update(request, 1, "alice", "SUBMIT");
             var hold = ProcurementPayableReservation.hold(UUID.randomUUID(), request, now); reservations.create(hold);
             request.approve(2, 1, 8, "manager", now.plusSeconds(1)); procurements.update(request, 2, "manager", "APPROVE");
-            jdbc.update("UPDATE approval_application SET status='APPROVED',version=8,payload_json=? WHERE tenant_id=? AND id=?", json.write(ProcurementPaymentFormContract.submittedPayload(request.currentRound())), tenant, request.applicationId().toString());
+            jdbc.update(
+                            "UPDATE approval_application SET"
+                                + " status='APPROVED',version=8,payload_json=? WHERE tenant_id=?"
+                                + " AND id=?", json.write(ProcurementPaymentFormContract.submittedPayload(request.currentRound())), tenant, request.applicationId().toString());
             return new SupplierPaymentAuthorization(UUID.randomUUID(), ApprovedProcurementPayment.from(request, hold), payable, "finance", authorizedAt(), authorizedAt().plusSeconds(86400));
         });
     }

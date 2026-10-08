@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.definition.mapper.DefinitionAvailabilityRepositoryMapper">
+    <insert id="append">
+        INSERT INTO definition_availability_change
+        (tenant_id,definition_id,revision,previous_enabled,start_enabled,changed_by,authorized_role,changed_at,reason)
+        VALUES (#{tenantId},#{definitionId},#{revision},#{previousEnabled},#{startEnabled},#{changedBy},#{authorizedRole},#{changedAt},#{reason})
+    </insert>
+
+    <select id="history" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM definition_availability_change
+        WHERE tenant_id=#{tenantId} AND definition_id=#{definitionId} AND revision&lt;#{beforeRevision} ORDER BY revision DESC LIMIT #{limit}
+    </select>
+</mapper>

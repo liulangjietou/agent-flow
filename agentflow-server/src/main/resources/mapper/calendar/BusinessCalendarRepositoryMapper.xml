@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.calendar.mapper.BusinessCalendarRepositoryMapper">
+    <insert id="create">
+        INSERT INTO business_calendar (id,tenant_id,calendar_key,name,zone_id,revision,updated_by,updated_at)
+        VALUES (#{id},#{tenantId},#{calendarKey},#{name},#{zoneId},#{revision},#{updatedBy},#{updatedAt})
+    </insert>
+
+    <update id="update">
+        UPDATE business_calendar SET name=#{name},zone_id=#{zoneId},revision=#{revision},updated_by=#{updatedBy},updated_at=#{updatedAt}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND revision=#{expectedRevision}
+    </update>
+
+    <insert id="appendVersion">
+        INSERT INTO business_calendar_version (tenant_id,calendar_id,calendar_key,name,zone_id,revision,rules_json,updated_by,updated_at)
+        VALUES (#{tenantId},#{calendarId},#{calendarKey},#{name},#{zoneId},#{revision},#{rulesJson},#{updatedBy},#{updatedAt})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT v.* FROM business_calendar c JOIN business_calendar_version v
+        ON v.tenant_id=c.tenant_id AND v.calendar_id=c.id AND v.revision=c.revision
+        WHERE c.tenant_id=#{tenantId} AND c.id=#{id}
+    </select>
+
+    <select id="findVersion" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM business_calendar_version WHERE tenant_id=#{tenantId} AND calendar_id=#{id} AND revision=#{revision}
+    </select>
+
+    <select id="list" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,calendar_key,name,zone_id,revision,updated_by,updated_at FROM business_calendar WHERE tenant_id=#{tenantId} AND calendar_key&gt;#{calendarKey} ORDER BY calendar_key LIMIT #{limit}
+    </select>
+
+    <select id="versions" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT calendar_id AS id,calendar_key,name,zone_id,revision,updated_by,updated_at FROM business_calendar_version
+        WHERE tenant_id=#{tenantId} AND calendar_id=#{id} AND revision&lt;#{revision} ORDER BY revision DESC LIMIT #{limit}
+    </select>
+</mapper>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.FinancialResourceReversalJournalMapper">
+    <select id="prepare" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM expense_resource_adjustment WHERE tenant_id=#{tenantId} AND id=#{adjustmentId}
+    </select>
+
+    <insert id="append">
+        INSERT INTO finance_consumption_reversal(tenant_id,resource_type,resource_id,source_line,report_id,round_no,report_line,adjustment_id,
+        before_version,after_version,amount,currency,reversed_at) VALUES(#{tenantId},#{resourceType},#{resourceId},#{sourceLine},#{reportId},#{roundNo},#{reportLine},#{adjustmentId},#{beforeVersion},#{afterVersion},#{amount},#{currency},#{reversedAt})
+    </insert>
+
+    <select id="requireOriginalUse" resultType="Integer">
+        SELECT COUNT(*) FROM invoice_active_claim WHERE tenant_id=#{tenantId} AND invoice_id=#{id} AND invoice_key=#{canonical} AND report_id=#{reportId} AND round_no=#{roundNo} AND line_no=#{lineNo} AND status='CONSUMED'
+    </select>
+
+    <select id="requireOriginalUse2" resultType="Integer">
+        SELECT COUNT(*) FROM finance_amount_use WHERE tenant_id=#{tenantId} AND resource_type=#{resourceType} AND resource_id=#{id} AND source_line=#{sourceLine} AND report_id=#{reportId} AND round_no=#{roundNo} AND report_line=#{lineNo} AND amount=#{amount} AND currency=#{currency} AND status='CONSUMED'
+    </select>
+</mapper>

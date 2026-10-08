@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.procurement.mapper.ProcurementPayableReservationRepositoryMapper">
+    <insert id="create">
+        INSERT INTO procurement_payable_reservation(tenant_id,id,request_id,application_id,employee_id,request_version,
+        round_no,legal_entity_id,supplier_reference,payable_reference,active_request_id,active_payable_reference,version,state_json,held_at)
+        VALUES(#{tenantId},#{id},#{requestId},#{applicationId},#{employeeId},#{requestVersion},#{roundNo},#{legalEntityId},#{supplierReference},#{payableReference},#{activeRequestId},#{activePayableReference},1,#{stateJson},#{heldAt})
+    </insert>
+
+    <update id="release">
+        UPDATE procurement_payable_reservation SET version=2,state_json=#{stateJson},released_at=#{releasedAt},active_request_id=NULL,active_payable_reference=NULL
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=1
+    </update>
+
+    <select id="complete" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT o.state_json AS settlement_json,b.state_json AS bank_json FROM supplier_payable_settlement_operation o
+        JOIN supplier_payment_operation b ON b.tenant_id=o.tenant_id AND b.id=o.payment_id
+        JOIN supplier_payable_settlement_revision r ON r.tenant_id=o.tenant_id AND r.operation_id=o.id AND r.version=o.version
+        JOIN supplier_payment_revision p ON p.tenant_id=b.tenant_id AND p.operation_id=b.id AND p.version=b.version
+        WHERE o.tenant_id=#{tenant} AND o.id=#{id} AND o.version=#{version} AND o.status='SETTLED' AND o.retired_version IS NULL AND o.active_payment_id=b.id
+        AND o.command_json=#{stateJson} AND o.command_digest=#{digest} AND b.version=#{expectedVersion} AND b.status='SUCCEEDED' AND b.command_json=#{commandJson} AND b.command_digest=#{commandDigest}
+        AND r.state_json=o.state_json AND p.state_json=b.state_json
+    </select>
+
+    <insert id="complete2">
+        INSERT INTO supplier_settlement_completion(tenant_id,reservation_id,operation_id,operation_version,payment_id,payment_version,completed_at) VALUES(#{tenantId},#{reservationId},#{operationId},#{operationVersion},#{paymentId},#{paymentVersion},#{completedAt})
+    </insert>
+
+    <update id="complete3">
+        UPDATE procurement_payable_reservation SET version=2,state_json=#{stateJson},settled_at=#{settledAt},settlement_id=#{id},settlement_version=#{version},active_request_id=NULL,active_payable_reference=NULL
+        WHERE tenant_id=#{tenant} AND id=#{expectedId} AND version=1
+    </update>
+
+    <update id="completeAdjustment">
+        UPDATE procurement_payable_reservation SET version=2,state_json=#{stateJson},adjusted_at=#{completedAt},adjustment_id=#{id},adjustment_version=#{version},
+            active_request_id=NULL,active_payable_reference=NULL
+        WHERE tenant_id=#{tenant} AND id=#{expectedId} AND version=1 AND state_json=#{expectedStateJson}
+    </update>
+
+    <select id="active" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM procurement_payable_reservation WHERE tenant_id=#{tenant} AND active_request_id=#{requestId}
+    </select>
+
+    <select id="history" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM procurement_payable_reservation WHERE tenant_id=#{tenant} AND request_id=#{requestId} ORDER BY round_no
+    </select>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM procurement_payable_reservation WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="requireCompletion" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT c.*,o.state_json AS settlement_json,b.state_json AS bank_json FROM supplier_settlement_completion c
+        JOIN supplier_payable_settlement_revision o ON o.tenant_id=c.tenant_id AND o.operation_id=c.operation_id AND o.version=c.operation_version
+        JOIN supplier_payment_revision b ON b.tenant_id=c.tenant_id AND b.operation_id=c.payment_id AND b.version=c.payment_version
+        WHERE c.tenant_id=#{tenantId} AND c.reservation_id=#{id}
+    </select>
+
+    <insert id="append">
+        INSERT INTO procurement_payable_reservation_revision(tenant_id,reservation_id,version,state_json) VALUES(#{tenantId},#{reservationId},#{version},#{stateJson})
+    </insert>
+</mapper>

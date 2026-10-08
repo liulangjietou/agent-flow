@@ -1,17 +1,13 @@
 package io.agentflow.organization;
+import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
-import java.time.Instant;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,10 +23,18 @@ import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
-import static org.assertj.core.api.Assertions.*;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 真正 JDBC 事务覆盖来源连续性、映射租户约束、并发领取及业务／游标／轨迹原子性。
+ *
  * @author owlzhangfq@gmail.com
  */
 class OrganizationSyncPersistenceTest {
@@ -48,9 +52,17 @@ class OrganizationSyncPersistenceTest {
         var data = new DriverManagerDataSource("jdbc:h2:mem:organization-sync-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", "");
         Flyway.configure().dataSource(data).load().migrate(); jdbc = new JdbcTemplate(data);
         var manager = new DataSourceTransactionManager(data); tx = new TransactionTemplate(manager);
-        var proxy = new ProxyFactory(new JdbcOrganizationSyncRepository(jdbc, json));
+        var proxy = new ProxyFactory(new JdbcOrganizationSyncRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.organization.mapper
+                                                .OrganizationSyncRepositoryMapper.class), json));
         proxy.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource())); sync = (JdbcOrganizationSyncRepository) proxy.getProxy();
-        organization = new JdbcOrganizationRepository(jdbc, json); service = new OrganizationService(organization);
+        organization = new JdbcOrganizationRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.organization.mapper.OrganizationRepositoryMapper
+                                        .class), json); service = new OrganizationService(organization);
         tx.executeWithoutResult(ignored -> { service.initialize(ADMIN); sync.register(new OrganizationSyncSource("tenant", "hr", 0, 1, null, "admin", AT)); });
     }
 
@@ -60,7 +72,11 @@ class OrganizationSyncPersistenceTest {
         var before = jdbc.queryForList("SELECT * FROM organization_directory"); var batch = received(0, 1);
         assertThat(sync.source("tenant").orElseThrow().appliedRevision()).isZero();
         assertThat(sync.due(AT.plusSeconds(60))).isEmpty();
-        var restored = new JdbcOrganizationSyncRepository(jdbc, json).find("tenant", batch.context().id()).orElseThrow();
+        var restored = new JdbcOrganizationSyncRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.organization.mapper
+                                                .OrganizationSyncRepositoryMapper.class), json).find("tenant", batch.context().id()).orElseThrow();
         assertThat(restored.context()).isEqualTo(batch.context()); assertThat(restored.state()).isEqualTo(batch.state());
         tx.executeWithoutResult(ignored -> { batch.cancel(3, "reviewer", "稍后重新读取", AT.plusSeconds(4)); sync.update(batch, 3); });
         assertThat(versions(batch)).containsExactly(1L, 2L, 3L, 4L);
@@ -120,7 +136,10 @@ class OrganizationSyncPersistenceTest {
     void transitionFailureRollsBackTheWholeStateWrite(String stage) {
         var batch = fresh("tenant", "hr", 0, null);
         if (stage.equals("claim")) tx.executeWithoutResult(ignored -> sync.create(batch));
-        jdbc.execute("ALTER TABLE organization_sync_transition ADD CONSTRAINT force_failure CHECK(batch_version<>" + (stage.equals("create") ? 1 : 2) + ")");
+        jdbc.execute(
+                "ALTER TABLE organization_sync_transition ADD CONSTRAINT force_failure"
+                        + " CHECK(batch_version<>"
+                        + (stage.equals("create") ? 1 : 2) + ")");
         assertThatThrownBy(() -> tx.executeWithoutResult(ignored -> {
             if (stage.equals("create")) sync.create(batch); else { batch.start(1, AT, AT.plusSeconds(30)); sync.update(batch, 1); }
         })).isInstanceOf(DataIntegrityViolationException.class);
@@ -135,7 +154,11 @@ class OrganizationSyncPersistenceTest {
         var binding = sync.binding("tenant", PERSON).orElseThrow(); assertThat(binding.localId()).isEqualTo(person.id()); assertThat(binding.localRevision()).isEqualTo(2);
         assertThat(binding.sourceRevision()).isEqualTo(1); assertThat(count("organization_sync_binding_change")).isEqualTo(1);
         assertThat(sync.find("tenant", batch.context().id()).orElseThrow().state().status()).isEqualTo(OrganizationSyncBatch.Status.APPLIED);
-        assertThat(new JdbcOrganizationSyncRepository(jdbc, json).binding("tenant", PERSON)).contains(binding);
+        assertThat(new JdbcOrganizationSyncRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.organization.mapper
+                                                        .OrganizationSyncRepositoryMapper.class), json).binding("tenant", PERSON)).contains(binding);
         assertThat(sync.binding("foreign", PERSON)).isEmpty();
         assertCode(() -> tx.executeWithoutResult(ignored -> sync.advance(sync.source("tenant").orElseThrow(), 1)), "CONCURRENCY_CONFLICT");
     }
@@ -144,7 +167,9 @@ class OrganizationSyncPersistenceTest {
         var person = tx.execute(ignored -> service.createPerson(ADMIN, "subject", "原姓名", true, true)); var batch = received(0, 1);
         var tables = List.of("organization_person", "organization_directory", "organization_change", "organization_sync_source", "organization_sync_batch", "organization_sync_transition");
         var before = tables.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table)).toList();
-        jdbc.execute("ALTER TABLE organization_sync_binding_change ADD CONSTRAINT reject_binding CHECK(binding_version<>1)");
+        jdbc.execute(
+                "ALTER TABLE organization_sync_binding_change ADD CONSTRAINT reject_binding"
+                        + " CHECK(binding_version<>1)");
         assertThatThrownBy(() -> tx.executeWithoutResult(ignored -> applyPerson(batch, person))).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(tables.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table)).toList()).isEqualTo(before);
         assertThat(count("organization_sync_binding")).isZero(); assertThat(count("organization_sync_binding_change")).isZero();
@@ -191,10 +216,11 @@ class OrganizationSyncPersistenceTest {
         assertCode(() -> tx.executeWithoutResult(ignored -> sync.save(foreignBinding, 0)), "CONCURRENCY_CONFLICT");
         var wrongKind = new OrganizationSyncBinding("tenant", "hr", new OrganizationSyncKey(OrganizationSyncKey.Kind.DEPARTMENT, "d"), unit.id(), 1, 1, 1, batch.context().id(), AT.plusSeconds(3));
         assertCode(() -> tx.executeWithoutResult(ignored -> sync.save(wrongKind, 0)), "CONCURRENCY_CONFLICT");
-        assertThatThrownBy(() -> jdbc.update("""
-                INSERT INTO organization_sync_binding(tenant_id,source_key,kind,external_id,local_id,person_id,local_revision,source_revision,version,applied_batch_id,updated_at)
-                VALUES('tenant','hr','PERSON','foreign',?,?,1,1,1,?,CURRENT_TIMESTAMP)
-                """, foreign.id().toString(), foreign.id().toString(), batch.context().id().toString())).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        """
+INSERT INTO organization_sync_binding(tenant_id,source_key,kind,external_id,local_id,person_id,local_revision,source_revision,version,applied_batch_id,updated_at)
+VALUES('tenant','hr','PERSON','foreign',?,?,1,1,1,?,CURRENT_TIMESTAMP)
+""", foreign.id().toString(), foreign.id().toString(), batch.context().id().toString())).isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test void advancesBindingWithoutRebindingAndKeepsEveryAppliedSnapshot() {
@@ -210,7 +236,9 @@ class OrganizationSyncPersistenceTest {
         });
         var latest = sync.binding("tenant", PERSON).orElseThrow(); assertThat(latest.version()).isEqualTo(2); assertThat(latest.localId()).isEqualTo(person.id());
         assertThat(latest.localRevision()).isEqualTo(3); assertThat(organization.person("tenant", person.id()).orElseThrow().subject()).isEqualTo("subject");
-        var history = jdbc.queryForList("SELECT snapshot_json FROM organization_sync_binding_change ORDER BY binding_version", String.class);
+        var history = jdbc.queryForList(
+                        "SELECT snapshot_json FROM organization_sync_binding_change ORDER BY"
+                                + " binding_version", String.class);
         assertThat(history).hasSize(2); assertThat(json.read(history.get(0), OrganizationSyncBinding.class)).isEqualTo(original);
         assertThat(json.read(history.get(1), OrganizationSyncBinding.class)).isEqualTo(latest);
         assertThat(sync.source("tenant").orElseThrow().appliedRevision()).isEqualTo(2);
@@ -257,7 +285,9 @@ class OrganizationSyncPersistenceTest {
         return batch;
     }
     private static OrganizationSyncBatch fresh(String tenant, String source, long after, UUID retry) { return new OrganizationSyncBatch(new OrganizationSyncBatch.Context(UUID.randomUUID(), tenant, source, after, "a".repeat(64), "admin", AT, retry)); }
-    private List<Long> versions(OrganizationSyncBatch batch) { return jdbc.queryForList("SELECT batch_version FROM organization_sync_transition WHERE tenant_id=? AND batch_id=? ORDER BY batch_version", Long.class, batch.context().tenantId(), batch.context().id().toString()); }
+    private List<Long> versions(OrganizationSyncBatch batch) { return jdbc.queryForList(
+                "SELECT batch_version FROM organization_sync_transition WHERE tenant_id=? AND"
+                        + " batch_id=? ORDER BY batch_version", Long.class, batch.context().tenantId(), batch.context().id().toString()); }
     private long count(String table) { return jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Long.class); }
     private static void assertCode(Runnable action, String code) { assertThatThrownBy(action::run).isInstanceOf(DomainException.class).extracting("code").isEqualTo(code); }
 }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.notification.mapper.ExpenseSettlementNotificationAccessMapper">
+    <select id="original" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT actor_id,state_json FROM expense_report_revision WHERE tenant_id=#{tenant} AND report_id=#{reportId} AND financial_version=#{businessVersion}
+    </select>
+
+    <select id="row" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT event_key,kind,application_id,round_no FROM notification_inbox
+        WHERE tenant_id=#{tenant} AND recipient_id=#{recipient} AND id=#{id} AND kind IN ('EXPENSE_SETTLEMENT_RESULT','EXPENSE_SETTLEMENT_ATTENTION')
+    </select>
+</mapper>

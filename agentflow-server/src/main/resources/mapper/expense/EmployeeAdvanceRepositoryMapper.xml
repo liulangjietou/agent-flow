@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.EmployeeAdvanceRepositoryMapper">
+    <insert id="create">
+        INSERT INTO employee_advance_order(tenant_id,advance_id,employee_id,legal_entity_id,currency,paid_on,due_on,trace_id) VALUES(#{tenantId},#{advanceId},#{employeeId},#{legalEntityId},#{currency},#{paidOn},#{dueOn},#{traceId})
+    </insert>
+    <select id="findOwnedByPaidOnQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT r.*,p.paid_on FROM employee_advance_order p JOIN finance_resource r
+          ON r.tenant_id=p.tenant_id AND r.resource_type=p.resource_type AND r.id=p.advance_id
+        WHERE p.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND p.employee_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND p.legal_entity_id=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} AND p.currency=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}
+        <choose><when test="condition0"></when><otherwise> AND (p.paid_on&gt;<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} OR (p.paid_on=<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} AND p.advance_id&gt;<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}))</otherwise></choose> ORDER BY p.paid_on,p.advance_id LIMIT <bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8}
+    </select>
+</mapper>

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.agent.mapper.ExpenseDraftAssistRepositoryMapper">
+    <insert id="create">
+        INSERT INTO agent_expense_draft_run(tenant_id,id,report_id,application_id,requested_by,
+            application_version,financial_version,status,version,active_report_id,context_json,state_json,created_at,trace_id)
+        SELECT r.tenant_id,#{id},r.id,r.application_id,r.employee_id,a.version,r.version,'QUEUED',1,r.id,#{stateJson},#{stateJson2},#{createdAt},#{traceId}
+        FROM expense_report r JOIN approval_application a ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        WHERE r.tenant_id=#{tenantId} AND r.id=#{reportId} AND r.application_id=#{applicationId} AND r.employee_id=#{requestedBy} AND a.created_by=r.employee_id
+            AND a.version=#{applicationVersion} AND r.version=#{financialVersion} AND a.status IN ('DRAFT','RETURNED','WITHDRAWN')
+            AND a.business_type='EXPENSE' AND a.business_id=r.id
+    </insert>
+
+    <update id="update">
+        UPDATE agent_expense_draft_run SET status=#{status},version=#{version},state_json=#{stateJson},active_report_id=#{reportId},lease_until=#{leaseUntil}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND status=#{previous} AND context_json=#{contextJson}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM agent_expense_draft_run WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="lock" resultType="String">
+        SELECT id FROM agent_expense_draft_run WHERE tenant_id=#{tenant} AND id=#{id} FOR UPDATE
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,a.business_no FROM agent_expense_draft_run q
+        LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+        WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until&lt;=#{leaseUntil})
+        ORDER BY q.created_at,q.id LIMIT 10
+    </select>
+
+    <select id="page" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,application_version,financial_version,status,version,created_at FROM agent_expense_draft_run
+        WHERE tenant_id=#{tenant} AND report_id=#{reportId} ORDER BY created_at DESC,id DESC LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="page2" resultType="Long">
+        SELECT COUNT(*) FROM agent_expense_draft_run WHERE tenant_id=#{tenant} AND report_id=#{reportId}
+    </select>
+
+    <insert id="append">
+        INSERT INTO agent_expense_draft_transition(tenant_id,run_id,run_version,status,state_json) VALUES(#{tenantId},#{runId},#{runVersion},#{status},#{stateJson})
+    </insert>
+</mapper>

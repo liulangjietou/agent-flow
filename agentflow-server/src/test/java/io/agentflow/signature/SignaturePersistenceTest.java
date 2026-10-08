@@ -1,6 +1,10 @@
 package io.agentflow.signature;
 
+import static io.agentflow.signature.SignaturePersistenceFixtures.*;
+import static org.assertj.core.api.Assertions.*;
+
 import io.agentflow.common.DomainException;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,11 +24,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static io.agentflow.signature.SignaturePersistenceFixtures.*;
-import static org.assertj.core.api.Assertions.*;
-
 /**
  * 真实 JDBC 事务覆盖原件轮次、租户、单次外发身份、回调竞争和逐份文件保存的恢复。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SignaturePersistenceTest {
@@ -63,7 +65,9 @@ class SignaturePersistenceTest {
             case "application-status" -> jdbc.update("UPDATE approval_application SET status='IN_APPROVAL' WHERE id=?", id);
             case "application-version" -> jdbc.update("UPDATE approval_application SET version=8 WHERE id=?", id);
             case "definition-version" -> jdbc.update("UPDATE approval_application SET definition_version=4 WHERE id=?", id);
-            case "round-status" -> jdbc.update("UPDATE approval_submission_round SET status='REJECTED' WHERE application_id=?", id);
+            case "round-status" -> jdbc.update(
+                            "UPDATE approval_submission_round SET status='REJECTED' WHERE"
+                                + " application_id=?", id);
             case "missing-round" -> { jdbc.update("DELETE FROM approval_attachment_round WHERE application_id=?", id); jdbc.update("DELETE FROM approval_submission_round WHERE application_id=?", id); }
             default -> throw new AssertionError(variant);
         }
@@ -222,7 +226,9 @@ class SignaturePersistenceTest {
         seed(jdbc, foreignRequest);
         var copy = copies.get(0);
         var foreign = foreignRequest.documents().stream().filter(document -> document.sha256().equals(copy.sha256())).findFirst().orElseThrow();
-        assertThatThrownBy(() -> jdbc.update("UPDATE signature_source_document SET original_content_id=? WHERE operation_id=? AND attachment_id=?",
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE signature_source_document SET original_content_id=?"
+                                            + " WHERE operation_id=? AND attachment_id=?",
                 foreign.contentId().toString(), childRequest.id().toString(), copy.attachmentId().toString())).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(repository.find("tenant-a", childRequest.id())).contains(child);
     }
@@ -230,18 +236,24 @@ class SignaturePersistenceTest {
     @ParameterizedTest @ValueSource(strings = {"create", "claim", "reservation"})
     void laterHistoryOrFileFailureRollsBackTheWholeTransition(String stage) {
         if (stage.equals("create")) {
-            jdbc.execute("ALTER TABLE signature_operation_revision ADD CONSTRAINT reject_first CHECK(version<>1)");
+            jdbc.execute(
+                    "ALTER TABLE signature_operation_revision ADD CONSTRAINT reject_first"
+                        + " CHECK(version<>1)");
             assertThatThrownBy(this::create).isInstanceOf(DataIntegrityViolationException.class);
             assertThat(count("signature_operation")).isZero(); assertThat(count("signature_source_document")).isZero();
         } else {
             create();
             if (stage.equals("claim")) {
-                jdbc.execute("ALTER TABLE signature_operation_revision ADD CONSTRAINT reject_claim CHECK(version<>2)");
+                jdbc.execute(
+                        "ALTER TABLE signature_operation_revision ADD CONSTRAINT reject_claim"
+                            + " CHECK(version<>2)");
                 assertThatThrownBy(() -> save(queued.claim(NOW, LEASE))).isInstanceOf(DataIntegrityViolationException.class);
                 assertThat(load()).isEqualTo(queued);
             } else {
                 var sent = save(queued.claim(NOW, LEASE));
-                jdbc.execute("ALTER TABLE signature_result_file ADD CONSTRAINT reject_reservation CHECK(byte_size<0)");
+                jdbc.execute(
+                        "ALTER TABLE signature_result_file ADD CONSTRAINT reject_reservation"
+                            + " CHECK(byte_size<0)");
                 assertThatThrownBy(() -> save(sent.complete(receipt(sent, SignatureReceipt.Status.SIGNED, 1, NOW.plusSeconds(1)), NOW.plusSeconds(1))))
                         .isInstanceOf(DataIntegrityViolationException.class);
                 assertThat(load()).isEqualTo(sent); assertThat(count("signature_result_file")).isZero();

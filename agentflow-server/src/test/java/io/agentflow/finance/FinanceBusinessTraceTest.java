@@ -1,17 +1,19 @@
 package io.agentflow.finance;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.*;
 import io.agentflow.observability.DiagnosticContext;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.UUID;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -22,12 +24,15 @@ import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * 真实扫描 SQL 验证原业务投影与工作器作用域；完整约束和领取规则由财务持久化及 HTTP 集成测试覆盖。
+ *
  * @author owlzhangfq@gmail.com
  */
 class FinanceBusinessTraceTest {
@@ -39,16 +44,30 @@ class FinanceBusinessTraceTest {
 
     @BeforeEach void schema() {
         jdbc = new JdbcTemplate(new DriverManagerDataSource("jdbc:h2:mem:finance-business-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", ""));
-        jdbc.execute("CREATE TABLE approval_application(tenant_id VARCHAR(64),id VARCHAR(36),business_no VARCHAR(128),round_no INT)");
-        jdbc.execute("CREATE TABLE approval_submission_round(tenant_id VARCHAR(64),application_id VARCHAR(36),round_no INT,process_instance_id VARCHAR(128))");
-        jdbc.execute("CREATE TABLE expense_report(tenant_id VARCHAR(64),id VARCHAR(36),application_id VARCHAR(36))");
-        jdbc.execute("CREATE TABLE payment_authorization(tenant_id VARCHAR(64),id VARCHAR(36),application_id VARCHAR(36),round_no INT,purpose VARCHAR(32),business_id VARCHAR(36))");
-        jdbc.execute("CREATE TABLE finance_resource(tenant_id VARCHAR(64),resource_type VARCHAR(32),id VARCHAR(36))");
+        jdbc.execute(
+                "CREATE TABLE approval_application(tenant_id VARCHAR(64),id VARCHAR(36),business_no"
+                        + " VARCHAR(128),round_no INT)");
+        jdbc.execute(
+                "CREATE TABLE approval_submission_round(tenant_id VARCHAR(64),application_id"
+                        + " VARCHAR(36),round_no INT,process_instance_id VARCHAR(128))");
+        jdbc.execute(
+                "CREATE TABLE expense_report(tenant_id VARCHAR(64),id VARCHAR(36),application_id"
+                        + " VARCHAR(36))");
+        jdbc.execute(
+                "CREATE TABLE payment_authorization(tenant_id VARCHAR(64),id"
+                        + " VARCHAR(36),application_id VARCHAR(36),round_no INT,purpose"
+                        + " VARCHAR(32),business_id VARCHAR(36))");
+        jdbc.execute(
+                "CREATE TABLE finance_resource(tenant_id VARCHAR(64),resource_type VARCHAR(32),id"
+                        + " VARCHAR(36))");
         for (String table : new String[]{"expense_precheck_job", "budget_operation", "voucher_operation", "payment_operation",
                 "voucher_preparation", "payment_execution_request", "payment_payee_review"}) {
-            jdbc.execute("CREATE TABLE " + table + "(tenant_id VARCHAR(64),id VARCHAR(36),application_id VARCHAR(36),report_id VARCHAR(36),"
-                    + "round_no INT,authorization_id VARCHAR(36),original_authorization_id VARCHAR(36),kind VARCHAR(32),trace_id VARCHAR(36),"
-                    + "status VARCHAR(32),created_at TIMESTAMP,updated_at TIMESTAMP,next_attempt_at TIMESTAMP,lease_until TIMESTAMP)");
+            jdbc.execute("CREATE TABLE " + table + "(tenant_id VARCHAR(64),id VARCHAR(36),application_id"
+                            + " VARCHAR(36),report_id VARCHAR(36),round_no INT,authorization_id"
+                            + " VARCHAR(36),original_authorization_id VARCHAR(36),kind"
+                            + " VARCHAR(32),trace_id VARCHAR(36),status VARCHAR(32),created_at"
+                            + " TIMESTAMP,updated_at TIMESTAMP,next_attempt_at"
+                            + " TIMESTAMP,lease_until TIMESTAMP)");
         }
     }
 
@@ -133,7 +152,8 @@ class FinanceBusinessTraceTest {
         };
         var now = Timestamp.from(Instant.now().minusSeconds(1));
         String status = kind == Kind.BALANCE_RECOVERY || kind == Kind.VOUCHER_RECOVERY ? "SUCCEEDED" : "QUEUED";
-        jdbc.update("INSERT INTO " + table + "(tenant_id,id,application_id,report_id,round_no,authorization_id,original_authorization_id,kind,trace_id,status,created_at,updated_at,next_attempt_at) VALUES(?,?,?,?,1,?,?,'PAYMENT',?,?,?,?,?)",
+        jdbc.update("INSERT INTO " + table + "(tenant_id,id,application_id,report_id,round_no,authorization_id,original_authorization_id,kind,trace_id,status,created_at,updated_at,next_attempt_at)"
+                        + " VALUES(?,?,?,?,1,?,?,'PAYMENT',?,?,?,?,?)",
                 TENANT, runId.toString(), applicationId.toString(), reportId.toString(), runId.toString(), runId.toString(), traceId, status, now, now, now);
     }
 
@@ -141,39 +161,116 @@ class FinanceBusinessTraceTest {
         return switch (kind) {
             case PRECHECK -> {
                 var service = mock(ExpensePrecheckService.class); doAnswer(claim).when(service).claim(anyString(), any(), any());
-                yield new Harness(new ExpensePrecheckWorker(new JdbcExpensePrecheckRepository(jdbc, json), service, mock(ExpensePrecheckEvaluator.class))::poll, ExpensePrecheckWorker.class);
+                yield new Harness(new ExpensePrecheckWorker(new JdbcExpensePrecheckRepository(
+                                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                        (jdbc).getDataSource(),
+                                                        io.agentflow.expense.mapper
+                                                                .ExpensePrecheckRepositoryMapper
+                                                                .class), json), service, mock(ExpensePrecheckEvaluator.class))::poll, ExpensePrecheckWorker.class);
             }
             case BUDGET -> {
                 var service = mock(BudgetOperationService.class); doAnswer(claim).when(service).claim(anyString(), any(), any());
-                yield new Harness(new BudgetOperationWorker(new JdbcBudgetOperationRepository(jdbc, json), service, mock(BudgetSystemPort.class))::poll, BudgetOperationWorker.class);
+                yield new Harness(new BudgetOperationWorker(new JdbcBudgetOperationRepository(
+                                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                        (jdbc).getDataSource(),
+                                                        io.agentflow.finance.mapper
+                                                                .BudgetOperationRepositoryMapper
+                                                                .class), json), service, mock(BudgetSystemPort.class))::poll, BudgetOperationWorker.class);
             }
             case VOUCHER -> {
                 var service = mock(VoucherOperationService.class); doAnswer(claim).when(service).claim(anyString(), any(), any());
-                yield new Harness(new VoucherOperationWorker(new JdbcVoucherOperationRepository(jdbc, json), service, mock(AccountingVoucherPort.class))::poll, VoucherOperationWorker.class);
+                yield new Harness(new VoucherOperationWorker(new JdbcVoucherOperationRepository(
+                                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                        (jdbc).getDataSource(),
+                                                        io.agentflow.finance.mapper
+                                                                .VoucherOperationRepositoryMapper
+                                                                .class), json), service, mock(AccountingVoucherPort.class))::poll, VoucherOperationWorker.class);
             }
             case PAYMENT -> {
                 var service = mock(PaymentOperationService.class); doAnswer(claim).when(service).claim(anyString(), any(), any());
-                yield new Harness(new PaymentOperationWorker(new JdbcPaymentOperationRepository(jdbc, json, new JdbcPaymentAuthorizationRepository(jdbc, json)), service, mock(PaymentAccountsPort.class), mock(PaymentSystemPort.class), mock(AdvanceDisbursementService.class))::poll, PaymentOperationWorker.class);
+                yield new Harness(new PaymentOperationWorker(new JdbcPaymentOperationRepository(
+                                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                        (jdbc).getDataSource(),
+                                                        io.agentflow.finance.mapper
+                                                                .PaymentOperationRepositoryMapper
+                                                                .class),
+                                                json,
+                                                new JdbcPaymentAuthorizationRepository(
+                                                        io.agentflow.mybatis.MyBatisTestSupport
+                                                                .mapper(
+                                                                        (jdbc).getDataSource(),
+                                                                        io.agentflow.finance.mapper
+                                                                                .PaymentAuthorizationRepositoryMapper
+                                                                                .class), json)), service, mock(PaymentAccountsPort.class), mock(PaymentSystemPort.class), mock(AdvanceDisbursementService.class))::poll, PaymentOperationWorker.class);
             }
             case PREPARATION -> {
                 var service = mock(VoucherPreparationService.class); doAnswer(claim).when(service).claim(anyString(), any(), any());
-                yield new Harness(new VoucherPreparationWorker(new JdbcVoucherPreparationRepository(jdbc, json), service, mock(AccountingPeriodPort.class), mock(AccountMappingPort.class), mock(JdbcPaymentOperationRepository.class), mock(PaymentVoucherRegistration.class))::poll, VoucherPreparationWorker.class);
+                yield new Harness(new VoucherPreparationWorker(new JdbcVoucherPreparationRepository(
+                                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                        (jdbc).getDataSource(),
+                                                        io.agentflow.finance.mapper
+                                                                .VoucherPreparationRepositoryMapper
+                                                                .class), json), service, mock(AccountingPeriodPort.class), mock(AccountMappingPort.class), mock(JdbcPaymentOperationRepository.class), mock(PaymentVoucherRegistration.class))::poll, VoucherPreparationWorker.class);
             }
             case REQUEST -> {
                 var service = mock(PaymentExecutionRequestService.class); doAnswer(claim).when(service).claim(anyString(), any(), any());
-                yield new Harness(new PaymentExecutionRequestWorker(new JdbcPaymentExecutionRequestRepository(jdbc, json, new JdbcPaymentAuthorizationRepository(jdbc, json)), service, mock(PaymentAccountsPort.class))::poll, PaymentExecutionRequestWorker.class);
+                yield new Harness(new PaymentExecutionRequestWorker(new JdbcPaymentExecutionRequestRepository(
+                                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                        (jdbc).getDataSource(),
+                                                        io.agentflow.finance.mapper
+                                                                .PaymentExecutionRequestRepositoryMapper
+                                                                .class),
+                                                json,
+                                                new JdbcPaymentAuthorizationRepository(
+                                                        io.agentflow.mybatis.MyBatisTestSupport
+                                                                .mapper(
+                                                                        (jdbc).getDataSource(),
+                                                                        io.agentflow.finance.mapper
+                                                                                .PaymentAuthorizationRepositoryMapper
+                                                                                .class), json)), service, mock(PaymentAccountsPort.class))::poll, PaymentExecutionRequestWorker.class);
             }
             case PAYEE -> {
                 var service = mock(PaymentPayeeReviewService.class); doAnswer(claim).when(service).claim(anyString(), any(), any());
-                yield new Harness(new PaymentPayeeReviewWorker(new JdbcPaymentPayeeReviewRepository(jdbc, json), service, mock(PaymentAccountsPort.class))::poll, PaymentPayeeReviewWorker.class);
+                yield new Harness(new PaymentPayeeReviewWorker(new JdbcPaymentPayeeReviewRepository(
+                                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                        (jdbc).getDataSource(),
+                                                        io.agentflow.finance.mapper
+                                                                .PaymentPayeeReviewRepositoryMapper
+                                                                .class), json), service, mock(PaymentAccountsPort.class))::poll, PaymentPayeeReviewWorker.class);
             }
             case BALANCE_RECOVERY -> {
                 var service = mock(AdvanceDisbursementService.class); doAnswer(claim).when(service).recover(anyString(), any());
-                yield new Harness(new PaymentOperationWorker(new JdbcPaymentOperationRepository(jdbc, json, new JdbcPaymentAuthorizationRepository(jdbc, json)), mock(PaymentOperationService.class), mock(PaymentAccountsPort.class), mock(PaymentSystemPort.class), service)::poll, PaymentOperationWorker.class);
+                yield new Harness(new PaymentOperationWorker(new JdbcPaymentOperationRepository(
+                                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                        (jdbc).getDataSource(),
+                                                        io.agentflow.finance.mapper
+                                                                .PaymentOperationRepositoryMapper
+                                                                .class),
+                                                json,
+                                                new JdbcPaymentAuthorizationRepository(
+                                                        io.agentflow.mybatis.MyBatisTestSupport
+                                                                .mapper(
+                                                                        (jdbc).getDataSource(),
+                                                                        io.agentflow.finance.mapper
+                                                                                .PaymentAuthorizationRepositoryMapper
+                                                                                .class), json)), mock(PaymentOperationService.class), mock(PaymentAccountsPort.class), mock(PaymentSystemPort.class), service)::poll, PaymentOperationWorker.class);
             }
             case VOUCHER_RECOVERY -> {
                 var service = mock(PaymentVoucherRegistration.class); doAnswer(claim).when(service).recover(anyString(), any());
-                yield new Harness(new VoucherPreparationWorker(mock(JdbcVoucherPreparationRepository.class), mock(VoucherPreparationService.class), mock(AccountingPeriodPort.class), mock(AccountMappingPort.class), new JdbcPaymentOperationRepository(jdbc, json, new JdbcPaymentAuthorizationRepository(jdbc, json)), service)::poll, VoucherPreparationWorker.class);
+                yield new Harness(new VoucherPreparationWorker(mock(JdbcVoucherPreparationRepository.class), mock(VoucherPreparationService.class), mock(AccountingPeriodPort.class), mock(AccountMappingPort.class), new JdbcPaymentOperationRepository(
+                                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                        (jdbc).getDataSource(),
+                                                        io.agentflow.finance.mapper
+                                                                .PaymentOperationRepositoryMapper
+                                                                .class),
+                                                json,
+                                                new JdbcPaymentAuthorizationRepository(
+                                                        io.agentflow.mybatis.MyBatisTestSupport
+                                                                .mapper(
+                                                                        (jdbc).getDataSource(),
+                                                                        io.agentflow.finance.mapper
+                                                                                .PaymentAuthorizationRepositoryMapper
+                                                                                .class), json)), service)::poll, VoucherPreparationWorker.class);
             }
         };
     }

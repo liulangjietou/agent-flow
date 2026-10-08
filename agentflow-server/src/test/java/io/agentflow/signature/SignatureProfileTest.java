@@ -1,6 +1,10 @@
 package io.agentflow.signature;
 
+import static io.agentflow.signature.SignatureVerificationFixtures.*;
+import static org.assertj.core.api.Assertions.*;
+
 import io.agentflow.common.DomainException;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -8,11 +12,9 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.agentflow.signature.SignatureVerificationFixtures.*;
-import static org.assertj.core.api.Assertions.*;
-
 /**
  * 授权资料绑定真实主体、公钥和全部签署方，管理员身份不产生额外签署权。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SignatureProfileTest {

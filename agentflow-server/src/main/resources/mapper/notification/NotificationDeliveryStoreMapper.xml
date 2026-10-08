@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.notification.mapper.NotificationDeliveryStoreMapper">
+    <insert id="append">
+        INSERT INTO notification_dispatch
+        (id,tenant_id,recipient_id,inbox_id,channel,consent_generation,status,created_at,updated_at,binding_id,destination_digest,version,next_attempt_at,trace_id)
+        VALUES (#{id},#{tenantId},#{recipientId},#{inboxId},#{channel},#{consentGeneration},'PENDING',#{createdAt},#{updatedAt},#{bindingId},#{destinationDigest},1,#{nextAttemptAt},#{traceId})
+    </insert>
+
+    <select id="suppressRevoked" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM notification_dispatch WHERE tenant_id=#{tenantId} AND recipient_id=#{recipient}
+        AND status IN ('PENDING','RETRY_WAIT') ORDER BY id FOR UPDATE
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id,
+            CASE WHEN a.id IS NOT NULL THEN n.task_id ELSE NULL END AS task_id
+        FROM notification_dispatch q
+        LEFT JOIN notification_inbox n ON n.tenant_id=q.tenant_id AND n.id=q.inbox_id AND n.recipient_id=q.recipient_id
+        LEFT JOIN approval_application a ON a.tenant_id=n.tenant_id AND a.id=n.application_id
+        LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=n.round_no
+        WHERE (q.status IN ('PENDING','RETRY_WAIT') AND q.next_attempt_at&lt;=#{stamp}) OR (q.status='IN_FLIGHT' AND q.lease_until&lt;=#{leaseUntil})
+        ORDER BY q.updated_at,q.id LIMIT 10
+    </select>
+
+    <select id="get" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM notification_dispatch WHERE id=#{id} AND tenant_id=#{tenantId} AND recipient_id=#{userId}
+    </select>
+
+    <select id="ownsMessage" resultType="Boolean">
+        SELECT EXISTS(SELECT 1 FROM notification_inbox WHERE id=#{inboxId} AND tenant_id=#{tenantId} AND recipient_id=#{recipient})
+    </select>
+
+    <update id="save">
+        UPDATE notification_dispatch SET status=#{status},version=#{version},attempts=#{attempts},cycle_attempts=#{cycleAttempts},next_attempt_at=#{nextAttemptAt},lease_until=#{leaseUntil},lease_token=#{leaseToken},error_code=#{errorCode},updated_at=#{changedAt}
+        WHERE id=#{id} AND version=#{expectedVersion}
+    </update>
+
+    <insert id="history">
+        INSERT INTO notification_delivery_event(delivery_id,version,status,attempts,cycle_attempts,error_code,actor_id,reason,occurred_at)
+        VALUES (#{deliveryId},#{version},#{status},#{attempts},#{cycleAttempts},#{errorCode},#{actorId},#{reason},#{occurredAt})
+    </insert>
+    <select id="findQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM notification_dispatch WHERE id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1}<choose><when test="condition0"> FOR UPDATE</when><otherwise></otherwise></choose>
+    </select>
+    <select id="searchQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM notification_dispatch WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND recipient_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}<choose><when test="hasChannel"> AND channel=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</when><otherwise></otherwise></choose><choose><when test="hasStatus"> AND status=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><choose><when test="hasBeforeTime"> AND (created_at&lt;<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} OR (created_at=<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} AND id&lt;<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}))</when><otherwise></otherwise></choose> ORDER BY created_at DESC,id DESC LIMIT <bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8}
+    </select>
+    <select id="historyQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT e.* FROM notification_delivery_event e JOIN notification_dispatch d ON d.id=e.delivery_id
+        WHERE d.id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND d.tenant_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND d.recipient_id=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} AND e.version&lt;=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}
+        <choose><when test="hasBeforeVersion"> AND e.version&lt;<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}</when><otherwise></otherwise></choose> ORDER BY e.version DESC LIMIT <bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6}
+    </select>
+</mapper>

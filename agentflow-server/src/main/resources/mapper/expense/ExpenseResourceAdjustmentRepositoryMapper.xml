@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpenseResourceAdjustmentRepositoryMapper">
+    <insert id="create">
+        INSERT INTO expense_resource_adjustment(trace_id,tenant_id,id,report_id,round_no,preparation_version,input_json,state_json,version,status,
+        active_report_id,resources_reversed,created_at,updated_at) VALUES(#{traceId},#{tenantId},#{id},#{reportId},#{roundNo},#{preparationVersion},#{inputJson},#{stateJson},1,'WAITING_BUDGET',#{activeReportId},FALSE,#{createdAt},#{updatedAt})
+    </insert>
+
+    <insert id="retire">
+        INSERT INTO expense_resource_adjustment_retirement(tenant_id,adjustment_id,before_version,after_version,stopped_budget_version,retired_by,retired_at,state_json)
+        VALUES(#{tenantId},#{adjustmentId},#{beforeVersion},#{afterVersion},#{stoppedBudgetVersion},#{retiredBy},#{retiredAt},#{stateJson})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_resource_adjustment WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="active" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_resource_adjustment WHERE tenant_id=#{tenant} AND active_report_id=#{report}
+    </select>
+
+    <select id="history" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_resource_adjustment WHERE tenant_id=#{tenant} AND report_id=#{report} ORDER BY created_at,id
+    </select>
+
+    <select id="ready" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.report_id,q.version,q.trace_id,business.business_no,submitted.process_instance_id FROM expense_resource_adjustment q
+        LEFT JOIN expense_report report ON report.tenant_id=q.tenant_id AND report.id=q.report_id
+        LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=report.application_id
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=q.round_no
+        WHERE q.status='READY' ORDER BY q.updated_at,q.id LIMIT 10
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM expense_resource_adjustment_revision WHERE tenant_id=#{tenant} AND adjustment_id=#{id} AND version=#{version}
+    </select>
+
+    <select id="retirement" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_resource_adjustment_retirement WHERE tenant_id=#{tenant} AND adjustment_id=#{id}
+    </select>
+
+    <select id="revisions" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT version,state_json FROM expense_resource_adjustment_revision WHERE tenant_id=#{tenant} AND adjustment_id=#{id} ORDER BY version
+    </select>
+
+    <select id="requireResourceEffects" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM finance_consumption_reversal WHERE tenant_id=#{tenantId} AND adjustment_id=#{id}
+    </select>
+
+    <update id="save">
+        UPDATE expense_resource_adjustment SET state_json=#{stateJson},version=#{version},status=#{status},active_report_id=#{reportId},budget_reversal_version=#{budgetReversalVersion},resources_reversed=#{resourcesReversed},issue=#{issue},updated_at=#{updatedAt}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND input_json=#{inputJson} AND status&lt;&gt;'RETIRED'
+    </update>
+
+    <insert id="append">
+        INSERT INTO expense_resource_adjustment_revision(tenant_id,adjustment_id,version,state_json) VALUES(#{tenantId},#{adjustmentId},#{version},#{stateJson})
+    </insert>
+</mapper>

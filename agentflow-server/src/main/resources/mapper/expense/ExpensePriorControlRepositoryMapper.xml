@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpensePriorControlRepositoryMapper">
+    <insert id="save">
+        INSERT INTO expense_prior_control(tenant_id,report_id,round_no,application_id,application_version,financial_version,
+            definition_id,definition_version,submitted_at,requires_approval,snapshot_json)
+        SELECT e.tenant_id,e.id,#{roundNo},a.id,a.version,e.version,d.id,d.version,#{submittedAt},#{requiresApproval},#{stateJson}
+        FROM expense_report e JOIN approval_application a ON a.tenant_id=e.tenant_id AND a.id=e.application_id
+        JOIN approval_definition d ON d.tenant_id=a.tenant_id AND d.process_key=a.process_key AND d.version=a.definition_version
+        WHERE e.tenant_id=#{tenantId} AND e.id=#{reportId} AND a.id=#{applicationId} AND e.version=#{financialVersion} AND a.version=#{applicationVersion} AND e.current_round_no=#{currentRoundNo}
+            AND a.status IN ('DRAFT','RETURNED','WITHDRAWN')
+            AND (CASE WHEN a.status='DRAFT' THEN a.round_no ELSE a.round_no+1 END)=#{roundNo11}
+            AND d.id=#{definitionId} AND d.version=#{definitionVersion} AND d.status='PUBLISHED'
+    </insert>
+
+    <insert id="save2">
+        INSERT INTO expense_prior_control_source(tenant_id,report_id,round_no,resource_type,request_id,before_version,after_version)
+        VALUES(#{tenantId},#{reportId},#{roundNo},'PRIOR_REQUEST',#{requestId},#{beforeVersion},#{afterVersion})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT p.*,r.state_json AS financial_state_json,d.version AS original_definition_version
+        FROM expense_prior_control p
+        JOIN expense_report_revision r ON r.tenant_id=p.tenant_id AND r.report_id=p.report_id AND r.financial_version=p.financial_version
+        JOIN approval_definition d ON d.tenant_id=p.tenant_id AND d.id=p.definition_id
+        WHERE p.tenant_id=#{tenant} AND p.report_id=#{reportId} AND p.round_no=#{roundNo}
+    </select>
+
+    <select id="restore" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT s.request_id,s.before_version,s.after_version,b.state_json AS before_json,a.state_json AS after_json
+        FROM expense_prior_control_source s
+        JOIN finance_resource_revision b ON b.tenant_id=s.tenant_id AND b.resource_type=s.resource_type AND b.resource_id=s.request_id AND b.version=s.before_version
+        JOIN finance_resource_revision a ON a.tenant_id=s.tenant_id AND a.resource_type=s.resource_type AND a.resource_id=s.request_id AND a.version=s.after_version
+        WHERE s.tenant_id=#{tenantId} AND s.report_id=#{reportId} AND s.round_no=#{roundNo} ORDER BY s.request_id
+    </select>
+</mapper>

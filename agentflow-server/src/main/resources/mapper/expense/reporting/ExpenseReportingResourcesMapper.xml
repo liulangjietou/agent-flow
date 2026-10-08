@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.reporting.mapper.ExpenseReportingResourcesMapper">
+    <select id="candidatesQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT p.id,s.round_no FROM <choose><when test="matchAdvance">advance_request</when><otherwise>expense_plan</otherwise></choose> p JOIN finance_resource f ON f.tenant_id=p.tenant_id AND f.id=p.id AND f.resource_type=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} JOIN approval_submission_round s ON s.tenant_id=p.tenant_id AND s.application_id=p.application_id AND s.status='APPROVED' WHERE p.tenant_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} ORDER BY p.id,s.round_no
+    </select>
+</mapper>

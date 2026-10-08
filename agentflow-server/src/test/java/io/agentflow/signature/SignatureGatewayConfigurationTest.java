@@ -1,5 +1,8 @@
 package io.agentflow.signature;
 
+import static io.agentflow.signature.SignatureVerificationFixtures.*;
+import static org.assertj.core.api.Assertions.*;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -10,11 +13,9 @@ import org.springframework.boot.context.properties.source.MapConfigurationProper
 import java.util.List;
 import java.util.Map;
 
-import static io.agentflow.signature.SignatureVerificationFixtures.*;
-import static org.assertj.core.api.Assertions.*;
-
 /**
  * 配置只信任明确的租户版本和固定地址，保留旧版本而不静默切换外发目标。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SignatureGatewayConfigurationTest {

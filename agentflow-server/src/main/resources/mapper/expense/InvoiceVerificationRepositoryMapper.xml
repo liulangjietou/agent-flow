@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.InvoiceVerificationRepositoryMapper">
+    <insert id="create">
+        INSERT INTO invoice_verification_job(tenant_id,id,invoice_id,owner_id,original_id,original_digest,invoice_version,
+        input_json,state_json,version,status,active_invoice_id,created_at,trace_id) VALUES(#{tenantId},#{id},#{invoiceId},#{ownerId},#{originalId},#{originalDigest},#{invoiceVersion},#{inputJson},#{stateJson},1,'QUEUED',#{activeInvoiceId},#{createdAt},#{traceId})
+    </insert>
+
+    <update id="update">
+        UPDATE invoice_verification_job SET version=#{version},status=#{status},state_json=#{stateJson},active_invoice_id=#{invoiceId},lease_until=#{leaseUntil},completed_at=#{completedAt}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND input_json=#{inputJson} AND version=#{expectedVersion}
+    </update>
+
+    <select id="lockInvoice" resultType="String">
+        SELECT id FROM finance_resource WHERE tenant_id=#{tenant} AND resource_type='INVOICE' AND id=#{invoiceId} FOR UPDATE
+    </select>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM invoice_verification_job WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="activeId" resultType="String">
+        SELECT id FROM invoice_verification_job WHERE tenant_id=#{tenant} AND active_invoice_id=#{invoiceId}
+    </select>
+
+    <select id="currentReceipts" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT j.* FROM invoice_verification_job j JOIN finance_resource r
+        ON r.tenant_id=j.tenant_id AND r.resource_type='INVOICE' AND r.id=j.invoice_id
+        WHERE j.tenant_id=#{parameters.tenant} AND j.invoice_id IN (<foreach collection="parameters['ids']" item="item" separator=",">#{item}</foreach>) AND j.status='SUCCEEDED' AND j.invoice_version=r.version-1
+        AND NOT EXISTS (SELECT 1 FROM invoice_verification_job later WHERE later.tenant_id=j.tenant_id
+            AND later.invoice_id=j.invoice_id AND later.invoice_version=r.version)
+    </select>
+
+    <select id="settlementReceipts" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT j.* FROM invoice_verification_job j JOIN finance_resource r
+        ON r.tenant_id=j.tenant_id AND r.resource_type='INVOICE' AND r.id=j.invoice_id
+        WHERE j.tenant_id=#{parameters.tenant} AND j.invoice_id IN (<foreach collection="parameters['ids']" item="item" separator=",">#{item}</foreach>) AND j.status='SUCCEEDED' AND j.invoice_version&lt;r.version
+        AND NOT EXISTS (SELECT 1 FROM invoice_verification_job later WHERE later.tenant_id=j.tenant_id
+            AND later.invoice_id=j.invoice_id AND later.invoice_version&gt;j.invoice_version)
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT tenant_id,id,trace_id FROM invoice_verification_job WHERE status='QUEUED' OR (status='RUNNING' AND lease_until&lt;=#{leaseUntil})
+        ORDER BY created_at,id LIMIT 10
+    </select>
+
+    <insert id="append">
+        INSERT INTO invoice_verification_revision(tenant_id,job_id,version,state_json) VALUES(#{tenantId},#{jobId},#{version},#{stateJson})
+    </insert>
+    <select id="listQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM invoice_verification_job WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND invoice_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} <choose><when test="firstPage"></when><otherwise>AND id&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} </otherwise></choose>ORDER BY id DESC LIMIT <bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}
+    </select>
+    <select id="listQuery2" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM invoice_verification_job WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND invoice_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} <choose><when test="firstPage"></when><otherwise>AND id&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} </otherwise></choose>ORDER BY id DESC LIMIT <bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}
+    </select>
+</mapper>

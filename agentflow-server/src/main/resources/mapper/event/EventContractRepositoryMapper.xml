@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.event.mapper.EventContractRepositoryMapper">
+    <insert id="publish">
+        INSERT INTO event_contract (tenant_id,contract_key,latest_version) VALUES (#{tenantId},#{contractKey},1)
+    </insert>
+
+    <update id="publish2">
+        UPDATE event_contract SET latest_version=#{version} WHERE tenant_id=#{tenantId} AND contract_key=#{key} AND latest_version=#{expectedVersion}
+    </update>
+
+    <insert id="publish3">
+        INSERT INTO event_contract_version
+        (tenant_id,contract_key,contract_version,name,source_key,event_type,envelope_version,published_by,published_at,publication_reason,
+         availability_revision,enabled,changed_by,changed_at,change_reason)
+        VALUES (#{tenantId},#{contractKey},#{contractVersion},#{name},#{sourceKey},#{eventType},#{envelopeVersion},#{publishedBy},#{publishedAt},#{publicationReason},1,TRUE,#{changedBy},#{changedAt},#{changeReason})
+    </insert>
+
+    <update id="changeAvailability">
+        UPDATE event_contract_version SET availability_revision=#{revision},enabled=#{enabled},changed_by=#{changedBy},changed_at=#{changedAt},change_reason=#{reason}
+        WHERE tenant_id=#{tenantId} AND contract_key=#{key} AND contract_version=#{contractVersion} AND availability_revision=#{expectedRevision} AND enabled&lt;&gt;#{beforeEnabled}
+    </update>
+
+    <insert id="appendHistory">
+        INSERT INTO event_contract_availability_history
+        (tenant_id,contract_key,contract_version,revision,enabled,changed_by,changed_at,reason) VALUES (#{tenantId},#{contractKey},#{contractVersion},#{revision},#{enabled},#{changedBy},#{changedAt},#{reason})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM event_contract_version WHERE tenant_id=#{tenantId} AND contract_key=#{key} AND contract_version=#{version}
+    </select>
+
+    <select id="lockVersion" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM event_contract_version WHERE tenant_id=#{tenantId} AND contract_key=#{key} AND contract_version=#{version} FOR UPDATE
+    </select>
+
+    <select id="latest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT v.* FROM event_contract c JOIN event_contract_version v
+        ON v.tenant_id=c.tenant_id AND v.contract_key=c.contract_key AND v.contract_version=c.latest_version
+        WHERE c.tenant_id=#{tenantId} AND c.contract_key=#{key}
+    </select>
+
+    <select id="list" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT v.* FROM event_contract c JOIN event_contract_version v
+        ON v.tenant_id=c.tenant_id AND v.contract_key=c.contract_key AND v.contract_version=c.latest_version
+        WHERE c.tenant_id=#{tenantId} AND c.contract_key&gt;#{contractKey} ORDER BY c.contract_key LIMIT #{limit}
+    </select>
+    <select id="versionsQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM event_contract_version WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND contract_key=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}<choose><when test="condition0"></when><otherwise> AND contract_version&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</otherwise></choose> ORDER BY contract_version DESC LIMIT <bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}
+    </select>
+    <select id="historyQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM event_contract_availability_history WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND contract_key=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND contract_version=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}<choose><when test="condition0"></when><otherwise> AND revision&lt;<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</otherwise></choose> ORDER BY revision DESC LIMIT <bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}
+    </select>
+</mapper>

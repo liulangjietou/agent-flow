@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.template.mapper.TemplateCopyRepositoryMapper">
+    <insert id="save">
+        INSERT INTO template_copy (tenant_id,definition_id,template_key,template_version,copied_by,copied_at)
+        VALUES (#{tenantId},#{definitionId},#{templateKey},#{templateVersion},#{copiedBy},#{copiedAt})
+    </insert>
+
+    <select id="findByTemplate" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT c.definition_id,d.process_key,d.name,d.status,COALESCE(d.version,0) AS version,d.revision,
+               c.template_version,c.copied_by,c.copied_at
+        FROM template_copy c JOIN approval_definition d ON d.tenant_id=c.tenant_id AND d.id=c.definition_id
+        WHERE c.tenant_id=#{tenantId} AND c.template_key=#{templateKey} ORDER BY c.copied_at DESC,c.definition_id
+    </select>
+</mapper>

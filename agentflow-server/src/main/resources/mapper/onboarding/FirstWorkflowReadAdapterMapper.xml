@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.onboarding.mapper.FirstWorkflowReadAdapterMapper">
+    <select id="read" resultType="Long">
+        SELECT COUNT(*) FROM approval_submission_round r JOIN approval_application a
+          ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        WHERE r.tenant_id=#{parameters[0]} AND a.process_key=#{parameters[1]} AND r.definition_version=#{parameters[2]}
+    </select>
+
+    <select id="read2" resultType="Long">
+        SELECT COUNT(*) FROM approval_submission_round r JOIN approval_application a
+          ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        WHERE r.tenant_id=#{parameters[0]} AND a.process_key=#{parameters[1]} AND r.definition_version=#{parameters[2]}
+         AND r.status='APPROVED'
+    </select>
+    <select id="readQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT id,process_key,name,version,status FROM approval_definition WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} ORDER BY updated_at DESC,id LIMIT 1
+    </select>
+    <select id="readQuery2" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT id,process_key,name,version,status FROM approval_definition WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}
+    </select>
+    <select id="evidenceQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT r.application_id,a.business_no,r.title,r.round_no,r.status,r.submitted_at,r.completed_at
+        FROM approval_submission_round r JOIN approval_application a
+          ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        WHERE r.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND a.process_key=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND r.definition_version=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+        <choose><when test="condition0"> AND r.status='APPROVED' ORDER BY r.completed_at DESC,</when><otherwise> ORDER BY </otherwise></choose>r.submitted_at DESC,r.application_id,r.round_no DESC LIMIT 1
+    </select>
+</mapper>

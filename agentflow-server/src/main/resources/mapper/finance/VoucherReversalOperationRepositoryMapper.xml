@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.finance.mapper.VoucherReversalOperationRepositoryMapper">
+    <insert id="create">
+        INSERT INTO voucher_reversal_operation(trace_id,tenant_id,id,operation_id,original_version,preparation_version,input_json,command_digest,state_json,
+        version,status,attempts,highest_revision,created_at,updated_at,next_attempt_at,active_operation_id)
+        VALUES(#{traceId},#{tenantId},#{id},#{operationId},#{originalVersion},#{preparationVersion},#{inputJson},#{commandDigest},#{stateJson},1,'QUEUED',0,0,#{createdAt},#{updatedAt},#{nextAttemptAt},#{activeOperationId})
+    </insert>
+
+    <update id="update">
+        UPDATE voucher_reversal_operation SET version=#{version},status=#{status},attempts=#{attempts},highest_revision=#{highestRevision},state_json=#{stateJson},updated_at=#{updatedAt},next_attempt_at=#{nextAttemptAt},lease_until=#{leaseUntil}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND input_json=#{inputJson} AND command_digest=#{digest} AND active_operation_id=operation_id AND retired_at IS NULL
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM voucher_reversal_operation WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="forOriginal" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM voucher_reversal_operation WHERE tenant_id=#{tenant} AND active_operation_id=#{id}
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM voucher_reversal_operation_revision WHERE tenant_id=#{tenant} AND reversal_id=#{id} AND version=#{version}
+    </select>
+
+    <select id="retirement" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM voucher_reversal_retirement WHERE tenant_id=#{tenant} AND reversal_id=#{id}
+    </select>
+
+    <select id="retirements" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM voucher_reversal_retirement WHERE tenant_id=#{tenant} AND operation_id=#{original} ORDER BY retired_at,id
+    </select>
+
+    <insert id="retire">
+        INSERT INTO voucher_reversal_retirement(tenant_id,id,operation_id,reversal_id,original_version,released_version,reversal_version,stopped_version,basis,retired_by,retired_at,retirement_json)
+        VALUES(#{tenantId},#{id},#{operationId},#{reversalId},#{originalVersion},#{releasedVersion},#{reversalVersion},#{stoppedVersion},#{basis},#{retiredBy},#{retiredAt},#{retirementJson})
+    </insert>
+
+    <update id="retire2">
+        UPDATE voucher_reversal_operation SET active_operation_id=NULL,retired_at=#{retiredAt} WHERE tenant_id=#{tenantId} AND id=#{reversalId} AND version=#{stoppedVersion} AND active_operation_id=#{operationId} AND retired_at IS NULL
+    </update>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM voucher_reversal_operation q
+        LEFT JOIN voucher_operation origin ON origin.tenant_id=q.tenant_id AND origin.id=q.operation_id
+        LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=origin.application_id
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+        WHERE q.retired_at IS NULL AND ((q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at&lt;=#{nextAttemptAt})
+        OR (q.status IN ('POSTING','QUERYING') AND q.lease_until&lt;=#{leaseUntil})) ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+    </select>
+
+    <insert id="append">
+        INSERT INTO voucher_reversal_operation_revision(tenant_id,reversal_id,version,state_json) VALUES(#{tenantId},#{reversalId},#{version},#{stateJson})
+    </insert>
+</mapper>

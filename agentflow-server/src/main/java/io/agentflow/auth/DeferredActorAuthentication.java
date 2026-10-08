@@ -1,10 +1,14 @@
 package io.agentflow.auth;
 
+
+import io.agentflow.auth.mapper.DeferredActorAuthenticationMapper;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
+import io.agentflow.mybatis.SqlRows;
+
 import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
@@ -17,20 +21,29 @@ import java.util.Optional;
 
 /**
  * 延迟首次外发绑定原登录；保存不可用于登录的引用，不复制令牌或伪造后台角色。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
 public class DeferredActorAuthentication {
     private final AuthService demo;
     private final OidcProperties oidc;
-    private final JdbcTemplate jdbc;
+    private final DeferredActorAuthenticationMapper sqlMapper;
     private final ObjectProvider<JdbcIndexedSessionRepository> sessions;
     private final ObjectProvider<OidcLogoutScopes> logouts;
 
     /** 企业模式必须能跨进程复核原登录，因此使用已配置的共享会话仓储。 */
-    public DeferredActorAuthentication(AuthService demo, OidcProperties oidc, JdbcTemplate jdbc,
-            ObjectProvider<JdbcIndexedSessionRepository> sessions, ObjectProvider<OidcLogoutScopes> logouts) {
-        this.demo = demo; this.oidc = oidc; this.jdbc = jdbc; this.sessions = sessions; this.logouts = logouts;
+    public DeferredActorAuthentication(
+            AuthService demo,
+            OidcProperties oidc,
+            DeferredActorAuthenticationMapper sqlMapper,
+            ObjectProvider<JdbcIndexedSessionRepository> sessions,
+            ObjectProvider<OidcLogoutScopes> logouts) {
+        this.demo = demo;
+        this.oidc = oidc;
+        this.sqlMapper = sqlMapper;
+        this.sessions = sessions;
+        this.logouts = logouts;
     }
 
     /** 展示入口只说明当前部署是否支持延迟认证，不返回会话标识或认证配置。 */
@@ -40,18 +53,27 @@ public class DeferredActorAuthentication {
     public LoginReference capture(HttpServletRequest request, Actor actor, Instant now) {
         LoginReference reference;
         if (oidc.enabled()) {
-            if (sessions.getIfAvailable() == null) throw new DomainException("DEFERRED_AUTHENTICATION_UNAVAILABLE", "Deferred execution requires shared OIDC sessions");
+            if (sessions.getIfAvailable() == null)
+                throw new DomainException(
+                        "DEFERRED_AUTHENTICATION_UNAVAILABLE",
+                        "Deferred execution requires shared OIDC sessions");
             var session = request.getSession(false);
             if (session == null) throw unauthenticated();
-            String primary = jdbc.query("SELECT PRIMARY_ID FROM AF_HTTP_SESSION WHERE SESSION_ID=?",
-                    (row, index) -> row.getString(1), session.getId()).stream().findFirst().orElseThrow(DeferredActorAuthentication::unauthenticated);
+            String primary =
+                    SqlRows.map(sqlMapper.capture(session.getId()), row -> row.getString(1))
+                            .stream()
+                            .findFirst()
+                            .orElseThrow(DeferredActorAuthentication::unauthenticated);
             reference = new LoginReference(Kind.OIDC_SESSION, primary);
         } else {
             String header = request.getHeader("Authorization");
             if (header == null || !header.startsWith("Bearer ")) throw unauthenticated();
-            reference = new LoginReference(Kind.DEMO_LOGIN, demo.loginReference(header.substring(7)));
+            reference =
+                    new LoginReference(Kind.DEMO_LOGIN, demo.loginReference(header.substring(7)));
         }
-        if (!resolve(reference, actor.tenantId(), actor.userId(), now).filter(actor::equals).isPresent()) throw unauthenticated();
+        if (!resolve(reference, actor.tenantId(), actor.userId(), now)
+                .filter(actor::equals)
+                .isPresent()) throw unauthenticated();
         return reference;
     }
 
@@ -67,14 +89,21 @@ public class DeferredActorAuthentication {
     private Optional<Actor> restoreSession(String primary, Instant now) {
         var repository = sessions.getIfAvailable();
         if (!oidc.enabled() || repository == null) return Optional.empty();
-        var ids = jdbc.query("SELECT SESSION_ID FROM AF_HTTP_SESSION WHERE PRIMARY_ID=? AND EXPIRY_TIME>?",
-                (row, index) -> row.getString(1), primary, now.toEpochMilli());
+        var ids =
+                SqlRows.map(
+                        sqlMapper.restoreSession(primary, now.toEpochMilli()),
+                        row -> row.getString(1));
         if (ids.isEmpty()) return Optional.empty();
         Session session = repository.findById(ids.get(0));
         if (session == null || session.isExpired()) return Optional.empty();
-        Object stored = session.getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
-        if (!(stored instanceof SecurityContext context) || context.getAuthentication() == null || !context.getAuthentication().isAuthenticated()
-                || !(context.getAuthentication().getPrincipal() instanceof PlatformOidcUser principal)) return Optional.empty();
+        Object stored =
+                session.getAttribute(
+                        HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY);
+        if (!(stored instanceof SecurityContext context)
+                || context.getAuthentication() == null
+                || !context.getAuthentication().isAuthenticated()
+                || !(context.getAuthentication().getPrincipal()
+                        instanceof PlatformOidcUser principal)) return Optional.empty();
         try {
             Actor actor = new OidcActorMapper(oidc).restoreSession(principal, now);
             var scopes = logouts.getIfAvailable();
@@ -84,26 +113,39 @@ public class DeferredActorAuthentication {
                 scopes.requireActive(principal.idToken(), value);
             }
             return Optional.of(actor);
-        } catch (OAuth2AuthenticationException invalid) { return Optional.empty(); }
+        } catch (OAuth2AuthenticationException invalid) {
+            return Optional.empty();
+        }
     }
 
     private static DomainException unauthenticated() { return new DomainException("UNAUTHENTICATED", "Original authenticated login is no longer available"); }
 
     /**
      * 引用只能用于内部权限复核，不能恢复浏览器凭据，也不作为公开接口参数。
+     *
      * @author owlzhangfq@gmail.com
      */
     public record LoginReference(Kind kind, String value) {
         public LoginReference {
-            if (kind == null || value == null || !(kind == Kind.DEMO_LOGIN ? value.matches("[0-9a-f]{64}")
-                    : value.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))) throw new IllegalArgumentException("Invalid deferred authentication reference");
+            if (kind == null
+                    || value == null
+                    || !(kind == Kind.DEMO_LOGIN
+                            ? value.matches("[0-9a-f]{64}")
+                            : value.matches(
+                                    "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")))
+                throw new IllegalArgumentException("Invalid deferred authentication reference");
         }
+
         @Override public String toString() { return "LoginReference[kind=" + kind + "]"; }
     }
 
     /**
      * 不允许企业与演示模式相互回退。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public enum Kind { DEMO_LOGIN, OIDC_SESSION }
+    public enum Kind {
+        DEMO_LOGIN,
+        OIDC_SESSION
+    }
 }

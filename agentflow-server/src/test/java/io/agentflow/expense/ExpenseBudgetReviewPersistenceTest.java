@@ -1,12 +1,17 @@
 package io.agentflow.expense;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.*;
 import io.agentflow.organization.InitiatorContext;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,6 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
+
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -26,12 +32,10 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
-import static org.mockito.ArgumentMatchers.any;
 
 /**
  * 真实 JDBC 复核每轮不可变来源、并发版本与事务回滚；原生任务编排由后续流程测试验证。
+ *
  * @author owlzhangfq@gmail.com
  */
 class ExpenseBudgetReviewPersistenceTest {
@@ -52,9 +56,25 @@ class ExpenseBudgetReviewPersistenceTest {
     @BeforeEach void database() {
         var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", "");
         Flyway.configure().dataSource(source).load().migrate(); jdbc = new JdbcTemplate(source); tx = new TransactionTemplate(new DataSourceTransactionManager(source));
-        reports = new JdbcExpenseReportRepository(jdbc, json); prechecks = new JdbcExpensePrecheckRepository(jdbc, json);
-        controls = new JdbcExpenseSubmissionControlRepository(jdbc, json); operations = new JdbcBudgetOperationRepository(jdbc, json);
-        occupations = new JdbcBudgetOccupationRepository(jdbc, json); reviews = repository();
+        reports = new JdbcExpenseReportRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.expense.mapper.ExpenseReportRepositoryMapper.class), json); prechecks = new JdbcExpensePrecheckRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.expense.mapper.ExpensePrecheckRepositoryMapper.class), json);
+        controls = new JdbcExpenseSubmissionControlRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.expense.mapper.ExpenseSubmissionControlRepositoryMapper
+                                        .class), json); operations = new JdbcBudgetOperationRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.finance.mapper.BudgetOperationRepositoryMapper.class), json);
+        occupations = new JdbcBudgetOccupationRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.finance.mapper.BudgetOccupationRepositoryMapper.class), json); reviews = repository();
     }
 
     @Test void budgetRecoveryFollowsAuthorizedOperationInsteadOfSubmissionThread() {
@@ -76,7 +96,9 @@ class ExpenseBudgetReviewPersistenceTest {
         org.mockito.Mockito.doAnswer(invocation -> { observed.add(org.slf4j.MDC.get("traceId")); return null; }).when(recovery).recover(org.mockito.ArgumentMatchers.any());
         new ExpenseBudgetReviewWorker(repository(), recovery).poll();
         assertThat(observed).containsExactly(authorized);
-        assertThat(jdbc.queryForObject("SELECT trace_id FROM expense_budget_review WHERE tenant_id=? AND report_id=? AND round_no=1", String.class, TENANT, initial.input().reportId().toString())).isEqualTo(submitted);
+        assertThat(jdbc.queryForObject(
+                                "SELECT trace_id FROM expense_budget_review WHERE tenant_id=? AND"
+                                        + " report_id=? AND round_no=1", String.class, TENANT, initial.input().reportId().toString())).isEqualTo(submitted);
     }
 
     @Test void staleBudgetRecoveryCannotAdvanceAReplacementAuthorization() {
@@ -123,9 +145,14 @@ class ExpenseBudgetReviewPersistenceTest {
         assertThat(reviews.find("foreign", first.input().reportId(), 1)).isEmpty();
         assertThat(reviews.find(TENANT, first.input().reportId(), 2)).isEmpty();
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> reviews.create(first))).isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> jdbc.update("UPDATE expense_budget_review SET original_operation_id=? WHERE tenant_id=? AND report_id=?",
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE expense_budget_review SET original_operation_id=?"
+                                                + " WHERE tenant_id=? AND report_id=?",
                 other.input().originalOperationId().toString(), TENANT, first.input().reportId().toString())).isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> jdbc.update("UPDATE expense_budget_review SET status='AUTHORIZED',version=3 WHERE tenant_id=? AND report_id=?",
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE expense_budget_review SET"
+                                            + " status='AUTHORIZED',version=3 WHERE tenant_id=? AND"
+                                            + " report_id=?",
                 TENANT, first.input().reportId().toString())).isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -186,7 +213,10 @@ class ExpenseBudgetReviewPersistenceTest {
         var closed = passed.close(ExpenseBudgetReview.Closure.WITHDRAWN, NOW.plusSeconds(4));
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> reviews.update(closed))).isInstanceOf(IllegalStateException.class);
         tx.executeWithoutResult(status -> {
-            jdbc.update("UPDATE approval_submission_round SET status='WITHDRAWN',reason='合成撤回',completed_by='alice',completed_at=? WHERE tenant_id=? AND application_id=? AND round_no=1",
+            jdbc.update(
+                            "UPDATE approval_submission_round SET"
+                                + " status='WITHDRAWN',reason='合成撤回',completed_by='alice',completed_at=?"
+                                + " WHERE tenant_id=? AND application_id=? AND round_no=1",
                     Timestamp.from(NOW.plusSeconds(4)), TENANT, initial.input().applicationId().toString());
             reviews.update(closed);
         });
@@ -198,7 +228,9 @@ class ExpenseBudgetReviewPersistenceTest {
         var initial = fixture();
         var state = json.read(json.write(initial), com.fasterxml.jackson.databind.node.ObjectNode.class);
         ((com.fasterxml.jackson.databind.node.ObjectNode) state.at("/input/policy")).put("reference", "forged-policy");
-        jdbc.update("UPDATE expense_budget_review SET policy_reference=?,input_json=?,state_json=? WHERE tenant_id=? AND report_id=?",
+        jdbc.update(
+                "UPDATE expense_budget_review SET policy_reference=?,input_json=?,state_json=?"
+                        + " WHERE tenant_id=? AND report_id=?",
                 "forged-policy", state.path("input").toString(), state.toString(), TENANT, initial.input().reportId().toString());
         assertThatThrownBy(() -> repository().find(TENANT, initial.input().reportId(), 1)).isInstanceOf(IllegalStateException.class);
     }
@@ -206,7 +238,10 @@ class ExpenseBudgetReviewPersistenceTest {
     private ExpenseBudgetReview fixture() {
         return tx.execute(status -> {
             UUID reportId = UUID.randomUUID(), app = UUID.randomUUID(), entity = UUID.randomUUID(), checkedId = UUID.randomUUID();
-            jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,?,?,'fixture',1,'alice','合成预算例外','{}','DRAFT',1,1,'EXPENSE',?)", app.toString(), TENANT, "REVIEW-"+reportId, reportId.toString());
+            jdbc.update(
+                            "INSERT INTO"
+                                + " approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)"
+                                + " VALUES(?,?,?,'fixture',1,'alice','合成预算例外','{}','DRAFT',1,1,'EXPENSE',?)", app.toString(), TENANT, "REVIEW-"+reportId, reportId.toString());
             var line = new ExpenseLine(1, "TRAVEL", DATE, null, "SH", BigDecimal.ONE, ExpenseLine.Unit.ITEM, money("100"), money("0"), List.of(), null,
                     List.of(new CostAllocation("IT", null, money("100"))), "合成明细", null);
             var report = ExpenseReport.draft(reportId, TENANT, app, "alice", new ExpenseContent(entity, ExpenseContent.Type.DAILY, "合成预算", List.of(line), List.of()));
@@ -220,8 +255,13 @@ class ExpenseBudgetReviewPersistenceTest {
             prechecks.create(check); check = check.start(NOW.minusSeconds(9), NOW.plusSeconds(30)); prechecks.update(check);
             prechecks.update(check.finish(new ExpensePrecheckJob.Result(evidence, List.of()), NOW.minusSeconds(7)));
             freeze(report, NOW); reports.update(report, 1, "alice", "SUBMIT");
-            jdbc.update("UPDATE approval_application SET status='IN_APPROVAL' WHERE tenant_id=? AND id=?", TENANT, app.toString());
-            jdbc.update("INSERT INTO approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status) VALUES(?,?,1,?,1,'合成轮次','{}','alice',?,'IN_APPROVAL')", TENANT, app.toString(), UUID.randomUUID().toString(), Timestamp.from(NOW));
+            jdbc.update(
+                            "UPDATE approval_application SET status='IN_APPROVAL' WHERE tenant_id=?"
+                                    + " AND id=?", TENANT, app.toString());
+            jdbc.update(
+                            "INSERT INTO"
+                                + " approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status)"
+                                + " VALUES(?,?,1,?,1,'合成轮次','{}','alice',?,'IN_APPROVAL')", TENANT, app.toString(), UUID.randomUUID().toString(), Timestamp.from(NOW));
             controls.create(ExpenseSubmissionControl.submitted(new ExpenseSubmissionControl.Input(TENANT, reportId, app, "alice", 1, 2, checkedId, DATE, false,
                     Map.of("budget", ExpenseProcessPolicy.Stage.BUDGET_REVIEW, "finance", ExpenseProcessPolicy.Stage.FINANCE_REVIEW)), NOW));
             var command = new BudgetCommand(UUID.randomUUID(), TENANT, BudgetCommand.Action.FREEZE, BudgetPrecheckPort.Request.fromCurrent(report, DATE), null);
@@ -253,11 +293,19 @@ class ExpenseBudgetReviewPersistenceTest {
             var original = operations.find(TENANT, value.input().originalOperationId()).orElseThrow().input().command();
             payload.put("budgetConfirmation", Map.of("operationId", original.id(), "commandDigest", original.digest()));
         }
-        jdbc.update("INSERT INTO audit_event(id,tenant_id,event_id,aggregate_type,aggregate_id,aggregate_version,application_id,action,actor_id,payload_json,occurred_at) VALUES(?,?,?,'Task',?,3,?,?,?,?,?)",
+        jdbc.update(
+                "INSERT INTO"
+                    + " audit_event(id,tenant_id,event_id,aggregate_type,aggregate_id,aggregate_version,application_id,action,actor_id,payload_json,occurred_at)"
+                    + " VALUES(?,?,?,'Task',?,3,?,?,?,?,?)",
                 UUID.randomUUID().toString(), TENANT, id.toString(), task, value.input().applicationId().toString(), action, actor, json.write(payload), Timestamp.from(at));
     }
-    private List<Long> revisions(ExpenseBudgetReview value) { return jdbc.queryForList("SELECT version FROM expense_budget_review_revision WHERE tenant_id=? AND report_id=? ORDER BY version", Long.class, TENANT, value.input().reportId().toString()); }
-    private JdbcExpenseBudgetReviewRepository repository() { return new JdbcExpenseBudgetReviewRepository(jdbc, json, operations, controls, prechecks); }
+    private List<Long> revisions(ExpenseBudgetReview value) { return jdbc.queryForList(
+                "SELECT version FROM expense_budget_review_revision WHERE tenant_id=? AND"
+                        + " report_id=? ORDER BY version", Long.class, TENANT, value.input().reportId().toString()); }
+    private JdbcExpenseBudgetReviewRepository repository() { return new JdbcExpenseBudgetReviewRepository(
+                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                        (jdbc).getDataSource(),
+                        io.agentflow.expense.mapper.ExpenseBudgetReviewRepositoryMapper.class), json, operations, controls, prechecks); }
     private void freeze(ExpenseReport report, Instant at) {
         var assessment = new ExpenseAssessment(new ExpenseExchangeRate("CNY", "CNY", BigDecimal.ONE, "rate-1", DATE),
                 new ExpensePolicySnapshot(UUID.randomUUID(), 1, money("100"), money("100"), ExpensePolicySnapshot.Decision.WITHIN_LIMIT, "tax-1", "policy-1"), money("0"));

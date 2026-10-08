@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.definition.mapper.DefinitionDraftRepositoryMapper">
+    <update id="save">
+        UPDATE approval_definition SET name=#{name}, version=#{persistedVersion}, revision=#{revision}, status=#{status}, graph_json=CASE WHEN status='DRAFT' THEN #{graphJson} ELSE graph_json END, form_schema_json=#{schemaJson}, notification_texts_json=#{textsJson}, start_enabled=#{startEnabled},
+            published_at=CASE WHEN #{status2}='PUBLISHED' THEN COALESCE(published_at, CURRENT_TIMESTAMP) ELSE published_at END,
+            updated_at=CURRENT_TIMESTAMP WHERE tenant_id=#{tenantId} AND id=#{id} AND revision=#{expectedRevision}
+    </update>
+
+    <select id="save2" resultType="Integer">
+        SELECT COUNT(*) FROM approval_definition WHERE tenant_id=#{tenantId} AND id=#{id}
+    </select>
+
+    <insert id="save3">
+        INSERT INTO approval_definition (id, tenant_id, process_key, name, version, revision, status, graph_json, form_schema_json, notification_texts_json, start_enabled)
+        VALUES (#{id}, #{tenantId}, #{processKey}, #{name}, #{version}, #{revision}, #{status}, #{graphJson}, #{formSchemaJson}, #{notificationTextsJson}, #{startEnabled})
+    </insert>
+
+    <select id="nextVersion" resultType="Long">
+        SELECT COALESCE(MAX(version), 0) + 1 FROM approval_definition
+        WHERE tenant_id=#{tenantId} AND process_key=#{key} AND status='PUBLISHED'
+    </select>
+
+    <select id="findById" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_definition WHERE tenant_id=#{tenantId} AND id=#{id}
+    </select>
+
+    <select id="findPublished" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_definition WHERE tenant_id=#{tenantId} AND process_key=#{key} AND version=#{version} AND status='PUBLISHED'
+    </select>
+
+    <select id="lockPublished" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_definition WHERE tenant_id=#{tenantId} AND process_key=#{key} AND version=#{version} AND status='PUBLISHED' FOR UPDATE
+    </select>
+
+    <select id="findAll" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_definition WHERE tenant_id=#{tenantId} ORDER BY updated_at DESC
+    </select>
+
+    <select id="findAll2" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_definition WHERE tenant_id=#{tenantId} AND status=#{toUpperCase} ORDER BY updated_at DESC
+    </select>
+</mapper>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.finance.mapper.BudgetConsumptionReversalRepositoryMapper">
+    <select id="create" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM expense_resource_adjustment WHERE tenant_id=#{tenant} AND id=#{adjustmentId}
+    </select>
+
+    <insert id="create2">
+        INSERT INTO budget_consumption_reversal_operation(trace_id,tenant_id,id,consumption_id,consumed_version,input_json,command_digest,state_json,
+        version,status,attempts,created_at,updated_at,next_attempt_at)
+        VALUES(#{traceId},#{tenantId},#{id},#{consumptionId},#{consumedVersion},#{inputJson},#{commandDigest},#{stateJson},1,'QUEUED',0,#{createdAt},#{updatedAt},#{nextAttemptAt})
+    </insert>
+
+    <update id="update">
+        UPDATE budget_consumption_reversal_operation SET state_json=#{stateJson},version=#{version},status=#{status},attempts=#{attempts},updated_at=#{updatedAt},next_attempt_at=#{nextAttemptAt},lease_until=#{leaseUntil}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND input_json=#{inputJson} AND command_digest=#{digest} AND created_at=#{createdAt}
+        AND EXISTS (SELECT 1 FROM expense_resource_adjustment a WHERE a.tenant_id=#{expectedTenantId} AND a.id=#{adjustmentId} AND a.status&lt;&gt;'RETIRED')
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM budget_consumption_reversal_operation WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM budget_consumption_reversal_operation_revision WHERE tenant_id=#{tenant} AND operation_id=#{id} AND version=#{version}
+    </select>
+
+    <select id="revisions" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT version,state_json FROM budget_consumption_reversal_operation_revision WHERE tenant_id=#{tenant} AND operation_id=#{id} ORDER BY version
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM budget_consumption_reversal_operation q
+        LEFT JOIN expense_resource_adjustment origin ON origin.tenant_id=q.tenant_id AND origin.id=q.id
+        LEFT JOIN expense_report report ON report.tenant_id=origin.tenant_id AND report.id=origin.report_id
+        LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=report.application_id
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+        WHERE (q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at&lt;=#{nextAttemptAt}) OR (q.status IN ('EXECUTING','QUERYING') AND q.lease_until&lt;=#{leaseUntil})
+        ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+    </select>
+
+    <insert id="append">
+        INSERT INTO budget_consumption_reversal_operation_revision(tenant_id,operation_id,version,state_json) VALUES(#{tenantId},#{operationId},#{version},#{stateJson})
+    </insert>
+</mapper>

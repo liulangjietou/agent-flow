@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpenseBudgetRetentionRepositoryMapper">
+    <insert id="create">
+        INSERT INTO expense_budget_retention(tenant_id,report_id,application_id,round_no,stopped_status,
+            retained_at,retention_days,expires_at,status,version,state_json,updated_at,trace_id)
+        SELECT r.tenant_id,r.id,r.application_id,s.round_no,s.status,s.completed_at,#{retentionDays},#{expiresAt},'RETAINED',1,#{stateJson},#{updatedAt},#{traceId}
+        FROM expense_report r JOIN approval_submission_round s
+            ON s.tenant_id=r.tenant_id AND s.application_id=r.application_id
+        WHERE r.tenant_id=#{tenantId} AND r.id=#{reportId} AND r.application_id=#{applicationId} AND s.round_no=#{roundNo} AND s.status=#{stoppedStatus} AND s.completed_at=#{retainedAt}
+    </insert>
+
+    <update id="update">
+        UPDATE expense_budget_retention SET status=#{status},release_operation_id=#{releaseOperationId},version=#{version},state_json=#{stateJson},updated_at=#{updatedAt}
+        WHERE tenant_id=#{tenantId} AND report_id=#{reportId} AND round_no=#{roundNo} AND application_id=#{applicationId} AND stopped_status=#{stoppedStatus}
+            AND retained_at=#{retainedAt} AND retention_days=#{retentionDays} AND expires_at=#{expiresAt} AND version=#{expectedVersion}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_budget_retention WHERE tenant_id=#{tenant} AND report_id=#{reportId} AND round_no=#{roundNo}
+    </select>
+
+    <insert id="append">
+        INSERT INTO expense_budget_retention_revision(tenant_id,report_id,round_no,version,state_json) VALUES(#{tenantId},#{reportId},#{roundNo},#{version},#{stateJson})
+    </insert>
+    <select id="candidatesQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT r.tenant_id,r.report_id,r.round_no,r.trace_id,business.business_no,submitted.process_instance_id FROM expense_budget_retention r
+        LEFT JOIN approval_application business ON business.tenant_id=r.tenant_id AND business.id=r.application_id
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=r.round_no
+        WHERE r.status IN ('RETAINED','RECONCILING','RELEASE_QUEUED') AND r.expires_at&lt;=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1}
+        <choose><when test="condition0"></when><otherwise> AND (r.tenant_id&gt;<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} OR (r.tenant_id=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} AND r.report_id&gt;<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}) OR (r.tenant_id=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} AND r.report_id=<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} AND r.round_no&gt;<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}))</otherwise></choose> ORDER BY r.tenant_id,r.report_id,r.round_no LIMIT <bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8}
+    </select>
+</mapper>

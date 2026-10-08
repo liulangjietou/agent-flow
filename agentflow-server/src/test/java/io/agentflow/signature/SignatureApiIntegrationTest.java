@@ -1,6 +1,13 @@
 package io.agentflow.signature;
 
+import static io.agentflow.signature.SignatureVerificationFixtures.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 import com.fasterxml.jackson.databind.JsonNode;
+
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
@@ -10,6 +17,7 @@ import io.agentflow.form.FieldVisibility;
 import io.agentflow.form.FormSchema;
 import io.agentflow.organization.LocalOrganizationDirectory;
 import io.agentflow.storage.LocalDocumentStore;
+
 import org.flowable.engine.TaskService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,14 +43,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import static io.agentflow.signature.SignatureVerificationFixtures.*;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
 /**
  * 真实表单上传、审批、认证过滤链、幂等写入和回调验签共同验证用户电子签接口。
+ *
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:signature-api;DB_CLOSE_DELAY=-1",
@@ -134,7 +137,9 @@ class SignatureApiIntegrationTest {
         var replay = write(post(endpoint), "alice", body, cancelKey, 200);
         assertThat(replay.getResponse().getContentAsString()).isEqualTo(cancelled.getResponse().getContentAsString());
         assertThat(replay.getResponse().getHeader("Idempotency-Replayed")).isEqualTo("true");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE aggregate_type='Signature' AND aggregate_id=?", Integer.class, id.toString())).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM audit_event WHERE aggregate_type='Signature'"
+                                    + " AND aggregate_id=?", Integer.class, id.toString())).isEqualTo(2);
         write(post(endpoint), "alice", json.write(Map.of("expectedVersion", "2")), UUID.randomUUID().toString(), 409);
     }
 
@@ -273,8 +278,10 @@ class SignatureApiIntegrationTest {
     private static String path(Source source) { return "/api/v1/applications/" + source.application() + "/signatures"; }
     private static String digest(byte[] body) { return java.util.HexFormat.of().formatHex(SignatureRequest.sha256().digest(body)); }
     private long count(String table, String column, UUID id) { return jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE " + column + "=?", Long.class, id.toString()); }
+
     /**
      * 经实际上传和审批取得的当前来源。
+     *
      * @author owlzhangfq@gmail.com
      */
     record Source(UUID application, UUID document, long version) { }

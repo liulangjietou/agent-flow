@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.organization.mapper.OrganizationRepositoryMapper">
+    <insert id="initialize">
+        INSERT INTO organization_directory(tenant_id,revision,initialized_by,initialized_at) VALUES (#{tenantId},1,#{initializedBy},#{initializedAt})
+    </insert>
+
+    <select id="initialized" resultType="Boolean">
+        SELECT EXISTS(SELECT 1 FROM organization_directory WHERE tenant_id=#{tenantId})
+    </select>
+
+    <select id="revision" resultType="Long">
+        SELECT revision FROM organization_directory WHERE tenant_id=#{tenantId}
+    </select>
+
+    <select id="lock" resultType="Long">
+        SELECT revision FROM organization_directory WHERE tenant_id=#{tenantId} FOR UPDATE
+    </select>
+
+    <select id="unit" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM organization_unit WHERE tenant_id=#{tenantId} AND id=#{id}
+    </select>
+
+    <select id="units" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM organization_unit WHERE tenant_id=#{tenantId} AND kind=#{kind} AND id&gt;#{afterId} ORDER BY id LIMIT #{limit}
+    </select>
+
+    <insert id="save">
+        INSERT INTO organization_unit(tenant_id,id,kind,name,legal_entity_id,parent_department_id,active,revision) VALUES (#{tenantId},#{id},#{kind},#{name},#{legalEntityId},#{parentDepartmentId},#{active},#{revision})
+    </insert>
+
+    <update id="save2">
+        UPDATE organization_unit SET name=#{name},parent_department_id=#{parentDepartmentId},active=#{active},revision=#{revision},head_appointment_id=#{headAppointmentId} WHERE tenant_id=#{tenantId} AND id=#{id} AND revision=#{expectedRevision}
+    </update>
+
+    <select id="person" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM organization_person WHERE tenant_id=#{tenantId} AND id=#{id}
+    </select>
+
+    <select id="personBySubject" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM organization_person WHERE tenant_id=#{tenantId} AND subject=#{subject}
+    </select>
+
+    <select id="people" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM organization_person WHERE tenant_id=#{tenantId} AND id&gt;#{afterId} ORDER BY id LIMIT #{limit}
+    </select>
+
+    <insert id="save3">
+        INSERT INTO organization_person(tenant_id,id,subject,display_name,active,approval_eligible,revision) VALUES (#{tenantId},#{id},#{subject},#{displayName},#{active},#{approvalEligible},#{revision})
+    </insert>
+
+    <update id="save4">
+        UPDATE organization_person SET display_name=#{displayName},active=#{active},approval_eligible=#{approvalEligible},revision=#{revision} WHERE tenant_id=#{tenantId} AND id=#{id} AND revision=#{expectedRevision}
+    </update>
+
+    <select id="appointment" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM organization_appointment WHERE tenant_id=#{tenantId} AND id=#{id}
+    </select>
+
+    <select id="appointmentByIdentity" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM organization_appointment WHERE tenant_id=#{tenantId} AND person_id=#{personId} AND department_id=#{departmentId} AND position_id=#{positionId}
+    </select>
+
+    <select id="appointments" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM organization_appointment WHERE tenant_id=#{tenantId} AND id&gt;#{afterId} ORDER BY id LIMIT #{limit}
+    </select>
+
+    <select id="appointments2" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM organization_appointment WHERE tenant_id=#{tenantId} AND person_id=#{personId} AND id&gt;#{afterId} ORDER BY id LIMIT #{limit}
+    </select>
+
+    <insert id="save5">
+        INSERT INTO organization_appointment(tenant_id,id,person_id,department_id,position_id,active,revision) VALUES (#{tenantId},#{id},#{personId},#{departmentId},#{positionId},#{active},#{revision})
+    </insert>
+
+    <update id="save6">
+        UPDATE organization_appointment SET active=#{active},revision=#{revision},supervisor_appointment_id=#{supervisorAppointmentId} WHERE tenant_id=#{tenantId} AND id=#{id} AND revision=#{expectedRevision}
+    </update>
+
+    <update id="recordChange">
+        UPDATE organization_directory SET revision=revision+1 WHERE tenant_id=#{tenantId} AND revision=#{previousRevision}
+    </update>
+
+    <insert id="recordChange2">
+        INSERT INTO organization_change(tenant_id,revision,actor,kind,record_id,snapshot_json,occurred_at) VALUES (#{tenantId},#{revision},#{actor},#{kind},#{recordId},#{snapshotJson},#{occurredAt})
+    </insert>
+
+    <select id="changes" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM organization_change WHERE tenant_id=#{tenantId} AND revision&lt;#{revision} ORDER BY revision DESC LIMIT #{limit}
+    </select>
+</mapper>

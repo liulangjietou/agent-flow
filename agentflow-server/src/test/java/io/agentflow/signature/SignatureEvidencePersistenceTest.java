@@ -1,5 +1,8 @@
 package io.agentflow.signature;
 
+import io.agentflow.mybatis.MyBatisTestSupport;
+import io.agentflow.signature.mapper.SignatureEvidenceRepositoryMapper;
+
 import io.agentflow.common.DomainException;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
@@ -178,7 +181,8 @@ class SignatureEvidencePersistenceTest {
         tx.executeWithoutResult(ignored -> { operations.update(accepted); evidence.append(accepted, verified.evidence()); }); return accepted;
     }
     private JdbcSignatureEvidenceRepository repository(DataSource source) {
-        var proxy = new ProxyFactory(new JdbcSignatureEvidenceRepository(new JdbcTemplate(source), JSON, SignaturePersistenceFixtures.repository(source), new SignatureReceiptVerifier(MAPPER)));
+        var proxy = new ProxyFactory(new JdbcSignatureEvidenceRepository(
+                MyBatisTestSupport.mapper(source, SignatureEvidenceRepositoryMapper.class), JSON, SignaturePersistenceFixtures.repository(source), new SignatureReceiptVerifier(MAPPER)));
         proxy.addAdvice(new TransactionInterceptor(new DataSourceTransactionManager(source), new AnnotationTransactionAttributeSource()));
         return (JdbcSignatureEvidenceRepository) proxy.getProxy();
     }

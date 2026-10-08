@@ -1,8 +1,18 @@
 package io.agentflow.budget;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import io.agentflow.approval.JdbcApplicationRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -13,17 +23,7 @@ import io.agentflow.finance.FinanceResult;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.PaymentPersonnel;
 import io.agentflow.organization.InitiatorContext;
-import java.math.BigDecimal;
-import java.time.Duration;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,18 +36,22 @@ import org.springframework.transaction.annotation.AnnotationTransactionAttribute
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 真实 H2/PostgreSQL 验证预算授权的单次证据、并发独占、租约恢复和安全结束原子性。
+ *
  * @author owlzhangfq@gmail.com
  */
 class BudgetAdjustmentExecutionPersistenceTest {
@@ -78,8 +82,23 @@ class BudgetAdjustmentExecutionPersistenceTest {
         new JdbcTemplate(dataSource).execute("CREATE SCHEMA \"" + schema + "\""); dataSource.setSchema(schema);
         var flyway = Flyway.configure().dataSource(dataSource).defaultSchema(schema); if (target != null) flyway.target(target);
         flyway.load().migrate(); jdbc = new JdbcTemplate(dataSource); manager = new DataSourceTransactionManager(dataSource); tx = new TransactionTemplate(manager);
-        requests = new JdbcBudgetAdjustmentRepository(jdbc, json); sources = new ApprovedBudgetAdjustmentSources(new JdbcApplicationRepository(jdbc, json), requests);
-        reviews = new JdbcBudgetAdjustmentReviewRepository(jdbc, json, sources); operations = new JdbcBudgetAdjustmentOperationRepository(jdbc, json, sources, reviews);
+        requests = new JdbcBudgetAdjustmentRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.budget.mapper.BudgetAdjustmentRepositoryMapper.class), json); sources = new ApprovedBudgetAdjustmentSources(new JdbcApplicationRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.approval.mapper.ApplicationRepositoryMapper
+                                                .class), json), requests);
+        reviews = new JdbcBudgetAdjustmentReviewRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.budget.mapper.BudgetAdjustmentReviewRepositoryMapper
+                                        .class), json, sources); operations = new JdbcBudgetAdjustmentOperationRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.budget.mapper.BudgetAdjustmentOperationRepositoryMapper
+                                        .class), json, sources, reviews);
         configuration = new FinanceGatewayConfiguration(); configuration.setEnabled(true);
         var financeTarget = new FinanceGatewayConfiguration.Target(); financeTarget.setEndpoint("https://budget-fixture.example/finance"); financeTarget.setToken("synthetic-token");
         configuration.getTenants().put(tenant, financeTarget);
@@ -96,8 +115,16 @@ class BudgetAdjustmentExecutionPersistenceTest {
         var source = approved(); var ready = ready(source, "finance", 2);
         String origin = UUID.randomUUID().toString(); BudgetAdjustmentOperation queued;
         try (var scope = new io.agentflow.observability.DiagnosticContext(origin, tenant).open()) { queued = authorize(ready); }
-        var reopenedReviews = new JdbcBudgetAdjustmentReviewRepository(jdbc, json, sources);
-        var reopened = new JdbcBudgetAdjustmentOperationRepository(jdbc, json, sources, reopenedReviews);
+        var reopenedReviews = new JdbcBudgetAdjustmentReviewRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.budget.mapper.BudgetAdjustmentReviewRepositoryMapper
+                                        .class), json, sources);
+        var reopened = new JdbcBudgetAdjustmentOperationRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.budget.mapper.BudgetAdjustmentOperationRepositoryMapper
+                                        .class), json, sources, reopenedReviews);
         assertThat(reopened.find(tenant, queued.command().id())).contains(queued);
         assertThat(reopened.find("foreign", queued.command().id())).isEmpty();
         assertThat(reopenedReviews.find(tenant, ready.input().id()).orElseThrow().supports(queued.command())).isTrue();
@@ -107,7 +134,14 @@ class BudgetAdjustmentExecutionPersistenceTest {
             assertThat(candidate.tenantId()).isEqualTo(tenant);
             assertThat(candidate.id()).isEqualTo(queued.command().id());
             assertThat(candidate.traceId()).isEqualTo(origin);
-            assertThat(candidate.businessNo()).isEqualTo(new JdbcApplicationRepository(jdbc, json).findById(tenant, queued.command().source().applicationId()).orElseThrow().businessNo());
+            assertThat(candidate.businessNo()).isEqualTo(new JdbcApplicationRepository(
+                                                            io.agentflow.mybatis.MyBatisTestSupport
+                                                                    .mapper(
+                                                                            (jdbc).getDataSource(),
+                                                                            io.agentflow.approval
+                                                                                    .mapper
+                                                                                    .ApplicationRepositoryMapper
+                                                                                    .class), json).findById(tenant, queued.command().source().applicationId()).orElseThrow().businessNo());
             assertThat(candidate.processInstanceId()).isNull();
         });
         assertThat(count("budget_adjustment_review_revision")).isEqualTo(4); assertThat(count("budget_adjustment_operation_revision")).isEqualTo(1);
@@ -128,7 +162,10 @@ class BudgetAdjustmentExecutionPersistenceTest {
 
     @Test void originalReadyEvidenceCannotReplaceMissingCurrentConsumptionProof() {
         var ready = ready(approved(), "finance", 2); var queued = authorize(ready);
-        jdbc.update("UPDATE budget_adjustment_review SET state_json=?,version=3,status='READY',updated_at=?,consumed_operation_id=NULL WHERE tenant_id=? AND id=?",
+        jdbc.update(
+                "UPDATE budget_adjustment_review SET"
+                    + " state_json=?,version=3,status='READY',updated_at=?,consumed_operation_id=NULL"
+                    + " WHERE tenant_id=? AND id=?",
                 json.write(ready), java.sql.Timestamp.from(ready.updatedAt()), tenant, ready.input().id().toString());
         assertThatThrownBy(() -> operations.find(tenant, queued.command().id())).isInstanceOf(IllegalStateException.class);
     }
@@ -137,8 +174,12 @@ class BudgetAdjustmentExecutionPersistenceTest {
         var source = approved(); var first = ready(source, "finance", 2); var second = ready(source, "finance-2", 2);
         assertThat(race(() -> authorize(first), () -> authorize(second))).containsExactlyInAnyOrder("SAVED", "BUDGET_ADJUSTMENT_ALREADY_AUTHORIZED");
         assertThat(count("budget_adjustment_operation")).isEqualTo(1); assertThat(count("budget_adjustment_operation_revision")).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM budget_adjustment_review WHERE tenant_id=? AND status='CONSUMED'", Integer.class, tenant)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM budget_adjustment_review WHERE tenant_id=? AND status='READY'", Integer.class, tenant)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM budget_adjustment_review WHERE tenant_id=?"
+                                        + " AND status='CONSUMED'", Integer.class, tenant)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM budget_adjustment_review WHERE tenant_id=?"
+                                        + " AND status='READY'", Integer.class, tenant)).isEqualTo(1);
     }
 
     @Test void competingClaimsPreserveOneLeaseAndCannotSkipExecutionIntoSuccess() throws Exception {
@@ -165,7 +206,10 @@ class BudgetAdjustmentExecutionPersistenceTest {
 
     @Test void evidenceConsumptionAppendFailureRollsBackNewCommandAndQueue() {
         var ready = ready(approved(), "finance", 2); var command = command(ready); var consumed = ready.consume(command, command.authorizedAt());
-        jdbc.update("INSERT INTO budget_adjustment_review_revision(tenant_id,review_id,version,state_json) VALUES(?,?,4,?)", tenant, ready.input().id().toString(), json.write(consumed));
+        jdbc.update(
+                "INSERT INTO"
+                    + " budget_adjustment_review_revision(tenant_id,review_id,version,state_json)"
+                    + " VALUES(?,?,4,?)", tenant, ready.input().id().toString(), json.write(consumed));
         var queued = BudgetAdjustmentOperation.queue(command, command.authorizedAt());
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> operations.create(queued, ready.input().id()))).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(reviews.find(tenant, ready.input().id())).contains(ready);
@@ -217,15 +261,23 @@ class BudgetAdjustmentExecutionPersistenceTest {
         var upgrade = Flyway.configure().dataSource(dataSource).defaultSchema(schema).target("77").load();
         assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
         assertThat(jdbc.queryForList("SELECT * FROM approval_application")).isEqualTo(applications);
-        assertThat(jdbc.queryForList("SELECT * FROM budget_adjustment_revision ORDER BY request_version")).isEqualTo(original);
+        assertThat(jdbc.queryForList(
+                                "SELECT * FROM budget_adjustment_revision ORDER BY"
+                                        + " request_version")).isEqualTo(original);
         assertThat(sources.derive(tenant, source.requestId())).isEqualTo(source);
         assertThat(upgrade.migrate().migrationsExecuted).isZero(); assertThat(upgrade.validateWithResult().validationSuccessful).isTrue();
         // 先独立验证 V77 保持原批准，再升级到当前结构供当前仓储写入新增诊断列。
         Flyway.configure().dataSource(dataSource).defaultSchema(schema).load().migrate();
         var ready = ready(source, "finance", 2); var queued = authorize(ready);
-        assertThatThrownBy(() -> jdbc.update("UPDATE budget_adjustment_operation SET review_version=2 WHERE tenant_id=? AND id=?", tenant, queued.command().id().toString())).isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> jdbc.update("UPDATE budget_adjustment_operation SET active_request_id=NULL WHERE tenant_id=? AND id=?", tenant, queued.command().id().toString())).isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> jdbc.update("UPDATE budget_adjustment_operation SET authorized_by='other' WHERE tenant_id=? AND id=?", tenant, queued.command().id().toString())).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE budget_adjustment_operation SET review_version=2"
+                                                + " WHERE tenant_id=? AND id=?", tenant, queued.command().id().toString())).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE budget_adjustment_operation SET"
+                                            + " active_request_id=NULL WHERE tenant_id=? AND id=?", tenant, queued.command().id().toString())).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE budget_adjustment_operation SET"
+                                            + " authorized_by='other' WHERE tenant_id=? AND id=?", tenant, queued.command().id().toString())).isInstanceOf(DataIntegrityViolationException.class);
     }
 
     @Test void workersUseShortTransactionsAndReadNeverAutomaticallyAuthorizes() {
@@ -344,11 +396,17 @@ class BudgetAdjustmentExecutionPersistenceTest {
         var ledger = new BudgetLedgerPort.Snapshot(content.ledgerRequest("alice"), "ledger-v1", now, now.plusSeconds(300), positions);
         var initiator = new InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1, entity, "法人", UUID.randomUUID(), "部门", UUID.randomUUID(), "岗位");
         return tx.execute(status -> {
-            jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,?,?,'fixture',1,'alice','预算调整','{}','DRAFT',1,1,'BUDGET_ADJUSTMENT',?)",
+            jdbc.update(
+                            "INSERT INTO"
+                                + " approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)"
+                                + " VALUES(?,?,?,'fixture',1,'alice','预算调整','{}','DRAFT',1,1,'BUDGET_ADJUSTMENT',?)",
                     request.applicationId().toString(), tenant, UUID.randomUUID().toString(), request.id().toString());
             requests.create(request, "alice"); request.freeze(1, 1, catalog, configuration.destination(tenant).orElseThrow().digest(tenant), ledger, initiator, now); requests.update(request, 1, "alice", "SUBMIT");
             request.approve(2, 1, 8, "manager", now.plusSeconds(1)); requests.update(request, 2, "manager", "APPROVE");
-            jdbc.update("UPDATE approval_application SET status='APPROVED',version=8,payload_json=? WHERE tenant_id=? AND id=?", json.write(BudgetAdjustmentFormContract.submittedPayload(request.currentRound())), tenant, request.applicationId().toString());
+            jdbc.update(
+                            "UPDATE approval_application SET"
+                                + " status='APPROVED',version=8,payload_json=? WHERE tenant_id=?"
+                                + " AND id=?", json.write(BudgetAdjustmentFormContract.submittedPayload(request.currentRound())), tenant, request.applicationId().toString());
             return sources.derive(tenant, request.id());
         });
     }
@@ -375,7 +433,9 @@ class BudgetAdjustmentExecutionPersistenceTest {
     }
     private BudgetAdjustmentOperation save(BudgetAdjustmentOperation value) { tx.executeWithoutResult(status -> operations.update(value)); return value; }
     private int count(String table) { return jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE tenant_id=?", Integer.class, tenant); }
-    private UUID readyId(BudgetAdjustmentOperation value) { return UUID.fromString(jdbc.queryForObject("SELECT review_id FROM budget_adjustment_operation WHERE tenant_id=? AND id=?", String.class, tenant, value.command().id().toString())); }
+    private UUID readyId(BudgetAdjustmentOperation value) { return UUID.fromString(jdbc.queryForObject(
+                        "SELECT review_id FROM budget_adjustment_operation WHERE tenant_id=? AND"
+                                + " id=?", String.class, tenant, value.command().id().toString())); }
     private BudgetAdjustmentObservation applied(BudgetAdjustmentCommand command, Instant at) {
         var changes = command.changes().stream().map(change -> {
             var position = command.ledger().position(change.budgetReference());

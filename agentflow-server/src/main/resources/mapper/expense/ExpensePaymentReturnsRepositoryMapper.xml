@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpensePaymentReturnsRepositoryMapper">
+    <insert id="create">
+        INSERT INTO expense_payment_returns(tenant_id,report_id,payment_id,input_json,state_json,version,review_required,created_at,updated_at)
+        VALUES(#{tenantId},#{reportId},#{paymentId},#{inputJson},#{stateJson},1,FALSE,#{createdAt},#{updatedAt})
+    </insert>
+
+    <update id="update">
+        UPDATE expense_payment_returns SET state_json=#{stateJson},version=#{version},review_required=#{reviewRequired},updated_at=#{updatedAt}
+        WHERE tenant_id=#{tenantId} AND report_id=#{businessId} AND version=#{expectedVersion} AND input_json=#{requestJson} AND created_at=#{createdAt}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_payment_returns WHERE tenant_id=#{tenant} AND report_id=#{reportId}
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM expense_payment_returns_revision WHERE tenant_id=#{tenant} AND report_id=#{reportId} AND version=#{version}
+    </select>
+
+    <insert id="append">
+        INSERT INTO expense_payment_returns_revision(tenant_id,report_id,version,state_json) VALUES(#{tenantId},#{reportId},#{version},#{stateJson})
+    </insert>
+</mapper>

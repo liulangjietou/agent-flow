@@ -1,9 +1,13 @@
 package io.agentflow.signature;
 
+import static org.assertj.core.api.Assertions.*;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -11,10 +15,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.*;
-
 /**
  * 服务端统一 JSON 边界恢复原授权和状态，不给领域模块引入时间序列化依赖。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SignatureSerializationTest {

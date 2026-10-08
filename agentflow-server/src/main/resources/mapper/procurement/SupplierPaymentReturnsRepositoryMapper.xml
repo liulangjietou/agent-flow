@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.procurement.mapper.SupplierPaymentReturnsRepositoryMapper">
+    <insert id="create">
+        INSERT INTO supplier_payment_returns(tenant_id,payment_id,payment_version,request_id,legal_entity_id,supplier_reference,payable_reference,input_json,state_json,version,review_required,created_at,updated_at)
+        VALUES(#{tenantId},#{paymentId},#{paymentVersion},#{requestId},#{legalEntityId},#{supplierReference},#{payableReference},#{inputJson},#{stateJson},1,FALSE,#{createdAt},#{updatedAt})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_payment_returns WHERE tenant_id=#{tenant} AND payment_id=#{id}
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM supplier_payment_returns_revision WHERE tenant_id=#{tenant} AND payment_id=#{id} AND version=#{version}
+    </select>
+
+    <select id="locked" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_payment_returns WHERE tenant_id=#{tenant} AND payment_id=#{id} FOR UPDATE
+    </select>
+
+    <update id="completeAccounting">
+        UPDATE supplier_payment_returns SET state_json=#{stateJson},version=#{version},review_required=#{reviewRequired},updated_at=#{updatedAt},
+            accounting_id=#{operationId},accounting_version=#{operationVersion},accounted_entry_count=#{entryCount},accounted_at=#{accountedAt}
+        WHERE tenant_id=#{tenantId} AND payment_id=#{id} AND version=#{expectedVersion} AND input_json=#{requestJson} AND state_json=#{beforeJson}
+    </update>
+
+    <update id="persist">
+        UPDATE supplier_payment_returns SET state_json=#{stateJson},version=#{version},review_required=#{reviewRequired},updated_at=#{updatedAt}
+        WHERE tenant_id=#{tenantId} AND payment_id=#{id} AND version=#{expectedVersion} AND input_json=#{requestJson} AND state_json=#{expectedStateJson}
+    </update>
+
+    <insert id="append">
+        INSERT INTO supplier_payment_returns_revision(tenant_id,payment_id,version,state_json) VALUES(#{tenantId},#{paymentId},#{version},#{stateJson})
+    </insert>
+</mapper>

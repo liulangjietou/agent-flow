@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpenseBudgetReviewRepositoryMapper">
+    <insert id="create">
+        INSERT INTO expense_budget_review(trace_id,tenant_id,report_id,application_id,employee_id,round_no,submitted_financial_version,
+            precheck_id,original_operation_id,target_digest,budget_node_id,policy_reference,version,status,input_json,state_json,
+            submitted_at,updated_at,next_check_at)
+        SELECT #{traceId},#{tenantId},#{reportId},#{applicationId},#{employeeId},#{roundNo},#{submittedFinancialVersion},#{precheckId},#{originalOperationId},#{targetDigest},#{budgetNodeId},#{policy},1,'WAITING_BUDGET',#{stateJson},#{stateJson2},#{submittedAt},#{updatedAt},#{updatedAt2}
+        FROM approval_application WHERE tenant_id=#{expectedTenantId} AND id=#{id} AND status='IN_APPROVAL' AND round_no=#{expectedRoundNo}
+    </insert>
+
+    <update id="update">
+        UPDATE expense_budget_review SET version=#{version},status=#{status},authorized_operation_id=#{authorizedOperationId},decision_audit_id=#{decision},automatic_audit_id=#{automatic},
+            state_json=#{stateJson},updated_at=#{updatedAt},next_check_at=#{nextCheckAt}
+        WHERE tenant_id=#{tenantId} AND report_id=#{reportId} AND round_no=#{roundNo} AND version=#{expectedVersion} AND input_json=#{inputJson}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_budget_review WHERE tenant_id=#{tenant} AND report_id=#{report} AND round_no=#{round}
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT r.tenant_id,r.report_id,r.application_id,r.round_no,b.id AS operation_id,COALESCE(b.trace_id,r.trace_id) AS trace_id,a.business_no,submitted.process_instance_id FROM expense_budget_review r
+        JOIN approval_application a ON a.tenant_id=r.tenant_id AND a.id=r.application_id AND a.round_no=r.round_no
+        JOIN budget_operation b ON b.tenant_id=r.tenant_id AND b.id=COALESCE(r.authorized_operation_id,r.original_operation_id)
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=a.tenant_id AND submitted.application_id=a.id AND submitted.round_no=r.round_no
+        WHERE a.status='IN_APPROVAL' AND r.next_check_at&lt;=#{nextCheckAt} AND
+            ((r.status IN ('WAITING_BUDGET','AUTHORIZED') AND b.status IN ('APPLIED','REJECTED')) OR
+            (r.status='CONFIRMED' AND r.budget_node_id IS NOT NULL AND r.automatic_audit_id IS NULL AND r.authorized_operation_id IS NULL))
+        ORDER BY r.next_check_at,r.tenant_id,r.report_id,r.round_no LIMIT 10
+    </select>
+
+    <update id="reschedule">
+        UPDATE expense_budget_review SET next_check_at=#{nextCheckAt} WHERE tenant_id=#{tenantId} AND report_id=#{reportId} AND round_no=#{roundNo}
+    </update>
+
+    <select id="requireSources" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM expense_report_revision WHERE tenant_id=#{tenantId} AND report_id=#{reportId} AND financial_version=#{submittedFinancialVersion}
+    </select>
+
+    <select id="requireSources2" resultType="String">
+        SELECT status FROM approval_submission_round WHERE tenant_id=#{tenantId} AND application_id=#{applicationId} AND round_no=#{roundNo}
+    </select>
+
+    <select id="audit" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT payload_json,occurred_at FROM audit_event WHERE tenant_id=#{tenantId} AND event_id=#{auditId} AND aggregate_type='Task'
+            AND aggregate_id=#{taskId} AND application_id=#{applicationId} AND actor_id=#{actor} AND action=#{action}
+    </select>
+
+    <insert id="append">
+        INSERT INTO expense_budget_review_revision(tenant_id,report_id,round_no,version,state_json) VALUES(#{tenantId},#{reportId},#{roundNo},#{version},#{stateJson})
+    </insert>
+</mapper>

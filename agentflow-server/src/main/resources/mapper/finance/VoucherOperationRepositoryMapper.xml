@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.finance.mapper.VoucherOperationRepositoryMapper">
+    <insert id="create">
+        INSERT INTO voucher_operation(tenant_id,id,business_type,business_id,application_id,round_no,kind,application_version,business_version,
+        input_json,command_digest,state_json,version,status,attempts,highest_revision,created_at,updated_at,next_attempt_at,trace_id)
+        VALUES(#{tenantId},#{id},#{businessType},#{businessId},#{applicationId},#{roundNo},#{kind},#{applicationVersion},#{businessVersion},#{inputJson},#{commandDigest},#{stateJson},1,'QUEUED',0,0,#{createdAt},#{updatedAt},#{nextAttemptAt},#{traceId})
+    </insert>
+
+    <update id="update">
+        UPDATE voucher_operation SET version=#{version},status=#{status},attempts=#{attempts},highest_revision=#{highestRevision},state_json=#{stateJson},updated_at=#{updatedAt},next_attempt_at=#{nextAttemptAt},lease_until=#{leaseUntil},reversal_id=#{reversalId}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND input_json=#{inputJson} AND command_digest=#{digest}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM voucher_operation WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM voucher_operation_revision WHERE tenant_id=#{tenant} AND operation_id=#{id} AND version=#{version}
+    </select>
+
+    <select id="forRound" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM voucher_operation WHERE tenant_id=#{tenant} AND application_id=#{applicationId} AND round_no=#{round} AND kind=#{kind}
+    </select>
+
+    <select id="requiresAdvanceReview" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT r.state_json FROM voucher_operation_revision r WHERE r.tenant_id=#{tenant} AND r.operation_id=#{id}
+        AND r.version&gt;GREATEST(COALESCE((SELECT MAX(d.resolved_version) FROM voucher_dispute_resolution d
+            WHERE d.tenant_id=r.tenant_id AND d.operation_id=r.operation_id AND d.outcome='POSTED'),0),
+            COALESCE((SELECT MAX(t.released_version) FROM voucher_reversal_retirement t
+            WHERE t.tenant_id=r.tenant_id AND t.operation_id=r.operation_id),0))
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM voucher_operation q
+        LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+        LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=q.round_no
+        WHERE (q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at&lt;=#{nextAttemptAt}) OR (q.status IN ('POSTING','QUERYING') AND q.lease_until&lt;=#{leaseUntil})
+        ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+    </select>
+
+    <insert id="append">
+        INSERT INTO voucher_operation_revision(tenant_id,operation_id,version,state_json) VALUES(#{tenantId},#{operationId},#{version},#{stateJson})
+    </insert>
+    <select id="disputeEvidenceRows" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT version,state_json FROM voucher_operation_revision WHERE tenant_id=#{parameters[0]} AND operation_id=#{parameters[1]} ORDER BY version
+    </select>
+    <select id="firstAcceptedPostingRows" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT version,state_json FROM voucher_operation_revision WHERE tenant_id=#{parameters[0]} AND operation_id=#{parameters[1]} ORDER BY version
+    </select>
+</mapper>

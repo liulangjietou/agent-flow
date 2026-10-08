@@ -1,7 +1,10 @@
 package io.agentflow.expense;
+import static org.assertj.core.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
+
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
@@ -10,12 +13,13 @@ import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
-import io.agentflow.observability.DiagnosticContext;
-import org.slf4j.MDC;
 import io.agentflow.finance.FinanceGatewayConfiguration;
 import io.agentflow.finance.FinanceResult;
 import io.agentflow.finance.Money;
+import io.agentflow.observability.DiagnosticContext;
+
 import org.junit.jupiter.api.*;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint;
@@ -25,6 +29,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
@@ -46,11 +51,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
-import static org.assertj.core.api.Assertions.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 
 /**
  * 真正经过认证、数据库、文件系统和本机 HTTP 网关；票面及法人均为合成夹具。
+ *
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true",
@@ -103,7 +107,9 @@ class InvoiceVerificationIntegrationTest {
     }
     @AfterEach void settleTestJobs() {
         configuration.setEnabled(true); configuration.getTenants().get("demo").setEndpoint(ENDPOINT);
-        for (String id : jdbc.queryForList("SELECT id FROM invoice_verification_job WHERE status IN ('QUEUED','RUNNING')", String.class)) {
+        for (String id : jdbc.queryForList(
+                        "SELECT id FROM invoice_verification_job WHERE status IN"
+                                + " ('QUEUED','RUNNING')", String.class)) {
             var job = jobs.find("demo", UUID.fromString(id)).orElseThrow();
             if (job.status() == InvoiceVerificationJob.Status.QUEUED) job = execution.claim("demo", job.input().id(), Instant.now());
             if (job != null) execution.fail(job, InvoiceVerificationJob.Failure.INTERNAL_ERROR, Instant.now());
@@ -119,13 +125,17 @@ class InvoiceVerificationIntegrationTest {
         UUID id = id(queued); String expectedTrace = queued.getHeader("X-Trace-Id");
         assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
         assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
-        assertThat(jdbc.queryForMap("SELECT * FROM invoice_verification_job WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM invoice_verification_job WHERE"
+                                                + " tenant_id='demo' AND id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         TRACES.clear();
         worker.poll();
         assertThat(job(id).status()).isEqualTo(InvoiceVerificationJob.Status.SUCCEEDED);
         assertThat(TRACES).isNotEmpty().containsOnly(expectedTrace);
-        assertThat(jdbc.queryForMap("SELECT * FROM invoice_verification_job WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM invoice_verification_job WHERE"
+                                                + " tenant_id='demo' AND id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
         assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
@@ -147,7 +157,11 @@ class InvoiceVerificationIntegrationTest {
         UUID invoice = original(true); String key = UUID.randomUUID().toString(); var input = input(invoice);
         var first = queue(invoice, "alice", key, input, 202); UUID id = id(first);
         assertThat(CALLS.get()).isZero(); assertThat(job(id).status()).isEqualTo(InvoiceVerificationJob.Status.QUEUED);
-        var recovered = new JdbcInvoiceVerificationRepository(jdbc, json);
+        var recovered = new JdbcInvoiceVerificationRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.expense.mapper.InvoiceVerificationRepositoryMapper
+                                        .class), json);
         new InvoiceVerificationWorker(recovered, execution, originals, files, gateway, configuration).poll();
         assertThat(job(id).status()).isEqualTo(InvoiceVerificationJob.Status.SUCCEEDED);
         assertThat(invoice(invoice).verification()).isEqualTo(Invoice.Verification.VERIFIED);
@@ -327,7 +341,9 @@ class InvoiceVerificationIntegrationTest {
     private UUID enqueue(UUID invoice) throws Exception { return id(queue(invoice, "alice", UUID.randomUUID().toString(), input(invoice), 202)); }
     private Invoice invoice(UUID id) { return invoices.find("demo", id).orElseThrow(); }
     private InvoiceVerificationJob job(UUID id) { return jobs.find("demo", id).orElseThrow(); }
-    private int revisions(UUID id) { return jdbc.queryForObject("SELECT COUNT(*) FROM invoice_verification_revision WHERE tenant_id='demo' AND job_id=?", Integer.class, id.toString()); }
+    private int revisions(UUID id) { return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM invoice_verification_revision WHERE tenant_id='demo' AND"
+                        + " job_id=?", Integer.class, id.toString()); }
     private MockHttpServletResponse queue(UUID invoice, String user, String key, Object input, int expected) throws Exception {
         var response = mvc.perform(post("/api/v1/invoices/" + invoice + "/verifications").header("Authorization", token(user)).header("Idempotency-Key", key)
                 .contentType("application/json").content(json.write(input))).andReturn().getResponse();

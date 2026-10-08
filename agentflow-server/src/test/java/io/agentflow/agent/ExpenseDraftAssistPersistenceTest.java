@@ -1,21 +1,15 @@
 package io.agentflow.agent;
+import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.ExpenseContent;
 import io.agentflow.expense.ExpenseLine;
 import io.agentflow.finance.FinanceCatalog;
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,10 +24,20 @@ import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
-import static org.assertj.core.api.Assertions.*;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 真实 JDBC 事务验证原快照、并发领取、租约、人工选择和追加轨迹的原子持久化。
+ *
  * @author owlzhangfq@gmail.com
  */
 class ExpenseDraftAssistPersistenceTest {
@@ -50,12 +54,26 @@ class ExpenseDraftAssistPersistenceTest {
         var source = new DriverManagerDataSource("jdbc:h2:mem:expense-draft-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(source).load().migrate(); jdbc = new JdbcTemplate(source);
         var manager = new DataSourceTransactionManager(source); tx = new TransactionTemplate(manager);
-        var proxy = new ProxyFactory(new JdbcExpenseDraftAssistRepository(jdbc, json));
+        var proxy = new ProxyFactory(new JdbcExpenseDraftAssistRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.agent.mapper.ExpenseDraftAssistRepositoryMapper
+                                                .class), json));
         proxy.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource()));
         runs = (JdbcExpenseDraftAssistRepository) proxy.getProxy();
-        jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,'retained',?,'fixture',1,'alice','保留申请','{}','DRAFT',1,1,'EXPENSE',?)", application.toString(), "DRAFT-" + application, report.toString());
-        jdbc.update("INSERT INTO expense_report(id,tenant_id,application_id,employee_id,version,state_json) VALUES(?,'retained',?,'alice',1,'{\"retained\":true}')", report.toString(), application.toString());
-        jdbc.update("INSERT INTO expense_report_revision(tenant_id,report_id,financial_version,actor_id,operation,state_json) SELECT tenant_id,id,version,employee_id,'CREATE',state_json FROM expense_report WHERE id=?", report.toString());
+        jdbc.update(
+                "INSERT INTO"
+                    + " approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)"
+                    + " VALUES(?,'retained',?,'fixture',1,'alice','保留申请','{}','DRAFT',1,1,'EXPENSE',?)", application.toString(), "DRAFT-" + application, report.toString());
+        jdbc.update(
+                "INSERT INTO"
+                    + " expense_report(id,tenant_id,application_id,employee_id,version,state_json)"
+                    + " VALUES(?,'retained',?,'alice',1,'{\"retained\":true}')", report.toString(), application.toString());
+        jdbc.update(
+                "INSERT INTO"
+                    + " expense_report_revision(tenant_id,report_id,financial_version,actor_id,operation,state_json)"
+                    + " SELECT tenant_id,id,version,employee_id,'CREATE',state_json FROM"
+                    + " expense_report WHERE id=?", report.toString());
     }
 
     @Test void retainsFullInputOutputAndSelectedPartsWithoutChangingFinancialOrApplicationRows() {
@@ -64,7 +82,11 @@ class ExpenseDraftAssistPersistenceTest {
         var run = completed(); var original = run.context();
         run.confirm(3, 1, 1, "alice", List.of(new ExpenseDraftAssistRun.Selection("line1", Set.of(ExpenseDraftAssistRun.Part.ITINERARY))), "仅确认行程", AT.plusSeconds(3));
         tx.executeWithoutResult(ignored -> runs.update(run, 3));
-        var restored = new JdbcExpenseDraftAssistRepository(jdbc, json).find(TENANT, run.context().id()).orElseThrow();
+        var restored = new JdbcExpenseDraftAssistRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.agent.mapper.ExpenseDraftAssistRepositoryMapper
+                                                .class), json).find(TENANT, run.context().id()).orElseThrow();
         assertThat(restored.context()).isEqualTo(original); assertThat(restored.state()).isEqualTo(run.state());
         assertThat(restored.state().review().selected().get(0).parts()).containsExactly(ExpenseDraftAssistRun.Part.ITINERARY);
         assertThat(versions(run)).containsExactly(1L, 2L, 3L, 4L);
@@ -142,7 +164,10 @@ class ExpenseDraftAssistPersistenceTest {
     @Test void reloadedRunningLeaseExpiresOnceAndLateCompletionCannotReplaceFailure() {
         var run = fresh(); tx.executeWithoutResult(ignored -> runs.create(run)); run.start(1, AT, AT.plusSeconds(60));
         tx.executeWithoutResult(ignored -> runs.update(run, 1));
-        var reopened = new JdbcExpenseDraftAssistRepository(jdbc, json); var restored = reopened.find(TENANT, run.context().id()).orElseThrow();
+        var reopened = new JdbcExpenseDraftAssistRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.agent.mapper.ExpenseDraftAssistRepositoryMapper.class), json); var restored = reopened.find(TENANT, run.context().id()).orElseThrow();
         assertThat(reopened.due(AT.plusSeconds(59))).isEmpty(); assertThat(reopened.due(AT.plusSeconds(60))).hasSize(1);
         assertThat(restored.expired(AT.plusSeconds(60))).isTrue(); restored.fail(2, AssistRun.Failure.MODEL_TIMEOUT, AT.plusSeconds(60));
         tx.executeWithoutResult(ignored -> runs.update(restored, 2));
@@ -154,21 +179,29 @@ class ExpenseDraftAssistPersistenceTest {
     @Test void failedReviewTraceRollsBackStatusAndRetryPreservesTheOriginalSuggestion() {
         var run = completed(); var original = loaded(run).state();
         run.confirm(3, 1, 1, "alice", List.of(new ExpenseDraftAssistRun.Selection("line1", Set.of(ExpenseDraftAssistRun.Part.ITINERARY))), null, AT.plusSeconds(3));
-        jdbc.execute("ALTER TABLE agent_expense_draft_transition ADD CONSTRAINT ck_draft_fixture_review CHECK (status<>'CONFIRMED')");
+        jdbc.execute(
+                "ALTER TABLE agent_expense_draft_transition ADD CONSTRAINT ck_draft_fixture_review"
+                        + " CHECK (status<>'CONFIRMED')");
         try {
             assertThatThrownBy(() -> tx.executeWithoutResult(ignored -> runs.update(run, 3))).isInstanceOf(DataIntegrityViolationException.class);
             assertThat(loaded(run).state()).isEqualTo(original); assertThat(versions(run)).containsExactly(1L, 2L, 3L);
-        } finally { jdbc.execute("ALTER TABLE agent_expense_draft_transition DROP CONSTRAINT ck_draft_fixture_review"); }
+        } finally { jdbc.execute(
+                    "ALTER TABLE agent_expense_draft_transition DROP CONSTRAINT"
+                            + " ck_draft_fixture_review"); }
         tx.executeWithoutResult(ignored -> runs.update(run, 3));
         assertThat(loaded(run).state()).isEqualTo(run.state()); assertThat(versions(run)).containsExactly(1L, 2L, 3L, 4L);
     }
 
     @Test void failedInitialTraceDoesNotLeaveAQueuedRowOrConsumeTheActiveSlot() {
-        var run = fresh(); jdbc.execute("ALTER TABLE agent_expense_draft_transition ADD CONSTRAINT ck_draft_fixture_queue CHECK (status<>'QUEUED')");
+        var run = fresh(); jdbc.execute(
+                "ALTER TABLE agent_expense_draft_transition ADD CONSTRAINT ck_draft_fixture_queue"
+                        + " CHECK (status<>'QUEUED')");
         try {
             assertThatThrownBy(() -> tx.executeWithoutResult(ignored -> runs.create(run))).isInstanceOf(DataIntegrityViolationException.class);
             assertThat(runs.find(TENANT, run.context().id())).isEmpty(); assertThat(runs.due(AT)).isEmpty();
-        } finally { jdbc.execute("ALTER TABLE agent_expense_draft_transition DROP CONSTRAINT ck_draft_fixture_queue"); }
+        } finally { jdbc.execute(
+                    "ALTER TABLE agent_expense_draft_transition DROP CONSTRAINT"
+                            + " ck_draft_fixture_queue"); }
         tx.executeWithoutResult(ignored -> runs.create(run)); assertThat(versions(run)).containsExactly(1L);
     }
 
@@ -210,7 +243,9 @@ class ExpenseDraftAssistPersistenceTest {
     }
     private ExpenseDraftAssistRun loaded(ExpenseDraftAssistRun run) { return runs.find(TENANT, run.context().id()).orElseThrow(); }
     private List<Long> versions(ExpenseDraftAssistRun run) {
-        return jdbc.queryForList("SELECT run_version FROM agent_expense_draft_transition WHERE tenant_id=? AND run_id=? ORDER BY run_version", Long.class, TENANT, run.context().id().toString());
+        return jdbc.queryForList(
+                "SELECT run_version FROM agent_expense_draft_transition WHERE tenant_id=? AND"
+                        + " run_id=? ORDER BY run_version", Long.class, TENANT, run.context().id().toString());
     }
     private static void assertCode(Runnable action, String code) {
         assertThatThrownBy(action::run).isInstanceOfSatisfying(DomainException.class, failure -> assertThat(failure.code()).isEqualTo(code));

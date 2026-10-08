@@ -42,6 +42,13 @@ jobs:
           AGENTFLOW_SESSION_TEST_PASSWORD: isolated-ci-database-only
         run: mvn -B -ntp -pl agentflow-server -am -Dtest=SharedSessionIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
 
+      - name: Verify MyBatis XML mappings and transaction boundaries on PostgreSQL
+        env:
+          AGENTFLOW_MYBATIS_TEST_URL: jdbc:postgresql://localhost:5432/agentflow_schema_test
+          AGENTFLOW_MYBATIS_TEST_USERNAME: agentflow_test
+          AGENTFLOW_MYBATIS_TEST_PASSWORD: isolated-ci-database-only
+        run: mvn -B -ntp -pl agentflow-server -am -Dtest=MyBatisMappingContractTest -Dsurefire.failIfNoSpecifiedTests=false test
+
       - name: Verify organization, field access and financial receipt boundaries on PostgreSQL
         env:
           PG_CONTAINER: ${{ job.services.postgres.id }}
@@ -112,6 +119,9 @@ jobs:
       - name: Check Java author tags
         run: java scripts/CheckAuthors.java .
       - name: Verify backend
+        env:
+          # 与 PostgreSQL 矩阵和本地验证使用相同的上下文缓存上限，及时释放旧连接池。
+          JAVA_TOOL_OPTIONS: -Dspring.test.context.cache.maxSize=4 -Djava.io.tmpdir=/fyoung/tmp
         run: mvn -B -ntp verify
       - name: Verify maintenance and capacity tool guards
         run: |

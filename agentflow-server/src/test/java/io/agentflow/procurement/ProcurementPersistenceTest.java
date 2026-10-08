@@ -1,24 +1,20 @@
 package io.agentflow.procurement;
+import static io.agentflow.procurement.ProcurementPaymentCheck.*;
+import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
+import io.agentflow.approval.JdbcApplicationRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
-import io.agentflow.approval.JdbcApplicationRepository;
 import io.agentflow.expense.FinanceJsonConfiguration;
 import io.agentflow.expense.InvoiceKey;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.Money;
 import io.agentflow.organization.InitiatorContext;
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,11 +23,19 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
-import static io.agentflow.procurement.ProcurementPaymentCheck.*;
-import static org.assertj.core.api.Assertions.*;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 实际数据库验证采购绑定、原始修订、持久预检租约及多表失败回滚。
+ *
  * @author owlzhangfq@gmail.com
  */
 class ProcurementPersistenceTest {
@@ -53,9 +57,31 @@ class ProcurementPersistenceTest {
                 System.getenv().getOrDefault("AGENTFLOW_PROCUREMENT_PERSISTENCE_USER", "sa"), System.getenv().getOrDefault("AGENTFLOW_PROCUREMENT_PERSISTENCE_PASSWORD", ""));
         Flyway.configure().dataSource(source).load().migrate();
         jdbc = new JdbcTemplate(source); tx = new TransactionTemplate(new DataSourceTransactionManager(source));
-        requests = new JdbcProcurementPaymentRepository(jdbc, json); checks = new JdbcProcurementPaymentCheckRepository(jdbc, json);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc), new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json));
-        reservationService = new ProcurementPayableReservations(reservations); applications = new JdbcApplicationRepository(jdbc, json);
+        requests = new JdbcProcurementPaymentRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper.ProcurementPaymentRepositoryMapper
+                                        .class), json); checks = new JdbcProcurementPaymentCheckRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .ProcurementPaymentCheckRepositoryMapper.class), json);
+        reservations = new JdbcProcurementPayableReservationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .ProcurementPayableReservationRepositoryMapper.class), json, requests, new JdbcProcurementInvoiceClaims(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .ProcurementInvoiceClaimsMapper.class)),
+                        new SupplierPayableReturnGuard(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierPayableReturnGuardMapper.class)),
+                        new JdbcSupplierAdjustmentCompletions(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierAdjustmentCompletionsMapper.class), json));
+        reservationService = new ProcurementPayableReservations(reservations); applications = new JdbcApplicationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.approval.mapper.ApplicationRepositoryMapper.class), json);
     }
 
     @Test void currentStateAndOriginalRevisionRestoreWithoutCrossTenantOrWrongBusinessBinding() {
@@ -64,7 +90,9 @@ class ProcurementPersistenceTest {
         assertThat(requests.find("foreign", request.id())).isEmpty();
         tx.executeWithoutResult(status -> { requests.lock(tenant, request.id()); request.revise(1, content("60")); requests.update(request, 1, "alice", "REVISE"); });
         assertThat(requests.find(tenant, request.id()).orElseThrow().content().amount()).isEqualTo(money("60"));
-        assertThat(json.read(jdbc.queryForObject("SELECT state_json FROM procurement_payment_revision WHERE tenant_id=? AND request_id=? AND request_version=1", String.class, tenant, request.id().toString()), ProcurementPaymentRequest.State.class)).isEqualTo(before);
+        assertThat(json.read(jdbc.queryForObject(
+                                        "SELECT state_json FROM procurement_payment_revision WHERE"
+                                            + " tenant_id=? AND request_id=? AND request_version=1", String.class, tenant, request.id().toString()), ProcurementPaymentRequest.State.class)).isEqualTo(before);
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> requests.update(request, 1, "alice", "REVISE"))).isInstanceOf(DomainException.class);
         var fake = ProcurementPaymentRequest.draft(UUID.randomUUID(), tenant, request.applicationId(), "alice", content("50"));
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> requests.create(fake, "alice"))).isInstanceOf(DomainException.class);
@@ -72,7 +100,10 @@ class ProcurementPersistenceTest {
 
     @Test void revisionAppendFailureRollsBackPrimaryStateAndPreservesTheOriginalSource() {
         var request = create(); var before = request.state(); request.revise(1, content("60"));
-        jdbc.update("INSERT INTO procurement_payment_revision(tenant_id,request_id,request_version,actor_id,operation,state_json) VALUES(?,?,2,'alice','SYNTHETIC_COLLISION',?)", tenant, request.id().toString(), json.write(request.state()));
+        jdbc.update(
+                "INSERT INTO"
+                    + " procurement_payment_revision(tenant_id,request_id,request_version,actor_id,operation,state_json)"
+                    + " VALUES(?,?,2,'alice','SYNTHETIC_COLLISION',?)", tenant, request.id().toString(), json.write(request.state()));
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> requests.update(request, 1, "alice", "REVISE"))).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(requests.find(tenant, request.id()).orElseThrow().state()).isEqualTo(before);
     }
@@ -84,10 +115,16 @@ class ProcurementPersistenceTest {
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> checks.create(queue(input(request, 2), NOW)))).isInstanceOf(DomainException.class);
         var running = job.start(NOW, NOW.plusSeconds(60)); tx.executeWithoutResult(status -> checks.update(running));
         var done = running.finish(Result.ready(evidence(request)), NOW.plusSeconds(2)); tx.executeWithoutResult(status -> checks.update(done));
-        var reopened = new JdbcProcurementPaymentCheckRepository(jdbc, json);
+        var reopened = new JdbcProcurementPaymentCheckRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .ProcurementPaymentCheckRepositoryMapper.class),
+                        json);
         assertThat(reopened.find(tenant, job.input().id()).orElseThrow()).isEqualTo(done);
         assertThat(reopened.active(tenant, request.id())).isFalse();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM procurement_payment_check_revision WHERE tenant_id=? AND job_id=?", Integer.class, tenant, job.input().id().toString())).isEqualTo(3);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM procurement_payment_check_revision WHERE"
+                                        + " tenant_id=? AND job_id=?", Integer.class, tenant, job.input().id().toString())).isEqualTo(3);
         var next = queue(input(request, 2), NOW.plusSeconds(3)); tx.executeWithoutResult(status -> reopened.create(next));
         assertThat(reopened.latestAttempt(tenant, request.id())).isEqualTo(2); assertThat(reopened.latestId(tenant, request.id())).contains(next.input().id());
         assertThat(reopened.find(tenant, done.input().id())).contains(done); assertThat(reopened.find("foreign", job.input().id())).isEmpty();
@@ -104,7 +141,9 @@ class ProcurementPersistenceTest {
         assertThat(checks.find(tenant, input.id())).contains(running);
         var timeout = running.finish(Result.ready(evidence(request)), NOW.plusSeconds(30)); tx.executeWithoutResult(status -> checks.update(timeout));
         assertThat(checks.find(tenant, input.id()).orElseThrow().result().code()).isEqualTo("TIMEOUT");
-        jdbc.update("UPDATE procurement_payment_check_job SET application_version=2 WHERE tenant_id=? AND id=?", tenant, input.id().toString());
+        jdbc.update(
+                "UPDATE procurement_payment_check_job SET application_version=2 WHERE tenant_id=?"
+                        + " AND id=?", tenant, input.id().toString());
         assertThatThrownBy(() -> checks.find(tenant, input.id())).isInstanceOf(IllegalStateException.class);
     }
 
@@ -122,8 +161,12 @@ class ProcurementPersistenceTest {
             start.countDown();
             assertThat(List.of(results.get(0).get(10, TimeUnit.SECONDS), results.get(1).get(10, TimeUnit.SECONDS)))
                     .containsExactlyInAnyOrder("HELD", "PROCUREMENT_PAYABLE_OCCUPIED");
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM procurement_payable_reservation WHERE tenant_id=?", Integer.class, tenant)).isEqualTo(1);
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM procurement_payable_reservation_revision WHERE tenant_id=?", Integer.class, tenant)).isEqualTo(1);
+            assertThat(jdbc.queryForObject(
+                                    "SELECT COUNT(*) FROM procurement_payable_reservation WHERE"
+                                            + " tenant_id=?", Integer.class, tenant)).isEqualTo(1);
+            assertThat(jdbc.queryForObject(
+                                    "SELECT COUNT(*) FROM procurement_payable_reservation_revision"
+                                            + " WHERE tenant_id=?", Integer.class, tenant)).isEqualTo(1);
         } finally { executor.shutdownNow(); }
     }
 
@@ -142,7 +185,9 @@ class ProcurementPersistenceTest {
         assertThat(reservations.active(tenant, request.id())).isEmpty();
         var history = reservations.history(tenant, request.id()); assertThat(history).hasSize(1);
         assertThat(history.get(0).source()).isEqualTo(original.source()); assertThat(history.get(0).release().reason()).isEqualTo(ProcurementPayableReservation.ReleaseReason.CANCELLED);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM procurement_payable_reservation_revision WHERE tenant_id=?", Integer.class, tenant)).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM procurement_payable_reservation_revision"
+                                        + " WHERE tenant_id=?", Integer.class, tenant)).isEqualTo(2);
         var next = create(); freeze(next); tx.executeWithoutResult(status -> hold(next));
         assertThat(reservations.active(tenant, next.id())).isPresent();
     }
@@ -160,7 +205,9 @@ class ProcurementPersistenceTest {
         assertThat(requests.find(tenant, first.id()).orElseThrow().state()).isEqualTo(before);
         assertThat(reservations.active(tenant, first.id())).contains(originalHold);
         assertThat(reservations.history(tenant, first.id())).containsExactly(originalHold);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM procurement_payable_reservation_revision WHERE tenant_id=?", Integer.class, tenant)).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM procurement_payable_reservation_revision"
+                                        + " WHERE tenant_id=?", Integer.class, tenant)).isEqualTo(2);
     }
 
     @Test void resubmissionReplacesOnlyItsOriginalHoldAndPreservesBothRounds() {
@@ -173,13 +220,18 @@ class ProcurementPersistenceTest {
         assertThat(history.get(0).source()).isEqualTo(first.source()); assertThat(history.get(0).release().reason()).isEqualTo(ProcurementPayableReservation.ReleaseReason.RESUBMITTED);
         assertThat(history.get(1).source().round().roundNo()).isEqualTo(2); assertThat(history.get(1).source().round().content().amount()).isEqualTo(money("60"));
         assertThat(history.get(1).held()).isTrue();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM procurement_payable_reservation_revision WHERE tenant_id=?", Integer.class, tenant)).isEqualTo(3);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM procurement_payable_reservation_revision"
+                                        + " WHERE tenant_id=?", Integer.class, tenant)).isEqualTo(3);
     }
 
     private ProcurementPaymentRequest create() {
         var request = ProcurementPaymentRequest.draft(UUID.randomUUID(), tenant, UUID.randomUUID(), "alice", content("70"));
         tx.executeWithoutResult(status -> {
-            jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,?,?,'fixture',1,'alice','采购付款','{}','DRAFT',1,1,'PROCUREMENT_PAYMENT',?)",
+            jdbc.update(
+                            "INSERT INTO"
+                                + " approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)"
+                                + " VALUES(?,?,?,'fixture',1,'alice','采购付款','{}','DRAFT',1,1,'PROCUREMENT_PAYMENT',?)",
                     request.applicationId().toString(), tenant, UUID.randomUUID().toString(), request.id().toString());
             requests.create(request, "alice");
         });

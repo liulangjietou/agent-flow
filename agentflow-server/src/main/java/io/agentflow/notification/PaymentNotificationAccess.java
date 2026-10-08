@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.JdbcPaymentAuthorizationRepository;
@@ -10,23 +11,27 @@ import io.agentflow.finance.PaymentAuthorization;
 import io.agentflow.finance.PaymentPersonnel;
 import io.agentflow.finance.PaymentView;
 import io.agentflow.finance.VoucherAccess;
+import io.agentflow.mybatis.SqlRows;
+import io.agentflow.notification.mapper.PaymentNotificationAccessMapper;
 import io.agentflow.organization.OrganizationPerson;
 import io.agentflow.organization.OrganizationRepository;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 import java.util.UUID;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Isolation;
 
 /**
  * 通知身份只定位原付款；当前人员、法人和财务字段权限仍由原业务读取入口决定。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
 public class PaymentNotificationAccess {
     private final CurrentActor actors;
-    private final JdbcTemplate jdbc;
+    private final PaymentNotificationAccessMapper sqlMapper;
     private final OrganizationRepository organization;
     private final PaymentPersonnel personnel;
     private final JdbcPaymentAuthorizationRepository authorizations;
@@ -36,12 +41,25 @@ public class PaymentNotificationAccess {
     private final JdbcPaymentOperationRepository operations;
 
     /** 通知不推定身份源角色，也不使用管理员身份代读原付款。 */
-    public PaymentNotificationAccess(CurrentActor actors, JdbcTemplate jdbc, OrganizationRepository organization, PaymentPersonnel personnel,
-                                     JdbcPaymentAuthorizationRepository authorizations, PaymentAccess payments, VoucherAccess financial,
-                                     JdbcPaymentExecutionRequestRepository requests, JdbcPaymentOperationRepository operations) {
-        this.actors = actors; this.jdbc = jdbc; this.organization = organization; this.personnel = personnel;
-        this.authorizations = authorizations; this.payments = payments; this.financial = financial;
-        this.requests = requests; this.operations = operations;
+    public PaymentNotificationAccess(
+            CurrentActor actors,
+            PaymentNotificationAccessMapper sqlMapper,
+            OrganizationRepository organization,
+            PaymentPersonnel personnel,
+            JdbcPaymentAuthorizationRepository authorizations,
+            PaymentAccess payments,
+            VoucherAccess financial,
+            JdbcPaymentExecutionRequestRepository requests,
+            JdbcPaymentOperationRepository operations) {
+        this.actors = actors;
+        this.sqlMapper = sqlMapper;
+        this.organization = organization;
+        this.personnel = personnel;
+        this.authorizations = authorizations;
+        this.payments = payments;
+        this.financial = financial;
+        this.requests = requests;
+        this.operations = operations;
     }
 
     /** 只为当前有效的原参与人建通知；财务和出纳还须保留原法人任职。 */
@@ -76,11 +94,17 @@ public class PaymentNotificationAccess {
     }
 
     private Row row(String tenant, String recipient, UUID messageId) {
-        return jdbc.query("""
-                SELECT event_key,kind,application_id,round_no FROM notification_inbox
-                WHERE tenant_id=? AND recipient_id=? AND id=? AND kind IN ('PAYMENT_RESULT','PAYMENT_ATTENTION')
-                """, (row, index) -> new Row(row.getString("event_key"), InboxMessage.Kind.valueOf(row.getString("kind")),
-                UUID.fromString(row.getString("application_id")), row.getInt("round_no")), tenant, recipient, messageId.toString()).stream().findFirst().orElse(null);
+        return SqlRows.map(
+                        sqlMapper.row(tenant, recipient, messageId.toString()),
+                        row ->
+                                new Row(
+                                        row.getString("event_key"),
+                                        InboxMessage.Kind.valueOf(row.getString("kind")),
+                                        UUID.fromString(row.getString("application_id")),
+                                        row.getInt("round_no")))
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
 
     private PaymentAuthorization payment(String tenant, String recipient, Row row) {
@@ -105,17 +129,31 @@ public class PaymentNotificationAccess {
 
     /**
      * 存储事实只在服务内使用，不把事件键公开给页面。
+     *
      * @author owlzhangfq@gmail.com
      */
-    private record Row(String eventKey, InboxMessage.Kind kind, UUID applicationId, int roundNo) { }
+    private record Row(String eventKey, InboxMessage.Kind kind, UUID applicationId, int roundNo) {}
+
     /**
      * 申请轮次与出纳最小视图使用各自既有读取入口。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public enum View { APPLICATION_ROUND, CASHIER_PAYMENT }
+    public enum View {
+        APPLICATION_ROUND,
+        CASHIER_PAYMENT
+    }
+
     /**
      * 只有明确打开消息且通过当前权限后才读取原付款；不以本轮最新授权替换历史原付款。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public record Target(UUID messageId, UUID paymentId, View view, UUID applicationId, int roundNo, PaymentView payment) { }
+    public record Target(
+            UUID messageId,
+            UUID paymentId,
+            View view,
+            UUID applicationId,
+            int roundNo,
+            PaymentView payment) {}
 }

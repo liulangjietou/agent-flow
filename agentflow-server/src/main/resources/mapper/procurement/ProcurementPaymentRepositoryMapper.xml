@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.procurement.mapper.ProcurementPaymentRepositoryMapper">
+    <select id="lock" resultType="String">
+        SELECT application_id FROM procurement_payment WHERE tenant_id=#{tenant} AND id=#{requestId}
+    </select>
+
+    <select id="lock2" resultType="String">
+        SELECT id FROM approval_application WHERE tenant_id=#{tenant} AND id=#{id} FOR UPDATE
+    </select>
+
+    <select id="lock3" resultType="String">
+        SELECT id FROM procurement_payment WHERE tenant_id=#{tenant} AND id=#{requestId} FOR UPDATE
+    </select>
+
+    <insert id="create">
+        INSERT INTO procurement_payment(id,tenant_id,application_id,employee_id,version,state_json)
+        SELECT #{id},tenant_id,id,created_by,1,#{stateJson} FROM approval_application
+        WHERE tenant_id=#{tenantId} AND id=#{applicationId} AND created_by=#{employeeId} AND business_type='PROCUREMENT_PAYMENT' AND business_id=#{businessId} AND status='DRAFT'
+    </insert>
+
+    <update id="update">
+        UPDATE procurement_payment SET version=#{version},state_json=#{stateJson},updated_at=CURRENT_TIMESTAMP
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND application_id=#{applicationId} AND employee_id=#{employeeId} AND version=#{expectedVersion}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM procurement_payment WHERE tenant_id=#{tenantId} AND id=#{id}
+    </select>
+
+    <insert id="append">
+        INSERT INTO procurement_payment_revision(tenant_id,request_id,request_version,actor_id,operation,state_json) VALUES(#{tenantId},#{requestId},#{requestVersion},#{actorId},#{operation},#{stateJson})
+    </insert>
+</mapper>

@@ -1,5 +1,8 @@
 package io.agentflow.signature;
 
+import io.agentflow.mybatis.MyBatisTestSupport;
+import io.agentflow.signature.mapper.SignatureEvidenceRepositoryMapper;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -104,7 +107,8 @@ class SignatureHttpRecoveryTest {
     private Harness harness(String url) {
         var source = new DriverManagerDataSource(url, "sa", ""); var jdbc = new JdbcTemplate(source); var operations = SignaturePersistenceFixtures.repository(source);
         var manager = new DataSourceTransactionManager(source);
-        var proxy = new ProxyFactory(new JdbcSignatureEvidenceRepository(jdbc, JSON, operations, new SignatureReceiptVerifier(MAPPER)));
+        var proxy = new ProxyFactory(new JdbcSignatureEvidenceRepository(
+                MyBatisTestSupport.mapper(source, SignatureEvidenceRepositoryMapper.class), JSON, operations, new SignatureReceiptVerifier(MAPPER)));
         proxy.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource()));
         return new Harness(jdbc, operations, (JdbcSignatureEvidenceRepository) proxy.getProxy(), new TransactionTemplate(manager));
     }

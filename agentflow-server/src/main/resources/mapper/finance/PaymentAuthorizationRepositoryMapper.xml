@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.finance.mapper.PaymentAuthorizationRepositoryMapper">
+    <insert id="create">
+        INSERT INTO payment_authorization(tenant_id,id,business_type,business_id,application_id,round_no,application_version,business_version,
+        purpose,voucher_operation_id,voucher_kind,terms_json,decision_json,state_json,version,status,active_business_id,authorized_at,expires_at,updated_at,legal_entity_id,due_date)
+        VALUES(#{tenantId},#{id},#{businessType},#{businessId},#{applicationId},#{roundNo},#{applicationVersion},#{businessVersion},#{purpose},#{voucherOperationId},#{voucherKind},#{termsJson},#{decisionJson},#{stateJson},1,'AUTHORIZED',#{activeBusinessId},#{authorizedAt},#{expiresAt},#{updatedAt},#{legalEntityId},#{dueDate})
+    </insert>
+
+    <select id="update" resultType="Long">
+        SELECT version FROM payment_operation WHERE tenant_id=#{tenantId} AND id=#{id}
+    </select>
+
+    <update id="update2">
+        UPDATE payment_authorization SET state_json=#{stateJson},version=#{version},status=#{status},active_business_id=#{activeBusiness},updated_at=#{updatedAt},debit_account_key=#{debitAccountKey}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND status=#{expectedStatus} AND terms_json=#{termsJson} AND decision_json=#{decisionJson}
+        AND ((version=1 AND debit_account_key IS NULL) OR debit_account_key=#{value13})
+        AND due_date IS NOT DISTINCT FROM #{dueDate}
+    </update>
+
+    <insert id="update3">
+        INSERT INTO payment_retirement(tenant_id,authorization_id,authorization_version,operation_version,basis,retired_by,retired_at,retirement_json)
+        VALUES(#{tenantId},#{authorizationId},3,#{operationVersion},#{basis},#{retiredBy},#{retiredAt},#{retirementJson})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM payment_authorization WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="active" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM payment_authorization WHERE tenant_id=#{tenant} AND business_type=#{businessType} AND active_business_id=#{businessId}
+    </select>
+
+    <select id="latest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM payment_authorization WHERE tenant_id=#{tenant} AND application_id=#{applicationId} AND round_no=#{round} ORDER BY authorized_at DESC,id DESC LIMIT 1
+    </select>
+
+    <select id="row" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT retirement_json FROM payment_retirement WHERE tenant_id=#{tenantId} AND authorization_id=#{id} AND authorization_version=3 AND operation_version=#{operationVersion} AND basis=#{basis} AND retired_by=#{retiredBy} AND retired_at=#{retiredAt}
+    </select>
+
+    <select id="requireRetirementProof" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM payment_operation_revision WHERE tenant_id=#{tenantId} AND operation_id=#{id} AND version=#{operationVersion}
+    </select>
+
+    <insert id="append">
+        INSERT INTO payment_authorization_revision(tenant_id,authorization_id,version,state_json) VALUES(#{tenantId},#{authorizationId},#{version},#{stateJson})
+    </insert>
+    <select id="cashierPageQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT p.* FROM payment_authorization p WHERE p.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND p.legal_entity_id IN (SELECT l.id FROM organization_directory o
+        JOIN organization_person p ON p.tenant_id=o.tenant_id AND p.active=TRUE
+        JOIN organization_appointment a ON a.tenant_id=p.tenant_id AND a.person_id=p.id AND a.active=TRUE
+        JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE AND d.kind='DEPARTMENT'
+        JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE AND j.kind='POSITION' AND j.legal_entity_id=d.legal_entity_id
+        JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE AND l.kind='LEGAL_ENTITY'
+        WHERE o.tenant_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND p.subject=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+        )<choose><when test="hasLegalEntityId"> AND p.legal_entity_id=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><choose><when test="unassignedAccountFilter"> AND p.debit_account_key IS NULL</when><otherwise><choose><when test="assignedAccountFilter"> AND p.debit_account_key=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}</when><otherwise></otherwise></choose></otherwise></choose><choose><when test="undatedSelected"> AND p.due_date IS NULL</when><otherwise></otherwise></choose><choose><when test="hasDueFrom"> AND p.due_date&gt;=<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6}</when><otherwise></otherwise></choose><choose><when test="hasDueTo"> AND p.due_date&lt;=<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}</when><otherwise></otherwise></choose><choose><when test="hasCursor"><choose><when test="hasDecision2"> AND (p.due_date&gt;<bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8} OR p.due_date IS NULL OR (p.due_date=<bind name="argument9" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument9} AND (p.authorized_at&lt;<bind name="argument10" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument10} OR (p.authorized_at=<bind name="argument11" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument11} AND p.id&lt;<bind name="argument12" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument12}))))</when><otherwise> AND <choose><when test="hasDecision">p.due_date IS NULL AND </when><otherwise></otherwise></choose>(p.authorized_at&lt;<bind name="argument13" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument13} OR (p.authorized_at=<bind name="argument14" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument14} AND p.id&lt;<bind name="argument15" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument15}))</otherwise></choose></when><otherwise></otherwise></choose> ORDER BY <choose><when test="condition9">p.due_date ASC NULLS LAST,p.authorized_at DESC,p.id DESC</when><otherwise>p.authorized_at DESC,p.id DESC</otherwise></choose> LIMIT <bind name="argument16" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument16}
+    </select>
+    <select id="cashierCountQuery" resultType="Long">
+        <bind name="position" value="0"/>
+        SELECT COUNT(*) FROM payment_authorization p WHERE p.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND p.legal_entity_id IN (SELECT l.id FROM organization_directory o
+        JOIN organization_person p ON p.tenant_id=o.tenant_id AND p.active=TRUE
+        JOIN organization_appointment a ON a.tenant_id=p.tenant_id AND a.person_id=p.id AND a.active=TRUE
+        JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE AND d.kind='DEPARTMENT'
+        JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE AND j.kind='POSITION' AND j.legal_entity_id=d.legal_entity_id
+        JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE AND l.kind='LEGAL_ENTITY'
+        WHERE o.tenant_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND p.subject=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+        )<choose><when test="hasLegalEntityId"> AND p.legal_entity_id=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><choose><when test="unassignedAccountFilter"> AND p.debit_account_key IS NULL</when><otherwise><choose><when test="assignedAccountFilter"> AND p.debit_account_key=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}</when><otherwise></otherwise></choose></otherwise></choose><choose><when test="undatedSelected"> AND p.due_date IS NULL</when><otherwise></otherwise></choose><choose><when test="hasDueFrom"> AND p.due_date&gt;=<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6}</when><otherwise></otherwise></choose><choose><when test="hasDueTo"> AND p.due_date&lt;=<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}</when><otherwise></otherwise></choose>
+    </select>
+    <select id="cashierMatchesQuery" resultType="Boolean">
+        <bind name="position" value="0"/>
+        SELECT EXISTS(SELECT 1 FROM payment_authorization p WHERE p.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND p.legal_entity_id IN (SELECT l.id FROM organization_directory o
+        JOIN organization_person p ON p.tenant_id=o.tenant_id AND p.active=TRUE
+        JOIN organization_appointment a ON a.tenant_id=p.tenant_id AND a.person_id=p.id AND a.active=TRUE
+        JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE AND d.kind='DEPARTMENT'
+        JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE AND j.kind='POSITION' AND j.legal_entity_id=d.legal_entity_id
+        JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE AND l.kind='LEGAL_ENTITY'
+        WHERE o.tenant_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND p.subject=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+        )<choose><when test="hasLegalEntityId"> AND p.legal_entity_id=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><choose><when test="unassignedAccountFilter"> AND p.debit_account_key IS NULL</when><otherwise><choose><when test="assignedAccountFilter"> AND p.debit_account_key=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}</when><otherwise></otherwise></choose></otherwise></choose><choose><when test="undatedSelected"> AND p.due_date IS NULL</when><otherwise></otherwise></choose><choose><when test="hasDueFrom"> AND p.due_date&gt;=<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6}</when><otherwise></otherwise></choose><choose><when test="hasDueTo"> AND p.due_date&lt;=<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}</when><otherwise></otherwise></choose> AND p.id=<bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8})
+    </select>
+    <select id="cashierAccountsQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT p.* FROM payment_authorization p WHERE p.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND p.legal_entity_id IN (SELECT l.id FROM organization_directory o
+        JOIN organization_person p ON p.tenant_id=o.tenant_id AND p.active=TRUE
+        JOIN organization_appointment a ON a.tenant_id=p.tenant_id AND a.person_id=p.id AND a.active=TRUE
+        JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE AND d.kind='DEPARTMENT'
+        JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE AND j.kind='POSITION' AND j.legal_entity_id=d.legal_entity_id
+        JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE AND l.kind='LEGAL_ENTITY'
+        WHERE o.tenant_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND p.subject=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+        )<choose><when test="hasLegalEntityId"> AND p.legal_entity_id=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><choose><when test="unassignedAccountFilter"> AND p.debit_account_key IS NULL</when><otherwise><choose><when test="assignedAccountFilter"> AND p.debit_account_key=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}</when><otherwise></otherwise></choose></otherwise></choose><choose><when test="undatedSelected"> AND p.due_date IS NULL</when><otherwise></otherwise></choose><choose><when test="hasDueFrom"> AND p.due_date&gt;=<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6}</when><otherwise></otherwise></choose><choose><when test="hasDueTo"> AND p.due_date&lt;=<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}</when><otherwise></otherwise></choose> AND p.debit_account_key IS NOT NULL<choose><when test="condition6"> AND p.debit_account_key&gt;<bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8}</when><otherwise></otherwise></choose> AND NOT EXISTS (SELECT 1 FROM payment_authorization newer
+            WHERE newer.tenant_id=p.tenant_id AND newer.debit_account_key=p.debit_account_key
+            AND (newer.authorized_at&gt;p.authorized_at OR (newer.authorized_at=p.authorized_at AND newer.id&gt;p.id)))
+        ORDER BY p.debit_account_key LIMIT <bind name="argument9" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument9}
+    </select>
+</mapper>

@@ -1,33 +1,4 @@
 package io.agentflow.approval;
-
-import com.fasterxml.jackson.databind.JsonNode;
-import io.agentflow.auth.AuthService;
-import io.agentflow.common.Actor;
-import io.agentflow.common.CurrentActor;
-import io.agentflow.approval.workspace.FlowablePendingTaskReadAdapter;
-import io.agentflow.approval.workspace.PendingTaskController;
-import io.agentflow.common.JsonUtil;
-import io.agentflow.definition.DefinitionApplicationService;
-import io.agentflow.approval.workspace.PendingTaskReadPort;
-import io.agentflow.approval.workspace.TaskQueryParameters;
-import org.flowable.engine.TaskService;
-import org.flowable.engine.RuntimeService;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.web.servlet.MockMvc;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 import static io.agentflow.definition.DefinitionModels.*;
 import static io.agentflow.support.MutationRequests.post;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,8 +8,41 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.JsonNode;
+
+import io.agentflow.approval.workspace.FlowablePendingTaskReadAdapter;
+import io.agentflow.approval.workspace.PendingTaskController;
+import io.agentflow.approval.workspace.PendingTaskReadPort;
+import io.agentflow.approval.workspace.TaskQueryParameters;
+import io.agentflow.auth.AuthService;
+import io.agentflow.common.Actor;
+import io.agentflow.common.CurrentActor;
+import io.agentflow.common.JsonUtil;
+import io.agentflow.definition.DefinitionApplicationService;
+
+import org.flowable.engine.RuntimeService;
+import org.flowable.engine.TaskService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
 /**
  * 在真实 HTTP、申请仓储与 Flowable 任务上验证筛选、分页和办理权限的一致性。
+ *
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {
@@ -180,7 +184,9 @@ class PendingTaskQueueIntegrationTest {
         String key = definition("user:manager");
         var ids = new HashSet<String>();
         for (int index = 0; index < 5; index++) ids.add(task(submit(key, "alice", "分页 " + index, "1").path("id").asText()));
-        for (String id : ids) jdbc.update("UPDATE ACT_RU_TASK SET CREATE_TIME_=TIMESTAMP '2026-01-01 00:00:00' WHERE ID_=?", id);
+        for (String id : ids) jdbc.update(
+                    "UPDATE ACT_RU_TASK SET CREATE_TIME_=TIMESTAMP '2026-01-01 00:00:00' WHERE"
+                            + " ID_=?", id);
         var first = query("manager", Map.of("processKey", key, "limit", "2"));
         assertThat(first.path("items").size()).isEqualTo(2);
         assertThat(first.path("total").asInt()).isEqualTo(5);
@@ -274,7 +280,11 @@ class PendingTaskQueueIntegrationTest {
         var statements = new ArrayList<String>();
         var actor = mock(CurrentActor.class);
         when(actor.actor()).thenReturn(new Actor("demo", "manager", Set.of("APPROVER", "MANAGER")));
-        var controller = new PendingTaskController(actor, new FlowablePendingTaskReadAdapter(observedJdbc(statements), auth, json, proxies, taskAuthorization), json);
+        var controller = new PendingTaskController(actor, new FlowablePendingTaskReadAdapter(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (observedJdbc(statements)).getDataSource(),
+                                        io.agentflow.approval.workspace.mapper
+                                                .FlowablePendingTaskReadAdapterMapper.class), auth, json, proxies, taskAuthorization), json);
         var first = controller.list(Map.of("processKey", key, "limit", "2"));
         assertThat(first.items()).hasSize(2);
         assertThat(first.total()).isEqualTo(5);
@@ -349,7 +359,9 @@ class PendingTaskQueueIntegrationTest {
         String low = submit(key, "alice", "风险低", "0").path("id").asText();
         String unmatched = submit(key, "alice", "规则未命中", "1").path("id").asText();
         String legacy = submit(key, "alice", "旧轮次", "102").path("id").asText();
-        jdbc.update("UPDATE approval_submission_round SET risk_level=NULL,risk_json=NULL WHERE application_id=?", legacy);
+        jdbc.update(
+                "UPDATE approval_submission_round SET risk_level=NULL,risk_json=NULL WHERE"
+                        + " application_id=?", legacy);
         String unrelated = submit(key, "alice", "他人高风险", "103").path("id").asText();
         tasks.setAssignee(task(unrelated), "finance");
         for (var expected : Map.of("high", high, "medium", medium, "low", low, "unmatched", unmatched, "unassessed", legacy).entrySet()) {
@@ -371,7 +383,8 @@ class PendingTaskQueueIntegrationTest {
         request("manager", Map.of("risk", "unknown")).andExpect(status().isBadRequest());
         request("manager", Map.of("risk", "HIGH")).andExpect(status().isBadRequest());
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update(
-                "UPDATE approval_submission_round SET risk_level=NULL WHERE application_id=?", high))
+                                        "UPDATE approval_submission_round SET risk_level=NULL WHERE"
+                                                + " application_id=?", high))
                 .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }
 
@@ -406,7 +419,9 @@ class PendingTaskQueueIntegrationTest {
                 .andExpect(status().isOk());
         mvc.perform(post("/api/v1/applications/" + id + "/submit").header("Authorization", token("alice"))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":4}")).andExpect(status().isOk());
-        assertThat(jdbc.queryForObject("SELECT risk_json FROM approval_submission_round WHERE application_id=? AND round_no=1", String.class, id))
+        assertThat(jdbc.queryForObject(
+                                "SELECT risk_json FROM approval_submission_round WHERE"
+                                        + " application_id=? AND round_no=1", String.class, id))
                 .isEqualTo(original);
         assertThat(query("manager", Map.of("processKey", key, "risk", "high")).path("total").asInt()).isZero();
         var second = query("manager", Map.of("processKey", key, "risk", "low")).path("items").get(0);

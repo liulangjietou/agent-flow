@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.mapper.SubprocessCallRepositoryMapper">
+    <insert id="append">
+        INSERT INTO approval_subprocess_call
+        (id,tenant_id,parent_application_id,parent_round_no,parent_instance_id,parent_runtime_definition_id,
+         node_id,node_name,activation_id,child_application_id,child_round_no,child_instance_id,
+         child_definition_id,child_process_key,child_definition_version,child_runtime_definition_id,policy_json,created_at)
+        VALUES (#{id},#{tenantId},#{parentApplicationId},#{parentRoundNo},#{parentInstanceId},#{parentRuntimeDefinitionId},#{nodeId},#{nodeName},#{activationId},#{childApplicationId},#{childRoundNo},#{childInstanceId},#{childDefinitionId},#{childProcessKey},#{childDefinitionVersion},#{childRuntimeDefinitionId},#{policyJson},#{createdAt})
+    </insert>
+
+    <select id="findByChild" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_subprocess_call WHERE tenant_id=#{tenantId} AND child_application_id=#{childApplicationId}
+    </select>
+
+    <select id="findByActivation" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_subprocess_call WHERE tenant_id=#{tenantId} AND parent_instance_id=#{parentInstanceId} AND activation_id=#{activationId}
+    </select>
+
+    <select id="findByParentRound" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_subprocess_call WHERE tenant_id=#{tenantId} AND parent_application_id=#{parentApplicationId} AND parent_round_no=#{roundNo} ORDER BY created_at,id
+    </select>
+
+    <select id="pageByParentRound" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT created_at FROM approval_subprocess_call WHERE tenant_id=#{tenantId} AND parent_application_id=#{parentApplicationId} AND parent_round_no=#{roundNo} AND id=#{afterId}
+    </select>
+    <select id="pageByParentRoundQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM approval_subprocess_call WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND parent_application_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND parent_round_no=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} ORDER BY created_at,id LIMIT <bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}
+    </select>
+    <select id="pageByParentRoundQuery2" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM approval_subprocess_call WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND parent_application_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND parent_round_no=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} AND (created_at&gt;<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} OR (created_at=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} AND id&gt;<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6})) ORDER BY created_at,id LIMIT <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}
+    </select>
+</mapper>

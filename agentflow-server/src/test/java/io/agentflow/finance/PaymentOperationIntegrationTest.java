@@ -1,21 +1,24 @@
 package io.agentflow.finance;
+import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
+
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
-import io.agentflow.common.DomainException;
 import io.agentflow.common.Actor;
+import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
-import io.agentflow.observability.DiagnosticContext;
-import org.slf4j.MDC;
-import io.agentflow.finance.callback.*;
 import io.agentflow.expense.*;
+import io.agentflow.finance.callback.*;
 import io.agentflow.notification.NotificationTexts;
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.organization.*;
+
 import org.junit.jupiter.api.*;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -27,6 +30,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -47,10 +51,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
-import static org.assertj.core.api.Assertions.*;
 
 /**
  * 实际批准聚合、组织、事务与回环资金 HTTP 验证原付款执行，不将合成回执当作真实银行到账。
+ *
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.finance-gateway.enabled=true", "agentflow.payments.worker-enabled=false", "agentflow.payments.lease-seconds=15",
@@ -137,40 +141,82 @@ class PaymentOperationIntegrationTest {
     }
     @AfterEach void removeOnlyPaymentFixtures() {
         if (managedMappingCreated) {
-            jdbc.update("UPDATE account_mapping_scope SET active_revision=0,active_mapping_id=NULL,active_mapping_version=NULL WHERE tenant_id='demo' AND legal_entity_id=?", ENTITY.toString());
+            jdbc.update(
+                    "UPDATE account_mapping_scope SET"
+                        + " active_revision=0,active_mapping_id=NULL,active_mapping_version=NULL"
+                        + " WHERE tenant_id='demo' AND legal_entity_id=?", ENTITY.toString());
             for (var table : List.of("account_mapping_activation", "account_mapping_version", "account_mapping_draft_revision", "account_mapping_draft", "account_mapping_scope")) {
                 jdbc.update("DELETE FROM " + table + " WHERE tenant_id='demo' AND legal_entity_id=?", ENTITY.toString());
             }
         }
         for (var id : fixtures) {
-            var batchIds = jdbc.queryForList("SELECT batch_id FROM payment_batch_item WHERE tenant_id='demo' AND authorization_id=?", String.class, id.toString());
+            var batchIds = jdbc.queryForList(
+                            "SELECT batch_id FROM payment_batch_item WHERE tenant_id='demo' AND"
+                                    + " authorization_id=?", String.class, id.toString());
             for (var batch : batchIds) {
                 jdbc.update("DELETE FROM payment_batch_item WHERE tenant_id='demo' AND batch_id=?", batch);
                 jdbc.update("DELETE FROM payment_batch WHERE tenant_id='demo' AND id=?", batch);
             }
         }
         for (var id : fixtures) {
-            jdbc.update("DELETE FROM payment_payee_review_revision WHERE tenant_id='demo' AND review_id IN (SELECT id FROM payment_payee_review WHERE tenant_id='demo' AND (original_authorization_id=? OR consumed_authorization_id=?))", id.toString(), id.toString());
-            jdbc.update("DELETE FROM payment_payee_review WHERE tenant_id='demo' AND (original_authorization_id=? OR consumed_authorization_id=?)", id.toString(), id.toString());
+            jdbc.update(
+                    "DELETE FROM payment_payee_review_revision WHERE tenant_id='demo' AND review_id"
+                            + " IN (SELECT id FROM payment_payee_review WHERE tenant_id='demo' AND"
+                            + " (original_authorization_id=? OR consumed_authorization_id=?))", id.toString(), id.toString());
+            jdbc.update(
+                    "DELETE FROM payment_payee_review WHERE tenant_id='demo' AND"
+                            + " (original_authorization_id=? OR consumed_authorization_id=?)", id.toString(), id.toString());
         }
         for (var id : fixtures) {
-            jdbc.update("DELETE FROM payment_callback_revision WHERE tenant_id='demo' AND callback_id IN (SELECT id FROM payment_callback WHERE tenant_id='demo' AND employee_payment_id=?)", id.toString());
+            jdbc.update(
+                    "DELETE FROM payment_callback_revision WHERE tenant_id='demo' AND callback_id"
+                            + " IN (SELECT id FROM payment_callback WHERE tenant_id='demo' AND"
+                            + " employee_payment_id=?)", id.toString());
             jdbc.update("DELETE FROM payment_callback WHERE tenant_id='demo' AND employee_payment_id=?", id.toString());
-            jdbc.update("DELETE FROM payment_dispute_resolution WHERE tenant_id='demo' AND payment_id=?", id.toString());
+            jdbc.update(
+                    "DELETE FROM payment_dispute_resolution WHERE tenant_id='demo' AND"
+                            + " payment_id=?", id.toString());
             jdbc.update("DELETE FROM payment_retirement WHERE tenant_id='demo' AND authorization_id=?", id.toString());
-            String application = "SELECT application_id FROM payment_authorization WHERE tenant_id='demo' AND id=?";
-            jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_preparation WHERE tenant_id='demo' AND kind='PAYMENT' AND application_id IN (" + application + "))", id.toString());
-            jdbc.update("DELETE FROM voucher_preparation WHERE tenant_id='demo' AND kind='PAYMENT' AND application_id IN (" + application + ")", id.toString());
-            jdbc.update("DELETE FROM voucher_operation_revision WHERE tenant_id='demo' AND operation_id IN (SELECT id FROM voucher_operation WHERE tenant_id='demo' AND kind='PAYMENT' AND application_id IN (" + application + "))", id.toString());
-            jdbc.update("DELETE FROM voucher_operation WHERE tenant_id='demo' AND kind='PAYMENT' AND application_id IN (" + application + ")", id.toString());
-            jdbc.update("DELETE FROM payment_execution_request_revision WHERE tenant_id='demo' AND request_id IN (SELECT id FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id=?)", id.toString());
-            jdbc.update("DELETE FROM payment_execution_request WHERE tenant_id='demo' AND authorization_id=?", id.toString());
-            jdbc.update("DELETE FROM payment_operation_revision WHERE tenant_id='demo' AND operation_id=?", id.toString());
+            String application =
+                    "SELECT application_id FROM payment_authorization WHERE tenant_id='demo' AND"
+                            + " id=?";
+            jdbc.update(
+                    "DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND"
+                            + " preparation_id IN (SELECT id FROM voucher_preparation WHERE"
+                            + " tenant_id='demo' AND kind='PAYMENT' AND application_id IN ("
+                            + application + "))", id.toString());
+            jdbc.update(
+                    "DELETE FROM voucher_preparation WHERE tenant_id='demo' AND kind='PAYMENT' AND"
+                            + " application_id IN ("
+                            + application + ")", id.toString());
+            jdbc.update(
+                    "DELETE FROM voucher_operation_revision WHERE tenant_id='demo' AND operation_id"
+                            + " IN (SELECT id FROM voucher_operation WHERE tenant_id='demo' AND"
+                            + " kind='PAYMENT' AND application_id IN ("
+                            + application + "))", id.toString());
+            jdbc.update(
+                    "DELETE FROM voucher_operation WHERE tenant_id='demo' AND kind='PAYMENT' AND"
+                            + " application_id IN ("
+                            + application + ")", id.toString());
+            jdbc.update(
+                    "DELETE FROM payment_execution_request_revision WHERE tenant_id='demo' AND"
+                            + " request_id IN (SELECT id FROM payment_execution_request WHERE"
+                            + " tenant_id='demo' AND authorization_id=?)", id.toString());
+            jdbc.update(
+                    "DELETE FROM payment_execution_request WHERE tenant_id='demo' AND"
+                            + " authorization_id=?", id.toString());
+            jdbc.update(
+                    "DELETE FROM payment_operation_revision WHERE tenant_id='demo' AND"
+                            + " operation_id=?", id.toString());
             jdbc.update("DELETE FROM payment_operation WHERE tenant_id='demo' AND id=?", id.toString());
-            jdbc.update("DELETE FROM payment_authorization_revision WHERE tenant_id='demo' AND authorization_id=?", id.toString());
+            jdbc.update(
+                    "DELETE FROM payment_authorization_revision WHERE tenant_id='demo' AND"
+                            + " authorization_id=?", id.toString());
             jdbc.update("DELETE FROM payment_authorization WHERE tenant_id='demo' AND id=?", id.toString()); COMMANDS.remove(id);
         }
-        jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject IN ('finance','cashier')");
+        jdbc.update(
+                "UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject IN"
+                        + " ('finance','cashier')");
     }
     @AfterAll static void stop() { SERVER.stop(0); HTTP_THREADS.shutdownNow(); }
 
@@ -179,18 +225,24 @@ class PaymentOperationIntegrationTest {
         var authorization = authorized(); String expectedTrace = UUID.randomUUID().toString();
         PaymentExecutionRequest queued;
         try (var trace = new DiagnosticContext(expectedTrace, "demo").open()) { queued = request(authorization, "v1"); }
-        assertThat(jdbc.queryForMap("SELECT * FROM payment_execution_request WHERE tenant_id='demo' AND id=?", queued.input().id().toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM payment_execution_request WHERE"
+                                                + " tenant_id='demo' AND id=?", queued.input().id().toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         TRACES.clear(); requestWorker.poll();
         assertThat(executionRequests.find("demo", queued.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.READY);
         UUID id = authorization.terms().id(); var operation = operations.find("demo", id).orElseThrow();
         COMMANDS.put(id, operation.input().command());
-        assertThat(jdbc.queryForMap("SELECT * FROM payment_operation WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM payment_operation WHERE tenant_id='demo' AND"
+                                                + " id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         worker.poll(); assertThat(reload(operation).settleable()).isTrue();
         assertThat(TRACES).hasSize(5).containsOnly(expectedTrace);
         var preparation = paymentPreparation(operation);
-        assertThat(jdbc.queryForMap("SELECT * FROM voucher_preparation WHERE tenant_id='demo' AND id=?", preparation.input().id().toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM voucher_preparation WHERE tenant_id='demo'"
+                                                + " AND id=?", preparation.input().id().toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         preparationWorker.poll(); voucherWorker.poll();
         assertThat(paymentVoucher(operation).usablePosted()).isTrue();
@@ -207,7 +259,9 @@ class PaymentOperationIntegrationTest {
         try (var trace = new DiagnosticContext(expectedTrace, "demo").open()) {
             queued = tx().execute(status -> payeeReviewService.register(ended, voucher.version(), "finance", now()));
         }
-        assertThat(jdbc.queryForMap("SELECT * FROM payment_payee_review WHERE tenant_id='demo' AND id=?", queued.input().id().toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM payment_payee_review WHERE tenant_id='demo'"
+                                                + " AND id=?", queued.input().id().toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         TRACES.clear(); payeeReviewWorker.poll();
         assertThat(payeeReviews.find("demo", queued.input().id()).orElseThrow().status()).isEqualTo(PaymentPayeeReview.Status.READY);
@@ -224,13 +278,17 @@ class PaymentOperationIntegrationTest {
         UUID id = queued.input().command().id();
         assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
         assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
-        assertThat(jdbc.queryForMap("SELECT * FROM payment_operation WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM payment_operation WHERE tenant_id='demo' AND"
+                                                + " id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         TRACES.clear();
         worker.poll();
         assertThat(reload(queued).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
         assertThat(TRACES).isNotEmpty().containsOnly(expectedTrace);
-        assertThat(jdbc.queryForMap("SELECT * FROM payment_operation WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM payment_operation WHERE tenant_id='demo' AND"
+                                                + " id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
         assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
@@ -240,7 +298,9 @@ class PaymentOperationIntegrationTest {
         var authorization = authorized(); var request = request(authorization, "v2"); requestWorker.poll();
         assertThat(executionRequests.find("demo", request.input().id()).orElseThrow().status()).isEqualTo(PaymentExecutionRequest.Status.BLOCKED);
         assertThat(operations.find("demo", authorization.terms().id())).isEmpty(); assertThat(WRITES.get()).isZero();
-        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_ATTENTION'",
+        assertThat(jdbc.queryForList(
+                                "SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo'"
+                                        + " AND application_id=? AND kind='PAYMENT_ATTENTION'",
                 String.class, authorization.terms().binding().applicationId().toString())).containsExactlyInAnyOrder("alice", "finance", "cashier");
         String path = requestNotificationPath(authorization, "cashier");
         var response = notificationGet(path, "cashier"); assertThat(response.getStatus()).isEqualTo(200);
@@ -250,7 +310,9 @@ class PaymentOperationIntegrationTest {
         assertThat(value.at("/payment/operation").isNull()).isTrue(); assertThat(value.at("/payment/executedBy").isNull()).isTrue();
         assertThat(value.toString()).doesNotContain("synthetic-account", "debitReference", "commandDigest");
         for (String user : List.of("alice", "finance", "admin", "bob")) assertThat(notificationGet(path, user).getStatus()).isEqualTo(404);
-        jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='cashier'");
+        jdbc.update(
+                "UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND"
+                        + " subject='cashier'");
         assertThat(notificationGet(path, "cashier").getStatus()).isEqualTo(404);
     }
 
@@ -274,7 +336,9 @@ class PaymentOperationIntegrationTest {
         requestService.fail(work, PaymentExecutionRequest.Failure.INTERNAL_ERROR, false, later);
         assertThat(executionRequests.find("demo", request.input().id())).contains(ready);
         assertThat(requestNotificationRecipients(authorization)).containsExactlyInAnyOrder("alice", "finance", "cashier");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_RESULT'",
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND"
+                                        + " application_id=? AND kind='PAYMENT_RESULT'",
                 Long.class, authorization.terms().binding().applicationId().toString())).isZero();
         assertThat(WRITES.get()).isZero(); assertThat(QUERIES.get()).isZero();
     }
@@ -284,10 +348,14 @@ class PaymentOperationIntegrationTest {
         var preference = notificationPreferences.get(recipient); notificationPreferences.revise(recipient, preference.version(), true, false);
         try {
             var authorization = authorized(); var request = request(authorization, "v1"); var until = authorization.decision().expiresAt();
-            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT payment_request_notice_fixture CHECK(application_id<>'"
-                    + authorization.terms().binding().applicationId() + "' OR kind<>'PAYMENT_ATTENTION' OR recipient_id<>'cashier')");
+            jdbc.execute(
+                    "ALTER TABLE notification_inbox ADD CONSTRAINT payment_request_notice_fixture"
+                            + " CHECK(application_id<>'"
+                            + authorization.terms().binding().applicationId() + "' OR kind<>'PAYMENT_ATTENTION' OR recipient_id<>'cashier')");
             try { assertThatThrownBy(() -> requestService.claim("demo", request.input().id(), until)).isInstanceOf(RuntimeException.class); }
-            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT payment_request_notice_fixture"); }
+            finally { jdbc.execute(
+                        "ALTER TABLE notification_inbox DROP CONSTRAINT"
+                                + " payment_request_notice_fixture"); }
             assertThat(authorizations.find("demo", authorization.terms().id())).contains(authorization);
             assertThat(executionRequests.find("demo", request.input().id())).contains(request);
             assertThat(requestNotificationRecipients(authorization)).isEmpty();
@@ -297,7 +365,10 @@ class PaymentOperationIntegrationTest {
             assertThat(requestNotificationRecipients(authorization)).containsExactlyInAnyOrder("alice", "finance", "cashier");
             var target = notificationGet(requestNotificationPath(authorization, "cashier"), "cashier"); assertThat(target.getStatus()).isEqualTo(200);
             assertThat(json.read(target.getContentAsString(), JsonNode.class).at("/payment/operation").isNull()).isTrue();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox n ON n.id=d.inbox_id WHERE n.application_id=? AND n.kind='PAYMENT_ATTENTION'",
+            assertThat(jdbc.queryForObject(
+                                    "SELECT COUNT(*) FROM notification_dispatch d JOIN"
+                                            + " notification_inbox n ON n.id=d.inbox_id WHERE"
+                                            + " n.application_id=? AND n.kind='PAYMENT_ATTENTION'",
                     Long.class, authorization.terms().binding().applicationId().toString())).isEqualTo(1);
             assertThat(operations.find("demo", authorization.terms().id())).isEmpty(); assertThat(WRITES.get()).isZero();
         } finally {
@@ -307,12 +378,16 @@ class PaymentOperationIntegrationTest {
     }
 
     private List<String> requestNotificationRecipients(PaymentAuthorization authorization) {
-        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_ATTENTION'",
+        return jdbc.queryForList(
+                "SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND"
+                        + " application_id=? AND kind='PAYMENT_ATTENTION'",
                 String.class, authorization.terms().binding().applicationId().toString());
     }
 
     private String requestNotificationPath(PaymentAuthorization authorization, String recipient) {
-        String id = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND recipient_id=? AND kind='PAYMENT_ATTENTION'",
+        String id = jdbc.queryForObject(
+                        "SELECT id FROM notification_inbox WHERE tenant_id='demo' AND"
+                            + " application_id=? AND recipient_id=? AND kind='PAYMENT_ATTENTION'",
                 String.class, authorization.terms().binding().applicationId().toString(), recipient);
         return "/api/v1/notifications/" + id + "/payment-target";
     }
@@ -321,7 +396,9 @@ class PaymentOperationIntegrationTest {
         var payment = job(); worker.poll();
         assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
         assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).containsExactlyInAnyOrder("alice", "finance", "cashier");
-        var content = jdbc.queryForList("SELECT title,content FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_RESULT'",
+        var content = jdbc.queryForList(
+                        "SELECT title,content FROM notification_inbox WHERE tenant_id='demo' AND"
+                                + " application_id=? AND kind='PAYMENT_RESULT'",
                 payment.input().command().binding().applicationId().toString());
         assertThat(content).allSatisfy(row -> {
             assertThat(row.get("title")).isEqualTo("付款结果更新");
@@ -368,7 +445,9 @@ class PaymentOperationIntegrationTest {
         execution.finish(sending, new FinanceResult.Success<>(failed), now());
         assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).containsExactlyInAnyOrder("alice", "finance", "cashier");
         assertThat(paymentNotificationRecipients(payment, "PAYMENT_ATTENTION")).isEmpty();
-        assertThat(jdbc.queryForList("SELECT content FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_RESULT'",
+        assertThat(jdbc.queryForList(
+                                "SELECT content FROM notification_inbox WHERE tenant_id='demo' AND"
+                                        + " application_id=? AND kind='PAYMENT_RESULT'",
                 String.class, command.binding().applicationId().toString())).allSatisfy(text -> assertThat(text).contains("未成功回执"));
         assertThat(balances.find("demo", command.binding().businessId())).isEmpty();
     }
@@ -376,7 +455,9 @@ class PaymentOperationIntegrationTest {
     @Test void resultAfterCashierDeactivationKeepsPaymentFactWithoutNotifyingInactiveRecipient() {
         var payment = job(); var checking = execution.claim("demo", payment.input().command().id(), now());
         var sending = execution.readyToSend(checking, directory(now()), account(now()), now());
-        jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='cashier'");
+        jdbc.update(
+                "UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND"
+                        + " subject='cashier'");
         execution.finish(sending, new FinanceResult.Success<>(paid(payment.input().command(), 1)), now());
         assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
         assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).containsExactlyInAnyOrder("alice", "finance");
@@ -386,7 +467,10 @@ class PaymentOperationIntegrationTest {
         var payment = job(); worker.poll(); reverse(payment); recheck(payment); worker.poll();
         assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).containsExactlyInAnyOrder("alice", "alice", "finance", "finance", "cashier", "cashier");
         assertThat(paymentNotificationRecipients(payment, "PAYMENT_ATTENTION")).isEmpty();
-        assertThat(jdbc.queryForList("SELECT DISTINCT content FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT_RESULT'",
+        assertThat(jdbc.queryForList(
+                                "SELECT DISTINCT content FROM notification_inbox WHERE"
+                                        + " tenant_id='demo' AND application_id=? AND"
+                                        + " kind='PAYMENT_RESULT'",
                 String.class, payment.input().command().binding().applicationId().toString())).anyMatch(text -> text.contains("资金退回"));
     }
 
@@ -397,16 +481,23 @@ class PaymentOperationIntegrationTest {
         try {
             var payment = job(); var checking = execution.claim("demo", payment.input().command().id(), now());
             var sending = execution.readyToSend(checking, directory(now()), account(now()), now());
-            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT payment_notification_fixture CHECK(application_id<>'"
-                    + payment.input().command().binding().applicationId() + "' OR kind<>'PAYMENT_RESULT' OR recipient_id<>'cashier')");
+            jdbc.execute(
+                    "ALTER TABLE notification_inbox ADD CONSTRAINT payment_notification_fixture"
+                            + " CHECK(application_id<>'"
+                            + payment.input().command().binding().applicationId() + "' OR kind<>'PAYMENT_RESULT' OR recipient_id<>'cashier')");
             try { assertThatThrownBy(() -> execution.finish(sending, new FinanceResult.Success<>(paid(payment.input().command(), 1)), now())).isInstanceOf(RuntimeException.class); }
-            finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT payment_notification_fixture"); }
+            finally { jdbc.execute(
+                        "ALTER TABLE notification_inbox DROP CONSTRAINT"
+                                + " payment_notification_fixture"); }
             assertThat(reload(payment)).isEqualTo(sending);
             assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).isEmpty();
             assertThat(balances.find("demo", payment.input().command().binding().businessId())).isEmpty();
             execution.finish(sending, new FinanceResult.Success<>(paid(payment.input().command(), 1)), now());
             assertThat(paymentNotificationRecipients(payment, "PAYMENT_RESULT")).hasSize(3);
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox n ON n.id=d.inbox_id WHERE n.application_id=? AND n.kind='PAYMENT_RESULT'",
+            assertThat(jdbc.queryForObject(
+                                    "SELECT COUNT(*) FROM notification_dispatch d JOIN"
+                                            + " notification_inbox n ON n.id=d.inbox_id WHERE"
+                                            + " n.application_id=? AND n.kind='PAYMENT_RESULT'",
                     Long.class, payment.input().command().binding().applicationId().toString())).isEqualTo(1);
         } finally {
             var current = notificationPreferences.get(recipient);
@@ -438,7 +529,9 @@ class PaymentOperationIntegrationTest {
         assertThat(applicant.getStatus()).isEqualTo(200);
         assertThat(json.read(applicant.getContentAsString(), JsonNode.class).path("view").asText()).isEqualTo("APPLICATION_ROUND");
         assertThat(notificationGet("/api/v1/applications/" + payment.input().command().binding().applicationId(), "cashier").getStatus()).isEqualTo(404);
-        jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='cashier'");
+        jdbc.update(
+                "UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND"
+                        + " subject='cashier'");
         assertThat(notificationGet(path, "cashier").getStatus()).isEqualTo(404);
     }
 
@@ -446,26 +539,37 @@ class PaymentOperationIntegrationTest {
         var recipient = new io.agentflow.common.Actor("demo", "cashier", java.util.Set.of("CASHIER"));
         var preference = notificationPreferences.get(recipient);
         notificationPreferences.revise(recipient, preference.version(), true, false);
-        String appointment = "SELECT a.id FROM organization_appointment a JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id "
-                + "JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id WHERE a.tenant_id='demo' AND p.subject='cashier' AND d.legal_entity_id=?";
+        String appointment =
+                "SELECT a.id FROM organization_appointment a JOIN organization_person p ON"
+                    + " p.tenant_id=a.tenant_id AND p.id=a.person_id JOIN organization_unit d ON"
+                    + " d.tenant_id=a.tenant_id AND d.id=a.department_id WHERE a.tenant_id='demo'"
+                    + " AND p.subject='cashier' AND d.legal_entity_id=?";
         var ids = jdbc.queryForList(appointment, String.class, ENTITY.toString());
         try {
             var payment = job(); worker.poll();
-            UUID delivery = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE tenant_id='demo' AND recipient_id='cashier' AND inbox_id=?",
+            UUID delivery = UUID.fromString(jdbc.queryForObject(
+                                    "SELECT id FROM notification_dispatch WHERE tenant_id='demo'"
+                                            + " AND recipient_id='cashier' AND inbox_id=?",
                     String.class, paymentMessageId(payment, "cashier")));
-            for (var id : ids) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            for (var id : ids) jdbc.update(
+                        "UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo'"
+                                + " AND id=?", id);
             assertThat(notificationDeliveries.claim(delivery, now())).isNull();
             assertThat(notificationStore.get(recipient, delivery).orElseThrow().progress().errorCode()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.FailureCode.MESSAGE_UNAVAILABLE);
             assertThat(notificationStore.get(recipient, delivery).orElseThrow().progress().attempts()).isZero();
         } finally {
-            for (var id : ids) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id);
+            for (var id : ids) jdbc.update(
+                        "UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND"
+                                + " id=?", id);
             var current = notificationPreferences.get(recipient);
             notificationPreferences.revise(recipient, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
         }
     }
 
     private String paymentMessageId(PaymentOperation payment, String recipient) {
-        return jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND recipient_id=? AND kind='PAYMENT_RESULT'",
+        return jdbc.queryForObject(
+                "SELECT id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND"
+                        + " recipient_id=? AND kind='PAYMENT_RESULT'",
                 String.class, payment.input().command().binding().applicationId().toString(), recipient);
     }
 
@@ -475,7 +579,9 @@ class PaymentOperationIntegrationTest {
     }
 
     private List<String> paymentNotificationRecipients(PaymentOperation payment, String kind) {
-        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind=? ORDER BY recipient_id",
+        return jdbc.queryForList(
+                "SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND"
+                        + " application_id=? AND kind=? ORDER BY recipient_id",
                 String.class, payment.input().command().binding().applicationId().toString(), kind);
     }
 
@@ -496,9 +602,13 @@ class PaymentOperationIntegrationTest {
 
     @Test void callbackQueueAndPaymentRevisionRollbackTogetherWhenHistoryCannotBeSaved() throws Exception {
         var payment = job(); worker.poll(); var before = reload(payment); var callback = receiveCallback("evt_" + UUID.randomUUID(), callbackBody(payment, 2));
-        jdbc.execute("ALTER TABLE payment_callback_revision ADD CONSTRAINT callback_history_fixture CHECK(version<2)");
+        jdbc.execute(
+                "ALTER TABLE payment_callback_revision ADD CONSTRAINT callback_history_fixture"
+                        + " CHECK(version<2)");
         try { assertThatThrownBy(() -> callbacks.process(candidate(callback), now())).isInstanceOf(RuntimeException.class); }
-        finally { jdbc.execute("ALTER TABLE payment_callback_revision DROP CONSTRAINT callback_history_fixture"); }
+        finally { jdbc.execute(
+                    "ALTER TABLE payment_callback_revision DROP CONSTRAINT"
+                            + " callback_history_fixture"); }
         assertThat(reload(payment)).isEqualTo(before); assertThat(callbackRecords.get("demo", callback.id())).isEqualTo(callback);
         callbacks.process(candidate(callback), now()); worker.poll(); assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isEqualTo(1);
     }
@@ -622,8 +732,14 @@ class PaymentOperationIntegrationTest {
         assertThat(done.status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(done.settleable()).isTrue();
         assertThat(done.version()).isEqualTo(4); assertThat(done.dispatches()).isEqualTo(1); assertThat(WRITES.get()).isEqualTo(1); assertThat(ACCOUNT_READS.get()).isEqualTo(2);
         assertThat(LAST_KEY.get()).isEqualTo(job.input().command().id().toString()); assertThat(QUERIES.get()).isZero();
-        assertThat(new JdbcPaymentOperationRepository(jdbc, json, authorizations).find("demo", job.input().command().id())).contains(done);
-        assertThat(jdbc.queryForList("SELECT version FROM payment_operation_revision WHERE tenant_id='demo' AND operation_id=? ORDER BY version", Long.class, job.input().command().id().toString())).containsExactly(1L, 2L, 3L, 4L);
+        assertThat(new JdbcPaymentOperationRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.finance.mapper
+                                                        .PaymentOperationRepositoryMapper.class), json, authorizations).find("demo", job.input().command().id())).contains(done);
+        assertThat(jdbc.queryForList(
+                                "SELECT version FROM payment_operation_revision WHERE"
+                                        + " tenant_id='demo' AND operation_id=? ORDER BY version", Long.class, job.input().command().id().toString())).containsExactly(1L, 2L, 3L, 4L);
         assertThat(operations.find("foreign", job.input().command().id())).isEmpty();
     }
     @Test void successfulPaymentCreatesOneActualBalanceAndQueriesCannotResetIt() {
@@ -643,7 +759,9 @@ class PaymentOperationIntegrationTest {
     @Test void confirmedBankReceiptQueuesItsSeparatePaymentVoucher() {
         var payment = job(); worker.poll();
         assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM voucher_preparation WHERE tenant_id='demo' AND application_id=? AND kind='PAYMENT'",
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM voucher_preparation WHERE tenant_id='demo'"
+                                        + " AND application_id=? AND kind='PAYMENT'",
                 Integer.class, payment.input().command().binding().applicationId().toString())).isEqualTo(1);
         assertThat(WRITES.get()).isEqualTo(1);
     }
@@ -707,16 +825,22 @@ class PaymentOperationIntegrationTest {
         preparationWorker.poll(); assertThat(paymentPreparation(payment).status()).isEqualTo(VoucherPreparation.Status.BLOCKED);
         assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED); assertThat(VOUCHER_WRITES.get()).isZero();
         UUID originalPreparation = paymentPreparation(payment).input().id();
-        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class,
+        assertThat(jdbc.queryForList(
+                                "SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo'"
+                                        + " AND event_key=?", String.class,
                 "voucher:" + originalPreparation + ":PREPARATION_BLOCKED")).containsExactlyInAnyOrder("alice", "cashier");
         recheck(payment); worker.poll();
         tx().executeWithoutResult(status -> preparationService.retryPayment("demo", source.applicationId(), source.roundNo(), "finance", now()));
         assertThat(paymentPreparation(payment).input().source()).isEqualTo(source);
         RESPONDER.set(PaymentOperationIntegrationTest::response); preparationWorker.poll(); voucherWorker.poll();
         assertThat(paymentPreparation(payment).input().attempt()).isEqualTo(2); assertThat(paymentVoucher(payment).usablePosted()).isTrue();
-        assertThat(jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", String.class,
+        assertThat(jdbc.queryForList(
+                                "SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo'"
+                                        + " AND event_key=?", String.class,
                 "voucher:" + paymentPreparation(payment).input().id() + ":POSTED")).containsExactlyInAnyOrder("alice", "finance");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND event_key=?", Long.class,
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM notification_inbox WHERE tenant_id='demo' AND"
+                                        + " event_key=?", Long.class,
                 "voucher:" + originalPreparation + ":POSTED")).isZero();
         assertThat(WRITES.get()).isEqualTo(1);
     }
@@ -724,20 +848,32 @@ class PaymentOperationIntegrationTest {
     @Test void paymentVoucherNotificationStillRequiresOriginalCashierLegalEntityScopeBeforeDelivery() {
         var recipient = new Actor("demo", "cashier", java.util.Set.of("CASHIER"));
         var preference = notificationPreferences.get(recipient); notificationPreferences.revise(recipient, preference.version(), true, false);
-        var appointmentIds = jdbc.queryForList("SELECT a.id FROM organization_appointment a JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id WHERE a.tenant_id='demo' AND p.subject='cashier' AND d.legal_entity_id=?", String.class, ENTITY.toString());
+        var appointmentIds = jdbc.queryForList(
+                        "SELECT a.id FROM organization_appointment a JOIN organization_person p ON"
+                            + " p.tenant_id=a.tenant_id AND p.id=a.person_id JOIN organization_unit"
+                            + " d ON d.tenant_id=a.tenant_id AND d.id=a.department_id WHERE"
+                            + " a.tenant_id='demo' AND p.subject='cashier' AND d.legal_entity_id=?", String.class, ENTITY.toString());
         try {
             var payment = job(); worker.poll(); configuration.setEnabled(false); preparationWorker.poll();
             var preparation = paymentPreparation(payment); assertThat(preparation.status()).isEqualTo(VoucherPreparation.Status.UNAVAILABLE);
-            String inboxId = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='cashier'", String.class,
+            String inboxId = jdbc.queryForObject(
+                            "SELECT id FROM notification_inbox WHERE tenant_id='demo' AND"
+                                    + " event_key=? AND recipient_id='cashier'", String.class,
                     "voucher:" + preparation.input().id() + ":PREPARATION_UNAVAILABLE");
-            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE tenant_id='demo' AND inbox_id=?", String.class, inboxId));
-            for (String id : appointmentIds) jdbc.update("UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo' AND id=?", id);
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject(
+                                    "SELECT id FROM notification_dispatch WHERE tenant_id='demo'"
+                                            + " AND inbox_id=?", String.class, inboxId));
+            for (String id : appointmentIds) jdbc.update(
+                        "UPDATE organization_appointment SET active=FALSE WHERE tenant_id='demo'"
+                                + " AND id=?", id);
             assertThat(notificationDeliveries.claim(deliveryId, now())).isNull();
             var delivery = notificationStore.get(recipient, deliveryId).orElseThrow();
             assertThat(delivery.progress().errorCode()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.FailureCode.MESSAGE_UNAVAILABLE);
             assertThat(delivery.progress().attempts()).isZero(); assertThat(reload(payment).status()).isEqualTo(PaymentOperation.Status.SUCCEEDED);
         } finally {
-            for (String id : appointmentIds) jdbc.update("UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND id=?", id);
+            for (String id : appointmentIds) jdbc.update(
+                        "UPDATE organization_appointment SET active=TRUE WHERE tenant_id='demo' AND"
+                                + " id=?", id);
             configuration.setEnabled(true);
             var current = notificationPreferences.get(recipient); notificationPreferences.revise(recipient, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
         }
@@ -762,7 +898,9 @@ class PaymentOperationIntegrationTest {
 
     @Test void upgradeBackfillAndRepeatedPollingDoNotSendOrQueryBank() {
         var payment = job(); worker.poll(); var preparation = paymentPreparation(payment);
-        jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id=?", preparation.input().id().toString());
+        jdbc.update(
+                "DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND"
+                        + " preparation_id=?", preparation.input().id().toString());
         jdbc.update("DELETE FROM voucher_preparation WHERE tenant_id='demo' AND id=?", preparation.input().id().toString());
         assertThat(operations.missingVoucherPreparations()).extracting(JdbcPaymentOperationRepository.Candidate::id).contains(payment.input().command().id());
         preparationWorker.poll(); preparationWorker.poll();
@@ -792,7 +930,9 @@ class PaymentOperationIntegrationTest {
     }
     @Test void changedApprovalOrDisabledOriginalCashierStopsBeforeAnyNetworkCall() {
         var job = job(); revoke(job); worker.poll(); assertThat(reload(job).status()).isEqualTo(PaymentOperation.Status.VOIDED);
-        var second = job(); jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='cashier'"); worker.poll();
+        var second = job(); jdbc.update(
+                "UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND"
+                        + " subject='cashier'"); worker.poll();
         assertThat(reload(second).status()).isEqualTo(PaymentOperation.Status.VOIDED); assertThat(WRITES.get()).isZero(); assertThat(ACCOUNT_READS.get()).isZero();
         assertThat(personnel.eligible("foreign", "finance", ENTITY)).isFalse(); assertThat(personnel.eligible("demo", "finance", UUID.randomUUID())).isFalse();
     }
@@ -865,14 +1005,22 @@ class PaymentOperationIntegrationTest {
         var job = job(); worker.poll(); var id = job.input().command().binding().businessId();
         // 按依赖顺序清除本用例的拨付记录和余额，模拟旧付款已成功但本地尚未入账。
         tx().executeWithoutResult(status -> {
-            jdbc.update("DELETE FROM employee_advance_order WHERE tenant_id='demo' AND advance_id=?", id.toString());
-            jdbc.update("DELETE FROM finance_resource_revision WHERE tenant_id='demo' AND resource_type='ADVANCE' AND resource_id=?", id.toString());
-            jdbc.update("DELETE FROM finance_resource WHERE tenant_id='demo' AND resource_type='ADVANCE' AND id=?", id.toString());
+            jdbc.update(
+                                    "DELETE FROM employee_advance_order WHERE tenant_id='demo' AND"
+                                            + " advance_id=?", id.toString());
+            jdbc.update(
+                                    "DELETE FROM finance_resource_revision WHERE tenant_id='demo'"
+                                            + " AND resource_type='ADVANCE' AND resource_id=?", id.toString());
+            jdbc.update(
+                                    "DELETE FROM finance_resource WHERE tenant_id='demo' AND"
+                                            + " resource_type='ADVANCE' AND id=?", id.toString());
         });
         assertThat(operations.missingAdvanceBalances()).extracting(JdbcPaymentOperationRepository.Candidate::id).contains(job.input().command().id());
         worker.poll(); disbursements.recover("demo", job.input().command().id());
         assertThat(balances.find("demo", id).orElseThrow().version()).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM employee_advance_order WHERE tenant_id='demo' AND advance_id=?", Long.class, id.toString())).isEqualTo(1L);
+        assertThat(jdbc.queryForObject(
+                                "SELECT count(*) FROM employee_advance_order WHERE tenant_id='demo'"
+                                        + " AND advance_id=?", Long.class, id.toString())).isEqualTo(1L);
         assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isZero();
     }
 
@@ -959,8 +1107,12 @@ class PaymentOperationIntegrationTest {
             authorizations.create(value); payeeReviewService.consume(proof, value, at); return value;
         }); fixtures.add(replacement.terms().id());
         tx().executeWithoutResult(status -> {
-            jdbc.update("DELETE FROM payment_payee_review_revision WHERE tenant_id='demo' AND review_id=?", ready.input().id().toString());
-            jdbc.update("DELETE FROM payment_payee_review WHERE tenant_id='demo' AND id=?", ready.input().id().toString());
+            jdbc.update(
+                                    "DELETE FROM payment_payee_review_revision WHERE"
+                                            + " tenant_id='demo' AND review_id=?", ready.input().id().toString());
+            jdbc.update(
+                                    "DELETE FROM payment_payee_review WHERE tenant_id='demo' AND"
+                                            + " id=?", ready.input().id().toString());
             assertThatThrownBy(() -> sources.requireCurrent(replacement, now())).isInstanceOfSatisfying(DomainException.class, error -> assertThat(error.code()).isEqualTo("PAYMENT_PAYEE_EVIDENCE_CHANGED"));
             status.setRollbackOnly();
         });
@@ -1005,7 +1157,9 @@ class PaymentOperationIntegrationTest {
         } finally { pool.shutdownNow(); }
         assertThat(saved).isEqualTo(1); assertThat(rejected).isEqualTo(1);
         assertThat(payeeReviews.find("demo", ready.input().id()).orElseThrow().consumedAuthorizationId()).isEqualTo(winner);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_authorization WHERE tenant_id='demo' AND business_id=?", Integer.class, original.terms().binding().businessId().toString())).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM payment_authorization WHERE tenant_id='demo'"
+                                        + " AND business_id=?", Integer.class, original.terms().binding().businessId().toString())).isEqualTo(2);
         assertThat(WRITES.get()).isZero();
     }
     @Test void duplicateCashierSelectionAndChangedDisplayedAccountVersionCannotRegisterPayment() {
@@ -1021,12 +1175,17 @@ class PaymentOperationIntegrationTest {
         requestWorker.poll(); var ready = executionRequests.find("demo", request.input().id()).orElseThrow(); assertThat(ready.status()).isEqualTo(PaymentExecutionRequest.Status.READY);
         requestService.finish(stale, directory(now()), account(now()), now()); assertThat(executionRequests.find("demo", request.input().id())).contains(ready);
         assertThat(requestNotificationRecipients(authorization)).containsExactlyInAnyOrder("alice", "finance", "cashier");
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM payment_operation WHERE tenant_id='demo' AND id=?", Long.class, authorization.terms().id().toString())).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM payment_operation WHERE tenant_id='demo' AND"
+                                        + " id=?", Long.class, authorization.terms().id().toString())).isEqualTo(1);
         assertThat(WRITES.get()).isZero();
     }
     @Test void requestHistoryFailureRollsBackAuthorizationAndPaymentQueueTogether() {
         var authorization = authorized(); var request = request(authorization, "v1"); var work = requestService.claim("demo", request.input().id(), now());
-        jdbc.update("INSERT INTO payment_execution_request_revision(tenant_id,request_id,version,state_json) VALUES('demo',?,3,'{}')", request.input().id().toString());
+        jdbc.update(
+                "INSERT INTO"
+                    + " payment_execution_request_revision(tenant_id,request_id,version,state_json)"
+                    + " VALUES('demo',?,3,'{}')", request.input().id().toString());
         assertThatThrownBy(() -> requestService.finish(work, directory(now()), account(now()), now())).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
         assertThat(authorizations.find("demo", authorization.terms().id())).contains(authorization); assertThat(operations.find("demo", authorization.terms().id())).isEmpty();
         assertThat(executionRequests.find("demo", request.input().id())).contains(work.request()); assertThat(WRITES.get()).isZero();
@@ -1059,7 +1218,9 @@ class PaymentOperationIntegrationTest {
         var changedInput = new PaymentExecutionRequest.Input(input.id(), input.tenantId(), input.authorizationId(), input.authorizationVersion(), input.cashier(), "another-debit", input.debitVersion());
         var changed = new PaymentExecutionRequest(changedInput, claimed.version(), claimed.status(), claimed.attempts(), claimed.createdAt(), claimed.updatedAt(), claimed.nextAttemptAt(), claimed.leaseUntil(), claimed.failure());
         assertThatThrownBy(() -> tx().executeWithoutResult(status -> executionRequests.update(changed))).isInstanceOf(DomainException.class);
-        jdbc.update("UPDATE payment_execution_request SET cashier_id='another-person' WHERE tenant_id='demo' AND id=?", input.id().toString());
+        jdbc.update(
+                "UPDATE payment_execution_request SET cashier_id='another-person' WHERE"
+                        + " tenant_id='demo' AND id=?", input.id().toString());
         assertThatThrownBy(() -> executionRequests.find("demo", input.id())).isInstanceOf(IllegalStateException.class);
     }
 
@@ -1069,6 +1230,7 @@ class PaymentOperationIntegrationTest {
 
     /**
      * 复用同一真实批准、资金回环和事务夹具验证组批，不复制单笔支付守卫。
+     *
      * @author owlzhangfq@gmail.com
      */
     @Nested
@@ -1097,7 +1259,9 @@ class PaymentOperationIntegrationTest {
                 assertThat(get(PATH + "/" + batch.id(), who).getStatus()).isEqualTo(403);
                 assertThat(submit(body, UUID.randomUUID().toString(), who).getStatus()).isEqualTo(403);
             }
-            jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='cashier'");
+            jdbc.update(
+                    "UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND"
+                            + " subject='cashier'");
             assertThat(get(PATH + "/" + batch.id(), "cashier").getStatus()).isEqualTo(404);
             assertThat(submit(body, key, "cashier").getStatus()).isEqualTo(404);
         }
@@ -1115,7 +1279,9 @@ class PaymentOperationIntegrationTest {
         @Test void failedBatchMembershipInsertRollsBackAllRegisteredChoices() {
             var values = List.of(authorized(), authorized()); var input = json.read(json.write(input(values)), PaymentBatchService.Input.class);
             long audit = jdbc.queryForObject("SELECT count(*) FROM audit_event", Long.class);
-            jdbc.execute("ALTER TABLE payment_batch_item ADD CONSTRAINT batch_membership_fixture CHECK(line_no<2)");
+            jdbc.execute(
+                    "ALTER TABLE payment_batch_item ADD CONSTRAINT batch_membership_fixture"
+                            + " CHECK(line_no<2)");
             actors.set(new io.agentflow.common.Actor("demo", "cashier", java.util.Set.of("CASHIER")));
             try {
                 assertThatThrownBy(() -> tx().execute(status -> paymentBatches.submit(input))).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
@@ -1144,7 +1310,9 @@ class PaymentOperationIntegrationTest {
                 assertThat(ready.await(3, TimeUnit.SECONDS)).isTrue(); release.countDown();
                 assertThat(List.of(one.get(8, TimeUnit.SECONDS), two.get(8, TimeUnit.SECONDS))).containsExactlyInAnyOrder(202, 409);
                 for (var value : List.of(first, second)) assertThat(executionRequests.forAuthorization("demo", value.terms().id())).isPresent();
-                assertThat(jdbc.queryForObject("SELECT count(DISTINCT batch_id) FROM payment_batch_item WHERE authorization_id IN (?,?)", Long.class, first.terms().id().toString(), second.terms().id().toString())).isEqualTo(1);
+                assertThat(jdbc.queryForObject(
+                                        "SELECT count(DISTINCT batch_id) FROM payment_batch_item"
+                                                + " WHERE authorization_id IN (?,?)", Long.class, first.terms().id().toString(), second.terms().id().toString())).isEqualTo(1);
                 assertThat(WRITES.get()).isZero();
             } finally { release.countDown(); pool.shutdownNow(); }
         }
@@ -1175,7 +1343,9 @@ class PaymentOperationIntegrationTest {
             for (var value : values) {
                 assertThat(executionRequests.forAuthorization("demo", value.terms().id())).isEmpty();
                 assertThat(operations.find("demo", value.terms().id())).isEmpty();
-                assertThat(jdbc.queryForObject("SELECT count(*) FROM payment_batch_item WHERE tenant_id='demo' AND authorization_id=?", Long.class, value.terms().id().toString())).isZero();
+                assertThat(jdbc.queryForObject(
+                                        "SELECT count(*) FROM payment_batch_item WHERE"
+                                                + " tenant_id='demo' AND authorization_id=?", Long.class, value.terms().id().toString())).isZero();
             }
             assertThat(WRITES.get()).isZero(); assertThat(ACCOUNT_READS.get()).isZero();
         }
@@ -1228,7 +1398,9 @@ class PaymentOperationIntegrationTest {
             }
         });
     }
-    private void revoke(PaymentOperation job) { jdbc.update("UPDATE approval_application SET status='REVOKED',version=version+1 WHERE tenant_id='demo' AND id=?", job.input().command().binding().applicationId().toString()); }
+    private void revoke(PaymentOperation job) { jdbc.update(
+                "UPDATE approval_application SET status='REVOKED',version=version+1 WHERE"
+                        + " tenant_id='demo' AND id=?", job.input().command().binding().applicationId().toString()); }
     private PaymentOperation reload(PaymentOperation value) { return operations.find("demo", value.input().command().id()).orElseThrow(); }
     private VoucherPreparation paymentPreparation(PaymentOperation payment) { return preparations.latest("demo", payment.input().command().binding().applicationId(), 1, VoucherCommand.Kind.PAYMENT).orElseThrow(); }
     private VoucherOperation paymentVoucher(PaymentOperation payment) { return vouchers.forRound("demo", payment.input().command().binding().applicationId(), 1, VoucherCommand.Kind.PAYMENT).orElseThrow(); }
@@ -1294,8 +1466,10 @@ class PaymentOperationIntegrationTest {
             }); server.start(); return server;
         } catch (Exception failed) { throw new IllegalStateException(failed); }
     }
+
     /**
      * 模拟资金已到账后本地消费者失败，验证持久确认和结算的共同回滚。
+     *
      * @author owlzhangfq@gmail.com
      */
     static class FailureListener {
@@ -1304,8 +1478,10 @@ class PaymentOperationIntegrationTest {
             if (event.current().status() == PaymentOperation.Status.SUCCEEDED && reject.compareAndSet(true, false)) throw new IllegalStateException("Synthetic settlement failure");
         }
     }
+
     /**
      * 故障消费者仅在此测试中启用。
+     *
      * @author owlzhangfq@gmail.com
      */
     @TestConfiguration(proxyBeanMethods = false)

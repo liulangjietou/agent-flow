@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.operations.mapper.ApprovalOperationsReadAdapterMapper">
+    <select id="readQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT COUNT(*) AS submitted, COUNT(DISTINCT r.application_id) AS applications,
+        COALESCE(SUM(CASE WHEN r.status='IN_APPROVAL' THEN 1 ELSE 0 END),0) AS in_approval,
+        COALESCE(SUM(CASE WHEN r.status='APPROVED' THEN 1 ELSE 0 END),0) AS approved,
+        COALESCE(SUM(CASE WHEN r.status='RETURNED' THEN 1 ELSE 0 END),0) AS returned,
+        COALESCE(SUM(CASE WHEN r.status='REJECTED' THEN 1 ELSE 0 END),0) AS rejected,
+        COALESCE(SUM(CASE WHEN r.status='WITHDRAWN' THEN 1 ELSE 0 END),0) AS withdrawn,
+        COUNT(CASE WHEN r.status='APPROVED' AND r.completed_at&gt;=r.submitted_at THEN 1 END) AS duration_samples,
+        AVG(CASE WHEN r.status='APPROVED' AND r.completed_at&gt;=r.submitted_at
+            THEN EXTRACT(EPOCH FROM r.completed_at)-EXTRACT(EPOCH FROM r.submitted_at) END) AS average_seconds
+        FROM approval_submission_round r JOIN approval_application a
+          ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        WHERE r.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND r.submitted_at&gt;=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND r.submitted_at&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+        <choose><when test="hasProcessKey"> AND a.process_key=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><choose><when test="hasDefinitionVersion"> AND r.definition_version=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}</when><otherwise></otherwise></choose><if test="!emptyOrganization"> AND (LOWER(r.initiator_legal_entity_name) LIKE <bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} ESCAPE '!' OR LOWER(r.initiator_department_name) LIKE <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7} ESCAPE '!' OR LOWER(r.initiator_position_name) LIKE <bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8} ESCAPE '!')</if>
+    </select>
+    <select id="readQuery2" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT FLOOR(EXTRACT(EPOCH FROM r.submitted_at)/86400) AS submitted_day,COUNT(*) AS submitted FROM approval_submission_round r JOIN approval_application a
+          ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        WHERE r.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND r.submitted_at&gt;=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND r.submitted_at&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+        <choose><when test="hasProcessKey"> AND a.process_key=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><choose><when test="hasDefinitionVersion"> AND r.definition_version=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}</when><otherwise></otherwise></choose><if test="!emptyOrganization"> AND (LOWER(r.initiator_legal_entity_name) LIKE <bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} ESCAPE '!' OR LOWER(r.initiator_department_name) LIKE <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7} ESCAPE '!' OR LOWER(r.initiator_position_name) LIKE <bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8} ESCAPE '!')</if> GROUP BY FLOOR(EXTRACT(EPOCH FROM r.submitted_at)/86400)
+    </select>
+    <select id="readQuery3" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT a.process_key,r.definition_version,COUNT(*) AS submitted, COUNT(DISTINCT r.application_id) AS applications,
+        COALESCE(SUM(CASE WHEN r.status='IN_APPROVAL' THEN 1 ELSE 0 END),0) AS in_approval,
+        COALESCE(SUM(CASE WHEN r.status='APPROVED' THEN 1 ELSE 0 END),0) AS approved,
+        COALESCE(SUM(CASE WHEN r.status='RETURNED' THEN 1 ELSE 0 END),0) AS returned,
+        COALESCE(SUM(CASE WHEN r.status='REJECTED' THEN 1 ELSE 0 END),0) AS rejected,
+        COALESCE(SUM(CASE WHEN r.status='WITHDRAWN' THEN 1 ELSE 0 END),0) AS withdrawn,
+        COUNT(CASE WHEN r.status='APPROVED' AND r.completed_at&gt;=r.submitted_at THEN 1 END) AS duration_samples,
+        AVG(CASE WHEN r.status='APPROVED' AND r.completed_at&gt;=r.submitted_at
+            THEN EXTRACT(EPOCH FROM r.completed_at)-EXTRACT(EPOCH FROM r.submitted_at) END) AS average_seconds
+        FROM approval_submission_round r JOIN approval_application a
+          ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        WHERE r.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND r.submitted_at&gt;=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND r.submitted_at&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+        <choose><when test="hasProcessKey"> AND a.process_key=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><choose><when test="hasDefinitionVersion"> AND r.definition_version=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}</when><otherwise></otherwise></choose><if test="!emptyOrganization"> AND (LOWER(r.initiator_legal_entity_name) LIKE <bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} ESCAPE '!' OR LOWER(r.initiator_department_name) LIKE <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7} ESCAPE '!' OR LOWER(r.initiator_position_name) LIKE <bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8} ESCAPE '!')</if> GROUP BY a.process_key,r.definition_version ORDER BY submitted DESC,a.process_key,r.definition_version LIMIT 501
+    </select>
+    <select id="readQuery4" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT a.process_key,a.definition_version,t.TASK_DEF_KEY_,t.NAME_,COUNT(*) AS tasks,
+               MIN(t.CREATE_TIME_) AS oldest,SUM(COUNT(*)) OVER () AS total_tasks,
+               SUM(CASE WHEN t.DUE_DATE_&lt;=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} THEN 1 ELSE 0 END) AS overdue_tasks,
+               SUM(SUM(CASE WHEN t.DUE_DATE_&lt;=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} THEN 1 ELSE 0 END)) OVER () AS overdue_total
+        <choose><when test="emptyOrganization">FROM ACT_RU_TASK t JOIN approval_application a ON EXISTS (
+            SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.PROC_INST_ID_=t.PROC_INST_ID_
+            AND v.EXECUTION_ID_=t.PROC_INST_ID_ AND v.TASK_ID_ IS NULL AND v.NAME_='applicationId' AND v.TEXT_=a.id)
+        WHERE a.tenant_id=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} AND a.status='IN_APPROVAL' AND t.SUSPENSION_STATE_=1
+        AND (t.TENANT_ID_ IS NULL OR t.TENANT_ID_='' OR t.TENANT_ID_=a.tenant_id)
+        AND EXISTS (SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.PROC_INST_ID_=t.PROC_INST_ID_
+            AND v.EXECUTION_ID_=t.PROC_INST_ID_ AND v.TASK_ID_ IS NULL AND v.NAME_='tenantId' AND v.TEXT_=a.tenant_id)
+        AND EXISTS (SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.PROC_INST_ID_=t.PROC_INST_ID_
+            AND v.EXECUTION_ID_=t.PROC_INST_ID_ AND v.TASK_ID_ IS NULL AND v.NAME_='roundNo' AND v.LONG_=a.round_no)
+        </when><otherwise>FROM ACT_RU_TASK t JOIN approval_application a ON EXISTS (
+            SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.PROC_INST_ID_=t.PROC_INST_ID_
+            AND v.EXECUTION_ID_=t.PROC_INST_ID_ AND v.TASK_ID_ IS NULL AND v.NAME_='applicationId' AND v.TEXT_=a.id)
+        LEFT JOIN approval_submission_round r ON r.tenant_id=a.tenant_id AND r.application_id=a.id
+        AND r.round_no=a.round_no AND r.process_instance_id=t.PROC_INST_ID_ AND r.status='IN_APPROVAL'
+        WHERE a.tenant_id=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} AND a.status='IN_APPROVAL' AND t.SUSPENSION_STATE_=1
+        AND (t.TENANT_ID_ IS NULL OR t.TENANT_ID_='' OR t.TENANT_ID_=a.tenant_id)
+        AND EXISTS (SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.PROC_INST_ID_=t.PROC_INST_ID_
+            AND v.EXECUTION_ID_=t.PROC_INST_ID_ AND v.TASK_ID_ IS NULL AND v.NAME_='tenantId' AND v.TEXT_=a.tenant_id)
+        AND EXISTS (SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.PROC_INST_ID_=t.PROC_INST_ID_
+            AND v.EXECUTION_ID_=t.PROC_INST_ID_ AND v.TASK_ID_ IS NULL AND v.NAME_='roundNo' AND v.LONG_=a.round_no)
+        </otherwise></choose><choose><when test="hasProcessKey"> AND a.process_key=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}</when><otherwise></otherwise></choose><choose><when test="hasDefinitionVersion"> AND a.definition_version=<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6}</when><otherwise></otherwise></choose><if test="!emptyOrganization2"> AND (LOWER(r.initiator_legal_entity_name) LIKE <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7} ESCAPE '!' OR LOWER(r.initiator_department_name) LIKE <bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8} ESCAPE '!' OR LOWER(r.initiator_position_name) LIKE <bind name="argument9" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument9} ESCAPE '!')</if>
+        GROUP BY a.process_key,a.definition_version,t.TASK_DEF_KEY_,t.NAME_
+        ORDER BY oldest ASC,a.process_key,a.definition_version,t.TASK_DEF_KEY_,t.NAME_
+         LIMIT 201
+    </select>
+    <select id="readQuery5" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT t.ID_,t.NAME_,t.ASSIGNEE_,t.CREATE_TIME_,t.DUE_DATE_,a.id,a.business_no,a.title,a.process_key,a.definition_version,a.round_no
+        <choose><when test="emptyOrganization">FROM ACT_RU_TASK t JOIN approval_application a ON EXISTS (
+            SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.PROC_INST_ID_=t.PROC_INST_ID_
+            AND v.EXECUTION_ID_=t.PROC_INST_ID_ AND v.TASK_ID_ IS NULL AND v.NAME_='applicationId' AND v.TEXT_=a.id)
+        WHERE a.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND a.status='IN_APPROVAL' AND t.SUSPENSION_STATE_=1
+        AND (t.TENANT_ID_ IS NULL OR t.TENANT_ID_='' OR t.TENANT_ID_=a.tenant_id)
+        AND EXISTS (SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.PROC_INST_ID_=t.PROC_INST_ID_
+            AND v.EXECUTION_ID_=t.PROC_INST_ID_ AND v.TASK_ID_ IS NULL AND v.NAME_='tenantId' AND v.TEXT_=a.tenant_id)
+        AND EXISTS (SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.PROC_INST_ID_=t.PROC_INST_ID_
+            AND v.EXECUTION_ID_=t.PROC_INST_ID_ AND v.TASK_ID_ IS NULL AND v.NAME_='roundNo' AND v.LONG_=a.round_no)
+        </when><otherwise>FROM ACT_RU_TASK t JOIN approval_application a ON EXISTS (
+            SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.PROC_INST_ID_=t.PROC_INST_ID_
+            AND v.EXECUTION_ID_=t.PROC_INST_ID_ AND v.TASK_ID_ IS NULL AND v.NAME_='applicationId' AND v.TEXT_=a.id)
+        LEFT JOIN approval_submission_round r ON r.tenant_id=a.tenant_id AND r.application_id=a.id
+        AND r.round_no=a.round_no AND r.process_instance_id=t.PROC_INST_ID_ AND r.status='IN_APPROVAL'
+        WHERE a.tenant_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND a.status='IN_APPROVAL' AND t.SUSPENSION_STATE_=1
+        AND (t.TENANT_ID_ IS NULL OR t.TENANT_ID_='' OR t.TENANT_ID_=a.tenant_id)
+        AND EXISTS (SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.PROC_INST_ID_=t.PROC_INST_ID_
+            AND v.EXECUTION_ID_=t.PROC_INST_ID_ AND v.TASK_ID_ IS NULL AND v.NAME_='tenantId' AND v.TEXT_=a.tenant_id)
+        AND EXISTS (SELECT 1 FROM ACT_RU_VARIABLE v WHERE v.PROC_INST_ID_=t.PROC_INST_ID_
+            AND v.EXECUTION_ID_=t.PROC_INST_ID_ AND v.TASK_ID_ IS NULL AND v.NAME_='roundNo' AND v.LONG_=a.round_no)
+        </otherwise></choose><choose><when test="hasProcessKey"> AND a.process_key=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</when><otherwise></otherwise></choose><choose><when test="hasDefinitionVersion"> AND a.definition_version=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><if test="!emptyOrganization2"> AND (LOWER(r.initiator_legal_entity_name) LIKE <bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} ESCAPE '!' OR LOWER(r.initiator_department_name) LIKE <bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} ESCAPE '!' OR LOWER(r.initiator_position_name) LIKE <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7} ESCAPE '!')</if> ORDER BY t.CREATE_TIME_,t.ID_ LIMIT 201
+    </select>
+    <select id="slaRows" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        WITH selected_rounds AS (SELECT r.tenant_id,r.application_id,r.round_no,r.process_instance_id FROM approval_submission_round r JOIN approval_application a
+          ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        WHERE r.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND r.submitted_at&gt;=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND r.submitted_at&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+        <choose><when test="hasProcessKey"> AND a.process_key=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><choose><when test="hasDefinitionVersion"> AND r.definition_version=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}</when><otherwise></otherwise></choose><if test="!emptyOrganization"> AND (LOWER(r.initiator_legal_entity_name) LIKE <bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} ESCAPE '!' OR LOWER(r.initiator_department_name) LIKE <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7} ESCAPE '!' OR LOWER(r.initiator_position_name) LIKE <bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8} ESCAPE '!')</if>) , bound_rounds AS (SELECT r.* FROM selected_rounds r WHERE 1=1
+            AND EXISTS (SELECT 1 FROM ACT_HI_VARINST v WHERE v.PROC_INST_ID_=r.process_instance_id
+                AND v.EXECUTION_ID_=r.process_instance_id AND v.TASK_ID_ IS NULL AND v.NAME_='tenantId' AND v.TEXT_=r.tenant_id)
+            AND EXISTS (SELECT 1 FROM ACT_HI_VARINST v WHERE v.PROC_INST_ID_=r.process_instance_id
+                AND v.EXECUTION_ID_=r.process_instance_id AND v.TASK_ID_ IS NULL AND v.NAME_='applicationId' AND v.TEXT_=r.application_id)
+            AND EXISTS (SELECT 1 FROM ACT_HI_VARINST v WHERE v.PROC_INST_ID_=r.process_instance_id
+                AND v.EXECUTION_ID_=r.process_instance_id AND v.TASK_ID_ IS NULL AND v.NAME_='roundNo' AND v.LONG_=r.round_no)
+        ), classified AS (
+            SELECT CASE
+                WHEN h.END_TIME_ IS NULL THEN 'UNFINISHED'
+                WHEN NOT EXISTS (SELECT 1 FROM audit_event e WHERE e.tenant_id=r.tenant_id
+                    AND e.application_id=r.application_id AND e.aggregate_type='Task' AND e.aggregate_id=h.ID_
+                    AND e.action IN ('APPROVE','RETURN','REJECT'))
+                    THEN CASE WHEN h.DELETE_REASON_ IS NOT NULL AND h.DELETE_REASON_&lt;&gt;'completed'
+                        THEN 'CANCELLED' ELSE 'UNRECORDED_DECISION' END
+                WHEN h.START_TIME_ IS NULL OR h.END_TIME_&lt;h.START_TIME_ OR h.DUE_DATE_&lt;h.START_TIME_ THEN 'INVALID_TIMING'
+                WHEN h.DUE_DATE_ IS NULL THEN 'NO_DEADLINE'
+                WHEN h.END_TIME_&gt;h.DUE_DATE_ THEN 'VIOLATED' ELSE 'ON_TIME' END AS outcome
+            FROM ACT_HI_TASKINST h JOIN bound_rounds r ON h.PROC_INST_ID_=r.process_instance_id
+            WHERE (h.TENANT_ID_ IS NULL OR h.TENANT_ID_='' OR h.TENANT_ID_=r.tenant_id)
+
+        )
+        SELECT COALESCE(SUM(CASE WHEN outcome='ON_TIME' THEN 1 ELSE 0 END),0) AS on_time,
+            COALESCE(SUM(CASE WHEN outcome='VIOLATED' THEN 1 ELSE 0 END),0) AS violated,
+            COALESCE(SUM(CASE WHEN outcome='NO_DEADLINE' THEN 1 ELSE 0 END),0) AS no_deadline,
+            COALESCE(SUM(CASE WHEN outcome='INVALID_TIMING' THEN 1 ELSE 0 END),0) AS invalid_timing,
+            COALESCE(SUM(CASE WHEN outcome='CANCELLED' THEN 1 ELSE 0 END),0) AS cancelled,
+            COALESCE(SUM(CASE WHEN outcome='UNFINISHED' THEN 1 ELSE 0 END),0) AS unfinished,
+            COALESCE(SUM(CASE WHEN outcome='UNRECORDED_DECISION' THEN 1 ELSE 0 END),0) AS unrecorded,
+            (SELECT COUNT(*) FROM selected_rounds)-(SELECT COUNT(*) FROM bound_rounds) AS unverified_rounds
+        FROM classified
+    </select>
+    <select id="notificationsRows" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        WITH selected_rounds AS (SELECT r.tenant_id,r.application_id,r.round_no,r.process_instance_id FROM approval_submission_round r JOIN approval_application a
+          ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        WHERE r.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND r.submitted_at&gt;=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND r.submitted_at&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+        <choose><when test="hasProcessKey"> AND a.process_key=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><choose><when test="hasDefinitionVersion"> AND r.definition_version=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}</when><otherwise></otherwise></choose><if test="!emptyOrganization"> AND (LOWER(r.initiator_legal_entity_name) LIKE <bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} ESCAPE '!' OR LOWER(r.initiator_department_name) LIKE <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7} ESCAPE '!' OR LOWER(r.initiator_position_name) LIKE <bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8} ESCAPE '!')</if>) SELECT COUNT(*) AS deliveries,
+            COALESCE(SUM(CASE WHEN d.status='ACCEPTED' THEN 1 ELSE 0 END),0) AS accepted,
+            COALESCE(SUM(CASE WHEN d.status='FAILED' THEN 1 ELSE 0 END),0) AS failed,
+            COALESCE(SUM(CASE WHEN d.status='RETRY_WAIT' THEN 1 ELSE 0 END),0) AS retry_waiting,
+            COALESCE(SUM(CASE WHEN d.status='UNKNOWN' THEN 1 ELSE 0 END),0) AS unknown_count,
+            COALESCE(SUM(CASE WHEN d.status='SUPPRESSED' THEN 1 ELSE 0 END),0) AS suppressed,
+            COALESCE(SUM(CASE WHEN d.status='PENDING' THEN 1 ELSE 0 END),0) AS pending,
+            COALESCE(SUM(CASE WHEN d.status='IN_FLIGHT' THEN 1 ELSE 0 END),0) AS in_flight,
+            COALESCE(SUM(CASE WHEN EXISTS(SELECT 1 FROM notification_delivery_event e
+                WHERE e.delivery_id=d.id AND e.status IN ('FAILED','RETRY_WAIT')) THEN 1 ELSE 0 END),0) AS previously_failed
+        FROM notification_dispatch d JOIN notification_inbox n
+            ON n.id=d.inbox_id AND n.tenant_id=d.tenant_id AND n.recipient_id=d.recipient_id
+        JOIN selected_rounds r ON r.tenant_id=n.tenant_id AND r.application_id=n.application_id AND r.round_no=n.round_no
+    </select>
+    <select id="agentRows" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        WITH selected_rounds AS (SELECT r.tenant_id,r.application_id,r.round_no,r.process_instance_id FROM approval_submission_round r JOIN approval_application a
+          ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        WHERE r.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND r.submitted_at&gt;=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND r.submitted_at&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+        <choose><when test="hasProcessKey"> AND a.process_key=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><choose><when test="hasDefinitionVersion"> AND r.definition_version=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}</when><otherwise></otherwise></choose><if test="!emptyOrganization"> AND (LOWER(r.initiator_legal_entity_name) LIKE <bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} ESCAPE '!' OR LOWER(r.initiator_department_name) LIKE <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7} ESCAPE '!' OR LOWER(r.initiator_position_name) LIKE <bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8} ESCAPE '!')</if>) SELECT COALESCE(SUM(CASE WHEN g.status='QUEUED' THEN 1 ELSE 0 END),0) AS queued,
+            COALESCE(SUM(CASE WHEN g.status='RUNNING' THEN 1 ELSE 0 END),0) AS running,
+            COALESCE(SUM(CASE WHEN g.status='COMPLETED' THEN 1 ELSE 0 END),0) AS awaiting_review,
+            COALESCE(SUM(CASE WHEN g.status='FAILED' THEN 1 ELSE 0 END),0) AS failed,
+            COALESCE(SUM(CASE WHEN g.status='ADOPTED' THEN 1 ELSE 0 END),0) AS adopted,
+            COALESCE(SUM(CASE WHEN g.status='DISMISSED' THEN 1 ELSE 0 END),0) AS dismissed
+        FROM agent_assist_run g JOIN selected_rounds r
+            ON g.tenant_id=r.tenant_id AND g.application_id=r.application_id AND g.round_no=r.round_no
+    </select>
+</mapper>

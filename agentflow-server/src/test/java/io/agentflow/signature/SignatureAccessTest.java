@@ -1,7 +1,12 @@
 package io.agentflow.signature;
 
-import io.agentflow.approval.ApprovalApplicationFacade;
+import static io.agentflow.signature.SignatureVerificationFixtures.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import io.agentflow.approval.ApplicationFieldViews;
+import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.copy.CopyReadService;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
@@ -20,6 +25,7 @@ import io.agentflow.form.FieldVisibility;
 import io.agentflow.form.FormSchema;
 import io.agentflow.organization.OrganizationPerson;
 import io.agentflow.organization.OrganizationRepository;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,13 +37,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
-import static io.agentflow.signature.SignatureVerificationFixtures.*;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
 /**
  * 真实字段投影与冻结附件读取串联验证；角色、组织、资料和来源各自约束，不相互补权。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SignatureAccessTest {

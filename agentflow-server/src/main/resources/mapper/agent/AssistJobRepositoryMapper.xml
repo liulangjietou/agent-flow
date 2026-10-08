@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.agent.mapper.AssistJobRepositoryMapper">
+    <insert id="create">
+        INSERT INTO agent_assist_job(tenant_id,run_id,task_id,requester_json,sources_json,target_digest,trace_id) VALUES(#{tenantId},#{runId},#{taskId},#{requesterJson},#{sourcesJson},#{targetDigest},#{traceId})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM agent_assist_job WHERE tenant_id=#{tenant} AND run_id=#{runId}
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT j.tenant_id,j.run_id,j.trace_id,a.business_no,s.process_instance_id,
+            CASE WHEN a.id IS NOT NULL THEN j.task_id ELSE NULL END AS task_id
+        FROM agent_assist_job j
+        JOIN agent_assist_run r ON r.tenant_id=j.tenant_id AND r.id=j.run_id
+        LEFT JOIN approval_application a ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=r.round_no
+        WHERE r.status='QUEUED' OR (r.status='RUNNING' AND j.lease_until&lt;=#{leaseUntil})
+        ORDER BY r.created_at,j.run_id LIMIT 10
+    </select>
+
+    <select id="lock" resultType="String">
+        SELECT run_id FROM agent_assist_job WHERE tenant_id=#{tenant} AND run_id=#{runId} FOR UPDATE
+    </select>
+
+    <update id="lease">
+        UPDATE agent_assist_job SET lease_until=#{leaseUntil} WHERE tenant_id=#{tenant} AND run_id=#{runId}
+    </update>
+</mapper>

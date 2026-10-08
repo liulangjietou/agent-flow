@@ -1,9 +1,13 @@
 package io.agentflow.approval;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.JdbcDefinitionDraftRepository;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,10 +15,9 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 /**
  * 验证 V6 升级不猜测旧 schema、不重写旧表单和轮次内容。
+ *
  * @author owlzhangfq@gmail.com
  */
 class FormSchemaMigrationTest {
@@ -27,18 +30,21 @@ class FormSchemaMigrationTest {
         String applicationId = UUID.randomUUID().toString();
         String graph = "{\"nodes\":[],\"edges\":[]}";
         String payload = "{\"old\":{\"note\":null},\"lines\":[{\"amount\":6000}],\"optional\":null}";
-        jdbc.update("""
-                INSERT INTO approval_definition (id,tenant_id,process_key,name,version,revision,status,graph_json)
-                VALUES (?, 'demo', 'legacy', '旧定义', 1, 1, 'PUBLISHED', ?)
-                """, definitionId, graph);
-        jdbc.update("""
-                INSERT INTO approval_application (id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version)
-                VALUES (?, 'demo', 'OLD-BIZ', 'legacy', 1, 'alice', '旧申请', ?, 'IN_APPROVAL', 1, 2)
-                """, applicationId, payload);
-        jdbc.update("""
-                INSERT INTO approval_submission_round (tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status)
-                VALUES ('demo', ?, 1, 'old-instance', 1, '旧申请', ?, 'alice', CURRENT_TIMESTAMP, 'IN_APPROVAL')
-                """, applicationId, payload);
+        jdbc.update(
+                """
+INSERT INTO approval_definition (id,tenant_id,process_key,name,version,revision,status,graph_json)
+VALUES (?, 'demo', 'legacy', '旧定义', 1, 1, 'PUBLISHED', ?)
+""", definitionId, graph);
+        jdbc.update(
+                """
+INSERT INTO approval_application (id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version)
+VALUES (?, 'demo', 'OLD-BIZ', 'legacy', 1, 'alice', '旧申请', ?, 'IN_APPROVAL', 1, 2)
+""", applicationId, payload);
+        jdbc.update(
+                """
+INSERT INTO approval_submission_round (tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status)
+VALUES ('demo', ?, 1, 'old-instance', 1, '旧申请', ?, 'alice', CURRENT_TIMESTAMP, 'IN_APPROVAL')
+""", applicationId, payload);
         var definitionBefore = jdbc.queryForMap("SELECT * FROM approval_definition WHERE id=?", definitionId);
         var applicationBefore = jdbc.queryForMap("SELECT * FROM approval_application WHERE id=?", applicationId);
         var roundBefore = jdbc.queryForMap("SELECT * FROM approval_submission_round WHERE application_id=?", applicationId);
@@ -69,12 +75,24 @@ class FormSchemaMigrationTest {
         assertThat(roundAfter.remove("RISK_JSON")).isNull();
         assertThat(roundAfter).isEqualTo(roundBefore);
         JsonUtil json = new JsonUtil(new ObjectMapper());
-        assertThat(new JdbcDefinitionDraftRepository(jdbc, json).findPublished("demo", "legacy", 1).orElseThrow().formSchema()).isNull();
-        var restoredApplication = new JdbcApplicationRepository(jdbc, json).findById("demo", UUID.fromString(applicationId)).orElseThrow();
+        assertThat(new JdbcDefinitionDraftRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.definition.mapper
+                                                        .DefinitionDraftRepositoryMapper.class), json).findPublished("demo", "legacy", 1).orElseThrow().formSchema()).isNull();
+        var restoredApplication = new JdbcApplicationRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.approval.mapper.ApplicationRepositoryMapper
+                                                .class), json).findById("demo", UUID.fromString(applicationId)).orElseThrow();
         assertThat(restoredApplication.formSchema()).isNull();
         assertThat(restoredApplication.runtimeDefinitionId()).isNull();
         assertThat(restoredApplication.businessReference()).isNull();
-        var restoredRound = new JdbcSubmissionRoundRepository(jdbc, json, event -> { }).findAll("demo", UUID.fromString(applicationId)).get(0);
+        var restoredRound = new JdbcSubmissionRoundRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.approval.mapper.SubmissionRoundRepositoryMapper
+                                                .class), json, event -> { }).findAll("demo", UUID.fromString(applicationId)).get(0);
         assertThat(restoredRound.formSchema()).isNull();
         assertThat(restoredRound.initiatorContext()).isNull();
         assertThat(restoredRound.risk()).isEqualTo(SubmissionRisk.unassessed());

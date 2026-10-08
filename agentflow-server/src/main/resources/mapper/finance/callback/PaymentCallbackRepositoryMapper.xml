@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.finance.callback.mapper.PaymentCallbackRepositoryMapper">
+    <select id="byEvent" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM payment_callback WHERE tenant_id=#{tenant} AND event_id=#{event}
+    </select>
+
+    <select id="get" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM payment_callback WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="lock" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM payment_callback WHERE tenant_id=#{tenant} AND id=#{id} FOR UPDATE
+    </select>
+
+    <insert id="create">
+        INSERT INTO payment_callback(tenant_id,id,event_id,payload_digest,target_digest,payment_kind,authorization_id,command_digest,source_revision,
+            employee_payment_id,supplier_payment_id,version,status,received_at,updated_at,next_attempt_at,failures,trace_id)
+        VALUES(#{tenantId},#{id},#{eventId},#{payloadDigest},#{targetDigest},#{paymentKind},#{authorizationId},#{commandDigest},#{sourceRevision},#{employeePaymentId},#{supplierPaymentId},1,'RECEIVED',#{receivedAt},#{updatedAt},#{nextAttemptAt},0,#{traceId})
+    </insert>
+
+    <update id="update">
+        UPDATE payment_callback SET version=#{version},status=#{status},updated_at=#{updatedAt},next_attempt_at=#{nextAttemptAt},failures=#{failures},query_version=#{queryVersion},reason=#{reason},requested_by=#{requestedBy},request_reason=#{requestReason}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND event_id=#{eventId} AND payload_digest=#{payloadDigest} AND target_digest=#{targetDigest}
+            AND payment_kind=#{kind} AND authorization_id=#{authorizationId} AND command_digest=#{commandDigest} AND source_revision=#{sourceRevision} AND received_at=#{receivedAt}
+    </update>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM payment_callback q
+        LEFT JOIN payment_authorization employee ON q.payment_kind='EMPLOYEE' AND employee.tenant_id=q.tenant_id AND employee.id=q.employee_payment_id
+        LEFT JOIN supplier_payment_authorization supplier ON q.payment_kind='SUPPLIER' AND supplier.tenant_id=q.tenant_id AND supplier.id=q.supplier_payment_id
+        LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id
+            AND a.id=CASE q.payment_kind WHEN 'EMPLOYEE' THEN employee.application_id WHEN 'SUPPLIER' THEN supplier.application_id END
+        LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id
+            AND s.round_no=CASE q.payment_kind WHEN 'EMPLOYEE' THEN employee.round_no WHEN 'SUPPLIER' THEN supplier.round_no END
+        WHERE q.next_attempt_at&lt;=#{nextAttemptAt} ORDER BY q.next_attempt_at,q.received_at,q.id LIMIT 10
+    </select>
+
+    <select id="page" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM payment_callback WHERE tenant_id=#{tenant} ORDER BY received_at DESC,id DESC LIMIT #{limit}
+    </select>
+
+    <select id="page2" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM payment_callback WHERE tenant_id=#{tenant} AND (received_at&lt;#{receivedAt} OR (received_at=#{expectedReceivedAt} AND id&lt;#{id})) ORDER BY received_at DESC,id DESC LIMIT #{limit}
+    </select>
+
+    <select id="history" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM payment_callback_revision WHERE tenant_id=#{tenant} AND callback_id=#{id} ORDER BY version DESC LIMIT 50
+    </select>
+
+    <insert id="append">
+        INSERT INTO payment_callback_revision(tenant_id,callback_id,version,state_json,occurred_at) VALUES(#{tenantId},#{callbackId},#{version},#{stateJson},#{occurredAt})
+    </insert>
+</mapper>

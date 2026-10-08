@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.finance.mapper.VoucherReversalRecordRepositoryMapper">
+    <insert id="create">
+        INSERT INTO voucher_reversal_record(tenant_id,id,operation_id,operation_version,check_id,check_version,legal_entity_id,
+        reversal_posting_reference,reversal_voucher_reference,recorded_by,observed_at,recorded_at,state_json)
+        VALUES(#{tenantId},#{id},#{operationId},#{operationVersion},#{checkId},#{checkVersion},#{legalEntityId},#{reversalPostingReference},#{reversalVoucherReference},#{recordedBy},#{observedAt},#{recordedAt},#{stateJson})
+    </insert>
+
+    <select id="forOperation" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM voucher_reversal_record WHERE tenant_id=#{tenant} AND operation_id=#{operationId}
+    </select>
+</mapper>

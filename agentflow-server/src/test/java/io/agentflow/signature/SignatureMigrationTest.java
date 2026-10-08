@@ -1,5 +1,8 @@
 package io.agentflow.signature;
 
+import static io.agentflow.signature.SignaturePersistenceFixtures.*;
+import static org.assertj.core.api.Assertions.*;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,11 +15,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static io.agentflow.signature.SignaturePersistenceFixtures.*;
-import static org.assertj.core.api.Assertions.*;
-
 /**
  * 非空 V110 升级逐表核对旧事实，统一文件清单的列类型与旧文件保持不变。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SignatureMigrationTest {
@@ -43,13 +44,18 @@ class SignatureMigrationTest {
             before.forEach((name, rows) -> assertThat(jdbc.queryForList("SELECT * FROM " + quote(name))).as(name).containsExactlyInAnyOrderElementsOf(rows));
             assertThat(jdbc.queryForList("SELECT * FROM stored_document_inventory")).containsExactlyInAnyOrderElementsOf(inventory);
             assertThat(columns(jdbc)).isEqualTo(columns);
-            assertThat(jdbc.queryForList("SELECT * FROM \"flyway_schema_history\" WHERE \"version\" IS NULL OR \"version\"<>'111' ORDER BY \"installed_rank\"")).isEqualTo(history);
+            assertThat(jdbc.queryForList(
+                                    "SELECT * FROM \"flyway_schema_history\" WHERE \"version\" IS"
+                                        + " NULL OR \"version\"<>'111' ORDER BY"
+                                        + " \"installed_rank\"")).isEqualTo(history);
             for (String name : List.of("signature_operation", "signature_source_document", "signature_operation_revision", "signature_result_file")) {
                 assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + name, Integer.class)).as(name).isZero();
             }
             assertThat(upgrade.migrate().migrationsExecuted).isZero();
             assertThat(upgrade.validateWithResult().validationSuccessful).isTrue();
-            System.out.printf("Signature migration verified, previousTables=%d, previousRows=%d, previousFiles=%d%n", before.size(), oldRows, inventory.size());
+            System.out.printf(
+                    "Signature migration verified, previousTables=%d, previousRows=%d,"
+                        + " previousFiles=%d%n", before.size(), oldRows, inventory.size());
         } finally { jdbc.execute("SHUTDOWN"); }
     }
 

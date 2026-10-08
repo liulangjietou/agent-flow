@@ -1,21 +1,26 @@
 package io.agentflow.procurement;
 
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
-import java.util.List;
-import java.util.UUID;
-import org.springframework.jdbc.core.JdbcTemplate;
+import io.agentflow.mybatis.SqlRows;
+import io.agentflow.procurement.mapper.SupplierAdjustmentSourcesMapper;
+
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.UUID;
+
 /**
  * 调整只能引用实际回款修订、实际原核销和已完成前次调整；历史恢复与当前办理分别校验。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Repository
 public class JdbcSupplierAdjustmentSources {
-    private final JdbcTemplate jdbc;
+    private final SupplierAdjustmentSourcesMapper sqlMapper;
     private final JsonUtil json;
     private final ProcurementPaymentRepository requests;
     private final JdbcSupplierPaymentReturnsRepository returns;
@@ -25,11 +30,23 @@ public class JdbcSupplierAdjustmentSources {
     private final JdbcSupplierPaymentReturnCheckRepository checks;
 
     /** 历史原件从各自的持久修订恢复，输入中的合法领域对象不能代替实际业务记录。 */
-    public JdbcSupplierAdjustmentSources(JdbcTemplate jdbc, JsonUtil json, ProcurementPaymentRepository requests,
-            JdbcSupplierPaymentReturnsRepository returns, JdbcProcurementPayableReservationRepository reservations, JdbcSupplierPaymentOperationRepository payments,
-            JdbcSupplierAdjustmentCompletions completions, JdbcSupplierPaymentReturnCheckRepository checks) {
-        this.jdbc = jdbc; this.json = json; this.requests = requests; this.returns = returns; this.reservations = reservations; this.payments = payments;
-        this.completions = completions; this.checks = checks;
+    public JdbcSupplierAdjustmentSources(
+            SupplierAdjustmentSourcesMapper sqlMapper,
+            JsonUtil json,
+            ProcurementPaymentRepository requests,
+            JdbcSupplierPaymentReturnsRepository returns,
+            JdbcProcurementPayableReservationRepository reservations,
+            JdbcSupplierPaymentOperationRepository payments,
+            JdbcSupplierAdjustmentCompletions completions,
+            JdbcSupplierPaymentReturnCheckRepository checks) {
+        this.sqlMapper = sqlMapper;
+        this.json = json;
+        this.requests = requests;
+        this.returns = returns;
+        this.reservations = reservations;
+        this.payments = payments;
+        this.completions = completions;
+        this.checks = checks;
     }
 
     /** 原申请优先、同应付银行其次，和原付款、核销及回款登记保持一致的加锁顺序。 */
@@ -69,49 +86,87 @@ public class JdbcSupplierAdjustmentSources {
 
     /** 读取结束后保留所有已知银行和当前 ERP 修订，旧的成功快照不能越过更新的本地事实。 */
     @Transactional(propagation = Propagation.MANDATORY)
-    public void requireEvidence(SupplierPayableAdjustmentSource source, SupplierPayableAdjustmentEvidence evidence) {
-        var payment = source.returns().request().command(); var tenant = payment.tenantId();
-        var current = payments.find(tenant, payment.id()).orElseThrow(JdbcSupplierAdjustmentSources::changed);
+    public void requireEvidence(
+            SupplierPayableAdjustmentSource source, SupplierPayableAdjustmentEvidence evidence) {
+        var payment = source.returns().request().command();
+        var tenant = payment.tenantId();
+        var current =
+                payments.find(tenant, payment.id())
+                        .orElseThrow(JdbcSupplierAdjustmentSources::changed);
         if (!evidence.bank().matchesCurrentBank(current)
-                || checks.history(tenant, payment.id()).stream().anyMatch(check -> !evidence.bank().continues(check.receipt()))
-                || returns.accountingReceipts(source.returns()).stream().anyMatch(prior -> !evidence.bank().continues(prior))) throw changed();
+                || checks.history(tenant, payment.id()).stream()
+                        .anyMatch(check -> !evidence.bank().continues(check.receipt()))
+                || returns.accountingReceipts(source.returns()).stream()
+                        .anyMatch(prior -> !evidence.bank().continues(prior))) throw changed();
         if (source.settlement() != null) {
-            var settled = activeSettlement(tenant, payment.id()); var observed = evidence.settlement();
-            if (settled == null || !settled.settled() || observed == null || observed.revision() < settled.observation().revision()
-                    || observed.observedAt().isBefore(settled.observation().observedAt()) || !observed.posting().equals(settled.observation().posting())) throw changed();
+            var settled = activeSettlement(tenant, payment.id());
+            var observed = evidence.settlement();
+            if (settled == null
+                    || !settled.settled()
+                    || observed == null
+                    || observed.revision() < settled.observation().revision()
+                    || observed.observedAt().isBefore(settled.observation().observedAt())
+                    || !observed.posting().equals(settled.observation().posting())) throw changed();
         }
         if (source.previous() != null) {
-            var previous = jdbc.query("SELECT state_json FROM supplier_payable_adjustment_operation WHERE tenant_id=? AND id=?",
-                    (row, index) -> json.read(row.getString("state_json"), SupplierPayableAdjustmentOperation.class), tenant, source.previous().observation().operationId().toString());
+            var previous =
+                    SqlRows.map(
+                            sqlMapper.requireEvidence(
+                                    tenant,
+                                    source.previous().observation().operationId().toString()),
+                            row ->
+                                    json.read(
+                                            row.getString("state_json"),
+                                            SupplierPayableAdjustmentOperation.class));
             var observed = evidence.previous();
-            if (previous.size() != 1 || !previous.get(0).adjusted() || observed == null || observed.revision() < previous.get(0).observation().revision()
-                    || observed.observedAt().isBefore(previous.get(0).observation().observedAt()) || !observed.posting().equals(previous.get(0).observation().posting())) throw changed();
+            if (previous.size() != 1
+                    || !previous.get(0).adjusted()
+                    || observed == null
+                    || observed.revision() < previous.get(0).observation().revision()
+                    || observed.observedAt().isBefore(previous.get(0).observation().observedAt())
+                    || !observed.posting().equals(previous.get(0).observation().posting()))
+                throw changed();
         }
     }
 
     /** 已保存准备恢复只核对当时原件，不能因之后追加回款或进入查询而改写旧输入。 */
     public void requireRecorded(SupplierPayableAdjustmentSource source) {
-        var ledger = source.returns(); var bank = ledger.request().command(); var tenant = bank.tenantId();
+        var ledger = source.returns();
+        var bank = ledger.request().command();
+        var tenant = bank.tenantId();
         if (!ledger.equals(returns.revision(tenant, bank.id(), ledger.version()))) throw changed();
         if (source.settlement() != null) {
             var original = source.settlement();
             var saved = settlementRevision(tenant, original.command().id(), original.version());
-            if (!saved.settled() || !saved.command().equals(original.command()) || !saved.observation().equals(original.observation())) throw changed();
+            if (!saved.settled()
+                    || !saved.command().equals(original.command())
+                    || !saved.observation().equals(original.observation())) throw changed();
         }
         if (source.previous() != null) {
             var previous = source.previous();
-            var saved = jdbc.query("""
-                    SELECT o.state_json FROM supplier_adjustment_completion c
-                    JOIN supplier_payable_adjustment_revision o ON o.tenant_id=c.tenant_id AND o.operation_id=c.operation_id AND o.version=c.operation_version
-                    WHERE c.tenant_id=? AND c.operation_id=? AND c.operation_version=? AND c.payment_id=?
-                    """, (row, index) -> json.read(row.getString("state_json"), SupplierPayableAdjustmentOperation.class),
-                    tenant, previous.observation().operationId().toString(), previous.version(), bank.id().toString());
+            var saved =
+                    SqlRows.map(
+                            sqlMapper.requireRecorded(
+                                    tenant,
+                                    previous.observation().operationId().toString(),
+                                    previous.version(),
+                                    bank.id().toString()),
+                            row ->
+                                    json.read(
+                                            row.getString("state_json"),
+                                            SupplierPayableAdjustmentOperation.class));
             if (saved.size() != 1) throw changed();
-            var operation = saved.get(0); var old = operation.command().source();
-            if (!operation.adjusted() || operation.version() != previous.version() || !operation.observation().equals(previous.observation())
-                    || !operation.command().tenantId().equals(tenant) || !operation.command().id().equals(previous.observation().operationId())
-                    || !old.returns().request().equals(ledger.request()) || !old.returns().entries().equals(previous.entries())
-                    || !java.util.Objects.equals(old.settlement(), source.settlement())) throw changed();
+            var operation = saved.get(0);
+            var old = operation.command().source();
+            if (!operation.adjusted()
+                    || operation.version() != previous.version()
+                    || !operation.observation().equals(previous.observation())
+                    || !operation.command().tenantId().equals(tenant)
+                    || !operation.command().id().equals(previous.observation().operationId())
+                    || !old.returns().request().equals(ledger.request())
+                    || !old.returns().entries().equals(previous.entries())
+                    || !java.util.Objects.equals(old.settlement(), source.settlement()))
+                throw changed();
         }
     }
 
@@ -131,53 +186,104 @@ public class JdbcSupplierAdjustmentSources {
     }
 
     private void requireFinancialState(SupplierPayableAdjustmentSource source) {
-        var bank = source.returns().request().command(); var tenant = bank.tenantId();
+        var bank = source.returns().request().command();
+        var tenant = bank.tenantId();
         requireRecorded(source);
-        var currentBank = payments.find(tenant, bank.id()).orElseThrow(JdbcSupplierAdjustmentSources::changed);
-        if (!currentBank.command().equals(bank) || currentBank.conflictingObservation() != null
-                || !currentBank.settleable() && currentBank.status() != SupplierPaymentOperation.Status.REVERSED) throw changed();
-        if (jdbc.queryForObject("SELECT COUNT(*) FROM supplier_settlement_preparation WHERE tenant_id=? AND active_payment_id=?", Integer.class, tenant, bank.id().toString()) != 0) throw changed();
+        var currentBank =
+                payments.find(tenant, bank.id())
+                        .orElseThrow(JdbcSupplierAdjustmentSources::changed);
+        if (!currentBank.command().equals(bank)
+                || currentBank.conflictingObservation() != null
+                || !currentBank.settleable()
+                        && currentBank.status() != SupplierPaymentOperation.Status.REVERSED)
+            throw changed();
+        if (SqlRows.single(sqlMapper.requireFinancialState(tenant, bank.id().toString())) != 0)
+            throw changed();
         var activeSettlement = activeSettlement(tenant, bank.id());
-        if (source.settlement() == null ? activeSettlement != null : activeSettlement == null) throw changed();
+        if (source.settlement() == null ? activeSettlement != null : activeSettlement == null)
+            throw changed();
         if (source.settlement() != null) {
-            var current = activeSettlement; var original = source.settlement();
-            if (!current.settled() || !current.command().equals(original.command()) || current.version() < original.version()
+            var current = activeSettlement;
+            var original = source.settlement();
+            if (!current.settled()
+                    || !current.command().equals(original.command())
+                    || current.version() < original.version()
                     || current.observation().revision() < original.observation().revision()
-                    || !current.observation().posting().equals(original.observation().posting())) throw changed();
+                    || !current.observation().posting().equals(original.observation().posting()))
+                throw changed();
         }
         // 已完成旧调整进入未知或争议时，新调整不能越过它继续记账。
-        if (jdbc.queryForObject("""
-                SELECT COUNT(*) FROM supplier_payable_adjustment_operation WHERE tenant_id=? AND payment_id=?
-                AND completed_version IS NOT NULL AND status<>'ADJUSTED'
-                """, Integer.class, tenant, bank.id().toString()) != 0) throw changed();
+        if (SqlRows.single(sqlMapper.requireFinancialState2(tenant, bank.id().toString())) != 0)
+            throw changed();
         var original = bank.holdCommand().authorization().source().reservation();
-        var current = reservations.find(tenant, original.id()).orElseThrow(JdbcSupplierAdjustmentSources::changed);
-        if (!current.source().equals(original.source()) || current.release() != null
+        var current =
+                reservations
+                        .find(tenant, original.id())
+                        .orElseThrow(JdbcSupplierAdjustmentSources::changed);
+        if (!current.source().equals(original.source())
+                || current.release() != null
                 || source.recognizesOriginalPayment() && !current.equals(original)
                 || source.previous() != null && current.held()
-                || current.settlement() != null && (source.settlement() == null
-                    || !current.settlement().operationId().equals(source.settlement().command().id()))) throw changed();
+                || current.settlement() != null
+                        && (source.settlement() == null
+                                || !current.settlement()
+                                        .operationId()
+                                        .equals(source.settlement().command().id())))
+            throw changed();
     }
 
-    private SupplierPayableSettlementOperation settlementRevision(String tenant, UUID id, long version) {
-        List<SupplierPayableSettlementOperation> saved = jdbc.query("SELECT state_json FROM supplier_payable_settlement_revision WHERE tenant_id=? AND operation_id=? AND version=?",
-                (row, index) -> json.read(row.getString("state_json"), SupplierPayableSettlementOperation.class), tenant, id.toString(), version);
-        if (saved.size() != 1) throw changed(); var value = saved.get(0);
-        if (!value.command().tenantId().equals(tenant) || !value.command().id().equals(id) || value.version() != version) throw changed();
+    private SupplierPayableSettlementOperation settlementRevision(
+            String tenant, UUID id, long version) {
+        List<SupplierPayableSettlementOperation> saved =
+                SqlRows.map(
+                        sqlMapper.settlementRevision(tenant, id.toString(), version),
+                        row ->
+                                json.read(
+                                        row.getString("state_json"),
+                                        SupplierPayableSettlementOperation.class));
+        if (saved.size() != 1) throw changed();
+        var value = saved.get(0);
+        if (!value.command().tenantId().equals(tenant)
+                || !value.command().id().equals(id)
+                || value.version() != version) throw changed();
         return value;
     }
+
     private SupplierPayableSettlementOperation activeSettlement(String tenant, UUID paymentId) {
-        var values = jdbc.query("SELECT state_json FROM supplier_payable_settlement_operation WHERE tenant_id=? AND active_payment_id=?",
-                (row, index) -> json.read(row.getString("state_json"), SupplierPayableSettlementOperation.class), tenant, paymentId.toString());
-        if (values.size() > 1) throw changed(); return values.isEmpty() ? null : values.get(0);
+        var values =
+                SqlRows.map(
+                        sqlMapper.activeSettlement(tenant, paymentId.toString()),
+                        row ->
+                                json.read(
+                                        row.getString("state_json"),
+                                        SupplierPayableSettlementOperation.class));
+        if (values.size() > 1) throw changed();
+        return values.isEmpty() ? null : values.get(0);
     }
-    private SupplierPayableAdjustmentSource.OriginalSettlement firstSettlement(SupplierPayableSettlementOperation current) {
+
+    private SupplierPayableAdjustmentSource.OriginalSettlement firstSettlement(
+            SupplierPayableSettlementOperation current) {
         var command = current.command();
-        return jdbc.query("SELECT version,state_json FROM supplier_payable_settlement_revision WHERE tenant_id=? AND operation_id=? ORDER BY version", (row, index) -> {
-            var value = json.read(row.getString("state_json"), SupplierPayableSettlementOperation.class);
-            if (value.version() != row.getLong("version") || !value.command().equals(command)) throw changed(); return value;
-        }, command.tenantId(), command.id().toString()).stream().filter(SupplierPayableSettlementOperation::settled).findFirst()
-                .map(value -> new SupplierPayableAdjustmentSource.OriginalSettlement(value.version(), value.command(), value.observation())).orElse(null);
+        return SqlRows.map(
+                        sqlMapper.firstSettlement(command.tenantId(), command.id().toString()),
+                        row -> {
+                            var value =
+                                    json.read(
+                                            row.getString("state_json"),
+                                            SupplierPayableSettlementOperation.class);
+                            if (value.version() != row.getLong("version")
+                                    || !value.command().equals(command)) throw changed();
+                            return value;
+                        })
+                .stream()
+                .filter(SupplierPayableSettlementOperation::settled)
+                .findFirst()
+                .map(
+                        value ->
+                                new SupplierPayableAdjustmentSource.OriginalSettlement(
+                                        value.version(), value.command(), value.observation()))
+                .orElse(null);
     }
+
     private static DomainException changed() { return new DomainException("SUPPLIER_ADJUSTMENT_SOURCE_CHANGED", "Registered supplier returns, original settlement or previous adjustment changed"); }
 }

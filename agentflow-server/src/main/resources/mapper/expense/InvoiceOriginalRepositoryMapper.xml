@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.InvoiceOriginalRepositoryMapper">
+    <insert id="reserveCapacity">
+        INSERT INTO invoice_wallet(tenant_id,owner_id) SELECT #{tenant},#{owner} WHERE NOT EXISTS (SELECT 1 FROM invoice_wallet WHERE tenant_id=#{tenantId} AND owner_id=#{ownerId})
+    </insert>
+
+    <update id="reserveCapacity2">
+        UPDATE invoice_wallet SET used_bytes=used_bytes+#{bytes},upload_count=upload_count+1 WHERE tenant_id=#{tenant} AND owner_id=#{owner} AND used_bytes&lt;=#{usedBytes} AND upload_count&lt;#{maximumUploads}
+    </update>
+
+    <insert id="create">
+        INSERT INTO invoice_original(tenant_id,id,invoice_id,owner_id,filename,byte_size,sha256,format,status,created_at) VALUES(#{tenantId},#{id},#{invoiceId},#{ownerId},#{filename},#{byteSize},#{sha256},#{format},#{status},#{createdAt})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM invoice_original WHERE tenant_id=#{tenant} AND invoice_id=#{invoiceId}
+    </select>
+
+    <select id="findAll" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM invoice_original WHERE tenant_id=#{parameters.tenant} AND invoice_id IN (<foreach collection="parameters['ids']" item="item" separator=",">#{item}</foreach>)
+    </select>
+
+    <select id="lock" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM invoice_original WHERE tenant_id=#{tenant} AND invoice_id=#{invoiceId} FOR UPDATE
+    </select>
+
+    <update id="updateStatus">
+        UPDATE invoice_original SET status=#{status} WHERE tenant_id=#{tenantId} AND invoice_id=#{invoiceId} AND status&lt;&gt;'READY'
+    </update>
+    <select id="listQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT o.*,r.state_json,r.version AS resource_version FROM invoice_original o JOIN finance_resource r ON r.tenant_id=o.tenant_id AND r.resource_type=o.resource_type AND r.id=o.invoice_id WHERE o.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND o.owner_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} <choose><when test="firstPage"></when><otherwise>AND o.invoice_id&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} </otherwise></choose>ORDER BY o.invoice_id DESC LIMIT <bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}
+    </select>
+    <select id="listQuery2" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT o.*,r.state_json,r.version AS resource_version FROM invoice_original o JOIN finance_resource r ON r.tenant_id=o.tenant_id AND r.resource_type=o.resource_type AND r.id=o.invoice_id WHERE o.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND o.owner_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} <choose><when test="firstPage"></when><otherwise>AND o.invoice_id&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} </otherwise></choose>ORDER BY o.invoice_id DESC LIMIT <bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}
+    </select>
+</mapper>

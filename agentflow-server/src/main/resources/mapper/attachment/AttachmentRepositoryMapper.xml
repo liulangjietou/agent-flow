@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.attachment.mapper.AttachmentRepositoryMapper">
+    <select id="lockApplication" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id FROM approval_application WHERE tenant_id=#{tenant} AND id=#{application} FOR UPDATE
+    </select>
+
+    <select id="requireCapacity" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT COUNT(*) AS uploads, COALESCE(SUM(byte_size),0) AS bytes FROM approval_attachment WHERE tenant_id=#{tenant} AND application_id=#{application}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO approval_attachment (id,tenant_id,application_id,field_path,filename,byte_size,sha256,created_by,created_at,status,content_id) VALUES (#{id},#{tenantId},#{applicationId},#{fieldPath},#{filename},#{byteSize},#{sha256},#{createdBy},#{createdAt},#{status},#{contentId})
+    </insert>
+
+    <select id="get" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_attachment WHERE tenant_id=#{tenant} AND application_id=#{application} AND id=#{id}
+    </select>
+
+    <update id="transition">
+        UPDATE approval_attachment SET status=#{status} WHERE tenant_id=#{tenantId} AND application_id=#{applicationId} AND id=#{id} AND status&lt;&gt;'READY'
+    </update>
+
+    <insert id="freeze">
+        INSERT INTO approval_attachment_round (tenant_id,application_id,round_no,field_path,attachment_id) VALUES (#{tenantId},#{applicationId},#{roundNo},#{fieldPath},#{attachmentId})
+    </insert>
+
+    <select id="frozen" resultType="Integer">
+        SELECT COUNT(*) FROM approval_attachment_round WHERE tenant_id=#{tenantId} AND application_id=#{applicationId} AND round_no=#{round} AND field_path=#{fieldPath} AND attachment_id=#{id}
+    </select>
+</mapper>

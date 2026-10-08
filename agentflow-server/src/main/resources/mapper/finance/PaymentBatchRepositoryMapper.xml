@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.finance.mapper.PaymentBatchRepositoryMapper">
+    <insert id="create">
+        INSERT INTO payment_batch(tenant_id,id,legal_entity_id,currency,cashier_id,item_count,total_value,created_at,state_json)
+        VALUES(#{tenantId},#{id},#{legalEntityId},#{currency},#{cashierId},#{itemCount},#{totalValue},#{createdAt},#{stateJson})
+    </insert>
+
+    <insert id="create2">
+        INSERT INTO payment_batch_item(tenant_id,batch_id,line_no,authorization_id,authorization_version,request_id,request_version)
+        VALUES(#{tenantId},#{batchId},#{lineNo},#{authorizationId},#{authorizationVersion},#{requestId},1)
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM payment_batch WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="verifyOriginalRegistrations" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT i.line_no,i.authorization_id,i.authorization_version,i.request_id,a.state_json AS authorization_json,r.state_json AS request_json
+        FROM payment_batch_item i
+        JOIN payment_authorization_revision a ON a.tenant_id=i.tenant_id AND a.authorization_id=i.authorization_id AND a.version=i.authorization_version
+        JOIN payment_execution_request_revision r ON r.tenant_id=i.tenant_id AND r.request_id=i.request_id AND r.version=i.request_version
+        WHERE i.tenant_id=#{tenantId} AND i.batch_id=#{id} ORDER BY i.line_no
+    </select>
+    <select id="pageQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM payment_batch WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND legal_entity_id IN (SELECT l.id FROM organization_directory o
+        JOIN organization_person p ON p.tenant_id=o.tenant_id AND p.active=TRUE
+        JOIN organization_appointment a ON a.tenant_id=p.tenant_id AND a.person_id=p.id AND a.active=TRUE
+        JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE AND d.kind='DEPARTMENT'
+        JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE AND j.kind='POSITION' AND j.legal_entity_id=d.legal_entity_id
+        JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE AND l.kind='LEGAL_ENTITY'
+        WHERE o.tenant_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND p.subject=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+        )<choose><when test="hasCursor"> AND (created_at&lt;<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} OR (created_at=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} AND id&lt;<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6}))</when><otherwise></otherwise></choose> ORDER BY created_at DESC,id DESC LIMIT <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}
+    </select>
+</mapper>

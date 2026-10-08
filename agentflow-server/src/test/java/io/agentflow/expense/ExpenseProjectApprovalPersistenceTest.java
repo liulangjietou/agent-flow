@@ -1,9 +1,12 @@
 package io.agentflow.expense;
 
+import static org.assertj.core.api.Assertions.*;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.BudgetPrecheckPort;
@@ -11,17 +14,7 @@ import io.agentflow.finance.EmployeeAccountSnapshot;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.Money;
 import io.agentflow.organization.InitiatorContext;
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,10 +30,22 @@ import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
-import static org.assertj.core.api.Assertions.*;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * 真实 JDBC 原修订校验、竞争写入与回滚；合成来源不代表组织资格或流程引擎验收。
+ *
  * @author owlzhangfq@gmail.com
  */
 class ExpenseProjectApprovalPersistenceTest {
@@ -65,17 +70,33 @@ class ExpenseProjectApprovalPersistenceTest {
         url = "jdbc:h2:mem:project-storage-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1";
         var source = new DriverManagerDataSource(url, "sa", ""); Flyway.configure().dataSource(source).load().migrate();
         jdbc = new JdbcTemplate(source); var manager = new DataSourceTransactionManager(source); tx = new TransactionTemplate(manager);
-        reports = new JdbcExpenseReportRepository(jdbc, json); prechecks = new JdbcExpensePrecheckRepository(jdbc, json);
-        var proxy = new ProxyFactory(new JdbcExpenseProjectApprovalRepository(jdbc, json));
+        reports = new JdbcExpenseReportRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.expense.mapper.ExpenseReportRepositoryMapper.class), json); prechecks = new JdbcExpensePrecheckRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.expense.mapper.ExpensePrecheckRepositoryMapper.class), json);
+        var proxy = new ProxyFactory(new JdbcExpenseProjectApprovalRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.expense.mapper
+                                                .ExpenseProjectApprovalRepositoryMapper.class), json));
         proxy.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource()));
         projects = (JdbcExpenseProjectApprovalRepository) proxy.getProxy();
         var line = new ExpenseLine(1, "OFFICE", DATE, null, "SH", BigDecimal.ONE, ExpenseLine.Unit.ITEM, money("100"), money("0"), List.of(), null,
                 List.of(new CostAllocation("IT", "A", money("40")), new CostAllocation("IT", "B", money("60"))), "合成项目费用", null);
         report = ExpenseReport.draft(UUID.randomUUID(), TENANT, UUID.randomUUID(), "alice",
                 new ExpenseContent(LEGAL, ExpenseContent.Type.DAILY, "项目存储验证", List.of(line), List.of()));
-        jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,?,?,'project-fixture',1,'alice','合成申请','{}','DRAFT',1,1,'EXPENSE',?)",
+        jdbc.update(
+                "INSERT INTO"
+                    + " approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)"
+                    + " VALUES(?,?,?,'project-fixture',1,'alice','合成申请','{}','DRAFT',1,1,'EXPENSE',?)",
                 report.applicationId().toString(), TENANT, "PROJECT-" + report.id(), report.id().toString());
-        jdbc.update("INSERT INTO approval_definition(id,tenant_id,process_key,name,version,revision,status,graph_json) VALUES(?,?,'project-fixture','合成存储定义',1,1,'PUBLISHED','{}')", definitionId.toString(), TENANT);
+        jdbc.update(
+                "INSERT INTO"
+                    + " approval_definition(id,tenant_id,process_key,name,version,revision,status,graph_json)"
+                    + " VALUES(?,?,'project-fixture','合成存储定义',1,1,'PUBLISHED','{}')", definitionId.toString(), TENANT);
         tx.executeWithoutResult(ignored -> reports.create(report, "alice"));
         var context = new InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1, LEGAL, "合成法人", UUID.randomUUID(), "部门", UUID.randomUUID(), "岗位");
         var input = new ExpensePrecheckJob.Input(UUID.randomUUID(), TENANT, report.id(), report.applicationId(), "alice", 1, 1, 1, 1, context, DATE, "a".repeat(64));
@@ -103,7 +124,12 @@ class ExpenseProjectApprovalPersistenceTest {
 
     @Test void originalEvidenceSurvivesFreshConnectionsReductionAndLaterPrechecks() {
         save();
-        var reopened = new JdbcExpenseProjectApprovalRepository(new JdbcTemplate(new DriverManagerDataSource(url, "sa", "")), json);
+        var reopened = new JdbcExpenseProjectApprovalRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (new JdbcTemplate(new DriverManagerDataSource(url, "sa", "")))
+                                        .getDataSource(),
+                                io.agentflow.expense.mapper.ExpenseProjectApprovalRepositoryMapper
+                                        .class), json);
         assertThat(reopened.find(TENANT, report.id(), 1)).contains(snapshot);
         assertThat(reopened.findByApplication(TENANT, report.applicationId(), 1)).contains(snapshot);
         assertThat(reopened.find("another-tenant", report.id(), 1)).isEmpty();
@@ -154,7 +180,9 @@ class ExpenseProjectApprovalPersistenceTest {
             case "precheck-input" -> alter("expense_precheck_revision", "state_json", "job_id", checked.input().id(), root ->
                     ((ObjectNode) root.path("input")).put("applicationId", UUID.randomUUID().toString()));
             case "financial-content" -> alter("expense_report_revision", "state_json", "report_id", report.id(), root -> root.put("applicationId", UUID.randomUUID().toString()));
-            case "submitted-time" -> jdbc.update("UPDATE expense_project_approval SET submitted_at=DATEADD('SECOND',1,submitted_at)");
+            case "submitted-time" -> jdbc.update(
+                            "UPDATE expense_project_approval SET"
+                                    + " submitted_at=DATEADD('SECOND',1,submitted_at)");
             case "definition-version" -> jdbc.update("UPDATE expense_project_approval SET definition_version=2");
             case "has-projects" -> jdbc.update("UPDATE expense_project_approval SET has_projects=FALSE");
             case "catalog-version" -> jdbc.update("UPDATE expense_project_approval SET catalog_version='other-version'");
@@ -184,9 +212,13 @@ class ExpenseProjectApprovalPersistenceTest {
 
     @Test void identityConstraintsAndConstructorPreventRebindingToAnUnknownRevisionOrRound() {
         save();
-        assertThatThrownBy(() -> jdbc.update("UPDATE expense_project_approval SET financial_version=999")).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE expense_project_approval SET"
+                                                + " financial_version=999")).isInstanceOf(DataIntegrityViolationException.class);
         assertThatThrownBy(() -> jdbc.update("UPDATE expense_project_approval SET precheck_version=1")).isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> jdbc.update("UPDATE expense_project_approval SET tenant_id='another-tenant'")).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE expense_project_approval SET"
+                                                + " tenant_id='another-tenant'")).isInstanceOf(DataIntegrityViolationException.class);
         for (var field : List.of("ruleVersion", "precheckVersion", "applicationVersion", "financialVersion", "definitionVersion")) {
             var raw = json.read(json.write(snapshot), ObjectNode.class); raw.put(field, 0);
             assertThatThrownBy(() -> json.read(json.write(raw), ExpenseProjectApprovalSnapshot.class)).isInstanceOf(DomainException.class);

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.InvoiceRepositoryMapper">
+    <select id="syncClaim" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT invoice_key,report_id,round_no,line_no,status FROM invoice_active_claim WHERE tenant_id=#{tenantId} AND invoice_id=#{id}
+    </select>
+
+    <select id="syncClaim2" resultType="Integer">
+        SELECT COUNT(*) FROM (
+            SELECT tenant_id,resource_type,resource_id,after_version,report_id,round_no,report_line FROM finance_consumption_reversal
+            UNION ALL
+            SELECT tenant_id,resource_type,resource_id,after_version,report_id,round_no,report_line FROM finance_consumption_reduction
+        ) effects WHERE tenant_id=#{tenantId} AND resource_type='INVOICE' AND resource_id=#{id} AND after_version=#{version}
+        AND report_id=#{reportId} AND round_no=#{roundNo} AND report_line=#{lineNo}
+    </select>
+
+    <delete id="syncClaim3">
+        DELETE FROM invoice_active_claim WHERE tenant_id=#{tenantId} AND invoice_id=#{id} AND status='CONSUMED'
+    </delete>
+
+    <delete id="syncClaim4">
+        DELETE FROM invoice_active_claim WHERE tenant_id=#{tenantId} AND invoice_id=#{id} AND status='OCCUPIED'
+    </delete>
+
+    <update id="syncClaim5">
+        UPDATE invoice_active_claim SET report_id=#{reportId},round_no=#{roundNo},line_no=#{lineNo},status=#{occupation} WHERE tenant_id=#{tenantId} AND invoice_id=#{id}
+    </update>
+
+    <insert id="syncClaim6">
+        INSERT INTO invoice_active_claim(tenant_id,invoice_key,invoice_id,report_id,round_no,line_no,status) VALUES(#{tenantId},#{invoiceKey},#{invoiceId},#{reportId},#{roundNo},#{lineNo},#{status})
+    </insert>
+</mapper>

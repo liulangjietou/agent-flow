@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.procurement.mapper.SupplierAdjustmentSourcesMapper">
+    <select id="requireEvidence" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM supplier_payable_adjustment_operation WHERE tenant_id=#{tenant} AND id=#{operationId}
+    </select>
+
+    <select id="requireRecorded" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT o.state_json FROM supplier_adjustment_completion c
+        JOIN supplier_payable_adjustment_revision o ON o.tenant_id=c.tenant_id AND o.operation_id=c.operation_id AND o.version=c.operation_version
+        WHERE c.tenant_id=#{tenant} AND c.operation_id=#{operationId} AND c.operation_version=#{version} AND c.payment_id=#{id}
+    </select>
+
+    <select id="requireFinancialState" resultType="Integer">
+        SELECT COUNT(*) FROM supplier_settlement_preparation WHERE tenant_id=#{tenant} AND active_payment_id=#{id}
+    </select>
+
+    <select id="requireFinancialState2" resultType="Integer">
+        SELECT COUNT(*) FROM supplier_payable_adjustment_operation WHERE tenant_id=#{tenant} AND payment_id=#{id}
+        AND completed_version IS NOT NULL AND status&lt;&gt;'ADJUSTED'
+    </select>
+
+    <select id="settlementRevision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM supplier_payable_settlement_revision WHERE tenant_id=#{tenant} AND operation_id=#{id} AND version=#{version}
+    </select>
+
+    <select id="activeSettlement" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM supplier_payable_settlement_operation WHERE tenant_id=#{tenant} AND active_payment_id=#{paymentId}
+    </select>
+
+    <select id="firstSettlement" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT version,state_json FROM supplier_payable_settlement_revision WHERE tenant_id=#{tenantId} AND operation_id=#{id} ORDER BY version
+    </select>
+</mapper>

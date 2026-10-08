@@ -1,8 +1,10 @@
 package io.agentflow.procurement;
+import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import io.agentflow.approval.JdbcApplicationRepository;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
@@ -13,6 +15,15 @@ import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.JdbcBudgetConsumptionReversalRepository;
 import io.agentflow.finance.Money;
 import io.agentflow.organization.InitiatorContext;
+
+import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.transaction.support.TransactionTemplate;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,17 +33,10 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import org.flywaydb.core.Flyway;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.springframework.transaction.support.TransactionTemplate;
-import static org.assertj.core.api.Assertions.*;
 
 /**
  * 采购原应付与员工报销使用真实仓储争抢同一票号，核验失败回滚及历史识别不随付款撤销。
+ *
  * @author owlzhangfq@gmail.com
  */
 class CrossBusinessInvoiceClaimTest {
@@ -54,14 +58,59 @@ class CrossBusinessInvoiceClaimTest {
         var source = new DriverManagerDataSource(System.getenv().getOrDefault("AGENTFLOW_INVOICE_CLAIM_TEST_URL", "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1"),
                 System.getenv().getOrDefault("AGENTFLOW_INVOICE_CLAIM_TEST_USER", "sa"), System.getenv().getOrDefault("AGENTFLOW_INVOICE_CLAIM_TEST_PASSWORD", ""));
         Flyway.configure().dataSource(source).load().migrate(); jdbc = new JdbcTemplate(source);
-        tx = new TransactionTemplate(new DataSourceTransactionManager(source)); applications = new JdbcApplicationRepository(jdbc, json);
-        expenses = new JdbcExpenseReportRepository(jdbc, json);
+        tx = new TransactionTemplate(new DataSourceTransactionManager(source)); applications = new JdbcApplicationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.approval.mapper.ApplicationRepositoryMapper.class),
+                        json);
+        expenses = new JdbcExpenseReportRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.expense.mapper.ExpenseReportRepositoryMapper.class), json);
         // 本组只验票号占用；如果误入部分调整分支，必须失败而不能绕过真实完成证明。
         var reductions = org.mockito.Mockito.mock(FinancialResourceReductionJournal.class, invocation -> { throw new AssertionError("Unexpected partial adjustment in invoice claim fixture"); });
-        invoices = new JdbcInvoiceRepository(new FinancialResourceStore(jdbc,
-                new FinancialResourceReversalJournal(jdbc, json, expenses, new JdbcBudgetConsumptionReversalRepository(jdbc, json), reductions)), jdbc, json);
-        requests = new JdbcProcurementPaymentRepository(jdbc, json);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc), new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json));
+        invoices = new JdbcInvoiceRepository(new FinancialResourceStore(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.expense.mapper.FinancialResourceStoreMapper
+                                                .class),
+                                new FinancialResourceReversalJournal(
+                                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                                io.agentflow.expense.mapper
+                                                        .FinancialResourceReversalJournalMapper
+                                                        .class),
+                                        json,
+                                        expenses,
+                                        new JdbcBudgetConsumptionReversalRepository(
+                                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                                        io.agentflow.finance.mapper
+                                                                .BudgetConsumptionReversalRepositoryMapper
+                                                                .class),
+                                                json),
+                                        reductions)),
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.expense.mapper.InvoiceRepositoryMapper.class),
+                        json);
+        requests = new JdbcProcurementPaymentRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper.ProcurementPaymentRepositoryMapper
+                                        .class),
+                        json);
+        reservations = new JdbcProcurementPayableReservationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .ProcurementPayableReservationRepositoryMapper.class),
+                        json,
+                        requests,
+                        new JdbcProcurementInvoiceClaims(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .ProcurementInvoiceClaimsMapper.class)),
+                        new SupplierPayableReturnGuard(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierPayableReturnGuardMapper.class)),
+                        new JdbcSupplierAdjustmentCompletions(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierAdjustmentCompletionsMapper.class), json));
     }
 
     @Test void procurementRecognitionRejectsAnExpenseCopyAndRollsBackItsVersionAndJournal() {
@@ -69,7 +118,9 @@ class CrossBusinessInvoiceClaimTest {
         var invoice = invoice(key); var use = use();
         fails(() -> occupy(invoice, use));
         assertThat(invoices.find(tenant, invoice.id()).orElseThrow().state()).isEqualTo(invoice.state());
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finance_resource_revision WHERE tenant_id=? AND resource_id=?", Integer.class, tenant, invoice.id().toString())).isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM finance_resource_revision WHERE tenant_id=?"
+                                        + " AND resource_id=?", Integer.class, tenant, invoice.id().toString())).isEqualTo(2);
         assertThat(reservations.active(tenant, request.id())).isPresent();
     }
 
@@ -84,7 +135,9 @@ class CrossBusinessInvoiceClaimTest {
             fails(() -> submit(request, List.of(key)));
             assertThat(requests.find(tenant, request.id()).orElseThrow().state()).isEqualTo(original);
             assertThat(reservations.history(tenant, request.id())).isEmpty();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM procurement_payment_revision WHERE tenant_id=? AND request_id=?", Integer.class, tenant, request.id().toString())).isEqualTo(1);
+            assertThat(jdbc.queryForObject(
+                                    "SELECT COUNT(*) FROM procurement_payment_revision WHERE"
+                                            + " tenant_id=? AND request_id=?", Integer.class, tenant, request.id().toString())).isEqualTo(1);
         }
     }
 
@@ -94,7 +147,9 @@ class CrossBusinessInvoiceClaimTest {
         fails(() -> occupy(invoice(key), use()));
         submit(procurement("AP-1"), List.of(key));
         var other = procurement("AP-2"); fails(() -> submit(other, List.of(key)));
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM invoice_active_claim WHERE tenant_id=? AND invoice_key=?", Integer.class, tenant, key.canonical())).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM invoice_active_claim WHERE tenant_id=? AND"
+                                        + " invoice_key=?", Integer.class, tenant, key.canonical())).isEqualTo(1);
     }
 
     @Test void aLaterInvoiceConflictRollsBackEveryEarlierClaimAndTheWholeProcurementSubmission() {
@@ -103,7 +158,9 @@ class CrossBusinessInvoiceClaimTest {
         fails(() -> submit(request, List.of(free, key)));
         assertThat(requests.find(tenant, request.id()).orElseThrow().state()).isEqualTo(original);
         assertThat(reservations.history(tenant, request.id())).isEmpty();
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM invoice_active_claim WHERE tenant_id=? AND invoice_key=?", Integer.class, tenant, free.canonical())).isZero();
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM invoice_active_claim WHERE tenant_id=? AND"
+                                        + " invoice_key=?", Integer.class, tenant, free.canonical())).isZero();
     }
 
     @Test void releasedExpenseAllowsProcurementButItsRecognitionAlsoBlocksReadOnlyExpensePrechecks() {
@@ -113,7 +170,9 @@ class CrossBusinessInvoiceClaimTest {
         var request = procurement("AP-1"); submit(request, List.of(key));
         var available = invoices.find(tenant, invoice.id()).orElseThrow(); available.occupy(available.version(), use, "alice", entity, NOW);
         var plan = new ExpenseSubmissionResources.Plan(List.of(new ExpenseSubmissionResources.InvoiceChange(available.state(), ExpenseSubmissionResources.Operation.RESERVE)), List.of(), List.of());
-        var precheck = new ExpensePrecheckResources(invoices, null, null, null, jdbc);
+        var precheck = new ExpensePrecheckResources(invoices, null, null, null,
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.expense.mapper.ExpensePrecheckResourcesMapper.class));
         fails(() -> precheck.requireClaimsAvailable(tenant, plan));
         assertThat(invoices.find(tenant, invoice.id()).orElseThrow().occupation()).isEqualTo(Invoice.Occupation.AVAILABLE);
     }

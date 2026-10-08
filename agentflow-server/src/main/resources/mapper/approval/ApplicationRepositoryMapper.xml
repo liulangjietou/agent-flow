@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.mapper.ApplicationRepositoryMapper">
+    <insert id="save">
+        INSERT INTO approval_application
+        (id, tenant_id, business_no, process_key, definition_version, created_by, title,
+         payload_json, status, round_no, version, form_schema_json, runtime_definition_id, notification_texts_json, search_amount, business_type, business_id, created_at, updated_at)
+        VALUES (#{id}, #{tenantId}, #{businessNo}, #{processKey}, #{definitionVersion}, #{createdBy}, #{title}, #{payloadJson}, #{status}, #{roundNo}, #{version}, #{formSchemaJson}, #{runtimeDefinitionId}, #{notificationTextsJson}, #{searchAmount}, #{businessType}, #{businessId}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+    </insert>
+
+    <select id="findById" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_application WHERE tenant_id=#{tenantId} AND id=#{id}
+    </select>
+
+    <select id="lockById" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_application WHERE tenant_id=#{tenantId} AND id=#{id} FOR UPDATE
+    </select>
+
+    <select id="findByBusinessNo" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_application WHERE tenant_id=#{tenantId} AND business_no=#{businessNo}
+    </select>
+
+    <update id="update">
+        UPDATE approval_application SET status=#{status}, round_no=#{roundNo}, version=#{version}, title=#{title}, payload_json=#{payloadJson}, search_amount=#{searchAmount}, updated_at=CURRENT_TIMESTAMP
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion}
+    </update>
+
+    <select id="findAll" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_application WHERE tenant_id=#{tenantId} ORDER BY updated_at DESC
+    </select>
+</mapper>

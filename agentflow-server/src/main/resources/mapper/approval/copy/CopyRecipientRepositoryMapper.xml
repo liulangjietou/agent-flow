@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.copy.mapper.CopyRecipientRepositoryMapper">
+    <select id="delivered" resultType="Boolean">
+        SELECT EXISTS(SELECT 1 FROM approval_copy_recipient WHERE tenant_id=#{tenant} AND application_id=#{application} AND round_no=#{round} AND process_instance_id=#{instance} AND node_id=#{node})
+    </select>
+
+    <insert id="append">
+        INSERT INTO approval_copy_recipient
+        (tenant_id,application_id,round_no,process_instance_id,node_id,node_name,recipient_id,recipient_rule,directory_revision,created_at)
+        SELECT #{tenantId},#{applicationId},#{roundNo},#{processInstanceId},#{nodeId},#{nodeName},#{recipient},#{rule},#{directoryRevision},#{createdAt} WHERE NOT EXISTS
+        (SELECT 1 FROM approval_copy_recipient WHERE tenant_id=#{expectedTenantId} AND application_id=#{expectedApplicationId} AND round_no=#{expectedRoundNo} AND node_id=#{expectedNodeId} AND recipient_id=#{recipientId})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_copy_recipient WHERE tenant_id=#{tenant} AND application_id=#{application} AND round_no=#{round} AND recipient_id=#{recipient} ORDER BY node_id
+    </select>
+</mapper>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.procurement.mapper.SupplierPaymentOperationRepositoryMapper">
+    <insert id="create">
+        INSERT INTO supplier_payment_operation(trace_id,tenant_id,id,execution_request_id,execution_request_version,hold_version,command_json,command_digest,state_json,
+        version,status,attempts,dispatches,highest_revision,created_at,updated_at,next_attempt_at)
+        VALUES(#{traceId},#{tenantId},#{id},#{executionRequestId},#{executionRequestVersion},#{holdVersion},#{commandJson},#{commandDigest},#{stateJson},1,'QUEUED',0,0,0,#{createdAt},#{updatedAt},#{nextAttemptAt})
+    </insert>
+
+    <select id="resolve" resultType="String">
+        SELECT id FROM supplier_payment_operation WHERE tenant_id=#{tenantId} AND id=#{paymentId} FOR UPDATE
+    </select>
+
+    <insert id="resolve2">
+        INSERT INTO supplier_payment_dispute_resolution(tenant_id,id,payment_id,disputed_version,resolved_version,outcome,resolved_by,observed_at,resolved_at,state_json)
+        VALUES(#{tenantId},#{id},#{paymentId},#{disputedVersion},#{resolvedVersion},#{outcome},#{resolvedBy},#{observedAt},#{resolvedAt},#{stateJson})
+    </insert>
+
+    <select id="latestResolution" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_payment_dispute_resolution WHERE tenant_id=#{tenant} AND payment_id=#{id} ORDER BY resolved_version DESC LIMIT 1
+    </select>
+
+    <update id="persist">
+        UPDATE supplier_payment_operation SET state_json=#{stateJson},version=#{version},status=#{status},attempts=#{attempts},dispatches=#{dispatches},highest_revision=#{highestRevision},updated_at=#{updatedAt},next_attempt_at=#{nextAttemptAt},lease_until=#{leaseUntil}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND command_json=#{commandJson} AND command_digest=#{digest}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_payment_operation WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM supplier_payment_revision WHERE tenant_id=#{tenant} AND operation_id=#{id} AND version=#{version}
+    </select>
+
+    <select id="firstSuccessfulRevision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT version,state_json FROM supplier_payment_revision WHERE tenant_id=#{tenant} AND operation_id=#{id} ORDER BY version
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM supplier_payment_operation q
+        LEFT JOIN supplier_payment_authorization origin ON origin.tenant_id=q.tenant_id AND origin.id=q.id
+        LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=origin.application_id
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+        WHERE (q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at&lt;=#{nextAttemptAt})
+        OR (q.status IN ('CHECKING','SENDING','QUERYING') AND q.lease_until&lt;=#{leaseUntil}) ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+    </select>
+
+    <insert id="append">
+        INSERT INTO supplier_payment_revision(tenant_id,operation_id,version,state_json) VALUES(#{tenantId},#{operationId},#{version},#{stateJson})
+    </insert>
+    <select id="resolutionHistoryRows" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT version,state_json FROM supplier_payment_revision WHERE tenant_id=#{parameters[0]} AND operation_id=#{parameters[1]} AND version&lt;=#{parameters[2]} ORDER BY version
+    </select>
+</mapper>

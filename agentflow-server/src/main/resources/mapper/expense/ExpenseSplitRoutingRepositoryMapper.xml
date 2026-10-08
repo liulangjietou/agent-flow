@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpenseSplitRoutingRepositoryMapper">
+    <insert id="save">
+        INSERT INTO expense_split_routing(tenant_id,report_id,round_no,application_id,application_version,financial_version,
+            definition_id,process_key,definition_version,rule_version,mode,submitted_at,snapshot_json)
+        SELECT e.tenant_id,e.id,#{roundNo},a.id,a.version,e.version,d.id,d.process_key,d.version,#{ruleVersion},#{mode},#{submittedAt},#{stateJson}
+        FROM expense_report e JOIN approval_application a ON a.tenant_id=e.tenant_id AND a.id=e.application_id
+        JOIN approval_definition d ON d.tenant_id=a.tenant_id AND d.process_key=a.process_key AND d.version=a.definition_version
+        WHERE e.tenant_id=#{tenantId} AND e.id=#{reportId} AND a.id=#{applicationId} AND e.version=#{financialVersion} AND a.version=#{applicationVersion} AND e.current_round_no=#{currentRoundNo}
+            AND a.status=#{status} AND a.status IN ('DRAFT','RETURNED','WITHDRAWN')
+            AND (CASE WHEN a.status='DRAFT' THEN a.round_no ELSE a.round_no+1 END)=#{roundNo13}
+            AND d.id=#{definitionId} AND d.process_key=#{processKey} AND d.version=#{definitionVersion} AND d.status='PUBLISHED'
+    </insert>
+
+    <insert id="save2">
+        INSERT INTO expense_split_routing_source(tenant_id,report_id,round_no,ordinal,source_report_id,source_application_id,
+            source_application_version,source_financial_version,source_round_no,document_json) VALUES(#{tenantId},#{reportId},#{roundNo},#{ordinal},#{sourceReportId},#{sourceApplicationId},#{sourceApplicationVersion},#{sourceFinancialVersion},#{sourceRoundNo},#{documentJson})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT r.*,v.state_json AS financial_state_json FROM expense_split_routing r
+        JOIN expense_report_revision v ON v.tenant_id=r.tenant_id AND v.report_id=r.report_id AND v.financial_version=r.financial_version
+         WHERE r.tenant_id=#{tenantId} AND r.report_id=#{reportId} AND r.round_no=#{roundNo}
+    </select>
+
+    <select id="findByApplication" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT r.*,v.state_json AS financial_state_json FROM expense_split_routing r
+        JOIN expense_report_revision v ON v.tenant_id=r.tenant_id AND v.report_id=r.report_id AND v.financial_version=r.financial_version
+         WHERE r.tenant_id=#{tenantId} AND r.application_id=#{applicationId} AND r.round_no=#{roundNo}
+    </select>
+
+    <select id="restore" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT s.*,v.state_json AS financial_state_json FROM expense_split_routing_source s
+        JOIN expense_report_revision v ON v.tenant_id=s.tenant_id AND v.report_id=s.source_report_id AND v.financial_version=s.source_financial_version
+        WHERE s.tenant_id=#{tenantId} AND s.report_id=#{reportId} AND s.round_no=#{roundNo} ORDER BY s.ordinal
+    </select>
+    <select id="candidateRows" resultType="io.agentflow.mybatis.SqlRow" fetchSize="128">
+        <bind name="position" value="0"/>
+        SELECT e.*,a.version AS candidate_application_version,a.status AS candidate_status,a.round_no AS candidate_round_no,
+            s.round_no AS candidate_frozen_round,s.status AS candidate_frozen_status
+        FROM expense_report e JOIN approval_application a ON a.tenant_id=e.tenant_id AND a.id=e.application_id
+        LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=a.round_no
+        WHERE e.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND e.employee_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND e.id&lt;&gt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} AND a.status IN ('IN_APPROVAL','APPROVED')
+            AND (e.current_round_no IS NULL OR (e.current_legal_entity_id=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} AND e.current_base_currency=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}
+                AND e.current_submitted_at&gt;=<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} AND e.current_submitted_at&lt;=<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}))
+        ORDER BY e.current_submitted_at,e.id
+    </select>
+</mapper>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpensePartialAdjustmentGuardMapper">
+    <select id="requireWholeAllowed" resultType="String">
+        SELECT id FROM expense_partial_adjustment WHERE tenant_id=#{tenant} AND report_id=#{report} AND retired_at IS NULL LIMIT 1
+    </select>
+
+    <select id="requirePartialAllowed" resultType="String">
+        SELECT id FROM expense_resource_adjustment WHERE tenant_id=#{tenant} AND active_report_id=#{report} LIMIT 1
+    </select>
+</mapper>

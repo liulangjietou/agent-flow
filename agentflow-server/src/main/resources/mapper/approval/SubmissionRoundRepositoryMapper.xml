@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.mapper.SubmissionRoundRepositoryMapper">
+    <insert id="append">
+        INSERT INTO approval_submission_round
+        (tenant_id, application_id, round_no, process_instance_id, definition_version,
+         title, payload_json, submitted_by, submitted_at, form_schema_json, initiator_context_json,
+         initiator_legal_entity_name, initiator_department_name, initiator_position_name, risk_level, risk_json, status)
+        VALUES (#{tenantId}, #{applicationId}, #{roundNo}, #{processInstanceId}, #{definitionVersion}, #{title}, #{payloadJson}, #{submittedBy}, #{submittedAt}, #{formSchemaJson}, #{initiatorContextJson}, #{initiatorLegalEntityName}, #{initiatorDepartmentName}, #{initiatorPositionName}, #{riskLevel}, #{riskJson}, 'IN_APPROVAL')
+    </insert>
+
+    <select id="findAll" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_submission_round WHERE tenant_id=#{tenantId} AND application_id=#{applicationId} ORDER BY round_no
+    </select>
+
+    <select id="findByRound" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM approval_submission_round WHERE tenant_id=#{tenantId} AND application_id=#{applicationId} AND round_no=#{roundNo}
+    </select>
+
+    <update id="complete">
+        UPDATE approval_submission_round SET status=#{status}, reason=#{reason}, completed_by=#{completedBy}, completed_at=#{completedAt}
+        WHERE tenant_id=#{tenantId} AND application_id=#{applicationId} AND round_no=#{roundNo} AND process_instance_id=#{processInstanceId} AND status='IN_APPROVAL'
+    </update>
+
+    <select id="complete2" resultType="Boolean">
+        SELECT COUNT(*) &gt; 0 FROM approval_submission_round WHERE tenant_id=#{tenantId} AND application_id=#{applicationId} AND round_no=#{roundNo}
+    </select>
+</mapper>

@@ -1,6 +1,11 @@
 package io.agentflow.signature;
 
+import static io.agentflow.signature.SignatureVerificationFixtures.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 import io.agentflow.common.DomainException;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -10,12 +15,9 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.agentflow.signature.SignatureVerificationFixtures.*;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
-
 /**
  * 回调入口只信任固定资料签名，有界读取并严格区分无效认证和证据存储故障。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SignatureCallbackVerifierTest {

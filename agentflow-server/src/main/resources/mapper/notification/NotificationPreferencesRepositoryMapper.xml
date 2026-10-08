@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.notification.mapper.NotificationPreferencesRepositoryMapper">
+    <insert id="save">
+        INSERT INTO notification_preferences
+        (tenant_id,recipient_id,email_enabled,enterprise_im_enabled,version,email_generation,enterprise_im_generation,updated_at)
+        VALUES (#{tenantId},#{recipientId},#{emailEnabled},#{enterpriseImEnabled},#{version},#{emailGeneration},#{enterpriseImGeneration},#{updatedAt})
+    </insert>
+
+    <update id="save2">
+        UPDATE notification_preferences SET email_enabled=#{emailEnabled},enterprise_im_enabled=#{enterpriseImEnabled},version=#{version},email_generation=#{emailGeneration},
+        enterprise_im_generation=#{enterpriseImGeneration},updated_at=#{updatedAt} WHERE tenant_id=#{tenantId} AND recipient_id=#{recipient} AND version=#{expectedVersion}
+    </update>
+
+    <insert id="save3">
+        INSERT INTO notification_preference_change
+        (tenant_id,recipient_id,version,email_enabled,enterprise_im_enabled,email_generation,enterprise_im_generation,changed_at)
+        VALUES (#{tenantId},#{recipientId},#{version},#{emailEnabled},#{enterpriseImEnabled},#{emailGeneration},#{enterpriseImGeneration},#{changedAt})
+    </insert>
+    <select id="readQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM notification_preferences WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND recipient_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}<choose><when test="condition0"> FOR UPDATE</when><otherwise></otherwise></choose>
+    </select>
+</mapper>

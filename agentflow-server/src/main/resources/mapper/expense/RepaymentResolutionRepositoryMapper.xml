@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.RepaymentResolutionRepositoryMapper">
+    <insert id="create">
+        INSERT INTO advance_repayment_resolution(tenant_id,id,advance_id,advance_version,repayment_id,check_id,check_version,outcome,resolved_by,observed_at,resolved_at,state_json)
+        VALUES(#{tenantId},#{id},#{advanceId},#{advanceVersion},#{repaymentId},#{checkId},#{checkVersion},#{outcome},#{resolvedBy},#{observedAt},#{resolvedAt},#{stateJson})
+    </insert>
+
+    <insert id="create2">
+        INSERT INTO advance_repayment_return(tenant_id,repayment_id,resolution_id,legal_entity_id,channel,transaction_reference,voucher_reference,entry_reference,amount,currency)
+        VALUES(#{tenantId},#{repaymentId},#{resolutionId},#{legalEntityId},#{channel},#{transactionReference},#{voucherReference},#{entryReference},#{amount},#{currency})
+    </insert>
+
+    <select id="latest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM advance_repayment_resolution WHERE tenant_id=#{tenant} AND repayment_id=#{repaymentId} ORDER BY advance_version DESC LIMIT 1
+    </select>
+
+    <select id="returned" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT d.*,r.legal_entity_id,r.channel,r.transaction_reference,r.voucher_reference,r.entry_reference,r.amount,r.currency
+        FROM advance_repayment_return r JOIN advance_repayment_resolution d ON d.tenant_id=r.tenant_id AND d.id=r.resolution_id
+        WHERE r.tenant_id=#{tenant} AND r.repayment_id=#{repaymentId} ORDER BY d.advance_version DESC,r.channel,r.transaction_reference
+    </select>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT r.*,p.state_json AS prior_check_json,c.state_json AS resolved_check_json
+        FROM advance_repayment_resolution r
+        JOIN repayment_review_check_revision p ON p.tenant_id=r.tenant_id AND p.check_id=r.check_id AND p.version=r.check_version-1
+        JOIN repayment_review_check_revision c ON c.tenant_id=r.tenant_id AND c.check_id=r.check_id AND c.version=r.check_version
+        WHERE r.tenant_id=#{tenant} AND r.id=#{id}
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM finance_resource_revision WHERE tenant_id=#{tenant} AND resource_type='ADVANCE' AND resource_id=#{id} AND version=#{version}
+    </select>
+</mapper>
