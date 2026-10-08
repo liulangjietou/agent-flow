@@ -1,8 +1,8 @@
 {
-  "recordedAt": "2026-10-08T01:24:17.894556+00:00",
+  "recordedAt": "2026-10-08T02:43:21.428407+00:00",
   "taskId": "V03",
   "status": "PARTIAL_CLAUSE_AUDIT_LOCAL_ASSERTIONS_VERIFIED",
-  "sourceBaseCommit": "0e34f64e2f2fe90988e67dd38081232f452aa8b2",
+  "sourceBaseCommit": "6bff0b5268db6fc318707ddb76ada946416583e5",
   "requirements": [
     {
       "id": "00",
@@ -10266,13 +10266,300 @@
           "text": "**删除 `PAYMENT_PENDING`/`PAID`/`PAYMENT_FAILED`/`RECONCILED`**：这些是结算事实，移到 `ExpenseSettlement`，兑现 02 §6.1 \"不能用一个 status 字段混合审批和支付语义\"。列表页需要\"已到账\"时，由读模型组合两个状态展示。\n\n### 3.2 结算状态（ExpenseSettlement）\n\n```text\nAPPROVED 事件\n   ▼\nPENDING_VOUCHER ──凭证推送成功──▶ PENDING_PAYMENT ──纳入付款批次──▶ PAYING\n       │                               ▲                                │\n       │凭证失败(可重试/人工)            │ 收款账户更新并复核                ├─成功──▶ PAID ──对账一致──▶ CLOSED\n       ▼                               │                                │\n   VOUCHER_FAILED               PAYMENT_FAILED ◀──────────失败──────────┘\n应付为 0（全额冲销）：PENDING_VOUCHER ──凭证成功──▶ CLOSED\n```\n\n结算状态的推进只由领域事件驱动；迟到/重复的支付回调按 `aggregateVersion` 丢弃并进入对账（沿用 03 §6）。"
         }
       ]
+    },
+    {
+      "id": "R130",
+      "requirement": "时间线组合真实操作、节点和轮次，同时间戳稳定分页不丢事件，节点开始始终先于结束；审计筛选绑定当前申请和条件。",
+      "sources": [
+        [
+          "03",
+          263,
+          264
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/approval/history/ApprovalHistoryQueryService.java",
+          "sha256": "0c2bda30d83e5076e8607e48298e18debfd643d6e314eaa53cd47b26341289e7"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/approval/history/FlowableProcessHistoryAdapter.java",
+          "sha256": "8b1b651ef23d480ca008ddbd002c4bc98e6be7f4af2ed44edae39d07f39f6a38"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/approval/history/JdbcAuditHistoryAdapter.java",
+          "sha256": "3ef74e0e89fcf2dc863ff794775f4ec648bcf3089f7c6b3f5ebefd07e337acab"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/approval/history/HistoryQueryParameters.java",
+          "sha256": "aa1e1bcaf79fbd0edc1d600a928dbe2dcf80b0155016f5496c0777a493a566d3"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/approval/ApplicationHistoryIntegrationTest.java",
+          "sha256": "5a1745614eb8782c299fc0d1d40d7710c22bd05c8794d8457bb5a0d3d5f88499",
+          "method": "twoRoundsKeepOperationsSeparateFromNodeAndRoundConclusions",
+          "line": 79,
+          "executedCases": [
+            {
+              "class": "io.agentflow.approval.ApplicationHistoryIntegrationTest",
+              "name": "twoRoundsKeepOperationsSeparateFromNodeAndRoundConclusions(String)[1]",
+              "status": "PASS"
+            },
+            {
+              "class": "io.agentflow.approval.ApplicationHistoryIntegrationTest",
+              "name": "twoRoundsKeepOperationsSeparateFromNodeAndRoundConclusions(String)[2]",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/approval/ApplicationHistoryIntegrationTest.java",
+          "sha256": "5a1745614eb8782c299fc0d1d40d7710c22bd05c8794d8457bb5a0d3d5f88499",
+          "method": "filteringAndStablePaginationKeepEveryEventSharingTheSameTimestamp",
+          "line": 283,
+          "executedCases": [
+            {
+              "class": "io.agentflow.approval.ApplicationHistoryIntegrationTest",
+              "name": "filteringAndStablePaginationKeepEveryEventSharingTheSameTimestamp",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/approval/ApplicationHistoryIntegrationTest.java",
+          "sha256": "5a1745614eb8782c299fc0d1d40d7710c22bd05c8794d8457bb5a0d3d5f88499",
+          "method": "equalTimestampNodeStartPrecedesItsEndEvenAcrossPageBoundaries",
+          "line": 316,
+          "executedCases": [
+            {
+              "class": "io.agentflow.approval.ApplicationHistoryIntegrationTest",
+              "name": "equalTimestampNodeStartPrecedesItsEndEvenAcrossPageBoundaries",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [
+        "V02"
+      ],
+      "sourceText": [
+        {
+          "documentId": "03",
+          "lines": [
+            263,
+            264
+          ],
+          "text": "- `GET /api/v1/applications/{applicationId}/timeline`：聚合领域事件、Flowable 历史关联和申请轮次，按 `occurredAt` 与序列号展示。\n- `GET /api/v1/applications/{applicationId}/audit`：仅追加审计视图，支持时间范围和动作筛选；普通用户不能删除或修改。"
+        }
+      ]
+    },
+    {
+      "id": "R131",
+      "requirement": "引擎历史清理后保留直接关联审计，未验证的旧任务关联不能补造事件，证据为空不从当前状态虚构历史。",
+      "sources": [
+        [
+          "03",
+          263,
+          264
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/approval/history/ApprovalHistoryQueryService.java",
+          "sha256": "0c2bda30d83e5076e8607e48298e18debfd643d6e314eaa53cd47b26341289e7"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/approval/history/JdbcAuditHistoryAdapter.java",
+          "sha256": "3ef74e0e89fcf2dc863ff794775f4ec648bcf3089f7c6b3f5ebefd07e337acab"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/approval/ApplicationHistoryIntegrationTest.java",
+          "sha256": "5a1745614eb8782c299fc0d1d40d7710c22bd05c8794d8457bb5a0d3d5f88499",
+          "method": "directlyLinkedAuditsSurviveEngineHistoryRetentionWithoutInventingLegacyLinks",
+          "line": 205,
+          "executedCases": [
+            {
+              "class": "io.agentflow.approval.ApplicationHistoryIntegrationTest",
+              "name": "directlyLinkedAuditsSurviveEngineHistoryRetentionWithoutInventingLegacyLinks",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/approval/ApplicationHistoryIntegrationTest.java",
+          "sha256": "5a1745614eb8782c299fc0d1d40d7710c22bd05c8794d8457bb5a0d3d5f88499",
+          "method": "emptyHistoricalEvidenceDoesNotTurnCurrentStateIntoFictionalEvents",
+          "line": 230,
+          "executedCases": [
+            {
+              "class": "io.agentflow.approval.ApplicationHistoryIntegrationTest",
+              "name": "emptyHistoricalEvidenceDoesNotTurnCurrentStateIntoFictionalEvents",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/approval/ApplicationHistoryIntegrationTest.java",
+          "sha256": "5a1745614eb8782c299fc0d1d40d7710c22bd05c8794d8457bb5a0d3d5f88499",
+          "method": "mismatchedEngineAssociationsCannotExposeNodeHistoryOrLegacyTaskEvents",
+          "line": 242,
+          "executedCases": [
+            {
+              "class": "io.agentflow.approval.ApplicationHistoryIntegrationTest",
+              "name": "mismatchedEngineAssociationsCannotExposeNodeHistoryOrLegacyTaskEvents(String)[1]",
+              "status": "PASS"
+            },
+            {
+              "class": "io.agentflow.approval.ApplicationHistoryIntegrationTest",
+              "name": "mismatchedEngineAssociationsCannotExposeNodeHistoryOrLegacyTaskEvents(String)[2]",
+              "status": "PASS"
+            },
+            {
+              "class": "io.agentflow.approval.ApplicationHistoryIntegrationTest",
+              "name": "mismatchedEngineAssociationsCannotExposeNodeHistoryOrLegacyTaskEvents(String)[3]",
+              "status": "PASS"
+            },
+            {
+              "class": "io.agentflow.approval.ApplicationHistoryIntegrationTest",
+              "name": "mismatchedEngineAssociationsCannotExposeNodeHistoryOrLegacyTaskEvents(String)[4]",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [
+        "V02"
+      ],
+      "sourceText": [
+        {
+          "documentId": "03",
+          "lines": [
+            263,
+            264
+          ],
+          "text": "- `GET /api/v1/applications/{applicationId}/timeline`：聚合领域事件、Flowable 历史关联和申请轮次，按 `occurredAt` 与序列号展示。\n- `GET /api/v1/applications/{applicationId}/audit`：仅追加审计视图，支持时间范围和动作筛选；普通用户不能删除或修改。"
+        }
+      ]
+    },
+    {
+      "id": "R132",
+      "requirement": "通知与投递意向同事务保存，SMTP 和 IM 网络在事务外执行；已接收不重复发送、敏感正文不外发，外部失败沿原投递恢复。",
+      "sources": [
+        [
+          "02",
+          337,
+          341
+        ],
+        [
+          "02",
+          384,
+          384
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDispatchPlanner.java",
+          "sha256": "4882c859c488e99108ab59b17bc5b1114aaf66b55d7e06b8b2f666fd174bd85b"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryService.java",
+          "sha256": "651c3c4be16b3d143cd6d086902f8150952a0903c41f5072356c0f1994c3043f"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/notification/NotificationDeliveryWorker.java",
+          "sha256": "4f1ceaf3eb8cddf197352775142f62094a3e01820d559510dbfd3743ea5764e7"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDeliveryIntegrationTest.java",
+          "sha256": "54034f3faec1d06ad126af49409b8f6f5bc1900336b281f89e564150d2f3b2bd",
+          "method": "newMessageAndItsDeliveryHistoryRollBackTogetherAndTransportRejectsCallerTransaction",
+          "line": 242,
+          "executedCases": [
+            {
+              "class": "io.agentflow.notification.NotificationDeliveryIntegrationTest",
+              "name": "newMessageAndItsDeliveryHistoryRollBackTogetherAndTransportRejectsCallerTransaction",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDeliveryIntegrationTest.java",
+          "sha256": "54034f3faec1d06ad126af49409b8f6f5bc1900336b281f89e564150d2f3b2bd",
+          "method": "realSmtpRunsOutsideTransactionAndAcceptedIsNotSentAgain",
+          "line": 66,
+          "executedCases": [
+            {
+              "class": "io.agentflow.notification.NotificationDeliveryIntegrationTest",
+              "name": "realSmtpRunsOutsideTransactionAndAcceptedIsNotSentAgain",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDeliveryIntegrationTest.java",
+          "sha256": "54034f3faec1d06ad126af49409b8f6f5bc1900336b281f89e564150d2f3b2bd",
+          "method": "realImRunsOutsideTransactionAndUsesIndependentChannelConsent",
+          "line": 99,
+          "executedCases": [
+            {
+              "class": "io.agentflow.notification.NotificationDeliveryIntegrationTest",
+              "name": "realImRunsOutsideTransactionAndUsesIndependentChannelConsent",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/notification/NotificationDeliveryIntegrationTest.java",
+          "sha256": "54034f3faec1d06ad126af49409b8f6f5bc1900336b281f89e564150d2f3b2bd",
+          "method": "unknownImWaitsForExplicitOriginalRetryAndRevokedConsentStopsFutureSends",
+          "line": 118,
+          "executedCases": [
+            {
+              "class": "io.agentflow.notification.NotificationDeliveryIntegrationTest",
+              "name": "unknownImWaitsForExplicitOriginalRetryAndRevokedConsentStopsFutureSends",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [
+        "E01",
+        "E02"
+      ],
+      "sourceText": [
+        {
+          "documentId": "02",
+          "lines": [
+            337,
+            341
+          ],
+          "text": "- 聚合：`AuditStream`、`NotificationMessage`；实体：`AuditEvent`、`DeliveryAttempt`；值对象：`RequestDigest`、`TraceId`、`Channel`。\n- 领域服务：`AuditAppendService`、`NotificationDispatchService`、`ReplayDetectionService`。\n- 领域事件：`AuditEventAppended`、`NotificationQueued`、`NotificationDeliveryFailed`。\n- 仓储接口：`AuditEventRepository`、`NotificationRepository`。\n- 基础设施适配器：`EmailAdapter`、`ImAdapter`、`WebhookAdapter`、`Clock`。审计追加与通知投递解耦，通知失败不能回滚已完成的审批动作。"
+        },
+        {
+          "documentId": "02",
+          "lines": [
+            384,
+            384
+          ],
+          "text": "一个审批动作的本地事务包含：读取申请与任务投影、校验租户/当前任务/SoD、调用聚合完成动作、写审计事件、写 outbox；Flowable task completion 与业务写入共用数据源的可行性列为 P，必须由 PoC 验证。外部预算、支付、通知和 Agent 模型调用不在本地原子事务内。"
+        }
+      ]
     }
   ],
   "boundaries": [
     "条款行是一项可检查行为的定位，不作为新增顶层任务，也不据此计算项目完成比例。",
     "Java 方法引用与 U07 更新后的 5334 个组合去重结果匹配；本次只重跑审批生命周期、凭证、预算、费用、审计和契约相关范围，其他结果保留原来源。前端引用匹配 U07 通知补充完整 1528 项成功记录。",
     "前端组件和处理器测试不等于真实键盘、屏幕阅读器、触屏或视觉验收，U01/W02/V01 门禁保持。",
-    "这里只记录已经细化到断言的 129 个条款单元；未声称覆盖全部原始规范。剩余章节条款仍在 V03 核对。",
+    "这里只记录已经细化到断言的 132 个条款单元；未声称覆盖全部原始规范。剩余章节条款仍在 V03 核对。",
     "PostgreSQL、Docker、真实企业来源、浏览器和远端交付未执行。"
   ],
   "completeRequirementInventory": false,

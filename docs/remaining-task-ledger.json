@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-08T02:17:51.495870+00:00",
+  "recordedAt": "2026-10-08T02:43:21.522555+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -2419,7 +2419,7 @@
           ]
         }
       ],
-      "observed": "129 个原始条款单元已关联源码、准确断言及执行证据；已撤销金融历史展示遗漏修正，零应付和迟到银行事实已有后端证据。其余规范和环境门禁继续核对。",
+      "observed": "132 个条款单元对应原文、源码和准确执行断言；历史排序、分页、保留及事务外通知投递证据补齐。余下规范和环境门禁仍开放。",
       "references": [
         {
           "path": "docs/product-goal-gap-audit.md",
@@ -2442,8 +2442,8 @@
       "dependsOn": [],
       "clauseAudit": {
         "status": "PARTIAL_CLAUSE_AUDIT_LOCAL_ASSERTIONS_VERIFIED",
-        "verifiedClauseUnits": 129,
-        "javaUnits": 93,
+        "verifiedClauseUnits": 132,
+        "javaUnits": 96,
         "webUnits": 36,
         "completeInventory": false,
         "evidence": "docs/evidence/requirement-clause-audit-20261007.json"
@@ -4551,12 +4551,11 @@
     "openPullRequestCount": 0
   },
   "latestProgress": {
-    "taskId": "U07",
-    "stage": "LEGACY_FINANCIAL_HISTORY_VIEW",
-    "status": "LOCAL_IMPLEMENTATION_VERIFIED_REQUIREMENT_AUDIT_CONTINUES",
-    "recordedAt": "2026-10-08T02:17:51.495870+00:00",
+    "taskId": "V03",
+    "status": "CLAUSE_AUDIT_CONTINUES",
+    "recordedAt": "2026-10-08T02:43:21.522555+00:00",
     "knownOpenTaskCount": 44,
-    "evidence": "docs/evidence/expense-financial-history-20261008.json"
+    "verifiedClauseUnits": 132
   },
   "localMainIntegration": {
     "verifiedThroughCommit": "ea0b0791dbaf4f9f412620021d801640e2f65fde",
