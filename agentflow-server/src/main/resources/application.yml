@@ -2,10 +2,10 @@ spring:
   application:
     name: agentflow-server
   datasource:
-    url: ${AGENTFLOW_DATASOURCE_URL:jdbc:h2:file:./data/agentflow;DB_CLOSE_ON_EXIT=FALSE}
-    username: ${AGENTFLOW_DATASOURCE_USERNAME:sa}
-    password: ${AGENTFLOW_DATASOURCE_PASSWORD:}
-    driver-class-name: ${AGENTFLOW_DATASOURCE_DRIVER:org.h2.Driver}
+    url: ${AGENTFLOW_DATASOURCE_URL:jdbc:postgresql://localhost:5432/agentflow}
+    username: ${AGENTFLOW_DATASOURCE_USERNAME:root}
+    password: ${AGENTFLOW_DATASOURCE_PASSWORD:123456}
+    driver-class-name: ${AGENTFLOW_DATASOURCE_DRIVER:org.postgresql.Driver}
   flyway:
     enabled: true
     locations: classpath:db/migration

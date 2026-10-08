@@ -318,7 +318,7 @@ sequenceDiagram
 
 | 内容 | 当前位置与配置 | 运行约束 |
 | --- | --- | --- |
-| 业务事实 | JDBC 仓储，PostgreSQL；本地开发默认 H2 文件库 | 申请、财务聚合、轮次和修订以租户及来源约束关联 |
+| 业务事实 | JDBC 仓储，本地开发默认 PostgreSQL | 申请、财务聚合、轮次和修订以租户及来源约束关联 |
 | 工作流运行 | 同数据源 Flowable 表 | 与申请/轮次的本地事务共同提交，不将引擎状态等同于财务终态 |
 | 结构迁移 | Flyway，当前源码最高业务迁移 `V104` | 生产用维护命令迁移；服务启动校验已迁移结构 |
 | 持久后台任务 | JDBC 任务、租约、执行状态和回执修订 | 副本竞争原任务；网络请求在事务外 |
@@ -357,7 +357,7 @@ flowchart TB
 
 | 能力 | 默认状态或入口 | 配套说明 |
 | --- | --- | --- |
-| 开发与 Docker 演示 | 开发 H2；`compose.demo.yml` 使用 PostgreSQL 17，入口 `8180` | [演示安装](docs/demo-installation.md) |
+| 开发与 Docker 演示 | 开发 PostgreSQL；`compose.demo.yml` 使用 PostgreSQL 17，入口 `8180` | [演示安装](docs/demo-installation.md) |
 | 企业身份 | 开发演示认证启用；`prod` 关闭演示，OIDC 需可信配置 | [OIDC](docs/enterprise-oidc.md)、[共享会话](docs/shared-enterprise-sessions.md) |
 | Agent 模型 | `AGENTFLOW_ASSIST_ENABLED=false` | `compose.assist.yml`；[受控模型执行](docs/agent-execution.md) |
 | 财务权威系统 | `AGENTFLOW_FINANCE_GATEWAY_ENABLED=false` | 按租户显式目标与凭据；[财务网关](docs/finance-gateway.md) |
@@ -391,6 +391,20 @@ docker compose -f compose.demo.yml up --build -d --wait --wait-timeout 180
 ### 本地 Java 与 Vue
 
 需要 Java 17+、Maven 3.9+，以及 Node.js 20.19+ 或 22.12+。
+
+默认连接本机 PostgreSQL，数据库名为 `agentflow`，账号为 `root`，密码为 `123456`，JDBC URL 为 `jdbc:postgresql://localhost:5432/agentflow`。启动前需准备数据库和账号；首次启动由 Flyway 创建业务表，Flowable 创建引擎表并部署 `expense-reimbursement` 示例流程。
+
+如果尚未安装 PostgreSQL，可先启动独立的本地数据库：
+
+```bash
+docker run --name agentflow-postgres \
+  -e POSTGRES_DB=agentflow -e POSTGRES_USER=root -e POSTGRES_PASSWORD=123456 \
+  -p 127.0.0.1:5432:5432 \
+  -v agentflow-postgres:/var/lib/postgresql/data \
+  -d postgres:17
+```
+
+可通过 `AGENTFLOW_DATASOURCE_URL`、`AGENTFLOW_DATASOURCE_USERNAME`、`AGENTFLOW_DATASOURCE_PASSWORD` 和 `AGENTFLOW_DATASOURCE_DRIVER` 覆盖连接配置。自动化测试默认使用独立 H2 内存库，PostgreSQL 专项测试使用显式指定的隔离数据库。
 
 ```bash
 git clone https://github.com/liulangjietou/agent-flow.git
