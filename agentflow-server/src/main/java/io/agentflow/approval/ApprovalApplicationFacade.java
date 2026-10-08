@@ -225,7 +225,9 @@ public class ApprovalApplicationFacade {
     public Application revokeBusiness(UUID id, long expectedVersion, String comment, BusinessReference reference) {
         var actor = currentActor.actor();
         requireWriteBinding(executionLocks.lock(service.get(actor.tenantId(), id)), java.util.Objects.requireNonNull(reference));
-        return service.revoke(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
+        var application = service.revoke(actor.tenantId(), id, expectedVersion, actor.userId(), comment);
+        notifications.revoked(application, actor.userId());
+        return application;
     }
 
     /** 内部财务结果使用明确系统身份退回，不冒用申请人或某个人工审批任务。 */

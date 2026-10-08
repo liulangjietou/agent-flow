@@ -1375,6 +1375,29 @@ class ExpenseSubmissionIntegrationTest {
     }
 
     @Test
+    void approvedExpenseRevocationNotifiesOnlyApplicantOnceWithoutCopyingReasonOrCreatingTaskAuthority() throws Exception {
+        var report = paymentReportBeforeVoucher(); String key = UUID.randomUUID().toString();
+        var input = new ExpenseLifecycleService.Input(app(report).version(), current(report).version(), "不应进入通知的财务撤销理由");
+        var receipt = ok(send(path(report) + "/revoke", "finance", key, input), 200);
+        assertThat(ok(send(path(report) + "/revoke", "finance", key, input), 200)).isEqualTo(receipt);
+        var messages = jdbc.queryForList("SELECT * FROM notification_inbox WHERE tenant_id='demo' AND application_id=? AND kind='APPLICATION_REVOKED'", report.applicationId().toString());
+        assertThat(messages).hasSize(1);
+        var message = messages.get(0);
+        assertThat(message.get("RECIPIENT_ID")).isEqualTo("alice");
+        assertThat(message.get("ACTOR_ID")).isEqualTo("finance");
+        assertThat(message.get("TASK_ID")).isNull();
+        assertThat(String.valueOf(message.get("CONTENT"))).doesNotContain(input.comment());
+        var page = ok(read("/api/v1/notifications", "alice"), 200).path("items");
+        var actual = java.util.stream.StreamSupport.stream(page.spliterator(), false)
+                .filter(item -> item.path("kind").asText().equals("APPLICATION_REVOKED")
+                        && item.path("applicationId").asText().equals(report.applicationId().toString())).toList();
+        assertThat(actual).hasSize(1);
+        assertThat(actual.get(0).path("applicationId").asText()).isEqualTo(report.applicationId().toString());
+        assertThat(actual.get(0).hasNonNull("taskId")).isFalse();
+        assertThat(tasks(report)).isEmpty();
+    }
+
+    @Test
     void revocationAndUnsentVoucherRetirementRollBackTogetherAndNeverDispatchAfterCommit() throws Exception {
         var report = paymentReportBeforeVoucher(); voucherPreparationWorker.poll();
         var operation = voucherOperations.forRound("demo", report.applicationId(), 1, VoucherCommand.Kind.EXPENSE_ACCRUAL).orElseThrow();
@@ -1387,6 +1410,7 @@ class ExpenseSubmissionIntegrationTest {
         assertThat(voucherOperations.find("demo", operation.input().command().id()).orElseThrow()).isEqualTo(operation);
         assertThat(occupations.find("demo", report.id()).orElseThrow()).isEqualTo(budget);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=? AND action='REVOKE'", Integer.class, report.applicationId().toString())).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_inbox WHERE application_id=? AND kind='APPLICATION_REVOKED'", Integer.class, report.applicationId().toString())).isZero();
         ok(send(path(report) + "/revoke", "finance", input), 200);
         assertThat(voucherOperations.find("demo", operation.input().command().id()).orElseThrow().status()).isEqualTo(VoucherOperation.Status.VOIDED);
         assertThat(voucherExecution.claim("demo", operation.input().command().id(), Instant.now())).isNull();

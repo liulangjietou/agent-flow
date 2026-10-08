@@ -1,8 +1,18 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-const { NotificationInboxQuery, isTaskNotification } = await import(process.env.AGENTFLOW_TEST_NOTIFICATIONS)
+const { NotificationInboxQuery, isTaskNotification, notificationLabels } = await import(process.env.AGENTFLOW_TEST_NOTIFICATIONS)
 const { createNavigation } = await import(process.env.AGENTFLOW_TEST_NOTIFICATION_NAVIGATION)
 const item = id => ({ id, kind: 'TASK_PENDING' })
+
+test('已批撤销通知显示明确结果并打开当前申请，不请求旧任务或显示新的审批权', async () => {
+  const kind = 'APPLICATION_REVOKED'; assert.match(notificationLabels[kind] ?? '', /已撤销/)
+  let requests = 0
+  const deps = { busy: { value: false }, writesBlocked: { value: false }, actorScope: { value: 'demo:alice' },
+    recordApplicationId: { value: '' }, notice: { value: '' }, api: { task: async () => { requests++; throw { status: 404 } } } }
+  await createNavigation(deps)({ kind, applicationId: 'revoked', roundNo: 1, taskId: 'ended' })
+  assert.equal(requests, 0); assert.equal(deps.recordApplicationId.value, 'revoked')
+  assert.equal(isTaskNotification({ kind }), false); assert.equal(deps.notice.value, '')
+})
 
 test('结束或移除会签的消息直接打开申请，不请求已取消任务，也不显示待办异常提示', async () => {
   for (const kind of ['TASK_COUNTERSIGN_COMPLETED', 'TASK_COUNTERSIGN_REMOVED', 'APPLICATION_PAUSED', 'APPLICATION_RESUMED', 'APPLICATION_CANCELLED', 'ADVANCE_OVERDUE']) {

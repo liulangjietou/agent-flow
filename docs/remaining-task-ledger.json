@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-08T00:19:55.138983+00:00",
+  "recordedAt": "2026-10-08T00:51:46.432714+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -22,7 +22,7 @@
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
     ],
     "localDeliveryBreakdown": {
-      "recordedAt": "2026-10-08T00:19:55.138983+00:00",
+      "recordedAt": "2026-10-08T00:51:46.432714+00:00",
       "implementationRemaining": {
         "count": 0,
         "taskIds": [],
@@ -53,7 +53,7 @@
           "U07"
         ]
       },
-      "note": "26 OPEN local targets: 20 implemented awaiting applicable browser/PostgreSQL gates; W02 and U01-U05 awaiting browser/devices. V03 inventory remains incomplete.",
+      "note": "26 OPEN local targets implemented: 20 awaiting applicable browser/PostgreSQL gates; W02 and U01-U05 awaiting browser/devices. V03 inventory remains incomplete.",
       "implementedAwaitingBrowserVerification": {
         "count": 6,
         "taskIds": [
@@ -2342,7 +2342,7 @@
           ]
         }
       ],
-      "observed": "U07 486 项 Java 范围、1525 项完整前端与固定包升级/强退恢复通过；Java 组合去重 5333。原批准证据、金融边界和原键恢复保持。浏览器、PostgreSQL 与最终部署仍待验。",
+      "observed": "U07 通知补充 39 项 Java 范围、1526 项完整前端及固定包升级/强退恢复通过；组合去重 Java 5334。环境门禁仍开放。",
       "references": [
         {
           "path": "docs/postgres-release-gate.md",
@@ -2381,10 +2381,10 @@
       "localAutomatedGate": {
         "status": "PASS",
         "evidence": "docs/evidence/local-regression-gate-20261007.json",
-        "javaUniqueCases": 5333,
-        "webUniqueCases": 1525,
-        "scopeSupplement": "docs/evidence/approved-expense-revocation-20261007.json",
-        "webScopeSupplement": "docs/evidence/approved-expense-revocation-20261007.json"
+        "javaUniqueCases": 5334,
+        "webUniqueCases": 1526,
+        "scopeSupplement": "docs/evidence/approved-expense-revocation-notification-20261007.json",
+        "webScopeSupplement": "docs/evidence/approved-expense-revocation-notification-20261007.json"
       }
     },
     {
@@ -2419,7 +2419,7 @@
           ]
         }
       ],
-      "observed": "125 个条款单元对应原文、源码、明确断言及执行记录；U07 已批撤销缺口补齐，原全员会签与业务写边界已有实现和测试。完整清单、视觉/设备和目标环境验收继续开放。",
+      "observed": "127 个条款单元已映射原文、源码、明确断言和执行结果；撤销的申请人通知补充完成。其余条款与环境仍继续核对。",
       "references": [
         {
           "path": "docs/product-goal-gap-audit.md",
@@ -2442,9 +2442,9 @@
       "dependsOn": [],
       "clauseAudit": {
         "status": "PARTIAL_CLAUSE_AUDIT_LOCAL_ASSERTIONS_VERIFIED",
-        "verifiedClauseUnits": 125,
-        "javaUnits": 91,
-        "webUnits": 34,
+        "verifiedClauseUnits": 127,
+        "javaUnits": 92,
+        "webUnits": 35,
         "completeInventory": false,
         "evidence": "docs/evidence/requirement-clause-audit-20261007.json"
       }
@@ -3353,16 +3353,28 @@
             626,
             626
           ]
+        },
+        {
+          "documentId": "05",
+          "section": "撤销事件的通知消费者",
+          "lines": [
+            527,
+            527
+          ]
         }
       ],
-      "observed": "真实 HTTP、页面、回执枚举和终态模板先失败后修复。486 项 Java 范围、1525 项完整前端、类型检查、构建、契约和固定包升级/强退恢复通过；浏览器及 PostgreSQL 待补验。",
+      "observed": "撤销主体与 05:527 申请人通知均已实现；通知补充 39 项 Java、1526 项完整前端、构建、契约及固定包升级/强退通过。浏览器及 PostgreSQL 待补验。",
       "references": [
         {
-          "path": "docs/evidence/approved-expense-revocation-20261007.json",
+          "path": "docs/evidence/approved-expense-revocation-notification-20261007.json",
           "line": 1
         },
         {
-          "path": "docs/approved-expense-revocation.md",
+          "path": "docs/approved-expense-revocation-notification.md",
+          "line": 1
+        },
+        {
+          "path": "docs/evidence/approved-expense-revocation-20261007.json",
           "line": 1
         }
       ],
@@ -4536,10 +4548,11 @@
   },
   "latestProgress": {
     "taskId": "U07",
+    "stage": "REVOCATION_NOTIFICATION_SUPPLEMENT",
     "status": "LOCAL_IMPLEMENTATION_VERIFIED_REQUIREMENT_AUDIT_CONTINUES",
-    "recordedAt": "2026-10-08T00:19:55.138983+00:00",
+    "recordedAt": "2026-10-08T00:51:46.432714+00:00",
     "knownOpenTaskCount": 44,
-    "evidence": "docs/evidence/approved-expense-revocation-20261007.json"
+    "evidence": "docs/evidence/approved-expense-revocation-notification-20261007.json"
   },
   "localMainIntegration": {
     "verifiedThroughCommit": "ea0b0791dbaf4f9f412620021d801640e2f65fde",

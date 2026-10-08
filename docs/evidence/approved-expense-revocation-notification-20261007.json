@@ -1,0 +1,131 @@
+{
+  "recordedAt": "2026-10-08T00:51:46.432714+00:00",
+  "taskId": "U07",
+  "stage": "REVOCATION_NOTIFICATION_SUPPLEMENT",
+  "status": "IMPLEMENTED_LOCAL_FIXED_PACKAGE_BROWSER_POSTGRES_PENDING",
+  "sourceBaseCommit": "430457a62e855fdd77274420234dc259af87226b",
+  "requirements": [
+    {
+      "documentId": "05",
+      "lines": [
+        527,
+        527
+      ]
+    }
+  ],
+  "implementation": [
+    {
+      "path": "agentflow-domain/src/main/java/io/agentflow/notification/InboxMessage.java",
+      "sha256": "3a1c449c24d13c30d6b74ecfc6dedb1d39a86b4a956d4762b729e105de0b20d5"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/approval/ApprovalApplicationFacade.java",
+      "sha256": "595c1b4cac182c5759201830bc5deb60e11b0c8f2918b03204d0efd5561df406"
+    },
+    {
+      "path": "agentflow-server/src/main/java/io/agentflow/notification/ApprovalNotificationService.java",
+      "sha256": "875cd8e5864ea10e553c688bbb546d9f7825aa1ad85ed21f646d06edf7afdfa7"
+    },
+    {
+      "path": "agentflow-server/src/main/resources/api/openapi.json",
+      "sha256": "e323f5355fe51e7bbe28ca794a3b5678ba2d5398d36a8c58a4b369e4399b70d5"
+    },
+    {
+      "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+      "sha256": "5331104ad393b7c516825b4607d6b3e6004afd40eb1747236f228a5747ce0bfd"
+    },
+    {
+      "path": "agentflow-web/src/api.ts",
+      "sha256": "05568b074d232d41035dba8426edbff9d64031edd662831273c3a407b1f1d87d"
+    },
+    {
+      "path": "agentflow-web/src/notificationInbox.ts",
+      "sha256": "65953cfc1f97a04c856f418fde97329e6cd9d60a7a82526f7c677c3f848f7ecb"
+    },
+    {
+      "path": "agentflow-web/tests/notifications.test.mjs",
+      "sha256": "2757b8f3a4c64cd3dbf2a7344ccf0b6888e93955eb7c5061ce62d1059cda54fb"
+    },
+    {
+      "path": "scripts/check-approved-expense-revocation.py",
+      "sha256": "787ff8fbb3ecb73b06a2a8383a7d91d2635bd95deca109ae84678c3a5ceb935c"
+    }
+  ],
+  "java": {
+    "uniqueCases": 5334,
+    "scopeRerunCases": 39,
+    "newCases": 1,
+    "fullRerun": false,
+    "scopeLog": "/fyoung/tmp/agentflow-remaining-20260928/u07n-java-final.log",
+    "scopeLogSha256": "72c5f73f9820bcff4f37a70864daf079941220bc69f0cfc393f255bb59504400"
+  },
+  "web": {
+    "uniquePassed": 1526,
+    "failed": 0,
+    "skipped": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/u07n-web-full.log",
+    "sha256": "872e5ac651d9560a646f918115c78f96e7d587c6eab9e0ec8f1d0e63e844a9da",
+    "typeAndBuild": "PASS"
+  },
+  "openApi": {
+    "operations": 397,
+    "schemas": 873,
+    "requestExamples": 130,
+    "nativeResponses": {
+      "status": "PASS",
+      "validatedActualResponses": 15
+    }
+  },
+  "fixedPackage": {
+    "status": "PASS",
+    "legacyJarSha256": "c714c7cfed8a0915886c30dea0c31f9ad7381a06c4814e89c4a442d7c97b6770",
+    "fixedJarSha256": "11390692c7efdfd62e713e2faed4edc95c8ada87e43b9f50140cceeb4c480cb6",
+    "checkerSha256": "787ff8fbb3ecb73b06a2a8383a7d91d2635bd95deca109ae84678c3a5ceb935c",
+    "sharedCheckerSha256": "38478ee9d7550251985ec8ca08789536ebaaaeb88590048b67cfb9e60baa4734",
+    "financeCheckerSha256": "bbfc0e9d8e3b0ae574f0f0cffb9b8524d1018c7abe7049d3c576e2f7aa7d5abe",
+    "upgrade": {
+      "preservedTables": 281,
+      "preservedRows": 381,
+      "newMigrations": 0
+    },
+    "runtimeBoots": 4,
+    "httpRequests": 77,
+    "originalApprovalPreserved": true,
+    "idempotentRevocation": true,
+    "invoiceReleased": true,
+    "externalBudgetReleaseConfirmed": true,
+    "financialSnapshotPreserved": true,
+    "originalFilePreserved": true,
+    "voucherWrites": 0,
+    "applicantNotificationOnce": true,
+    "otherActorsNotNotified": true,
+    "originalNotificationPreservedAfterRestart": true
+  },
+  "rules": [
+    "申请自身撤销事实由审批应用层通知，站内消息、外发意向与原撤销事务共用提交和回滚。",
+    "只通知申请人；真实财务操作者和原申请轮次保持，不复制原因、财务正文或旧任务身份。",
+    "原成功幂等键回放不重复通知，消息事件键和接收人唯一约束仍有效。",
+    "通知只提供当前申请详情入口，重新读取继续由原授权层判断，不授予审批权。",
+    "外发沿原接收人偏好和渠道代次，不在业务事务中发送；本次未连接企业渠道。"
+  ],
+  "retainedFailures": [
+    "先复现真实撤销成功但通知为零，以及前端撤销类型未显示。",
+    "初次绿测的 HTTP 断言只按类型过滤，误纳入另一份申请的合法通知；改为同申请绑定，原 SQL 本单唯一断言保持。",
+    "固定包首轮因拷包脚本括号错误未启动，修正脚本后用新目录完整运行。"
+  ],
+  "review": {
+    "method": "manual notification ownership, transaction, recipient, privacy, replay, navigation and old snapshot review",
+    "findings": []
+  },
+  "archive": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/u07n-revocation-notification-verified-20261007",
+    "files": 43,
+    "manifestSha256": "6ac80a519ce3d30e8aa0a3eba3d521101771a3cec3ce1e2a9090040cfc55aafb"
+  },
+  "remaining": [
+    "真实浏览器/辅助设备",
+    "PostgreSQL 与目标部署",
+    "V03 余下条款",
+    "真实渠道及 E15 远端交付"
+  ]
+}

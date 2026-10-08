@@ -2,7 +2,7 @@
 
 2026-10-07 当前：至少 44 项 OPEN，26 项本地功能的已知实现缺口已补齐，等待适用环境验收；3 项整体核验、15 项外部联调/交付仍开放。20 项本地功能等待适用的浏览器或 PostgreSQL 验收，W02 和 U01–U05 等待浏览器/辅助设备。V03 未结束，不能将已确认实现缺口为零解释为全项目无遗漏。
 
-U07 已补齐已批准未外发报销撤销。486 项 Java 范围、完整前端 1,525 项、构建、契约及固定包升级/强退恢复通过。Java 组合去重 5,333 项，本次没有全量重跑 Java。见[当前台账](remaining-task-ledger.md)及[已批撤销验证](approved-expense-revocation.md)。
+U07 已补齐已批准未外发报销撤销及申请人通知；通知补充 39 项 Java 范围和固定包恢复通过。486 项 Java 范围、完整前端 1,526 项、构建、契约及固定包升级/强退恢复通过。Java 组合去重 5,334 项，本次没有全量重跑 Java。见[当前台账](remaining-task-ledger.md)及[已批撤销验证](approved-expense-revocation.md)。
 
 继续在隔离分支 `codex/governance-identifier-integration` 开发，已验证成果按用户授权持续快进合入本地 main。远端推送、PR 与 CI 仍由 V02/E15 门禁负责。
 

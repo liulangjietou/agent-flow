@@ -71,6 +71,11 @@ public class ApprovalNotificationService {
         proxies.lifecycle(application, Kind.APPLICATION_WITHDRAWN, previous, recipients);
     }
 
+    /** 已批撤销只通知申请人真实结论，不复制财务原因，也不新增历史审批人的读取或任务授权。 */
+    public void revoked(Application application, String actor) {
+        send(application, actor, application.createdBy(), Kind.APPLICATION_REVOKED, null, null);
+    }
+
     /** 暂停通知保留实际接收人；入口指向申请，暂停任务不再提供办理操作。 */
     public void instancePaused(Application application, String actor, List<TaskAudiencePort.Audience> previous) {
         instanceChanged(application, actor, Kind.APPLICATION_PAUSED, previous);

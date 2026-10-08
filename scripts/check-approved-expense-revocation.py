@@ -43,7 +43,7 @@ def approve(runtime, fixture):
     raise AssertionError("Expense approval did not complete")
 
 
-def run(java, legacy, fixed, directory, result):
+def run(java, legacy, fixed, directory, result, verify_notification=False):
     sources = Sources(directory)
     runtime = base.Runtime(java, directory, sources)
     original_call = runtime.call
@@ -78,7 +78,8 @@ def run(java, legacy, fixed, directory, result):
         invoice_before = runtime.call("GET", invoice_path); assert invoice_before["occupation"] == "OCCUPIED"
         request = {"applicationVersion": approved["applicationVersion"], "financialVersion": approved["financialVersion"], "comment": "经财务确认撤销未外发报销"}
         key = str(uuid4())
-        runtime.call("POST", path + "/revoke", request, "finance", 404, key=key)
+        if not verify_notification:
+            runtime.call("POST", path + "/revoke", request, "finance", 404, key=key)
         runtime.settings["agentflow.budgets.worker-enabled"] = False
         runtime.stop(); before = base.snapshot(runtime, h2, "before-upgrade")
         runtime.start(fixed, login=False); runtime.stop(); after = base.snapshot(runtime, h2, "after-upgrade")
@@ -95,6 +96,17 @@ def run(java, legacy, fixed, directory, result):
         receipt = runtime.call("POST", path + "/revoke", request, "finance", key=key)
         assert receipt["status"] == "REVOKED" and receipt["applicationVersion"] == approved["applicationVersion"] + 1
         assert receipt["financialVersion"] == approved["financialVersion"]
+        notification = None
+        if verify_notification:
+            messages = [item for item in runtime.call("GET", "/notifications")["items"]
+                        if item["kind"] == "APPLICATION_REVOKED" and item["applicationId"] == report["applicationId"]]
+            assert len(messages) == 1, messages
+            notification = messages[0]
+            assert notification["actor"] == "finance" and not notification.get("taskId")
+            assert request["comment"] not in notification.get("content", "")
+            for actor in ("finance", "bob", "admin"):
+                assert not [item for item in runtime.call("GET", "/notifications", user=actor)["items"]
+                            if item["kind"] == "APPLICATION_REVOKED" and item["applicationId"] == report["applicationId"]]
         assert runtime.call("GET", invoice_path)["occupation"] == "AVAILABLE"
         waiting = runtime.call("GET", path + "/workflow", user="finance")
         assert waiting["budget"]["ledgerStatus"] == "FROZEN" and waiting["budget"]["operationStatus"] == "QUEUED"
@@ -104,6 +116,10 @@ def run(java, legacy, fixed, directory, result):
         runtime.start(fixed)
         assert runtime.call("POST", path + "/revoke", request, "finance", key=key) == receipt
         assert runtime.records[-1]["replayed"] == "true"
+        if verify_notification:
+            messages = [item for item in runtime.call("GET", "/notifications")["items"]
+                        if item["kind"] == "APPLICATION_REVOKED" and item["applicationId"] == report["applicationId"]]
+            assert messages == [notification], messages
         finished = base.wait_for(lambda: runtime.call("GET", path + "/workflow", user="finance"),
                                  lambda value: value["budget"]["ledgerStatus"] == "RELEASED")
         voucher = base.wait_for(lambda: runtime.call("GET", application_path + "/vouchers?roundNo=1", user="finance"),
@@ -120,11 +136,14 @@ def run(java, legacy, fixed, directory, result):
         assert all(value["received"] == 1 for value in operations)
         assert not sources.errors and not sources.model_calls
         assert {call["operation"] for call in sources.calls} <= {"catalog", "employee-account", "exchange-rate", "expense-policy", "budget-precheck", "budget-command", "budget-query", "invoice-verification"}
-        base.save(directory / "verified-revocation.json", {"receipt": receipt, "workflow": finished, "report": current, "rounds": rounds})
+        base.save(directory / "verified-revocation.json", {"receipt": receipt, "workflow": finished, "report": current, "rounds": rounds,
+                                                        "notification": notification})
         base.save(directory / "synthetic-budget-commands.json", sources.commands)
         result.update(status="PASS", runtimeBoots=runtime.starts, httpRequests=len(runtime.records), originalApprovalPreserved=True,
                       idempotentRevocation=True, invoiceReleased=True, externalBudgetReleaseConfirmed=True, financialSnapshotPreserved=True,
                       originalFilePreserved=True, voucherWrites=0)
+        if verify_notification:
+            result.update(applicantNotificationOnce=True, otherActorsNotNotified=True, originalNotificationPreservedAfterRestart=True)
     finally:
         runtime.stop(); sources.close()
         base.save(directory / "requests.json", runtime.records)
@@ -136,6 +155,8 @@ def main():
     parser.add_argument("--legacy-jar", type=Path, required=True)
     parser.add_argument("--fixed-jar", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--verify-revocation-notification", action="store_true",
+                        help="旧包已支持撤销时，验证新包补充的申请人通知及重启幂等；不再次在旧包撤销测试单。")
     args = parser.parse_args(); directory = args.output.resolve()
     assert directory.is_relative_to(Path("/fyoung/tmp").resolve()), "Evidence must stay under /fyoung/tmp"
     directory.mkdir(parents=True, exist_ok=False)
@@ -143,7 +164,7 @@ def main():
               "checkerSha256": base.digest(Path(__file__)), "sharedCheckerSha256": base.digest(Path(base.__file__)),
               "financeCheckerSha256": base.digest(Path(finance.__file__))}
     try:
-        run(args.java, args.legacy_jar.resolve(), args.fixed_jar.resolve(), directory, result)
+        run(args.java, args.legacy_jar.resolve(), args.fixed_jar.resolve(), directory, result, args.verify_revocation_notification)
     except Exception as error:
         result.update(status="FAILED", failureType=type(error).__name__, failure=str(error)); raise
     finally:
