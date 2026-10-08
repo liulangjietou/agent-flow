@@ -1,8 +1,8 @@
 {
-  "recordedAt": "2026-10-08T02:57:32.025961+00:00",
+  "recordedAt": "2026-10-08T03:17:04.203484+00:00",
   "taskId": "V03",
   "status": "PARTIAL_CLAUSE_AUDIT_LOCAL_ASSERTIONS_VERIFIED",
-  "sourceBaseCommit": "5de80ab14a90ecd3415dde3ee28826f80811779e",
+  "sourceBaseCommit": "1095391e7b9af20970accb30c8f1a252ab831b13",
   "requirements": [
     {
       "id": "00",
@@ -10646,13 +10646,658 @@
           "text": "以上端口的 `*Result` 类型统一用 Java 17 的 `sealed interface` + `record` 定义（如冻结结果分为成功、预算不足、系统不可用），`Money` 等值对象用 `record`，写法和限制见 02 §11。"
         }
       ]
+    },
+    {
+      "id": "R134",
+      "requirement": "逾期借款按原法人时区及当前未还余额提醒，消息和证据同事务并发只登记一次；新借款是否阻断使用显式租户配置且提交重新检查。",
+      "sources": [
+        [
+          "05",
+          263,
+          263
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/expense/EmployeeAdvance.java",
+          "sha256": "2f2663e2e71c31c0c507916316b5da10e1c8561b76f08b95017c6328c5303c89"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceOverdueChecks.java",
+          "sha256": "2d4d22077929ca8126bf8d6bccb69297491041f64d74de5ebb31ff6714a8c87e"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceOverdueReminders.java",
+          "sha256": "c5c9c5fa7113e3b8436663a6e90da3937e6324a1ee37c58f943ad6a61329cb49"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/AdvanceOverdueScheduling.java",
+          "sha256": "da2e1d4277c335abf14eac85cc30b44d79d7dd6f0fca23960ae29216f9214def"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/AdvanceRequestIntegrationTest.java",
+          "sha256": "637f760e7b25374cbddb81bf2816123af09eb38c5396515b840c794a57bfbe8c",
+          "method": "overdueReminderUsesFrozenZoneAndLatestBalanceAndRemainsOnceAfterRepayment",
+          "line": 213,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.AdvanceRequestIntegrationTest",
+              "name": "overdueReminderUsesFrozenZoneAndLatestBalanceAndRemainsOnceAfterRepayment",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/AdvanceRequestIntegrationTest.java",
+          "sha256": "637f760e7b25374cbddb81bf2816123af09eb38c5396515b840c794a57bfbe8c",
+          "method": "overdueReminderRollsBackWithItsEvidenceAndConcurrentScansCommitOnlyOne",
+          "line": 238,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.AdvanceRequestIntegrationTest",
+              "name": "overdueReminderRollsBackWithItsEvidenceAndConcurrentScansCommitOnlyOne",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/AdvanceRequestIntegrationTest.java",
+          "sha256": "637f760e7b25374cbddb81bf2816123af09eb38c5396515b840c794a57bfbe8c",
+          "method": "overdueBalanceAppearingAfterReadyCannotBypassTheSubmissionGate",
+          "line": 137,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.AdvanceRequestIntegrationTest",
+              "name": "overdueBalanceAppearingAfterReadyCannotBypassTheSubmissionGate",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/AdvanceRequestIntegrationTest.java",
+          "sha256": "637f760e7b25374cbddb81bf2816123af09eb38c5396515b840c794a57bfbe8c",
+          "method": "explicitAllowAndUnconfiguredPoliciesDoNotPretendToEnforceBlocking",
+          "line": 165,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.AdvanceRequestIntegrationTest",
+              "name": "explicitAllowAndUnconfiguredPoliciesDoNotPretendToEnforceBlocking",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/AdvanceRequestIntegrationTest.java",
+          "sha256": "637f760e7b25374cbddb81bf2816123af09eb38c5396515b840c794a57bfbe8c",
+          "method": "overdueScopeUsesLegalEntityDateAndAllItsCurrenciesWithoutLeakingOtherOwners",
+          "line": 177,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.AdvanceRequestIntegrationTest",
+              "name": "overdueScopeUsesLegalEntityDateAndAllItsCurrenciesWithoutLeakingOtherOwners",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/AdvanceOverdueSchedulingTest.java",
+          "sha256": "d3a00b96ae60f8d0b221e1258502d48f9c86558c454fbe6a182af9514bd9f278",
+          "method": "failedItemDoesNotStarveLaterPagesAndCursorWraps",
+          "line": 17,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.AdvanceOverdueSchedulingTest",
+              "name": "failedItemDoesNotStarveLaterPagesAndCursorWraps",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [
+        "V02",
+        "E03"
+      ],
+      "sourceText": [
+        {
+          "documentId": "05",
+          "lines": [
+            263,
+            263
+          ],
+          "text": "- 逾期借款（超过约定归还日）触发提醒；是否禁止有逾期借款的员工提交新借款为 Q。"
+        }
+      ]
+    },
+    {
+      "id": "R135",
+      "requirement": "票据抽取保存带来源的候选字段和本人修订，确认建议不自动验票或占用；模型外发需原件及目标明确确认，原登录、本人和租户权限保持。",
+      "sources": [
+        [
+          "05",
+          193,
+          208
+        ],
+        [
+          "05",
+          599,
+          599
+        ],
+        [
+          "02",
+          164,
+          168
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionController.java",
+          "sha256": "d67f6eca6ee9cacf7284c015f2747e5cd473a456252f5cf00814192b563bcac3"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionService.java",
+          "sha256": "61d10a1910b2870904ceeb104dd80478f17644fa97134911b250b17b259f720a"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/InvoiceExtractionEngine.java",
+          "sha256": "9b79d58c43f5fa10288f4369922204f58c52bbd55bda84b58001e0142d941080"
+        },
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/agent/InvoiceExtractionRun.java",
+          "sha256": "6abd6e8cf3137e4edbfe7187b82a9b8f6d993343e749a6140d3a054522a4f7f9"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionApiIntegrationTest.java",
+          "sha256": "80f3ae0be790d2adfdcadc37e36574070e954a1e91e302cb47a30e81b83f526b",
+          "method": "localInputQueueAndEditedConfirmationPreserveFinanceAndMinimalAudit",
+          "line": 93,
+          "executedCases": [
+            {
+              "class": "io.agentflow.agent.InvoiceExtractionApiIntegrationTest",
+              "name": "localInputQueueAndEditedConfirmationPreserveFinanceAndMinimalAudit",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionApiIntegrationTest.java",
+          "sha256": "80f3ae0be790d2adfdcadc37e36574070e954a1e91e302cb47a30e81b83f526b",
+          "method": "modelTransmissionNeedsExplicitConsentCurrentTargetAndDisplayedOriginal",
+          "line": 187,
+          "executedCases": [
+            {
+              "class": "io.agentflow.agent.InvoiceExtractionApiIntegrationTest",
+              "name": "modelTransmissionNeedsExplicitConsentCurrentTargetAndDisplayedOriginal",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionIntegrationTest.java",
+          "sha256": "a9124a03cd784230b019766b6f93059d6b0b97683d7a303657ce838ed5edb366",
+          "method": "localXmlCompletesWithModelDisabledAndConfirmationNeverChangesInvoiceState",
+          "line": 130,
+          "executedCases": [
+            {
+              "class": "io.agentflow.agent.InvoiceExtractionIntegrationTest",
+              "name": "localXmlCompletesWithModelDisabledAndConfirmationNeverChangesInvoiceState",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/agent/InvoiceExtractionIntegrationTest.java",
+          "sha256": "a9124a03cd784230b019766b6f93059d6b0b97683d7a303657ce838ed5edb366",
+          "method": "preparedInputHistoryAndConfirmationAreBoundToOriginalOwnerAndTenant",
+          "line": 168,
+          "executedCases": [
+            {
+              "class": "io.agentflow.agent.InvoiceExtractionIntegrationTest",
+              "name": "preparedInputHistoryAndConfirmationAreBoundToOriginalOwnerAndTenant",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [
+        "A01",
+        "V01",
+        "E08"
+      ],
+      "sourceText": [
+        {
+          "documentId": "05",
+          "lines": [
+            193,
+            208
+          ],
+          "text": "## 4. 发票管理\n\n### 4.1 生命周期\n\n```text\n上传(PDF/OFD/XML/图片) → 识别(XML 解析优先，OCR 兜底) → 查验 → 进入个人票夹(AVAILABLE)\n   → 挂到报销行 → 提交时占用(OCCUPIED) → 付款成功或应付为 0 的结算关闭时核销(CONSUMED)\n   → 驳回/作废/撤销/核减删行时释放(AVAILABLE)\n```\n\n- **识别**：数电票优先解析 XML 结构化数据，PDF/OFD 次之，图片走 `OcrAdapter`；Agent 抽取结果只是候选，需申请人确认。\n- **查验**（`InvoiceVerificationPort`）：真伪、是否红冲/作废、票面金额与税额一致。查验服务不可用时返回 503，**不得**标记为已查验；是否允许\"待补查验\"先提交由财务决定（Q）。\n- **抬头与税号**：购买方名称/税号必须等于报销单所属法人；不一致返回 `INVOICE_TITLE_MISMATCH`。\n- **时限**：开票日期早于 `报销时限天数` 或跨会计年度的发票，按费用标准配置阻断或要求说明。\n- **进项税**：可抵扣票据（增值税专票、符合条件的旅客运输票据等）拆出 `taxAmount` 并标记 `taxDeductible`，凭证中单独记进项税科目；可抵扣范围以财务税务口径为准（Q）。\n"
+        },
+        {
+          "documentId": "05",
+          "lines": [
+            599,
+            599
+          ],
+          "text": "| 票据抽取 | 从 XML/PDF/图片抽取候选字段，带置信度与证据位置 | 自动确认发票、自动占用 |"
+        },
+        {
+          "documentId": "02",
+          "lines": [
+            164,
+            168
+          ],
+          "text": "Agent 是辅助能力，不是审批权威源。允许的用例：草稿生成、文档字段抽取、预算/重复发票预检、审批摘要、风险提示、审批人建议。禁止绕过租户、角色和 SoD；禁止修改已发布定义、改写审计、直接付款或替授权人形成最终审批结论。\n\nAgent 单一服务按用例选择工具，不拆成四个微服务（C/A）。每个 tool 必须有租户上下文、资源范围、超时、审计和幂等策略。Agent 输出保存模型版本、提示版本、输入引用、证据位置、置信度、规则结果、人工修订和采用者。低置信度、高金额、高风险结果强制人工确认。\n\nAgent 调用方→下游：`DraftAgent -> ApplicationDraft`；`DocumentAgent -> Attachment/ExtractionEvidence`；`PolicyAgent -> Budget/Invoice/Route read-only`；`SummaryAgent -> ApprovalView`。Agent 只提交建议，最终动作仍由用户任务动作 API 执行。长时重试、外部信号和补偿若在 P1 变成主要复杂度，再评估 Temporal；审批状态仍归 Flowable/审批域。"
+        }
+      ]
+    },
+    {
+      "id": "R136",
+      "requirement": "预检解释只发送本人明确选择的规则与费用事实，人工采纳不改变原规则或金融状态；替换检查及修改财务版本阻止沿旧来源采纳。",
+      "sources": [
+        [
+          "05",
+          601,
+          601
+        ],
+        [
+          "02",
+          164,
+          168
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationController.java",
+          "sha256": "11c5511023eb632326758967b9410c8f498b760cfb510063b8b7972b971a956d"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationService.java",
+          "sha256": "9efd68fd883225351000c610c967cbd1623fa85e44f804e18b6b4eeda0c7ed29"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/PrecheckExplanationSources.java",
+          "sha256": "a94b67d73b1266fbcb0b3b0d5468c6a92ec897f916cc8a53aafe9a504304a685"
+        },
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/agent/PrecheckExplanationRun.java",
+          "sha256": "ea94c22d0ecd4d37aa8f63a4d3cd66e253ff9e6c34464eaa04bde6a0917df6e8"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/PrecheckExplanationIntegrationTest.java",
+          "sha256": "d393b5503ac196b872eaeb6114c89f34fc8f0103c6fbcb79c387dade0a4fc089",
+          "method": "explicitInputAndIdempotentReviewNeverChangeFinancialFactsOrRuleResult",
+          "line": 141,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.PrecheckExplanationIntegrationTest",
+              "name": "explicitInputAndIdempotentReviewNeverChangeFinancialFactsOrRuleResult",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/PrecheckExplanationIntegrationTest.java",
+          "sha256": "d393b5503ac196b872eaeb6114c89f34fc8f0103c6fbcb79c387dade0a4fc089",
+          "method": "queueRejectsUnselectedPrivateSourcesUnknownFieldsAndWrongPrecheckVersion",
+          "line": 190,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.PrecheckExplanationIntegrationTest",
+              "name": "queueRejectsUnselectedPrivateSourcesUnknownFieldsAndWrongPrecheckVersion",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/PrecheckExplanationIntegrationTest.java",
+          "sha256": "d393b5503ac196b872eaeb6114c89f34fc8f0103c6fbcb79c387dade0a4fc089",
+          "method": "optedInExpenseLineContainsOnlyItsWhitelistedClaimedFacts",
+          "line": 278,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.PrecheckExplanationIntegrationTest",
+              "name": "optedInExpenseLineContainsOnlyItsWhitelistedClaimedFacts",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/PrecheckExplanationIntegrationTest.java",
+          "sha256": "d393b5503ac196b872eaeb6114c89f34fc8f0103c6fbcb79c387dade0a4fc089",
+          "method": "supersededCheckPreventsAdoptionButAllowsDismissalAndNewGeneration",
+          "line": 205,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.PrecheckExplanationIntegrationTest",
+              "name": "supersededCheckPreventsAdoptionButAllowsDismissalAndNewGeneration",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/PrecheckExplanationIntegrationTest.java",
+          "sha256": "d393b5503ac196b872eaeb6114c89f34fc8f0103c6fbcb79c387dade0a4fc089",
+          "method": "financialRevisionInvalidatesReviewAndReviewCannotAcceptExtraActions",
+          "line": 293,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.PrecheckExplanationIntegrationTest",
+              "name": "financialRevisionInvalidatesReviewAndReviewCannotAcceptExtraActions",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [
+        "A02",
+        "E08"
+      ],
+      "sourceText": [
+        {
+          "documentId": "05",
+          "lines": [
+            601,
+            601
+          ],
+          "text": "| 预检解释 | 用业务语言解释超标、预算、重复票据原因 | 改变规则结论 |"
+        },
+        {
+          "documentId": "02",
+          "lines": [
+            164,
+            168
+          ],
+          "text": "Agent 是辅助能力，不是审批权威源。允许的用例：草稿生成、文档字段抽取、预算/重复发票预检、审批摘要、风险提示、审批人建议。禁止绕过租户、角色和 SoD；禁止修改已发布定义、改写审计、直接付款或替授权人形成最终审批结论。\n\nAgent 单一服务按用例选择工具，不拆成四个微服务（C/A）。每个 tool 必须有租户上下文、资源范围、超时、审计和幂等策略。Agent 输出保存模型版本、提示版本、输入引用、证据位置、置信度、规则结果、人工修订和采用者。低置信度、高金额、高风险结果强制人工确认。\n\nAgent 调用方→下游：`DraftAgent -> ApplicationDraft`；`DocumentAgent -> Attachment/ExtractionEvidence`；`PolicyAgent -> Budget/Invoice/Route read-only`；`SummaryAgent -> ApprovalView`。Agent 只提交建议，最终动作仍由用户任务动作 API 执行。长时重试、外部信号和补偿若在 P1 变成主要复杂度，再评估 Temporal；审批状态仍归 Flowable/审批域。"
+        }
+      ]
+    },
+    {
+      "id": "R137",
+      "requirement": "填报助手按行程推荐类别及分摊，人工逐项确认仅保存建议复核；不得夹带补贴金额、账户或目录替换，财务版本变化及并发复核严格阻断。",
+      "sources": [
+        [
+          "05",
+          600,
+          600
+        ],
+        [
+          "02",
+          164,
+          168
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistController.java",
+          "sha256": "dd59f5ced12a38f5385cc4f111e7331773fbb49c75336080281bf201c7bb15b4"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistPreparation.java",
+          "sha256": "8e455584a1b87a25cc11b7e2446293c9d2c5f538bb37cf2bd69533c1ffbb97fd"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseDraftAssistService.java",
+          "sha256": "36b8e6169bcbcfa383d948d390ee82b9c64ed0d0eefd839d0975cbe910af8985"
+        },
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseDraftAssistRun.java",
+          "sha256": "06741d2fba7fc66b9676483591c5f38c6556b21c9c3d1721fbefcc38ca4e7e6c"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseDraftAssistIntegrationTest.java",
+          "sha256": "070cab488cce67abc170e823cd9cf70e44d05f2344f8eb5cda3549b7f487fa67",
+          "method": "previewQueueAndGranularConfirmationPreserveFinancialFactsAndIdempotentReplay",
+          "line": 129,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseDraftAssistIntegrationTest",
+              "name": "previewQueueAndGranularConfirmationPreserveFinancialFactsAndIdempotentReplay",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseDraftAssistIntegrationTest.java",
+          "sha256": "070cab488cce67abc170e823cd9cf70e44d05f2344f8eb5cda3549b7f487fa67",
+          "method": "requestShapesAndQueriesCannotSmuggleFinancialFieldsOrDirectoryOverrides",
+          "line": 296,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseDraftAssistIntegrationTest",
+              "name": "requestShapesAndQueriesCannotSmuggleFinancialFieldsOrDirectoryOverrides",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseDraftAssistIntegrationTest.java",
+          "sha256": "070cab488cce67abc170e823cd9cf70e44d05f2344f8eb5cda3549b7f487fa67",
+          "method": "changedReportAfterGenerationPreventsConfirmationBeforeAnyDirectoryRead",
+          "line": 227,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseDraftAssistIntegrationTest",
+              "name": "changedReportAfterGenerationPreventsConfirmationBeforeAnyDirectoryRead(String)[1]",
+              "status": "PASS"
+            },
+            {
+              "class": "io.agentflow.expense.ExpenseDraftAssistIntegrationTest",
+              "name": "changedReportAfterGenerationPreventsConfirmationBeforeAnyDirectoryRead(String)[2]",
+              "status": "PASS"
+            },
+            {
+              "class": "io.agentflow.expense.ExpenseDraftAssistIntegrationTest",
+              "name": "changedReportAfterGenerationPreventsConfirmationBeforeAnyDirectoryRead(String)[3]",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseDraftAssistIntegrationTest.java",
+          "sha256": "070cab488cce67abc170e823cd9cf70e44d05f2344f8eb5cda3549b7f487fa67",
+          "method": "concurrentConfirmationsKeepOneReviewAndOneConflict",
+          "line": 282,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseDraftAssistIntegrationTest",
+              "name": "concurrentConfirmationsKeepOneReviewAndOneConflict",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [
+        "A03",
+        "E08"
+      ],
+      "sourceText": [
+        {
+          "documentId": "05",
+          "lines": [
+            600,
+            600
+          ],
+          "text": "| 填报助手 | 按行程生成明细草稿、推荐费用类别和分摊 | 生成补贴金额（补贴由规则计算） |"
+        },
+        {
+          "documentId": "02",
+          "lines": [
+            164,
+            168
+          ],
+          "text": "Agent 是辅助能力，不是审批权威源。允许的用例：草稿生成、文档字段抽取、预算/重复发票预检、审批摘要、风险提示、审批人建议。禁止绕过租户、角色和 SoD；禁止修改已发布定义、改写审计、直接付款或替授权人形成最终审批结论。\n\nAgent 单一服务按用例选择工具，不拆成四个微服务（C/A）。每个 tool 必须有租户上下文、资源范围、超时、审计和幂等策略。Agent 输出保存模型版本、提示版本、输入引用、证据位置、置信度、规则结果、人工修订和采用者。低置信度、高金额、高风险结果强制人工确认。\n\nAgent 调用方→下游：`DraftAgent -> ApplicationDraft`；`DocumentAgent -> Attachment/ExtractionEvidence`；`PolicyAgent -> Budget/Invoice/Route read-only`；`SummaryAgent -> ApprovalView`。Agent 只提交建议，最终动作仍由用户任务动作 API 执行。长时重试、外部信号和补偿若在 P1 变成主要复杂度，再评估 Temporal；审批状态仍归 Flowable/审批域。"
+        }
+      ]
+    },
+    {
+      "id": "R138",
+      "requirement": "风险提示保留同日多笔、跨单、非工作日及连号观察的来源和覆盖范围，发送前逐单验证当前决定权与完整字段；去标识信息不含完整票号及内部身份，人工采纳不写审批或核减。",
+      "sources": [
+        [
+          "05",
+          602,
+          602
+        ],
+        [
+          "02",
+          164,
+          168
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskController.java",
+          "sha256": "c4fafc9d18c4fc1f4678cc76194b306dedd9992b8b1da631e399620ec41d5308"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskService.java",
+          "sha256": "b730aba42a014055a35034fdbf7a9f60fe3bda53074069943e6dc3bf039915f2"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskAccess.java",
+          "sha256": "ff063565c917b0e1d9edd0e3b929da22c09248dd2a076fe6f46da3b58f874baa"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/agent/ExpenseRiskSources.java",
+          "sha256": "3b56979d364c0c910fa5a623dff033a0b3c70c7c1df352aed2bfb24d3187e4b6"
+        },
+        {
+          "path": "agentflow-domain/src/main/java/io/agentflow/agent/ExpenseRiskRun.java",
+          "sha256": "5b6b0f4ff2185384f46569a9c1966ba862f66a2ad1854e1b48083bb2d2af4229"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskSourcesTest.java",
+          "sha256": "82d4b0fd52197ac355e98ad0da72f5577526250e2d1ba7b345d736a05bf4499d",
+          "method": "fourKindsRetainTheirEvidenceButNeverExposeLocalIdentityCalendarNotesOrInvoiceNumbers",
+          "line": 31,
+          "executedCases": [
+            {
+              "class": "io.agentflow.agent.ExpenseRiskSourcesTest",
+              "name": "fourKindsRetainTheirEvidenceButNeverExposeLocalIdentityCalendarNotesOrInvoiceNumbers",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskSourcesTest.java",
+          "sha256": "82d4b0fd52197ac355e98ad0da72f5577526250e2d1ba7b345d736a05bf4499d",
+          "method": "partialInvoiceCoverageAndMissingCalendarRemainExplicitWithoutCreatingUnsupportedConcerns",
+          "line": 56,
+          "executedCases": [
+            {
+              "class": "io.agentflow.agent.ExpenseRiskSourcesTest",
+              "name": "partialInvoiceCoverageAndMissingCalendarRemainExplicitWithoutCreatingUnsupportedConcerns",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskAccessTest.java",
+          "sha256": "14a9635daf4a108f8317282a48949ad28d64ab40d7cae418947611fc3143428e",
+          "method": "currentAdminRoleCannotReplaceActualDecisionPermission",
+          "line": 80,
+          "executedCases": [
+            {
+              "class": "io.agentflow.agent.ExpenseRiskAccessTest",
+              "name": "currentAdminRoleCannotReplaceActualDecisionPermission",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskAccessTest.java",
+          "sha256": "14a9635daf4a108f8317282a48949ad28d64ab40d7cae418947611fc3143428e",
+          "method": "cannotUseReadableMainReportToSendAnUnreadableComparison",
+          "line": 88,
+          "executedCases": [
+            {
+              "class": "io.agentflow.agent.ExpenseRiskAccessTest",
+              "name": "cannotUseReadableMainReportToSendAnUnreadableComparison(String)[1]",
+              "status": "PASS"
+            },
+            {
+              "class": "io.agentflow.agent.ExpenseRiskAccessTest",
+              "name": "cannotUseReadableMainReportToSendAnUnreadableComparison(String)[2]",
+              "status": "PASS"
+            },
+            {
+              "class": "io.agentflow.agent.ExpenseRiskAccessTest",
+              "name": "cannotUseReadableMainReportToSendAnUnreadableComparison(String)[3]",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskExecutionTest.java",
+          "sha256": "851e3d6ddfb93951cff6bb1567f663161979ff692a5d9a65893733fcf87bb150",
+          "method": "authorizedCurrentReviewerCanAdoptWithoutOriginalLoginAndWithoutBusinessWrites",
+          "line": 216,
+          "executedCases": [
+            {
+              "class": "io.agentflow.agent.ExpenseRiskExecutionTest",
+              "name": "authorizedCurrentReviewerCanAdoptWithoutOriginalLoginAndWithoutBusinessWrites",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/agent/ExpenseRiskExecutionTest.java",
+          "sha256": "851e3d6ddfb93951cff6bb1567f663161979ff692a5d9a65893733fcf87bb150",
+          "method": "staleSourcesPreventAdoptionButCurrentAuthorizedReviewerCanDismiss",
+          "line": 245,
+          "executedCases": [
+            {
+              "class": "io.agentflow.agent.ExpenseRiskExecutionTest",
+              "name": "staleSourcesPreventAdoptionButCurrentAuthorizedReviewerCanDismiss",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [
+        "A04",
+        "E08"
+      ],
+      "sourceText": [
+        {
+          "documentId": "05",
+          "lines": [
+            602,
+            602
+          ],
+          "text": "| 风险提示 | 同日多笔打车、疑似拆单、节假日消费、发票连号等异常 | 自动驳回或核减 |"
+        },
+        {
+          "documentId": "02",
+          "lines": [
+            164,
+            168
+          ],
+          "text": "Agent 是辅助能力，不是审批权威源。允许的用例：草稿生成、文档字段抽取、预算/重复发票预检、审批摘要、风险提示、审批人建议。禁止绕过租户、角色和 SoD；禁止修改已发布定义、改写审计、直接付款或替授权人形成最终审批结论。\n\nAgent 单一服务按用例选择工具，不拆成四个微服务（C/A）。每个 tool 必须有租户上下文、资源范围、超时、审计和幂等策略。Agent 输出保存模型版本、提示版本、输入引用、证据位置、置信度、规则结果、人工修订和采用者。低置信度、高金额、高风险结果强制人工确认。\n\nAgent 调用方→下游：`DraftAgent -> ApplicationDraft`；`DocumentAgent -> Attachment/ExtractionEvidence`；`PolicyAgent -> Budget/Invoice/Route read-only`；`SummaryAgent -> ApprovalView`。Agent 只提交建议，最终动作仍由用户任务动作 API 执行。长时重试、外部信号和补偿若在 P1 变成主要复杂度，再评估 Temporal；审批状态仍归 Flowable/审批域。"
+        }
+      ]
     }
   ],
   "boundaries": [
     "条款行是一项可检查行为的定位，不作为新增顶层任务，也不据此计算项目完成比例。",
-    "Java 方法引用与 U07 更新后的 5334 个组合去重结果匹配；本次只重跑审批生命周期、凭证、预算、费用、审计和契约相关范围，其他结果保留原来源。前端引用匹配 U07 通知补充完整 1528 项成功记录。",
+    "Java 方法引用与 U07 更新后的 5334 个组合去重结果匹配；本次只重跑审批生命周期、凭证、预算、费用、审计和契约相关范围，其他结果保留原来源。前端引用匹配 U07 金融历史展示补充后的完整 1528 项成功记录。",
     "前端组件和处理器测试不等于真实键盘、屏幕阅读器、触屏或视觉验收，U01/W02/V01 门禁保持。",
-    "这里只记录已经细化到断言的 133 个条款单元；未声称覆盖全部原始规范。剩余章节条款仍在 V03 核对。",
+    "这里只记录已经细化到断言的 138 个条款单元；未声称覆盖全部原始规范。剩余章节条款仍在 V03 核对。",
     "PostgreSQL、Docker、真实企业来源、浏览器和远端交付未执行。"
   ],
   "completeRequirementInventory": false,
@@ -10708,5 +11353,31 @@
       ],
       "next": "保留现有固定包和本地受控证据，不把 H2 或合成依赖视为 PostgreSQL 与企业现场验收。"
     }
-  ]
+  ],
+  "reviewedChainSupplement": {
+    "clauseIds": [
+      "R134",
+      "R135",
+      "R136",
+      "R137",
+      "R138"
+    ],
+    "scope": "借款逾期提醒以及票据抽取、预检解释、结构化填报助手和风险提示的人工确认边界。",
+    "callers": [
+      "AdvanceOverdueScheduling.poll",
+      "InvoiceExtractionController",
+      "PrecheckExplanationController",
+      "ExpenseDraftAssistController",
+      "ExpenseRiskController"
+    ],
+    "downstream": [
+      "借款余额及原批准轮次、站内消息与提醒证据",
+      "本人原件、来源投影、模型 worker、建议聚合及追加人工复核"
+    ],
+    "responsibility": "当前来源与跨聚合编排在应用服务，建议状态和人工复核在建议聚合；受控 worker 执行事务外模型调用。",
+    "businessCodeChanged": false,
+    "testsRerunThisStage": false,
+    "newImplementationGapsFound": 0,
+    "note": "准确测试方法已检查实际断言，并与保留的 5334 项组合去重 PASS 结果对应；没有将本次源码检索或类名当作新的执行验收。"
+  }
 }
