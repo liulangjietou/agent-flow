@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAt": "2026-10-08T00:51:46.432714+00:00",
+  "recordedAt": "2026-10-08T02:17:51.495870+00:00",
   "baselineCommit": "f5fd8d53c3d6bbafef456d96c462320bd186d8fc",
   "branch": "codex/governance-identifier-integration",
   "status": "PARTIAL_REQUIREMENT_AUDIT_WITH_CONFIRMED_BACKLOG",
@@ -22,7 +22,7 @@
       "原来的 6 条是工作类别，部分过往本地完成说法漏了原费用需求；不与本表的小任务数量相加。"
     ],
     "localDeliveryBreakdown": {
-      "recordedAt": "2026-10-08T00:51:46.432714+00:00",
+      "recordedAt": "2026-10-08T02:17:51.495870+00:00",
       "implementationRemaining": {
         "count": 0,
         "taskIds": [],
@@ -53,7 +53,7 @@
           "U07"
         ]
       },
-      "note": "26 OPEN local targets implemented: 20 awaiting applicable browser/PostgreSQL gates; W02 and U01-U05 awaiting browser/devices. V03 inventory remains incomplete.",
+      "note": "26 OPEN local targets implemented: 20 awaiting applicable browser/PostgreSQL gates; six awaiting browser/devices. V03 inventory remains incomplete.",
       "implementedAwaitingBrowserVerification": {
         "count": 6,
         "taskIds": [
@@ -2382,9 +2382,9 @@
         "status": "PASS",
         "evidence": "docs/evidence/local-regression-gate-20261007.json",
         "javaUniqueCases": 5334,
-        "webUniqueCases": 1526,
+        "webUniqueCases": 1528,
         "scopeSupplement": "docs/evidence/approved-expense-revocation-notification-20261007.json",
-        "webScopeSupplement": "docs/evidence/approved-expense-revocation-notification-20261007.json"
+        "webScopeSupplement": "docs/evidence/expense-financial-history-20261008.json"
       }
     },
     {
@@ -2419,7 +2419,7 @@
           ]
         }
       ],
-      "observed": "127 个条款单元已映射原文、源码、明确断言和执行结果；撤销的申请人通知补充完成。其余条款与环境仍继续核对。",
+      "observed": "129 个原始条款单元已关联源码、准确断言及执行证据；已撤销金融历史展示遗漏修正，零应付和迟到银行事实已有后端证据。其余规范和环境门禁继续核对。",
       "references": [
         {
           "path": "docs/product-goal-gap-audit.md",
@@ -2442,9 +2442,9 @@
       "dependsOn": [],
       "clauseAudit": {
         "status": "PARTIAL_CLAUSE_AUDIT_LOCAL_ASSERTIONS_VERIFIED",
-        "verifiedClauseUnits": 127,
-        "javaUnits": 92,
-        "webUnits": 35,
+        "verifiedClauseUnits": 129,
+        "javaUnits": 93,
+        "webUnits": 36,
         "completeInventory": false,
         "evidence": "docs/evidence/requirement-clause-audit-20261007.json"
       }
@@ -3363,8 +3363,12 @@
           ]
         }
       ],
-      "observed": "撤销主体与 05:527 申请人通知均已实现；通知补充 39 项 Java、1526 项完整前端、构建、契约及固定包升级/强退通过。浏览器及 PostgreSQL 待补验。",
+      "observed": "已批撤销主体、申请人通知及存量金融历史展示均已实现；金融历史补充完整前端 1528 项、构建和契约通过，原后台 5334 项组合证据保持。浏览器及 PostgreSQL 待补验。",
       "references": [
+        {
+          "path": "docs/evidence/expense-financial-history-20261008.json",
+          "line": 1
+        },
         {
           "path": "docs/evidence/approved-expense-revocation-notification-20261007.json",
           "line": 1
@@ -4548,11 +4552,11 @@
   },
   "latestProgress": {
     "taskId": "U07",
-    "stage": "REVOCATION_NOTIFICATION_SUPPLEMENT",
+    "stage": "LEGACY_FINANCIAL_HISTORY_VIEW",
     "status": "LOCAL_IMPLEMENTATION_VERIFIED_REQUIREMENT_AUDIT_CONTINUES",
-    "recordedAt": "2026-10-08T00:51:46.432714+00:00",
+    "recordedAt": "2026-10-08T02:17:51.495870+00:00",
     "knownOpenTaskCount": 44,
-    "evidence": "docs/evidence/approved-expense-revocation-notification-20261007.json"
+    "evidence": "docs/evidence/expense-financial-history-20261008.json"
   },
   "localMainIntegration": {
     "verifiedThroughCommit": "ea0b0791dbaf4f9f412620021d801640e2f65fde",

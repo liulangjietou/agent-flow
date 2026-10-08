@@ -34,6 +34,24 @@ function mount(Component, values) {
   return { props, events, state: mounted.$.setupState, close() { app.unmount(); Object.assign(api, originals); global.fetch = originalFetch; bindAuthenticationActor(null) } }
 }
 
+test('已撤销报销的付款区区分无记录和原付款，保留事实读取且不提示重新授权', async () => {
+  const value = finance(); value.actions.authorize = false
+  api.financePayment = async () => clone(value)
+  const p = mount(Finance, { ...binding(), revoked: true })
+  const html = () => renderToString(createSSRApp({ ...FinanceRendered, setup: () => p.state }, { ...p.props }))
+  try {
+    await settle()
+    assert.match(await html(), /审批已撤销/)
+    assert.match(await html(), /本轮没有付款授权记录/)
+    assert.doesNotMatch(await html(), /财务授权后由独立出纳办理/)
+    value.payment = { ...payment(), status: 'EXECUTION_REGISTERED', version: 2, executedBy: 'cashier', operation: operation() }
+    await p.state.load()
+    assert.equal(p.state.view.payment.operation.status, 'UNKNOWN')
+    assert.doesNotMatch(await html(), /本轮没有付款授权记录/)
+    assert.equal(p.state.allowed('AUTHORIZE'), false)
+  } finally { p.close() }
+})
+
 test('付款成功展示要求原绑定、精确金额和完整回单，原命令和另一轮次不能混用', () => {
   const value = payment(); assert.equal(rules.validatePayment(value), value)
   for (const change of [{ id: 'other' }, { amount: { value: 100, currency: 'CNY' } }, { amount: { value: '0.00', currency: 'CNY' } }, { maskedPayeeAccount: '1234567890123456' }, { status: 'SUCCEEDED' }, { expiresAt: 'invalid' }]) assert.throws(() => rules.validatePayment({ ...value, ...change }, 'authorization'))

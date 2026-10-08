@@ -3,7 +3,7 @@ import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api, writeRequests } from '../api'
 import PaymentFacts from './PaymentFacts.vue'
 import { financePaymentInput, financePaymentLabels, financePaymentActionKeys, payeeReviewLabels, validateFinancePayment, validateFinancePaymentReceipt, validatePayeeReviewReceipt, paymentDisputeInput, validatePaymentDisputeReceipt, disputeOutcomeLabels, disputeIssueLabels, paymentError, paymentIssue, type FinancePaymentAction, type FinancePaymentView, type PaymentBinding } from '../payments'
-const props = defineProps<{ applicationId: string; businessId: string; roundNo: number; applicationVersion: number; businessVersion: number; scopeKey: string; locked?: boolean }>()
+const props = defineProps<{ applicationId: string; businessId: string; roundNo: number; applicationVersion: number; businessVersion: number; scopeKey: string; locked?: boolean; revoked?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean] }>()
 const view = ref<FinancePaymentView | null>(null), loading = ref(false), saving = ref(false), requiresRefresh = ref(false), unconfirmed = ref(false)
 type Action = FinancePaymentAction | 'RESOLVE_DISPUTE'
@@ -72,14 +72,14 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
 <template>
   <section class="finance-payment" aria-label="本轮付款与授权">
     <div class="payment-heading"><h3>第 {{ roundNo }} 轮 · 付款</h3><button type="button" class="quiet" :disabled="loading || saving || locked" @click="notice = ''; load()">刷新付款状态</button></div>
-    <p class="payment-help">财务授权后由独立出纳办理，到账以银行确认结果为准。</p>
+    <p class="payment-help">{{ revoked ? '审批已撤销，原付款和迟到结果仍按资金回执核对。' : '财务授权后由独立出纳办理，到账以银行确认结果为准。' }}</p>
     <p v-if="loading" role="status" class="payment-help">正在核对本轮付款权限与状态…</p>
     <p v-if="error" class="payment-error" role="alert">{{ error }}</p><p v-if="notice" class="payment-help" role="status">{{ notice }}</p>
     <p v-if="unconfirmed && !saving" class="payment-error" role="alert">上次操作结果尚未确认，请在未确认操作中恢复原请求后刷新。</p>
     <p v-if="requiresRefresh && !unconfirmed && !error" class="payment-help" role="status">请刷新付款状态，核对恢复后的原操作。</p>
     <template v-if="view">
       <PaymentFacts v-if="view.payment" :payment="view.payment" />
-      <p v-else class="payment-help">尚无本轮付款授权。<span v-if="view.payable">本次应付 {{ view.payable.currency }} {{ view.payable.value }}。</span></p>
+      <p v-else class="payment-help">{{ revoked ? '本轮没有付款授权记录。' : '尚无本轮付款授权。' }}<span v-if="view.payable">本次应付 {{ view.payable.currency }} {{ view.payable.value }}。</span></p>
       <div v-if="view.payeeReview" class="payee-review" aria-label="本人账户复核">
         <h4>本人账户复核 · {{ payeeReviewLabels[view.payeeReview.status] }}</h4>
         <p v-if="view.payeeReview.maskedAccount">本次读取账户 <strong>{{ view.payeeReview.maskedAccount }}</strong><br />证据有效至 {{ new Date(view.payeeReview.validUntil!).toLocaleString() }}</p>

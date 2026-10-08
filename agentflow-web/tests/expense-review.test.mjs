@@ -73,12 +73,27 @@ test('已撤销报销明确显示终态，保留金额历史但不再提示等�
     ...(Array.isArray(vnode.children) ? vnode.children.flatMap(names) : [])]
   try {
     await tick(); await tick()
-    assert.match(text(p.root), /已撤销.*不会再付款或核销/)
+    assert.match(text(p.root), /审批已撤销/); assert.match(text(p.root), /已登记的付款、凭证及核销结果/)
     assert.match(text(p.root), /原申报合计/); assert.match(text(p.root), /当前核定合计/)
     const children = names(p.instance().$.subTree)
-    assert.equal(children.includes('FinancePaymentStatus'), false)
-    assert.equal(children.includes('ExpenseSettlementStatus'), false)
-    assert.equal(children.filter(name => name === 'VoucherStatus').length, 1)
+    assert.equal(children.includes('FinancePaymentStatus'), true)
+    assert.equal(children.includes('ExpenseSettlementStatus'), true)
+    assert.equal(children.filter(name => name === 'VoucherStatus').length, 2)
+  } finally { p.close() }
+})
+
+test('已撤销旧单继续读取原付款凭证和核销事实，保留迟到银行结果的对账入口', async () => {
+  const report = { ...detail(), applicationStatus: 'REVOKED' }, flow = { ...workflow(), task: null }
+  const p = mount(Detail, report, flow, { reportId: 'report', applicationId: 'app', version: 2, scopeKey: 'tenant:finance', locked: false })
+  const names = vnode => !vnode ? [] : [vnode.type?.name, ...(vnode.component ? names(vnode.component.subTree) : []),
+    ...(Array.isArray(vnode.children) ? vnode.children.flatMap(names) : [])]
+  try {
+    await tick(); await tick()
+    const children = names(p.instance().$.subTree)
+    assert.equal(children.includes('FinancePaymentStatus'), true)
+    assert.equal(children.includes('ExpenseSettlementStatus'), true)
+    assert.equal(children.filter(name => name === 'VoucherStatus').length, 2)
+    assert.doesNotMatch(text(p.root), /不会再付款或核销/)
   } finally { p.close() }
 })
 

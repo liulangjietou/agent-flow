@@ -1,0 +1,100 @@
+{
+  "recordedAt": "2026-10-08T02:17:51.495870+00:00",
+  "taskId": "U07",
+  "stage": "LEGACY_FINANCIAL_HISTORY_VIEW",
+  "status": "IMPLEMENTED_LOCAL_COMPONENTS_BUILD_BROWSER_PENDING",
+  "sourceBaseCommit": "0e34f64e2f2fe90988e67dd38081232f452aa8b2",
+  "requirements": [
+    {
+      "documentId": "02",
+      "lines": [
+        124,
+        128
+      ]
+    },
+    {
+      "documentId": "05",
+      "lines": [
+        156,
+        171
+      ]
+    }
+  ],
+  "implementation": [
+    {
+      "path": "agentflow-web/src/components/ExpenseDetail.vue",
+      "sha256": "32cfb59879ad462a03e257d984ffd8804dd78cca699175d2f97030ef1b8ac432"
+    },
+    {
+      "path": "agentflow-web/src/components/ExpenseSettlementStatus.vue",
+      "sha256": "b438e123f4da7be422fa99e63bbc302547c275938d8e398f79c0359f08a8c462"
+    },
+    {
+      "path": "agentflow-web/src/components/FinancePaymentStatus.vue",
+      "sha256": "fab4a44a0ad18f5552e5e3cf99a2a706f6503f95f0a4332b38e91ac3abc097ba"
+    },
+    {
+      "path": "agentflow-web/src/components/VoucherStatus.vue",
+      "sha256": "f91d7589babd4d81041ce85e1fde760c0d3d3dd180dea5e5b2e7f0742df9c06a"
+    },
+    {
+      "path": "agentflow-web/tests/expense-review.test.mjs",
+      "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a"
+    },
+    {
+      "path": "agentflow-web/tests/payments.test.mjs",
+      "sha256": "a0b0de9739a74ea458ae5221d9a052b449fb89b65a12cfa936ff12f36c8b5fe4"
+    }
+  ],
+  "red": {
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/u07h-web-red.log",
+    "sha256": "acb105a668225f647b6da20983fde0f163f691a454e7fb2809087c7727bc3bca",
+    "failed": 1
+  },
+  "web": {
+    "scopeCases": 77,
+    "renderScopeCases": 46,
+    "scopeCountsOverlap": true,
+    "fullPassed": 1528,
+    "failed": 0,
+    "skipped": 0,
+    "log": "/fyoung/tmp/agentflow-remaining-20260928/u07h-web-full.log",
+    "sha256": "2bca2d90bfdb185d5865cf867a7aa15fac970819c14999ef992e554fa1b29f28",
+    "typeAndBuild": "PASS"
+  },
+  "openApi": {
+    "status": "PASS",
+    "operations": 397,
+    "schemas": 873,
+    "requestExamples": 130
+  },
+  "backend": {
+    "changed": false,
+    "retested": false,
+    "retainedUniqueJava": 5334,
+    "existingWitness": "ExpenseSubmissionIntegrationTest.lateSuccessAfterApprovalRevocationIsRecordedButCannotConsume",
+    "baseline": "/fyoung/tmp/agentflow-remaining-20260928/u07n-java-aggregate.json",
+    "sha256": "e882dffb337d67f83cfb3b8389f6c2637c5695661da8135be416e9617cbf75dd"
+  },
+  "rootCause": "费用父组件用审批 REVOKED 状态排除了全部付款、付款凭证和核销查询，遗漏存量已登记/迟到银行事实；旧前端用例仅覆盖未登记金融记录。",
+  "rules": [
+    "审批结论和金融事实独立，父组件继续挂载原金融读取入口。",
+    "各金融组件依据真实记录显示现有事实和空态；已撤销空态不提示继续等待付款或核销。",
+    "预算显示实际 FROZEN/RELEASED/CONSUMED 台账，不按审批状态猜测已释放或待释放。",
+    "操作仍由原服务端能力、双版本和权限决定；本次不改变付款、撤销、核销或对账策略。"
+  ],
+  "review": {
+    "method": "manual caller, financial read-model, legacy fact, permission and rendered empty-state review",
+    "findings": []
+  },
+  "archive": {
+    "path": "/fyoung/tmp/agentflow-remaining-20260928/u07h-financial-history-verified-20261008",
+    "files": 17,
+    "manifestSha256": "4fd8b0d3027cfbea508f3de980d0c9bf48ec3de72658b3e3457866b33cfdc211"
+  },
+  "remaining": [
+    "真实浏览器/辅助设备",
+    "原 U07 PostgreSQL 和目标环境验收",
+    "V03 余下规范和 E 系列门禁"
+  ]
+}

@@ -5,7 +5,7 @@ import VoucherReversal from './VoucherReversal.vue'
 import VoucherReversalExecution from './VoucherReversalExecution.vue'
 import { voucherOutcomeLabels, operationLabels, preparationLabels, validateVoucherReceipt, validateVoucherView, voucherActionInput, voucherActionLabels, voucherDisputeInput, validateVoucherDisputeReceipt, voucherDisputeIssue, voucherError, voucherIssue, type VoucherAction, type VoucherBinding, type VoucherView } from '../vouchers'
 
-const props = defineProps<{ applicationId: string; businessId: string; businessType: 'EXPENSE' | 'ADVANCE_REQUEST'; roundNo: number; applicationVersion: number; businessVersion: number; scopeKey: string; locked?: boolean; payment?: boolean }>()
+const props = defineProps<{ applicationId: string; businessId: string; businessType: 'EXPENSE' | 'ADVANCE_REQUEST'; roundNo: number; applicationVersion: number; businessVersion: number; scopeKey: string; locked?: boolean; revoked?: boolean; payment?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean]; changed: [] }>()
 const view = ref<VoucherView | null>(null), loading = ref(false), saving = ref(false), requiresRefresh = ref(false), unconfirmed = ref(false)
 const reversalBusy = ref(false), executionBusy = ref(false)
@@ -94,13 +94,13 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
 <template>
   <section class="voucher-status" :aria-label="`本轮${title}`">
     <div class="voucher-heading"><h3>第 {{ roundNo }} 轮 · {{ title }}</h3><button type="button" class="quiet" :disabled="loading || saving || reversalBusy || executionBusy || locked" @click="notice = ''; load()">刷新{{ title }}状态</button></div>
-    <p class="voucher-help">{{ payment ? '根据原支付命令和成功回单办理会计入账。付款凭证的准备、查询及重发均不会再次付款。' : '挂账凭证记录本轮已批准的费用或借款。已过账后仍须办理实际付款与结算。' }}</p>
+    <p class="voucher-help">{{ revoked ? '审批已撤销，原凭证及迟到会计结果仍保留供核对。' : payment ? '根据原支付命令和成功回单办理会计入账。付款凭证的准备、查询及重发均不会再次付款。' : '挂账凭证记录本轮已批准的费用或借款。已过账后仍须办理实际付款与结算。' }}</p>
     <p v-if="loading" class="voucher-help" role="status">正在核对本轮凭证与读取权限…</p>
     <p v-if="error" class="voucher-error" role="alert">{{ error }}</p><p v-if="notice" class="voucher-help" role="status">{{ notice }}</p>
     <p v-if="unconfirmed && !saving" class="voucher-error" role="alert">上次操作结果尚未确认，请在未确认操作中恢复后刷新状态。</p>
     <p v-if="requiresRefresh && !error && !unconfirmed && !loading" class="voucher-help" role="status">上次操作已恢复，请刷新凭证状态后再办理。</p>
     <template v-if="view">
-      <p v-if="payment && !view.preparation && !view.operation" class="voucher-help">成功付款后生成付款凭证；全额冲销或零金额结算不生成付款凭证。</p>
+      <p v-if="payment && !view.preparation && !view.operation" class="voucher-help">{{ revoked ? '本轮没有付款凭证记录，审批撤销不代表外部结果可以抹去。' : '成功付款后生成付款凭证；全额冲销或零金额结算不生成付款凭证。' }}</p>
       <div class="voucher-stages"><article><small>会计依据</small><strong>{{ view.preparation ? preparationLabels[view.preparation.status] : '尚无凭证准备记录' }}</strong><p v-if="view.preparation">第 {{ view.preparation.attempt }} 次准备 · {{ timeLabel(view.preparation.createdAt) }}</p><p v-if="view.preparation?.issue">{{ voucherIssue(view.preparation.issue) }}</p></article>
         <article :class="{ posted: view.operation?.status === 'POSTED' }"><small>ERP 过账</small><strong>{{ view.operation ? operationLabels[view.operation.status] : '尚无过账记录' }}</strong><p v-if="view.operation">会计日期 {{ view.operation.accountingDate }} · 尝试处理 {{ view.operation.attempts }} 次</p><p v-if="view.operation?.issue">{{ voucherIssue(view.operation.issue) }}</p></article></div>
       <details v-if="view.mapping" class="voucher-mapping" aria-label="科目版本依据"><summary>{{ view.operation ? '原凭证科目依据' : '准备时固定的科目选择' }} · {{ view.mapping.source === 'PLATFORM_PUBLISHED' ? '平台发布 v' + view.mapping.mappingVersion : 'ERP 管理' }}</summary><dl><div><dt>法人 / 币种</dt><dd>{{ view.mapping.legalEntityId }} / {{ view.mapping.currency }}</dd></div><template v-if="view.mapping.source === 'PLATFORM_PUBLISHED'"><div><dt>配置编号</dt><dd>{{ view.mapping.mappingId }}</dd></div><div><dt>生效 / 类别修订</dt><dd>{{ view.mapping.activeRevision }} / {{ view.mapping.categoryRevision }}</dd></div><div><dt>原配置内容摘要</dt><dd><code>{{ view.mapping.definitionDigest }}</code></dd></div></template><div><dt>ERP 来源版本</dt><dd>{{ view.mapping.erpSourceVersion ?? '尚未取得 ERP 科目核对结果' }}</dd></div></dl><p class="voucher-help">来源为本条准备或原凭证记录。当前配置换版不改写已登记凭证的依据。</p></details>

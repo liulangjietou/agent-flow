@@ -1,8 +1,8 @@
 {
-  "recordedAt": "2026-10-08T00:47:45.946279+00:00",
+  "recordedAt": "2026-10-08T01:24:17.894556+00:00",
   "taskId": "V03",
   "status": "PARTIAL_CLAUSE_AUDIT_LOCAL_ASSERTIONS_VERIFIED",
-  "sourceBaseCommit": "430457a62e855fdd77274420234dc259af87226b",
+  "sourceBaseCommit": "0e34f64e2f2fe90988e67dd38081232f452aa8b2",
   "requirements": [
     {
       "id": "00",
@@ -8179,7 +8179,7 @@
         },
         {
           "path": "agentflow-web/src/components/ExpenseDetail.vue",
-          "sha256": "e84d44ec49e93d05c8c35a6fb03d5c922c4ca10dba6a19e0e530de7533e852d6"
+          "sha256": "32cfb59879ad462a03e257d984ffd8804dd78cca699175d2f97030ef1b8ac432"
         },
         {
           "path": "agentflow-web/src/App.vue",
@@ -8189,45 +8189,45 @@
       "testWitnesses": [
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "核减输入即时提示增额与税额越界，未填原因说明不允许提交且不写请求",
-          "line": 85
+          "line": 100
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "财务详情顶部固定的四项金额同步未保存核减，取消恢复当前已确认金额",
-          "line": 220
+          "line": 235
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "实际 App 审批入口在费用仍未保存时拒绝批准，不调用接口也不清空原任务",
-          "line": 245
+          "line": 260
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "核减预览以稳定行号合并未改行，大额一分与只减税额均不发生浮点舍入",
-          "line": 253
+          "line": 268
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "核减结果未确认时取消表单仍保持审批锁，当前费用版本刷新后才解除",
-          "line": 269
-        },
-        {
-          "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
-          "case": "实际父页面接线禁止审批与加签且保持核减可编辑，旧身份任务版本回调不能解锁新任务",
           "line": 284
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
+          "case": "实际父页面接线禁止审批与加签且保持核减可编辑，旧身份任务版本回调不能解锁新任务",
+          "line": 299
+        },
+        {
+          "path": "agentflow-web/tests/expense-review.test.mjs",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "业务审批人无法读取敏感费用时完成受限读取仍解除加载锁，不以完整财务权限代替任务授权",
-          "line": 341
+          "line": 356
         }
       ],
       "status": "LOCAL_COMPONENT_TEST_PASSED_BROWSER_PENDING",
@@ -8506,7 +8506,7 @@
         },
         {
           "path": "agentflow-web/src/components/ExpenseDetail.vue",
-          "sha256": "e84d44ec49e93d05c8c35a6fb03d5c922c4ca10dba6a19e0e530de7533e852d6"
+          "sha256": "32cfb59879ad462a03e257d984ffd8804dd78cca699175d2f97030ef1b8ac432"
         },
         {
           "path": "agentflow-web/src/components/TaskActions.vue",
@@ -8520,27 +8520,27 @@
       "testWitnesses": [
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "收单必须逐项核对纸质材料，缺失项阻止签收并预填退回且不直接写入",
-          "line": 147
+          "line": 162
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "全部纸质材料勾选后才能签收，取消再打开与版本变化不能继承上次确认",
-          "line": 170
+          "line": 185
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "缺件预填进入真实退回表单并允许修改，确认前不执行；旧上下文和现有人工意见不能被覆盖",
-          "line": 188
+          "line": 203
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "缺件从真实费用详情转交，父待办在下次渲染前后复核上下文，不把迟到草稿带入新任务",
-          "line": 318
+          "line": 333
         }
       ],
       "status": "LOCAL_COMPONENT_TEST_PASSED_BROWSER_PENDING",
@@ -9197,7 +9197,7 @@
         },
         {
           "path": "agentflow-web/src/components/ExpenseDetail.vue",
-          "sha256": "e84d44ec49e93d05c8c35a6fb03d5c922c4ca10dba6a19e0e530de7533e852d6"
+          "sha256": "32cfb59879ad462a03e257d984ffd8804dd78cca699175d2f97030ef1b8ac432"
         },
         {
           "path": "agentflow-web/src/expenses.ts",
@@ -9207,15 +9207,15 @@
       "testWitnesses": [
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "逐行核减必须各自填写原因，不同原因一次提交且未修改行不要求原因",
-          "line": 103
+          "line": 118
         },
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "核减历史逐行显示原因，旧行记录使用原统一原因且不补写历史",
-          "line": 133
+          "line": 148
         }
       ],
       "status": "LOCAL_COMPONENT_TEST_PASSED_BROWSER_PENDING",
@@ -9959,7 +9959,7 @@
     },
     {
       "id": "R125",
-      "requirement": "撤销终态保留原申报和核定金额历史，不再进入付款核销办理；预算释放按实际确认状态显示。",
+      "requirement": "撤销终态保留原金额和金融事实；原付款、凭证及核销仍读取，空记录不提示待办，预算依实际台账显示。",
       "sources": [
         [
           "05",
@@ -9975,13 +9975,13 @@
       "implementation": [
         {
           "path": "agentflow-web/src/components/ExpenseDetail.vue",
-          "sha256": "e84d44ec49e93d05c8c35a6fb03d5c922c4ca10dba6a19e0e530de7533e852d6"
+          "sha256": "32cfb59879ad462a03e257d984ffd8804dd78cca699175d2f97030ef1b8ac432"
         }
       ],
       "testWitnesses": [
         {
           "path": "agentflow-web/tests/expense-review.test.mjs",
-          "sha256": "591cce1984d6812809997456d1cf7e29d10af23eb1d9275702b5b85068f234c0",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
           "case": "已撤销报销明确显示终态，保留金额历史但不再提示等待付款核销",
           "line": 69
         }
@@ -10122,13 +10122,157 @@
           "text": "| `ExpenseReportRevoked` | 费用核算 | 财务控制、通知 |"
         }
       ]
+    },
+    {
+      "id": "R128",
+      "requirement": "借款全额冲销零应付经挂账及资源预算核销后结算归档，不生成付款授权或银行调用；既有已撤销后的迟到成功仍记录但不再消费资源。",
+      "sources": [
+        [
+          "05",
+          620,
+          620
+        ],
+        [
+          "02",
+          124,
+          128
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSettlementRegistration.java",
+          "sha256": "62ef86b627593f50d4271a97e7c96aeb626ca4798c3a1beccb14cf9e56c21c24"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/expense/ExpenseSettlementService.java",
+          "sha256": "e3a0edd4b41ae0dd1ce666707d53bb9e0e1b08f3296ee25ab9e963eee6cdf07c"
+        },
+        {
+          "path": "agentflow-server/src/main/java/io/agentflow/finance/PaymentOperationService.java",
+          "sha256": "1032b4deaef2f6deef80864d6b4c209cf8e08859d5d47fd8288a7f9a211b5037"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+          "sha256": "5331104ad393b7c516825b4607d6b3e6004afd40eb1747236f228a5747ce0bfd",
+          "method": "fullAdvanceOffsetSettlesAfterAccrualWithoutAnyPaymentAuthorizationOrBankCall",
+          "line": 5344,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+              "name": "fullAdvanceOffsetSettlesAfterAccrualWithoutAnyPaymentAuthorizationOrBankCall",
+              "status": "PASS"
+            }
+          ]
+        },
+        {
+          "path": "agentflow-server/src/test/java/io/agentflow/expense/ExpenseSubmissionIntegrationTest.java",
+          "sha256": "5331104ad393b7c516825b4607d6b3e6004afd40eb1747236f228a5747ce0bfd",
+          "method": "lateSuccessAfterApprovalRevocationIsRecordedButCannotConsume",
+          "line": 5358,
+          "executedCases": [
+            {
+              "class": "io.agentflow.expense.ExpenseSubmissionIntegrationTest",
+              "name": "lateSuccessAfterApprovalRevocationIsRecordedButCannotConsume",
+              "status": "PASS"
+            }
+          ]
+        }
+      ],
+      "status": "LOCAL_JAVA_ASSERTIONS_PASSED",
+      "remainingAcceptanceTaskIds": [
+        "V02"
+      ],
+      "sourceText": [
+        {
+          "documentId": "05",
+          "lines": [
+            620,
+            620
+          ],
+          "text": "- [ ] 报销 3,000、借款余额 5,000：冲销 3,000，应付 0，结算直接关闭，借款余额 2,000。"
+        },
+        {
+          "documentId": "02",
+          "lines": [
+            124,
+            128
+          ],
+          "text": "- `PAYMENT_PENDING`、`PAID`、`PAYMENT_FAILED`、`RECONCILED` 从申请单状态中移除，归属结算对象（报销为 `ExpenseSettlement`，见 05 §3.2）。列表页需要\"已到账\"时由读模型组合审批状态和结算状态。\n\n撤回、作废、撤销的允许条件和副作用见 05 §3.4。\n\nFlowable 的流程实例/任务状态是运行事实；申请单状态由领域服务根据事件更新。二者允许短暂不同时变化，例如 Flowable 任务已完成而结算仍在付款中。不能用一个 `status` 字段混合审批和支付语义（A）。"
+        }
+      ]
+    },
+    {
+      "id": "R129",
+      "requirement": "审批撤销不隐藏原付款、付款凭证和核销读模型；银行迟到结果继续可核对，通知及界面不能用审批结论伪造金融结论。",
+      "sources": [
+        [
+          "02",
+          124,
+          128
+        ],
+        [
+          "05",
+          156,
+          171
+        ]
+      ],
+      "implementation": [
+        {
+          "path": "agentflow-web/src/components/ExpenseDetail.vue",
+          "sha256": "32cfb59879ad462a03e257d984ffd8804dd78cca699175d2f97030ef1b8ac432"
+        },
+        {
+          "path": "agentflow-web/src/components/FinancePaymentStatus.vue",
+          "sha256": "fab4a44a0ad18f5552e5e3cf99a2a706f6503f95f0a4332b38e91ac3abc097ba"
+        },
+        {
+          "path": "agentflow-web/src/components/ExpenseSettlementStatus.vue",
+          "sha256": "b438e123f4da7be422fa99e63bbc302547c275938d8e398f79c0359f08a8c462"
+        },
+        {
+          "path": "agentflow-web/src/components/VoucherStatus.vue",
+          "sha256": "f91d7589babd4d81041ce85e1fde760c0d3d3dd180dea5e5b2e7f0742df9c06a"
+        }
+      ],
+      "testWitnesses": [
+        {
+          "path": "agentflow-web/tests/expense-review.test.mjs",
+          "sha256": "dced51310da305cc99af8ed2c2f14ceb83e759c62cd09cd07646d2dfda03b01a",
+          "case": "已撤销旧单继续读取原付款凭证和核销事实，保留迟到银行结果的对账入口",
+          "line": 85
+        }
+      ],
+      "status": "LOCAL_COMPONENT_TEST_PASSED_BROWSER_PENDING",
+      "remainingAcceptanceTaskIds": [
+        "U07"
+      ],
+      "sourceText": [
+        {
+          "documentId": "02",
+          "lines": [
+            124,
+            128
+          ],
+          "text": "- `PAYMENT_PENDING`、`PAID`、`PAYMENT_FAILED`、`RECONCILED` 从申请单状态中移除，归属结算对象（报销为 `ExpenseSettlement`，见 05 §3.2）。列表页需要\"已到账\"时由读模型组合审批状态和结算状态。\n\n撤回、作废、撤销的允许条件和副作用见 05 §3.4。\n\nFlowable 的流程实例/任务状态是运行事实；申请单状态由领域服务根据事件更新。二者允许短暂不同时变化，例如 Flowable 任务已完成而结算仍在付款中。不能用一个 `status` 字段混合审批和支付语义（A）。"
+        },
+        {
+          "documentId": "05",
+          "lines": [
+            156,
+            171
+          ],
+          "text": "**删除 `PAYMENT_PENDING`/`PAID`/`PAYMENT_FAILED`/`RECONCILED`**：这些是结算事实，移到 `ExpenseSettlement`，兑现 02 §6.1 \"不能用一个 status 字段混合审批和支付语义\"。列表页需要\"已到账\"时，由读模型组合两个状态展示。\n\n### 3.2 结算状态（ExpenseSettlement）\n\n```text\nAPPROVED 事件\n   ▼\nPENDING_VOUCHER ──凭证推送成功──▶ PENDING_PAYMENT ──纳入付款批次──▶ PAYING\n       │                               ▲                                │\n       │凭证失败(可重试/人工)            │ 收款账户更新并复核                ├─成功──▶ PAID ──对账一致──▶ CLOSED\n       ▼                               │                                │\n   VOUCHER_FAILED               PAYMENT_FAILED ◀──────────失败──────────┘\n应付为 0（全额冲销）：PENDING_VOUCHER ──凭证成功──▶ CLOSED\n```\n\n结算状态的推进只由领域事件驱动；迟到/重复的支付回调按 `aggregateVersion` 丢弃并进入对账（沿用 03 §6）。"
+        }
+      ]
     }
   ],
   "boundaries": [
     "条款行是一项可检查行为的定位，不作为新增顶层任务，也不据此计算项目完成比例。",
-    "Java 方法引用与 U07 更新后的 5334 个组合去重结果匹配；本次只重跑审批生命周期、凭证、预算、费用、审计和契约相关范围，其他结果保留原来源。前端引用匹配 U07 通知补充完整 1526 项成功记录。",
+    "Java 方法引用与 U07 更新后的 5334 个组合去重结果匹配；本次只重跑审批生命周期、凭证、预算、费用、审计和契约相关范围，其他结果保留原来源。前端引用匹配 U07 通知补充完整 1528 项成功记录。",
     "前端组件和处理器测试不等于真实键盘、屏幕阅读器、触屏或视觉验收，U01/W02/V01 门禁保持。",
-    "这里只记录已经细化到断言的 127 个条款单元；未声称覆盖全部原始规范。剩余章节条款仍在 V03 核对。",
+    "这里只记录已经细化到断言的 129 个条款单元；未声称覆盖全部原始规范。剩余章节条款仍在 V03 核对。",
     "PostgreSQL、Docker、真实企业来源、浏览器和远端交付未执行。"
   ],
   "completeRequirementInventory": false,
@@ -10141,9 +10285,9 @@
       "fullRerun": false
     },
     "web": {
-      "path": "/fyoung/tmp/agentflow-remaining-20260928/u07n-web-full.log",
-      "sha256": "872e5ac651d9560a646f918115c78f96e7d587c6eab9e0ec8f1d0e63e844a9da",
-      "uniquePassed": 1526,
+      "path": "/fyoung/tmp/agentflow-remaining-20260928/u07h-web-full.log",
+      "sha256": "2bca2d90bfdb185d5865cf867a7aa15fac970819c14999ef992e554fa1b29f28",
+      "uniquePassed": 1528,
       "failed": 0,
       "skipped": 0
     }

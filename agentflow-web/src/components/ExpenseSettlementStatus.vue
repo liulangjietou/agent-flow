@@ -5,7 +5,7 @@ import ExpensePaymentReturn from './ExpensePaymentReturn.vue'
 import ExpenseResourceAdjustment from './ExpenseResourceAdjustment.vue'
 import ExpensePartialAdjustment from './ExpensePartialAdjustment.vue'
 import { settlementLabels, settlementFundingLabels, settlementBudgetLabels, settlementIssue, settlementError, settlementRetry, validateSettlement, validateSettlementReceipt, type SettlementBinding, type SettlementView } from '../expenseSettlement'
-const props = defineProps<{ reportId: string; applicationId: string; roundNo: number; applicationVersion: number; financialVersion: number; scopeKey: string; locked?: boolean }>()
+const props = defineProps<{ reportId: string; applicationId: string; roundNo: number; applicationVersion: number; financialVersion: number; scopeKey: string; locked?: boolean; revoked?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean]; changed: [] }>()
 const returnBusy = ref(false), adjustmentBusy = ref(false), partialBusy = ref(false)
 const view = ref<SettlementView | null>(null), loading = ref(false), saving = ref(false), requiresRefresh = ref(false), unconfirmed = ref(false), confirming = ref(false)
@@ -69,7 +69,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
     <p v-if="unconfirmed && !saving" class="settlement-error" role="alert">上次重试结果尚未确认，请在未确认操作中恢复原请求后刷新。</p>
     <p v-if="requiresRefresh && !unconfirmed && !error" class="settlement-help" role="status">请刷新结算状态，核对原请求恢复后的结果。</p>
     <template v-if="view">
-      <p v-if="!view.settlement" class="settlement-help">尚未登记本轮核销，正在等待付款到账或零应付结算依据。</p>
+      <p v-if="!view.settlement" class="settlement-help">{{ revoked ? '审批已撤销，本轮没有核销记录。原金融结果以实际记录为准。' : '尚未登记本轮核销，正在等待付款到账或零应付结算依据。' }}</p>
       <template v-else>
         <strong class="settlement-status" :class="{ complete: view.settlement.status === 'SETTLED' }">{{ settlementLabels[view.settlement.status] }}</strong>
         <div class="settlement-stages">
