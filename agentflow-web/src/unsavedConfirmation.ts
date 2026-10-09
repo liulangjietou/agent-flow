@@ -1,4 +1,4 @@
-export interface ConfirmationRequest { id: number; confirmLabel: string }
+export interface ConfirmationRequest { id: number; confirmLabel: string; title?: string; description?: string }
 
 /**
  * 只保管一项待确认意图；取消、会话失效与卸载均不能放行后续操作。
@@ -11,12 +11,13 @@ export class UnsavedConfirmation {
   private disposed = false
 
   /** 重复点击直接拒绝，不替换原对话框，也不共享确认结果。 */
-  async confirm(confirmLabel: string, allowed: () => boolean, required = true): Promise<boolean> {
+  async confirm(confirmLabel: string, allowed: () => boolean, required = true,
+    content: Pick<ConfirmationRequest, 'title' | 'description'> = {}): Promise<boolean> {
     if (this.disposed || this.pending || !allowed()) return false
     const accepted = required ? await new Promise<boolean>(resolve => {
       const id = ++this.sequence
       this.pending = { id, resolve }
-      this.active = { id, confirmLabel }
+      this.active = { id, confirmLabel, ...content }
     }) : true
     return accepted && !this.disposed && allowed()
   }

@@ -48,8 +48,8 @@ onUnmounted(async () => {
     <div class="modal-backdrop confirmation-backdrop" @click.self="answer(false)">
       <section ref="dialog" class="modal unsaved-confirmation" role="dialog" aria-modal="true" :aria-labelledby="titleId" :aria-describedby="descriptionId" tabindex="-1" @keydown.stop="keyHandler">
         <p class="eyebrow">UNSAVED CHANGES</p>
-        <h2 :id="titleId">有未保存的流程修改</h2>
-        <p :id="descriptionId" class="confirmation-description">继续操作会放弃设计器中未保存的修改。选择“继续编辑”可保留当前内容。</p>
+        <h2 :id="titleId">{{ request.title ?? '有未保存的流程修改' }}</h2>
+        <p :id="descriptionId" class="confirmation-description">{{ request.description ?? '继续操作会放弃设计器中未保存的修改。选择“继续编辑”可保留当前内容。' }}</p>
         <div class="confirmation-actions">
           <button ref="cancelButton" class="secondary" type="button" @click="answer(false)">继续编辑</button>
           <button class="primary" type="button" @click="answer(true)">{{ request.confirmLabel }}</button>
