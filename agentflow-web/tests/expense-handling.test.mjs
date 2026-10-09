@@ -35,7 +35,7 @@ test('办理历史拒绝跨单、重复记录、超过上限与伪造审批状�
 test('工具回执绑定原办理、双版本、白名单及来源记录', () => {
   const path = `${model.handlingPath(uuid(2))}/${uuid(1)}/inspect`, input = JSON.stringify({ expectedVersion: 1, tool: 'EXPENSE' })
   assert.deepEqual(model.validateHandlingReceipt(receipt(), path, input), receipt())
-  for (const change of [v => { v.task.id = uuid(9) }, v => { v.task.version++ }, v => { v.result.expense.financialVersion++ }, v => { v.result.tool = 'APPROVE' }, v => { v.result.invoice = {} }, v => { v.task.steps[0].outcome = 'SUBMITTED' }]) {
+  for (const change of [v => { v.task.id = uuid(9) }, v => { v.task.version = 1 }, v => { v.result.expense.financialVersion++ }, v => { v.result.tool = 'APPROVE' }, v => { v.result.invoice = {} }, v => { v.task.steps[0].outcome = 'SUBMITTED' }]) {
     const value = receipt(); change(value); assert.throws(() => model.validateHandlingReceipt(value, path, input))
   }
 })

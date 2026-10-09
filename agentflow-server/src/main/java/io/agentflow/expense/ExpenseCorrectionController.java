@@ -32,11 +32,22 @@ public class ExpenseCorrectionController {
     private final ExpenseAllowancePreparation allowances;
     private final ExpenseCorrectionService corrections;
     private final IdempotencyExecutor idempotency;
+    private final ExpenseStructuredCorrectionService structured;
 
     /** 补贴读取留在事务外，回执恢复不重新准备或保存费用。 */
     public ExpenseCorrectionController(PrecheckExplanationService explanations, ExpenseAllowancePreparation allowances,
-            ExpenseCorrectionService corrections, IdempotencyExecutor idempotency) {
+            ExpenseCorrectionService corrections, IdempotencyExecutor idempotency, ExpenseStructuredCorrectionService structured) {
         this.explanations = explanations; this.allowances = allowances; this.corrections = corrections; this.idempotency = idempotency;
+        this.structured = structured;
+    }
+
+    /** 逐项确认的差异由服务器合并，保持原幂等保存及自动重检语义。 */
+    @PostMapping("/structured")
+    public ResponseEntity<String> structured(@PathVariable UUID id, @PathVariable UUID runId,
+            @Valid @RequestBody ExpenseStructuredCorrectionService.Input body, HttpServletRequest request) {
+        if (request.getQueryString() != null) throw new DomainException("INVALID_AGENT_QUERY", "Structured correction does not accept query parameters");
+        explanations.authorize(id);
+        return idempotency.executePrepared(request, HttpStatus.OK, () -> structured.prepare(id, runId, body), prepared -> structured.apply(id, runId, prepared));
     }
 
     /** 原键回放仍检查本人权限；成功表示补正保存并排队，不表示审批通过。 */

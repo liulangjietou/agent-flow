@@ -1,3 +1,4 @@
+import { agentPath, readExpenseAgent, readAgentPreview, validateAgentMutation, readHandlingReads, validateReadRecovery, type AgentScope, type AgentPreview, type ExpenseAgentView } from './expenseAgent.js'
 import { handlingPath, readHandlingTasks, validateHandlingReceipt, readAgentUsage, type HandlingTask, type HandlingStart, type HandlingInspect, type HandlingReceipt } from './expenseHandling.js'
 import { readProjectOwners } from './expenseProjectApproval.js'
 import { readPriorRequestPage, readPriorAssessments } from './expensePriorControl.js'
@@ -615,6 +616,8 @@ export const writeRequests = new PendingWrites(async (operation, key) => {
   const taskAction = /^\/tasks\/([^/?]+)\/actions$/.exec(operation.path)
   if (taskAction) validateTaskAssignmentReceipt(result, decodeURIComponent(taskAction[1]!), JSON.parse(operation.body!) as TaskActionInput)
   if (/^\/expense-reports\/[^/?]+\/handling-tasks(?:\/[^/?]+\/(close|inspect))?$/.test(operation.path)) validateHandlingReceipt(result, operation.path, operation.body!)
+  if (/\/handling-tasks\/[^/?]+\/agent(?:\/(resume|cancel))?$/.test(operation.path)) validateAgentMutation(result, operation.path, operation.body!)
+  if (/\/handling-tasks\/[^/?]+\/reads\/[^/?]+\/resume$/.test(operation.path)) validateReadRecovery(result, operation.path)
   validateEventMutation(result, operation.path, operation.body ?? '{}')
   const membership = /^\/tasks\/([^/?]+)\/countersign-changes$/.exec(operation.path)
   if (membership) validateCountersignReceipt(result as CountersignReceipt, decodeURIComponent(membership[1]!), JSON.parse(operation.body!) as CountersignInput)
@@ -624,7 +627,7 @@ export const writeRequests = new PendingWrites(async (operation, key) => {
   if (instance) validateInstanceReceipt(result as InstanceControlView, decodeURIComponent(instance[1]!), Number(instance[2]), instance[3] as InstanceControlAction, JSON.parse(operation.body!) as InstanceControlInput)
   if (/^\/applications\/[^/?]+\/draft-assist-runs(?:\/[^/?]+\/review)?$/.test(operation.path)) validateDraftReceipt(result, operation.path, operation.body!)
   if (/^\/expense-reports\/[^/?]+\/precheck-explanations(?:\/[^/?]+\/review)?$/.test(operation.path)) validateExplanationReceipt(result, operation.path, operation.body!)
-  if (/^\/expense-reports\/[^/?]+\/precheck-explanations\/[^/?]+\/correct$/.test(operation.path)) validateCorrectionReceipt(result, operation.path, operation.body!)
+  if (/^\/expense-reports\/[^/?]+\/precheck-explanations\/[^/?]+\/correct(?:\/structured)?$/.test(operation.path)) validateCorrectionReceipt(result, operation.path, operation.body!)
   if (/^\/expense-reports\/[^/?]+\/risk-explanations(?:\/[^/?]+\/review)?$/.test(operation.path)) validateRiskReceipt(result, operation.path, operation.body!)
   if (/^\/expense-reports\/[^/?]+\/draft-assists(?:\/[^/?]+\/(?:confirm|dismiss))?$/.test(operation.path)) validateExpenseAssistReceipt(result, operation.path, operation.body!)
   return result
@@ -634,6 +637,14 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  expenseAgent: (id: string, task: string, signal: AbortSignal) => request(agentPath(id, task), { signal, cache: 'no-store' }).then(value => readExpenseAgent(value, id, task)),
+  previewExpenseAgent: (id: string, task: string, scope: AgentScope, signal: AbortSignal) => request(agentPath(id, task) + '/preview', { method: 'POST', body: JSON.stringify(scope), signal, cache: 'no-store' }).then(value => readAgentPreview(value, scope)),
+  startExpenseAgent: (id: string, task: string, preview: AgentPreview) => write<ExpenseAgentView>(agentPath(id, task), 'POST', '授权自动办理本单报销', { scope: preview.scope, targetDigest: preview.targetDigest, consentDigest: preview.consentDigest }),
+  resumeExpenseAgent: (id: string, task: string, expectedVersion: number, answer: string, acknowledgeUnknown: boolean) => write<ExpenseAgentView>(agentPath(id, task) + '/resume', 'POST', '补充资料并继续原办理', { expectedVersion, answer, acknowledgeUnknown }),
+  cancelExpenseAgent: (id: string, task: string, expectedVersion: number) => write<ExpenseAgentView>(agentPath(id, task) + '/cancel', 'POST', '停止后续自动办理', { expectedVersion }),
+  expenseHandlingReads: (id: string, task: string, signal: AbortSignal) => request(handlingPath(id) + '/' + encodeURIComponent(task) + '/reads', { signal, cache: 'no-store' }).then(readHandlingReads),
+  resumeHandlingRead: (id: string, task: string, readId: string, expectedVersion: number) => write<HandlingReceipt>(handlingPath(id) + '/' + encodeURIComponent(task) + '/reads/' + encodeURIComponent(readId) + '/resume', 'POST', '恢复原报销查询步骤', { expectedVersion }),
+  correctExpenseFields: (id: string, runId: string, body: { expectedRunVersion: number; applicationVersion: number; financialVersion: number; selectedPatchIds: string[]; comment: string }) => write<ExpenseCorrectionReceipt>(explanationPath(id) + '/' + encodeURIComponent(runId) + '/correct/structured', 'POST', '逐项确认字段差异并重新预检', body),
   expenseHandlingTasks: (id: string, signal: AbortSignal) => request(handlingPath(id), { signal, cache: 'no-store' }).then(value => readHandlingTasks(value, id)),
   startExpenseHandling: (id: string, body: HandlingStart) => write<HandlingTask>(handlingPath(id), 'POST', '开始本人报销办理', body),
   closeExpenseHandling: (id: string, taskId: string, expectedVersion: number) => write<HandlingTask>(handlingPath(id) + '/' + encodeURIComponent(taskId) + '/close', 'POST', '结束本人办理记录', { expectedVersion }),

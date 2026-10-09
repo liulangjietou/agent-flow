@@ -86,3 +86,15 @@
 供应商采购付款办理使用 `/api/v1/procurement-payments/{id}/supplier-payment` 读取原轮次状态，`/reviews` 登记新鲜应付复核，`/authorizations` 消费同一财务的证据并登记固定预留。`/api/v1/supplier-payments/{id}/finance-actions` 只恢复同一原授权；`QUERY`、`RETRY`、`RETIRE` 分别受原状态和展示版本约束。FINANCE 角色、非申请人、原轮次敏感字段可读与当前法人任职缺一不可，幂等回放也重新检查。202 不是银行付款或 ERP 结算成功，完整规则见 [供应商付款](supplier-payments.md)。
 
 本人通知偏好使用 `GET/PUT /api/v1/notifications/preferences`：默认关闭外部开关，站内提醒常开，不接受其他人的身份或外部地址。PUT 显式携带两个开关与 `expectedVersion`，响应禁止缓存，原键恢复回放历史回执后应重新读取当前设置。保存成功不代表外部渠道接通或消息送达，见[个人通知偏好](notification-preferences.md)。
+
+## 受控报销自动办理与结构化补正
+
+自动办理位于 `/api/v1/expense-reports/{id}/handling-tasks/{taskId}`。`GET /agent` 读取原状态，未授权返回 null；`POST /agent/preview` 展示本次已保存费用、所选票据与预检、工具范围和模型目的地；`POST /agent` 使用预览双摘要登记授权并返回 202。`POST /agent/resume` 补充回答、明确继续未知模型执行，或重试失败的原只读步骤；`POST /agent/cancel` 停止后续动作。除只读预览之外的写操作均保留原幂等键。
+
+一次授权最多 12 步、30 分钟。`Scope` 仅包含 `policyLineNos / invoiceIds / precheckIds / maxSteps`；模型只能返回 `action / referenceId / lineNo / message` 四个字段，动作是 EXPENSE、INVOICE、POLICY、PRECHECK_RESULT、EXTRACT_INVOICE、DRAFT、ASK_USER、FINISH。每次外发前和结果登记前重新检查原登录、人员状态、单据双版本和模型目标。模型步骤先保存原输入；未知模型结果不会自动重发，人工确认继续时保留旧步骤并创建新决策身份。所有状态读取禁止缓存，原登录引用不出站。
+
+`GET /reads` 返回查询调用前的原步骤、原输入、摘要及 RUNNING / PREPARED / RECORDED / FAILED 状态。`POST /reads/{readId}/resume` 只接受 expectedVersion，重用服务器保存的原参数与授权。制度服务目标变化或费用双版本变化会拒绝续查。外呼不占业务事务；已读取结果先落库，办理登记和回执同事务，成功回放不再查询外部服务。
+
+票据抽取原排队接口增加可选 `handling: {reportId, taskId}`；费用草稿原排队接口增加可选 `handlingTaskId`。绑定与原任务排队共同提交，抽取失败及本人确认仍使用原运行编号。抽取本人确认后进入费用草稿的人工确认节点，草稿继续通过原预览、目录校验及确认用例办理。
+
+预检解释 v2 的每个问题允许附带 `patches`：`lineNo / field / beforeValue / afterValue / impact`。每个字段必须引用员工明确选择的 `expense:field[行号].字段` 来源和摘要，保留修改前值。可改字段为 CATEGORY_CODE、CITY_CODE、INCURRED_ON、ENDED_ON、DESCRIPTION、EXCEPTION_REASON；含补贴依据的行只允许后两项。旧 v1 建议仍可读取。`POST /precheck-explanations/{runId}/correct/structured` 只接受原建议编号列表 `selectedPatchIds`、原运行版本、费用双版本和说明；服务器构造费用正文并调用原补正保存服务，统一提交采纳、费用修改与新预检。金额、税额、票据、分摊、审批和付款不属于模型修改能力。

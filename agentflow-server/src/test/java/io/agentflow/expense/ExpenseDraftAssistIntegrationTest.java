@@ -53,7 +53,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "spring.datasource.username=${AGENTFLOW_EXPENSE_DRAFT_TEST_USER:sa}", "spring.datasource.password=${AGENTFLOW_EXPENSE_DRAFT_TEST_PASSWORD:}",
         "spring.datasource.driver-class-name=${AGENTFLOW_EXPENSE_DRAFT_TEST_DRIVER:org.h2.Driver}",
         "agentflow.auth.demo-enabled=true", "agentflow.assist.enabled=true", "agentflow.assist.worker-enabled=false",
-        "agentflow.assist.model=synthetic-draft", "agentflow.assist.timeout-seconds=2", "agentflow.finance-gateway.enabled=true"})
+        "agentflow.expense-agent.worker-enabled=false", "agentflow.assist.model=synthetic-draft", "agentflow.assist.timeout-seconds=2", "agentflow.finance-gateway.enabled=true"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class ExpenseDraftAssistIntegrationTest {
     private static final AtomicInteger MODEL_CALLS = new AtomicInteger(), CATALOG_CALLS = new AtomicInteger(), OBSERVATIONS = new AtomicInteger();
@@ -78,6 +78,7 @@ class ExpenseDraftAssistIntegrationTest {
     @Autowired ExpenseReportRepository reports;
     @Autowired ExpenseDraftAssistService service;
     @Autowired ExpenseDraftAssistWorker worker;
+    @Autowired io.agentflow.agent.ExpenseAgentWorker agentWorker;
     @Autowired JdbcExpenseDraftAssistRepository runs;
     @Autowired AssistConfiguration configuration;
     @Autowired FinanceGatewayConfiguration finance;
@@ -153,6 +154,43 @@ class ExpenseDraftAssistIntegrationTest {
         var editorPage = read(report, "?page=0&pageSize=20", "alice", 200);
         assertThat(editorPage.path("pageSize").asInt()).isEqualTo(20);
         assertThat(editorPage.path("items")).hasSize(1);
+    }
+
+    @Test void automaticDraftUsesTheOriginalQueueAndConfirmationBeforeCompleting() throws Exception {
+        var report = report(); String handling = "/api/v1/expense-reports/" + report.id() + "/handling-tasks";
+        var task = agentCommand(handling, Map.of("applicationVersion", 1, "financialVersion", 1, "goal", "整理费用草稿"), 201);
+        String root = handling + "/" + task.path("id").asText() + "/agent";
+        var scope = Map.of("policyLineNos", List.of(), "invoiceIds", List.of(), "precheckIds", List.of(), "maxSteps", 8);
+        var preview = agentCommand(root + "/preview", scope, 200);
+        agentCommand(root, Map.of("scope", scope, "targetDigest", preview.path("targetDigest").asText(), "consentDigest", preview.path("consentDigest").asText()), 202);
+        agentWorker.poll();
+        var body = generation(preview(report)); body.put("handlingTaskId", task.path("id").asText());
+        var queued = send(report, "", "alice", body, UUID.randomUUID().toString(), 202); UUID id = remember(queued);
+        assertThat(jdbc.queryForObject("SELECT child_id FROM agent_handling_child WHERE handling_id=? AND kind='DRAFT'", String.class, task.path("id").asText())).isEqualTo(id.toString());
+        assertThat(jdbc.queryForObject("SELECT status FROM agent_expense_orchestration WHERE handling_id=?", String.class, task.path("id").asText())).isEqualTo("WAITING_CHILD");
+        worker.poll(); send(report, "/" + id + "/confirm", "alice", confirmation(), UUID.randomUUID().toString(), 200);
+        agentWorker.poll();
+        assertThat(jdbc.queryForObject("SELECT status FROM agent_expense_orchestration WHERE handling_id=?", String.class, task.path("id").asText())).isEqualTo("COMPLETED");
+        assertThat(reports.find("demo", report.id()).orElseThrow().version()).isEqualTo(1);
+    }
+    @Test void boundDraftCannotAppearInALaterHandlingRecord() throws Exception {
+        var report = report(); String handling = "/api/v1/expense-reports/" + report.id() + "/handling-tasks";
+        var task = agentCommand(handling, Map.of("applicationVersion", 1, "financialVersion", 1, "goal", "原草稿办理"), 201);
+        var body = generation(preview(report)); body.put("handlingTaskId", task.path("id").asText());
+        UUID id = remember(send(report, "", "alice", body, UUID.randomUUID().toString(), 202));
+        long version = jdbc.queryForObject("SELECT version FROM agent_expense_handling WHERE id=?", Long.class, task.path("id").asText());
+        agentCommand(handling + "/" + task.path("id").asText() + "/close", Map.of("expectedVersion", version), 200);
+        var next = agentCommand(handling, Map.of("applicationVersion", 1, "financialVersion", 1, "goal", "后一次独立办理"), 201);
+        worker.poll(); send(report, "/" + id + "/confirm", "alice", confirmation(), UUID.randomUUID().toString(), 200);
+        String state = jdbc.queryForObject("SELECT state_json FROM agent_expense_handling WHERE id=?", String.class, next.path("id").asText());
+        assertThat(json.read(state, JsonNode.class).path("steps")).isEmpty();
+    }
+
+    private JsonNode agentCommand(String path, Object input, int status) throws Exception {
+        var response = mvc.perform(post(path).header("Authorization", token("alice")).header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType("application/json").content(json.write(input))).andReturn().getResponse();
+        assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(status);
+        return json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class);
     }
 
     @Test void otherUsersAdminsAndTenantsCannotPreviewReadOrReplayAnotherApplicantsData() throws Exception {
@@ -363,6 +401,10 @@ class ExpenseDraftAssistIntegrationTest {
             server.createContext("/model", exchange -> {
                 MODEL_CALLS.incrementAndGet(); String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8); LAST_MODEL.set(body); LAST_TRACE.set(exchange.getRequestHeaders().getFirst(DiagnosticContext.HEADER));
                 var request = wire.read(body, JsonNode.class); var input = wire.read(request.at("/messages/1/content").asText(), JsonNode.class);
+                if (input.has("goal")) {
+                    var decision = wire.read("{}", ObjectNode.class); decision.put("action", "DRAFT"); decision.putNull("referenceId"); decision.putNull("lineNo"); decision.put("message", "请本人核对草稿发送内容");
+                    respond(exchange, 200, Map.of("model", "synthetic-agent", "choices", List.of(Map.of("finish_reason", "stop", "message", Map.of("role", "assistant", "content", wire.write(decision)))))); return;
+                }
                 var evidence = java.util.stream.StreamSupport.stream(input.path("sources").spliterator(), false)
                         .filter(value -> Set.of("expense:itinerary[1]", ExpenseDraftAssistInput.CATALOG).contains(value.at("/reference/sourceId").asText()))
                         .map(value -> value.path("reference")).toList();

@@ -20,7 +20,7 @@
 
 办理状态 `OPEN / NEEDS_INFORMATION / NEEDS_CONFIRMATION / WAITING` 不等于预检 `READY`，也不等于申请 `APPROVED`。同一子运行只更新原步骤；较新预检结论替代旧结论参与当前状态归并，但历史步骤保留。达到上限或结束办理只结束该记录，不取消已授权的原子任务，不影响单独使用已有业务入口。
 
-四种受控读取仅返回本人可访问事实，不自动发送模型。同步只读准备在事务外执行，结果登记前复核身份与单据版本；成功原键重放恢复原回执。模型任务、预检和财务命令先持久化再执行，网络中断后恢复原运行。费用修改必须由员工确认，办理目标文本不会默认外发给模型。
+四种手工读取返回本人可访问事实。自动办理须额外预览并明确授权费用、目标与工具结果的模型发送；未授权不会因保存目标而启动模型。只读查询在调用前提交原步骤、输入摘要与授权依据，结果先保存再登记；成功原键重放恢复原回执。费用修改继续由本人确认。
 
 ## 验证命令与证据边界
 
@@ -105,3 +105,34 @@ python3 scripts/evaluate-expense-agent.py /fyoung/tmp/finance-labelled-cases.jso
 | 低风险自动通过 | 尚未授权新规则；如需启用，应另行明确并发布可审计规则，不能使用模型置信度批准 |
 
 现有 `remaining-task-ledger.md` 的待交付口径不因本次新增测试而批量关闭。真实联调、企业数据验收及正式发布继续逐项登记。
+
+## 四项增量开发（2026-10-09）
+
+| 截图中的剩余项 | 本批实现 | 验证要点 |
+| --- | --- | --- |
+| 受控 Agent 自动编排 | `ExpenseAgentRun` 管理最多 12 步和 30 分钟授权；实际模型依次选择白名单查询、读取结果、提问或完成；后台复核原登录及人员启停，修改前停在人工节点 | 查询前持久身份、读取后决策、补充回答、取消迟到结果、撤销登录、版本及目标变更、未知模型步骤恢复 |
+| 结构化补正与差异确认 | v2 建议包含六类允许字段的修改前后值、依据及影响；编辑器逐项勾选；服务端只接受原建议编号，再经原费用服务保存和预检 | 伪造来源、错误原值、重复字段和金额字段拒绝；只保存选中字段，保留金额与分摊；原键回放 |
+| 票据任务接续 | 原票据抽取排队与办理绑定同事务，抽取领取、成功、失败及复核更新原轨迹；本人确认后进入费用草稿人工节点；草稿仍用原目录预览及确认服务 | 真实 XML 抽取、原任务绑定、确认后进入 DRAFT；实际草稿排队和确认后结束自动办理，费用仍待本人保存 |
+| 外部查询持久执行 | V132 保存原输入、摘要、授权及固定制度目标；RUNNING → PREPARED → RECORDED，失败保留 FAILED；恢复原编号和原参数 | 事务外调用、外呼前有记录、查询失败重试、登记回滚不丢准备结果、重启沿用原记录、丢失回执无额外调用 |
+
+V133 保存自动循环、步骤变迁、原模型请求和子任务绑定，并将 HANDLING 纳入模型用量。非空升级测试保留既有用量，拒绝未知用途。原财务、审批和付款聚合没有被 Agent 替代。
+
+增量验收命令：
+
+```bash
+mvn -B -ntp -pl agentflow-server -am \
+  -Dtest=ExpenseAgentRunTest,HandlingReadExecutionTest,ExpenseFieldPatchTest,ExpenseHandlingTaskTest,PrecheckExplanationRunTest,PrecheckExplanationIntegrationTest,ExpenseDraftAssistIntegrationTest,InvoiceExtractionIntegrationTest,ExpenseHandlingMigrationTest,OpenApiContractTest \
+  -Dsurefire.failIfNoSpecifiedTests=false -Djava.io.tmpdir=/fyoung/tmp test
+node agentflow-web/scripts/test-requests.mjs expense-agent.test.mjs expense-handling.test.mjs precheck-explanation.test.mjs expense-draft-assist.test.mjs invoice-extraction.test.mjs
+python3 scripts/check-expense-orchestration.py --java /path/to/jdk17/bin/java \
+  --jar agentflow-server/target/agentflow-server-0.1.0-SNAPSHOT.jar \
+  --output-dir /fyoung/tmp/agentflow-orchestration-acceptance-unique
+```
+
+浏览器脚本使用真实编辑器与 Java HTTP，记录桌面和移动截图；只在 `result.json` 明确 PASS 后算通过。财务、模型和组织数据仍为合成夹具。PostgreSQL 非空 V131 → V133 升级使用另建空库 `AGENTFLOW_ORCHESTRATION_MIGRATION_URL`，不能指向工作库；账号沿用同次 `AGENTFLOW_HANDLING_MIGRATION_USER/PASSWORD`。企业真实供应商与财务验收数据仍待选定。
+
+本批最终本地验收：相关 Java 用例共 129 项通过；其中 75 项另外在 PostgreSQL 17 的四个新建隔离库通过，验证后仅删除这四个库。前端请求、状态与组件用例 83 项通过；TypeScript 和生产构建通过；OpenAPI 校验 411 个操作、896 个模型；Java 署名检查与差异空白检查通过。
+
+真实浏览器验收覆盖 1360×1000 桌面及 390×844 移动端：授权后自动查询、读取结果后提问、刷新恢复原运行、本人回答后继续、两处建议仅采纳一处、实际 XML 抽取和本人确认、确认票面值带入原费用草稿表单、外部制度查询失败后重启沿用原编号，以及成功回执丢失后恢复且无额外外呼。页面无脚本错误，移动端无横向溢出。
+
+模型调用中断与查询重试的边界不同：原模型步骤不静默重发；原登录仍有效时，本人确认后开启下一次决策并保留旧步骤。原登录撤销、人员停用或费用版本变化会停止运行。演示令牌随进程重启失效，不能用另一次登录冒充原授权；企业跨实例恢复依赖已有持久 OIDC 会话配置。真实供应商联调、真实财务样本效果和生产准入尚未由这些合成测试证明。

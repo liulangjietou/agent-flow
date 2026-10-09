@@ -17,7 +17,7 @@ export interface ExpenseAssistInput {
 }
 interface Choice { code: string; name: string }
 export interface ExpenseAssistPreview { input: ExpenseAssistInput; providerId: string; model: string; destination: string; targetDigest: string; consentDigest: string }
-export interface ExpenseAssistGenerate { input: ExpenseAssistRequest; validUntil: string; targetDigest: string; consentDigest: string }
+export interface ExpenseAssistGenerate { input: ExpenseAssistRequest; validUntil: string; targetDigest: string; consentDigest: string; handlingTaskId?: string }
 export interface ExpenseAssistSelection { proposalId: string; parts: ExpenseAssistPart[] }
 export interface ExpenseAssistConfirm { expectedRunVersion: number; applicationVersion: number; financialVersion: number; selected: ExpenseAssistSelection[]; comment?: string }
 export interface ExpenseAssistDismiss { expectedRunVersion: number; comment?: string }

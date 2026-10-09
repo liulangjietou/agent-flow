@@ -14,6 +14,24 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * @author owlzhangfq@gmail.com
  */
 class ExpenseHandlingMigrationTest {
+    @Test void upgradeToOrchestrationPreservesExistingUsageAndAllowsNewPurpose() {
+        var source = new DriverManagerDataSource(
+                System.getenv().getOrDefault("AGENTFLOW_ORCHESTRATION_MIGRATION_URL", "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1"),
+                System.getenv().getOrDefault("AGENTFLOW_HANDLING_MIGRATION_USER", "sa"),
+                System.getenv().getOrDefault("AGENTFLOW_HANDLING_MIGRATION_PASSWORD", ""));
+        Flyway.configure().dataSource(source).target("131").load().migrate(); var jdbc = new JdbcTemplate(source);
+        String insert = "INSERT INTO agent_execution_usage(tenant_id,run_id,kind,owner_id,subject_id,state_json) VALUES('retained',?,?,'alice',?,'{\"retained\":true}')";
+        String report = UUID.randomUUID().toString(); jdbc.update(insert, UUID.randomUUID().toString(), "PRECHECK_EXPLANATION", report);
+        var before = jdbc.queryForList("SELECT * FROM agent_execution_usage");
+        var flyway = Flyway.configure().dataSource(source).target("133").load();
+        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(2);
+        assertThat(jdbc.queryForList("SELECT * FROM agent_execution_usage")).isEqualTo(before);
+        assertThat(jdbc.update(insert, UUID.randomUUID().toString(), "HANDLING", report)).isEqualTo(1);
+        assertThatThrownBy(() -> jdbc.update(insert, UUID.randomUUID().toString(), "ARBITRARY", report)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM agent_handling_read", Integer.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM agent_expense_orchestration", Integer.class)).isZero();
+        assertThat(flyway.migrate().migrationsExecuted).isZero(); assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
+    }
     @Test void upgradeRetainsOriginalFactsAndEnforcesOwnerAndActiveUniqueness() {
         var source = new DriverManagerDataSource(
                 System.getenv().getOrDefault("AGENTFLOW_HANDLING_MIGRATION_URL", "jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1"),
@@ -25,7 +43,7 @@ class ExpenseHandlingMigrationTest {
         jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,'retained','EXP-RETAIN','fixture',1,'alice','保留申请','{}','DRAFT',0,1,'EXPENSE',?)", app, report);
         jdbc.update("INSERT INTO expense_report(id,tenant_id,application_id,employee_id,version,state_json) VALUES(?,'retained',?,'alice',1,'{\"retained\":true}')", report, app);
         var before = jdbc.queryForList("SELECT * FROM expense_report");
-        var flyway = Flyway.configure().dataSource(source).load();
+        var flyway = Flyway.configure().dataSource(source).target("131").load();
         assertThat(flyway.migrate().migrationsExecuted).isEqualTo(2);
         assertThat(jdbc.queryForList("SELECT * FROM expense_report")).isEqualTo(before);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM agent_execution_usage", Integer.class)).isZero();

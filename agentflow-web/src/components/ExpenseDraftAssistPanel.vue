@@ -8,7 +8,7 @@ import { expenseAssistError, expenseAssistFailures, expenseAssistMatches, expens
   rememberExpenseAssist, subscribeExpenseAssistRecovery, type ExpenseAssistDetail, type ExpenseAssistLeg, type ExpenseAssistPage,
   type ExpenseAssistPart, type ExpenseAssistPreview, type ExpenseAssistRequest, type ExpenseAssistSelection } from '../expenseDraftAssist'
 
-const props = defineProps<{ scopeKey: string; report: ExpenseDetail; catalog: FinanceCatalog; locked: boolean; applicationDirty: boolean }>()
+const props = defineProps<{ scopeKey: string; report: ExpenseDetail; catalog: FinanceCatalog; locked: boolean; applicationDirty: boolean; handlingDraft?: { taskId: string; brief: string; runId?: string } }>()
 const emit = defineEmits<{ busy: [value: boolean]; dirty: [value: boolean]; fill: [value: ExpenseAssistDetail] }>()
 const blankLeg = (id: number): ExpenseAssistLeg => ({ id, startsOn: '', endsOn: '', cityCode: '', purpose: '' })
 const brief = ref(''), itinerary = ref<ExpenseAssistLeg[]>([blankLeg(1)])
@@ -102,7 +102,7 @@ async function generate() {
   const original = context.value, generation = session, p = preview.value, body = previewRequest.value
   sending.value = true; error.value = ''; notice.value = ''
   try {
-    const result = await api.generateExpenseAssist(props.report.id, { input: body, validUntil: p.input.validUntil, targetDigest: p.targetDigest, consentDigest: p.consentDigest })
+    const result = await api.generateExpenseAssist(props.report.id, { input: body, validUntil: p.input.validUntil, targetDigest: p.targetDigest, consentDigest: p.consentDigest, ...(props.handlingDraft ? { handlingTaskId: props.handlingDraft.taskId } : {}) })
     if (!active || original !== context.value || generation !== session) return
     clearDraft(); notice.value = '建议已排队，请刷新原记录查看生成结果。'
     await loadPage(0, true)
@@ -144,6 +144,12 @@ watch(context, () => {
   reset(); if (!props.scopeKey) return
   void loadPage(0, true); const id = focusedExpenseAssist(props.scopeKey, props.report.id); if (id) void loadDetail(id, true)
 }, { immediate: true, flush: 'sync' })
+/** 办理传递本人已确认的票据候选，仍由本人核对原草稿预览和目录。 */
+watch(() => props.handlingDraft, value => {
+  if (!value) return
+  if (value.runId) { clearDraft(); void loadDetail(value.runId, true); return }
+  if (!draftDirty.value && !reviewDirty.value) { brief.value = value.brief; clearPreview() }
+}, { immediate: true })
 watch(() => [brief.value, itinerary.value, categories.value, centers.value, projects.value, props.catalog], clearPreview, { deep: true, flush: 'sync' })
 watch(() => [props.catalog.validUntil, preview.value?.input.validUntil, detail.value?.input.validUntil, now.value], () => {
   clearTimeout(expiry)

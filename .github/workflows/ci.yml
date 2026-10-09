@@ -75,6 +75,7 @@ jobs:
             'AGENTFLOW_EXPLANATION_TEST:precheck_explanation'
             'AGENTFLOW_CORRECTION_MIGRATION:expense_correction_migration'
             'AGENTFLOW_HANDLING_MIGRATION:expense_handling_migration'
+            'AGENTFLOW_ORCHESTRATION_MIGRATION:expense_orchestration_migration'
             'AGENTFLOW_REPAYMENT_TEST:advance_repayments'
             'AGENTFLOW_DISBURSEMENT_RETURN_MIGRATION:disbursement_return_migration'
             'AGENTFLOW_ADVANCE_VOUCHER_MIGRATION:advance_voucher_migration'

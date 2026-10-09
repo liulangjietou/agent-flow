@@ -40,8 +40,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class InvoiceExtractionController {
     private final InvoiceExtractionService service;
     private final IdempotencyExecutor idempotency;
+    private final ExpenseHandlingChildren children;
     /** 复用原身份、幂等和原件服务，不接受客户端代填归属或页数。 */
-    public InvoiceExtractionController(InvoiceExtractionService service, IdempotencyExecutor idempotency) { this.service = service; this.idempotency = idempotency; }
+    public InvoiceExtractionController(InvoiceExtractionService service, IdempotencyExecutor idempotency, ExpenseHandlingChildren children) { this.service = service; this.idempotency = idempotency; this.children = children; }
 
     /** 在事务外检查完整原件，展示实际处理方式和模型目的地，不发送或排队。 */
     @GetMapping("/input")
@@ -73,7 +74,7 @@ public class InvoiceExtractionController {
         }
         return noStore(idempotency.executePrepared(request, HttpStatus.ACCEPTED,
                 () -> service.prepare(id, body.expectedOriginalId(), body.expectedOriginalDigest()),
-                prepared -> service.queue(prepared, body.method(), body.targetDigest())));
+                prepared -> children.invoice(prepared, body)));
     }
 
     /** 确认只保存本人选择的值，放弃保留历史；两者都不执行税务查验或修改财务状态。 */
@@ -104,7 +105,12 @@ public class InvoiceExtractionController {
      */
     public record GenerateRequest(@NotNull UUID expectedOriginalId, @NotNull @Pattern(regexp = "[a-f0-9]{64}") String expectedOriginalDigest,
                                   @NotNull InvoiceExtractionSuggestion.Method method, @Pattern(regexp = "[a-f0-9]{64}") String targetDigest,
-                                  @NotNull @JsonDeserialize(using = ConfirmationDeserializer.class) Boolean externalSendConfirmed) {
+                                  @NotNull @JsonDeserialize(using = ConfirmationDeserializer.class) Boolean externalSendConfirmed,
+                                  @Valid ExpenseHandlingChildren.Binding handling) {
+        /** 独立票据入口兼容未绑定办理的原请求。 */
+        public GenerateRequest(UUID expectedOriginalId, String expectedOriginalDigest, InvoiceExtractionSuggestion.Method method, String targetDigest, Boolean externalSendConfirmed) {
+            this(expectedOriginalId, expectedOriginalDigest, method, targetDigest, externalSendConfirmed, null);
+        }
         /** 防止额外字段被静默忽略成已接受的配置或权限。 */
         @JsonAnySetter public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown invoice extraction request field"); }
     }

@@ -29,8 +29,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class ExpenseHandlingController {
     private final ExpenseHandlingService service;
     private final IdempotencyExecutor idempotency;
+    private final HandlingReadService reads;
     /** 成功回放继续检查本人身份，不创建第二个办理或步骤。 */
-    public ExpenseHandlingController(ExpenseHandlingService service, IdempotencyExecutor idempotency) { this.service = service; this.idempotency = idempotency; }
+    public ExpenseHandlingController(ExpenseHandlingService service, IdempotencyExecutor idempotency, HandlingReadService reads) { this.service = service; this.idempotency = idempotency; this.reads = reads; }
     /** 有界本人历史，关闭记录也保留原步骤。 */
     @GetMapping
     public ResponseEntity<List<ExpenseHandlingService.View>> list(@PathVariable UUID id, HttpServletRequest request) {
@@ -53,7 +54,19 @@ public class ExpenseHandlingController {
     public ResponseEntity<String> inspect(@PathVariable UUID id, @PathVariable UUID taskId, @Valid @RequestBody Inspect body, HttpServletRequest request) {
         noQuery(request); service.authorize(id);
         return idempotency.executePrepared(request, HttpStatus.OK,
-                () -> service.prepare(id, taskId, body.expectedVersion(), body.tool(), body.referenceId(), body.lineNo()), prepared -> service.record(id, prepared));
+                () -> reads.prepare(id, taskId, request.getHeader("Idempotency-Key"), body), prepared -> reads.record(id, prepared));
+    }
+    /** 显示失败、执行中和已完成的原读取，供刷新或重启后继续。 */
+    @GetMapping("/{taskId}/reads")
+    public ResponseEntity<List<HandlingReadService.View>> reads(@PathVariable UUID id, @PathVariable UUID taskId, HttpServletRequest request) {
+        noQuery(request); return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(reads.list(id, taskId));
+    }
+    /** 恢复原读取身份与输入，完成后只登记一次原工具结果。 */
+    @PostMapping("/{taskId}/reads/{readId}/resume")
+    public ResponseEntity<String> resumeRead(@PathVariable UUID id, @PathVariable UUID taskId, @PathVariable UUID readId,
+            @Valid @RequestBody Close body, HttpServletRequest request) {
+        noQuery(request); service.authorizeTask(id, taskId);
+        return idempotency.executePrepared(request, HttpStatus.OK, () -> reads.resume(id, taskId, readId, body.expectedVersion()), prepared -> reads.record(id, prepared));
     }
     private static void noQuery(HttpServletRequest request) {
         if (request.getQueryString() != null) throw new DomainException("INVALID_AGENT_QUERY", "Expense handling does not accept query parameters");

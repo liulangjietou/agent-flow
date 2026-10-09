@@ -8,6 +8,7 @@
             <when test="kind == 'INVOICE'">SELECT created_at, invoice_id AS subject_id FROM agent_invoice_extraction_run</when>
             <when test="kind == 'EXPENSE_DRAFT'">SELECT created_at, report_id AS subject_id FROM agent_expense_draft_run</when>
             <when test="kind == 'PRECHECK_EXPLANATION'">SELECT created_at, report_id AS subject_id FROM agent_precheck_explanation_run</when>
+            <when test="kind == 'HANDLING'">SELECT created_at, report_id AS subject_id FROM agent_handling_model_call</when>
             <otherwise>SELECT created_at, report_id AS subject_id FROM agent_expense_risk_run</otherwise>
         </choose>
         WHERE tenant_id=#{tenant} AND id=#{runId}

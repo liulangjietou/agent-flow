@@ -13,7 +13,7 @@ import org.apache.commons.lang3.StringUtils;
  * @author owlzhangfq@gmail.com
  */
 public final class PrecheckExplanationRun {
-    public static final String PROMPT_VERSION = "expense-precheck-explanation-v1";
+    public static final String PROMPT_VERSION = "expense-precheck-explanation-v2";
     private final Context context;
     private State state = new State(Status.QUEUED, 1, null, null, null, null, null, null);
 
@@ -31,7 +31,7 @@ public final class PrecheckExplanationRun {
     public void complete(long version, PrecheckExplanationSuggestion suggestion, Instant at) {
         require(version, Status.RUNNING); time(at, state.startedAt());
         if (expired(at)) throw new DomainException("AGENT_RUN_STATE_CONFLICT", "Explanation lease expired");
-        if (suggestion == null || !PROMPT_VERSION.equals(suggestion.promptVersion())) throw new DomainException("INVALID_AGENT_OUTPUT", "Explanation prompt changed");
+        if (suggestion == null || !java.util.Set.of(PROMPT_VERSION, "expense-precheck-explanation-v1").contains(suggestion.promptVersion())) throw new DomainException("INVALID_AGENT_OUTPUT", "Explanation prompt changed");
         suggestion.requireMatches(context.input());
         state = new State(Status.COMPLETED, version + 1, state.startedAt(), state.leaseUntil(), at, suggestion, null, null);
     }

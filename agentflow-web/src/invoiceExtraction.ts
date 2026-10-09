@@ -20,7 +20,7 @@ export interface ExtractionDetail extends ExtractionSummary {
   failure: 'MODEL_UNAVAILABLE' | 'EXECUTION_TIMEOUT' | 'INVALID_RESULT' | 'INPUT_UNAVAILABLE' | null
   review: { actor: string; at: string; selected?: ExtractionSelection[] | null; comment?: string | null } | null
 }
-export interface ExtractionGenerate { expectedOriginalId: string; expectedOriginalDigest: string; method: ExtractionMethod; targetDigest: string | null; externalSendConfirmed: boolean }
+export interface ExtractionGenerate { expectedOriginalId: string; expectedOriginalDigest: string; method: ExtractionMethod; targetDigest: string | null; externalSendConfirmed: boolean; handling?: { reportId: string; taskId: string } }
 export interface ExtractionReview { expectedRunVersion: number; action: 'CONFIRM' | 'DISMISS'; selected?: ExtractionSelection[]; comment: string }
 export interface ExtractionEdits { runId: string; version: number; selected: ExtractionField[]; values: Partial<Record<ExtractionField, string>>; comment: string }
 

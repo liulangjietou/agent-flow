@@ -26,12 +26,14 @@ public class InvoiceExtractionService {
     private final JdbcInvoiceExtractionRunRepository runs;
     private final AssistConfiguration configuration;
     private final InvoiceExtractionEligibility eligibility;
+    private final HandlingChildJournal handling;
 
-    /** 抽取状态只写自己的仓储，不依赖发票查验或财务写入端口。 */
+    /** 抽取状态与显式绑定的办理轨迹同事务，不依赖发票查验或财务写入端口。 */
     public InvoiceExtractionService(CurrentActor actors, JdbcInvoiceOriginalRepository originals, InvoiceExtractionSources sources,
-            JdbcInvoiceExtractionRunRepository runs, AssistConfiguration configuration, InvoiceExtractionEligibility eligibility) {
+            JdbcInvoiceExtractionRunRepository runs, AssistConfiguration configuration, InvoiceExtractionEligibility eligibility, HandlingChildJournal handling) {
         this.actors = actors; this.originals = originals; this.sources = sources; this.runs = runs;
         this.configuration = configuration; this.eligibility = eligibility;
+        this.handling = handling;
     }
 
     /** 在幂等写事务之前核对完整原件；返回对象只能由服务端解析产生，不能由请求反序列化构造。 */
@@ -121,6 +123,7 @@ public class InvoiceExtractionService {
             run.dismiss(expectedVersion, actor.userId(), comment, Instant.now());
         } else throw new DomainException("INVALID_AGENT_REVIEW", "Invoice extraction review action is required");
         runs.update(run, expectedVersion, null);
+        handling.invoice(run);
         return receipt(run);
     }
 
@@ -143,6 +146,7 @@ public class InvoiceExtractionService {
         // 即使后续资格拒绝，领取与失败轨迹仍在同一事务中形成，不能留下无租约的中间态。
         int modelSeconds = run.context().method() == MODEL ? Math.max(0, configuration.getTimeoutSeconds()) : 0;
         runs.update(run, 1, now.plusSeconds((long) SOURCE_SECONDS + COMPLETION_GRACE_SECONDS + modelSeconds));
+        handling.invoice(run);
         try {
             eligibility.requireActive(tenant, run.context().requestedBy());
             if (!run.context().requestedBy().equals(original.ownerId())) throw inputChanged();
@@ -165,6 +169,7 @@ public class InvoiceExtractionService {
         try { run.complete(2, suggestion, now); }
         catch (DomainException invalid) { fail(run, InvoiceExtractionRun.Failure.INVALID_RESULT, now); return; }
         runs.update(run, 2, null);
+        handling.invoice(run);
     }
 
     private InvoiceOriginal owned(UUID invoiceId) {
@@ -189,7 +194,7 @@ public class InvoiceExtractionService {
         if (!configuration.targetDigest(InvoiceExtractionRun.CONTRACT_VERSION).equals(digest)) throw new DomainException("AGENT_TARGET_CHANGED", "Refresh the invoice model destination");
     }
     private void fail(InvoiceExtractionRun run, InvoiceExtractionRun.Failure failure, Instant at) {
-        long previous = run.state().version(); run.fail(previous, failure, at); runs.update(run, previous, null);
+        long previous = run.state().version(); run.fail(previous, failure, at); runs.update(run, previous, null); handling.invoice(run);
     }
     private static void requireInput(InvoiceOriginal original, InvoiceExtractionInput input) { if (!matches(original, input)) throw inputChanged(); }
     private static boolean matches(InvoiceOriginal original, InvoiceExtractionInput input) {
