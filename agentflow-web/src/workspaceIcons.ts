@@ -1,0 +1,31 @@
+/** 工作区使用同一套描边图标，图形只辅助识别，操作名称由调用方提供。 */
+export const workspaceIcons = {
+  guide: 'M12 3 3 7.5 12 12l9-4.5L12 3ZM3 12l9 4.5 9-4.5M3 16.5l9 4.5 9-4.5',
+  inbox: 'M4 4h16v16H4V4ZM4 13h5l1.5 3h3l1.5-3h5M8 8h8',
+  send: 'm3 11 18-8-8 18-2-8-8-2Zm8 2L21 3',
+  draft: 'M14 3H5v18h14V8l-5-5ZM14 3v5h5M8 12h8M8 16h5',
+  check: 'M20 11v9H4V4h11m-7 7 4 4L21 4',
+  bell: 'M5 16h14l-2-3V9a5 5 0 0 0-10 0v4l-2 3Zm5 4h4M12 2v2',
+  records: 'M4 4h16v16H4V4ZM8 8h8M8 12h8M8 16h4',
+  flow: 'M8 3h8v5H8V3ZM3 16h7v5H3v-5Zm11 0h7v5h-7v-5ZM12 8v4M6.5 16v-4h11v4',
+  template: 'M3 4h18v16H3V4ZM3 9h18M9 9v11',
+  spark: 'm12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5L12 3Z',
+  wallet: 'M4 5h15v4H4a2 2 0 0 1 0-4ZM4 9v11h17V9H4Zm11 4h6v4h-6v-4Z',
+  chart: 'M4 3v17h17M8 15V9m5 6V5m5 10v-4',
+  payment: 'M3 5h18v14H3V5ZM3 10h18M7 15h3',
+  mapping: 'M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4',
+  policy: 'M6 3h12v18H6V3ZM9 7h6M9 11h6M9 15h4',
+  code: 'm8 6-6 6 6 6m8-12 6 6-6 6M14 3l-4 18',
+  integration: 'M8 12H4V4h8v4m4 4h4v8h-8v-4m-4-4 8-4m-8 4 8 4',
+  audit: 'M14 3H5v18h14V8l-5-5ZM14 3v5h5M8 12h5m-5 4h3m3-2 2 2 4-4',
+  people: 'M15 20v-3a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v3m12-7a4 4 0 0 1 6 4v3M12 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm5-3a3 3 0 0 1 0 6',
+  calendar: 'M4 5h16v16H4V5ZM8 2v6m8-6v6M4 10h16M8 14h2m4 0h2m-8 3h2',
+  system: 'M12 3 3 7v5c0 5 9 9 9 9s9-4 9-9V7l-9-4Zm-4 9 3 3 5-6',
+  refresh: 'M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 3M5 15a8 8 0 0 0 13 3',
+  plus: 'M12 5v14M5 12h14',
+  arrow: 'M4 12h16m-6-6 6 6-6 6',
+  close: 'm6 6 12 12M18 6 6 18',
+  logout: 'M10 4H4v16h6m-1-8h12m-5-5 5 5-5 5',
+} as const
+
+export type WorkspaceIconName = keyof typeof workspaceIcons

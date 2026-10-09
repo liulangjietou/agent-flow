@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { workspaceMenu, type WorkspacePage } from '../workspaceNavigation'
+import WorkspaceIcon from './WorkspaceIcon.vue'
 
 const props = defineProps<{ page: WorkspacePage; tenantId: string; username: string; canInspect: boolean; canManage: boolean; canCashier?: boolean; canConfigureFinance?: boolean; canReadFinancialReports?: boolean; taskCount: number | null; serverAvailable: boolean; logoutDisabled: boolean }>()
 const emit = defineEmits<{ 'update:page': [page: WorkspacePage]; logout: [] }>()
@@ -69,15 +70,15 @@ onBeforeUnmount(() => { close(); media?.removeEventListener('change', resize) })
     <nav aria-label="工作空间页面">
       <section v-for="group in groups" :key="group.label" class="navigation-group" :aria-label="group.label">
         <h2 class="navigation-group-label">{{ group.label }}</h2>
-        <button v-for="item in group.items" :key="item.label" type="button" :class="{ active: page === item.page }" :aria-label="item.label" :aria-current="page === item.page ? 'page' : undefined" :title="item.page ? item.label : 'Agent 证据服务尚未接入'" :disabled="!item.page" @click="item.page && select(item.page)"><b aria-hidden="true">{{ item.icon }}</b><span>{{ item.label }}</span><i v-if="item.page === 'workbench'" aria-hidden="true">{{ taskCount ?? '—' }}</i><small v-if="!item.page">未接入</small></button>
+        <button v-for="item in group.items" :key="item.label" type="button" :class="{ active: page === item.page }" :aria-label="item.label" :aria-current="page === item.page ? 'page' : undefined" :title="item.page ? item.label : 'Agent 证据服务尚未接入'" :disabled="!item.page" @click="item.page && select(item.page)"><WorkspaceIcon :name="item.icon" /><span>{{ item.label }}</span><i v-if="item.page === 'workbench'" aria-hidden="true">{{ taskCount ?? '—' }}</i><small v-if="!item.page">未接入</small></button>
       </section>
     </nav>
-    <div class="sidebar-bottom"><div class="online-dot" :class="{ offline: !serverAvailable }" aria-hidden="true"></div><span>{{ username }}<small>{{ serverAvailable ? '上次数据同步成功' : '上次数据同步失败' }}</small></span><button type="button" title="退出登录" aria-label="退出登录" :disabled="logoutDisabled" @click="logout">↪<span class="navigation-logout-text">退出</span></button></div>
+    <div class="sidebar-bottom"><div class="online-dot" :class="{ offline: !serverAvailable }" aria-hidden="true"></div><span>{{ username }}<small>{{ serverAvailable ? '上次数据同步成功' : '上次数据同步失败' }}</small></span><button type="button" title="退出登录" aria-label="退出登录" :disabled="logoutDisabled" @click="logout"><WorkspaceIcon name="logout" /><span class="navigation-logout-text">退出</span></button></div>
   </component>
 </template>
 
 <style scoped>
-.mobile-menu-trigger,.navigation-logout-text{display:none}.navigation-brand{display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0}.navigation-brand .brand{min-width:0}.navigation-group+.navigation-group{border-top:1px solid #294049;margin-top:18px;padding-top:14px}.navigation-group-label{font-size:10px;font-weight:500;color:#789396;letter-spacing:.06em;margin:4px 12px 9px}.sidebar-bottom>span{min-width:0;overflow-wrap:anywhere}.sidebar-bottom small{display:block;font-size:9px;color:#789396;margin-top:4px}.sidebar-bottom button{min-width:36px;min-height:44px}.workspace-navigation button:focus-visible{outline-color:#74d9cf;outline-offset:-3px}
+.mobile-menu-trigger,.navigation-logout-text{display:none}.navigation-brand{display:flex;align-items:flex-start;justify-content:space-between;flex-shrink:0}.navigation-brand .brand{min-width:0}.navigation-group+.navigation-group{border-top:1px solid #36515c;margin-top:16px;padding-top:14px}.navigation-group-label{font-size:11px;font-weight:500;color:#a2b9c2;letter-spacing:.06em;margin:4px 12px 9px}.sidebar-bottom>span{min-width:0;overflow-wrap:anywhere}.sidebar-bottom small{display:block;font-size:11px;color:#a2b9c2;margin-top:4px}.sidebar-bottom button{min-width:36px;min-height:44px;display:flex;align-items:center;justify-content:center;border-radius:8px}.sidebar-bottom button:hover:not(:disabled){background:#244550;color:#fff}.workspace-navigation button:focus-visible{outline-color:#74d9cf;outline-offset:-3px}
 @media(max-width:1050px) and (min-width:651px){.navigation-group-label{display:none}.workspace-navigation .brand{padding:0 6px 30px}.sidebar-bottom button{min-width:26px}}
 @media(max-width:650px){
   .mobile-menu-trigger{display:flex;align-items:center;gap:6px;flex-shrink:0;min-height:44px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:white;font-size:12px;font-weight:700}.mobile-menu-trigger>span{font-size:16px}
@@ -85,6 +86,6 @@ onBeforeUnmount(() => { close(); media?.removeEventListener('change', resize) })
   dialog.workspace-navigation:not([open]){display:none}dialog.workspace-navigation[open]{display:flex}dialog.workspace-navigation::backdrop{background:rgba(12,30,39,.55)}
   .workspace-navigation .brand{padding:0 4px 22px;gap:10px}.workspace-navigation .brand>div:not(.brand-mark),.workspace-navigation .space-label,.workspace-navigation nav button span,.workspace-navigation nav button i,.workspace-navigation nav button small,.workspace-navigation .sidebar-bottom span{display:block}
   .workspace-navigation .space-label{overflow-wrap:anywhere;line-height:1.6}.workspace-navigation .brand-mark{width:38px;height:38px;flex-shrink:0}.navigation-close{min-width:44px;min-height:44px;color:#adc1c4;font-size:28px;margin-top:-7px}
-  .workspace-navigation nav button{justify-content:flex-start;padding:12px;min-height:46px;gap:12px;font-size:13px}.workspace-navigation nav button b{width:18px;flex-shrink:0}.navigation-group-label{font-size:11px}.workspace-navigation .sidebar-bottom{padding-top:14px;gap:10px}.workspace-navigation .sidebar-bottom button{min-width:64px;display:flex;align-items:center;justify-content:center;gap:6px}.workspace-navigation .sidebar-bottom .navigation-logout-text{display:inline;font-size:12px}
+  .workspace-navigation nav button{justify-content:flex-start;padding:12px;min-height:46px;gap:12px;font-size:13px}.navigation-group-label{font-size:11px}.workspace-navigation .sidebar-bottom{padding-top:14px;gap:10px}.workspace-navigation .sidebar-bottom button{min-width:64px;display:flex;align-items:center;justify-content:center;gap:6px}.workspace-navigation .sidebar-bottom .navigation-logout-text{display:inline;font-size:12px}
 }
 </style>

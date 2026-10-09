@@ -11,7 +11,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, 
 import ApplicationRecord from './components/ApplicationRecord.vue'
 import type { RelatedRound } from './subprocessRelations'
 import WorkspaceNavigation from './components/WorkspaceNavigation.vue'
-import type { WorkspacePage as Page } from './workspaceNavigation'
+import WorkspaceIcon from './components/WorkspaceIcon.vue'
+import { workspacePageLabel, type WorkspacePage as Page } from './workspaceNavigation'
 import BranchDiagnostics from './components/BranchDiagnostics.vue'
 import { DesignerValidation } from './designerValidation'
 import ApplicationSearch from './components/ApplicationSearch.vue'
@@ -1545,36 +1546,59 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
 <template>
   <div class="app" :inert="confirmationOpen || publicationOpen || logoutOpen" @keydown="keyHandler">
     <section v-if="!loggedIn" class="login-screen">
-      <form class="login-card" @submit.prevent="login">
-        <div class="brand-mark">AF</div><p class="eyebrow">AGENTFLOW / WORKFLOW OS</p>
-        <h1>让每一次审批<br /><em>都有依据。</em></h1><p class="login-copy">面向 OA、财务与业务团队的智能审批工作台。</p>
-        <p v-if="authLoading" role="status">正在读取登录配置…</p>
-        <template v-else-if="authOptions?.mode === 'DEMO'">
-          <label>租户空间<input v-model="tenantId" autocomplete="organization" placeholder="demo" /></label>
-          <label>用户名<input v-model="username" autocomplete="username" placeholder="admin" /></label>
-          <label>密码<input v-model="password" autocomplete="current-password" type="password" placeholder="请输入密码" /></label>
-          <button class="primary wide" :disabled="busy">{{ busy ? '正在登录…' : '进入工作台 ↗' }}</button>
-          <small>演示租户 demo；账号 admin / manager / finance / cashier / alice，密码 demo</small>
-        </template>
-        <template v-else-if="authOptions?.mode === 'OIDC'">
-          <p class="login-copy">使用企业账号登录，租户空间和权限由管理员分配。</p>
-          <button type="button" class="primary wide" :disabled="busy" @click="enterpriseLogin">使用企业账号登录 ↗</button>
-        </template>
-        <template v-else>
-          <p role="status">{{ authOptions?.mode === 'UNCONFIGURED' ? '尚未配置登录服务，请联系管理员。' : '无法读取登录配置，请检查服务连接后重试。' }}</p>
-          <button type="button" class="primary wide" @click="loadAuthentication()">重新检查</button>
-        </template>
-        <small v-if="notice" role="status">{{ notice }}</small>
-      </form>
+      <div class="login-layout">
+        <div class="login-story">
+          <div class="brand"><div class="brand-mark" aria-hidden="true">AF</div><div><strong>agentflow</strong><small>审批与业务协同</small></div></div>
+          <p class="eyebrow">AGENTFLOW / WORKSPACE</p>
+          <h1>让每一次审批<br /><em>都有依据。</em></h1>
+          <p class="login-copy">申请、审批与财务记录，在同一工作空间有序流转。</p>
+          <ol class="login-journey" aria-label="审批流程">
+            <li><WorkspaceIcon name="draft" /><strong>填写申请</strong><span>材料与业务事实</span></li>
+            <li><WorkspaceIcon name="flow" /><strong>审批流转</strong><span>明确每一步责任</span></li>
+            <li><WorkspaceIcon name="check" /><strong>记录归档</strong><span>结果有迹可循</span></li>
+          </ol>
+        </div>
+        <form class="login-card" aria-labelledby="login-title" @submit.prevent="login">
+          <h2 id="login-title">登录工作空间</h2>
+          <p class="login-intro">继续处理你的申请与审批。</p>
+          <p v-if="authLoading" role="status">正在读取登录配置…</p>
+          <template v-else-if="authOptions?.mode === 'DEMO'">
+            <label>租户空间<input v-model="tenantId" autocomplete="organization" placeholder="demo" /></label>
+            <label>用户名<input v-model="username" autocomplete="username" placeholder="admin" /></label>
+            <label>密码<input v-model="password" autocomplete="current-password" type="password" placeholder="请输入密码" /></label>
+            <button class="primary wide" :disabled="busy" :aria-busy="busy">{{ busy ? '正在登录…' : '进入工作台' }}<WorkspaceIcon v-if="!busy" name="arrow" /></button>
+            <details class="login-demo"><summary>查看演示账号</summary><p>租户 demo；账号 admin / manager / finance / cashier / alice，密码 demo。</p></details>
+          </template>
+          <template v-else-if="authOptions?.mode === 'OIDC'">
+            <p class="login-copy">使用企业账号登录，租户空间和权限由管理员分配。</p>
+            <button type="button" class="primary wide" :disabled="busy" @click="enterpriseLogin">使用企业账号登录 ↗</button>
+          </template>
+          <template v-else>
+            <p role="status">{{ authOptions?.mode === 'UNCONFIGURED' ? '尚未配置登录服务，请联系管理员。' : '无法读取登录配置，请检查服务连接后重试。' }}</p>
+            <button type="button" class="primary wide" @click="loadAuthentication()">重新检查</button>
+          </template>
+          <p v-if="notice" class="login-message" role="status">{{ notice }}</p>
+        </form>
+      </div>
     </section>
     <template v-else>
-      <main ref="workspace" class="main" tabindex="-1">
-        <header><div class="header-location"><WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :can-cashier="canCashier" :can-configure-finance="canConfigureFinance" :can-read-financial-reports="canReadFinancialReports" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="requestLogout" /><div class="crumb">当前空间 <strong>/</strong> {{ page === 'expense-reports' ? '费用财务报表' : page === 'account-mappings' ? '科目映射' : page === 'expense-configuration' ? '费用制度' : page === 'webhooks' ? '集成投递' : page === 'audit' ? '操作审计' : page === 'transfer' ? '模板文件' : page === 'guide' ? '开始使用' : page === 'examples' ? '示例数据' : page === 'operations' ? '审批运营' : page === 'api' ? '接口文档' : page === 'notifications' ? '消息中心' : page === 'started' ? '我发起' : page === 'drafts' ? '我的草稿' : page === 'handled' ? '已办记录' : page === 'organization' ? '组织与人员' : page === 'proxies' ? '审批代理' : page === 'calendars' ? '工作日历' : page === 'system' ? '系统自检' : page === 'designer' ? '流程管理' : page === 'templates' ? '模板中心' : page === 'assist' ? 'Agent 助理' : page === 'cashier' ? '出纳付款' : page === 'expense' ? '财务申请' : page === 'applications' ? '申请记录' : '审批工作台' }}</div></div><div class="header-actions"><button class="quiet" :disabled="busy" @click="refreshPage">刷新数据</button><div class="avatar">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span></div></header>
+      <a class="skip-link" href="#workspace-content">跳至工作区</a>
+      <main id="workspace-content" ref="workspace" class="main" tabindex="-1">
+        <header class="workspace-header">
+          <div class="header-location">
+            <WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :can-cashier="canCashier" :can-configure-finance="canConfigureFinance" :can-read-financial-reports="canReadFinancialReports" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="requestLogout" />
+            <div class="crumb" aria-label="当前位置"><span class="crumb-space">工作空间</span><strong aria-hidden="true">/</strong><span class="crumb-current">{{ workspacePageLabel(page) }}</span></div>
+          </div>
+          <div class="header-actions">
+            <button class="quiet" :disabled="busy" @click="refreshPage"><WorkspaceIcon name="refresh" />刷新数据</button>
+            <div class="avatar" aria-hidden="true">{{ username.slice(0, 1).toUpperCase() }}</div><span class="user-name">{{ username }}</span>
+          </div>
+        </header>
         <div v-if="sessionExpired" class="session-notice" role="alert"><div><strong>需要恢复企业会话</strong><p>会话需要恢复。请在新窗口登录原账号，再恢复当前会话；本页的草稿和未确认操作会保留。</p><p v-if="notice">{{ notice }}</p></div><button class="secondary" @click="reopenEnterpriseLogin">重新登录</button><button class="secondary" :disabled="busy" @click="restoreEnterpriseSession">恢复当前会话</button></div>
-        <div v-if="notice && !sessionExpired" ref="operationStatus" class="toast" role="status" tabindex="-1">{{ notice }}<button aria-label="关闭提示" @click="notice = ''">×</button></div>
+        <div v-if="notice && !sessionExpired" ref="operationStatus" class="toast" role="status" tabindex="-1">{{ notice }}<button aria-label="关闭提示" @click="notice = ''"><WorkspaceIcon name="close" /></button></div>
         <div v-if="!newApplicationOpen && !recordApplicationId" class="recovery-container"><RequestRecovery :pending="visiblePendingWrites" :error="recoveryError" @recover="recoverOperation" /></div>
         <section v-if="page === 'workbench'" class="content">
-          <div class="page-heading"><div><p class="eyebrow">{{ today }}</p><h2>今天，先处理重要的事。</h2><p class="subhead">当前有 <strong>{{ taskCount ?? '—' }}</strong> 项可处理的审批任务。</p></div><button class="primary" @click="openApplicationForm">＋ 发起申请</button></div>
+          <div class="page-heading"><div><p class="eyebrow">{{ today }}</p><h2>待我审批</h2><p class="subhead">当前有 <strong>{{ taskCount ?? '—' }}</strong> 项可处理的审批任务。</p></div><button class="primary" @click="openApplicationForm"><WorkspaceIcon name="plus" />发起申请</button></div>
 
           <div class="work-grid" :class="{ 'board-work-grid': taskQueueView === 'board' }">
             <PendingTaskQueue ref="taskQueuePanel" v-model:view="taskQueueView" :scope-key="actorScope" :refresh-version="taskRefresh" :locked="busy || writesBlocked" :selected-id="activeTask?.taskId" @select="selectTask" @clear-selection="clearTaskSelection" @changed="refreshWorkspace" />
@@ -1599,7 +1623,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                 <p v-if="expenseTaskBusy" class="inline-error" role="status">费用操作尚未结束。请先保存或取消当前表单；结果待核对时请刷新费用状态。</p>
                 <TaskActions ref="taskActionsPanel" :key="actorScope + ':' + activeTask.taskId" :task="activeTask" :scope-key="actorScope" :locked="busy || writesBlocked || expenseTaskBusy || !activeApplication || !!detailError" @execute="performAction" @membership="performMembershipChange" @refresh="expenseTaskChanged" />
               </div>
-              <div v-else class="empty-detail"><div class="empty-icon">◎</div><h3>{{ detailLoading ? '正在读取待办…' : '选择一项待办' }}</h3><p>{{ detailLoading ? '正在核对当前处理权限与申请版本。' : '查看真实申请内容，完成批准、退回或转交。' }}</p></div>
+              <div v-else class="empty-detail"><div class="empty-icon"><WorkspaceIcon name="inbox" /></div><h3>{{ detailLoading ? '正在读取待办…' : '选择一项待办' }}</h3><p>{{ detailLoading ? '正在核对当前处理权限与申请版本。' : '查看真实申请内容，完成批准、退回或转交。' }}</p></div>
             </div>
           </div>
         </section>

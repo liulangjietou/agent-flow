@@ -43,9 +43,9 @@ onUnmounted(() => { query.clear(); diagnostics.clear() })
     <div class="guide-scope"><strong>{{ enterpriseAuth ? '已启用企业登录' : '当前为开发与演示环境' }}</strong><span>先核对工作区初始化，再配置并运行第一条流程。已有配置可直接采用；正式使用前仍需完成企业接入验收。</span></div>
     <TenantInitializationWizard :scope-key="scopeKey" :refresh-version="refreshVersion" :locked="locked" :enterprise-auth="enterpriseAuth" @templates="emit('templates')" @organization="emit('organization')" @completed="refresh" />
     <div class="guide-paths">
-      <article class="panel guide-path featured"><span class="guide-number">01 / RECOMMENDED</span><h3>从模板开始</h3><p>请假、用印、合同审批已有字段与路由样例，复制后按实际制度调整。</p><button class="primary" :disabled="locked" @click="emit('templates')">选择并复制模板 ↗</button><button class="quiet" :disabled="locked" @click="emit('import')">从文件导入模板 →</button></article>
-      <article class="panel guide-path"><span class="guide-number">02 / DESIGN</span><h3>创建自己的流程</h3><p>打开可视化设计器，配置字段、审批人和条件，校验并模拟后发布。</p><button class="secondary" :disabled="locked" @click="emit('new')">新建审批流程</button></article>
-      <article class="panel guide-path"><span class="guide-number">03 / EXPLORE</span><h3>先看示例数据</h3><p>预览表单样例、预期路径和校验错误，理解一条流程会怎样运行。</p><button class="secondary" :disabled="locked" @click="emit('examples')">只读查看样例</button></article>
+      <article class="panel guide-path featured"><span class="guide-number">模板起步</span><h3>从模板开始</h3><p>请假、用印、合同审批已有字段与路由样例，复制后按实际制度调整。</p><button class="primary" :disabled="locked" @click="emit('templates')">选择并复制模板 ↗</button><button class="quiet" :disabled="locked" @click="emit('import')">从文件导入模板 →</button></article>
+      <article class="panel guide-path"><span class="guide-number">流程设计</span><h3>创建自己的流程</h3><p>打开可视化设计器，配置字段、审批人和条件，校验并模拟后发布。</p><button class="secondary" :disabled="locked" @click="emit('new')">新建审批流程</button></article>
+      <article class="panel guide-path"><span class="guide-number">示例预览</span><h3>先看示例数据</h3><p>预览表单样例、预期路径和校验错误，理解一条流程会怎样运行。</p><button class="secondary" :disabled="locked" @click="emit('examples')">只读查看样例</button></article>
     </div>
     <div class="guide-layout">
       <section class="panel guide-progress" :aria-busy="query.loading" aria-labelledby="guide-progress-title">
