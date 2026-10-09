@@ -80,6 +80,17 @@ assert.equal(validator({ $ref: '#/components/schemas/ReviewPrecheckExplanationRe
 // 风险来源范围的每层对象都封闭，调用者不能夹带租户、身份或金额事实。
 const riskDocument = { reportId: randomUUID(), roundNo: 1, lineNos: [1] }
 const riskInput = { taskId: 'current-task', scope: { documents: [riskDocument], calendarId: null } }
+const agentScope = { policyLineNos: [1], invoiceIds: [], precheckIds: [], maxSteps: 8 }
+validate({ $ref: '#/components/schemas/ExpenseAgentScope' }, agentScope)
+assert.equal(validator({ $ref: '#/components/schemas/ExpenseAgentScope' })({ ...agentScope, approve: true }), false)
+assert.equal(validator({ $ref: '#/components/schemas/ExpenseAgentScope' })({ ...agentScope, maxSteps: 13 }), false)
+validate({ $ref: '#/components/schemas/ExpenseAgentResume' }, { expectedVersion: 2, acknowledgeUnknown: false })
+assert.equal(validator({ $ref: '#/components/schemas/ExpenseAgentResume' })({ expectedVersion: 2, acknowledgeUnknown: 'true' }), false)
+const patchSelection = { expectedRunVersion: 3, applicationVersion: 1, financialVersion: 1, selectedPatchIds: ['expense:field[1].DESCRIPTION'] }
+validate({ $ref: '#/components/schemas/ExpenseStructuredCorrectionRequest' }, patchSelection)
+assert.equal(validator({ $ref: '#/components/schemas/ExpenseStructuredCorrectionRequest' })({ ...patchSelection, content: {} }), false)
+assert.equal(validator({ $ref: '#/components/schemas/ExpenseStructuredCorrectionRequest' })({ ...patchSelection, selectedPatchIds: [] }), false)
+
 const riskInputSchema = { $ref: '#/components/schemas/ExpenseRiskInputRequest' }
 validate(riskInputSchema, riskInput)
 for (const value of [

@@ -5,7 +5,7 @@ import type { PrecheckView } from './expenseDraft.js'
 
 /** 办理记录只组织原业务事实，完成助手步骤不代表预检通过或审批通过。 */
 export const handlingStatuses = { OPEN: '继续整理', WAITING: '等待原任务结果', NEEDS_INFORMATION: '需要补充材料', NEEDS_CONFIRMATION: '待本人核对建议', SUBMITTED: '已提交审批', CLOSED: '办理记录已结束', LIMIT_REACHED: '已达到步骤上限' } as const
-export const handlingTools = { EXPENSE: '读取费用', INVOICE: '核对票据', POLICY: '查询制度', PRECHECK_RESULT: '读取预检', DRAFT: '费用行建议', PRECHECK: '费用预检', EXPLANATION: '补正解释', EXPENSE_SAVED: '本人保存费用', CORRECTION: '本人确认补正', SUBMISSION: '本人提交审批' } as const
+export const handlingTools = { EXPENSE: '读取费用', INVOICE: '核对票据', POLICY: '查询制度', PRECHECK_RESULT: '读取预检', INVOICE_EXTRACTION: '票面提取与本人确认', DRAFT: '费用行建议', PRECHECK: '费用预检', EXPLANATION: '补正解释', EXPENSE_SAVED: '本人保存费用', CORRECTION: '本人确认补正', SUBMISSION: '本人提交审批' } as const
 export type ReadTool = 'EXPENSE' | 'INVOICE' | 'POLICY' | 'PRECHECK_RESULT'
 export interface HandlingStep { number: number; tool: keyof typeof handlingTools; referenceId: string; sourceVersion: number; outcome: string; applicationVersion: number; financialVersion: number; inputDigest: string; startedAt: string; updatedAt: string }
 export interface HandlingTask { id: string; reportId: string; applicationId: string; goal: string; createdAt: string; version: number; status: keyof typeof handlingStatuses; applicationVersion: number; financialVersion: number; current: boolean; steps: HandlingStep[] }
@@ -53,7 +53,7 @@ export function validateHandlingReceipt(value: unknown, path: string, body: stri
   if (match[2] && task.id !== decodeURIComponent(match[2])) throw unreadable()
   if (!match[3]) {
     if (task.version !== 1 || task.status !== 'OPEN' || task.steps.length || task.goal !== input.goal || task.applicationVersion !== input.applicationVersion || task.financialVersion !== input.financialVersion) throw unreadable()
-  } else if (task.version !== input.expectedVersion + 1) throw unreadable()
+  } else if (match[3] === 'close' ? task.version !== input.expectedVersion + 1 : task.version <= input.expectedVersion) throw unreadable()
   if (match[3] === 'close' && task.status !== 'CLOSED') throw unreadable()
   if (match[3] === 'inspect') {
     if (!object(value) || !object(value.result) || value.result.tool !== input.tool) throw unreadable()
@@ -69,7 +69,7 @@ export function validateHandlingReceipt(value: unknown, path: string, body: stri
   return task
 }
 
-export const usageKinds = { SUMMARY: '审批摘要', DRAFT: '表单草稿', INVOICE: '票据抽取', EXPENSE_DRAFT: '费用行建议', PRECHECK_EXPLANATION: '预检解释', EXPENSE_RISK: '费用风险解释' } as const
+export const usageKinds = { SUMMARY: '审批摘要', DRAFT: '表单草稿', INVOICE: '票据抽取', EXPENSE_DRAFT: '费用行建议', PRECHECK_EXPLANATION: '预检解释', EXPENSE_RISK: '费用风险解释', HANDLING: '报销办理决策' } as const
 export interface AgentUsage { runId: string; kind: keyof typeof usageKinds; subjectId: string; queuedAt: string; startedAt: string; completedAt: string | null; queueMillis: number; executionMillis: number | null; outcome: string; providerId: string | null; modelVersion: string | null; promptVersion: string | null; usageStatus: 'REPORTED' | 'NOT_REPORTED' | 'INVALID'; inputTokens: number | null; outputTokens: number | null; totalTokens: number | null }
 export const usageOutcomes: Record<string, string> = { IN_PROGRESS: '最终结果尚未记录', SUCCEEDED: '模型输出已通过格式检查', EXECUTION_FAILED: '执行异常', MODEL_TIMEOUT: '模型超时', MODEL_UNAVAILABLE: '模型不可用', INVALID_MODEL_OUTPUT: '输出校验失败', INPUT_UNAVAILABLE: '来源不可用' }
 /** 明确报告的零有效；未报告、记录中断和无效用量不能补零。 */

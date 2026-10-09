@@ -1421,7 +1421,7 @@ async function recoverOperation(id: string) {
       } else if (/^\/expense-reports\/[^/?]+\/precheck-explanations(?:\/[^/?]+\/review)?$/.test(request.path)) {
         acknowledgeExplanation(actorScope.value, request.path, result as ExplanationReceipt)
         notice.value = '原预检解释操作已确认，请核对同一条记录；费用金额、检查结论和审批状态保持不变。'
-      } else if (/^\/expense-reports\/[^/?]+\/precheck-explanations\/[^/?]+\/correct$/.test(request.path)) {
+      } else if (/^\/expense-reports\/[^/?]+\/precheck-explanations\/[^/?]+\/correct(?:\/structured)?$/.test(request.path)) {
         const value = result as ExpenseCorrectionReceipt
         const restored = expenseDrafts.acknowledge(actorScope.value, request.path, request.body!, value.expense, value.precheckId)
         if (!restored) recordApplicationId.value = value.expense.applicationId

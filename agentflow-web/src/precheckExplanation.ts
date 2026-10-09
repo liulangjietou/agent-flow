@@ -15,7 +15,10 @@ export interface ExplanationSummary {
   status: AssistStatus; version: number; createdAt: string
 }
 export interface ExplanationPage { items: ExplanationSummary[]; total: number; page: number; pageSize: number }
-export interface ExplanationItem { issueSourceId: string; explanation: string; corrections: string[]; evidence: AssistReference[] }
+export const patchFields = { CATEGORY_CODE: '费用类别', CITY_CODE: '发生城市', INCURRED_ON: '发生日期', ENDED_ON: '结束日期', DESCRIPTION: '费用说明', EXCEPTION_REASON: '例外事由' } as const
+export interface ExpensePatch { lineNo: number; field: keyof typeof patchFields; beforeValue: string; afterValue: string; impact: string }
+export const patchId = (patch: ExpensePatch) => `expense:field[${patch.lineNo}].${patch.field}`
+export interface ExplanationItem { patches?: ExpensePatch[]; issueSourceId: string; explanation: string; corrections: string[]; evidence: AssistReference[] }
 export interface ExplanationDetail extends ExplanationSummary {
   result: 'READY' | 'BLOCKED' | 'UNAVAILABLE'; checkedAt: string; validUntil: string
   startedAt: string | null; completedAt: string | null; sources: AssistSource[]
@@ -27,7 +30,7 @@ export interface ExplanationDetail extends ExplanationSummary {
 }
 export interface ExpenseCorrectionSelection {
   runId: string; expectedRunVersion: number; applicationVersion: number; financialVersion: number
-  selectedIssueIds: string[]; comment: string; validUntil: string; items: ExplanationItem[]
+  selectedIssueIds: string[]; comment: string; validUntil: string; items: ExplanationItem[]; selectedPatchIds?: string[]; sources?: AssistSource[]
 }
 export interface ExpenseCorrectionInput {
   expectedRunVersion: number; applicationVersion: number; financialVersion: number
@@ -60,7 +63,7 @@ function summary(v: unknown): v is ExplanationSummary {
 function sources(v: unknown, maximum: number): v is AssistSource[] {
   return Array.isArray(v) && v.length <= maximum && v.every(s => object(s) && text(s.label) && typeof s.content === 'string'
     && object(s.reference) && typeof s.reference.sourceId === 'string'
-    && /^(?:precheck:result|precheck:finding\[(?:0|[1-9][0-9]*)\]|expense:(?:line|policy)\[[1-9][0-9]*\])$/.test(s.reference.sourceId)
+    && /^(?:precheck:result|precheck:finding\[(?:0|[1-9][0-9]*)\]|expense:(?:line|policy)\[[1-9][0-9]*\]|expense:field\[[1-9][0-9]*\]\.(?:CATEGORY_CODE|CITY_CODE|INCURRED_ON|ENDED_ON|DESCRIPTION|EXCEPTION_REASON))$/.test(s.reference.sourceId)
     && digest(s.reference.contentDigest)) && new Set(v.map(s => s.reference.sourceId)).size === v.length
 }
 function issueIds(result: string, values: AssistSource[]) {
@@ -74,7 +77,7 @@ export function readExplanationInput(value: unknown, precheckId: string): Explan
   if (!object(value) || !uuid(value.precheckId) || value.precheckId !== precheckId || !positive(value.applicationVersion)
       || !positive(value.financialVersion) || !positive(value.attempt) || !ownValue(precheckStatuses, String(value.result))
       || !nullableTime(value.checkedAt) || !nullableTime(value.validUntil) || typeof value.enabled !== 'boolean'
-      || !nullableText(value.unavailableCode) || !sources(value.sources, 611)) throw unreadable()
+      || !nullableText(value.unavailableCode) || !sources(value.sources, 1811)) throw unreadable()
   if (value.enabled) {
     if (!terminal(value.result) || !time(value.checkedAt) || !time(value.validUntil) || Date.parse(value.validUntil) <= Date.parse(value.checkedAt)
         || value.unavailableCode !== null || !text(value.providerId) || !text(value.model) || !text(value.destination) || !digest(value.targetDigest)) throw unreadable()
@@ -105,9 +108,21 @@ export function readExplanationDetail(value: unknown, id: string): ExplanationDe
       || d.completedAt && Date.parse(d.completedAt) < Date.parse(d.startedAt!)) throw unreadable()
   if (['COMPLETED', 'ADOPTED', 'DISMISSED'].includes(d.status)) {
     const s = d.suggestion
-    if (!s || !text(s.providerId) || !text(s.modelVersion) || s.promptVersion !== 'expense-precheck-explanation-v1'
+    if (!s || !text(s.providerId) || !text(s.modelVersion) || !['expense-precheck-explanation-v1', 'expense-precheck-explanation-v2'].includes(s.promptVersion)
         || !Array.isArray(s.items) || s.items.length !== issues.length || new Set(s.items.map(i => i?.issueSourceId)).size !== issues.length) throw unreadable()
+    const patchIds = new Set<string>()
     for (const item of s.items) {
+      if (item?.patches != null) {
+        if (!Array.isArray(item.patches) || item.patches.length > 5) throw unreadable()
+        for (const patch of item.patches) {
+          if (!object(patch) || !positive(patch.lineNo) || patch.lineNo > 200 || !Object.prototype.hasOwnProperty.call(patchFields, patch.field)
+            || typeof patch.beforeValue !== 'string' || patch.beforeValue.length > 2000 || typeof patch.afterValue !== 'string' || patch.afterValue.length > 2000
+            || patch.beforeValue === patch.afterValue || !text(patch.impact) || patch.impact.length > 500) throw unreadable()
+          const id = patchId(patch), source = d.sources.find(source => source.reference.sourceId === id)
+          if (patchIds.has(id) || !source || source.content !== patch.beforeValue || !item.evidence?.some(ref => ref.sourceId === id && ref.contentDigest === source.reference.contentDigest)) throw unreadable()
+          patchIds.add(id)
+        }
+      }
       if (!item || !issues.includes(item.issueSourceId) || !text(item.explanation) || item.explanation.length > 1000
           || !Array.isArray(item.corrections) || item.corrections.length > 5 || d.result !== 'READY' && !item.corrections.length
           || !item.corrections.every(c => text(c) && c.length <= 500) || !Array.isArray(item.evidence) || !item.evidence.length
@@ -139,22 +154,23 @@ export function correctionSelection(detail: ExplanationDetail, selected: string[
       || !selected.every(id => detail.suggestion?.items.some(item => item.issueSourceId === id))) throw new Error('请核对仍有效的失败检查并勾选要补正的问题。')
   return { runId: detail.id, expectedRunVersion: detail.version, applicationVersion: detail.applicationVersion,
     financialVersion: detail.financialVersion, selectedIssueIds: [...selected], comment, validUntil: detail.validUntil,
-    items: JSON.parse(JSON.stringify(detail.suggestion!.items.filter(item => selected.includes(item.issueSourceId)))) }
+    items: JSON.parse(JSON.stringify(detail.suggestion!.items.filter(item => selected.includes(item.issueSourceId)))), sources: JSON.parse(JSON.stringify(detail.sources)) }
 }
 /** 成功响应必须绑定原解释、单据及递增双版本，缺失的新预检回执继续按未知写入恢复。 */
 export function validateCorrectionReceipt(value: unknown, path: string, body: string): ExpenseCorrectionReceipt {
-  const route = /^\/expense-reports\/([^/?]+)\/precheck-explanations\/([^/?]+)\/correct$/.exec(path)
+  const route = /^\/expense-reports\/([^/?]+)\/precheck-explanations\/([^/?]+)\/correct(?:\/structured)?$/.exec(path)
   const input = JSON.parse(body) as ExpenseCorrectionInput
+  const structured = path.endsWith('/structured')
   if (!route || !object(value) || value.runId !== decodeURIComponent(route[2]!) || !uuid(value.precheckId) || !object(value.expense)) throw unreadable()
   const expense = value.expense
   if (expense.id !== decodeURIComponent(route[1]!) || !uuid(expense.applicationId) || !text(expense.businessNo)
       || expense.applicationVersion !== input.applicationVersion + 1 || expense.financialVersion !== input.financialVersion + 1
       || !positive(expense.roundNo) || expense.editable !== true || !['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(String(expense.applicationStatus))
-      || expense.financialRound != null || !object(expense.content) || expense.content.legalEntityId !== input.content.legalEntityId
-      || expense.content.type !== input.content.type || !text(expense.content.title) || !Array.isArray(expense.content.lines)
-      || expense.content.lines.length !== input.content.lines.length || !Array.isArray(expense.content.advanceOffsets)
+      || expense.financialRound != null || !object(expense.content) || (!structured && expense.content.legalEntityId !== input.content.legalEntityId)
+      || (!structured && expense.content.type !== input.content.type) || !text(expense.content.title) || !Array.isArray(expense.content.lines)
+      || (!structured && expense.content.lines.length !== input.content.lines.length) || !Array.isArray(expense.content.advanceOffsets)
       || new Set(expense.content.lines.map(line => object(line) ? line.lineNo : null)).size !== expense.content.lines.length
-      || !expense.content.lines.every(line => object(line) && input.content.lines.some(original => original.lineNo === line.lineNo)
+      || !expense.content.lines.every(line => object(line) && (structured || input.content.lines.some(original => original.lineNo === line.lineNo))
         && text(line.categoryCode) && text(line.incurredOn) && object(line.claimedGross) && text(line.claimedGross.currency)
         && typeof line.claimedGross.value === 'string' && object(line.claimedTax) && Array.isArray(line.allocations) && Array.isArray(line.invoiceIds))) throw unreadable()
   return value as unknown as ExpenseCorrectionReceipt
@@ -190,6 +206,8 @@ export function acknowledgeExplanation(scope: string, path: string, receipt: Exp
 }
 /** 业务标签用于阅读；原始发送文本另行原样展示，金额不经浮点重算。 */
 export function explanationSourceLabel(source: AssistSource): string {
+  const field = /^expense:field\[([1-9][0-9]*)\]\.([A-Z_]+)$/.exec(source.reference.sourceId)
+  if (field && Object.prototype.hasOwnProperty.call(patchFields, field[2]!)) return `第 ${field[1]} 行可补正字段 · ${patchFields[field[2] as keyof typeof patchFields]}`
   if (finding(source.reference.sourceId)) {
     try {
       const f = JSON.parse(source.content)

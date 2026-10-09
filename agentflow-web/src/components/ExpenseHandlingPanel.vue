@@ -4,17 +4,18 @@ import { api, writeRequests } from '../api'
 import { expenseError, moneyLabel, type ExpenseDetail } from '../expenses'
 import { handlingActive, handlingPath, handlingStatuses, handlingTools, stepOutcomes, type HandlingTask, type HandlingResult, type ReadTool } from '../expenseHandling'
 import AgentUsagePanel from './AgentUsagePanel.vue'
+import ExpenseAgentPanel from './ExpenseAgentPanel.vue'
 
 const props = defineProps<{ report: ExpenseDetail; scopeKey: string; locked?: boolean; dirty?: boolean; refreshVersion?: number }>()
-const emit = defineEmits<{ busy: [value: boolean]; navigate: [target: 'invoice' | 'draft' | 'check' | 'explanation'] }>()
+const emit = defineEmits<{ busy: [value: boolean]; navigate: [target: 'invoice' | 'draft' | 'check' | 'explanation']; draft: [value: { taskId: string; brief: string; runId?: string }] }>()
 const tasks = ref<HandlingTask[]>([]), goal = ref('核对报销材料、制度依据并处理预检问题')
 const loading = ref(false), saving = ref(false), error = ref(''), result = ref<HandlingResult | null>(null), pending = ref(false)
 const lineNo = ref<number | ''>(''), invoiceId = ref(''), selected = ref(''), usageRefresh = ref(0)
-const showAllSteps = ref(false)
+const showAllSteps = ref(false), agentBusy = ref(false)
 const active = computed(() => tasks.value.find(handlingActive))
 const shown = computed(() => tasks.value.find(task => task.id === selected.value) ?? active.value ?? tasks.value[0])
 const visibleSteps = computed(() => showAllSteps.value ? shown.value?.steps ?? [] : shown.value?.steps.slice(-4) ?? [])
-const blocked = computed(() => !!props.locked || !!props.dirty || loading.value || saving.value || pending.value)
+const blocked = computed(() => !!props.locked || !!props.dirty || loading.value || saving.value || pending.value || agentBusy.value)
 const canInspect = computed(() => !blocked.value && !!active.value?.current && active.value.steps.length < 32)
 const invoiceIds = computed(() => [...new Set(props.report.content.lines.flatMap(line => line.invoiceIds))])
 let epoch = 0, controller: AbortController | null = null, timer: ReturnType<typeof setTimeout> | undefined, polls = 0
@@ -72,7 +73,7 @@ async function inspect(tool: ReadTool) {
 watch(() => [props.scopeKey, props.report.id, props.report.applicationVersion, props.report.financialVersion, props.refreshVersion], () => {
   stop(); tasks.value = []; result.value = null; selected.value = ''; invoiceId.value = ''; lineNo.value = ''; loading.value = false; saving.value = false; polls = 0; syncPending(); void load()
 }, { immediate: true, flush: 'sync' })
-watch(saving, value => emit('busy', value), { flush: 'sync' })
+watch(() => saving.value || agentBusy.value, value => emit('busy', value), { flush: 'sync' })
 onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
 </script>
 
@@ -90,6 +91,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
       <div class="state"><strong>{{ handlingStatuses[shown.status] }}</strong><span>{{ shown.steps.length }} / 32 步</span></div><p class="goal">{{ shown.goal }}</p>
       <p v-if="active && !active.current" class="help">记录对应的单据版本已变化，请重新读取费用。结束旧记录后，可为当前版本开始新办理。</p>
       <details v-if="active?.id === shown.id" class="tools"><summary>核对已保存的费用与依据</summary><div class="tool-row"><button type="button" class="secondary" :disabled="!canInspect" @click="inspect('EXPENSE')">读取当前费用</button></div><div class="tool-row"><label>费用行<select v-model="lineNo" aria-label="费用行" :disabled="!canInspect"><option value="">选择费用行</option><option v-for="line in report.content.lines" :key="line.lineNo" :value="line.lineNo">{{ line.lineNo }} · {{ line.description }}</option></select></label><button type="button" class="secondary" :disabled="!canInspect || !lineNo" @click="inspect('POLICY')">查询适用制度</button></div><div class="tool-row"><label>已关联票据<select v-model="invoiceId" :disabled="!canInspect"><option value="">选择本人票据</option><option v-for="id in invoiceIds" :key="id" :value="id">{{ id }}</option></select></label><button type="button" class="secondary" :disabled="!canInspect || !invoiceId" @click="inspect('INVOICE')">读取票据事实</button></div></details>
+      <ExpenseAgentPanel v-if="active?.id === shown.id" :report="report" :task="active" :scope-key="scopeKey" :locked="!!locked || !!dirty || saving || pending" @busy="agentBusy = $event" @draft="emit('draft', $event)" @changed="polls = 0; load()" />
       <div v-if="result" class="result" role="status"><p v-if="result.expense">已读取 {{ result.expense.content.lines.length }} 行已保存费用，财务版本 {{ result.expense.financialVersion }}。</p><template v-if="result.policy"><strong>{{ result.policy.guidance.policyName }} · v{{ result.policy.guidance.policyVersion }}</strong><p>{{ result.policy.guidance.ruleName }} · 依据 {{ result.policy.guidance.factSourceReference }}</p><p>有效至 {{ new Date(result.policy.guidance.validUntil).toLocaleString('zh-CN') }}，保存与提交时会再次核对。</p></template><template v-if="result.invoice"><p>{{ result.invoice.original.filename }} · {{ ({ VERIFIED: '查验通过', PENDING: '待查验', FAILED: '查验未通过' })[result.invoice.verification] }}</p><p v-if="result.invoice.facts">查验金额 {{ moneyLabel(result.invoice.facts.gross) }} · 票据日期 {{ result.invoice.facts.issueDate }}</p></template></div>
       <ol class="steps"><li v-for="step in visibleSteps" :key="step.number"><span class="number">{{ step.number }}</span><div><strong>{{ handlingTools[step.tool] }}</strong><span>{{ stepOutcomes[step.outcome] }} · 财务版本 {{ step.financialVersion }}</span><details><summary>原始依据</summary><p>原记录 {{ step.referenceId }} · 来源版本 {{ step.sourceVersion }}</p><p>输入摘要 {{ step.inputDigest }}</p><p>{{ new Date(step.updatedAt).toLocaleString('zh-CN') }}</p></details></div></li></ol>
       <button v-if="shown.steps.length > 4" type="button" class="quiet" :aria-expanded="showAllSteps" @click="showAllSteps = !showAllSteps">{{ showAllSteps ? '只看最近 4 步' : `查看全部 ${shown.steps.length} 步` }}</button>

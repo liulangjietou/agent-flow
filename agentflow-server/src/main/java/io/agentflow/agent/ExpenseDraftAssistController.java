@@ -28,10 +28,12 @@ public class ExpenseDraftAssistController {
     private final ExpenseDraftAssistService service;
     private final ExpenseDraftAssistPreparation preparation;
     private final IdempotencyExecutor idempotency;
+    private final ExpenseHandlingChildren children;
 
     /** 外部目录准备与写入分开，成功回放不再请求目录或模型。 */
-    public ExpenseDraftAssistController(ExpenseDraftAssistService service, ExpenseDraftAssistPreparation preparation, IdempotencyExecutor idempotency) {
+    public ExpenseDraftAssistController(ExpenseDraftAssistService service, ExpenseDraftAssistPreparation preparation, IdempotencyExecutor idempotency, ExpenseHandlingChildren children) {
         this.service = service; this.preparation = preparation; this.idempotency = idempotency;
+        this.children = children;
     }
 
     /** 显示实际发送内容、目的地、有效期和确认摘要，不排队、不调用模型。 */
@@ -46,7 +48,7 @@ public class ExpenseDraftAssistController {
         noQuery(request); service.authorize(id);
         return idempotency.executePrepared(request, HttpStatus.ACCEPTED,
                 () -> preparation.prepare(id, body.input().command(), body.validUntil()),
-                prepared -> service.queue(id, prepared, body.targetDigest(), body.consentDigest()));
+                prepared -> children.draft(id, prepared, body));
     }
 
     /** 历史分页不接受人员、租户、模型目标或任意条件覆盖。 */
@@ -130,7 +132,11 @@ public class ExpenseDraftAssistController {
      */
     public record GenerateRequest(@NotNull @Valid InputRequest input, @NotNull Instant validUntil,
             @NotBlank @Pattern(regexp = "[a-f0-9]{64}") String targetDigest,
-            @NotBlank @Pattern(regexp = "[a-f0-9]{64}") String consentDigest) {
+            @NotBlank @Pattern(regexp = "[a-f0-9]{64}") String consentDigest, UUID handlingTaskId) {
+        /** 兼容独立费用草稿请求。 */
+        public GenerateRequest(InputRequest input, Instant validUntil, String targetDigest, String consentDigest) {
+            this(input, validUntil, targetDigest, consentDigest, null);
+        }
         /** 不接受模型目的地 URL、凭据或未展示的来源正文。 */
         @JsonAnySetter public void rejectUnknown(String name, Object value) { unknown(); }
     }

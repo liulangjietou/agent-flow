@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.agent.mapper.ExpenseAgentMapper">
+    <insert id="insert">INSERT INTO agent_expense_orchestration(tenant_id,id,handling_id,report_id,version,status,context_json,state_json)
+        VALUES(#{tenant},#{id},#{task},#{report},1,'READY',#{context},#{state})</insert>
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">SELECT context_json,state_json FROM agent_expense_orchestration
+        WHERE tenant_id=#{tenant} AND handling_id=#{task}<if test="lock"> FOR UPDATE</if></select>
+    <select id="candidates" resultType="io.agentflow.mybatis.SqlRow">SELECT tenant_id,handling_id FROM agent_expense_orchestration
+        WHERE status IN ('READY','TOOL_READY','WAITING_CHILD') OR (status IN ('MODEL_RUNNING','TOOL_RUNNING') AND lease_until &lt;= #{now})
+        ORDER BY checked_at,id LIMIT 10</select>
+    <update id="checked">UPDATE agent_expense_orchestration SET checked_at=#{now} WHERE tenant_id=#{tenant} AND handling_id=#{task}</update>
+    <update id="update">UPDATE agent_expense_orchestration SET version=#{version},status=#{status},lease_until=#{lease},state_json=#{state}
+        WHERE tenant_id=#{tenant} AND id=#{id} AND version=#{previous}</update>
+    <insert id="append">INSERT INTO agent_expense_orchestration_transition(tenant_id,id,version,state_json) VALUES(#{tenant},#{id},#{version},#{state})</insert>
+    <insert id="modelCall">INSERT INTO agent_handling_model_call(tenant_id,id,orchestration_id,report_id,input_json,created_at)
+        VALUES(#{tenant},#{id},#{run},#{report},#{input},#{created})</insert>
+    <insert id="child">INSERT INTO agent_handling_child(tenant_id,handling_id,child_id,kind,report_id,application_version,financial_version)
+        VALUES(#{tenant},#{task},#{child},#{kind},#{report},#{application},#{financial})</insert>
+    <select id="childLinks" resultType="io.agentflow.mybatis.SqlRow">SELECT handling_id,report_id,application_version,financial_version
+        FROM agent_handling_child WHERE tenant_id=#{tenant} AND child_id=#{child} AND kind=#{kind}</select>
+</mapper>

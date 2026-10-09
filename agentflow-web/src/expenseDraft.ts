@@ -209,7 +209,7 @@ export class ExpenseDrafts {
   hasDrafts() { return [...this.drafts.values()].some(value => JSON.stringify(value.content) !== value.baseline || !value.detail && !!value.businessNo.trim() || !!value.pending || !!value.correction) }
   subscribe(listener: (scope: string, key: string) => void) { this.listeners.add(listener); return () => this.listeners.delete(listener) }
   acknowledge(scope: string, path: string, body: string, result: ExpenseDetail, queuedPrecheckId?: string): boolean {
-    if (path !== '/expense-reports' && !/^\/expense-reports\/[^/]+\/(?:revise|precheck-explanations\/[^/]+\/correct)$/.test(path)) return false
+    if (path !== '/expense-reports' && !/^\/expense-reports\/[^/]+\/(?:revise|precheck-explanations\/[^/]+\/correct(?:\/structured)?)$/.test(path)) return false
     for (const [storedKey, state] of this.drafts) {
       const [owner, key] = JSON.parse(storedKey) as [string, string]
       if (owner !== scope || state.pending?.path !== path || state.pending.body !== body || !result.id || !result.applicationId

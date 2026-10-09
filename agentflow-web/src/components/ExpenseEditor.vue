@@ -15,7 +15,7 @@ import PrecheckExplanationPanel from './PrecheckExplanationPanel.vue'
 import ExpenseDraftAssistPanel from './ExpenseDraftAssistPanel.vue'
 import { fillExpenseFromAssist, expenseAssistError, type ExpenseAssistDetail } from '../expenseDraftAssist'
 import type { AdvanceOffsetSuggestion } from '../advanceOffsetSuggestion'
-import { explanationError, type ExpenseCorrectionSelection, type ExpenseCorrectionInput } from '../precheckExplanation'
+import { explanationError, patchFields, patchId, type ExpenseCorrectionSelection, type ExpenseCorrectionInput } from '../precheckExplanation'
 
 const props = defineProps<{ scopeKey: string; initial?: ExpenseDetail; locked?: boolean }>()
 const emit = defineEmits<{ close: []; submitted: [applicationId: string]; busy: [value: boolean] }>()
@@ -25,6 +25,11 @@ const assistBusy = ref(false), handlingBusy = ref(false)
 const explanationBusy = ref(false), explanationDirty = ref(false), explanationRefresh = ref(0)
 const draftAssistBusy = ref(false), draftAssistDirty = ref(false)
 const handlingRefresh = ref(0)
+const handlingDraft = ref<{ taskId: string; brief: string; runId?: string }>()
+/** 已确认票据沿原草稿任务继续，种子正文仍须在模型预览中明确授权。 */
+function continueHandlingDraft(value: { taskId: string; brief: string; runId?: string }) {
+  handlingDraft.value = value; navigateHandling('draft')
+}
 const draftLocked = computed(() => draftAssistBusy.value || draftAssistDirty.value)
 const explanationLocked = computed(() => explanationBusy.value || explanationDirty.value)
 const assistantLocked = computed(() => explanationLocked.value || draftLocked.value || handlingBusy.value)
@@ -49,6 +54,7 @@ function preserve() { expenseDrafts.put(props.scopeKey, sessionKey.value, state.
 function stop() { epoch++; controller?.abort(); controller = null; selection.clear() }
 function initialize() {
   leaving = false
+  handlingDraft.value = undefined
   draftAssistBusy.value = false; draftAssistDirty.value = false; handlingBusy.value = false
   explanationBusy.value = false; explanationDirty.value = false; explanationRefresh.value = 0
   stop(); loading.value = false; saving.value = false; childBusy.value = false; assistBusy.value = false; discard.value = false; error.value = ''; notice.value = ''; catalog.value = null
@@ -96,17 +102,21 @@ async function save() {
   const correction = state.value.correction
   if (correction && (!detail || correction.applicationVersion !== detail.applicationVersion || correction.financialVersion !== detail.financialVersion
       || Date.parse(correction.validUntil) <= Date.now())) { error.value = '补正依据已过期或版本已变化。请退出补正，保存当前修改后重新预检。'; return }
-  const body = correction ? { expectedRunVersion: correction.expectedRunVersion, applicationVersion: correction.applicationVersion,
+  const structured = !!correction?.selectedPatchIds?.length
+  if (structured && JSON.stringify(state.value.content) !== state.value.baseline) { error.value = '逐项应用差异前请保留原费用内容；已有手工编辑时，请取消差异勾选后按当前表单保存。'; return }
+  const body = structured ? { expectedRunVersion: correction!.expectedRunVersion, applicationVersion: correction!.applicationVersion,
+    financialVersion: correction!.financialVersion, selectedPatchIds: [...correction!.selectedPatchIds!], comment: correction!.comment } : correction ? { expectedRunVersion: correction.expectedRunVersion, applicationVersion: correction.applicationVersion,
     financialVersion: correction.financialVersion, selectedIssueIds: correction.selectedIssueIds, comment: correction.comment, content }
     : detail ? { applicationVersion: detail.applicationVersion, financialVersion: detail.financialVersion, content }
     : { businessNo: state.value.businessNo.trim(), processKey: definition!.key, definitionVersion: definition!.version, content }
-  const path = correction ? `/expense-reports/${encodeURIComponent(detail!.id)}/precheck-explanations/${encodeURIComponent(correction.runId)}/correct`
+  const path = correction ? `/expense-reports/${encodeURIComponent(detail!.id)}/precheck-explanations/${encodeURIComponent(correction.runId)}/correct${structured ? '/structured' : ''}`
     : detail ? `/expense-reports/${encodeURIComponent(detail.id)}/revise` : '/expense-reports'
   const version = epoch, scope = props.scopeKey
   state.value.pending = { path, body: JSON.stringify(body) }; preserve(); saving.value = true
   try {
     if (correction) {
-      const receipt = await api.correctExpense(detail!.id, correction.runId, body as ExpenseCorrectionInput)
+      const receipt = structured ? await api.correctExpenseFields(detail!.id, correction.runId, body as Parameters<typeof api.correctExpenseFields>[2])
+        : await api.correctExpense(detail!.id, correction.runId, body as ExpenseCorrectionInput)
       if (version !== epoch) return
       if (!expenseDrafts.acknowledge(scope, path, JSON.stringify(body), receipt.expense, receipt.precheckId)) throw new Error('Expense correction receipt mismatch')
       notice.value = '补正已保存，正在核对新预检结果。检查通过后仍需本人确认提交审批。'
@@ -129,7 +139,7 @@ function beginCorrection(selection: ExpenseCorrectionSelection) {
   const detail = state.value.detail
   if (blocked.value || dirty.value || !detail?.editable || selection.applicationVersion !== detail.applicationVersion
       || selection.financialVersion !== detail.financialVersion || Date.parse(selection.validUntil) <= Date.now()) return
-  state.value.correction = selection; error.value = ''; notice.value = '请按下方清单核对并编辑费用，完成后确认补正并重新预检。'
+  state.value.correction = { ...selection, selectedPatchIds: [] }; error.value = ''; notice.value = '请按下方清单核对并编辑费用，完成后确认补正并重新预检。'
 }
 /** 退出补正保留人工编辑内容；结果未知的请求必须先恢复，不能换新键保存。 */
 function cancelCorrection() {
@@ -195,13 +205,20 @@ onUnmounted(() => { if (!leaving) preserve(); stop(); unsubscribe(); emit('busy'
     <p v-if="error || selection.error" class="editor-error" role="alert">{{ error || selection.error }}</p>
     <div v-if="discard" class="discard-confirmation" role="group" aria-label="处理未保存的费用内容"><p>本地内容尚未保存。返回会放弃这些修改；已经保存的单据和待恢复请求仍保留。</p><button type="button" class="secondary" @click="discard = false">继续填写</button><button type="button" class="return" :disabled="saving || childBusy || assistBusy || assistantLocked || locked" @click="leave">放弃本地修改并返回</button></div>
     <div v-if="state.requiresRefresh && !state.pending" class="editor-notice"><p>请先核对服务器当前版本。读取会替换本地未保存内容，不会自动再次保存。</p><button v-if="state.detail" type="button" class="secondary" :disabled="saving || childBusy || assistBusy || assistantLocked || locked" @click="reloadSaved">放弃本地修改并读取服务器版本</button><button v-else type="button" class="secondary" :disabled="locked" @click="state.requiresRefresh = false">修正填报内容</button></div>
-    <ExpenseHandlingPanel v-if="state.detail" :report="state.detail" :scope-key="scopeKey" :dirty="dirty" :refresh-version="handlingRefresh + explanationRefresh" :locked="!!locked || saving || childBusy || assistBusy || explanationLocked || draftLocked || state.requiresRefresh" @busy="handlingBusy = $event" @navigate="navigateHandling" />
+    <ExpenseHandlingPanel v-if="state.detail" :report="state.detail" :scope-key="scopeKey" :dirty="dirty" :refresh-version="handlingRefresh + explanationRefresh" :locked="!!locked || saving || childBusy || assistBusy || explanationLocked || draftLocked || state.requiresRefresh" @busy="handlingBusy = $event" @navigate="navigateHandling" @draft="continueHandlingDraft" />
     <p v-if="loading" class="editor-help" role="status">正在读取本人可用的财务目录…</p>
     <button type="button" class="quiet catalog-refresh" :disabled="loading || saving || childBusy || assistBusy || assistantLocked || locked" @click="loadCatalog">{{ catalog ? '刷新财务目录' : '重试财务目录' }}</button>
     <section v-if="state.correction" class="correction-checklist" aria-label="本次补正清单">
       <h4>核对建议并修改费用</h4>
       <p>依据有效至 {{ new Date(state.correction.validUntil).toLocaleString('zh-CN') }}。确认时将保存当前费用，并沿用原任职和会计日期重新预检。</p>
-      <article v-for="item in state.correction.items" :key="item.issueSourceId"><p>{{ item.explanation }}</p><ol><li v-for="step in item.corrections" :key="step">{{ step }}</li></ol></article>
+      <article v-for="item in state.correction.items" :key="item.issueSourceId"><p>{{ item.explanation }}</p><ol><li v-for="step in item.corrections" :key="step">{{ step }}</li></ol>
+        <div v-for="patch in item.patches ?? []" :key="patchId(patch)" class="field-diff">
+          <label><input v-model="state.correction.selectedPatchIds" type="checkbox" :value="patchId(patch)" :disabled="blocked || JSON.stringify(state.content) !== state.baseline && !state.correction.selectedPatchIds?.includes(patchId(patch))" />采纳第 {{ patch.lineNo }} 行 · {{ patchFields[patch.field] }}</label>
+          <dl><dt>修改前</dt><dd>{{ patch.beforeValue || '（空）' }}</dd><dt>修改后</dt><dd>{{ patch.afterValue || '（空）' }}</dd><dt>影响</dt><dd>{{ patch.impact }}</dd></dl>
+          <details><summary>原问题和依据</summary><p>{{ item.explanation }}</p><p v-for="reference in item.evidence" :key="reference.sourceId">{{ state.correction.sources?.find(source => source.reference.sourceId === reference.sourceId)?.label ?? reference.sourceId }}：{{ state.correction.sources?.find(source => source.reference.sourceId === reference.sourceId)?.content }}<small>来源摘要 {{ reference.contentDigest }}</small></p></details>
+        </div>
+      </article>
+      <p v-if="state.correction.selectedPatchIds?.length">只应用已勾选的 {{ state.correction.selectedPatchIds.length }} 处差异；服务器将核对修改前值，并执行原费用校验及重新预检。</p>
       <button type="button" class="quiet" :disabled="saving || locked || !!state.pending" @click="cancelCorrection">退出补正，保留当前编辑</button>
     </section>
     <form v-if="catalog" novalidate @submit.prevent="save">
@@ -214,10 +231,10 @@ onUnmounted(() => { if (!leaving) preserve(); stop(); unsubscribe(); emit('busy'
         <button type="button" class="secondary" :disabled="blocked || !entity || state.content.lines.length >= 200" @click="addLine">＋ 添加费用行</button>
         <ExpenseInvoiceAssist data-handling="invoice" v-model="state.content" :scope-key="scopeKey" :report-id="state.detail?.id" :locked="!!locked || saving || childBusy || loading || assistantLocked || state.requiresRefresh" @busy="assistBusy = $event" />
         <ExpenseFundingPicker v-model="state.content" :scope-key="scopeKey" :report-id="state.detail?.id" :base-currency="entity?.baseCurrency ?? ''" :locked="!!blocked" />
-        <div class="save-toolbar"><span>{{ dirty ? '有未保存的内容' : state.detail ? '当前费用内容已保存' : '允许先保存不含费用行的草稿' }}</span><button class="primary" :disabled="blocked || loading || selection.loading || !state.detail && !state.definition">{{ saving ? '正在保存…' : state.correction ? '确认补正并重新预检' : '保存费用草稿' }}</button></div>
+        <div class="save-toolbar"><span>{{ dirty ? '有未保存的内容' : state.detail ? '当前费用内容已保存' : '允许先保存不含费用行的草稿' }}</span><button class="primary" :disabled="blocked || loading || selection.loading || !state.detail && !state.definition">{{ saving ? '正在保存…' : state.correction?.selectedPatchIds?.length ? '应用所选差异并重新预检' : state.correction ? '确认补正并重新预检' : '保存费用草稿' }}</button></div>
       </fieldset>
     </form>
-    <ExpenseDraftAssistPanel data-handling="draft" v-if="state.detail && catalog" :scope-key="scopeKey" :report="state.detail" :catalog="catalog" :application-dirty="dirty" :locked="!!locked || saving || childBusy || assistBusy || explanationLocked || handlingBusy || loading || state.requiresRefresh" @busy="draftAssistBusy = $event" @dirty="draftAssistDirty = $event" @fill="applyDraftAssist" />
+    <ExpenseDraftAssistPanel data-handling="draft" v-if="state.detail && catalog" :scope-key="scopeKey" :report="state.detail" :catalog="catalog" :handling-draft="handlingDraft" :application-dirty="dirty" :locked="!!locked || saving || childBusy || assistBusy || explanationLocked || handlingBusy || loading || state.requiresRefresh" @busy="draftAssistBusy = $event" @dirty="draftAssistDirty = $event" @fill="applyDraftAssist" />
     <p v-else-if="!state.detail" class="editor-help">保存费用草稿后，可按行程生成费用行、类别和分摊建议。</p>
     <ExpenseSubmission data-handling="check" v-if="state.detail?.editable && !dirty && !state.requiresRefresh && entity" :detail="state.detail" :queued-precheck-id="state.queuedPrecheckId" :scope-key="scopeKey" :time-zone="entity.timeZone" :locked="!!locked || saving || assistBusy || assistantLocked" @busy="childBusy = $event" @submitted="submitted" @offsets="applyOffsets" @checked="explanationRefresh++" @locate="locateFinding" />
     <p v-else-if="state.detail && dirty" class="editor-help">请先保存当前修改，再执行费用预检或提交。</p>
@@ -226,5 +243,5 @@ onUnmounted(() => { if (!leaving) preserve(); stop(); unsubscribe(); emit('busy'
 </template>
 
 <style scoped>
-.correction-checklist{margin:16px 0;padding:18px;background:#edf9f5;border:1px solid var(--line);border-radius:10px;font-size:13px;line-height:1.8;overflow-wrap:anywhere}.correction-checklist h4{margin:0}.expense-editor{background:white;border:1px solid var(--line);border-radius:16px;padding:28px;min-width:0}.editor-heading{display:flex;justify-content:space-between;gap:20px;align-items:start}.editor-heading h3{font-size:23px;margin:9px 0}.editor-heading p:not(.eyebrow){font-size:12px;color:var(--muted);line-height:1.8;overflow-wrap:anywhere}.editor-heading button{flex-shrink:0}.expense-editor fieldset{margin:0;padding:0;border:0;min-width:0}.definition-choice{padding:20px 0;border-bottom:1px solid var(--line);margin-bottom:20px}.expense-editor label{display:grid;gap:8px;font-size:12px;min-width:0;margin:14px 0}.expense-editor input,.expense-editor select{font:inherit;width:100%;min-width:0;padding:11px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}.editor-basics{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}.title-field{grid-column:1/-1}.editor-help{font-size:12px;color:var(--muted);line-height:1.8}.catalog-refresh{font-size:12px;color:var(--deep);margin:8px 0}.editor-error,.editor-notice{font-size:12px;padding:14px;border-radius:9px;line-height:1.8;overflow-wrap:anywhere}.editor-error{color:var(--red);background:#fff1ed}.editor-notice{background:#edf9f5;color:var(--deep)}.save-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:20px;border-top:1px solid var(--line)}.save-toolbar span{font-size:12px;color:var(--muted)}.discard-confirmation{border:1px solid #ecc3b7;background:#fff6f1;padding:16px;font-size:12px;line-height:1.8;border-radius:10px}.discard-confirmation button{margin:4px 10px 4px 0}@media(max-width:650px){.expense-editor{padding:16px}.editor-basics{grid-template-columns:1fr}.editor-heading h3{font-size:20px}.save-toolbar{flex-wrap:wrap}}
+.field-diff{padding:14px;margin:12px 0;background:white;border:1px solid var(--line);border-radius:8px}.expense-editor .field-diff label{display:flex;align-items:center}.expense-editor .field-diff input{width:auto;margin:0}.field-diff dl{display:grid;grid-template-columns:70px 1fr;gap:8px}.field-diff dd{margin:0;white-space:pre-wrap}.correction-checklist{margin:16px 0;padding:18px;background:#edf9f5;border:1px solid var(--line);border-radius:10px;font-size:13px;line-height:1.8;overflow-wrap:anywhere}.correction-checklist h4{margin:0}.expense-editor{background:white;border:1px solid var(--line);border-radius:16px;padding:28px;min-width:0}.editor-heading{display:flex;justify-content:space-between;gap:20px;align-items:start}.editor-heading h3{font-size:23px;margin:9px 0}.editor-heading p:not(.eyebrow){font-size:12px;color:var(--muted);line-height:1.8;overflow-wrap:anywhere}.editor-heading button{flex-shrink:0}.expense-editor fieldset{margin:0;padding:0;border:0;min-width:0}.definition-choice{padding:20px 0;border-bottom:1px solid var(--line);margin-bottom:20px}.expense-editor label{display:grid;gap:8px;font-size:12px;min-width:0;margin:14px 0}.expense-editor input,.expense-editor select{font:inherit;width:100%;min-width:0;padding:11px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--ink)}.editor-basics{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}.title-field{grid-column:1/-1}.editor-help{font-size:12px;color:var(--muted);line-height:1.8}.catalog-refresh{font-size:12px;color:var(--deep);margin:8px 0}.editor-error,.editor-notice{font-size:12px;padding:14px;border-radius:9px;line-height:1.8;overflow-wrap:anywhere}.editor-error{color:var(--red);background:#fff1ed}.editor-notice{background:#edf9f5;color:var(--deep)}.save-toolbar{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-top:20px;border-top:1px solid var(--line)}.save-toolbar span{font-size:12px;color:var(--muted)}.discard-confirmation{border:1px solid #ecc3b7;background:#fff6f1;padding:16px;font-size:12px;line-height:1.8;border-radius:10px}.discard-confirmation button{margin:4px 10px 4px 0}@media(max-width:650px){.expense-editor{padding:16px}.editor-basics{grid-template-columns:1fr}.editor-heading h3{font-size:20px}.save-toolbar{flex-wrap:wrap}}
 </style>

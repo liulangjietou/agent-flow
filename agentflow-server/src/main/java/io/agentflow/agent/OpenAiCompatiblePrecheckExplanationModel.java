@@ -17,8 +17,11 @@ public class OpenAiCompatiblePrecheckExplanationModel implements PrecheckExplana
             用简体中文解释 issueSourceIds 对应的原检查问题并提出人工补正步骤，必须逐项回答且不能添加其他问题。
             原检查结论是权威结果，不能宣布通过、批准、付款，不能自动修改金额或规则；UNAVAILABLE 表示没有可信结论，不是业务被拒绝。
             费用来源中的 claimedGross/claimedTax 是申报金额。没有提供的制度阈值、预算余额、核定金额、真实票据或人员事实不得编造。
-            缺少必要事实时明确说明应由本人或财务核对。所有补正只提供文字步骤，不输出字段赋值或执行动作。
-            仅返回 JSON：{"items":[{"issueSourceId":"原问题标识","explanation":"解释","corrections":["人工补正步骤"],"evidence":[{"sourceId":"原引用标识","contentDigest":"原内容摘要"}]}]}。
+            缺少必要事实时明确说明应由本人或财务核对，不编造日期、城市、事由或例外理由。
+            仅当有明确证据且本人选择了 expense:field[行号].字段 来源时，才给出对应字段差异 patches；没有可靠建议返回空数组。
+            允许字段仅 CATEGORY_CODE、CITY_CODE、INCURRED_ON、ENDED_ON、DESCRIPTION、EXCEPTION_REASON。beforeValue 必须逐字等于字段来源正文，afterValue 是建议字符串，impact 说明修改影响和仍须重新预检。
+            禁止金额、税额、票据、分摊、补贴依据、审批或付款赋值。同一字段最多一条差异，evidence 必须同时引用问题、字段和支持新值的原始证据。
+            仅返回 JSON：{"items":[{"issueSourceId":"原问题标识","explanation":"解释","corrections":["人工补正步骤"],"patches":[{"lineNo":1,"field":"DESCRIPTION","beforeValue":"原值","afterValue":"建议值","impact":"影响"}],"evidence":[{"sourceId":"原引用标识","contentDigest":"原内容摘要"}]}]}。
             每条 explanation 最多 1000 字符，corrections 最多 5 条、每条最多 500 字符，失败问题至少有一条步骤。
             每条至少引用自己的问题来源，其他引用必须来自本次 sources 且逐字匹配；不能返回额外字段、Markdown 或工具调用。
             """;
@@ -38,9 +41,17 @@ public class OpenAiCompatiblePrecheckExplanationModel implements PrecheckExplana
             var output = reply.output();
             if (!output.isObject() || output.size() != 1 || !output.path("items").isArray()) throw invalid();
             for (JsonNode item : output.path("items")) {
-                if (!item.isObject() || item.size() != 4 || !item.path("issueSourceId").isTextual() || !item.path("explanation").isTextual()
+                if (!item.isObject() || item.size() != (item.has("patches") ? 5 : 4) || !item.path("issueSourceId").isTextual() || !item.path("explanation").isTextual()
                         || !item.path("corrections").isArray() || !item.path("evidence").isArray()) throw invalid();
                 for (var correction : item.path("corrections")) if (!correction.isTextual()) throw invalid();
+                if (item.has("patches")) {
+                    if (!item.path("patches").isArray()) throw invalid();
+                    for (var patch : item.path("patches")) {
+                        if (!patch.isObject() || patch.size() != 5 || !patch.path("lineNo").isIntegralNumber()
+                                || !patch.path("lineNo").canConvertToInt() || !patch.path("field").isTextual()
+                                || !patch.path("beforeValue").isTextual() || !patch.path("afterValue").isTextual() || !patch.path("impact").isTextual()) throw invalid();
+                    }
+                }
                 for (var reference : item.path("evidence")) {
                     if (!reference.isObject() || reference.size() != 2 || !reference.path("sourceId").isTextual()
                             || !reference.path("contentDigest").isTextual()) throw invalid();

@@ -59,6 +59,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "spring.datasource.username=${AGENTFLOW_EXPLANATION_TEST_USER:sa}", "spring.datasource.password=${AGENTFLOW_EXPLANATION_TEST_PASSWORD:}",
         "spring.datasource.driver-class-name=${AGENTFLOW_EXPLANATION_TEST_DRIVER:org.h2.Driver}",
         "agentflow.auth.demo-enabled=true", "agentflow.assist.enabled=true", "agentflow.assist.worker-enabled=false",
+        "agentflow.expense-agent.worker-enabled=false", "agentflow.invoices.extraction-worker-enabled=false", "agentflow.invoices.verification-worker-enabled=false",
         "agentflow.assist.model=synthetic-explanation", "agentflow.assist.timeout-seconds=2",
         "agentflow.finance-gateway.enabled=true", "agentflow.expenses.precheck-worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
@@ -68,6 +69,7 @@ class PrecheckExplanationIntegrationTest {
     private static final AtomicReference<String> MODE = new AtomicReference<>("success");
     private static final AtomicReference<String> LAST_TRACE = new AtomicReference<>();
     private String lastRequestTrace;
+    private static final AtomicReference<Runnable> DURING_AGENT = new AtomicReference<>();
     private static final AtomicReference<String> LAST_BODY = new AtomicReference<>();
     private static final java.util.concurrent.ExecutorService HTTP_THREADS = Executors.newFixedThreadPool(2);
     private static final HttpServer MODEL = server();
@@ -96,6 +98,16 @@ class PrecheckExplanationIntegrationTest {
     @Autowired ExpenseCorrectionRepository corrections;
     @Autowired ExpenseHandlingRepository handling;
     @Autowired AgentUsageRepository usage;
+    @Autowired ExpenseAgentWorker agentWorker;
+    @Autowired ExpenseAgentRepository agents;
+    @Autowired HandlingReadService durableReads;
+    @Autowired InvoiceWalletService invoiceWallet;
+    @Autowired InvoiceExtractionService extraction;
+    @Autowired InvoiceExtractionWorker extractionWorker;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+    @MockitoSpyBean ExpensePolicyGuidanceService guidance;
+    private static JdbcTemplate modelDatabase;
+    private static final java.util.concurrent.atomic.AtomicBoolean PERSISTED_BEFORE_SEND = new java.util.concurrent.atomic.AtomicBoolean();
 
     @Test void handlingResumesOriginalStepsAndCorrectionVersionsWithoutSendingAgain() throws Exception {
         var report = report(); String root = handlingPath(report);
@@ -175,6 +187,205 @@ class PrecheckExplanationIntegrationTest {
         assertThat(persisted.outcome()).isEqualTo("IN_PROGRESS");
         assertThat(persisted.totalTokens()).isNull();
         assertThat(persisted.completedAt()).isNull();
+    }
+
+
+    @Test void agentChoosesReadsConsumesRealResultAsksAndContinuesOriginalRun() throws Exception {
+        var report = report(); String root = startAgent(report, List.of(), "agent-read"); int before = REQUESTS.get();
+        agentWorker.poll();
+        assertThat(PERSISTED_BEFORE_SEND.get()).isTrue();
+        assertThat(query(root, "alice", 200).at("/state/status").asText()).isEqualTo("TOOL_READY");
+        agentWorker.poll();
+        var read = query(root, "alice", 200);
+        assertThat(read.at("/state/steps/0/observation").asText()).contains("不可发送标题");
+        agentWorker.poll();
+        var question = query(root, "alice", 200);
+        assertThat(question.at("/state/status").asText()).isEqualTo("NEEDS_INFORMATION");
+        assertThat(LAST_BODY.get()).contains("不可发送标题");
+        agentWorker.poll(); assertThat(REQUESTS.get()).isEqualTo(before + 2);
+        command(root + "/resume", "alice", Map.of("expectedVersion", question.at("/state/version").asLong(), "answer", "办公用品用于本次客户培训", "acknowledgeUnknown", false), UUID.randomUUID().toString(), 200);
+        agentWorker.poll();
+        var completed = query(root, "alice", 200);
+        assertThat(completed.at("/state/status").asText()).isEqualTo("COMPLETED");
+        assertThat(completed.at("/state/steps")).hasSize(3);
+        assertThat(completed.path("id")).isEqualTo(question.path("id"));
+        assertThat(query("/api/v1/agent-executions/usage?subjectId=" + report.id(), "alice", 200)).hasSize(3);
+        for (String user : List.of("bob", "admin")) query(root, user, 404);
+        assertThat(completed.toString()).doesNotContain("DEMO_LOGIN", "loginReference", "token");
+        assertThat(reports.find("demo", report.id()).orElseThrow().version()).isEqualTo(1);
+    }
+
+    @Test void cancellingWhileModelIsInFlightRejectsItsLateDecision() throws Exception {
+        var report = report(); String root = startAgent(report, List.of(), "agent-read");
+        DURING_AGENT.set(() -> {
+            try {
+                var running = query(root, "alice", 200);
+                command(root + "/cancel", "alice", Map.of("expectedVersion", running.at("/state/version").asLong()), UUID.randomUUID().toString(), 200);
+            } catch (Exception failure) { throw new IllegalStateException(failure); }
+        });
+        agentWorker.poll(); var stopped = query(root, "alice", 200);
+        assertThat(stopped.at("/state/status").asText()).isEqualTo("CANCELLED");
+        assertThat(stopped.at("/state/steps/0/decision").isNull()).isTrue();
+        int count = REQUESTS.get(); agentWorker.poll(); assertThat(REQUESTS.get()).isEqualTo(count);
+        assertThat(query(root.replace("/agent", "/reads"), "alice", 200)).isEmpty();
+    }
+
+    @Test void changedExpenseOrDestinationStopsBeforeAnotherModelRequest() throws Exception {
+        var report = report(); String root = startAgent(report, List.of(), "agent-read"); int before = REQUESTS.get();
+        report.revise(1, report.content()); reports.update(report, 1, "alice", "FIXTURE_REVISE");
+        agentWorker.poll(); assertThat(REQUESTS.get()).isEqualTo(before);
+        assertThat(query(root, "alice", 200).at("/state/status").asText()).isEqualTo("FAILED");
+        var next = report(); String second = startAgent(next, List.of(), "agent-read");
+        configuration.setModel("changed-model"); agentWorker.poll();
+        assertThat(REQUESTS.get()).isEqualTo(before); assertThat(query(second, "alice", 200).at("/state/status").asText()).isEqualTo("FAILED");
+    }
+
+    @Test void authorizationRejectsUnknownScopeAndInactiveEmployeeBeforeSending() throws Exception {
+        var report = report(); String root = startAgent(report, List.of(), "agent-read");
+        command(root + "/preview", "alice", Map.of("policyLineNos", List.of(), "invoiceIds", List.of(), "precheckIds", List.of(), "maxSteps", 8, "approve", true), UUID.randomUUID().toString(), 400);
+        int before = REQUESTS.get();
+        jdbc.update("UPDATE organization_person SET active=false WHERE tenant_id='demo' AND subject='alice'");
+        try {
+            agentWorker.poll(); assertThat(REQUESTS.get()).isEqualTo(before);
+            assertThat(jdbc.queryForObject("SELECT status FROM agent_expense_orchestration WHERE report_id=?", String.class, report.id().toString())).isEqualTo("FAILED");
+        } finally { jdbc.update("UPDATE organization_person SET active=true WHERE tenant_id='demo' AND subject='alice'"); }
+    }
+
+    @Test void preparedReadSurvivesRollbackAndRestoresWithoutAnotherExternalRequest() throws Exception {
+        var report = report(); var task = command(handlingPath(report), "alice", Map.of("applicationVersion", 1, "financialVersion", 1, "goal", "读费用"), UUID.randomUUID().toString(), 201);
+        var taskId = UUID.fromString(task.path("id").asText()); String key = UUID.randomUUID().toString();
+        actors.set(alice);
+        var input = new ExpenseHandlingController.Inspect(1L, ExpenseHandlingService.ReadTool.EXPENSE, null, null);
+        var prepared = durableReads.prepare(report.id(), taskId, key, input);
+        var tx = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        assertThatThrownBy(() -> tx.executeWithoutResult(status -> { durableReads.record(report.id(), prepared); throw new IllegalStateException("Simulated receipt crash"); })).isInstanceOf(IllegalStateException.class);
+        assertThat(durableReads.list(report.id(), taskId).get(0).status()).isEqualTo(HandlingReadExecution.Status.PREPARED);
+        assertThat(handling.find("demo", taskId).orElseThrow().state().steps()).isEmpty();
+        var recovered = durableReads.prepare(report.id(), taskId, key, input);
+        assertThat(recovered.id()).isEqualTo(prepared.id());
+        var receipt = tx.execute(status -> durableReads.record(report.id(), recovered));
+        assertThat(receipt.task().steps()).hasSize(1);
+        assertThat(durableReads.list(report.id(), taskId).get(0).status()).isEqualTo(HandlingReadExecution.Status.RECORDED);
+        actors.clear();
+    }
+
+    @Test void failedPolicyReadCannotResumeAgainstAChangedDestination() throws Exception {
+        var report = report(); var task = command(handlingPath(report), "alice", Map.of("applicationVersion", 1, "financialVersion", 1, "goal", "查制度"), UUID.randomUUID().toString(), 201);
+        String root = handlingPath(report) + "/" + task.path("id").asText(); var calls = new AtomicInteger();
+        org.mockito.Mockito.doAnswer(invocation -> { calls.incrementAndGet(); throw new io.agentflow.common.DomainException("FINANCE_GATEWAY_UNAVAILABLE", "Synthetic outage"); }).when(guidance).read(org.mockito.ArgumentMatchers.any());
+        command(root + "/inspect", "alice", Map.of("expectedVersion", 1, "tool", "POLICY", "lineNo", 1), UUID.randomUUID().toString(), 503);
+        var failed = query(root + "/reads", "alice", 200).get(0); String original = finance.getTenants().get("demo").getEndpoint();
+        try {
+            finance.getTenants().get("demo").setEndpoint(original + "/changed");
+            command(root + "/reads/" + failed.path("id").asText() + "/resume", "alice", Map.of("expectedVersion", failed.path("version").asLong()), UUID.randomUUID().toString(), 409);
+            assertThat(calls.get()).isEqualTo(1);
+        } finally { finance.getTenants().get("demo").setEndpoint(original); }
+    }
+
+    @Test void revokedOriginalLoginCannotBeReplacedByAnotherLiveLogin() throws Exception {
+        var report = report(); String task = command(handlingPath(report), "alice", Map.of("applicationVersion", 1, "financialVersion", 1, "goal", "核对材料"), UUID.randomUUID().toString(), 201).path("id").asText();
+        String root = handlingPath(report) + "/" + task + "/agent"; var scope = Map.of("policyLineNos", List.of(), "invoiceIds", List.of(), "precheckIds", List.of(), "maxSteps", 8);
+        var preview = command(root + "/preview", "alice", scope, UUID.randomUUID().toString(), 200); String bearer = token("alice");
+        var response = mvc.perform(post(root).header("Authorization", bearer).header("Idempotency-Key", UUID.randomUUID().toString())
+                .contentType("application/json").content(json.write(Map.of("scope", scope, "targetDigest", preview.path("targetDigest").asText(), "consentDigest", preview.path("consentDigest").asText())))).andReturn().getResponse();
+        assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(202);
+        auth.logout(bearer.substring(7)); int before = REQUESTS.get(); agentWorker.poll();
+        assertThat(REQUESTS.get()).isEqualTo(before);
+        assertThat(query(root, "alice", 200).at("/state/message").asText()).isEqualTo("UNAUTHENTICATED");
+        assertThatThrownBy(actors::actor).isInstanceOf(io.agentflow.common.DomainException.class);
+    }
+
+    @Test void restartKeepsUnknownModelIdentityAndRequiresExplicitNewDecision() throws Exception {
+        var report = report(); String root = startAgent(report, List.of(), "agent-read");
+        UUID task = UUID.fromString(root.split("/")[6]);
+        var tx = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        UUID original = tx.execute(status -> {
+            var run = agents.find("demo", task, true).orElseThrow().run(); var step = run.plan(Instant.now().minusSeconds(90), 1);
+            agents.modelCall(run, "{}"); agents.save(run, 1); return step.id();
+        });
+        int before = REQUESTS.get(); agentWorker.poll();
+        var interrupted = query(root, "alice", 200);
+        assertThat(interrupted.at("/state/status").asText()).isEqualTo("INTERRUPTED"); assertThat(REQUESTS.get()).isEqualTo(before);
+        command(root + "/resume", "alice", Map.of("expectedVersion", interrupted.at("/state/version").asLong(), "answer", "", "acknowledgeUnknown", false), UUID.randomUUID().toString(), 422);
+        command(root + "/resume", "alice", Map.of("expectedVersion", interrupted.at("/state/version").asLong(), "answer", "确认继续", "acknowledgeUnknown", true), UUID.randomUUID().toString(), 200);
+        agentWorker.poll(); var resumed = query(root, "alice", 200);
+        assertThat(resumed.at("/state/steps/0/id").asText()).isEqualTo(original.toString());
+        assertThat(resumed.at("/state/steps/1/id").asText()).isNotEqualTo(original.toString());
+        assertThat(REQUESTS.get()).isEqualTo(before + 1);
+    }
+
+    @Test void policyReadIsPersistedBeforeExternalCallAndFailureResumesSameStep() throws Exception {
+        var report = report(); var task = command(handlingPath(report), "alice", Map.of("applicationVersion", 1, "financialVersion", 1, "goal", "查制度"), UUID.randomUUID().toString(), 201);
+        String root = handlingPath(report) + "/" + task.path("id").asText(); var calls = new AtomicInteger();
+        UUID policy = UUID.randomUUID();
+        org.mockito.Mockito.doAnswer(invocation -> {
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            var states = jdbc.queryForList("SELECT state_json FROM agent_handling_read WHERE handling_id=?", String.class, task.path("id").asText());
+            assertThat(states).hasSize(1); assertThat(states.get(0)).contains("RUNNING", "authorizationDigest", "inputDigest");
+            if (calls.incrementAndGet() == 1) throw new io.agentflow.common.DomainException("FINANCE_GATEWAY_UNAVAILABLE", "Synthetic interruption");
+            return new ExpensePolicyGuidanceService.View(invocation.getArgument(0), new ExpensePolicyGuidance(policy, 1, "合成制度", "OFFICE", "办公费用", new ExpensePolicyDefinition.Constraints(ExpensePolicyDefinition.Effect.ALLOW, null, null, null, null, List.of(), false), "fixture", Instant.now().plusSeconds(120), null), null);
+        }).when(guidance).read(org.mockito.ArgumentMatchers.any());
+        command(root + "/inspect", "alice", Map.of("expectedVersion", 1, "tool", "POLICY", "lineNo", 1), UUID.randomUUID().toString(), 503);
+        var failed = query(root + "/reads", "alice", 200).get(0);
+        assertThat(failed.path("status").asText()).isEqualTo("FAILED");
+        String recovery = root + "/reads/" + failed.path("id").asText() + "/resume"; String key = UUID.randomUUID().toString();
+        var body = Map.of("expectedVersion", failed.path("version").asLong());
+        var receipt = command(recovery, "alice", body, key, 200);
+        assertThat(receipt.at("/task/steps")).hasSize(1); assertThat(receipt.at("/result/policy/guidance/policyId").asText()).isEqualTo(policy.toString());
+        assertThat(command(recovery, "alice", body, key, 200)).isEqualTo(receipt);
+        var restored = query(root + "/reads", "alice", 200); assertThat(restored).hasSize(1);
+        assertThat(restored.get(0).path("id")).isEqualTo(failed.path("id")); assertThat(restored.get(0).path("status").asText()).isEqualTo("RECORDED");
+        assertThat(calls.get()).isEqualTo(2);
+    }
+
+    @Test void invoiceRunConfirmationIsBoundAndContinuesIntoDraftPreparation() throws Exception {
+        byte[] bytes = "<EInvoice><Header><Version>0.31</Version></Header><TaxSupervisionInfo><InvoiceNumber>000077</InvoiceNumber></TaxSupervisionInfo></EInvoice>".getBytes(StandardCharsets.UTF_8);
+        actors.set(alice); var original = invoiceWallet.reserve(new InvoiceWalletService.UploadInput("handling.xml", (long) bytes.length,
+                java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)), InvoiceOriginal.Format.XML));
+        invoiceWallet.upload(original.id(), new java.io.ByteArrayInputStream(bytes)); actors.clear();
+        var report = report(); String root = startAgent(report, List.of(original.id()), "agent-invoice"); agentWorker.poll();
+        var agent = query(root, "alice", 200); assertThat(agent.at("/state/status").asText()).isEqualTo("NEEDS_CONFIRMATION");
+        String invoiceRoot = "/api/v1/invoices/" + original.id() + "/extraction-runs";
+        var options = query(invoiceRoot + "/input", "alice", 200);
+        var queued = command(invoiceRoot, "alice", Map.of("expectedOriginalId", options.at("/input/originalId").asText(), "expectedOriginalDigest", options.at("/input/originalDigest").asText(),
+                "method", "STRUCTURED_XML", "externalSendConfirmed", false, "handling", Map.of("reportId", report.id(), "taskId", agent.path("taskId").asText())), UUID.randomUUID().toString(), 202);
+        var binding = query(root, "alice", 200); assertThat(binding.at("/state/childId")).isEqualTo(queued.path("id"));
+        extractionWorker.poll();
+        var completed = query(invoiceRoot + "/" + queued.path("id").asText(), "alice", 200);
+        command(invoiceRoot + "/" + queued.path("id").asText() + "/review", "alice", Map.of("expectedRunVersion", completed.path("version").asLong(), "action", "CONFIRM", "selected", List.of(Map.of("field", "INVOICE_NUMBER", "value", "000077"))), UUID.randomUUID().toString(), 200);
+        agentWorker.poll(); var next = query(root, "alice", 200);
+        assertThat(next.at("/state/status").asText()).isEqualTo("NEEDS_CONFIRMATION"); assertThat(next.at("/state/steps/1/decision/action").asText()).isEqualTo("DRAFT");
+        assertThat(next.at("/state/steps/0/observation").asText()).contains("EMPLOYEE_CONFIRMED_INVOICE_FIELDS", "000077");
+        var history = query(handlingPath(report), "alice", 200).get(0);
+        assertThat(history.path("steps")).hasSize(1); assertThat(history.at("/steps/0/tool").asText()).isEqualTo("INVOICE_EXTRACTION");
+        assertThat(history.at("/steps/0/outcome").asText()).isEqualTo("CONFIRMED");
+        actors.set(alice); assertThat(invoiceWallet.get(original.id()).verification()).isEqualTo(Invoice.Verification.PENDING); actors.clear();
+    }
+
+    @Test void structuredCorrectionsApplyOnlySelectedServerSuggestionAndRecheckAtomically() throws Exception {
+        var report = report(); var job = checked(report); MODE.set("patches");
+        UUID id = remember(send(report, "", "alice", generation(job, List.of("precheck:result", ISSUE, "expense:field[1].DESCRIPTION", "expense:field[1].EXCEPTION_REASON")), UUID.randomUUID().toString(), 202)); worker.poll();
+        var detail = read(report, "/" + id, "alice", 200); assertThat(detail.at("/suggestion/items/0/patches")).hasSize(2);
+        var body = Map.of("expectedRunVersion", 3, "applicationVersion", 1, "financialVersion", 1, "selectedPatchIds", List.of("expense:field[1].DESCRIPTION"), "comment", "只采纳用途说明");
+        String key = UUID.randomUUID().toString(); var receipt = send(report, "/" + id + "/correct/structured", "alice", body, key, 200);
+        var saved = reports.find("demo", report.id()).orElseThrow();
+        assertThat(saved.content().lines().get(0).description()).isEqualTo("本人核对后的费用用途");
+        assertThat(saved.content().lines().get(0).exceptionReason()).isEqualTo(report.content().lines().get(0).exceptionReason());
+        assertThat(saved.content().lines().get(0).claimedGross()).isEqualTo(report.content().lines().get(0).claimedGross());
+        assertThat(saved.content().lines().get(0).allocations()).isEqualTo(report.content().lines().get(0).allocations());
+        assertThat(jobs.find("demo", UUID.fromString(receipt.path("precheckId").asText())).orElseThrow().status()).isEqualTo(Status.QUEUED);
+        assertThat(send(report, "/" + id + "/correct/structured", "alice", body, key, 200)).isEqualTo(receipt);
+    }
+
+    private String startAgent(ExpenseReport report, List<UUID> invoices, String mode) throws Exception {
+        MODE.set(mode);
+        String task = command(handlingPath(report), "alice", Map.of("applicationVersion", 1, "financialVersion", 1, "goal", "核对报销材料并补齐"), UUID.randomUUID().toString(), 201).path("id").asText();
+        String root = handlingPath(report) + "/" + task + "/agent";
+        var scope = Map.of("policyLineNos", List.of(), "invoiceIds", invoices, "precheckIds", List.of(), "maxSteps", 8);
+        var preview = command(root + "/preview", "alice", scope, UUID.randomUUID().toString(), 200);
+        var body = Map.of("scope", scope, "targetDigest", preview.path("targetDigest").asText(), "consentDigest", preview.path("consentDigest").asText());
+        String key = UUID.randomUUID().toString(); var created = command(root, "alice", body, key, 202);
+        assertThat(command(root, "alice", body, key, 202)).isEqualTo(created); return root;
     }
 
     private static String handlingPath(ExpenseReport report) { return "/api/v1/expense-reports/" + report.id() + "/handling-tasks"; }
@@ -265,7 +476,7 @@ class PrecheckExplanationIntegrationTest {
         properties.add("agentflow.attachments.directory", () -> "/fyoung/tmp/agentflow-precheck-explanation-fixtures");
     }
     @BeforeEach void setup() {
-        wire = json; MODE.set("success"); configuration.setEnabled(true); configuration.setEndpoint(ENDPOINT);
+        wire = json; modelDatabase = jdbc; MODE.set("success"); DURING_AGENT.set(null); PERSISTED_BEFORE_SEND.set(false); configuration.setEnabled(true); configuration.setEndpoint(ENDPOINT);
         configuration.setModel("synthetic-explanation"); configuration.setTimeoutSeconds(2);
         var admin = new Actor("demo", "admin", Set.of("ADMIN"));
         if (jdbc.queryForObject("SELECT COUNT(*) FROM organization_directory WHERE tenant_id='demo'", Integer.class) == 0) organization.initialize(admin);
@@ -277,6 +488,8 @@ class PrecheckExplanationIntegrationTest {
         appointment = organization.createAppointment(admin, person, department.id(), position.id(), true);
     }
     @AfterEach void settle() {
+        org.mockito.Mockito.reset(guidance);
+        jdbc.update("UPDATE agent_expense_orchestration SET status='CANCELLED' WHERE status NOT IN ('COMPLETED','FAILED','CANCELLED','LIMIT_REACHED')");
         actors.clear(); configuration.setEnabled(true); configuration.setEndpoint(ENDPOINT); configuration.setModel("synthetic-explanation"); configuration.setTimeoutSeconds(2);
         for (UUID id : queued) {
             service.claim("demo", id, Instant.now()); service.finish("demo", id, null, AssistRun.Failure.MODEL_UNAVAILABLE, Instant.now());
@@ -307,7 +520,7 @@ class PrecheckExplanationIntegrationTest {
         var application = applications.findById("demo", report.applicationId()).orElseThrow(); int before = REQUESTS.get();
         var options = read(report, "/input?precheckId=" + job.input().id(), "alice", 200);
         assertThat(options.path("enabled").asBoolean()).isTrue();
-        assertThat(options.path("sources").toString()).contains(ISSUE, "expense:line[1]", "BUDGET_INSUFFICIENT")
+        assertThat(java.util.stream.StreamSupport.stream(options.path("sources").spliterator(), false).filter(value -> !value.at("/reference/sourceId").asText().startsWith("expense:field[")).toList().toString()).contains(ISSUE, "expense:line[1]", "BUDGET_INSUFFICIENT")
                 .doesNotContain("不可发送说明", "不可发送例外", "不可发送归属", "不可发送标题", "employeeId", "dependencyDigest", "invoiceIds");
         var body = generation(job, List.of("precheck:result", ISSUE)); String key = UUID.randomUUID().toString();
         var receipt = send(report, "", "alice", body, key, 202); UUID id = remember(receipt);
@@ -535,11 +748,32 @@ class PrecheckExplanationIntegrationTest {
             server.createContext("/v1/chat/completions", exchange -> {
                 REQUESTS.incrementAndGet(); String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8); LAST_BODY.set(body); LAST_TRACE.set(exchange.getRequestHeaders().getFirst(DiagnosticContext.HEADER));
                 var request = wire.read(body, JsonNode.class); var input = wire.read(request.at("/messages/1/content").asText(), JsonNode.class);
+                if (input.has("goal")) {
+                    var during = DURING_AGENT.getAndSet(null); if (during != null) during.run();
+                    PERSISTED_BEFORE_SEND.set(modelDatabase.queryForObject("SELECT COUNT(*) FROM agent_handling_model_call WHERE input_json=?", Integer.class, request.at("/messages/1/content").asText()) > 0);
+                    String action = MODE.get().equals("agent-invoice") ? "EXTRACT_INVOICE" : !input.path("answers").isEmpty() ? "FINISH" : input.path("history").isEmpty() ? "EXPENSE" : "ASK_USER";
+                    var decision = wire.read("{}", ObjectNode.class); decision.put("action", action).putNull("referenceId").putNull("lineNo").put("message", action.equals("ASK_USER") ? "请说明费用用途" : "按本次目标继续");
+                    if (action.equals("EXTRACT_INVOICE")) decision.put("referenceId", input.at("/scope/invoiceIds/0").asText());
+                    byte[] response = wire.write(Map.of("model", "synthetic-agent", "usage", Map.of("prompt_tokens", 8, "completion_tokens", 4, "total_tokens", 12), "choices", List.of(Map.of("finish_reason", "stop", "message", Map.of("role", "assistant", "content", wire.write(decision)))))).getBytes(StandardCharsets.UTF_8);
+                    exchange.getResponseHeaders().set("Content-Type", "application/json"); exchange.sendResponseHeaders(200, response.length);
+                    try { exchange.getResponseBody().write(response); } finally { exchange.close(); } return;
+                }
                 var source = java.util.stream.StreamSupport.stream(input.path("sources").spliterator(), false)
                         .filter(value -> value.at("/reference/sourceId").asText().equals(ISSUE)).findFirst().orElseThrow();
                 var item = wire.read(wire.write(Map.of("issueSourceId", ISSUE, "explanation", "原检查显示预算不足，请核对费用归属后重新预检。",
                         "corrections", List.of("核对预算口径与可用额度"), "evidence", List.of(source.path("reference")))), ObjectNode.class);
                 var output = wire.read(wire.write(Map.of("items", List.of(item))), ObjectNode.class); String mode = MODE.get();
+                if (mode.equals("patches")) {
+                    var patches = item.putArray("patches"); var references = item.withArray("evidence");
+                    for (var fieldSource : input.path("sources")) {
+                        String sourceId = fieldSource.at("/reference/sourceId").asText();
+                        if (sourceId.startsWith("expense:field[")) {
+                            references.add(fieldSource.path("reference"));
+                            patches.addObject().put("lineNo", 1).put("field", sourceId.contains("DESCRIPTION") ? "DESCRIPTION" : "EXCEPTION_REASON")
+                                    .put("beforeValue", fieldSource.path("content").asText()).put("afterValue", "本人核对后的费用用途").put("impact", "补充用途后仍需重新预检");
+                        }
+                    }
+                }
                 switch (mode) {
                     case "extra" -> item.put("approved", true);
                     case "number" -> item.put("explanation", 1);

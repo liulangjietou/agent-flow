@@ -120,14 +120,29 @@ public class ExpenseHandlingService {
     @Transactional
     public ToolReceipt record(UUID reportId, Prepared prepared) {
         authorize(reportId); var actor = actors.actor(); reports.lock(actor.tenantId(), reportId);
-        var task = requireTask(reportId, prepared.taskId()); task.requireVersion(prepared.expectedVersion());
+        var task = requireTask(reportId, prepared.taskId());
         var expense = drafts.read(reportId, null); requireCurrent(expense, prepared.applicationVersion(), prepared.financialVersion());
-        if (!task.active()) throw new DomainException("AGENT_HANDLING_CLOSED", "Expense handling record is closed");
+        if (!task.active() || task.state().steps().size() >= ExpenseHandlingTask.MAX_STEPS) throw new DomainException("AGENT_HANDLING_CLOSED", "Expense handling record is closed or full");
         // 原请求幂等保证同一次读取只追加一个步骤，引用仍使用原始业务标识。
         task.observe(ExpenseHandlingTask.Tool.valueOf(prepared.result().tool().name()), prepared.reference(), prepared.sourceVersion(), "READ",
                 prepared.applicationVersion(), prepared.financialVersion(), prepared.digest(), prepared.at(), now());
-        repository.save(task, prepared.expectedVersion()); return new ToolReceipt(view(task, expense), prepared.result());
+        repository.save(task, task.state().version() - 1); return new ToolReceipt(view(task, expense), prepared.result());
     }
+
+    /** 工具调用前冻结原单据双版本；步骤完成并发不改变其授权范围。 */
+    @Transactional(readOnly = true)
+    public ExpenseHandlingTask requireReadable(UUID reportId, UUID taskId, Long expectedVersion) {
+        authorize(reportId); var task = requireTask(reportId, taskId);
+        if (expectedVersion != null) task.requireVersion(expectedVersion);
+        var expense = drafts.read(reportId, null);
+        requireCurrent(expense, task.state().applicationVersion(), task.state().financialVersion());
+        if (!task.active() || task.state().steps().size() >= ExpenseHandlingTask.MAX_STEPS) throw new DomainException("AGENT_HANDLING_CLOSED", "Handling cannot accept more steps");
+        return task;
+    }
+
+    /** 历史执行读取保留本人和办理归属校验。 */
+    @Transactional(readOnly = true)
+    public ExpenseHandlingTask authorizeTask(UUID reportId, UUID taskId) { authorize(reportId); return requireTask(reportId, taskId); }
 
     private ExpenseHandlingTask requireTask(UUID reportId, UUID id) {
         var actor = actors.actor();

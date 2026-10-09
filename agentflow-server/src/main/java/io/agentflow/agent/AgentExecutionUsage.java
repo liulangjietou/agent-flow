@@ -17,5 +17,5 @@ public record AgentExecutionUsage(UUID runId, Kind kind, UUID subjectId, Instant
      * 六种已存在的模型用途，不允许请求指定表名或查询其他人的执行。
      * @author owlzhangfq@gmail.com
      */
-    public enum Kind { SUMMARY, DRAFT, INVOICE, EXPENSE_DRAFT, PRECHECK_EXPLANATION, EXPENSE_RISK }
+    public enum Kind { SUMMARY, DRAFT, INVOICE, EXPENSE_DRAFT, PRECHECK_EXPLANATION, EXPENSE_RISK, HANDLING }
 }

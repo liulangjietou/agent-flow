@@ -105,7 +105,7 @@ public final class ExpenseHandlingTask {
      * 实际费用场景的白名单；没有任意查询、脚本、批准或付款工具。
      * @author owlzhangfq@gmail.com
      */
-    public enum Tool { EXPENSE, INVOICE, POLICY, PRECHECK_RESULT, DRAFT, PRECHECK, EXPLANATION, EXPENSE_SAVED, CORRECTION, SUBMISSION }
+    public enum Tool { EXPENSE, INVOICE, POLICY, PRECHECK_RESULT, INVOICE_EXTRACTION, DRAFT, PRECHECK, EXPLANATION, EXPENSE_SAVED, CORRECTION, SUBMISSION }
     /**
      * 步骤引用原始事实和版本，仅保留摘要，不复制票面、账户或模型来源正文。
      * @author owlzhangfq@gmail.com

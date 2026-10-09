@@ -6,7 +6,7 @@ import { extractionDrafts, extractionError, extractionFields, extractionMatches,
   extractionStatuses, acknowledgeExtraction, focusedExtraction, rememberExtraction,
   type ExtractionOptions, type ExtractionPage, type ExtractionDetail, type ExtractionField, type ExtractionReview } from '../invoiceExtraction'
 
-const props = defineProps<{ item: InvoiceItem; scopeKey: string; refreshVersion: number; locked?: boolean }>()
+const props = defineProps<{ item: InvoiceItem; scopeKey: string; refreshVersion: number; locked?: boolean; handling?: { reportId: string; taskId: string }; focusRunId?: string; allowGenerate?: boolean }>()
 const emit = defineEmits<{ busy: [value: boolean]; dirty: [value: boolean] }>()
 const options = ref<ExtractionOptions | null>(null), page = ref<ExtractionPage | null>(null), detail = ref<ExtractionDetail | null>(null)
 const selectedId = ref(''), externalSendConfirmed = ref(false), selected = ref<ExtractionField[]>([]), values = ref<Partial<Record<ExtractionField, string>>>({})
@@ -21,7 +21,7 @@ const context = computed(() => JSON.stringify([props.scopeKey, props.item.id]))
 const dirty = computed(() => selected.value.length > 0 || comment.value.length > 0 || JSON.stringify(values.value) !== initialValues.value)
 const locked = computed(() => !!props.locked || sending.value)
 const running = computed(() => page.value?.items.some(item => item.status === 'QUEUED' || item.status === 'RUNNING') || detail.value?.status === 'QUEUED' || detail.value?.status === 'RUNNING')
-const canGenerate = computed(() => !locked.value && !dirty.value && !loading.input && !loading.list && !running.value && !!options.value?.enabled
+const canGenerate = computed(() => props.allowGenerate !== false && !locked.value && !dirty.value && !loading.input && !loading.list && !running.value && !!options.value?.enabled
   && extractionMatches(options.value.input, props.item) && (options.value.method === 'STRUCTURED_XML' || externalSendConfirmed.value))
 const canNavigate = computed(() => !locked.value && !dirty.value)
 const canReview = computed(() => !locked.value && !loading.detail && detail.value?.status === 'COMPLETED' && editVersion.value === detail.value.version)
@@ -111,7 +111,7 @@ async function generate() {
   sending.value = true; error.value = ''; notice.value = ''
   try {
     const receipt = await api.generateInvoiceExtraction(invoiceId, { expectedOriginalId: available.input.originalId, expectedOriginalDigest: available.input.originalDigest,
-      method: available.method, targetDigest: available.targetDigest, externalSendConfirmed: available.method === 'MODEL' && externalSendConfirmed.value })
+      method: available.method, targetDigest: available.targetDigest, externalSendConfirmed: available.method === 'MODEL' && externalSendConfirmed.value, ...(props.handling ? { handling: props.handling } : {}) })
     if (!active || original !== context.value) return
     externalSendConfirmed.value = false; rememberExtraction(props.scopeKey, invoiceId, receipt.id)
     notice.value = '已登记提取任务。可刷新本条结果，完成后仍需逐字段核对。'
@@ -148,6 +148,7 @@ watch([selected, values, comment], () => {
 }, { deep: true, flush: 'sync' })
 watch(context, () => { reset(); if (props.scopeKey) refresh() }, { immediate: true, flush: 'sync' })
 watch(() => props.refreshVersion, refresh)
+watch(() => props.focusRunId, id => { if (id) { rememberExtraction(props.scopeKey, props.item.id, id); void loadDetail(id, true) } }, { immediate: true })
 watch(() => [props.item.original.id, props.item.original.sha256, props.item.original.status], () => { void loadInput() })
 watch(sending, value => emit('busy', value), { flush: 'sync' })
 watch(dirty, value => emit('dirty', value), { immediate: true, flush: 'sync' })

@@ -22,8 +22,14 @@ public class ExpenseHandlingJournal {
     @Transactional(propagation = Propagation.MANDATORY)
     public void record(String tenant, UUID reportId, ExpenseHandlingTask.Tool tool, UUID reference, long sourceVersion, String outcome,
             long applicationVersion, long financialVersion, Object input, Instant occurredAt) {
+        recordFor(tenant, reportId, null, tool, reference, sourceVersion, outcome, applicationVersion, financialVersion, input, occurredAt);
+    }
+    /** 显式绑定的子任务只更新原办理，不能落入后来创建的新办理记录。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void recordFor(String tenant, UUID reportId, UUID taskId, ExpenseHandlingTask.Tool tool, UUID reference, long sourceVersion, String outcome,
+            long applicationVersion, long financialVersion, Object input, Instant occurredAt) {
         var task = repository.active(tenant, reportId).orElse(null);
-        if (task == null) return;
+        if (task == null || taskId != null && !task.context().id().equals(taskId)) return;
         long previous = task.state().version();
         if (task.observe(tool, reference, sourceVersion, outcome, applicationVersion, financialVersion, AssistConfiguration.digest(json.write(input)),
                 occurredAt, Instant.now().truncatedTo(ChronoUnit.MILLIS))) repository.save(task, previous);

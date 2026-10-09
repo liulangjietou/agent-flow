@@ -68,7 +68,6 @@ class Sources:
                     request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                     if self.path == "/model":
                         content = json.loads(request["messages"][1]["content"])
-                        assert set(content) == {"sources", "issueSourceIds"}
                         mode = fixture.model
                         with fixture.lock:
                             fixture.model_calls.append({"mode": mode, "at": instant(), "body": request})
@@ -76,14 +75,7 @@ class Sources:
                         fixture.entered.set()
                         if mode in ("HOLD", "LATE"):
                             fixture.release.wait(40)
-                        refs = {s["reference"]["sourceId"]: s["reference"] for s in content["sources"]}
-                        items = [{"issueSourceId": identity, "explanation": "请按原检查问题核对费用依据。",
-                                  "corrections": ["核对原检查来源并按费用页面补正后重新预检。"], "evidence": [refs[identity]]}
-                                 for identity in content["issueSourceIds"]]
-                        if mode == "FORGED":
-                            items[0]["evidence"] = [{"sourceId": items[0]["issueSourceId"], "contentDigest": "f" * 64}]
-                        result = {"model": "synthetic-explanation-v1", "choices": [{"finish_reason": "stop", "message": {
-                            "role": "assistant", "content": json.dumps({"items": items}, ensure_ascii=False)}}]}
+                        result = fixture.model_result(content, mode)
                         status = 200
                     else:
                         assert self.path.startswith("/finance/") and request["tenantId"] == "demo" and request["contractVersion"] == 1
@@ -112,6 +104,19 @@ class Sources:
         self.server.daemon_threads = True
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
+
+    def model_result(self, content, mode):
+        """按解释协议生成确定性回环结果，子类可验证其他明确的模型协议。"""
+        assert set(content) == {"sources", "issueSourceIds"}
+        refs = {s["reference"]["sourceId"]: s["reference"] for s in content["sources"]}
+        items = [{"issueSourceId": identity, "explanation": "请按原检查问题核对费用依据。",
+                  "corrections": ["核对原检查来源并按费用页面补正后重新预检。"], "evidence": [refs[identity]]}
+                 for identity in content["issueSourceIds"]]
+        if mode == "FORGED":
+            items[0]["evidence"] = [{"sourceId": items[0]["issueSourceId"], "contentDigest": "f" * 64}]
+        result = {"model": "synthetic-explanation-v1", "choices": [{"finish_reason": "stop", "message": {
+            "role": "assistant", "content": json.dumps({"items": items}, ensure_ascii=False)}}]}
+        return result
 
     def finance(self, operation, request):
         """明确返回合成拒绝或暂不可用，不构造任何付款、预算冻结或批准事实。"""

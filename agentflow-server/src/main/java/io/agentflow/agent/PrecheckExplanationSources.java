@@ -45,6 +45,13 @@ public class PrecheckExplanationSources {
             sources.add(source("expense:line[" + line.lineNo() + "]", "第 " + line.lineNo() + " 行费用数据",
                     new LineFact(line.lineNo(), line.categoryCode(), line.incurredOn(), line.endedOn(), line.cityCode(),
                             line.quantity(), line.unit(), line.claimedGross(), line.claimedTax(), line.invoiceIds().size(), line.priorRequest() != null)));
+            for (var field : io.agentflow.expense.ExpenseFieldPatch.Field.values()) {
+                if (line.allowance() != null && field != io.agentflow.expense.ExpenseFieldPatch.Field.DESCRIPTION
+                        && field != io.agentflow.expense.ExpenseFieldPatch.Field.EXCEPTION_REASON) continue;
+                String value = field.read(line);
+                sources.add(new AssistModelPort.Source(new AssistInput.Reference("expense:field[" + line.lineNo() + "]." + field.name(),
+                        AssistConfiguration.digest(value)), "第 " + line.lineNo() + " 行可补正字段 · " + field.name(), value));
+            }
         }
         appendPolicies(report, job, sources);
         return List.copyOf(sources);

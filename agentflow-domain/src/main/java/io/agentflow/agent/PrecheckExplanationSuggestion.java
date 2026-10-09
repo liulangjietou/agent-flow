@@ -36,16 +36,29 @@ public record PrecheckExplanationSuggestion(String providerId, String modelVersi
             if (!item.evidence().contains(allowed.get(item.issueSourceId()))
                     || item.evidence().stream().anyMatch(reference -> !reference.equals(allowed.get(reference.sourceId())))
                     || input.result() != io.agentflow.expense.ExpensePrecheckJob.Status.READY && item.corrections().isEmpty()) throw invalid();
+            for (var patch : item.patches()) {
+                var source = input.sources().stream().filter(value -> value.reference().sourceId().equals(patch.sourceId())).findFirst().orElseThrow(PrecheckExplanationSuggestion::invalid);
+                if (!source.content().equals(patch.beforeValue()) || !item.evidence().contains(source.reference())) throw invalid();
+            }
         }
+        var patches = items.stream().flatMap(item -> item.patches().stream()).toList();
+        if (patches.stream().map(io.agentflow.expense.ExpenseFieldPatch::sourceId).distinct().count() != patches.size()) throw invalid();
     }
 
     /**
-     * 一条原问题对应一份解释，补正内容只是文字，不是字段赋值或工具参数。
+     * 一条原问题对应解释、文字步骤和允许字段差异，差异必须由本人逐项确认。
      * @author owlzhangfq@gmail.com
      */
-    public record Item(String issueSourceId, String explanation, List<String> corrections, List<AssistInput.Reference> evidence) {
+    public record Item(String issueSourceId, String explanation, List<String> corrections, List<AssistInput.Reference> evidence,
+            List<io.agentflow.expense.ExpenseFieldPatch> patches) {
+        /** 旧持久记录只有文字步骤，恢复时没有可执行字段差异。 */
+        public Item(String issueSourceId, String explanation, List<String> corrections, List<AssistInput.Reference> evidence) {
+            this(issueSourceId, explanation, corrections, evidence, List.of());
+        }
         /** 长度、来源及重复项在进入聚合前验证，不能默默截断模型建议。 */
         public Item {
+            patches = patches == null ? List.of() : List.copyOf(patches);
+            if (patches.size() > MAX_CORRECTIONS || patches.stream().anyMatch(java.util.Objects::isNull)) throw invalid();
             if (StringUtils.isBlank(issueSourceId) || issueSourceId.length() > 150 || StringUtils.isBlank(explanation)
                     || explanation.length() > MAX_TEXT_LENGTH || corrections == null || corrections.size() > MAX_CORRECTIONS
                     || corrections.stream().anyMatch(value -> StringUtils.isBlank(value) || value.length() > MAX_CORRECTION_LENGTH)
