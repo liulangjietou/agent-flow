@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.organization.mapper.OrganizationInitiatorDirectoryMapper">
+    <select id="options" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT a.id, p.id AS person_id, p.subject, o.revision AS directory_revision,
+               l.id AS legal_entity_id, l.name AS legal_entity_name,
+               d.id AS department_id, d.name AS department_name,
+               j.id AS position_id, j.name AS position_name
+        FROM organization_appointment a
+        JOIN organization_directory o ON o.tenant_id=a.tenant_id
+        JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id AND p.active=TRUE
+        JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE
+        JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE
+        JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE
+        WHERE a.tenant_id=#{tenantId} AND p.subject=#{userId} AND a.active=TRUE
+         AND a.id&gt;#{afterId} ORDER BY a.id LIMIT #{limit}
+    </select>
+
+    <select id="findCurrent" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT a.id, p.id AS person_id, p.subject, o.revision AS directory_revision,
+               l.id AS legal_entity_id, l.name AS legal_entity_name,
+               d.id AS department_id, d.name AS department_name,
+               j.id AS position_id, j.name AS position_name
+        FROM organization_appointment a
+        JOIN organization_directory o ON o.tenant_id=a.tenant_id
+        JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id AND p.active=TRUE
+        JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE
+        JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE
+        JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE
+        WHERE a.tenant_id=#{tenantId} AND p.subject=#{userId} AND a.active=TRUE
+         AND a.id=#{appointmentId}
+    </select>
+</mapper>

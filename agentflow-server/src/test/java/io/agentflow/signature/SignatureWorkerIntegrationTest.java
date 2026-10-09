@@ -1,6 +1,9 @@
 package io.agentflow.signature;
 
-import io.agentflow.observability.DiagnosticContext;
+import static io.agentflow.signature.SignatureVerificationFixtures.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import io.agentflow.approval.JdbcApplicationRepository;
 import io.agentflow.auth.DeferredActorAuthentication;
@@ -9,7 +12,9 @@ import io.agentflow.auth.DeferredActorAuthentication.LoginReference;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.storage.LocalDocumentStore;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,13 +39,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static io.agentflow.signature.SignatureVerificationFixtures.*;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
 /**
  * 真实 H2 事务、HTTP 与文件验证后台恢复；认证与资源决策单独由专门用例覆盖。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SignatureWorkerIntegrationTest {
@@ -66,8 +67,23 @@ class SignatureWorkerIntegrationTest {
         var source = new DriverManagerDataSource("jdbc:h2:mem:signature-worker-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", "");
         Flyway.configure().dataSource(source).load().migrate();
         jdbc = new JdbcTemplate(source); manager = new DataSourceTransactionManager(source); tx = new TransactionTemplate(manager);
-        operations = proxy(new JdbcSignatureOperationRepository(jdbc, JSON)); logins = proxy(new JdbcSignatureLoginRepository(jdbc));
-        evidence = proxy(new JdbcSignatureEvidenceRepository(jdbc, JSON, operations, provider.verifier)); audit = proxy(new SignatureAudit(jdbc, JSON));
+        operations = proxy(new JdbcSignatureOperationRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.signature.mapper
+                                                .SignatureOperationRepositoryMapper.class), JSON)); logins = proxy(new JdbcSignatureLoginRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.signature.mapper.SignatureLoginRepositoryMapper
+                                                .class)));
+        evidence = proxy(new JdbcSignatureEvidenceRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.signature.mapper
+                                                .SignatureEvidenceRepositoryMapper.class), JSON, operations, provider.verifier)); audit = proxy(new SignatureAudit(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.signature.mapper.SignatureAuditMapper.class), JSON));
         when(authentication.resolve(any(), eq("tenant-a"), eq("alice"), any())).thenReturn(Optional.of(alice));
         when(authentication.capture(any(), eq(alice), any())).thenReturn(reference);
         service = service(audit);
@@ -243,7 +259,9 @@ class SignatureWorkerIntegrationTest {
             assertThat(accepted.version()).isEqualTo(claim.version() + 1);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM signature_receipt_evidence", Integer.class)).isEqualTo(1);
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM signature_result_file", Integer.class)).isEqualTo(provider.input.request().documents().size());
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE action='SIGNATURE_CALLBACK'", Integer.class)).isEqualTo(1);
+            assertThat(jdbc.queryForObject(
+                                    "SELECT COUNT(*) FROM audit_event WHERE"
+                                            + " action='SIGNATURE_CALLBACK'", Integer.class)).isEqualTo(1);
             service.finish(claim, new SignatureGateway.Unavailable(SignatureOperation.Failure.TIMEOUT), provider.clock.now);
             assertThat(stored()).isEqualTo(accepted);
         } finally { executor.shutdownNow(); }
@@ -258,7 +276,9 @@ class SignatureWorkerIntegrationTest {
         service.receiveCallback(callback, provider.clock.now);
         assertThat(stored()).isEqualTo(accepted);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM signature_receipt_evidence", Integer.class)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE action='SIGNATURE_CALLBACK'", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM audit_event WHERE"
+                                        + " action='SIGNATURE_CALLBACK'", Integer.class)).isEqualTo(1);
     }
 
     @Test void newerCallbackWaitingBehindWorkerKeepsMonotonicStateAndOriginalEvidenceTime() {
@@ -285,7 +305,11 @@ class SignatureWorkerIntegrationTest {
     }
     private SignatureOperation stored() { return operations.find("tenant-a", provider.input.request().id()).orElseThrow(); }
     private SignatureOperationService service(SignatureAudit auditService) {
-        return proxy(new SignatureOperationService(actors, new JdbcApplicationRepository(jdbc, JSON), operations, logins, evidence, authentication, access, auditService, 15));
+        return proxy(new SignatureOperationService(actors, new JdbcApplicationRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.approval.mapper.ApplicationRepositoryMapper
+                                                .class), JSON), operations, logins, evidence, authentication, access, auditService, 15));
     }
     private SignatureAccess.CreateInput command() {
         var request = provider.input.request(); return new SignatureAccess.CreateInput(2, 7, request.authorization().profileKey(), request.authorization().profileVersion(),

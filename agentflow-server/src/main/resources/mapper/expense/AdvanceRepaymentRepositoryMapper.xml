@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.AdvanceRepaymentRepositoryMapper">
+    <insert id="create">
+        INSERT INTO advance_repayment(tenant_id,id,advance_id,advance_version,check_id,check_version,legal_entity_id,receipt_reference,channel,
+        transaction_reference,voucher_reference,entry_reference,amount,currency,recorded_by,recorded_at,state_json)
+        VALUES(#{tenantId},#{id},#{advanceId},#{advanceVersion},#{checkId},#{checkVersion},#{legalEntityId},#{receiptReference},#{channel},#{transactionReference},#{voucherReference},#{entryReference},#{amount},#{currency},#{recordedBy},#{recordedAt},#{stateJson})
+    </insert>
+
+    <select id="forReceipt" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM advance_repayment WHERE tenant_id=#{tenant} AND legal_entity_id=#{legalEntity} AND receipt_reference=#{reference}
+    </select>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM advance_repayment WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="list" resultType="java.sql.Timestamp">
+        SELECT recorded_at FROM advance_repayment WHERE tenant_id=#{tenant} AND advance_id=#{advanceId} AND id=#{before}
+    </select>
+
+    <select id="findRecorded" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT r.*,p.state_json AS prior_check_json,c.state_json AS recorded_check_json
+        FROM advance_repayment r
+        JOIN advance_repayment_check_revision p ON p.tenant_id=r.tenant_id AND p.check_id=r.check_id AND p.version=r.check_version-1
+        JOIN advance_repayment_check_revision c ON c.tenant_id=r.tenant_id AND c.check_id=r.check_id AND c.version=r.check_version
+        WHERE r.tenant_id=#{tenant} AND r.id=#{id}
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM finance_resource_revision WHERE tenant_id=#{tenant} AND resource_type='ADVANCE' AND resource_id=#{id} AND version=#{version}
+    </select>
+    <select id="listQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM advance_repayment WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND advance_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}<choose><when test="hasCursor"> AND (recorded_at&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} OR (recorded_at=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} AND id&lt;<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}))</when><otherwise></otherwise></choose> ORDER BY recorded_at DESC,id DESC LIMIT <bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6}
+    </select>
+</mapper>

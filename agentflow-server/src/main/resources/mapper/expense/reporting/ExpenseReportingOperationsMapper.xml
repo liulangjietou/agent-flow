@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.reporting.mapper.ExpenseReportingOperationsMapper">
+    <select id="arrival" resultType="String">
+        SELECT p.id FROM payment_operation p JOIN payment_authorization a ON a.tenant_id=p.tenant_id AND a.id=p.id WHERE a.tenant_id=#{tenant} AND a.business_type='EXPENSE' AND a.business_id=#{id} AND a.application_id=#{applicationId} AND a.round_no=#{roundNo} ORDER BY p.id
+    </select>
+
+    <select id="backlog" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,business_type,business_id,application_id,round_no FROM voucher_operation WHERE tenant_id=#{tenant} AND status&lt;&gt;'POSTED' ORDER BY id
+    </select>
+
+    <select id="backlog2" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT p.id,a.business_type,a.business_id,a.application_id,a.round_no FROM payment_operation p JOIN payment_authorization a ON a.tenant_id=p.tenant_id AND a.id=p.id WHERE p.tenant_id=#{tenant} AND p.status&lt;&gt;'SUCCEEDED' ORDER BY p.id
+    </select>
+</mapper>

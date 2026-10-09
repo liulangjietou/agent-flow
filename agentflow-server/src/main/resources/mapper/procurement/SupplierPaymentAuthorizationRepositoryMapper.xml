@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.procurement.mapper.SupplierPaymentAuthorizationRepositoryMapper">
+    <insert id="create">
+        INSERT INTO supplier_payment_authorization(tenant_id,id,request_id,application_id,employee_id,round_no,application_version,request_version,
+        reservation_id,legal_entity_id,authorized_by,authorized_at,expires_at,state_json,active_request_id) VALUES(#{tenantId},#{id},#{requestId},#{applicationId},#{employeeId},#{roundNo},#{applicationVersion},#{requestVersion},#{reservationId},#{legalEntityId},#{authorizedBy},#{authorizedAt},#{expiresAt},#{stateJson},#{activeRequestId})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_payment_authorization WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="forRequest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_payment_authorization WHERE tenant_id=#{tenant} AND request_id=#{requestId} ORDER BY authorized_at DESC,id DESC LIMIT 1
+    </select>
+
+    <select id="activeForRequest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_payment_authorization WHERE tenant_id=#{tenant} AND active_request_id=#{requestId}
+    </select>
+
+    <select id="retire" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM supplier_payable_hold_operation WHERE tenant_id=#{tenant} AND id=#{authorizationId} AND version=#{operationVersion} AND command_digest=#{digest} AND command_json=#{stateJson}
+    </select>
+
+    <insert id="retire2">
+        INSERT INTO supplier_authorization_retirement(tenant_id,authorization_id,operation_version,basis,retired_by,retired_at,state_json) VALUES(#{tenantId},#{authorizationId},#{operationVersion},#{basis},#{retiredBy},#{retiredAt},#{stateJson})
+    </insert>
+
+    <update id="retire3">
+        UPDATE supplier_payment_authorization SET active_request_id=NULL,retired_hold_version=#{operationVersion} WHERE tenant_id=#{tenant} AND id=#{authorizationId} AND active_request_id=request_id AND retired_hold_version IS NULL
+    </update>
+
+    <select id="retirement" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_authorization_retirement WHERE tenant_id=#{tenant} AND authorization_id=#{id}
+    </select>
+
+    <select id="retirementProof" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM supplier_payable_hold_revision WHERE tenant_id=#{tenant} AND operation_id=#{authorizationId} AND version=#{operationVersion}
+    </select>
+    <select id="cashierPageQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM supplier_payment_authorization WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND legal_entity_id IN (<bind name="start1" value="position"/><foreach collection="parameters" item="parameter" index="parameterIndex" separator=","><if test="parameterIndex &gt;= start1 and parameterIndex &lt; start1 + entitiesCount">#{parameter}</if></foreach><bind name="position" value="position + entitiesCount"/>)<choose><when test="condition1"> AND (authorized_at&lt;<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} OR (authorized_at=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} AND id&lt;<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}))</when><otherwise></otherwise></choose> ORDER BY authorized_at DESC,id DESC LIMIT <bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}
+    </select>
+</mapper>

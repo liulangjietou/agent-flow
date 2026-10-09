@@ -2,17 +2,15 @@ package io.agentflow.auth;
 
 import com.nimbusds.jose.JOSEObjectType;
 import com.nimbusds.jose.proc.DefaultJOSEObjectTypeVerifier;
+
+import io.agentflow.auth.mapper.OidcLogoutScopesMapper;
 import io.agentflow.common.JsonUtil;
-import java.net.http.HttpClient;
-import java.time.Clock;
-import java.time.Duration;
-import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.security.oauth2.jwt.MappedJwtClaimSetConverter;
@@ -20,8 +18,14 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.web.client.RestTemplate;
 
+import java.net.http.HttpClient;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.Map;
+
 /**
  * 后通道注销显式启用，所有认证实例必须使用同一配置和数据库。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Configuration(proxyBeanMethods = false)
@@ -29,13 +33,18 @@ import org.springframework.web.client.RestTemplate;
 public class OidcBackchannelConfiguration {
     /** 错误认证组合启动即失败；演示和单实例内存会话不会隐式开启企业注销。 */
     @Bean
-    public OidcLogoutScopes oidcLogoutScopes(JdbcTemplate jdbc, JsonUtil json, OidcProperties oidc,
-            PlatformTransactionManager manager, @Value("${agentflow.auth.demo-enabled:false}") boolean demo,
+    public OidcLogoutScopes oidcLogoutScopes(
+            OidcLogoutScopesMapper sqlMapper,
+            JsonUtil json,
+            OidcProperties oidc,
+            PlatformTransactionManager manager,
+            @Value("${agentflow.auth.demo-enabled:false}") boolean demo,
             @Value("${agentflow.auth.session.jdbc-enabled:false}") boolean shared) {
         if (!oidc.enabled() || demo || !shared) {
-            throw new IllegalArgumentException("Back-channel logout requires enterprise OIDC and shared JDBC sessions");
+            throw new IllegalArgumentException(
+                    "Back-channel logout requires enterprise OIDC and shared JDBC sessions");
         }
-        return new OidcLogoutScopes(jdbc, json, oidc, manager);
+        return new OidcLogoutScopes(sqlMapper, json, oidc, manager);
     }
 
     /** 签名算法与当前 ID Token 接入一致；只从已验证发现配置中的公钥端点读取。 */

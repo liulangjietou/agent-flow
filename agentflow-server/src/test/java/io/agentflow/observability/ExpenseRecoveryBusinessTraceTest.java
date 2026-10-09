@@ -1,13 +1,19 @@
 package io.agentflow.observability;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
-import io.agentflow.finance.*;
-import io.agentflow.expense.*;
-import io.agentflow.approval.process.ExpenseBudgetReviewRecovery;
-import io.agentflow.common.JsonUtil;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.agentflow.approval.process.ExpenseBudgetReviewRecovery;
+import io.agentflow.common.JsonUtil;
+import io.agentflow.expense.*;
+import io.agentflow.finance.*;
+
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -16,15 +22,14 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 /**
  * 真实扫描 SQL 与工作器共同验证原报销轮次；当前轮次和其他租户不能替代持久来源。
+ *
  * @author owlzhangfq@gmail.com
  */
 class ExpenseRecoveryBusinessTraceTest {
@@ -36,16 +41,40 @@ class ExpenseRecoveryBusinessTraceTest {
 
     @BeforeEach void schema() {
         jdbc=new JdbcTemplate(new DriverManagerDataSource("jdbc:h2:mem:recovery-business-"+UUID.randomUUID()+";DB_CLOSE_DELAY=-1","sa",""));
-        jdbc.execute("CREATE TABLE approval_application(tenant_id VARCHAR(64),id VARCHAR(36),business_no VARCHAR(128),round_no INT,status VARCHAR(32))");
-        jdbc.execute("CREATE TABLE approval_submission_round(tenant_id VARCHAR(64),application_id VARCHAR(36),round_no INT,process_instance_id VARCHAR(128))");
-        jdbc.execute("CREATE TABLE expense_report(tenant_id VARCHAR(64),id VARCHAR(36),application_id VARCHAR(36))");
-        jdbc.execute("CREATE TABLE expense_archive(tenant_id VARCHAR(64),report_id VARCHAR(36),round_no INT,archived_at TIMESTAMP)");
-        jdbc.execute("CREATE TABLE expense_partial_adjustment_operation(tenant_id VARCHAR(64),id VARCHAR(36),adjustment_id VARCHAR(36),trace_id VARCHAR(36))");
+        jdbc.execute(
+                "CREATE TABLE approval_application(tenant_id VARCHAR(64),id VARCHAR(36),business_no"
+                        + " VARCHAR(128),round_no INT,status VARCHAR(32))");
+        jdbc.execute(
+                "CREATE TABLE approval_submission_round(tenant_id VARCHAR(64),application_id"
+                        + " VARCHAR(36),round_no INT,process_instance_id VARCHAR(128))");
+        jdbc.execute(
+                "CREATE TABLE expense_report(tenant_id VARCHAR(64),id VARCHAR(36),application_id"
+                        + " VARCHAR(36))");
+        jdbc.execute(
+                "CREATE TABLE expense_archive(tenant_id VARCHAR(64),report_id VARCHAR(36),round_no"
+                        + " INT,archived_at TIMESTAMP)");
+        jdbc.execute(
+                "CREATE TABLE expense_partial_adjustment_operation(tenant_id VARCHAR(64),id"
+                        + " VARCHAR(36),adjustment_id VARCHAR(36),trace_id VARCHAR(36))");
         for(var table:List.of("expense_settlement","expense_budget_review","budget_operation","expense_partial_adjustment_preparation",
                 "expense_partial_adjustment","expense_resource_adjustment_preparation","expense_resource_adjustment",
                 "budget_consumption_reversal_operation","payment_operation","payment_authorization","voucher_operation",
                 "voucher_preparation","voucher_reversal_preparation","voucher_reversal_operation")) {
-            jdbc.execute("CREATE TABLE "+table+"(tenant_id VARCHAR(64),id VARCHAR(36),report_id VARCHAR(36),business_id VARCHAR(36),application_id VARCHAR(36),round_no INT,version BIGINT,trace_id VARCHAR(36),status VARCHAR(32),kind VARCHAR(32),purpose VARCHAR(32),adjustment_id VARCHAR(36),operation_id VARCHAR(36),consumption_id VARCHAR(36),budget_operation_id VARCHAR(36),accrual_operation_id VARCHAR(36),original_operation_id VARCHAR(36),authorized_operation_id VARCHAR(36),budget_node_id VARCHAR(64),automatic_audit_id VARCHAR(36),budget_status VARCHAR(32),accrual_status VARCHAR(32),created_at TIMESTAMP,updated_at TIMESTAMP,next_attempt_at TIMESTAMP,next_check_at TIMESTAMP,lease_until TIMESTAMP,budget_next_at TIMESTAMP,accrual_next_at TIMESTAMP,budget_lease_until TIMESTAMP,accrual_lease_until TIMESTAMP,completed_at TIMESTAMP,retired_at TIMESTAMP)");
+            jdbc.execute("CREATE TABLE "+table+ "(tenant_id VARCHAR(64),id VARCHAR(36),report_id"
+                            + " VARCHAR(36),business_id VARCHAR(36),application_id"
+                            + " VARCHAR(36),round_no INT,version BIGINT,trace_id VARCHAR(36),status"
+                            + " VARCHAR(32),kind VARCHAR(32),purpose VARCHAR(32),adjustment_id"
+                            + " VARCHAR(36),operation_id VARCHAR(36),consumption_id"
+                            + " VARCHAR(36),budget_operation_id VARCHAR(36),accrual_operation_id"
+                            + " VARCHAR(36),original_operation_id"
+                            + " VARCHAR(36),authorized_operation_id VARCHAR(36),budget_node_id"
+                            + " VARCHAR(64),automatic_audit_id VARCHAR(36),budget_status"
+                            + " VARCHAR(32),accrual_status VARCHAR(32),created_at"
+                            + " TIMESTAMP,updated_at TIMESTAMP,next_attempt_at"
+                            + " TIMESTAMP,next_check_at TIMESTAMP,lease_until"
+                            + " TIMESTAMP,budget_next_at TIMESTAMP,accrual_next_at"
+                            + " TIMESTAMP,budget_lease_until TIMESTAMP,accrual_lease_until"
+                            + " TIMESTAMP,completed_at TIMESTAMP,retired_at TIMESTAMP)");
         }
     }
     @AfterEach void cleanup() { MDC.clear();jdbc.execute("DROP ALL OBJECTS"); }
@@ -71,10 +100,17 @@ class ExpenseRecoveryBusinessTraceTest {
     @Test void paymentRecoveryCannotUseAnotherTenantAuthorization() {
         seed(Kind.PAYMENT_RECOVERY,TENANT,TENANT,true);
         jdbc.update("UPDATE payment_authorization SET tenant_id='tenant-b'");
-        assertThat(new JdbcExpenseSettlementRepository(jdbc,json).recoveryCandidates(null)).isEmpty();
+        assertThat(new JdbcExpenseSettlementRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpenseSettlementRepositoryMapper.class),json).recoveryCandidates(null)).isEmpty();
     }
     private JdbcExpenseBudgetReviewRepository budgetReviews() {
-        return new JdbcExpenseBudgetReviewRepository(jdbc,json,mock(JdbcBudgetOperationRepository.class),mock(JdbcExpenseSubmissionControlRepository.class),mock(JdbcExpensePrecheckRepository.class));
+        return new JdbcExpenseBudgetReviewRepository(
+                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                        (jdbc).getDataSource(),
+                        io.agentflow.expense.mapper.ExpenseBudgetReviewRepositoryMapper.class),json,mock(JdbcBudgetOperationRepository.class),mock(JdbcExpenseSubmissionControlRepository.class),mock(JdbcExpensePrecheckRepository.class));
     }
     private void seed(Kind kind,String appTenant,String sourceTenant,boolean originalRound) {
         jdbc.update("INSERT INTO approval_application VALUES(?,?,?,?,'IN_APPROVAL')",appTenant,application.toString(),BUSINESS,kind==Kind.BUDGET_REVIEW?1:2);
@@ -118,7 +154,8 @@ class ExpenseRecoveryBusinessTraceTest {
     }
     private void row(String table,String tenant,UUID identity,String status) {
         var at=Timestamp.from(Instant.EPOCH);
-        jdbc.update("INSERT INTO "+table+"(tenant_id,id,report_id,business_id,application_id,round_no,version,trace_id,status,kind,created_at,updated_at,next_attempt_at,next_check_at) VALUES(?,?,?,?,?,1,1,?,?,'EXPENSE_ACCRUAL',?,?,?,?)",
+        jdbc.update("INSERT INTO "+table+ "(tenant_id,id,report_id,business_id,application_id,round_no,version,trace_id,status,kind,created_at,updated_at,next_attempt_at,next_check_at)"
+                        + " VALUES(?,?,?,?,?,1,1,?,?,'EXPENSE_ACCRUAL',?,?,?,?)",
                 tenant,identity.toString(),report.toString(),report.toString(),application.toString(),trace,status,at,at,at,at);
     }
     private void verify(Kind kind,String appTenant,String sourceTenant,boolean originalRound) {
@@ -144,7 +181,11 @@ class ExpenseRecoveryBusinessTraceTest {
         return switch(kind) {
             case ARCHIVE -> {
                 var runs = mock(JdbcExpenseArchiveRepository.class); var service = mock(ExpenseArchiveService.class);
-                var scanned = new JdbcExpenseArchiveRepository(jdbc,json).candidates(null);
+                var scanned = new JdbcExpenseArchiveRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpenseArchiveRepositoryMapper.class),json).candidates(null);
                 assertThat(scanned).hasSize(1);
                 when(runs.candidates(any())).thenReturn(scanned);
                 doAnswer(capture).when(service).prepare(anyString(), any(UUID.class));
@@ -152,7 +193,11 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case BUDGET_REVIEW -> {
                 var runs = mock(JdbcExpenseBudgetReviewRepository.class); var service = mock(ExpenseBudgetReviewRecovery.class);
-                var scanned = new JdbcExpenseBudgetReviewRepository(jdbc,json,mock(JdbcBudgetOperationRepository.class),mock(JdbcExpenseSubmissionControlRepository.class),mock(JdbcExpensePrecheckRepository.class)).due(Instant.now());
+                var scanned = new JdbcExpenseBudgetReviewRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpenseBudgetReviewRepositoryMapper.class),json,mock(JdbcBudgetOperationRepository.class),mock(JdbcExpenseSubmissionControlRepository.class),mock(JdbcExpensePrecheckRepository.class)).due(Instant.now());
                 assertThat(scanned).hasSize(1);
                 when(runs.due(any(Instant.class))).thenReturn(scanned);
                 doAnswer(capture).when(service).recover(any());
@@ -160,7 +205,12 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case PARTIAL_PREPARATION -> {
                 var runs = mock(JdbcExpensePartialPreparationRepository.class); var service = mock(ExpensePartialPreparationService.class);
-                var scanned = new JdbcExpensePartialPreparationRepository(jdbc,json,mock(ExpenseReportRepository.class),mock(JdbcExpensePartialAdjustmentRepository.class),mock(ExpensePartialAdjustmentSources.class)).due(Instant.now());
+                var scanned = new JdbcExpensePartialPreparationRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpensePartialPreparationRepositoryMapper
+                                                        .class),json,mock(ExpenseReportRepository.class),mock(JdbcExpensePartialAdjustmentRepository.class),mock(ExpensePartialAdjustmentSources.class)).due(Instant.now());
                 assertThat(scanned).hasSize(1);
                 when(runs.due(any(Instant.class))).thenReturn(scanned);
                 doAnswer(capture).when(service).claim(anyString(), any(UUID.class), any(Instant.class));
@@ -168,7 +218,12 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case PARTIAL_BUDGET -> {
                 var runs = mock(JdbcExpensePartialAdjustmentRepository.class); var service = mock(ExpensePartialAdjustmentFinance.class);
-                var scanned = new JdbcExpensePartialAdjustmentRepository(jdbc,json,mock(ExpenseReportRepository.class),mock(ExpensePartialAdjustmentSources.class),mock(ExpensePartialAdjustmentGuard.class),mock(JdbcExpensePartialDisputeRepository.class)).dueBudget(Instant.now());
+                var scanned = new JdbcExpensePartialAdjustmentRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpensePartialAdjustmentRepositoryMapper
+                                                        .class),json,mock(ExpenseReportRepository.class),mock(ExpensePartialAdjustmentSources.class),mock(ExpensePartialAdjustmentGuard.class),mock(JdbcExpensePartialDisputeRepository.class)).dueBudget(Instant.now());
                 assertThat(scanned).hasSize(1);
                 when(runs.dueBudget(any(Instant.class))).thenReturn(scanned);
                 doAnswer(capture).when(service).claimBudget(anyString(), any(UUID.class), eq(command), any(Instant.class));
@@ -176,7 +231,12 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case PARTIAL_ACCRUAL -> {
                 var runs = mock(JdbcExpensePartialAdjustmentRepository.class); var service = mock(ExpensePartialAdjustmentFinance.class);
-                var scanned = new JdbcExpensePartialAdjustmentRepository(jdbc,json,mock(ExpenseReportRepository.class),mock(ExpensePartialAdjustmentSources.class),mock(ExpensePartialAdjustmentGuard.class),mock(JdbcExpensePartialDisputeRepository.class)).dueAccrual(Instant.now());
+                var scanned = new JdbcExpensePartialAdjustmentRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpensePartialAdjustmentRepositoryMapper
+                                                        .class),json,mock(ExpenseReportRepository.class),mock(ExpensePartialAdjustmentSources.class),mock(ExpensePartialAdjustmentGuard.class),mock(JdbcExpensePartialDisputeRepository.class)).dueAccrual(Instant.now());
                 assertThat(scanned).hasSize(1);
                 when(runs.dueAccrual(any(Instant.class))).thenReturn(scanned);
                 doAnswer(capture).when(service).claimAccrual(anyString(), any(UUID.class), eq(command), any(Instant.class));
@@ -184,7 +244,12 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case PARTIAL_COMPLETION -> {
                 var runs = mock(JdbcExpensePartialAdjustmentRepository.class); var service = mock(ExpensePartialAdjustmentExecution.class);
-                var scanned = new JdbcExpensePartialAdjustmentRepository(jdbc,json,mock(ExpenseReportRepository.class),mock(ExpensePartialAdjustmentSources.class),mock(ExpensePartialAdjustmentGuard.class),mock(JdbcExpensePartialDisputeRepository.class)).ready();
+                var scanned = new JdbcExpensePartialAdjustmentRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpensePartialAdjustmentRepositoryMapper
+                                                        .class),json,mock(ExpenseReportRepository.class),mock(ExpensePartialAdjustmentSources.class),mock(ExpensePartialAdjustmentGuard.class),mock(JdbcExpensePartialDisputeRepository.class)).ready();
                 assertThat(scanned).hasSize(1);
                 when(runs.ready()).thenReturn(scanned);
                 doAnswer(capture).when(service).apply(any());
@@ -192,7 +257,12 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case RESOURCE_PREPARATION -> {
                 var runs = mock(JdbcExpenseResourceAdjustmentPreparationRepository.class); var service = mock(ExpenseResourceAdjustmentPreparationService.class);
-                var scanned = new JdbcExpenseResourceAdjustmentPreparationRepository(jdbc,json,mock(ExpenseResourceAdjustmentSources.class),mock(ExpensePartialAdjustmentGuard.class)).due(Instant.now());
+                var scanned = new JdbcExpenseResourceAdjustmentPreparationRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpenseResourceAdjustmentPreparationRepositoryMapper
+                                                        .class),json,mock(ExpenseResourceAdjustmentSources.class),mock(ExpensePartialAdjustmentGuard.class)).due(Instant.now());
                 assertThat(scanned).hasSize(1);
                 when(runs.due(any(Instant.class))).thenReturn(scanned);
                 doAnswer(capture).when(service).claim(anyString(), any(UUID.class), any(Instant.class));
@@ -200,7 +270,12 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case RESOURCE_BUDGET -> {
                 var runs = mock(JdbcBudgetConsumptionReversalRepository.class); var service = mock(ExpenseResourceAdjustmentBudgetExecution.class);
-                var scanned = new JdbcBudgetConsumptionReversalRepository(jdbc,json).due(Instant.now());
+                var scanned = new JdbcBudgetConsumptionReversalRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.finance.mapper
+                                                        .BudgetConsumptionReversalRepositoryMapper
+                                                        .class),json).due(Instant.now());
                 assertThat(scanned).hasSize(1);
                 when(runs.due(any(Instant.class))).thenReturn(scanned);
                 doAnswer(capture).when(service).claim(anyString(), any(UUID.class), any(Instant.class));
@@ -208,7 +283,12 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case RESOURCE_COMPLETION -> {
                 var runs = mock(JdbcExpenseResourceAdjustmentRepository.class); var service = mock(ExpenseResourceAdjustmentExecution.class);
-                var scanned = new JdbcExpenseResourceAdjustmentRepository(jdbc,json,mock(JdbcExpenseResourceAdjustmentPreparationRepository.class),mock(JdbcBudgetConsumptionReversalRepository.class),mock(ExpenseReportRepository.class),mock(ExpensePartialAdjustmentGuard.class)).ready();
+                var scanned = new JdbcExpenseResourceAdjustmentRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpenseResourceAdjustmentRepositoryMapper
+                                                        .class),json,mock(JdbcExpenseResourceAdjustmentPreparationRepository.class),mock(JdbcBudgetConsumptionReversalRepository.class),mock(ExpenseReportRepository.class),mock(ExpensePartialAdjustmentGuard.class)).ready();
                 assertThat(scanned).hasSize(1);
                 when(runs.ready()).thenReturn(scanned);
                 doAnswer(capture).when(service).apply(any());
@@ -216,7 +296,11 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case SETTLEMENT -> {
                 var runs = mock(JdbcExpenseSettlementRepository.class); var service = mock(ExpenseSettlementService.class);
-                var scanned = new JdbcExpenseSettlementRepository(jdbc,json).pending();
+                var scanned = new JdbcExpenseSettlementRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpenseSettlementRepositoryMapper.class),json).pending();
                 assertThat(scanned).hasSize(1);
                 when(runs.pending()).thenReturn(scanned);
                 doAnswer(capture).when(service).consume(any());
@@ -224,7 +308,11 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case PAYMENT_RECOVERY -> {
                 var runs = mock(JdbcExpenseSettlementRepository.class); var service = mock(ExpenseSettlementRegistration.class);
-                var scanned = new JdbcExpenseSettlementRepository(jdbc,json).recoveryCandidates(null);
+                var scanned = new JdbcExpenseSettlementRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpenseSettlementRepositoryMapper.class),json).recoveryCandidates(null);
                 assertThat(scanned).hasSize(1);
                 when(runs.recoveryCandidates(any())).thenReturn(scanned);
                 doAnswer(capture).when(service).recover(any());
@@ -232,7 +320,11 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case VOUCHER_RECOVERY -> {
                 var runs = mock(JdbcExpenseSettlementRepository.class); var service = mock(ExpenseSettlementRegistration.class);
-                var scanned = new JdbcExpenseSettlementRepository(jdbc,json).recoveryCandidates(null);
+                var scanned = new JdbcExpenseSettlementRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpenseSettlementRepositoryMapper.class),json).recoveryCandidates(null);
                 assertThat(scanned).hasSize(1);
                 when(runs.recoveryCandidates(any())).thenReturn(scanned);
                 doAnswer(capture).when(service).recover(any());
@@ -240,7 +332,11 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case ZERO_RECOVERY -> {
                 var runs = mock(JdbcExpenseSettlementRepository.class); var service = mock(ExpenseSettlementRegistration.class);
-                var scanned = new JdbcExpenseSettlementRepository(jdbc,json).recoveryCandidates(null);
+                var scanned = new JdbcExpenseSettlementRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpenseSettlementRepositoryMapper.class),json).recoveryCandidates(null);
                 assertThat(scanned).hasSize(1);
                 when(runs.recoveryCandidates(any())).thenReturn(scanned);
                 doAnswer(capture).when(service).recover(any());
@@ -248,7 +344,12 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case REVERSAL_PREPARATION -> {
                 var runs = mock(JdbcVoucherReversalPreparationRepository.class); var service = mock(VoucherReversalPreparationService.class);
-                var scanned = new JdbcVoucherReversalPreparationRepository(jdbc,json,mock(ExpensePartialAdjustmentGuard.class)).due(Instant.now());
+                var scanned = new JdbcVoucherReversalPreparationRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.finance.mapper
+                                                        .VoucherReversalPreparationRepositoryMapper
+                                                        .class),json,mock(ExpensePartialAdjustmentGuard.class)).due(Instant.now());
                 assertThat(scanned).hasSize(1);
                 when(runs.due(any(Instant.class))).thenReturn(scanned);
                 doAnswer(capture).when(service).claim(anyString(), any(UUID.class), any(Instant.class));
@@ -256,7 +357,12 @@ class ExpenseRecoveryBusinessTraceTest {
             }
             case REVERSAL -> {
                 var runs = mock(JdbcVoucherReversalOperationRepository.class); var service = mock(VoucherReversalExecutionService.class);
-                var scanned = new JdbcVoucherReversalOperationRepository(jdbc,json,mock(JdbcVoucherReversalPreparationRepository.class),mock(JdbcVoucherOperationRepository.class),mock(ExpensePartialAdjustmentGuard.class)).due(Instant.now());
+                var scanned = new JdbcVoucherReversalOperationRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.finance.mapper
+                                                        .VoucherReversalOperationRepositoryMapper
+                                                        .class),json,mock(JdbcVoucherReversalPreparationRepository.class),mock(JdbcVoucherOperationRepository.class),mock(ExpensePartialAdjustmentGuard.class)).due(Instant.now());
                 assertThat(scanned).hasSize(1);
                 when(runs.due(any(Instant.class))).thenReturn(scanned);
                 doAnswer(capture).when(service).claim(anyString(), any(UUID.class), any(Instant.class));

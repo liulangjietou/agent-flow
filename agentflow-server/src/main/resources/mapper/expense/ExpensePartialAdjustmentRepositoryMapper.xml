@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpensePartialAdjustmentRepositoryMapper">
+    <insert id="create">
+        INSERT INTO expense_partial_adjustment(trace_id,tenant_id,id,report_id,round_no,sequence_no,settlement_version,consumption_id,consumed_version,
+        accrual_id,accrual_version,previous_id,previous_version,input_json,state_json,version,status,active_report_id,created_at,updated_at)
+        VALUES(#{traceId},#{tenantId},#{id},#{reportId},#{roundNo},#{sequenceNo},#{settlementVersion},#{consumptionId},#{consumedVersion},#{accrualId},#{accrualVersion},#{previousId},#{previousVersion},#{inputJson},#{stateJson},1,'WAITING_FINANCE',#{activeReportId},#{createdAt},#{updatedAt})
+    </insert>
+
+    <insert id="create2">
+        INSERT INTO expense_partial_adjustment_return(tenant_id,adjustment_id,report_id,funds_identity,registration_id,entry_json,active_funds_identity)
+        VALUES(#{tenantId},#{adjustmentId},#{reportId},#{fundsIdentity},#{registrationId},#{entryJson},#{activeFundsIdentity})
+    </insert>
+
+    <update id="update">
+        UPDATE expense_partial_adjustment_return SET active_funds_identity=NULL,released_at=#{at} WHERE tenant_id=#{tenantId} AND adjustment_id=#{id} AND released_at IS NULL AND completed_at IS NULL
+    </update>
+
+    <select id="completeResources" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM finance_consumption_reduction WHERE tenant_id=#{tenantId} AND adjustment_id=#{id}
+    </select>
+
+    <select id="completeResources2" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_partial_adjustment_return WHERE tenant_id=#{tenantId} AND adjustment_id=#{id}
+    </select>
+
+    <insert id="completeResources3">
+        INSERT INTO expense_partial_adjustment_completion(tenant_id,adjustment_id,before_version,after_version,source_json,completed_at) VALUES(#{tenantId},#{adjustmentId},#{beforeVersion},#{afterVersion},#{sourceJson},#{completedAt})
+    </insert>
+
+    <update id="completeResources4">
+        UPDATE expense_partial_adjustment_return SET completed_at=#{updatedAt},completed_version=#{version} WHERE tenant_id=#{tenantId} AND adjustment_id=#{id} AND completed_at IS NULL AND released_at IS NULL
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_partial_adjustment WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="active" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_partial_adjustment WHERE tenant_id=#{tenant} AND active_report_id=#{report}
+    </select>
+
+    <select id="latestCompleted" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_partial_adjustment WHERE tenant_id=#{tenant} AND report_id=#{report} AND completed_at IS NOT NULL ORDER BY completed_sequence DESC LIMIT 1
+    </select>
+
+    <select id="history" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_partial_adjustment WHERE tenant_id=#{tenant} AND report_id=#{report} ORDER BY sequence_no,created_at,id
+    </select>
+
+    <select id="claimedReturnIds" resultType="String">
+        SELECT funds_identity FROM expense_partial_adjustment_return WHERE tenant_id=#{tenant} AND report_id=#{report} AND active_funds_identity IS NOT NULL
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM expense_partial_adjustment_revision WHERE tenant_id=#{tenant} AND adjustment_id=#{id} AND version=#{version}
+    </select>
+
+    <select id="ready" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.report_id,q.version,q.trace_id,business.business_no,submitted.process_instance_id FROM expense_partial_adjustment q
+        LEFT JOIN expense_report report ON report.tenant_id=q.tenant_id AND report.id=q.report_id
+        LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=report.application_id
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=q.round_no
+        WHERE q.status='READY' AND q.completed_at IS NULL AND q.retired_at IS NULL ORDER BY q.updated_at,q.id LIMIT 10
+    </select>
+
+    <update id="save">
+        UPDATE expense_partial_adjustment SET state_json=#{stateJson},version=#{version},status=#{status},active_report_id=#{activeReport},budget_operation_id=#{id},budget_status=#{budgetStatus},budget_next_at=#{nextAttemptAt},budget_lease_until=#{leaseUntil},
+        accrual_operation_id=#{accrualOperationId},accrual_status=#{accrualStatus},accrual_next_at=#{accrualNextAt},accrual_lease_until=#{accrualLeaseUntil},completed_at=#{at},completed_sequence=#{sequence},retired_at=#{retiredAt},updated_at=#{updatedAt},resolution_count=#{resolutionCount}
+        WHERE tenant_id=#{tenantId} AND id=#{expectedId} AND version=#{expectedVersion} AND input_json=#{inputJson} AND retired_at IS NULL
+    </update>
+
+    <insert id="registerOperation">
+        INSERT INTO expense_partial_adjustment_operation(trace_id,tenant_id,id,adjustment_id,side,adjustment_version,input_json,authorization_source_json,created_at) VALUES(#{traceId},#{tenantId},#{id},#{adjustmentId},#{side},#{adjustmentVersion},#{inputJson},#{authorizationSourceJson},#{createdAt})
+    </insert>
+
+    <select id="requireUsedReturns" resultType="String">
+        SELECT entry_json FROM expense_partial_adjustment_return WHERE tenant_id=#{tenantId} AND report_id=#{reportId} AND active_funds_identity=#{fundsIdentity} AND completed_at IS NOT NULL
+    </select>
+
+    <select id="requireCompletedHistoryCurrent" resultType="String">
+        SELECT id FROM expense_partial_adjustment WHERE tenant_id=#{tenantId} AND report_id=#{reportId} AND completed_at IS NOT NULL AND status&lt;&gt;'APPLIED' LIMIT 1
+    </select>
+
+    <select id="sequence" resultType="Long">
+        SELECT sequence_no FROM expense_partial_adjustment WHERE tenant_id=#{tenantId} AND id=#{id} AND report_id=#{reportId} AND completed_at IS NOT NULL
+    </select>
+
+    <select id="requireRecordedCompletion" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT c.before_version,c.after_version,c.source_json,c.completed_at,b.state_json AS before_json,a.state_json AS after_json
+        FROM expense_partial_adjustment_completion c
+        JOIN expense_partial_adjustment_revision b ON b.tenant_id=c.tenant_id AND b.adjustment_id=c.adjustment_id AND b.version=c.before_version
+        JOIN expense_partial_adjustment_revision a ON a.tenant_id=c.tenant_id AND a.adjustment_id=c.adjustment_id AND a.version=c.after_version
+        WHERE c.tenant_id=#{tenantId} AND c.adjustment_id=#{id}
+    </select>
+
+    <select id="requireRegistered" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_partial_adjustment_operation WHERE tenant_id=#{tenantId} AND id=#{id} AND adjustment_id=#{adjustmentId} AND side=#{side}
+    </select>
+
+    <insert id="append">
+        INSERT INTO expense_partial_adjustment_revision(tenant_id,adjustment_id,version,state_json) VALUES(#{tenantId},#{adjustmentId},#{version},#{stateJson})
+    </insert>
+    <select id="dueQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <choose>
+            <when test="sideChoice == &quot;budget&quot;">
+                SELECT a.tenant_id,a.id,a.report_id,a.version,o.trace_id,business.business_no,submitted.process_instance_id,a.budget_operation_id AS operation_id FROM expense_partial_adjustment a LEFT JOIN expense_partial_adjustment_operation o ON o.tenant_id=a.tenant_id AND o.adjustment_id=a.id AND o.id=a.budget_operation_id LEFT JOIN expense_report report ON report.tenant_id=a.tenant_id AND report.id=a.report_id LEFT JOIN approval_application business ON business.tenant_id=a.tenant_id AND business.id=report.application_id LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=a.round_no WHERE a.retired_at IS NULL AND ((a.budget_status IN ('QUEUED','UNKNOWN') AND a.budget_next_at&lt;=#{parameters[0]}) OR (a.budget_status IN ('EXECUTING','POSTING','QUERYING') AND a.budget_lease_until&lt;=#{parameters[1]})) ORDER BY a.updated_at,a.id LIMIT 10
+            </when>
+            <otherwise>
+                SELECT a.tenant_id,a.id,a.report_id,a.version,o.trace_id,business.business_no,submitted.process_instance_id,a.accrual_operation_id AS operation_id FROM expense_partial_adjustment a LEFT JOIN expense_partial_adjustment_operation o ON o.tenant_id=a.tenant_id AND o.adjustment_id=a.id AND o.id=a.accrual_operation_id LEFT JOIN expense_report report ON report.tenant_id=a.tenant_id AND report.id=a.report_id LEFT JOIN approval_application business ON business.tenant_id=a.tenant_id AND business.id=report.application_id LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=a.round_no WHERE a.retired_at IS NULL AND ((a.accrual_status IN ('QUEUED','UNKNOWN') AND a.accrual_next_at&lt;=#{parameters[0]}) OR (a.accrual_status IN ('EXECUTING','POSTING','QUERYING') AND a.accrual_lease_until&lt;=#{parameters[1]})) ORDER BY a.updated_at,a.id LIMIT 10
+            </otherwise>
+        </choose>
+    </select>
+</mapper>

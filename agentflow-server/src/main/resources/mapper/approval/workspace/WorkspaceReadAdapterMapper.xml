@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.workspace.mapper.WorkspaceReadAdapterMapper">
+    <select id="isParticipant" resultType="Boolean">
+        SELECT EXISTS(SELECT 1 FROM audit_event WHERE tenant_id=#{tenantId} AND application_id=#{applicationId}
+        AND actor_id=#{userId} AND aggregate_type='Task' AND action IN
+        ('APPROVE','RETURN','REJECT','TRANSFER','DELEGATE','RESOLVE','ADD_SIGNER','REMOVE_SIGNER'))
+    </select>
+
+    <select id="participantsInRound" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT actor_id,payload_json FROM audit_event WHERE tenant_id=#{tenantId} AND application_id=#{applicationId} AND aggregate_type='Task' AND action IN ('APPROVE','RETURN','REJECT','TRANSFER','DELEGATE','RESOLVE','ADD_SIGNER','REMOVE_SIGNER')
+    </select>
+    <select id="applicationsQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT a.id,a.business_no,a.title,a.process_key,a.definition_version,a.status,a.round_no,a.created_at,a.updated_at
+        FROM approval_application a WHERE a.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND a.created_by=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}
+        <choose><when test="hasDrafts"> AND a.status=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</when><otherwise></otherwise></choose><if test="!emptyText"> AND (LOWER(a.title) LIKE <bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} ESCAPE '!' OR LOWER(a.business_no) LIKE <bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} ESCAPE '!' OR LOWER(a.process_key) LIKE <bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} ESCAPE '!')</if><if test="!missingBeforeTime"> AND (a.created_at&lt;<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7} OR (a.created_at=<bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8} AND a.id&lt;<bind name="argument9" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument9}))</if> ORDER BY a.created_at DESC,a.id DESC LIMIT <bind name="argument10" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument10}
+    </select>
+    <select id="handledQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT e.id,e.aggregate_id,e.application_id,e.action,e.occurred_at,e.payload_json,
+               a.business_no,a.title,a.process_key,a.definition_version,a.status
+        FROM audit_event e JOIN approval_application a ON a.tenant_id=e.tenant_id AND a.id=e.application_id
+        WHERE e.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND e.actor_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND e.aggregate_type='Task' AND e.action IN
+        ('APPROVE','RETURN','REJECT','TRANSFER','DELEGATE','RESOLVE','ADD_SIGNER','REMOVE_SIGNER')<choose><when test="hasAction"> AND e.action=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</when><otherwise></otherwise></choose><if test="!emptyText"> AND (LOWER(a.title) LIKE <bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} ESCAPE '!' OR LOWER(a.business_no) LIKE <bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} ESCAPE '!' OR LOWER(a.process_key) LIKE <bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} ESCAPE '!')</if><if test="!missingBeforeTime"> AND (e.occurred_at&lt;<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7} OR (e.occurred_at=<bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8} AND e.id&lt;<bind name="argument9" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument9}))</if> ORDER BY e.occurred_at DESC,e.id DESC LIMIT <bind name="argument10" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument10}
+    </select>
+</mapper>

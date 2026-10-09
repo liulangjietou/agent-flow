@@ -1,35 +1,41 @@
 package io.agentflow.notification;
 
+
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
-import io.agentflow.expense.AdvanceRepaymentSources;
-import io.agentflow.expense.JdbcRepaymentReviewCheckRepository;
-import io.agentflow.expense.JdbcRepaymentResolutionRepository;
 import io.agentflow.expense.AdvanceRepaymentReviewCheck;
-import io.agentflow.finance.AdvanceRepaymentAdjustmentPort;
-import io.agentflow.finance.VoucherAccess;
-import io.agentflow.finance.PaymentAuthorization;
+import io.agentflow.expense.AdvanceRepaymentSources;
 import io.agentflow.expense.JdbcAdvanceRepaymentRepository;
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
-import org.springframework.jdbc.core.JdbcTemplate;
+import io.agentflow.expense.JdbcRepaymentResolutionRepository;
+import io.agentflow.expense.JdbcRepaymentReviewCheckRepository;
+import io.agentflow.finance.AdvanceRepaymentAdjustmentPort;
+import io.agentflow.finance.PaymentAuthorization;
+import io.agentflow.finance.VoucherAccess;
+import io.agentflow.mybatis.SqlRows;
+import io.agentflow.notification.mapper.RepaymentReviewNotificationAccessMapper;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
 /**
  * 原还款复核消息只读精确查询和实际裁决，当前权限与原字段保护独立复核。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
 public class RepaymentReviewNotificationAccess {
     private final CurrentActor actors;
-    private final JdbcTemplate jdbc;
+    private final RepaymentReviewNotificationAccessMapper sqlMapper;
     private final JdbcRepaymentReviewCheckRepository checks;
     private final JdbcRepaymentResolutionRepository resolutions;
     private final AdvanceRepaymentSources sources;
@@ -37,13 +43,29 @@ public class RepaymentReviewNotificationAccess {
     private final ApplicationRepository applications;
     private final VoucherAccess access;
     private final PaymentNotificationAccess personnel;
+
     /** 身份来自原放款、已登记还款及原复核查询，不根据最新登记或管理员角色推测。 */
-    public RepaymentReviewNotificationAccess(CurrentActor actors, JdbcTemplate jdbc, JdbcRepaymentReviewCheckRepository checks,
-            JdbcRepaymentResolutionRepository resolutions, AdvanceRepaymentSources sources, JdbcAdvanceRepaymentRepository repayments, ApplicationRepository applications,
-            VoucherAccess access, PaymentNotificationAccess personnel) {
-        this.actors = actors; this.jdbc = jdbc; this.checks = checks; this.resolutions = resolutions; this.sources = sources;
-        this.repayments = repayments; this.applications = applications; this.access = access; this.personnel = personnel;
+    public RepaymentReviewNotificationAccess(
+            CurrentActor actors,
+            RepaymentReviewNotificationAccessMapper sqlMapper,
+            JdbcRepaymentReviewCheckRepository checks,
+            JdbcRepaymentResolutionRepository resolutions,
+            AdvanceRepaymentSources sources,
+            JdbcAdvanceRepaymentRepository repayments,
+            ApplicationRepository applications,
+            VoucherAccess access,
+            PaymentNotificationAccess personnel) {
+        this.actors = actors;
+        this.sqlMapper = sqlMapper;
+        this.checks = checks;
+        this.resolutions = resolutions;
+        this.sources = sources;
+        this.repayments = repayments;
+        this.applications = applications;
+        this.access = access;
+        this.personnel = personnel;
     }
+
     /** 只读取消息原来源；不查询银行、不续期证据、不登记资金或修改借款。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Target target(UUID messageId) {
@@ -58,11 +80,13 @@ public class RepaymentReviewNotificationAccess {
                 observed == null ? null : new Observation(observed.status(), observed.revision(), observed.observedAt(), observed.validUntil()),
                 resolution == null ? null : new Resolution(resolution.decision().id(), resolution.advanceVersion(), resolution.decision().receipt().status(), resolution.decision().resolvedAt()));
     }
+
     /** 外发最小消息之前复核原参与关系与当前人员和法人资格。 */
     public boolean deliveryAllowed(NotificationDelivery delivery) {
         var row = row(delivery.tenantId(), delivery.recipient(), delivery.inboxId());
         return row == null || allowed(delivery.tenantId(), delivery.recipient(), row) != null;
     }
+
     Source original(String tenant, UUID id) {
         var check = checks.find(tenant, id).orElse(null); if (check == null) return null;
         var input = check.input(); var request = input.request().original().request(); AdvanceRepaymentSources.Source bank;
@@ -84,10 +108,12 @@ public class RepaymentReviewNotificationAccess {
         return new Source(application, check, resolution, bank.authorization(), request.legalEntityId(),
                 List.of(request.employeeId(), input.requestedBy()).stream().distinct().toList());
     }
+
     boolean eligible(String tenant, String recipient, Source source) {
         var applicant = source.check().input().request().original().request().employeeId();
         return source.recipients().contains(recipient) && personnel.eligible(tenant, recipient, applicant, source.entity());
     }
+
     private Source allowed(String tenant, String recipient, Row row) {
         if (row == null) return null;
         var key = RepaymentReviewNotice.source(row.eventKey()).filter(value -> value.notice().kind() == row.kind()).orElse(null); if (key == null) return null;
@@ -96,39 +122,83 @@ public class RepaymentReviewNotificationAccess {
                 && source.authorization().terms().binding().roundNo() == row.roundNo()
                 && key.notice().presentIn(source.check()) && eligible(tenant, recipient, source) ? source : null;
     }
+
     private Row row(String tenant, String recipient, UUID id) {
-        return jdbc.query("""
-                SELECT event_key,kind,application_id,round_no FROM notification_inbox
-                WHERE tenant_id=? AND recipient_id=? AND id=? AND kind IN ('REPAYMENT_REVIEW_RESULT','REPAYMENT_REVIEW_ATTENTION')
-                """, (row, index) -> new Row(row.getString("event_key"), InboxMessage.Kind.valueOf(row.getString("kind")), UUID.fromString(row.getString("application_id")), row.getInt("round_no")),
-                tenant, recipient, id.toString()).stream().findFirst().orElse(null);
+        return SqlRows.map(
+                        sqlMapper.row(tenant, recipient, id.toString()),
+                        row ->
+                                new Row(
+                                        row.getString("event_key"),
+                                        InboxMessage.Kind.valueOf(row.getString("kind")),
+                                        UUID.fromString(row.getString("application_id")),
+                                        row.getInt("round_no")))
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
+
     /**
      * 真实参与人和原件仅用于服务端核对，不公开资金命令。
+     *
      * @author owlzhangfq@gmail.com
      */
-    record Source(Application application, AdvanceRepaymentReviewCheck check, JdbcRepaymentResolutionRepository.Resolved resolution, PaymentAuthorization authorization, UUID entity, List<String> recipients) { }
+    record Source(
+            Application application,
+            AdvanceRepaymentReviewCheck check,
+            JdbcRepaymentResolutionRepository.Resolved resolution,
+            PaymentAuthorization authorization,
+            UUID entity,
+            List<String> recipients) {}
+
     /**
      * 仅定位当前接收人的持久消息。
+     *
      * @author owlzhangfq@gmail.com
      */
-    private record Row(String eventKey, InboxMessage.Kind kind, UUID applicationId, int roundNo) { }
+    private record Row(String eventKey, InboxMessage.Kind kind, UUID applicationId, int roundNo) {}
+
     /**
      * 原查询状态与真实登记分开，金额、公司账户、入款流水及办理许可均不返回。
+     *
      * @author owlzhangfq@gmail.com
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Target(UUID messageId, UUID checkId, UUID paymentId, UUID advanceId, UUID repaymentId, UUID applicationId, int roundNo, RepaymentReviewNotice fact,
-                         long version, AdvanceRepaymentReviewCheck.Status status, Instant requestedAt, Instant updatedAt, AdvanceRepaymentReviewCheck.Issue issue,
-                         Observation observation, Resolution resolution) { }
+    public record Target(
+            UUID messageId,
+            UUID checkId,
+            UUID paymentId,
+            UUID advanceId,
+            UUID repaymentId,
+            UUID applicationId,
+            int roundNo,
+            RepaymentReviewNotice fact,
+            long version,
+            AdvanceRepaymentReviewCheck.Status status,
+            Instant requestedAt,
+            Instant updatedAt,
+            AdvanceRepaymentReviewCheck.Issue issue,
+            Observation observation,
+            Resolution resolution) {}
+
     /**
      * 原件版本和当时有效窗口只用于追溯，不提供新鲜性或登记许可。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public record Observation(AdvanceRepaymentAdjustmentPort.Status outcome, long revision, Instant observedAt, Instant validUntil) { }
+    public record Observation(
+            AdvanceRepaymentAdjustmentPort.Status outcome,
+            long revision,
+            Instant observedAt,
+            Instant validUntil) {}
+
     /**
      * 本次查询实际消费的具名决定，不能替换成当前累计账本版本。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public record Resolution(UUID id, long advanceVersion, AdvanceRepaymentAdjustmentPort.Status outcome, Instant resolvedAt) { }
+    public record Resolution(
+            UUID id,
+            long advanceVersion,
+            AdvanceRepaymentAdjustmentPort.Status outcome,
+            Instant resolvedAt) {}
 }

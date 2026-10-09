@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.finance.mapper.PaymentOperationRepositoryMapper">
+    <insert id="create">
+        INSERT INTO payment_operation(tenant_id,id,input_json,command_digest,state_json,version,status,attempts,dispatches,highest_revision,created_at,updated_at,next_attempt_at,trace_id)
+        VALUES(#{tenantId},#{id},#{inputJson},#{commandDigest},#{stateJson},1,'QUEUED',0,0,0,#{createdAt},#{updatedAt},#{nextAttemptAt},#{traceId})
+    </insert>
+
+    <update id="update">
+        UPDATE payment_operation SET version=#{version},status=#{status},attempts=#{attempts},dispatches=#{dispatches},highest_revision=#{highestRevision},state_json=#{stateJson},updated_at=#{updatedAt},next_attempt_at=#{nextAttemptAt},lease_until=#{leaseUntil}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND input_json=#{inputJson} AND command_digest=#{digest}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM payment_operation WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM payment_operation_revision WHERE tenant_id=#{tenant} AND operation_id=#{id} AND version=#{version}
+    </select>
+
+    <select id="missingVoucherPreparations" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM payment_operation q
+        JOIN payment_authorization auth ON auth.tenant_id=q.tenant_id AND auth.id=q.id
+        LEFT JOIN approval_application a ON a.tenant_id=auth.tenant_id AND a.id=auth.application_id
+        LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=auth.round_no
+        WHERE q.status='SUCCEEDED'
+        AND NOT EXISTS (SELECT 1 FROM voucher_preparation v WHERE v.tenant_id=auth.tenant_id AND v.application_id=auth.application_id AND v.round_no=auth.round_no AND v.kind='PAYMENT')
+        AND NOT EXISTS (SELECT 1 FROM voucher_operation v WHERE v.tenant_id=auth.tenant_id AND v.application_id=auth.application_id AND v.round_no=auth.round_no AND v.kind='PAYMENT')
+        ORDER BY q.updated_at,q.id LIMIT 10
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM payment_operation q
+        LEFT JOIN payment_authorization auth ON auth.tenant_id=q.tenant_id AND auth.id=q.id
+        LEFT JOIN approval_application a ON a.tenant_id=auth.tenant_id AND a.id=auth.application_id
+        LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=auth.round_no
+        WHERE (q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at&lt;=#{nextAttemptAt}) OR (q.status IN ('CHECKING','SENDING','QUERYING') AND q.lease_until&lt;=#{leaseUntil})
+        ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+    </select>
+
+    <select id="missingAdvanceBalances" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM payment_operation q
+        JOIN payment_authorization auth ON auth.tenant_id=q.tenant_id AND auth.id=q.id
+        LEFT JOIN approval_application a ON a.tenant_id=auth.tenant_id AND a.id=auth.application_id
+        LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=auth.round_no
+        WHERE q.status='SUCCEEDED' AND auth.purpose='EMPLOYEE_ADVANCE'
+        AND NOT EXISTS (SELECT 1 FROM finance_resource r WHERE r.tenant_id=auth.tenant_id AND r.resource_type='ADVANCE' AND r.id=auth.business_id)
+        ORDER BY q.updated_at,q.id LIMIT 10
+    </select>
+
+    <insert id="append">
+        INSERT INTO payment_operation_revision(tenant_id,operation_id,version,state_json) VALUES(#{tenantId},#{operationId},#{version},#{stateJson})
+    </insert>
+    <select id="firstSuccessfulRevisionRows" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT version,state_json FROM payment_operation_revision WHERE tenant_id=#{parameters[0]} AND operation_id=#{parameters[1]} ORDER BY version
+    </select>
+    <select id="disputeEvidenceRows" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT version,state_json FROM payment_operation_revision WHERE tenant_id=#{parameters[0]} AND operation_id=#{parameters[1]} ORDER BY version
+    </select>
+</mapper>

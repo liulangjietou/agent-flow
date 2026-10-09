@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.agent.mapper.DraftAssistServiceMapper;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.SubprocessExecutionLocks;
 import io.agentflow.approval.model.Application;
@@ -7,16 +8,18 @@ import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 编排草稿授权、持久运行和人工保存；模型调用始终在这些事务之外。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
@@ -28,14 +31,26 @@ public class DraftAssistService {
     private final DraftAssistInputs inputs;
     private final JdbcDraftAssistRunRepository runs;
     private final AssistConfiguration configuration;
-    private final JdbcTemplate jdbc;
+    private final DraftAssistServiceMapper sqlMapper;
 
     /** 草稿写入复用原申请服务，建议上下文仅拥有自己的运行与确认状态。 */
-    public DraftAssistService(ApprovalApplicationFacade applications, ApplicationRepository applicationRepository,
-            SubprocessExecutionLocks locks, CurrentActor actors, DraftAssistInputs inputs, JdbcDraftAssistRunRepository runs,
-            AssistConfiguration configuration, JdbcTemplate jdbc) {
-        this.applications = applications; this.applicationRepository = applicationRepository; this.locks = locks; this.actors = actors;
-        this.inputs = inputs; this.runs = runs; this.configuration = configuration; this.jdbc = jdbc;
+    public DraftAssistService(
+            ApprovalApplicationFacade applications,
+            ApplicationRepository applicationRepository,
+            SubprocessExecutionLocks locks,
+            CurrentActor actors,
+            DraftAssistInputs inputs,
+            JdbcDraftAssistRunRepository runs,
+            AssistConfiguration configuration,
+            DraftAssistServiceMapper sqlMapper) {
+        this.applications = applications;
+        this.applicationRepository = applicationRepository;
+        this.locks = locks;
+        this.actors = actors;
+        this.inputs = inputs;
+        this.runs = runs;
+        this.configuration = configuration;
+        this.sqlMapper = sqlMapper;
     }
 
     /** 展示实际模型目的地和可发送目录，默认不选已有正文。 */
@@ -114,25 +129,40 @@ public class DraftAssistService {
         var initial = runs.find(tenant, id).orElse(null);
         if (initial == null) return null;
         UUID applicationId = initial.context().input().applicationId();
-        if (jdbc.queryForList("SELECT id FROM approval_application WHERE tenant_id=? AND id=? FOR UPDATE", String.class, tenant, applicationId.toString()).isEmpty()) return null;
+        if (sqlMapper.claim(tenant, applicationId.toString()).isEmpty()) return null;
         if (!runs.lock(tenant, id)) return null;
         var run = runs.find(tenant, id).orElseThrow();
         if (run.state().status() == DraftAssistRun.Status.RUNNING) {
             var lease = runs.lease(tenant, id);
-            if (lease != null && !lease.isAfter(now)) fail(run, AssistRun.Failure.MODEL_TIMEOUT, now);
+            if (lease != null && !lease.isAfter(now))
+                fail(run, AssistRun.Failure.MODEL_TIMEOUT, now);
             return null;
         }
         if (run.state().status() != DraftAssistRun.Status.QUEUED) return null;
-        run.start(1, now); runs.update(run, 1);
+        run.start(1, now);
+        runs.update(run, 1);
         try {
             configuration.requireAvailable();
-            if (!configuration.targetDigest(DraftAssistRun.PROMPT_VERSION).equals(run.context().targetDigest())) throw new DomainException("AGENT_TARGET_CHANGED", "Draft model target changed");
-        } catch (DomainException unavailable) { fail(run, AssistRun.Failure.MODEL_UNAVAILABLE, now); return null; }
+            if (!configuration
+                    .targetDigest(DraftAssistRun.PROMPT_VERSION)
+                    .equals(run.context().targetDigest()))
+                throw new DomainException("AGENT_TARGET_CHANGED", "Draft model target changed");
+        } catch (DomainException unavailable) {
+            fail(run, AssistRun.Failure.MODEL_UNAVAILABLE, now);
+            return null;
+        }
         try {
-            var application = applicationRepository.findById(tenant, applicationId).orElseThrow(DraftAssistService::notFound);
+            var application =
+                    applicationRepository
+                            .findById(tenant, applicationId)
+                            .orElseThrow(DraftAssistService::notFound);
             application.requireEditable(run.context().input().applicationVersion());
-            if (!application.createdBy().equals(run.context().requestedBy()) || application.businessReference() != null) throw notFound();
-        } catch (DomainException unavailable) { fail(run, AssistRun.Failure.INPUT_UNAVAILABLE, now); return null; }
+            if (!application.createdBy().equals(run.context().requestedBy())
+                    || application.businessReference() != null) throw notFound();
+        } catch (DomainException unavailable) {
+            fail(run, AssistRun.Failure.INPUT_UNAVAILABLE, now);
+            return null;
+        }
         runs.lease(tenant, id, now.plusSeconds(configuration.getTimeoutSeconds() + 30L));
         return run.context();
     }
@@ -150,39 +180,72 @@ public class DraftAssistService {
         catch (DomainException invalid) { fail(run, AssistRun.Failure.INVALID_MODEL_OUTPUT, now); return; }
         runs.update(run, 2); runs.lease(tenant, id, null);
     }
+
     private void fail(DraftAssistRun run, AssistRun.Failure failure, Instant now) {
         run.fail(run.state().version(), failure, now); runs.update(run, run.state().version() - 1);
         runs.lease(run.context().tenantId(), run.context().id(), null);
     }
+
     private DraftAssistRun requireRun(Application application, UUID id) {
         var run = runs.find(application.tenantId(), id).orElseThrow(DraftAssistService::notFound);
         if (!run.context().input().applicationId().equals(application.id()) || !run.context().requestedBy().equals(actors.actor().userId())) throw notFound();
         return run;
     }
+
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Draft suggestion not found"); }
+
     private static Receipt receipt(DraftAssistRun run) {
         return new Receipt(run.context().id(), run.state().status(), run.state().version(),
                 run.state().review() == null ? null : run.state().review().appliedApplicationVersion());
     }
+
     /**
      * 当前草稿和实际模型目的地供申请人选择发送内容。
+     *
      * @author owlzhangfq@gmail.com
      */
-    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
-    public record InputOptions(long applicationVersion, boolean enabled, String unavailableCode, String providerId,
-                               String model, String destination, String targetDigest, FormSchema targetSchema, List<AssistModelPort.Source> sources) { }
+    @com.fasterxml.jackson.annotation.JsonInclude(
+            com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
+    public record InputOptions(
+            long applicationVersion,
+            boolean enabled,
+            String unavailableCode,
+            String providerId,
+            String model,
+            String destination,
+            String targetDigest,
+            FormSchema targetSchema,
+            List<AssistModelPort.Source> sources) {}
+
     /**
      * 安全幂等回执不携带申请正文、模型结果或原始输入。
+     *
      * @author owlzhangfq@gmail.com
      */
-    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
-    public record Receipt(UUID id, DraftAssistRun.Status status, long version, Long savedApplicationVersion) { }
+    @com.fasterxml.jackson.annotation.JsonInclude(
+            com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
+    public record Receipt(
+            UUID id, DraftAssistRun.Status status, long version, Long savedApplicationVersion) {}
+
     /**
      * 只有原申请人可以读取的建议、输入与人工记录。
+     *
      * @author owlzhangfq@gmail.com
      */
-    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
-    public record Detail(UUID id, long applicationVersion, DraftAssistRun.Status status, long version, Instant createdAt,
-                         Instant startedAt, Instant completedAt, FormSchema targetSchema, List<AssistModelPort.Source> sources,
-                         DraftSuggestion suggestion, AssistRun.Failure failure, DraftAssistRun.Review review, boolean canAdopt) { }
+    @com.fasterxml.jackson.annotation.JsonInclude(
+            com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
+    public record Detail(
+            UUID id,
+            long applicationVersion,
+            DraftAssistRun.Status status,
+            long version,
+            Instant createdAt,
+            Instant startedAt,
+            Instant completedAt,
+            FormSchema targetSchema,
+            List<AssistModelPort.Source> sources,
+            DraftSuggestion suggestion,
+            AssistRun.Failure failure,
+            DraftAssistRun.Review review,
+            boolean canAdopt) {}
 }

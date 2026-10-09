@@ -1,23 +1,28 @@
 package io.agentflow.organization;
 
+import static org.assertj.core.api.Assertions.*;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+
 import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
-import java.time.Instant;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
-import static org.assertj.core.api.Assertions.*;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * V109 已有组织事实和未处理来源批次升级后不变，计划和应用记录只新增空表。
+ *
  * @author owlzhangfq@gmail.com
  */
 class OrganizationSyncPlanMigrationTest {
@@ -25,7 +30,15 @@ class OrganizationSyncPlanMigrationTest {
         var data = new DriverManagerDataSource("jdbc:h2:mem:sync-plan-migration-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(data).target("109").load().migrate(); var jdbc = new JdbcTemplate(data);
         var json = new JsonUtil(new ObjectMapper().findAndRegisterModules().disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS));
-        var organization = new OrganizationService(new JdbcOrganizationRepository(jdbc, json)); var sync = new JdbcOrganizationSyncRepository(jdbc, json);
+        var organization = new OrganizationService(new JdbcOrganizationRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.organization.mapper
+                                                .OrganizationRepositoryMapper.class), json)); var sync = new JdbcOrganizationSyncRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.organization.mapper.OrganizationSyncRepositoryMapper
+                                        .class), json);
         var tx = new TransactionTemplate(new DataSourceTransactionManager(data)); var actor = new Actor("tenant", "admin", Set.of("ADMIN"));
         Instant at = Instant.parse("2026-10-04T00:00:00Z");
         var batch = new OrganizationSyncBatch(new OrganizationSyncBatch.Context(UUID.randomUUID(), "tenant", "hr", 0, "1".repeat(64), "admin", at, null));
@@ -53,13 +66,17 @@ class OrganizationSyncPlanMigrationTest {
 
     private void createV109(JdbcTemplate jdbc, JsonUtil json, OrganizationSyncBatch batch) {
         var context = batch.context();
-        jdbc.update("""
-                INSERT INTO organization_sync_batch(tenant_id,id,source_key,after_revision,requested_by,status,version,
-                    pending_tenant_id,context_json,state_json,created_at)
-                VALUES(?,?,?,?,?,'QUEUED',1,?,?,?,?)
-                """, context.tenantId(), context.id().toString(), context.sourceKey(), context.afterRevision(), context.requestedBy(),
+        jdbc.update(
+                """
+INSERT INTO organization_sync_batch(tenant_id,id,source_key,after_revision,requested_by,status,version,
+    pending_tenant_id,context_json,state_json,created_at)
+VALUES(?,?,?,?,?,'QUEUED',1,?,?,?,?)
+""", context.tenantId(), context.id().toString(), context.sourceKey(), context.afterRevision(), context.requestedBy(),
                 context.tenantId(), json.write(context), json.write(batch.state()), java.sql.Timestamp.from(context.createdAt()));
-        jdbc.update("INSERT INTO organization_sync_transition(tenant_id,batch_id,batch_version,status,state_json) VALUES(?,?,1,'QUEUED',?)",
+        jdbc.update(
+                "INSERT INTO"
+                    + " organization_sync_transition(tenant_id,batch_id,batch_version,status,state_json)"
+                    + " VALUES(?,?,1,'QUEUED',?)",
                 context.tenantId(), context.id().toString(), json.write(batch.state()));
     }
 }

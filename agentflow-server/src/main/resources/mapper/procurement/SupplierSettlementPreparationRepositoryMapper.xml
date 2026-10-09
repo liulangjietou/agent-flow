@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.procurement.mapper.SupplierSettlementPreparationRepositoryMapper">
+    <select id="create" resultType="Integer">
+        SELECT COUNT(*) FROM supplier_payable_settlement_operation WHERE tenant_id=#{tenant} AND active_payment_id=#{paymentId}
+    </select>
+
+    <insert id="create2">
+        INSERT INTO supplier_settlement_preparation(trace_id,tenant_id,id,payment_id,payment_version,finance_actor,accounting_date,input_json,state_json,
+        version,status,attempts,created_at,updated_at,next_attempt_at,active_payment_id) VALUES(#{traceId},#{tenantId},#{id},#{paymentId},#{paymentVersion},#{financeActor},#{accountingDate},#{inputJson},#{stateJson},1,'QUEUED',0,#{createdAt},#{updatedAt},#{nextAttemptAt},#{activePaymentId})
+    </insert>
+
+    <update id="update">
+        UPDATE supplier_settlement_preparation SET state_json=#{stateJson},version=#{version},status=#{status},attempts=#{attempts},updated_at=#{updatedAt},next_attempt_at=#{nextAttemptAt},lease_until=#{leaseUntil},
+        active_payment_id=#{owner},registered_operation_id=#{registered} WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND input_json=#{inputJson} AND status IN ('QUEUED','RUNNING')
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_settlement_preparation WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="active" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_settlement_preparation WHERE tenant_id=#{tenant} AND active_payment_id=#{paymentId}
+    </select>
+
+    <select id="latest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_settlement_preparation WHERE tenant_id=#{tenant} AND payment_id=#{paymentId} ORDER BY created_at DESC,id DESC LIMIT 1
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM supplier_settlement_preparation_revision WHERE tenant_id=#{tenant} AND preparation_id=#{id} AND version=#{version}
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM supplier_settlement_preparation q
+        LEFT JOIN supplier_payment_authorization origin ON origin.tenant_id=q.tenant_id AND origin.id=q.payment_id
+        LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=origin.application_id
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+        WHERE (q.status='QUEUED' AND q.next_attempt_at&lt;=#{nextAttemptAt})
+        OR (q.status='RUNNING' AND q.lease_until&lt;=#{leaseUntil}) ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+    </select>
+
+    <select id="requireRegistration" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT command_json FROM supplier_payable_settlement_operation WHERE tenant_id=#{tenant} AND id=#{id} AND preparation_version=#{version}
+    </select>
+
+    <insert id="append">
+        INSERT INTO supplier_settlement_preparation_revision(tenant_id,preparation_id,version,state_json) VALUES(#{tenantId},#{preparationId},#{version},#{stateJson})
+    </insert>
+</mapper>

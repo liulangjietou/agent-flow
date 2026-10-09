@@ -1,82 +1,104 @@
 package io.agentflow.approval;
 
+import io.agentflow.approval.mapper.ApplicationRepositoryMapper;
 import io.agentflow.approval.model.Application;
-import io.agentflow.approval.model.BusinessReference;
-import io.agentflow.approval.workspace.ApplicationAmountProjection;
 import io.agentflow.approval.model.ApplicationStatus;
+import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
+import io.agentflow.approval.workspace.ApplicationAmountProjection;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.form.FormSchema;
+import io.agentflow.mybatis.SqlRow;
+import io.agentflow.mybatis.SqlRows;
 import io.agentflow.notification.NotificationTexts;
-import org.springframework.jdbc.core.JdbcTemplate;
+
 import org.springframework.stereotype.Repository;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
  * PostgreSQL/H2 兼容的申请聚合仓储实现，所有查询均带租户条件。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Repository
 public class JdbcApplicationRepository implements ApplicationRepository {
-    private final JdbcTemplate jdbcTemplate;
+    private final ApplicationRepositoryMapper sqlMapper;
     private final JsonUtil jsonUtil;
 
     /** 创建仓储。 */
-    public JdbcApplicationRepository(JdbcTemplate jdbcTemplate, JsonUtil jsonUtil) {
-        this.jdbcTemplate = jdbcTemplate;
+    public JdbcApplicationRepository(ApplicationRepositoryMapper sqlMapper, JsonUtil jsonUtil) {
+        this.sqlMapper = sqlMapper;
         this.jsonUtil = jsonUtil;
     }
 
     @Override
     public Application save(Application application) {
-        jdbcTemplate.update("""
-                INSERT INTO approval_application
-                (id, tenant_id, business_no, process_key, definition_version, created_by, title,
-                 payload_json, status, round_no, version, form_schema_json, runtime_definition_id, notification_texts_json, search_amount, business_type, business_id, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """, application.id().toString(), application.tenantId(), application.businessNo(),
-                application.processKey(), application.definitionVersion(), application.createdBy(), application.title(),
-                jsonUtil.write(application.payload()), application.status().name(), application.roundNo(), application.version(),
-                application.formSchema() == null ? null : jsonUtil.write(application.formSchema()), application.runtimeDefinitionId(), jsonUtil.write(application.notificationTexts()), ApplicationAmountProjection.extract(application.payload(), application.formSchema()),
-                application.businessReference() == null ? null : application.businessReference().type().name(),
-                application.businessReference() == null ? null : application.businessReference().id().toString());
+        sqlMapper.save(
+                application.id().toString(),
+                application.tenantId(),
+                application.businessNo(),
+                application.processKey(),
+                application.definitionVersion(),
+                application.createdBy(),
+                application.title(),
+                jsonUtil.write(application.payload()),
+                application.status().name(),
+                application.roundNo(),
+                application.version(),
+                application.formSchema() == null ? null : jsonUtil.write(application.formSchema()),
+                application.runtimeDefinitionId(),
+                jsonUtil.write(application.notificationTexts()),
+                ApplicationAmountProjection.extract(
+                        application.payload(), application.formSchema()),
+                application.businessReference() == null
+                        ? null
+                        : application.businessReference().type().name(),
+                application.businessReference() == null
+                        ? null
+                        : application.businessReference().id().toString());
         return application;
     }
 
     @Override
     public Optional<Application> findById(String tenantId, UUID id) {
-        List<Application> rows = jdbcTemplate.query("SELECT * FROM approval_application WHERE tenant_id=? AND id=?",
-                this::map, tenantId, id.toString());
+        List<Application> rows =
+                SqlRows.map(sqlMapper.findById(tenantId, id.toString()), this::map);
         return rows.stream().findFirst();
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     public Optional<Application> lockById(String tenantId, UUID id) {
-        return jdbcTemplate.query("SELECT * FROM approval_application WHERE tenant_id=? AND id=? FOR UPDATE",
-                this::map, tenantId, id.toString()).stream().findFirst();
+        return SqlRows.map(sqlMapper.lockById(tenantId, id.toString()), this::map).stream()
+                .findFirst();
     }
 
     @Override
     public Optional<Application> findByBusinessNo(String tenantId, String businessNo) {
-        List<Application> rows = jdbcTemplate.query("SELECT * FROM approval_application WHERE tenant_id=? AND business_no=?",
-                this::map, tenantId, businessNo);
+        List<Application> rows =
+                SqlRows.map(sqlMapper.findByBusinessNo(tenantId, businessNo), this::map);
         return rows.stream().findFirst();
     }
 
     @Override
     public Application update(Application application, long expectedVersion) {
-        int updated = jdbcTemplate.update("""
-                UPDATE approval_application SET status=?, round_no=?, version=?, title=?, payload_json=?, search_amount=?, updated_at=CURRENT_TIMESTAMP
-                WHERE tenant_id=? AND id=? AND version=?
-                """, application.status().name(), application.roundNo(), application.version(), application.title(),
-                jsonUtil.write(application.payload()), ApplicationAmountProjection.extract(application.payload(), application.formSchema()), application.tenantId(), application.id().toString(), expectedVersion);
+        int updated =
+                sqlMapper.update(
+                        application.status().name(),
+                        application.roundNo(),
+                        application.version(),
+                        application.title(),
+                        jsonUtil.write(application.payload()),
+                        ApplicationAmountProjection.extract(
+                                application.payload(), application.formSchema()),
+                        application.tenantId(),
+                        application.id().toString(),
+                        expectedVersion);
         if (updated != 1) {
             throw new DomainException("CONCURRENCY_CONFLICT", "Application version has changed");
         }
@@ -85,10 +107,10 @@ public class JdbcApplicationRepository implements ApplicationRepository {
 
     @Override
     public List<Application> findAll(String tenantId) {
-        return jdbcTemplate.query("SELECT * FROM approval_application WHERE tenant_id=? ORDER BY updated_at DESC", this::map, tenantId);
+        return SqlRows.map(sqlMapper.findAll(tenantId), this::map);
     }
 
-    private Application map(ResultSet resultSet, int rowNum) throws SQLException {
+    private Application map(SqlRow resultSet) {
         return Application.restore(UUID.fromString(resultSet.getString("id")), resultSet.getString("tenant_id"),
                 resultSet.getString("business_no"), resultSet.getString("process_key"),
                 resultSet.getLong("definition_version"), resultSet.getString("created_by"),

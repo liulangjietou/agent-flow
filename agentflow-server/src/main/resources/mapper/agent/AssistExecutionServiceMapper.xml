@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.agent.mapper.AssistExecutionServiceMapper">
+    <select id="queue" resultType="Integer">
+        SELECT COUNT(*) FROM agent_assist_run r
+        JOIN agent_assist_job j ON j.tenant_id=r.tenant_id AND j.run_id=r.id
+        WHERE r.tenant_id=#{tenantId} AND r.application_id=#{applicationId} AND r.status IN ('QUEUED','RUNNING')
+    </select>
+
+    <select id="lockApplication" resultType="String">
+        SELECT id FROM approval_application WHERE tenant_id=#{tenant} AND id=#{id} FOR UPDATE
+    </select>
+</mapper>

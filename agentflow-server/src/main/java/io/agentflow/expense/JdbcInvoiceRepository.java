@@ -1,27 +1,37 @@
 package io.agentflow.expense;
 
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.expense.mapper.InvoiceRepositoryMapper;
+import io.agentflow.mybatis.SqlRows;
+
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Optional;
 import java.util.UUID;
 
 /**
  * 发票仓储以有效占用键实现租户内互斥；不同上传原件也不能并发报销同一张发票。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Repository
 public class JdbcInvoiceRepository implements InvoiceRepository {
     private static final FinancialResourceStore.Kind KIND = FinancialResourceStore.Kind.INVOICE;
     private final FinancialResourceStore store;
-    private final JdbcTemplate jdbc;
+    private final InvoiceRepositoryMapper sqlMapper;
     private final JsonUtil json;
 
     /** 互斥键与发票状态使用同一数据库和事务。 */
-    public JdbcInvoiceRepository(FinancialResourceStore store, JdbcTemplate jdbc, JsonUtil json) { this.store = store; this.jdbc = jdbc; this.json = json; }
+    public JdbcInvoiceRepository(
+            FinancialResourceStore store, InvoiceRepositoryMapper sqlMapper, JsonUtil json) {
+        this.store = store;
+        this.sqlMapper = sqlMapper;
+        this.json = json;
+    }
 
     @Override @Transactional
     public void create(Invoice invoice, String actor) {
@@ -52,39 +62,75 @@ public class JdbcInvoiceRepository implements InvoiceRepository {
     }
 
     private void syncClaim(Invoice invoice) {
-        var previous = jdbc.query("SELECT invoice_key,report_id,round_no,line_no,status FROM invoice_active_claim WHERE tenant_id=? AND invoice_id=?",
-                (row, index) -> new Claim(row.getString("invoice_key"), new ExpenseUse(UUID.fromString(row.getString("report_id")), row.getInt("round_no"), row.getInt("line_no")), row.getString("status")),
-                invoice.tenantId(), invoice.id().toString()).stream().findFirst().orElse(null);
-        if (previous != null && "CONSUMED".equals(previous.status())
-                && (invoice.occupation() != Invoice.Occupation.CONSUMED || !previous.use().equals(invoice.use()))) {
-            if (invoice.occupation() != Invoice.Occupation.AVAILABLE || invoice.verification() != Invoice.Verification.PENDING
-                    || jdbc.queryForObject("""
-                    SELECT COUNT(*) FROM (
-                        SELECT tenant_id,resource_type,resource_id,after_version,report_id,round_no,report_line FROM finance_consumption_reversal
-                        UNION ALL
-                        SELECT tenant_id,resource_type,resource_id,after_version,report_id,round_no,report_line FROM finance_consumption_reduction
-                    ) effects WHERE tenant_id=? AND resource_type='INVOICE' AND resource_id=? AND after_version=?
-                    AND report_id=? AND round_no=? AND report_line=?
-                    """, Integer.class, invoice.tenantId(), invoice.id().toString(), invoice.version(), previous.use().reportId().toString(), previous.use().roundNo(), previous.use().lineNo()) != 1) {
-                throw new DomainException("INVOICE_OCCUPATION_CHANGED", "Consumed invoice occupation requires an authorized reversal before release");
+        var previous =
+                SqlRows.map(
+                                sqlMapper.syncClaim(invoice.tenantId(), invoice.id().toString()),
+                                row ->
+                                        new Claim(
+                                                row.getString("invoice_key"),
+                                                new ExpenseUse(
+                                                        UUID.fromString(row.getString("report_id")),
+                                                        row.getInt("round_no"),
+                                                        row.getInt("line_no")),
+                                                row.getString("status")))
+                        .stream()
+                        .findFirst()
+                        .orElse(null);
+        if (previous != null
+                && "CONSUMED".equals(previous.status())
+                && (invoice.occupation() != Invoice.Occupation.CONSUMED
+                        || !previous.use().equals(invoice.use()))) {
+            if (invoice.occupation() != Invoice.Occupation.AVAILABLE
+                    || invoice.verification() != Invoice.Verification.PENDING
+                    || SqlRows.single(
+                                    sqlMapper.syncClaim2(
+                                            invoice.tenantId(),
+                                            invoice.id().toString(),
+                                            invoice.version(),
+                                            previous.use().reportId().toString(),
+                                            previous.use().roundNo(),
+                                            previous.use().lineNo()))
+                            != 1) {
+                throw new DomainException(
+                        "INVOICE_OCCUPATION_CHANGED",
+                        "Consumed invoice occupation requires an authorized reversal before"
+                            + " release");
             }
-            jdbc.update("DELETE FROM invoice_active_claim WHERE tenant_id=? AND invoice_id=? AND status='CONSUMED'", invoice.tenantId(), invoice.id().toString());
+            sqlMapper.syncClaim3(invoice.tenantId(), invoice.id().toString());
             return;
         }
         if (invoice.occupation() == Invoice.Occupation.AVAILABLE) {
-            jdbc.update("DELETE FROM invoice_active_claim WHERE tenant_id=? AND invoice_id=? AND status='OCCUPIED'", invoice.tenantId(), invoice.id().toString());
+            sqlMapper.syncClaim4(invoice.tenantId(), invoice.id().toString());
             return;
         }
-        String key = invoice.facts().key().canonical(); var use = invoice.use();
+        String key = invoice.facts().key().canonical();
+        var use = invoice.use();
         if (previous != null) {
-            if (!key.equals(previous.key())) throw new DomainException("INVOICE_FACTS_CHANGED", "Occupied invoice canonical identity changed");
-            jdbc.update("UPDATE invoice_active_claim SET report_id=?,round_no=?,line_no=?,status=? WHERE tenant_id=? AND invoice_id=?",
-                    use.reportId().toString(), use.roundNo(), use.lineNo(), invoice.occupation().name(), invoice.tenantId(), invoice.id().toString());
+            if (!key.equals(previous.key()))
+                throw new DomainException(
+                        "INVOICE_FACTS_CHANGED", "Occupied invoice canonical identity changed");
+            sqlMapper.syncClaim5(
+                    use.reportId().toString(),
+                    use.roundNo(),
+                    use.lineNo(),
+                    invoice.occupation().name(),
+                    invoice.tenantId(),
+                    invoice.id().toString());
         } else {
             try {
-                jdbc.update("INSERT INTO invoice_active_claim(tenant_id,invoice_key,invoice_id,report_id,round_no,line_no,status) VALUES(?,?,?,?,?,?,?)",
-                        invoice.tenantId(), key, invoice.id().toString(), use.reportId().toString(), use.roundNo(), use.lineNo(), invoice.occupation().name());
-            } catch (DuplicateKeyException occupied) { throw new DomainException("INVOICE_OCCUPIED", "Invoice already has an active occupation in this tenant"); }
+                sqlMapper.syncClaim6(
+                        invoice.tenantId(),
+                        key,
+                        invoice.id().toString(),
+                        use.reportId().toString(),
+                        use.roundNo(),
+                        use.lineNo(),
+                        invoice.occupation().name());
+            } catch (DuplicateKeyException occupied) {
+                throw new DomainException(
+                        "INVOICE_OCCUPIED",
+                        "Invoice already has an active occupation in this tenant");
+            }
         }
     }
 
@@ -94,7 +140,8 @@ public class JdbcInvoiceRepository implements InvoiceRepository {
 
     /**
      * 已锁定发票对应的现行互斥键。
+     *
      * @author owlzhangfq@gmail.com
      */
-    private record Claim(String key, ExpenseUse use, String status) { }
+    private record Claim(String key, ExpenseUse use, String status) {}
 }

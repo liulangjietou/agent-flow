@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpensePaymentReturnRepositoryMapper">
+    <insert id="create">
+        INSERT INTO expense_payment_return_registration(tenant_id,id,report_id,return_version,settlement_version,check_id,check_version,outcome,registered_by,observed_at,registered_at,state_json)
+        VALUES(#{tenantId},#{id},#{reportId},#{returnVersion},#{settlementVersion},#{checkId},#{checkVersion},#{outcome},#{registeredBy},#{observedAt},#{registeredAt},#{stateJson})
+    </insert>
+
+    <select id="history" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_payment_return_registration WHERE tenant_id=#{tenant} AND report_id=#{reportId} ORDER BY return_version
+    </select>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT r.*,p.state_json AS prior_check_json,c.state_json AS resolved_check_json
+        FROM expense_payment_return_registration r
+        JOIN expense_payment_return_check_revision p ON p.tenant_id=r.tenant_id AND p.check_id=r.check_id AND p.version=r.check_version-1
+        JOIN expense_payment_return_check_revision c ON c.tenant_id=r.tenant_id AND c.check_id=r.check_id AND c.version=r.check_version
+        WHERE r.tenant_id=#{tenant} AND r.id=#{id}
+    </select>
+</mapper>

@@ -1,7 +1,11 @@
 package io.agentflow.signature;
 
+import static io.agentflow.signature.SignaturePersistenceFixtures.*;
+import static org.assertj.core.api.Assertions.*;
+
 import io.agentflow.auth.DeferredActorAuthentication.Kind;
 import io.agentflow.auth.DeferredActorAuthentication.LoginReference;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -16,11 +20,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static io.agentflow.signature.SignaturePersistenceFixtures.*;
-import static org.assertj.core.api.Assertions.*;
-
 /**
  * 非空 V112 升级保留旧业务与会话，引用不阻止注销，独立 H2 恢复不补造登录。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SignatureLoginMigrationTest {
@@ -41,7 +43,11 @@ class SignatureLoginMigrationTest {
         before.forEach((table, rows) -> assertThat(jdbc.queryForList("SELECT * FROM " + quoted(table))).as(table)
                 .usingRecursiveFieldByFieldElementComparator().containsExactlyInAnyOrderElementsOf(rows));
         assertThat(operations.find("tenant-a", queued.input().request().id())).contains(queued);
-        var logins = new JdbcSignatureLoginRepository(jdbc); assertThat(logins.find(queued)).isEmpty();
+        var logins = new JdbcSignatureLoginRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.signature.mapper.SignatureLoginRepositoryMapper
+                                        .class)); assertThat(logins.find(queued)).isEmpty();
         var reference = new LoginReference(Kind.OIDC_SESSION, primary); tx.executeWithoutResult(ignored -> logins.insert(queued, reference));
         jdbc.update("DELETE FROM AF_HTTP_SESSION WHERE PRIMARY_ID=?", primary);
         assertThat(jdbc.queryForList("SELECT * FROM AF_HTTP_SESSION_ATTRIBUTES")).isEmpty(); assertThat(logins.find(queued)).contains(reference);
@@ -50,7 +56,11 @@ class SignatureLoginMigrationTest {
         var restored = new DriverManagerDataSource("jdbc:h2:mem:signature-login-restored-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         var restoredJdbc = new JdbcTemplate(restored); restoredJdbc.execute("RUNSCRIPT FROM '" + backup.toString().replace("'", "''") + "'");
         assertThat(Flyway.configure().dataSource(restored).target("113").load().validateWithResult().validationSuccessful).isTrue();
-        assertThat(new JdbcSignatureLoginRepository(restoredJdbc).find(queued)).contains(reference);
+        assertThat(new JdbcSignatureLoginRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (restoredJdbc).getDataSource(),
+                                                io.agentflow.signature.mapper
+                                                        .SignatureLoginRepositoryMapper.class)).find(queued)).contains(reference);
         assertThat(repository(restored).find("tenant-a", queued.input().request().id())).contains(queued);
         assertThat(restoredJdbc.queryForList("SELECT * FROM AF_HTTP_SESSION")).isEmpty();
         System.out.println("Signature login migration preserved tables=" + before.size() + ", original operation=1, restored reference=1, restored sessions=0");

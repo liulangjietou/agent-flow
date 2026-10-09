@@ -1,7 +1,10 @@
 package io.agentflow.finance;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.mock;
 
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -10,6 +13,7 @@ import io.agentflow.organization.JdbcOrganizationRepository;
 import io.agentflow.organization.OrganizationAppointment;
 import io.agentflow.organization.OrganizationPerson;
 import io.agentflow.organization.OrganizationUnit;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +21,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.support.TransactionTemplate;
+
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Duration;
@@ -26,11 +31,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.mock;
 
 /**
  * 真实数据库验证筛选、总数和游标共用权限范围，账户索引不替代原付款事实。
+ *
  * @author owlzhangfq@gmail.com
  */
 class CashierPaymentFiltersTest {
@@ -148,7 +152,9 @@ class CashierPaymentFiltersTest {
         actors.set(new Actor("foreign", "cashier", Set.of("CASHIER")));
         assertThat(workspace.list(Map.of()).totalCount()).isZero(); assertThat(workspace.filterOptions(Map.of()).accounts()).isEmpty();
         actors.set(new Actor(f.tenant, "cashier", Set.of("CASHIER")));
-        f.jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id=? AND subject='cashier'", f.tenant);
+        f.jdbc.update(
+                "UPDATE organization_person SET active=FALSE WHERE tenant_id=? AND"
+                        + " subject='cashier'", f.tenant);
         assertThat(workspace.list(Map.of()).items()).isEmpty(); assertThat(workspace.filterOptions(Map.of()).legalEntities()).isEmpty();
         assertCode(() -> workspace.list(Map.of("beforeId", payment.terms().id().toString())), "NOT_FOUND");
         actors.set(new Actor(f.tenant, "cashier", Set.of("ADMIN")));
@@ -183,20 +189,30 @@ class CashierPaymentFiltersTest {
         f.jdbc.update("UPDATE payment_authorization SET state_json=? WHERE tenant_id=? AND id=?", "{broken", f.tenant, corrupt.terms().id().toString());
         String columns = "tenant_id,id,terms_json,decision_json,state_json,status,version,authorized_at,expires_at,legal_entity_id";
         var before = f.jdbc.queryForList("SELECT " + columns + " FROM payment_authorization ORDER BY id");
-        var revisions = f.jdbc.queryForList("SELECT * FROM payment_authorization_revision ORDER BY authorization_id,version");
+        var revisions = f.jdbc.queryForList(
+                        "SELECT * FROM payment_authorization_revision ORDER BY"
+                                + " authorization_id,version");
         var originalVoucherRows = f.jdbc.queryForList("SELECT * FROM voucher_operation ORDER BY id");
         String originalVoucherQuery = "SELECT " + String.join(",", originalVoucherRows.get(0).keySet()) + " FROM voucher_operation ORDER BY id";
         var originalVoucherRevisions = f.jdbc.queryForList("SELECT * FROM voucher_operation_revision ORDER BY operation_id,version");
         var flyway = Flyway.configure().dataSource(f.source).target("114").load(); assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
         assertThat(f.jdbc.queryForList("SELECT " + columns + " FROM payment_authorization ORDER BY id")).isEqualTo(before);
-        assertThat(f.jdbc.queryForList("SELECT * FROM payment_authorization_revision ORDER BY authorization_id,version")).isEqualTo(revisions);
-        assertThat(f.jdbc.queryForObject("SELECT debit_account_key FROM payment_authorization WHERE tenant_id=? AND id=?", String.class, f.tenant, selected.terms().id().toString())).isEqualTo(CashierPaymentAccountKey.of(selected));
-        assertThat(f.jdbc.queryForObject("SELECT debit_account_key FROM payment_authorization WHERE tenant_id=? AND id=?", String.class, f.tenant, corrupt.terms().id().toString())).isNull();
+        assertThat(f.jdbc.queryForList(
+                                "SELECT * FROM payment_authorization_revision ORDER BY"
+                                        + " authorization_id,version")).isEqualTo(revisions);
+        assertThat(f.jdbc.queryForObject(
+                                "SELECT debit_account_key FROM payment_authorization WHERE"
+                                        + " tenant_id=? AND id=?", String.class, f.tenant, selected.terms().id().toString())).isEqualTo(CashierPaymentAccountKey.of(selected));
+        assertThat(f.jdbc.queryForObject(
+                                "SELECT debit_account_key FROM payment_authorization WHERE"
+                                        + " tenant_id=? AND id=?", String.class, f.tenant, corrupt.terms().id().toString())).isNull();
         assertThat(flyway.migrate().migrationsExecuted).isZero(); assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
         // V114 的旧列断言完成后再升到当前结构，新仓储不运行在旧表结构上。
         Flyway.configure().dataSource(f.source).load().migrate();
         assertThat(f.jdbc.queryForList(originalVoucherQuery)).isEqualTo(originalVoucherRows);
-        assertThat(f.jdbc.queryForList("SELECT * FROM voucher_operation_revision ORDER BY operation_id,version")).isEqualTo(originalVoucherRevisions);
+        assertThat(f.jdbc.queryForList(
+                                "SELECT * FROM voucher_operation_revision ORDER BY"
+                                        + " operation_id,version")).isEqualTo(originalVoucherRevisions);
         assertThat(f.jdbc.queryForObject("SELECT COUNT(*) FROM voucher_operation WHERE trace_id IS NOT NULL", Integer.class)).isZero();
         assertThat(f.vouchers.find(f.tenant, selected.terms().voucherOperationId())).get()
                 .extracting(VoucherOperation::status).isEqualTo(VoucherOperation.Status.POSTED);
@@ -209,6 +225,7 @@ class CashierPaymentFiltersTest {
 
     /**
      * 每个用例独立建立真实挂账、原授权和当前法人任职；旧库按旧列保存相同领域事实。
+     *
      * @author owlzhangfq@gmail.com
      */
     private final class Fixture {
@@ -216,11 +233,29 @@ class CashierPaymentFiltersTest {
         private final DriverManagerDataSource source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         private final JdbcTemplate jdbc = new JdbcTemplate(source);
         private final TransactionTemplate tx = new TransactionTemplate(new DataSourceTransactionManager(source));
-        private final JdbcPaymentAuthorizationRepository authorizations = new JdbcPaymentAuthorizationRepository(jdbc, JSON);
-        private final JdbcPaymentOperationRepository operations = new JdbcPaymentOperationRepository(jdbc, JSON, authorizations);
-        private final JdbcVoucherOperationRepository vouchers = new JdbcVoucherOperationRepository(jdbc, JSON);
-        private final JdbcPaymentExecutionRequestRepository requests = new JdbcPaymentExecutionRequestRepository(jdbc, JSON, authorizations);
-        private final JdbcOrganizationRepository organization = new JdbcOrganizationRepository(jdbc, JSON);
+        private final JdbcPaymentAuthorizationRepository authorizations = new JdbcPaymentAuthorizationRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.finance.mapper.PaymentAuthorizationRepositoryMapper
+                                        .class), JSON);
+        private final JdbcPaymentOperationRepository operations = new JdbcPaymentOperationRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.finance.mapper.PaymentOperationRepositoryMapper.class), JSON, authorizations);
+        private final JdbcVoucherOperationRepository vouchers = new JdbcVoucherOperationRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.finance.mapper.VoucherOperationRepositoryMapper.class), JSON);
+        private final JdbcPaymentExecutionRequestRepository requests = new JdbcPaymentExecutionRequestRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.finance.mapper.PaymentExecutionRequestRepositoryMapper
+                                        .class), JSON, authorizations);
+        private final JdbcOrganizationRepository organization = new JdbcOrganizationRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.organization.mapper.OrganizationRepositoryMapper
+                                        .class), JSON);
         private final UUID person = UUID.randomUUID();
         private final boolean legacy;
         private int sequence;
@@ -239,7 +274,10 @@ class CashierPaymentFiltersTest {
             }); return legal;
         }
         private CashierPaymentWorkspace workspace() {
-            actors.set(new Actor(tenant, "cashier", Set.of("CASHIER"))); var personnel = new PaymentPersonnel(jdbc);
+            actors.set(new Actor(tenant, "cashier", Set.of("CASHIER"))); var personnel = new PaymentPersonnel(
+                            io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                    (jdbc).getDataSource(),
+                                    io.agentflow.finance.mapper.PaymentPersonnelMapper.class));
             var access = new PaymentAccess(actors, mock(VoucherAccess.class), authorizations, vouchers, personnel);
             return new CashierPaymentWorkspace(actors, access, mock(ApprovedPaymentSources.class), authorizations, requests, operations, mock(PaymentAccountsPort.class), personnel);
         }
@@ -250,7 +288,10 @@ class CashierPaymentFiltersTest {
         private PaymentAuthorization payment(UUID entity, String currency, String target, String reference, String accountVersion, LocalDate dueDate) {
             UUID business = UUID.randomUUID(), application = UUID.randomUUID(); Instant authorized = NOW.plusSeconds(++sequence), created = NOW.minusSeconds(3);
             LocalDate date = LocalDate.of(2026, 10, 4); var amount = new Money(new BigDecimal("100"), currency);
-            jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,?,?,'fixture',1,'alice','出纳筛选验收','{}','APPROVED',1,5,'ADVANCE_REQUEST',?)", application.toString(), tenant, business.toString(), business.toString());
+            jdbc.update(
+                    "INSERT INTO"
+                        + " approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)"
+                        + " VALUES(?,?,?,'fixture',1,'alice','出纳筛选验收','{}','APPROVED',1,5,'ADVANCE_REQUEST',?)", application.toString(), tenant, business.toString(), business.toString());
             var lines = List.of(new VoucherCommand.Line(1, new AccountMappingPort.Key(AccountMappingPort.Role.EMPLOYEE_RECEIVABLE, ""), VoucherCommand.Side.DEBIT, amount, 0, null, null, business),
                     new VoucherCommand.Line(2, new AccountMappingPort.Key(AccountMappingPort.Role.EMPLOYEE_PAYABLE, ""), VoucherCommand.Side.CREDIT, amount, 0, null, null, null));
             var request = new AccountMappingPort.Request(entity, currency, lines.stream().map(VoucherCommand.Line::account).toList());
@@ -270,8 +311,14 @@ class CashierPaymentFiltersTest {
             tx.executeWithoutResult(ignored -> {
                 if (!legacy) { authorizations.update(executed); operations.create(PaymentOperation.queue(executed, authorized)); }
                 else {
-                    jdbc.update("UPDATE payment_authorization SET state_json=?,version=2,status='EXECUTION_REGISTERED',updated_at=? WHERE tenant_id=? AND id=?", JSON.write(executed), Timestamp.from(authorized), tenant, initial.terms().id().toString());
-                    jdbc.update("INSERT INTO payment_authorization_revision(tenant_id,authorization_id,version,state_json) VALUES(?,?,2,?)", tenant, initial.terms().id().toString(), JSON.write(executed));
+                    jdbc.update(
+                                    "UPDATE payment_authorization SET"
+                                        + " state_json=?,version=2,status='EXECUTION_REGISTERED',updated_at=?"
+                                        + " WHERE tenant_id=? AND id=?", JSON.write(executed), Timestamp.from(authorized), tenant, initial.terms().id().toString());
+                    jdbc.update(
+                                    "INSERT INTO"
+                                        + " payment_authorization_revision(tenant_id,authorization_id,version,state_json)"
+                                        + " VALUES(?,?,2,?)", tenant, initial.terms().id().toString(), JSON.write(executed));
                 }
             }); return executed;
         }
@@ -279,30 +326,38 @@ class CashierPaymentFiltersTest {
         private void createVoucher(VoucherOperation queued, VoucherOperation claimed, VoucherOperation posted) {
             if (!legacy) { vouchers.create(queued); vouchers.update(claimed); vouchers.update(posted); return; }
             var command = posted.input().command(); var binding = command.binding();
-            jdbc.update("""
-                    INSERT INTO voucher_operation(tenant_id,id,business_type,business_id,application_id,round_no,kind,application_version,business_version,
-                    input_json,command_digest,state_json,version,status,attempts,highest_revision,created_at,updated_at)
-                    VALUES(?,?,'ADVANCE_REQUEST',?,?,?,?,?,?,?,?,?,?,'POSTED',?,?,?,?)
-                    """, tenant, command.id().toString(), binding.businessId().toString(), binding.applicationId().toString(),
+            jdbc.update(
+                    """
+INSERT INTO voucher_operation(tenant_id,id,business_type,business_id,application_id,round_no,kind,application_version,business_version,
+input_json,command_digest,state_json,version,status,attempts,highest_revision,created_at,updated_at)
+VALUES(?,?,'ADVANCE_REQUEST',?,?,?,?,?,?,?,?,?,?,'POSTED',?,?,?,?)
+""", tenant, command.id().toString(), binding.businessId().toString(), binding.applicationId().toString(),
                     binding.roundNo(), command.kind().name(), binding.applicationVersion(), binding.businessVersion(),
                     JSON.write(posted.input()), command.digest(), JSON.write(posted), posted.version(), posted.attempts(),
                     posted.highestRevision(), Timestamp.from(posted.createdAt()), Timestamp.from(posted.updatedAt()));
             for (var revision : List.of(queued, claimed, posted)) {
-                jdbc.update("INSERT INTO voucher_operation_revision(tenant_id,operation_id,version,state_json) VALUES(?,?,?,?)",
+                jdbc.update(
+                        "INSERT INTO"
+                            + " voucher_operation_revision(tenant_id,operation_id,version,state_json)"
+                            + " VALUES(?,?,?,?)",
                         tenant, command.id().toString(), revision.version(), JSON.write(revision));
             }
         }
         private void createAuthorization(PaymentAuthorization value) {
             if (!legacy) { authorizations.create(value); return; }
             var terms = value.terms(); var binding = terms.binding(); var decision = value.decision();
-            jdbc.update("""
-                    INSERT INTO payment_authorization(tenant_id,id,business_type,business_id,application_id,round_no,application_version,business_version,
-                    purpose,voucher_operation_id,voucher_kind,terms_json,decision_json,state_json,version,status,active_business_id,authorized_at,expires_at,updated_at,legal_entity_id)
-                    VALUES(?,?,'ADVANCE_REQUEST',?,?,1,5,3,'EMPLOYEE_ADVANCE',?,'EMPLOYEE_ADVANCE',?,?,?,1,'AUTHORIZED',?,?,?,?,?)
-                    """, tenant, terms.id().toString(), binding.businessId().toString(), binding.applicationId().toString(), terms.voucherOperationId().toString(),
+            jdbc.update(
+                    """
+INSERT INTO payment_authorization(tenant_id,id,business_type,business_id,application_id,round_no,application_version,business_version,
+purpose,voucher_operation_id,voucher_kind,terms_json,decision_json,state_json,version,status,active_business_id,authorized_at,expires_at,updated_at,legal_entity_id)
+VALUES(?,?,'ADVANCE_REQUEST',?,?,1,5,3,'EMPLOYEE_ADVANCE',?,'EMPLOYEE_ADVANCE',?,?,?,1,'AUTHORIZED',?,?,?,?,?)
+""", tenant, terms.id().toString(), binding.businessId().toString(), binding.applicationId().toString(), terms.voucherOperationId().toString(),
                     JSON.write(terms), JSON.write(decision), JSON.write(value), binding.businessId().toString(), Timestamp.from(decision.authorizedAt()),
                     Timestamp.from(decision.expiresAt()), Timestamp.from(value.updatedAt()), terms.payee().legalEntityId().toString());
-            jdbc.update("INSERT INTO payment_authorization_revision(tenant_id,authorization_id,version,state_json) VALUES(?,?,1,?)", tenant, terms.id().toString(), JSON.write(value));
+            jdbc.update(
+                    "INSERT INTO"
+                        + " payment_authorization_revision(tenant_id,authorization_id,version,state_json)"
+                        + " VALUES(?,?,1,?)", tenant, terms.id().toString(), JSON.write(value));
         }
     }
 }

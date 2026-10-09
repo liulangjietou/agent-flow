@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpensePartialPreparationRepositoryMapper">
+    <insert id="create">
+        INSERT INTO expense_partial_adjustment_preparation(trace_id,tenant_id,id,adjustment_id,adjustment_version,report_id,side,requested_by,input_json,state_json,version,status,active_slot,created_at,updated_at)
+        VALUES(#{traceId},#{tenantId},#{id},#{adjustmentId},#{adjustmentVersion},#{reportId},#{side},#{requestedBy},#{inputJson},#{stateJson},1,'QUEUED',1,#{createdAt},#{updatedAt})
+    </insert>
+
+    <insert id="consume">
+        INSERT INTO expense_partial_adjustment_authorization(tenant_id,preparation_id,adjustment_id,preparation_before,preparation_after,adjustment_before,adjustment_after,operation_id,authorized_at)
+        VALUES(#{tenantId},#{preparationId},#{adjustmentId},#{preparationBefore},#{preparationAfter},#{adjustmentBefore},#{adjustmentAfter},#{operationId},#{authorizedAt})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_partial_adjustment_preparation WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="latest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_partial_adjustment_preparation WHERE tenant_id=#{tenant} AND adjustment_id=#{adjustment} AND side=#{side} AND requested_by=#{actor} ORDER BY created_at DESC,id DESC LIMIT 1
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM expense_partial_adjustment_preparation q
+        LEFT JOIN expense_partial_adjustment origin ON origin.tenant_id=q.tenant_id AND origin.id=q.adjustment_id AND origin.report_id=q.report_id
+        LEFT JOIN expense_report report ON report.tenant_id=origin.tenant_id AND report.id=origin.report_id
+        LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=report.application_id
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+        WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until&lt;=#{leaseUntil}) ORDER BY q.created_at,q.id LIMIT 10
+    </select>
+
+    <select id="save" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT input_json FROM expense_partial_adjustment_preparation WHERE tenant_id=#{tenant} AND id=#{id} AND version=#{version}
+    </select>
+
+    <update id="save2">
+        UPDATE expense_partial_adjustment_preparation SET state_json=#{stateJson},version=#{version},status=#{status},active_slot=#{active},lease_until=#{leaseUntil},updated_at=#{updatedAt} WHERE tenant_id=#{tenant} AND id=#{id} AND version=#{expectedVersion} AND input_json=#{originalInput} AND status&lt;&gt;'AUTHORIZED'
+    </update>
+
+    <select id="requireConsumption" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_partial_adjustment_authorization WHERE tenant_id=#{tenant} AND preparation_id=#{id}
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM expense_partial_adjustment_preparation_revision WHERE tenant_id=#{tenant} AND preparation_id=#{id} AND version=#{version}
+    </select>
+
+    <insert id="append">
+        INSERT INTO expense_partial_adjustment_preparation_revision(tenant_id,preparation_id,version,state_json) VALUES(#{tenantId},#{preparationId},#{version},#{stateJson})
+    </insert>
+</mapper>

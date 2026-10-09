@@ -1,8 +1,11 @@
 package io.agentflow.notification;
 
+
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.PaymentPersonnel;
+import io.agentflow.mybatis.SqlRows;
+import io.agentflow.notification.mapper.SupplierPaymentNotificationAccessMapper;
 import io.agentflow.organization.OrganizationPerson;
 import io.agentflow.organization.OrganizationRepository;
 import io.agentflow.procurement.JdbcSupplierPayableHoldRepository;
@@ -14,21 +17,23 @@ import io.agentflow.procurement.SupplierCashierWorkspace;
 import io.agentflow.procurement.SupplierPaymentAccess;
 import io.agentflow.procurement.SupplierPaymentAuthorization;
 import io.agentflow.procurement.SupplierPaymentExecutionRequest;
-import java.util.List;
-import java.util.UUID;
-import org.springframework.jdbc.core.JdbcTemplate;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.UUID;
+
 /**
  * 供应商消息始终读取原出纳选择，当前人员、法人与采购字段权限由原业务入口复核。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
 public class SupplierPaymentNotificationAccess {
     private final CurrentActor actors;
-    private final JdbcTemplate jdbc;
+    private final SupplierPaymentNotificationAccessMapper sqlMapper;
     private final OrganizationRepository organization;
     private final PaymentPersonnel personnel;
     private final JdbcSupplierPaymentAuthorizationRepository authorizations;
@@ -39,11 +44,27 @@ public class SupplierPaymentNotificationAccess {
     private final SupplierCashierAccess cashier;
 
     /** 历史消息不借最新授权、最近请求或管理员身份读取敏感业务。 */
-    public SupplierPaymentNotificationAccess(CurrentActor actors, JdbcTemplate jdbc, OrganizationRepository organization, PaymentPersonnel personnel,
-            JdbcSupplierPaymentAuthorizationRepository authorizations, JdbcSupplierPaymentExecutionRepository requests,
-            JdbcSupplierPaymentOperationRepository payments, JdbcSupplierPayableHoldRepository holds, SupplierPaymentAccess procurement, SupplierCashierAccess cashier) {
-        this.actors = actors; this.jdbc = jdbc; this.organization = organization; this.personnel = personnel; this.authorizations = authorizations;
-        this.requests = requests; this.payments = payments; this.holds = holds; this.procurement = procurement; this.cashier = cashier;
+    public SupplierPaymentNotificationAccess(
+            CurrentActor actors,
+            SupplierPaymentNotificationAccessMapper sqlMapper,
+            OrganizationRepository organization,
+            PaymentPersonnel personnel,
+            JdbcSupplierPaymentAuthorizationRepository authorizations,
+            JdbcSupplierPaymentExecutionRepository requests,
+            JdbcSupplierPaymentOperationRepository payments,
+            JdbcSupplierPayableHoldRepository holds,
+            SupplierPaymentAccess procurement,
+            SupplierCashierAccess cashier) {
+        this.actors = actors;
+        this.sqlMapper = sqlMapper;
+        this.organization = organization;
+        this.personnel = personnel;
+        this.authorizations = authorizations;
+        this.requests = requests;
+        this.payments = payments;
+        this.holds = holds;
+        this.procurement = procurement;
+        this.cashier = cashier;
     }
 
     /** 接收人仅来自原内部参与人，供应商名称和收款账户不能充当组织身份。 */
@@ -77,13 +98,21 @@ public class SupplierPaymentNotificationAccess {
         var row = row(value.tenantId(), value.recipient(), value.inboxId());
         return row == null || context(value.tenantId(), value.recipient(), row) != null;
     }
+
     private Row row(String tenant, String recipient, UUID id) {
-        return jdbc.query("""
-                SELECT event_key,kind,application_id,round_no FROM notification_inbox
-                WHERE tenant_id=? AND recipient_id=? AND id=? AND kind IN ('SUPPLIER_PAYMENT_RESULT','SUPPLIER_PAYMENT_ATTENTION')
-                """, (row, index) -> new Row(row.getString("event_key"), InboxMessage.Kind.valueOf(row.getString("kind")),
-                UUID.fromString(row.getString("application_id")), row.getInt("round_no")), tenant, recipient, id.toString()).stream().findFirst().orElse(null);
+        return SqlRows.map(
+                        sqlMapper.row(tenant, recipient, id.toString()),
+                        row ->
+                                new Row(
+                                        row.getString("event_key"),
+                                        InboxMessage.Kind.valueOf(row.getString("kind")),
+                                        UUID.fromString(row.getString("application_id")),
+                                        row.getInt("round_no")))
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
+
     private Context context(String tenant, String recipient, Row row) {
         if (row == null) return null;
         var identity = SupplierPaymentNotice.source(row.eventKey()).filter(value -> value.notice().kind() == row.kind()).orElse(null);
@@ -97,26 +126,46 @@ public class SupplierPaymentNotificationAccess {
                 || !eligible(tenant, recipient, source.employeeId(), source.round().content().legalEntityId())) return null;
         return new Context(authorization, request);
     }
+
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Supplier payment notification is unavailable in the current scope"); }
+
     /**
      * 原事件定位只在服务内使用，完整采购、账户和指令留在受控存储。
+     *
      * @author owlzhangfq@gmail.com
      */
-    private record Row(String eventKey, InboxMessage.Kind kind, UUID applicationId, int roundNo) { }
+    private record Row(String eventKey, InboxMessage.Kind kind, UUID applicationId, int roundNo) {}
+
     /**
      * 原授权与原选择不能被工作区的最近请求替代。
+     *
      * @author owlzhangfq@gmail.com
      */
-    private record Context(SupplierPaymentAuthorization authorization, SupplierPaymentExecutionRequest request) { }
+    private record Context(
+            SupplierPaymentAuthorization authorization, SupplierPaymentExecutionRequest request) {}
+
     /**
      * 采购原轮次与出纳工作区各自重新校验权限。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public enum View { APPLICATION_ROUND, CASHIER_PAYMENT }
+    public enum View {
+        APPLICATION_ROUND,
+        CASHIER_PAYMENT
+    }
+
     /**
      * 原选择已停止时只展示原事实，不导航到后来另一人的出纳选择。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public record Target(UUID messageId, UUID paymentId, UUID executionRequestId, View view, UUID applicationId, int roundNo,
-                         boolean canOpenCashier, SupplierCashierWorkspace.View payment) { }
+    public record Target(
+            UUID messageId,
+            UUID paymentId,
+            UUID executionRequestId,
+            View view,
+            UUID applicationId,
+            int roundNo,
+            boolean canOpenCashier,
+            SupplierCashierWorkspace.View payment) {}
 }

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.InvoiceOccupationQueriesMapper">
+    <select id="claims" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT invoice_key,report_id,round_no,line_no,status FROM invoice_active_claim
+        WHERE tenant_id=#{parameters.tenant} AND invoice_key IN (<foreach collection="parameters['keys']" item="item" separator=",">#{item}</foreach>)
+    </select>
+</mapper>

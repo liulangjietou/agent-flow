@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.organization.mapper.LocalOrganizationDirectoryMapper">
+    <select id="approvers" resultType="String">
+        SELECT subject FROM organization_person WHERE tenant_id=#{tenantId} AND active=TRUE AND approval_eligible=TRUE ORDER BY subject
+    </select>
+
+    <select id="formOptions" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,display_name FROM organization_person WHERE tenant_id=#{tenantId} AND active=TRUE AND approval_eligible=TRUE ORDER BY display_name,id
+    </select>
+
+    <select id="formOptions2" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT u.id,u.name,u.kind,
+               CASE WHEN a.active=TRUE AND a.department_id=u.id AND p.active=TRUE AND p.approval_eligible=TRUE
+                              AND j.active=TRUE THEN TRUE ELSE FALSE END AS head_available
+        FROM organization_unit u
+        JOIN organization_unit l ON l.tenant_id=u.tenant_id AND l.id=u.legal_entity_id AND l.active=TRUE
+        LEFT JOIN organization_appointment a ON a.tenant_id=u.tenant_id AND a.id=u.head_appointment_id
+        LEFT JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id
+        LEFT JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id
+        WHERE u.tenant_id=#{tenantId} AND u.active=TRUE AND u.kind IN ('DEPARTMENT','POSITION') ORDER BY u.kind,u.name,u.id
+    </select>
+
+    <select id="options" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,name,kind FROM organization_unit WHERE tenant_id=#{tenantId} AND kind IN ('DEPARTMENT','POSITION') AND active=TRUE ORDER BY kind,name,id
+    </select>
+    <select id="optionsQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT id,display_name FROM organization_person WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND active=TRUE<choose><when test="condition0"> AND approval_eligible=TRUE</when><otherwise></otherwise></choose> ORDER BY display_name,id
+    </select>
+    <select id="roleMembersQuery" resultType="String">
+        <bind name="position" value="0"/>
+        SELECT DISTINCT p.subject FROM organization_appointment a
+        JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id AND p.active=TRUE
+        JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE
+        JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE
+        JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE
+        WHERE a.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND a.active=TRUE
+        <choose><when test="condition0"> AND p.approval_eligible=TRUE</when><otherwise></otherwise></choose> AND (a.department_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} OR a.position_id=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}) ORDER BY p.subject
+    </select>
+    <select id="memberCountsQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT a.<choose><when test="columnChoice == &quot;department_id&quot;">department_id</when><otherwise>position_id</otherwise></choose> AS id,COUNT(DISTINCT p.subject) AS members FROM organization_appointment a
+        JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id AND p.active=TRUE
+        JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE
+        JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE
+        JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE
+        WHERE a.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND a.active=TRUE
+        <choose><when test="condition1"> AND p.approval_eligible=TRUE</when><otherwise></otherwise></choose> GROUP BY a.<choose><when test="columnChoice == &quot;department_id&quot;">department_id</when><otherwise>position_id</otherwise></choose>
+    </select>
+</mapper>

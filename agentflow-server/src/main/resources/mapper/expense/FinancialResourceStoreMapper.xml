@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.FinancialResourceStoreMapper">
+    <insert id="create">
+        INSERT INTO finance_resource(tenant_id,resource_type,id,owner_id,source_reference,version,context_json,state_json) VALUES(#{tenantId},#{resourceType},#{id},#{ownerId},#{sourceReference},1,#{contextJson},#{stateJson})
+    </insert>
+
+    <update id="update">
+        UPDATE finance_resource SET version=#{version},state_json=#{state},updated_at=CURRENT_TIMESTAMP
+        WHERE tenant_id=#{tenantId} AND resource_type=#{resourceType} AND id=#{id} AND owner_id=#{ownerId} AND source_reference=#{sourceReference} AND context_json=#{context} AND version=#{expectedVersion}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM finance_resource WHERE tenant_id=#{tenantId} AND resource_type=#{resourceType} AND id=#{id}
+    </select>
+
+    <select id="findAll" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM finance_resource WHERE tenant_id=#{parameters.tenant} AND resource_type=#{parameters.kind} AND id IN (<foreach collection="parameters['ids']" item="item" separator=",">#{item}</foreach>) ORDER BY id
+    </select>
+
+    <delete id="replaceAmountUses">
+        DELETE FROM finance_amount_use WHERE tenant_id=#{tenantId} AND resource_type=#{resourceType} AND resource_id=#{id}
+    </delete>
+
+    <insert id="append">
+        INSERT INTO finance_resource_revision(tenant_id,resource_type,resource_id,version,actor_id,operation,state_json) VALUES(#{tenantId},#{resourceType},#{resourceId},#{version},#{actorId},#{operation},#{stateJson})
+    </insert>
+    <insert id="insertAmountUses">
+        INSERT INTO finance_amount_use(tenant_id,resource_type,resource_id,source_line,report_id,round_no,report_line,amount,currency,status) VALUES <foreach collection="rows" item="row" separator=",">(#{row.tenantId},#{row.resourceType},#{row.resourceId},#{row.sourceLine},#{row.reportId},#{row.roundNo},#{row.reportLine},#{row.amount},#{row.currency},#{row.status})</foreach>
+    </insert>
+</mapper>

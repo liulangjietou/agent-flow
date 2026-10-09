@@ -2,9 +2,10 @@ package io.agentflow.expense;
 
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import io.agentflow.expense.mapper.InvoiceOccupationQueriesMapper;
+
 import org.springframework.stereotype.Service;
+
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -13,21 +14,29 @@ import java.util.UUID;
 
 /**
  * 当前票号占用的授权读模型；只读原互斥键，不将可撤销的单据权限固化到预检历史。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
 public class InvoiceOccupationQueries {
-    private final NamedParameterJdbcTemplate jdbc;
+    private final InvoiceOccupationQueriesMapper sqlMapper;
     private final CurrentActor actors;
     private final InvoiceRepository invoices;
     private final ExpenseReportRepository reports;
     private final ExpenseDraftService expenses;
 
     /** 单号可见性复用报销详情的当前轮次及敏感字段权限，管理员没有额外豁免。 */
-    public InvoiceOccupationQueries(JdbcTemplate jdbc, CurrentActor actors, InvoiceRepository invoices,
-            ExpenseReportRepository reports, ExpenseDraftService expenses) {
-        this.jdbc = new NamedParameterJdbcTemplate(jdbc); this.actors = actors;
-        this.invoices = invoices; this.reports = reports; this.expenses = expenses;
+    public InvoiceOccupationQueries(
+            InvoiceOccupationQueriesMapper sqlMapper,
+            CurrentActor actors,
+            InvoiceRepository invoices,
+            ExpenseReportRepository reports,
+            ExpenseDraftService expenses) {
+        this.sqlMapper = sqlMapper;
+        this.actors = actors;
+        this.invoices = invoices;
+        this.reports = reports;
+        this.expenses = expenses;
     }
 
     /** 批量读取本人票夹中已知票号的有效占用；另一份上传原件仍指向同一权威互斥键。 */
@@ -77,15 +86,24 @@ public class InvoiceOccupationQueries {
 
     private Map<String, Claim> claims(List<Invoice> candidates) {
         if (candidates.isEmpty()) return Map.of();
-        var keys = candidates.stream().map(invoice -> invoice.facts().key().canonical()).distinct().toList();
+        var keys =
+                candidates.stream()
+                        .map(invoice -> invoice.facts().key().canonical())
+                        .distinct()
+                        .toList();
         var result = new LinkedHashMap<String, Claim>();
-        jdbc.query("""
-                SELECT invoice_key,report_id,round_no,line_no,status FROM invoice_active_claim
-                WHERE tenant_id=:tenant AND invoice_key IN (:keys)
-                """, Map.of("tenant", actors.actor().tenantId(), "keys", keys), row -> {
-            result.put(row.getString("invoice_key"), new Claim(uuid(row.getString("report_id")),
-                    row.getInt("round_no"), row.getInt("line_no"), Invoice.Occupation.valueOf(row.getString("status"))));
-        });
+        sqlMapper
+                .claims(Map.of("tenant", actors.actor().tenantId(), "keys", keys))
+                .forEach(
+                        row -> {
+                            result.put(
+                                    row.getString("invoice_key"),
+                                    new Claim(
+                                            uuid(row.getString("report_id")),
+                                            row.getInt("round_no"),
+                                            row.getInt("line_no"),
+                                            Invoice.Occupation.valueOf(row.getString("status"))));
+                        });
         return result;
     }
 
@@ -107,22 +125,30 @@ public class InvoiceOccupationQueries {
 
     /**
      * 原互斥表的最小行，采购来源没有报销单标识。
+     *
      * @author owlzhangfq@gmail.com
      */
-    private record Claim(UUID reportId, int roundNo, int lineNo, Invoice.Occupation status) { }
+    private record Claim(UUID reportId, int roundNo, int lineNo, Invoice.Occupation status) {}
+
     /**
      * 当前有效占用；没有 expense 不代表未占用，只表示不能展示报销来源。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public record View(Invoice.Occupation status, ExpenseReference expense) { }
+    public record View(Invoice.Occupation status, ExpenseReference expense) {}
+
     /**
      * 通过原轮次详情权限后才能返回的最小业务定位信息。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public record ExpenseReference(UUID reportId, UUID applicationId, String businessNo, int roundNo, int lineNo) { }
+    public record ExpenseReference(
+            UUID reportId, UUID applicationId, String businessNo, int roundNo, int lineNo) {}
+
     /**
      * 本人当前费用行与票号占用的关联，不回显占用方票据、员工或资金信息。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public record Conflict(int lineNo, UUID invoiceId, View occupation) { }
+    public record Conflict(int lineNo, UUID invoiceId, View occupation) {}
 }

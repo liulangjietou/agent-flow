@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.finance.mapper.FinanceReceiptCreditRepositoryMapper">
+    <insert id="record">
+        INSERT INTO finance_receipt_credit(tenant_id,legal_entity_id,business_id,channel,transaction_reference,amount,currency,supplier_registration_id)
+        VALUES(#{tenantId},#{legalEntityId},#{businessId},#{channel},#{transactionReference},#{amount},#{currency},#{supplierRegistrationId})
+    </insert>
+
+    <update id="account">
+        UPDATE finance_receipt_credit SET voucher_reference=#{voucherReference},entry_reference=#{entryReference},supplier_adjustment_id=#{id},supplier_adjustment_version=#{version}
+        WHERE tenant_id=#{tenantId} AND legal_entity_id=#{legalEntityId} AND business_id=#{requestId} AND channel='BANK_TRANSFER' AND transaction_reference=#{transactionReference}
+            AND supplier_registration_id=#{registrationId} AND amount=#{amount} AND currency=#{currency} AND voucher_reference IS NULL AND entry_reference IS NULL
+            AND supplier_adjustment_id IS NULL AND supplier_adjustment_version IS NULL
+    </update>
+
+    <insert id="insert">
+        INSERT INTO finance_receipt_credit(tenant_id,legal_entity_id,business_id,channel,transaction_reference,voucher_reference,entry_reference,amount,currency,repayment_id,disbursement_resolution_id,expense_registration_id)
+        VALUES(#{tenantId},#{legalEntityId},#{businessId},#{channel},#{transactionReference},#{voucherReference},#{entryReference},#{amount},#{currency},#{repaymentId},#{disbursementResolutionId},#{expenseRegistrationId})
+    </insert>
+</mapper>

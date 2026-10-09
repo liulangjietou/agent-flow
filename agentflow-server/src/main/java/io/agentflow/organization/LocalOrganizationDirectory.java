@@ -3,10 +3,12 @@ package io.agentflow.organization;
 import io.agentflow.approval.service.TaskRecipientDirectory;
 import io.agentflow.auth.AuthService;
 import io.agentflow.definition.DefinitionAssigneeDirectory;
+import io.agentflow.organization.mapper.LocalOrganizationDirectoryMapper;
+
 import org.springframework.context.annotation.Primary;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,31 +19,31 @@ import java.util.UUID;
 
 /**
  * 将本地组织适配到既有选人和收件人端口；显式初始化后空目录不会回退为演示人员。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Component
 @Primary
-public class LocalOrganizationDirectory implements TaskRecipientDirectory, DefinitionAssigneeDirectory {
+public class LocalOrganizationDirectory
+        implements TaskRecipientDirectory, DefinitionAssigneeDirectory {
     public static final String PERSON_ROLE = "ORG_PERSON_";
     public static final String UNIT_ROLE = "ORG_UNIT_";
     public static final String SUPERVISOR_RULE = "role:ORG_SUPERVISOR_";
     public static final String DEPARTMENT_HEAD_RULE = "role:ORG_DEPARTMENT_HEAD";
     public static final int MAX_SUPERVISOR_LEVEL = 10;
-    private static final String ACTIVE_APPOINTMENTS = """
-            FROM organization_appointment a
-            JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id AND p.active=TRUE
-            JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE
-            JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE
-            JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE
-            WHERE a.tenant_id=? AND a.active=TRUE
-            """;
+
     private final OrganizationRepository repository;
-    private final JdbcTemplate jdbc;
+    private final LocalOrganizationDirectoryMapper sqlMapper;
     private final AuthService demo;
 
     /** 演示源作为明确的兼容分支，企业身份与组织来源彼此独立。 */
-    public LocalOrganizationDirectory(OrganizationRepository repository, JdbcTemplate jdbc, AuthService demo) {
-        this.repository = repository; this.jdbc = jdbc; this.demo = demo;
+    public LocalOrganizationDirectory(
+            OrganizationRepository repository,
+            LocalOrganizationDirectoryMapper sqlMapper,
+            AuthService demo) {
+        this.repository = repository;
+        this.sqlMapper = sqlMapper;
+        this.demo = demo;
     }
 
     /** 本地规则只引用不透明实体标识，因此 OIDC 主体中的冒号等字符不会进入表达式。 */
@@ -64,7 +66,7 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
     @Override
     public List<String> approvers(String tenantId) {
         if (!repository.initialized(tenantId)) return demo.approvers(tenantId);
-        return jdbc.queryForList("SELECT subject FROM organization_person WHERE tenant_id=? AND active=TRUE AND approval_eligible=TRUE ORDER BY subject", String.class, tenantId);
+        return sqlMapper.approvers(tenantId);
     }
 
     @Override
@@ -85,12 +87,18 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
     private List<String> roleMembers(String tenantId, String role, boolean approvalRequired) {
         if (role.startsWith(PERSON_ROLE)) {
             var id = localId(role, PERSON_ROLE);
-            return repository.person(tenantId, id).filter(person -> person.active() && (!approvalRequired || person.approvalEligible()))
-                    .map(person -> List.of(person.subject())).orElseGet(List::of);
+            return repository
+                    .person(tenantId, id)
+                    .filter(
+                            person ->
+                                    person.active()
+                                            && (!approvalRequired || person.approvalEligible()))
+                    .map(person -> List.of(person.subject()))
+                    .orElseGet(List::of);
         }
         if (role.startsWith(UNIT_ROLE)) {
             String id = localId(role, UNIT_ROLE).toString();
-            return jdbc.queryForList("SELECT DISTINCT p.subject " + appointments(approvalRequired) + " AND (a.department_id=? OR a.position_id=?) ORDER BY p.subject", String.class, tenantId, id, id);
+            return sqlMapper.roleMembersQuery(approvalRequired, new Object[] {tenantId, id, id});
         }
         return List.of();
     }
@@ -112,23 +120,31 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
     public List<FormOption> formOptions(String tenantId) {
         if (!repository.initialized(tenantId)) return List.of();
         var result = new ArrayList<FormOption>();
-        jdbc.query("SELECT id,display_name FROM organization_person WHERE tenant_id=? AND active=TRUE AND approval_eligible=TRUE ORDER BY display_name,id",
-                (org.springframework.jdbc.core.RowCallbackHandler) row -> result.add(new FormOption(UUID.fromString(row.getString("id")),
-                        row.getString("display_name"), io.agentflow.definition.FormAssigneePolicy.SourceKind.PERSON, 1, false)), tenantId);
+        sqlMapper
+                .formOptions(tenantId)
+                .forEach(
+                        row ->
+                                result.add(
+                                        new FormOption(
+                                                UUID.fromString(row.getString("id")),
+                                                row.getString("display_name"),
+                                                io.agentflow.definition.FormAssigneePolicy
+                                                        .SourceKind.PERSON,
+                                                1,
+                                                false)));
         var counts = memberCounts(tenantId, true);
-        jdbc.query("""
-                SELECT u.id,u.name,u.kind,
-                       CASE WHEN a.active=TRUE AND a.department_id=u.id AND p.active=TRUE AND p.approval_eligible=TRUE
-                                      AND j.active=TRUE THEN TRUE ELSE FALSE END AS head_available
-                FROM organization_unit u
-                JOIN organization_unit l ON l.tenant_id=u.tenant_id AND l.id=u.legal_entity_id AND l.active=TRUE
-                LEFT JOIN organization_appointment a ON a.tenant_id=u.tenant_id AND a.id=u.head_appointment_id
-                LEFT JOIN organization_person p ON p.tenant_id=a.tenant_id AND p.id=a.person_id
-                LEFT JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id
-                WHERE u.tenant_id=? AND u.active=TRUE AND u.kind IN ('DEPARTMENT','POSITION') ORDER BY u.kind,u.name,u.id
-                """, (org.springframework.jdbc.core.RowCallbackHandler) row -> result.add(new FormOption(UUID.fromString(row.getString("id")),
-                        row.getString("name"), io.agentflow.definition.FormAssigneePolicy.SourceKind.valueOf(row.getString("kind")),
-                        counts.getOrDefault(row.getString("id"), 0), row.getBoolean("head_available"))), tenantId);
+        sqlMapper
+                .formOptions2(tenantId)
+                .forEach(
+                        row ->
+                                result.add(
+                                        new FormOption(
+                                                UUID.fromString(row.getString("id")),
+                                                row.getString("name"),
+                                                io.agentflow.definition.FormAssigneePolicy
+                                                        .SourceKind.valueOf(row.getString("kind")),
+                                                counts.getOrDefault(row.getString("id"), 0),
+                                                row.getBoolean("head_available"))));
         return List.copyOf(result);
     }
 
@@ -154,15 +170,31 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
         for (int level = 1; level <= MAX_SUPERVISOR_LEVEL; level++) {
             result.add(new Option(SUPERVISOR_RULE + level, "本次任职 · 第 " + level + " 级主管", 0, true));
         }
-        jdbc.query("SELECT id,display_name FROM organization_person WHERE tenant_id=? AND active=TRUE" + (approvalRequired ? " AND approval_eligible=TRUE" : "") + " ORDER BY display_name,id",
-                (org.springframework.jdbc.core.RowCallbackHandler) row -> result.add(new Option("role:" + PERSON_ROLE + row.getString("id"), "人员 · " + row.getString("display_name"), 1)), tenantId);
+        sqlMapper
+                .optionsQuery(approvalRequired, new Object[] {tenantId})
+                .forEach(
+                        row ->
+                                result.add(
+                                        new Option(
+                                                "role:" + PERSON_ROLE + row.getString("id"),
+                                                "人员 · " + row.getString("display_name"),
+                                                1)));
         var counts = memberCounts(tenantId, approvalRequired);
-        jdbc.query("SELECT id,name,kind FROM organization_unit WHERE tenant_id=? AND kind IN ('DEPARTMENT','POSITION') AND active=TRUE ORDER BY kind,name,id",
-                (org.springframework.jdbc.core.RowCallbackHandler) row -> {
-                    int count = counts.getOrDefault(row.getString("id"), 0);
-                    if (count > 0) result.add(new Option("role:" + UNIT_ROLE + row.getString("id"),
-                            ("DEPARTMENT".equals(row.getString("kind")) ? "部门 · " : "岗位 · ") + row.getString("name"), count));
-                }, tenantId);
+        sqlMapper
+                .options(tenantId)
+                .forEach(
+                        row -> {
+                            int count = counts.getOrDefault(row.getString("id"), 0);
+                            if (count > 0)
+                                result.add(
+                                        new Option(
+                                                "role:" + UNIT_ROLE + row.getString("id"),
+                                                ("DEPARTMENT".equals(row.getString("kind"))
+                                                                ? "部门 · "
+                                                                : "岗位 · ")
+                                                        + row.getString("name"),
+                                                count));
+                        });
         return List.copyOf(result);
     }
 
@@ -170,14 +202,11 @@ public class LocalOrganizationDirectory implements TaskRecipientDirectory, Defin
         var counts = new HashMap<String, Integer>();
         for (String column : List.of("department_id", "position_id")) {
             // 列名是服务端固定白名单，不来自 URL 或客户端输入。
-            jdbc.query("SELECT a." + column + " AS id,COUNT(DISTINCT p.subject) AS members " + appointments(approvalRequired) + " GROUP BY a." + column,
-                    (org.springframework.jdbc.core.RowCallbackHandler) row -> counts.put(row.getString("id"), row.getInt("members")), tenantId);
+            sqlMapper
+                    .memberCountsQuery(column, approvalRequired, new Object[] {tenantId})
+                    .forEach(row -> counts.put(row.getString("id"), row.getInt("members")));
         }
         return counts;
-    }
-
-    private static String appointments(boolean approvalRequired) {
-        return ACTIVE_APPOINTMENTS + (approvalRequired ? " AND p.approval_eligible=TRUE" : "");
     }
 
     private static UUID localId(String role, String prefix) {

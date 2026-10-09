@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.budget.mapper.BudgetAdjustmentQueryMapper">
+    <select id="list" resultType="java.sql.Timestamp">
+        SELECT created_at FROM budget_adjustment WHERE tenant_id=#{tenantId} AND employee_id=#{userId} AND id=#{before}
+    </select>
+    <select id="listQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT r.id,r.application_id,a.business_no,a.title,a.status,a.round_no,a.version application_version,
+        r.version request_version,r.created_at
+        FROM budget_adjustment r JOIN approval_application a ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        WHERE r.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND r.employee_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}
+        <choose><when test="containsKeySelected"> AND a.status=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</when><otherwise></otherwise></choose><choose><when test="hasBefore"> AND (r.created_at&lt;<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} OR (r.created_at=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} AND r.id&lt;<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6}))</when><otherwise></otherwise></choose> ORDER BY r.created_at DESC,r.id DESC LIMIT <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}
+    </select>
+</mapper>

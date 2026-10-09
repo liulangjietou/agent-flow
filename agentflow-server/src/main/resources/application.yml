@@ -13,6 +13,14 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
+mybatis:
+  mapper-locations: classpath*:mapper/**/*.xml
+  configuration:
+    local-cache-scope: STATEMENT
+    cache-enabled: false
+    call-setters-on-nulls: true
+    return-instance-for-empty-row: true
+
 server:
   address: ${SERVER_ADDRESS:127.0.0.1}
   port: ${SERVER_PORT:8080}

@@ -1,25 +1,19 @@
 package io.agentflow.expense;
+import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import io.agentflow.common.JsonUtil;
-import io.agentflow.common.DomainException;
+
 import io.agentflow.approval.model.ApplicationStatus;
+import io.agentflow.common.DomainException;
+import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionModels.Graph;
 import io.agentflow.definition.DefinitionModels.Node;
 import io.agentflow.definition.DefinitionModels.NodeType;
 import io.agentflow.expense.ExpenseSplitRiskEvidence.Document;
 import io.agentflow.finance.EmployeeAccountSnapshot;
 import io.agentflow.finance.Money;
-import java.math.BigDecimal;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,10 +29,20 @@ import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
-import static org.assertj.core.api.Assertions.*;
+
+import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * 实际非空旧库验证当前财务轮次投影和不可变路由依据；SQL 夹具不代表完整审批运行。
+ *
  * @author owlzhangfq@gmail.com
  */
 class ExpenseSplitRoutingPersistenceTest {
@@ -66,7 +70,9 @@ class ExpenseSplitRoutingPersistenceTest {
 
     @Test void migrationAddsCurrentRoundProjectionAndEvidenceWithoutRewritingAnyLegacyColumn() {
         var before = legacyRows(); upgrade();
-        assertThat(jdbc.queryForList("SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='EXPENSE_REPORT'", String.class))
+        assertThat(jdbc.queryForList(
+                                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE"
+                                        + " TABLE_NAME='EXPENSE_REPORT'", String.class))
                 .contains("CURRENT_ROUND_NO", "CURRENT_SUBMITTED_AT", "CURRENT_LEGAL_ENTITY_ID", "CURRENT_BASE_CURRENCY");
         assertThat(jdbc.queryForList("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES", String.class))
                 .contains("EXPENSE_SPLIT_ROUTING", "EXPENSE_SPLIT_ROUTING_SOURCE");
@@ -76,7 +82,9 @@ class ExpenseSplitRoutingPersistenceTest {
         for (var report : List.of(approving, reduced, returned)) {
             assertThat(projection(report)).containsEntry("CURRENT_ROUND_NO", 1).containsEntry("CURRENT_LEGAL_ENTITY_ID", LEGAL.toString())
                     .containsEntry("CURRENT_BASE_CURRENCY", "CNY");
-            assertThat(jdbc.queryForObject("SELECT current_submitted_at FROM expense_report WHERE id=?", Timestamp.class, report.id().toString()).toInstant()).isEqualTo(AT);
+            assertThat(jdbc.queryForObject(
+                                            "SELECT current_submitted_at FROM expense_report WHERE"
+                                                    + " id=?", Timestamp.class, report.id().toString()).toInstant()).isEqualTo(AT);
         }
         assertThat(returned.content().legalEntityId()).isNotEqualTo(LEGAL);
         assertThat(Flyway.configure().dataSource(source).target("116").load().migrate().migrationsExecuted).isZero();
@@ -110,7 +118,10 @@ class ExpenseSplitRoutingPersistenceTest {
     }
 
     @Test void activeSourceWithMissingProjectionCannotDisappearFromRiskCheck() {
-        upgrade(); jdbc.update("UPDATE expense_report SET current_round_no=NULL,current_submitted_at=NULL,current_legal_entity_id=NULL,current_base_currency=NULL WHERE id=?", approving.id().toString());
+        upgrade(); jdbc.update(
+                "UPDATE expense_report SET"
+                    + " current_round_no=NULL,current_submitted_at=NULL,current_legal_entity_id=NULL,current_base_currency=NULL"
+                    + " WHERE id=?", approving.id().toString());
         assertThatThrownBy(() -> candidates(draft, Set.of("TAXI"))).isInstanceOf(IllegalStateException.class);
     }
 
@@ -130,7 +141,9 @@ class ExpenseSplitRoutingPersistenceTest {
         assertThat(routing.findByApplication(TENANT, draft.applicationId(), 1)).contains(snapshot);
         assertThat(routing.find("foreign", draft.id(), 1)).isEmpty(); assertThat(routing.find(TENANT, draft.id(), 2)).isEmpty();
         assertThat(snapshot.assessment().routingAmount()).isEqualTo(money("8000"));
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM approval_submission_round WHERE application_id=?", Integer.class, draft.applicationId().toString())).isZero();
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM approval_submission_round WHERE"
+                                        + " application_id=?", Integer.class, draft.applicationId().toString())).isZero();
         long version = reduced.version(); reduced.reduce(version, List.of(new ExpenseReport.Reduction(1, money("1000"), money("0"))), "finance", "CORRECTION", "再次核減", AT.plusSeconds(2));
         tx.executeWithoutResult(ignored -> reports.update(reduced, version, "finance", "REDUCE"));
         jdbc.update("UPDATE approval_application SET status='WITHDRAWN',version=version+1 WHERE id=?", approving.applicationId().toString());
@@ -170,9 +183,15 @@ class ExpenseSplitRoutingPersistenceTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_split_routing", Integer.class)).isZero();
         insertRound(approving);
         tx.executeWithoutResult(ignored -> routing.save(snapshot));
-        assertThatThrownBy(() -> jdbc.update("UPDATE expense_split_routing SET financial_version=999 WHERE report_id=?", draft.id().toString())).isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> jdbc.update("UPDATE expense_split_routing SET tenant_id='foreign' WHERE report_id=?", draft.id().toString())).isInstanceOf(DataIntegrityViolationException.class);
-        jdbc.update("UPDATE expense_split_routing_source SET source_application_version=99 WHERE report_id=? AND ordinal=1", draft.id().toString());
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE expense_split_routing SET financial_version=999"
+                                                + " WHERE report_id=?", draft.id().toString())).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE expense_split_routing SET tenant_id='foreign' WHERE"
+                                                + " report_id=?", draft.id().toString())).isInstanceOf(DataIntegrityViolationException.class);
+        jdbc.update(
+                "UPDATE expense_split_routing_source SET source_application_version=99 WHERE"
+                        + " report_id=? AND ordinal=1", draft.id().toString());
         assertThatThrownBy(() -> routing.find(TENANT, draft.id(), 1)).isInstanceOf(IllegalStateException.class);
     }
 
@@ -193,7 +212,9 @@ class ExpenseSplitRoutingPersistenceTest {
                 jdbc.update("UPDATE approval_definition SET graph_json=? WHERE id=?", json.write(graph), definitionId.toString());
                 routing.save(value);
                 assertThat(routing.find(TENANT, draft.id(), 1)).contains(value);
-                assertThat(jdbc.queryForObject("SELECT mode FROM expense_split_routing WHERE report_id=?", String.class, draft.id().toString())).isEqualTo(mode.name());
+                assertThat(jdbc.queryForObject(
+                                                "SELECT mode FROM expense_split_routing WHERE"
+                                                        + " report_id=?", String.class, draft.id().toString())).isEqualTo(mode.name());
                 assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_split_routing_source", Integer.class)).isZero();
                 transaction.setRollbackOnly();
             });
@@ -203,13 +224,23 @@ class ExpenseSplitRoutingPersistenceTest {
     private void upgrade() {
         Flyway.configure().dataSource(source).target("116").load().migrate();
         var manager = new DataSourceTransactionManager(source); tx = new TransactionTemplate(manager);
-        reports = new JdbcExpenseReportRepository(jdbc, json);
-        var proxy = new ProxyFactory(new JdbcExpenseSplitRoutingRepository(jdbc, json));
+        reports = new JdbcExpenseReportRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.expense.mapper.ExpenseReportRepositoryMapper.class), json);
+        var proxy = new ProxyFactory(new JdbcExpenseSplitRoutingRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.expense.mapper
+                                                .ExpenseSplitRoutingRepositoryMapper.class), json));
         proxy.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource()));
         routing = (JdbcExpenseSplitRoutingRepository) proxy.getProxy();
         var graph = new Graph(List.of(new Node("start", "开始", NodeType.START, Map.of("expenseSplitRisk", "ENABLED", "expenseSplitWindowDays", "7", "expenseSplitThreshold", "5000", "expenseSplitCurrency", "CNY")),
                 new Node("gate", "业务金额", NodeType.EXCLUSIVE_GATEWAY, Map.of("expenseSplitRouting", "AGGREGATE_AMOUNT"))), List.of());
-        jdbc.update("INSERT INTO approval_definition(id,tenant_id,process_key,name,version,revision,status,graph_json) VALUES(?,?,'split-fixture','合成存储定义',1,1,'PUBLISHED',?)", definitionId.toString(), TENANT, json.write(graph));
+        jdbc.update(
+                "INSERT INTO"
+                    + " approval_definition(id,tenant_id,process_key,name,version,revision,status,graph_json)"
+                    + " VALUES(?,?,'split-fixture','合成存储定义',1,1,'PUBLISHED',?)", definitionId.toString(), TENANT, json.write(graph));
     }
     private List<Document> candidates(ExpenseReport primary, Set<String> categories) {
         return tx.execute(ignored -> routing.candidates(TENANT, "alice", LEGAL, "CNY", primary.id(), AT.minusSeconds(7 * 24 * 3600), AT, categories));
@@ -229,13 +260,23 @@ class ExpenseSplitRoutingPersistenceTest {
                 round.approvedLines().stream().map(line -> new ExpenseSplitRiskEvidence.Line(line.lineNo(), "TAXI", line.gross())).toList());
     }
     private Map<String, Object> projection(ExpenseReport report) {
-        return jdbc.queryForMap("SELECT current_round_no,current_submitted_at,current_legal_entity_id,current_base_currency FROM expense_report WHERE id=?", report.id().toString());
+        return jdbc.queryForMap(
+                "SELECT"
+                    + " current_round_no,current_submitted_at,current_legal_entity_id,current_base_currency"
+                    + " FROM expense_report WHERE id=?", report.id().toString());
     }
     private List<List<Map<String, Object>>> legacyRows() {
-        return List.of(jdbc.queryForList("SELECT id,tenant_id,application_id,business_type,employee_id,version,state_json,created_at,updated_at FROM expense_report ORDER BY id"),
-                jdbc.queryForList("SELECT * FROM expense_report_revision ORDER BY report_id,financial_version"),
+        return List.of(jdbc.queryForList(
+                        "SELECT"
+                            + " id,tenant_id,application_id,business_type,employee_id,version,state_json,created_at,updated_at"
+                            + " FROM expense_report ORDER BY id"),
+                jdbc.queryForList(
+                        "SELECT * FROM expense_report_revision ORDER BY"
+                                + " report_id,financial_version"),
                 jdbc.queryForList("SELECT * FROM approval_application ORDER BY id"),
-                jdbc.queryForList("SELECT * FROM approval_submission_round ORDER BY application_id,round_no"));
+                jdbc.queryForList(
+                        "SELECT * FROM approval_submission_round ORDER BY"
+                                + " application_id,round_no"));
     }
     private ExpenseReport seed(String status, String amount, String reduction) {
         var report = ExpenseReport.draft(UUID.randomUUID(), TENANT, UUID.randomUUID(), "alice", content(LEGAL, amount));
@@ -250,13 +291,20 @@ class ExpenseSplitRoutingPersistenceTest {
                 report.revise(report.version(), content(UUID.randomUUID(), amount)); revisions.add(report.state());
             }
         }
-        jdbc.update("""
-                INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)
-                VALUES(?,? ,?,'split-fixture',1,'alice','跨单存储夹具','{}',?,1,5,'EXPENSE',?)
-                """, report.applicationId().toString(), TENANT, "SPLIT-" + report.id(), status, report.id().toString());
-        jdbc.update("INSERT INTO expense_report(id,tenant_id,application_id,employee_id,version,state_json) VALUES(?,?,?,'alice',?,?)",
+        jdbc.update(
+                """
+INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)
+VALUES(?,? ,?,'split-fixture',1,'alice','跨单存储夹具','{}',?,1,5,'EXPENSE',?)
+""", report.applicationId().toString(), TENANT, "SPLIT-" + report.id(), status, report.id().toString());
+        jdbc.update(
+                "INSERT INTO"
+                    + " expense_report(id,tenant_id,application_id,employee_id,version,state_json)"
+                    + " VALUES(?,?,?,'alice',?,?)",
                 report.id().toString(), TENANT, report.applicationId().toString(), report.version(), json.write(report.state()));
-        for (var state : revisions) jdbc.update("INSERT INTO expense_report_revision(tenant_id,report_id,financial_version,actor_id,operation,state_json) VALUES(?,?,?,'fixture','SEED',?)",
+        for (var state : revisions) jdbc.update(
+                    "INSERT INTO"
+                        + " expense_report_revision(tenant_id,report_id,financial_version,actor_id,operation,state_json)"
+                        + " VALUES(?,?,?,'fixture','SEED',?)",
                 TENANT, report.id().toString(), state.version(), json.write(state));
         if (!status.equals("DRAFT")) insertRound(report);
         return report;
@@ -264,10 +312,11 @@ class ExpenseSplitRoutingPersistenceTest {
     private void insertRound(ExpenseReport report) {
         String status = jdbc.queryForObject("SELECT status FROM approval_application WHERE id=?", String.class, report.applicationId().toString());
         boolean concluded = !status.equals("IN_APPROVAL");
-        jdbc.update("""
-                INSERT INTO approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status,completed_by,completed_at)
-                VALUES(?,?,1,?,1,'存储原轮次','{}','alice',?,?,?,?)
-                """, TENANT, report.applicationId().toString(), "fixture-" + report.id(), Timestamp.from(AT), status,
+        jdbc.update(
+                """
+INSERT INTO approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status,completed_by,completed_at)
+VALUES(?,?,1,?,1,'存储原轮次','{}','alice',?,?,?,?)
+""", TENANT, report.applicationId().toString(), "fixture-" + report.id(), Timestamp.from(AT), status,
                 concluded ? "approver" : null, concluded ? Timestamp.from(AT.plusSeconds(1)) : null);
     }
     private static ExpenseContent content(UUID legal, String amount) {

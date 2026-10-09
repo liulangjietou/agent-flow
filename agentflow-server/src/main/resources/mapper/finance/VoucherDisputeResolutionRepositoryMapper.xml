@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.finance.mapper.VoucherDisputeResolutionRepositoryMapper">
+    <insert id="create">
+        INSERT INTO voucher_dispute_resolution(tenant_id,id,operation_id,disputed_version,resolved_version,outcome,resolved_by,observed_at,resolved_at,state_json)
+        VALUES(#{tenantId},#{id},#{operationId},#{disputedVersion},#{resolvedVersion},#{outcome},#{resolvedBy},#{observedAt},#{resolvedAt},#{stateJson})
+    </insert>
+
+    <select id="latest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM voucher_dispute_resolution WHERE tenant_id=#{tenant} AND operation_id=#{operationId} ORDER BY resolved_version DESC LIMIT 1
+    </select>
+</mapper>

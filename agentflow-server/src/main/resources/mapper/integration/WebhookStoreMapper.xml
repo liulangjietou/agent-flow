@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.integration.mapper.WebhookStoreMapper">
+    <insert id="append">
+        INSERT INTO webhook_delivery (id,tenant_id,target_id,destination_digest,event_id,event_type,application_id,
+            aggregate_version,payload_json,occurred_at,status,version,attempts,cycle_attempts,next_attempt_at,updated_at)
+        VALUES (#{id},#{tenantId},#{targetId},#{destinationDigest},#{eventId},#{eventType},#{applicationId},#{aggregateVersion},#{payloadJson},#{occurredAt},'PENDING',1,0,0,#{nextAttemptAt},#{updatedAt})
+    </insert>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id FROM webhook_delivery
+        WHERE (status IN ('PENDING','RETRY_WAIT') AND next_attempt_at&lt;=#{nextAttemptAt}) OR (status='IN_FLIGHT' AND lease_until&lt;=#{leaseUntil})
+        ORDER BY updated_at,id LIMIT 10
+    </select>
+
+    <select id="businessContext" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT a.business_no,r.process_instance_id FROM approval_application a
+        LEFT JOIN approval_submission_round r ON r.tenant_id=a.tenant_id AND r.application_id=a.id AND r.round_no=#{originalRound}
+        WHERE a.tenant_id=#{tenantId} AND a.id=#{applicationId}
+    </select>
+
+    <update id="claim">
+        UPDATE webhook_attempt SET finished_at=#{finishedAt},result='OUTCOME_UNKNOWN',error_code='OUTCOME_UNKNOWN' WHERE delivery_id=#{id} AND attempt_no=#{attempts} AND finished_at IS NULL
+    </update>
+
+    <insert id="claim2">
+        INSERT INTO webhook_attempt (delivery_id,attempt_no,lease_token,started_at,result) VALUES (#{deliveryId},#{attemptNo},#{leaseToken},#{startedAt},'IN_FLIGHT')
+    </insert>
+
+    <update id="finish">
+        UPDATE webhook_attempt SET finished_at=#{finishedAt},result=#{success},http_status=#{httpStatus},error_code=#{errorCode}
+        WHERE delivery_id=#{id} AND attempt_no=#{attempts} AND lease_token=#{leaseToken} AND finished_at IS NULL
+    </update>
+
+    <select id="get" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM webhook_delivery WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <insert id="retry">
+        INSERT INTO webhook_retry_request (id,delivery_id,requested_by,requested_at,previous_status,previous_version) VALUES (#{id},#{deliveryId},#{requestedBy},#{requestedAt},#{previousStatus},#{previousVersion})
+    </insert>
+
+    <select id="attempts" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM webhook_attempt WHERE delivery_id=#{id} ORDER BY attempt_no DESC LIMIT 50
+    </select>
+
+    <select id="retries" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM webhook_retry_request WHERE delivery_id=#{id} ORDER BY requested_at DESC,id DESC LIMIT 20
+    </select>
+
+    <select id="internal" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM webhook_delivery WHERE id=#{id}
+    </select>
+
+    <update id="update">
+        UPDATE webhook_delivery SET status=#{status},version=#{version},attempts=#{attempts},cycle_attempts=#{cycleAttempts},next_attempt_at=#{nextAttemptAt},lease_until=#{leaseUntil},lease_token=#{leaseToken},http_status=#{httpStatus},error_code=#{errorCode},updated_at=#{updatedAt}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion}
+    </update>
+    <select id="searchQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT id,target_id,event_id,event_type,application_id,aggregate_version,occurred_at,updated_at,status,version,attempts,cycle_attempts,next_attempt_at,lease_until,http_status,error_code FROM webhook_delivery WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1}<choose><when test="hasTarget"> AND target_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}</when><otherwise></otherwise></choose><choose><when test="hasStatus"> AND status=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</when><otherwise></otherwise></choose><choose><when test="hasApplicationId"> AND application_id=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}</when><otherwise></otherwise></choose><choose><when test="hasBeforeTime"> AND (occurred_at&lt;<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} OR (occurred_at=<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} AND id&lt;<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}))</when><otherwise></otherwise></choose> ORDER BY occurred_at DESC,id DESC LIMIT <bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8}
+    </select>
+    <select id="overviewQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT COUNT(*) AS total,
+            COALESCE(SUM(CASE WHEN status='PENDING' THEN 1 ELSE 0 END),0) AS pending,
+            COALESCE(SUM(CASE WHEN status='IN_FLIGHT' THEN 1 ELSE 0 END),0) AS in_flight,
+            COALESCE(SUM(CASE WHEN status='RETRY_WAIT' THEN 1 ELSE 0 END),0) AS retry_wait,
+            COALESCE(SUM(CASE WHEN status='DELIVERED' THEN 1 ELSE 0 END),0) AS delivered,
+            COALESCE(SUM(CASE WHEN status='FAILED' THEN 1 ELSE 0 END),0) AS failed
+        FROM webhook_delivery WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1}
+        <choose><when test="hasTarget"> AND target_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}</when><otherwise></otherwise></choose><choose><when test="hasApplicationId"> AND application_id=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</when><otherwise></otherwise></choose>
+    </select>
+</mapper>

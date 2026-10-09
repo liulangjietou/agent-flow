@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.finance.mapper.BudgetOperationRepositoryMapper">
+    <insert id="create">
+        INSERT INTO budget_operation(tenant_id,id,report_id,financial_version,input_json,command_digest,state_json,
+        version,status,attempts,active_report_id,created_at,updated_at,next_attempt_at,trace_id)
+        VALUES(#{tenantId},#{id},#{reportId},#{financialVersion},#{inputJson},#{commandDigest},#{stateJson},1,'QUEUED',0,#{activeReportId},#{createdAt},#{updatedAt},#{nextAttemptAt},#{traceId})
+    </insert>
+
+    <update id="update">
+        UPDATE budget_operation SET version=#{version},status=#{status},attempts=#{attempts},active_report_id=#{reportId},state_json=#{stateJson},updated_at=#{updatedAt},next_attempt_at=#{nextAttemptAt},lease_until=#{leaseUntil}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND input_json=#{inputJson} AND command_digest=#{digest}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM budget_operation WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="latest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM budget_operation WHERE tenant_id=#{tenant} AND report_id=#{reportId} ORDER BY financial_version DESC,created_at DESC,id DESC LIMIT 1
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,a.business_no FROM budget_operation q
+        LEFT JOIN expense_report e ON e.tenant_id=q.tenant_id AND e.id=q.report_id
+        LEFT JOIN approval_application a ON a.tenant_id=e.tenant_id AND a.id=e.application_id
+        WHERE (q.status IN ('QUEUED','UNKNOWN') AND q.next_attempt_at&lt;=#{nextAttemptAt}) OR (q.status IN ('EXECUTING','QUERYING') AND q.lease_until&lt;=#{leaseUntil})
+        ORDER BY COALESCE(q.next_attempt_at,q.lease_until),q.created_at,q.id LIMIT 10
+    </select>
+
+    <insert id="append">
+        INSERT INTO budget_operation_revision(tenant_id,operation_id,version,state_json) VALUES(#{tenantId},#{operationId},#{version},#{stateJson})
+    </insert>
+</mapper>

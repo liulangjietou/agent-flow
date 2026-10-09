@@ -1,6 +1,10 @@
 package io.agentflow.signature;
 
+import static io.agentflow.signature.SignatureVerificationFixtures.*;
+import static org.assertj.core.api.Assertions.*;
+
 import io.agentflow.common.DomainException;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -10,11 +14,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 
-import static io.agentflow.signature.SignatureVerificationFixtures.*;
-import static org.assertj.core.api.Assertions.*;
-
 /**
  * 使用真实 JDK 密钥签名验证原文、租户和请求绑定，合成回执不代表真实文件签署验收。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SignatureReceiptVerifierTest {

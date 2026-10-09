@@ -1,19 +1,24 @@
 package io.agentflow.agent;
 
+
+import io.agentflow.agent.mapper.AssistExecutionServiceMapper;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
-import org.springframework.jdbc.core.JdbcTemplate;
+import io.agentflow.mybatis.SqlRows;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 /**
  * Agent 跨聚合应用编排；所有方法只做短事务，不在锁内请求模型。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
@@ -25,14 +30,26 @@ public class AssistExecutionService {
     private final AssistRunRepository runs;
     private final JdbcAssistJobRepository jobs;
     private final AssistConfiguration configuration;
-    private final JdbcTemplate jdbc;
+    private final AssistExecutionServiceMapper sqlMapper;
 
     /** 复用审批授权与领域运行，不建立第二套申请或审批状态。 */
-    public AssistExecutionService(ApprovalApplicationFacade applications, ApplicationRepository applicationRepository,
-            CurrentActor actors, AssistInputService inputs, AssistRunRepository runs, JdbcAssistJobRepository jobs,
-            AssistConfiguration configuration, JdbcTemplate jdbc) {
-        this.applications = applications; this.applicationRepository = applicationRepository; this.actors = actors;
-        this.inputs = inputs; this.runs = runs; this.jobs = jobs; this.configuration = configuration; this.jdbc = jdbc;
+    public AssistExecutionService(
+            ApprovalApplicationFacade applications,
+            ApplicationRepository applicationRepository,
+            CurrentActor actors,
+            AssistInputService inputs,
+            AssistRunRepository runs,
+            JdbcAssistJobRepository jobs,
+            AssistConfiguration configuration,
+            AssistExecutionServiceMapper sqlMapper) {
+        this.applications = applications;
+        this.applicationRepository = applicationRepository;
+        this.actors = actors;
+        this.inputs = inputs;
+        this.runs = runs;
+        this.jobs = jobs;
+        this.configuration = configuration;
+        this.sqlMapper = sqlMapper;
     }
 
     /** 输入预览只给当前决策待办，所有来源默认不选。 */
@@ -50,26 +67,48 @@ public class AssistExecutionService {
 
     /** 幂等层只保存不含正文的运行回执，回放不会返回已失权的摘要或来源。 */
     @Transactional
-    public Receipt queue(UUID applicationId, String taskId, long expectedVersion, String targetDigest, List<String> sourceIds) {
+    public Receipt queue(
+            UUID applicationId,
+            String taskId,
+            long expectedVersion,
+            String targetDigest,
+            List<String> sourceIds) {
         configuration.requireAvailable();
-        if (!configuration.targetDigest().equals(targetDigest)) throw new DomainException("AGENT_TARGET_CHANGED", "Refresh the model destination before selecting input");
+        if (!configuration.targetDigest().equals(targetDigest))
+            throw new DomainException(
+                    "AGENT_TARGET_CHANGED", "Refresh the model destination before selecting input");
         lockApplication(actors.actor().tenantId(), applicationId);
         var application = applications.get(applicationId);
         requireVersion(application, expectedVersion);
         inputs.requireDecision(application, taskId, actors.actor());
         var sources = inputs.select(application, sourceIds);
-        Integer active = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM agent_assist_run r
-                JOIN agent_assist_job j ON j.tenant_id=r.tenant_id AND j.run_id=r.id
-                WHERE r.tenant_id=? AND r.application_id=? AND r.status IN ('QUEUED','RUNNING')
-                """,
-                Integer.class, application.tenantId(), applicationId.toString());
-        if (active != null && active > 0) throw new DomainException("AGENT_RUN_ACTIVE", "An assist run is already active for this application");
-        var run = AssistRun.queue(UUID.randomUUID(), application.tenantId(), actors.actor().userId(), Instant.now(),
-                new AssistInput(applicationId, application.version(), application.roundNo(), sources.stream().map(AssistModelPort.Source::reference).toList()),
-                AssistConfiguration.PROMPT_VERSION);
+        Integer active =
+                SqlRows.single(sqlMapper.queue(application.tenantId(), applicationId.toString()));
+        if (active != null && active > 0)
+            throw new DomainException(
+                    "AGENT_RUN_ACTIVE", "An assist run is already active for this application");
+        var run =
+                AssistRun.queue(
+                        UUID.randomUUID(),
+                        application.tenantId(),
+                        actors.actor().userId(),
+                        Instant.now(),
+                        new AssistInput(
+                                applicationId,
+                                application.version(),
+                                application.roundNo(),
+                                sources.stream().map(AssistModelPort.Source::reference).toList()),
+                        AssistConfiguration.PROMPT_VERSION);
         runs.create(run);
-        jobs.create(new JdbcAssistJobRepository.Job(run.tenantId(), run.id(), taskId, actors.actor(), sources, configuration.targetDigest(), null));
+        jobs.create(
+                new JdbcAssistJobRepository.Job(
+                        run.tenantId(),
+                        run.id(),
+                        taskId,
+                        actors.actor(),
+                        sources,
+                        configuration.targetDigest(),
+                        null));
         return receipt(run);
     }
 
@@ -138,33 +177,52 @@ public class AssistExecutionService {
         run.fail(run.version(), failure, now); runs.update(run, run.version() - 1);
         jobs.lease(run.tenantId(), run.id(), null);
     }
+
     private void lockApplication(String tenant, UUID id) {
-        if (jdbc.queryForList("SELECT id FROM approval_application WHERE tenant_id=? AND id=? FOR UPDATE", String.class, tenant, id.toString()).isEmpty()) throw notFound();
+        if (sqlMapper.lockApplication(tenant, id.toString()).isEmpty()) throw notFound();
     }
+
     private AssistRun requireRun(String tenant, UUID id) { return runs.find(tenant, id).orElseThrow(AssistExecutionService::notFound); }
+
     private static void requireVersion(Application application, long version) {
         if (application.version() != version) throw new DomainException("AGENT_INPUT_CHANGED", "Application changed since the assist input was selected");
     }
+
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Assist context not found"); }
+
     private static Receipt receipt(AssistRun run) { return new Receipt(run.id(), run.status(), run.version()); }
 
     /**
      * 复核是独立动作，不能携带或暗示批准指令。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public enum ReviewAction { ADOPT, DISMISS }
+    public enum ReviewAction {
+        ADOPT,
+        DISMISS
+    }
 
     /**
      * 最小变更回执用于安全幂等回放。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public record Receipt(UUID id, AssistRun.Status status, long version) { }
+    public record Receipt(UUID id, AssistRun.Status status, long version) {}
 
     /**
      * 实际可发送内容供审批人预览，凭据和内部目标配置不进入响应。
+     *
      * @author owlzhangfq@gmail.com
      */
-    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
-    public record InputOptions(long applicationVersion, boolean enabled, String unavailableCode, String providerId,
-                               String model, String destination, String targetDigest, List<AssistModelPort.Source> sources) { }
+    @com.fasterxml.jackson.annotation.JsonInclude(
+            com.fasterxml.jackson.annotation.JsonInclude.Include.ALWAYS)
+    public record InputOptions(
+            long applicationVersion,
+            boolean enabled,
+            String unavailableCode,
+            String providerId,
+            String model,
+            String destination,
+            String targetDigest,
+            List<AssistModelPort.Source> sources) {}
 }

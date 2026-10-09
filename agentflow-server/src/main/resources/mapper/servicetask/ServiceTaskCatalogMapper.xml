@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.servicetask.mapper.ServiceTaskCatalogMapper">
+    <select id="install" resultType="Integer">
+        SELECT id FROM service_task_catalog_lock WHERE id=1 FOR UPDATE
+    </select>
+
+    <insert id="install2">
+        INSERT INTO service_task_contract(tenant_id,operation_key,operation_version,contract_digest,target_digest,contract_json,installed_at)
+        VALUES(#{tenantId},#{operationKey},#{operationVersion},#{contractDigest},#{targetDigest},#{contractJson},#{installedAt})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT contract_json,contract_digest,target_digest FROM service_task_contract WHERE tenant_id=#{tenant} AND operation_key=#{key} AND operation_version=#{version}
+    </select>
+
+    <select id="list" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT operation_key,MAX(operation_version) AS latest_version FROM service_task_contract
+        WHERE tenant_id=#{tenant} AND operation_key&gt;#{afterKey} GROUP BY operation_key ORDER BY operation_key LIMIT #{limit}
+    </select>
+    <select id="versionsQuery" resultType="Long">
+        <bind name="position" value="0"/>
+        SELECT operation_version FROM service_task_contract WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND operation_key=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}<choose><when test="hasBeforeVersion"> AND operation_version&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</when><otherwise></otherwise></choose> ORDER BY operation_version DESC LIMIT <bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}
+    </select>
+</mapper>

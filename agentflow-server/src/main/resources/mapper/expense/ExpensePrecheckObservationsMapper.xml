@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpensePrecheckObservationsMapper">
+    <select id="dependencies" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT invoice_id,COUNT(*) AS attempts,SUM(version) AS revisions FROM invoice_verification_job
+        WHERE tenant_id=#{parameters.tenant} AND invoice_id IN (<foreach collection="parameters['ids']" item="item" separator=",">#{item}</foreach>) GROUP BY invoice_id ORDER BY invoice_id
+    </select>
+
+    <select id="dependencies2" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT invoice_key,invoice_id,report_id,round_no,line_no,status FROM invoice_active_claim
+        WHERE tenant_id=#{parameters.tenant} AND invoice_key IN (<foreach collection="parameters['keys']" item="item" separator=",">#{item}</foreach>) ORDER BY invoice_key
+    </select>
+</mapper>

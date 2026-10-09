@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.organization.mapper.OrganizationSyncPlanRepositoryMapper">
+    <insert id="create">
+        INSERT INTO organization_sync_plan(tenant_id,id,batch_id,batch_version,source_version,directory_revision,
+            prepared_by,prepared_at,ready,digest,plan_json)
+        SELECT b.tenant_id,#{id},b.id,#{batchVersion},#{sourceVersion},#{directoryRevision}, #{preparedBy},#{preparedAt},#{ready},#{digest},#{body}
+        FROM organization_sync_batch b JOIN organization_sync_source s ON s.tenant_id=b.tenant_id
+        JOIN organization_directory d ON d.tenant_id=b.tenant_id
+        WHERE b.tenant_id=#{tenantId} AND b.id=#{batchId} AND b.status='RECEIVED' AND b.version=#{version} AND s.version=#{sourceVersion2}
+          AND s.applied_revision=b.after_revision AND d.revision=#{revision}
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM organization_sync_plan WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <insert id="applied">
+        INSERT INTO organization_sync_application(tenant_id,batch_id,plan_id,plan_digest)
+        SELECT p.tenant_id,p.batch_id,p.id,p.digest FROM organization_sync_plan p
+        JOIN organization_sync_batch b ON b.tenant_id=p.tenant_id AND b.id=p.batch_id
+        WHERE p.tenant_id=#{tenantId} AND p.id=#{id} AND p.batch_id=#{batchId} AND p.digest=#{digest} AND p.ready=TRUE AND b.status='APPLIED'
+    </insert>
+
+    <select id="appliedPlan" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT plan_id,plan_digest FROM organization_sync_application WHERE tenant_id=#{tenant} AND batch_id=#{batchId}
+    </select>
+
+    <select id="page" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,directory_revision,prepared_by,prepared_at,ready FROM organization_sync_plan
+        WHERE tenant_id=#{tenant} AND batch_id=#{batchId} ORDER BY prepared_at DESC,id DESC LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="page2" resultType="Long">
+        SELECT COUNT(*) FROM organization_sync_plan WHERE tenant_id=#{tenant} AND batch_id=#{batchId}
+    </select>
+</mapper>

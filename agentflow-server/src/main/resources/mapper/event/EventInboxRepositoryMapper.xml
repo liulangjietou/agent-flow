@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.event.mapper.EventInboxRepositoryMapper">
+    <select id="byEvent" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM event_inbox WHERE tenant_id=#{tenantId} AND source_key=#{sourceKey} AND event_id=#{eventId}
+    </select>
+
+    <select id="get" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM event_inbox WHERE tenant_id=#{tenantId} AND id=#{id}
+    </select>
+
+    <select id="lock" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM event_inbox WHERE tenant_id=#{tenantId} AND id=#{id} FOR UPDATE
+    </select>
+
+    <insert id="create">
+        INSERT INTO event_inbox(tenant_id,id,source_key,event_id,application_id,contract_key,contract_version,input_json,
+            version,status,received_at,updated_at,next_attempt_at,failures,trace_id)
+        VALUES(#{tenantId},#{id},#{sourceKey},#{eventId},#{applicationId},#{contractKey},#{contractVersion},#{inputJson},1,'RECEIVED',#{receivedAt},#{updatedAt},#{nextAttemptAt},0,#{traceId})
+    </insert>
+
+    <update id="update">
+        UPDATE event_inbox SET version=#{version},status=#{status},updated_at=#{updatedAt},next_attempt_at=#{nextAttemptAt},failures=#{failures},reason=#{reason},error_code=#{errorCode},requested_by=#{requestedBy},request_reason=#{requestReason}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND input_json=#{inputJson} AND received_at=#{receivedAt}
+    </update>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,a.business_no FROM event_inbox q
+        LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+        WHERE q.next_attempt_at&lt;=#{nextAttemptAt} ORDER BY q.next_attempt_at,q.received_at,q.id LIMIT #{BATCH_SIZE}
+    </select>
+
+    <select id="findProcessInstance" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT process_instance_id FROM approval_submission_round WHERE tenant_id=#{tenantId} AND application_id=#{applicationId} AND round_no=#{roundNo}
+    </select>
+
+    <select id="page" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM event_inbox WHERE tenant_id=#{tenantId} ORDER BY received_at DESC,id DESC LIMIT #{limit}
+    </select>
+
+    <select id="page2" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM event_inbox WHERE tenant_id=#{tenantId} AND (received_at&lt;#{receivedAt} OR (received_at=#{expectedReceivedAt} AND id&lt;#{beforeId})) ORDER BY received_at DESC,id DESC LIMIT #{limit}
+    </select>
+
+    <insert id="append">
+        INSERT INTO event_inbox_revision(tenant_id,inbox_id,version,state_json,occurred_at) VALUES(#{tenantId},#{inboxId},#{version},#{stateJson},#{occurredAt})
+    </insert>
+    <select id="historyQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT state_json FROM event_inbox_revision WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND inbox_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}<choose><when test="condition0"></when><otherwise> AND version&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</otherwise></choose> ORDER BY version DESC LIMIT <bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}
+    </select>
+</mapper>

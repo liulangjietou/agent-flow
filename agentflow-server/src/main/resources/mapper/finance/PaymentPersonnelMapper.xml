@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.finance.mapper.PaymentPersonnelMapper">
+    <select id="eligible" resultType="Boolean">
+        SELECT EXISTS(SELECT l.id FROM organization_directory o
+        JOIN organization_person p ON p.tenant_id=o.tenant_id AND p.active=TRUE
+        JOIN organization_appointment a ON a.tenant_id=p.tenant_id AND a.person_id=p.id AND a.active=TRUE
+        JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE AND d.kind='DEPARTMENT'
+        JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE AND j.kind='POSITION' AND j.legal_entity_id=d.legal_entity_id
+        JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE AND l.kind='LEGAL_ENTITY'
+        WHERE o.tenant_id=#{tenant} AND p.subject=#{user}
+         AND l.id=#{legalEntityId})
+    </select>
+
+    <select id="legalEntities" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT DISTINCT id FROM (SELECT l.id FROM organization_directory o
+        JOIN organization_person p ON p.tenant_id=o.tenant_id AND p.active=TRUE
+        JOIN organization_appointment a ON a.tenant_id=p.tenant_id AND a.person_id=p.id AND a.active=TRUE
+        JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE AND d.kind='DEPARTMENT'
+        JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE AND j.kind='POSITION' AND j.legal_entity_id=d.legal_entity_id
+        JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE AND l.kind='LEGAL_ENTITY'
+        WHERE o.tenant_id=#{tenant} AND p.subject=#{user}
+        ) eligible_entities
+    </select>
+
+    <select id="legalEntityOptions" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,name FROM organization_unit WHERE tenant_id=#{tenant} AND id IN (SELECT l.id FROM organization_directory o
+        JOIN organization_person p ON p.tenant_id=o.tenant_id AND p.active=TRUE
+        JOIN organization_appointment a ON a.tenant_id=p.tenant_id AND a.person_id=p.id AND a.active=TRUE
+        JOIN organization_unit d ON d.tenant_id=a.tenant_id AND d.id=a.department_id AND d.active=TRUE AND d.kind='DEPARTMENT'
+        JOIN organization_unit j ON j.tenant_id=a.tenant_id AND j.id=a.position_id AND j.active=TRUE AND j.kind='POSITION' AND j.legal_entity_id=d.legal_entity_id
+        JOIN organization_unit l ON l.tenant_id=d.tenant_id AND l.id=d.legal_entity_id AND l.active=TRUE AND l.kind='LEGAL_ENTITY'
+        WHERE o.tenant_id=#{tenantId} AND p.subject=#{user}
+        ) ORDER BY name,id
+    </select>
+</mapper>

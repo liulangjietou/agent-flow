@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.procurement.mapper.SupplierPayableReviewRepositoryMapper">
+    <insert id="create">
+        INSERT INTO supplier_payable_review(trace_id,tenant_id,id,request_id,application_id,employee_id,round_no,application_version,request_version,reservation_id,
+        requested_by,requested_at,input_json,state_json,version,status,attempts,updated_at,active_request_id)
+        VALUES(#{traceId},#{tenantId},#{id},#{requestId},#{applicationId},#{employeeId},#{roundNo},#{applicationVersion},#{requestVersion},#{reservationId},#{requestedBy},#{requestedAt},#{inputJson},#{stateJson},1,'QUEUED',0,#{updatedAt},#{activeRequestId})
+    </insert>
+
+    <update id="update">
+        UPDATE supplier_payable_review SET state_json=#{stateJson},version=#{version},status=#{status},attempts=#{attempts},updated_at=#{updatedAt},lease_until=#{leaseUntil},checked_at=#{checkedAt},active_request_id=#{activeRequest},consumed_authorization_id=#{consumedAuthorizationId}
+        WHERE tenant_id=#{tenant} AND id=#{id} AND version=#{expectedVersion} AND input_json=#{inputJson}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_payable_review WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="latest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_payable_review WHERE tenant_id=#{tenant} AND request_id=#{requestId} AND requested_by=#{finance} ORDER BY requested_at DESC,id DESC LIMIT 1
+    </select>
+
+    <select id="forAuthorization" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_payable_review WHERE tenant_id=#{tenant} AND consumed_authorization_id=#{authorizationId}
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM supplier_payable_review q
+        LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=q.application_id
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=q.round_no
+        WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until&lt;=#{leaseUntil}) ORDER BY q.requested_at,q.id LIMIT 10
+    </select>
+
+    <insert id="append">
+        INSERT INTO supplier_payable_review_revision(tenant_id,review_id,version,state_json) VALUES(#{tenantId},#{reviewId},#{version},#{stateJson})
+    </insert>
+</mapper>

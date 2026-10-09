@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.signature.mapper.SignatureEvidenceRepositoryMapper">
+    <insert id="append">
+        INSERT INTO signature_receipt_evidence(tenant_id,operation_id,evidence_digest,receipt_digest,provider_revision,status,accepted_version,verified_at,evidence_json)
+        VALUES(#{tenantId},#{operationId},#{evidenceDigest},#{receiptDigest},#{providerRevision},#{status},#{acceptedVersion},#{verifiedAt},#{evidenceJson})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT e.*,r.state_json AS accepted_state FROM signature_receipt_evidence e
+        JOIN signature_operation_revision r ON r.tenant_id=e.tenant_id AND r.operation_id=e.operation_id AND r.version=e.accepted_version
+        WHERE e.tenant_id=#{tenant} AND e.operation_id=#{operationId} AND e.evidence_digest=#{evidenceDigest}
+    </select>
+
+    <select id="forReceipt" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT evidence_digest FROM signature_receipt_evidence WHERE tenant_id=#{tenantId} AND operation_id=#{id}
+        AND receipt_digest=#{digest} AND accepted_version&lt;=#{version} ORDER BY accepted_version,evidence_digest LIMIT 1
+    </select>
+</mapper>

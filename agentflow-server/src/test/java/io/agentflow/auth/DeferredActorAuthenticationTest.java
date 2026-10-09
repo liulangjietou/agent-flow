@@ -1,9 +1,13 @@
 package io.agentflow.auth;
 
+import static org.assertj.core.api.Assertions.*;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,10 +34,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.*;
-
 /**
  * 原登录复核使用真实 JDBC 会话序列化与退出范围；不以目录或角色快照替代认证事实。
+ *
  * @author owlzhangfq@gmail.com
  */
 class DeferredActorAuthenticationTest {
@@ -49,7 +52,10 @@ class DeferredActorAuthenticationTest {
     @BeforeEach void schema() {
         Flyway.configure().dataSource(source).target("23").load().migrate();
         sessions = repository();
-        logouts = new OidcLogoutScopes(jdbc, new JsonUtil(new ObjectMapper()), enterprise, manager);
+        logouts = new OidcLogoutScopes(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.auth.mapper.OidcLogoutScopesMapper.class), new JsonUtil(new ObjectMapper()), enterprise, manager);
     }
 
     @Test void demoReferenceCannotAuthenticateAndDoesNotSurviveLogoutOrAnotherProcess() {
@@ -150,7 +156,10 @@ class DeferredActorAuthenticationTest {
         var beans = new DefaultListableBeanFactory();
         if (repository != null) beans.registerSingleton("sessions", repository);
         if (scopes != null) beans.registerSingleton("logouts", scopes);
-        return new DeferredActorAuthentication(demoService, properties, jdbc, beans.getBeanProvider(JdbcIndexedSessionRepository.class), beans.getBeanProvider(OidcLogoutScopes.class));
+        return new DeferredActorAuthentication(demoService, properties,
+                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                        (jdbc).getDataSource(),
+                        io.agentflow.auth.mapper.DeferredActorAuthenticationMapper.class), beans.getBeanProvider(JdbcIndexedSessionRepository.class), beans.getBeanProvider(OidcLogoutScopes.class));
     }
     private static OidcProperties properties(boolean enabled, String role) {
         return new OidcProperties(enabled, "https://identity.example", "flow", "unused", "tenant", "roles", Map.of("external", "tenant-a"), Map.of("staff", Set.of(role)), false);

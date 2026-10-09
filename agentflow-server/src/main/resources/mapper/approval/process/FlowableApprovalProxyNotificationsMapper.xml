@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.process.mapper.FlowableApprovalProxyNotificationsMapper">
+    <select id="overdue" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT p.tenant_id,p.id AS proxy_id,a.id AS application_id,t.ID_ AS task_id,p.trace_id,a.business_no,r.process_instance_id
+        FROM organization_approval_proxy p
+        JOIN organization_person principal ON principal.tenant_id=p.tenant_id AND principal.id=p.principal_id
+        JOIN organization_person substitute ON substitute.tenant_id=p.tenant_id AND substitute.id=p.substitute_id
+        JOIN approval_definition d ON d.tenant_id=p.tenant_id AND d.id=p.definition_id AND d.status='PUBLISHED'
+        JOIN approval_application a ON a.tenant_id=d.tenant_id AND a.process_key=d.process_key
+            AND a.definition_version=d.version AND a.status='IN_APPROVAL'
+        JOIN approval_submission_round r ON r.tenant_id=a.tenant_id AND r.application_id=a.id
+            AND r.round_no=a.round_no AND r.status='IN_APPROVAL'
+        JOIN ACT_RU_TASK t ON t.PROC_INST_ID_=r.process_instance_id AND t.TENANT_ID_=r.tenant_id
+        WHERE p.revoked_at IS NULL AND p.created_at&lt;=#{parameters[0]} AND p.starts_at&lt;=#{parameters[1]} AND p.ends_at&gt;#{parameters[2]}
+            AND principal.active=TRUE AND principal.approval_eligible=TRUE
+            AND substitute.active=TRUE AND substitute.approval_eligible=TRUE
+            AND (t.ASSIGNEE_=principal.subject OR (t.ASSIGNEE_ IS NULL AND EXISTS
+                (SELECT 1 FROM ACT_RU_IDENTITYLINK i WHERE i.TASK_ID_=t.ID_ AND i.TYPE_='candidate' AND i.USER_ID_=principal.subject)))
+         AND t.SUSPENSION_STATE_=1 AND p.tenant_id=#{parameters[3]} AND t.ID_=#{parameters[4]} ORDER BY p.id
+    </select>
+
+    <select id="notify" resultType="Boolean">
+        SELECT EXISTS(SELECT 1 FROM approval_proxy_notification WHERE tenant_id=#{tenantId} AND proxy_id=#{id} AND task_id=#{getId} AND event_version=0 AND (kind=#{kind} OR #{value5}='TASK_PENDING'))
+    </select>
+
+    <insert id="notify2">
+        INSERT INTO approval_proxy_notification(tenant_id,proxy_id,task_id,kind,inbox_id) VALUES(#{tenantId},#{proxyId},#{taskId},#{kind},#{inboxId})
+    </insert>
+
+    <select id="capture" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT p.tenant_id,p.id AS proxy_id,a.id AS application_id,t.ID_ AS task_id,p.trace_id,a.business_no,r.process_instance_id
+        FROM organization_approval_proxy p
+        JOIN organization_person principal ON principal.tenant_id=p.tenant_id AND principal.id=p.principal_id
+        JOIN organization_person substitute ON substitute.tenant_id=p.tenant_id AND substitute.id=p.substitute_id
+        JOIN approval_definition d ON d.tenant_id=p.tenant_id AND d.id=p.definition_id AND d.status='PUBLISHED'
+        JOIN approval_application a ON a.tenant_id=d.tenant_id AND a.process_key=d.process_key
+            AND a.definition_version=d.version AND a.status='IN_APPROVAL'
+        JOIN approval_submission_round r ON r.tenant_id=a.tenant_id AND r.application_id=a.id
+            AND r.round_no=a.round_no AND r.status='IN_APPROVAL'
+        JOIN ACT_RU_TASK t ON t.PROC_INST_ID_=r.process_instance_id AND t.TENANT_ID_=r.tenant_id
+        WHERE p.revoked_at IS NULL AND p.created_at&lt;=#{parameters[0]} AND p.starts_at&lt;=#{parameters[1]} AND p.ends_at&gt;#{parameters[2]}
+            AND principal.active=TRUE AND principal.approval_eligible=TRUE
+            AND substitute.active=TRUE AND substitute.approval_eligible=TRUE
+            AND (t.ASSIGNEE_=principal.subject OR (t.ASSIGNEE_ IS NULL AND EXISTS
+                (SELECT 1 FROM ACT_RU_IDENTITYLINK i WHERE i.TASK_ID_=t.ID_ AND i.TYPE_='candidate' AND i.USER_ID_=principal.subject)))
+         AND p.tenant_id=#{parameters[3]} AND a.id=#{parameters[4]} ORDER BY p.id,t.ID_
+    </select>
+
+    <select id="lifecycle" resultType="Boolean">
+        SELECT EXISTS(SELECT 1 FROM approval_proxy_notification WHERE tenant_id=#{tenantId} AND proxy_id=#{proxyId} AND task_id=#{taskId} AND kind=#{kind} AND event_version=#{version})
+    </select>
+
+    <insert id="lifecycle2">
+        INSERT INTO approval_proxy_notification(tenant_id,proxy_id,task_id,kind,inbox_id,event_version) VALUES(#{tenantId},#{proxyId},#{taskId},#{kind},#{inboxId},#{eventVersion})
+    </insert>
+
+    <select id="deliveryAllowed" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT proxy_id,task_id,kind,event_version FROM approval_proxy_notification WHERE tenant_id=#{tenantId} AND inbox_id=#{inboxId}
+    </select>
+    <select id="candidatesQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT p.tenant_id,p.id AS proxy_id,a.id AS application_id,t.ID_ AS task_id,p.trace_id,a.business_no,r.process_instance_id
+        FROM organization_approval_proxy p
+        JOIN organization_person principal ON principal.tenant_id=p.tenant_id AND principal.id=p.principal_id
+        JOIN organization_person substitute ON substitute.tenant_id=p.tenant_id AND substitute.id=p.substitute_id
+        JOIN approval_definition d ON d.tenant_id=p.tenant_id AND d.id=p.definition_id AND d.status='PUBLISHED'
+        JOIN approval_application a ON a.tenant_id=d.tenant_id AND a.process_key=d.process_key
+            AND a.definition_version=d.version AND a.status='IN_APPROVAL'
+        JOIN approval_submission_round r ON r.tenant_id=a.tenant_id AND r.application_id=a.id
+            AND r.round_no=a.round_no AND r.status='IN_APPROVAL'
+        JOIN ACT_RU_TASK t ON t.PROC_INST_ID_=r.process_instance_id AND t.TENANT_ID_=r.tenant_id
+        WHERE p.revoked_at IS NULL AND p.created_at&lt;=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND p.starts_at&lt;=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND p.ends_at&gt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}
+            AND principal.active=TRUE AND principal.approval_eligible=TRUE
+            AND substitute.active=TRUE AND substitute.approval_eligible=TRUE
+            AND (t.ASSIGNEE_=principal.subject OR (t.ASSIGNEE_ IS NULL AND EXISTS
+                (SELECT 1 FROM ACT_RU_IDENTITYLINK i WHERE i.TASK_ID_=t.ID_ AND i.TYPE_='candidate' AND i.USER_ID_=principal.subject)))
+        AND t.SUSPENSION_STATE_=1 AND NOT EXISTS (SELECT 1 FROM approval_proxy_notification n WHERE n.tenant_id=p.tenant_id
+            AND n.proxy_id=p.id AND n.task_id=t.ID_ AND n.event_version=0)
+        <choose><when test="condition0"> AND (p.tenant_id&gt;<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} OR (p.tenant_id=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} AND (p.id&gt;<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} OR (p.id=<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7} AND t.ID_&gt;<bind name="argument8" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument8}))))</when><otherwise></otherwise></choose> ORDER BY p.tenant_id,p.id,t.ID_ LIMIT <bind name="argument9" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument9}
+    </select>
+</mapper>

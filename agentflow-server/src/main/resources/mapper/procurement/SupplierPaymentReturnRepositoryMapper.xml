@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.procurement.mapper.SupplierPaymentReturnRepositoryMapper">
+    <insert id="register">
+        INSERT INTO supplier_payment_return_registration(tenant_id,id,payment_id,before_version,return_version,check_id,check_version,outcome,registered_by,observed_at,registered_at,state_json)
+        VALUES(#{tenantId},#{id},#{paymentId},#{beforeVersion},#{returnVersion},#{checkId},#{checkVersion},#{outcome},#{registeredBy},#{observedAt},#{registeredAt},#{stateJson})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_payment_return_registration WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="history" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM supplier_payment_return_registration WHERE tenant_id=#{tenant} AND payment_id=#{paymentId} ORDER BY return_version
+    </select>
+    <select id="pageQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM supplier_payment_return_registration WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND payment_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}<choose><when test="condition0"></when><otherwise> AND return_version&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</otherwise></choose> ORDER BY return_version DESC LIMIT <bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}
+    </select>
+</mapper>

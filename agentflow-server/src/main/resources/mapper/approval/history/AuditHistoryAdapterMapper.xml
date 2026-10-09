@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.history.mapper.AuditHistoryAdapterMapper">
+    <select id="readQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM audit_event WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND (
+          (application_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND aggregate_type IN ('Application','Task'))
+          OR (application_id IS NULL AND aggregate_type='Application' AND aggregate_id=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3})
+        <choose><when test="hasTasks"> OR (application_id IS NULL AND aggregate_type='Task' AND aggregate_id IN (<bind name="start1" value="position"/><foreach collection="parameters" item="parameter" index="parameterIndex" separator=","><if test="parameterIndex &gt;= start1 and parameterIndex &lt; start1 + itemsCount">#{parameter}</if></foreach><bind name="position" value="position + itemsCount"/>))</when><otherwise></otherwise></choose>)
+    </select>
+</mapper>

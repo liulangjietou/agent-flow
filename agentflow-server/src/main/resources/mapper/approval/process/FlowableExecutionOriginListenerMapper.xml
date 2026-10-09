@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.process.mapper.FlowableExecutionOriginListenerMapper">
+    <insert id="capture">
+        INSERT INTO workflow_execution_origin(tenant_id,object_kind,object_id,trace_id)
+        SELECT #{tenant},#{kind},#{id},#{traceId} WHERE NOT EXISTS (SELECT 1 FROM workflow_execution_origin
+            WHERE tenant_id=#{tenantId} AND object_kind=#{objectKind} AND object_id=#{objectId})
+    </insert>
+</mapper>

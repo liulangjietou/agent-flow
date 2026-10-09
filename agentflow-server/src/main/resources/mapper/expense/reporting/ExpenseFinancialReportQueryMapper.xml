@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.reporting.mapper.ExpenseFinancialReportQueryMapper">
+    <select id="read" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT r.id,s.round_no FROM expense_report r JOIN approval_submission_round s ON s.tenant_id=r.tenant_id AND s.application_id=r.application_id WHERE r.tenant_id=#{tenantId} AND s.submitted_at&gt;=#{startAt} AND s.submitted_at&lt;#{endAt} ORDER BY s.submitted_at,r.id,s.round_no
+    </select>
+</mapper>

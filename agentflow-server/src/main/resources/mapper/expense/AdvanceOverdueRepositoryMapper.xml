@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.AdvanceOverdueRepositoryMapper">
+    <select id="lock" resultType="String">
+        SELECT id FROM finance_resource WHERE tenant_id=#{tenantId} AND resource_type='ADVANCE' AND id=#{id} FOR UPDATE
+    </select>
+
+    <select id="recorded" resultType="Integer">
+        SELECT COUNT(*) FROM advance_overdue_reminder WHERE tenant_id=#{tenantId} AND advance_id=#{id}
+    </select>
+
+    <insert id="record">
+        INSERT INTO advance_overdue_reminder(tenant_id,advance_id,inbox_id,employee_id,advance_version,observed_on,time_zone,outstanding,currency,created_at) VALUES(#{tenantId},#{advanceId},#{inboxId},#{employeeId},#{advanceVersion},#{observedOn},#{timeZone},#{outstanding},#{currency},#{createdAt})
+    </insert>
+    <select id="ownedDueBeforeRows" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT p.tenant_id,p.advance_id,p.due_on,p.trace_id,NULL AS business_no,NULL AS process_instance_id FROM employee_advance_order p WHERE p.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND p.employee_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND p.legal_entity_id=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} AND p.due_on&lt;<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}<choose><when test="condition0"> AND (p.due_on&gt;<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} OR (p.due_on=<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6} AND p.advance_id&gt;<bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}))</when><otherwise></otherwise></choose> ORDER BY p.due_on,p.advance_id LIMIT 100
+    </select>
+    <select id="candidatesRows" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT p.tenant_id,p.advance_id,p.due_on,p.trace_id,business.business_no,submitted.process_instance_id FROM employee_advance_order p
+        JOIN advance_request a ON a.tenant_id=p.tenant_id AND a.id=p.advance_id
+        LEFT JOIN approval_application business ON business.tenant_id=a.tenant_id AND business.id=a.application_id
+        LEFT JOIN payment_authorization origin ON origin.tenant_id=p.tenant_id AND origin.business_type='ADVANCE_REQUEST'
+            AND origin.active_business_id=p.advance_id AND origin.application_id=business.id
+            AND origin.purpose='EMPLOYEE_ADVANCE' AND origin.status='EXECUTION_REGISTERED'
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+        WHERE p.due_on&lt;<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND NOT EXISTS (SELECT 1 FROM advance_overdue_reminder n WHERE n.tenant_id=p.tenant_id AND n.advance_id=p.advance_id)
+        <choose><when test="condition0"> AND (p.due_on&gt;<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} OR (p.due_on=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} AND (p.tenant_id&gt;<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} OR (p.tenant_id=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} AND p.advance_id&gt;<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6}))))</when><otherwise></otherwise></choose> ORDER BY p.due_on,p.tenant_id,p.advance_id LIMIT 100
+    </select>
+</mapper>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.definition.mapper.DefinitionPublicationRepositoryMapper">
+    <insert id="save">
+        INSERT INTO definition_publication
+            (tenant_id, definition_id, process_key, definition_version, published_by, authorized_role,
+             published_at, change_note, validation_json)
+        VALUES (#{tenantId}, #{definitionId}, #{processKey}, #{definitionVersion}, #{publishedBy}, #{authorizedRole}, #{publishedAt}, #{changeNote}, #{validationJson})
+    </insert>
+
+    <select id="findByDefinition" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM definition_publication WHERE tenant_id=#{tenantId} AND definition_id=#{definitionId}
+    </select>
+</mapper>

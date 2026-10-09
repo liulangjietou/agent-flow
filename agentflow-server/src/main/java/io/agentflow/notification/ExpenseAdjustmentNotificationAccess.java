@@ -1,6 +1,8 @@
 package io.agentflow.notification;
 
+
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
@@ -17,23 +19,27 @@ import io.agentflow.expense.JdbcExpenseSettlementRepository;
 import io.agentflow.finance.BudgetConsumptionReversalObservation;
 import io.agentflow.finance.BudgetConsumptionReversalOperation;
 import io.agentflow.finance.JdbcBudgetConsumptionReversalRepository;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import org.springframework.jdbc.core.JdbcTemplate;
+import io.agentflow.mybatis.SqlRows;
+import io.agentflow.notification.mapper.ExpenseAdjustmentNotificationAccessMapper;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 /**
  * 原结算、实际准备与完整调整修订证明消息来源，当前原轮次权限约束详情。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
 public class ExpenseAdjustmentNotificationAccess {
     private final CurrentActor actors;
-    private final JdbcTemplate jdbc;
+    private final ExpenseAdjustmentNotificationAccessMapper sqlMapper;
     private final JdbcExpenseResourceAdjustmentPreparationRepository preparations;
     private final JdbcExpenseResourceAdjustmentRepository adjustments;
     private final JdbcBudgetConsumptionReversalRepository budgets;
@@ -44,12 +50,29 @@ public class ExpenseAdjustmentNotificationAccess {
     private final PaymentNotificationAccess personnel;
 
     /** 不重新读取外部财务依据，不调用授权、预算查询或资源恢复。 */
-    public ExpenseAdjustmentNotificationAccess(CurrentActor actors, JdbcTemplate jdbc, JdbcExpenseResourceAdjustmentPreparationRepository preparations,
-            JdbcExpenseResourceAdjustmentRepository adjustments, JdbcBudgetConsumptionReversalRepository budgets, JdbcExpenseSettlementRepository settlements,
-            ApplicationRepository applications, ExpenseSettlementAccess readAccess, ExpenseResourceAdjustmentAccess financeAccess, PaymentNotificationAccess personnel) {
-        this.actors = actors; this.jdbc = jdbc; this.preparations = preparations; this.adjustments = adjustments; this.budgets = budgets; this.settlements = settlements;
-        this.applications = applications; this.readAccess = readAccess; this.financeAccess = financeAccess; this.personnel = personnel;
+    public ExpenseAdjustmentNotificationAccess(
+            CurrentActor actors,
+            ExpenseAdjustmentNotificationAccessMapper sqlMapper,
+            JdbcExpenseResourceAdjustmentPreparationRepository preparations,
+            JdbcExpenseResourceAdjustmentRepository adjustments,
+            JdbcBudgetConsumptionReversalRepository budgets,
+            JdbcExpenseSettlementRepository settlements,
+            ApplicationRepository applications,
+            ExpenseSettlementAccess readAccess,
+            ExpenseResourceAdjustmentAccess financeAccess,
+            PaymentNotificationAccess personnel) {
+        this.actors = actors;
+        this.sqlMapper = sqlMapper;
+        this.preparations = preparations;
+        this.adjustments = adjustments;
+        this.budgets = budgets;
+        this.settlements = settlements;
+        this.applications = applications;
+        this.readAccess = readAccess;
+        this.financeAccess = financeAccess;
+        this.personnel = personnel;
     }
+
     /** 本人消息固定原调整，管理员身份不能绕过原财务字段权限。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Target target(UUID id) {
@@ -63,11 +86,13 @@ public class ExpenseAdjustmentNotificationAccess {
                 source.adjustment() == null ? null : Adjustment.of(source.adjustment()), source.completion() == null ? null : Completion.of(source.completion()),
                 source.retirement() == null ? null : Retirement.of(source.retirement()));
     }
+
     /** 外发前重新检查当前人员资格及消息的实际原事实。 */
     public boolean deliveryAllowed(NotificationDelivery delivery) {
         var row = row(delivery.tenantId(), delivery.recipient(), delivery.inboxId());
         return row == null || allowed(delivery.tenantId(), delivery.recipient(), row) != null;
     }
+
     Source original(String tenant, UUID id, ExpenseAdjustmentNotice fact) {
         var preparation = preparations.find(tenant, id).orElse(null); if (preparation == null) return null;
         var input = preparation.input(); var basis = input.basis(); var binding = basis.settlement().input().source();
@@ -92,10 +117,12 @@ public class ExpenseAdjustmentNotificationAccess {
         var source = new Source(app, preparation, adjustment, budget, completion, retirement, resourceHistory, budgetHistory, recipients.stream().distinct().toList());
         return hasFact(source, fact, null) ? source : null;
     }
+
     boolean eligible(String tenant, String recipient, Source source) {
         var basis = source.preparation().input().basis();
         return source.recipients().contains(recipient) && personnel.eligible(tenant, recipient, basis.settlement().input().source().employeeId(), basis.legalEntityId());
     }
+
     private Source allowed(String tenant, String recipient, Row row) {
         if (row == null) return null;
         var key = ExpenseAdjustmentNotice.source(row.eventKey()).filter(value -> value.notice().kind() == row.kind()).orElse(null); if (key == null) return null;
@@ -104,6 +131,7 @@ public class ExpenseAdjustmentNotificationAccess {
                 && source.preparation().input().basis().settlement().input().source().roundNo() == row.roundNo()
                 && hasFact(source, key.notice(), row.createdAt()) && eligible(tenant, recipient, source) ? source : null;
     }
+
     private static boolean hasFact(Source source, ExpenseAdjustmentNotice fact, Instant at) {
         if (fact == ExpenseAdjustmentNotice.RETIRED) return source.retirement() != null && timeMatches(source.retirement().retiredAt(), at);
         if (ExpenseAdjustmentNotice.from(source.preparation()).filter(value -> value == fact).isPresent()) return timeMatches(source.preparation().updatedAt(), at);
@@ -111,67 +139,128 @@ public class ExpenseAdjustmentNotificationAccess {
         return source.budgetHistory().stream().anyMatch(value -> timeMatches(value.updatedAt(), at) && ExpenseAdjustmentNotice.from(value).filter(notice -> notice == fact).isPresent())
                 || source.resourceHistory().stream().anyMatch(value -> timeMatches(value.updatedAt(), at) && ExpenseAdjustmentNotice.from(value).filter(notice -> notice == fact).isPresent());
     }
+
     private static boolean timeMatches(Instant fact, Instant message) { return message == null || fact.equals(message); }
+
     private Row row(String tenant, String recipient, UUID id) {
-        return jdbc.query("""
-                SELECT event_key,kind,application_id,round_no,created_at FROM notification_inbox
-                WHERE tenant_id=? AND recipient_id=? AND id=? AND kind IN ('EXPENSE_ADJUSTMENT_RESULT','EXPENSE_ADJUSTMENT_ATTENTION')
-                """, (row, index) -> new Row(row.getString("event_key"), InboxMessage.Kind.valueOf(row.getString("kind")), UUID.fromString(row.getString("application_id")), row.getInt("round_no"), row.getTimestamp("created_at").toInstant()),
-                tenant, recipient, id.toString()).stream().findFirst().orElse(null);
+        return SqlRows.map(
+                        sqlMapper.row(tenant, recipient, id.toString()),
+                        row ->
+                                new Row(
+                                        row.getString("event_key"),
+                                        InboxMessage.Kind.valueOf(row.getString("kind")),
+                                        UUID.fromString(row.getString("application_id")),
+                                        row.getInt("round_no"),
+                                        row.getTimestamp("created_at").toInstant()))
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
+
     /**
      * 完整原事实只用于内部核对，不返回外部账户或原财务快照。
+     *
      * @author owlzhangfq@gmail.com
      */
-    record Source(Application application, ExpenseResourceAdjustmentPreparation preparation, ExpenseResourceAdjustment adjustment,
-                  BudgetConsumptionReversalOperation budget, ExpenseResourceAdjustment completion, ExpenseResourceAdjustmentRetirement retirement,
-                  List<ExpenseResourceAdjustment> resourceHistory, List<BudgetConsumptionReversalOperation> budgetHistory, List<String> recipients) { }
+    record Source(
+            Application application,
+            ExpenseResourceAdjustmentPreparation preparation,
+            ExpenseResourceAdjustment adjustment,
+            BudgetConsumptionReversalOperation budget,
+            ExpenseResourceAdjustment completion,
+            ExpenseResourceAdjustmentRetirement retirement,
+            List<ExpenseResourceAdjustment> resourceHistory,
+            List<BudgetConsumptionReversalOperation> budgetHistory,
+            List<String> recipients) {}
+
     /**
      * 消息发生时间必须对应准确历史修订。
+     *
      * @author owlzhangfq@gmail.com
      */
-    private record Row(String eventKey, InboxMessage.Kind kind, UUID applicationId, int roundNo, Instant createdAt) { }
+    private record Row(
+            String eventKey,
+            InboxMessage.Kind kind,
+            UUID applicationId,
+            int roundNo,
+            Instant createdAt) {}
+
     /**
      * 预算结果、资源结果和实际安全结束独立展示。
+     *
      * @author owlzhangfq@gmail.com
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Target(UUID messageId, UUID adjustmentId, UUID reportId, UUID applicationId, int roundNo, ExpenseAdjustmentNotice fact,
-                         Preparation preparation, Budget budget, Adjustment adjustment, Completion completion, Retirement retirement) { }
+    public record Target(
+            UUID messageId,
+            UUID adjustmentId,
+            UUID reportId,
+            UUID applicationId,
+            int roundNo,
+            ExpenseAdjustmentNotice fact,
+            Preparation preparation,
+            Budget budget,
+            Adjustment adjustment,
+            Completion completion,
+            Retirement retirement) {}
+
     /**
      * 本次准备的最小事实。
+     *
      * @author owlzhangfq@gmail.com
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Preparation(long version, ExpenseResourceAdjustmentPreparation.Status status, Instant updatedAt, String issue) {
+    public record Preparation(
+            long version,
+            ExpenseResourceAdjustmentPreparation.Status status,
+            Instant updatedAt,
+            String issue) {
         static Preparation of(ExpenseResourceAdjustmentPreparation value) { return new Preparation(value.version(), value.status(), value.updatedAt(), value.issue()); }
     }
+
     /**
      * 原预算回执和另一次矛盾回执均保留，不展示金额或外部引用。
+     *
      * @author owlzhangfq@gmail.com
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Budget(long version, BudgetConsumptionReversalOperation.Status status, Instant updatedAt, BudgetConsumptionReversalOperation.Failure failure,
-                         BudgetConsumptionReversalObservation.Status outcome, BudgetConsumptionReversalObservation.Status conflictingOutcome) {
+    public record Budget(
+            long version,
+            BudgetConsumptionReversalOperation.Status status,
+            Instant updatedAt,
+            BudgetConsumptionReversalOperation.Failure failure,
+            BudgetConsumptionReversalObservation.Status outcome,
+            BudgetConsumptionReversalObservation.Status conflictingOutcome) {
         static Budget of(BudgetConsumptionReversalOperation value) { return new Budget(value.version(), value.status(), value.updatedAt(), value.failure(), value.observation() == null ? null : value.observation().status(), value.conflictingObservation() == null ? null : value.conflictingObservation().status()); }
     }
+
     /**
      * 已完成资源标志不会在预算重新核对时消失。
+     *
      * @author owlzhangfq@gmail.com
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Adjustment(long version, ExpenseResourceAdjustment.Status status, Instant updatedAt, boolean resourcesReversed, String issue) {
+    public record Adjustment(
+            long version,
+            ExpenseResourceAdjustment.Status status,
+            Instant updatedAt,
+            boolean resourcesReversed,
+            String issue) {
         static Adjustment of(ExpenseResourceAdjustment value) { return new Adjustment(value.version(), value.status(), value.updatedAt(), value.resourcesReversed(), value.issue()); }
     }
+
     /**
      * 首次实际完成修订，不把较晚的重新确认当成再次资源冲回。
+     *
      * @author owlzhangfq@gmail.com
      */
     public record Completion(long adjustmentVersion, long budgetVersion, Instant completedAt) {
         static Completion of(ExpenseResourceAdjustment value) { return new Completion(value.version(), value.budgetReversalVersion(), value.updatedAt()); }
     }
+
     /**
      * 安全结束的原调整及已停止预算准确版本。
+     *
      * @author owlzhangfq@gmail.com
      */
     public record Retirement(long adjustmentVersion, long budgetVersion, Instant retiredAt) {

@@ -1,8 +1,14 @@
 package io.agentflow.definition;
 
+import static io.agentflow.definition.DefinitionModels.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,12 +19,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static io.agentflow.definition.DefinitionModels.*;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 /**
  * 用真实数据库校验版本分配、独立快照写入与旧库迁移。
+ *
  * @author owlzhangfq@gmail.com
  */
 class JdbcDefinitionDraftRepositoryTest {
@@ -30,10 +33,19 @@ class JdbcDefinitionDraftRepositoryTest {
         var dataSource = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(dataSource).load().migrate();
         jdbc = new JdbcTemplate(dataSource);
-        repository = new JdbcDefinitionDraftRepository(jdbc, new JsonUtil(new ObjectMapper()));
-        assertThat(jdbc.queryForObject("SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='APPROVAL_APPLICATION' AND COLUMN_NAME='VERSION'", String.class))
+        repository = new JdbcDefinitionDraftRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.definition.mapper.DefinitionDraftRepositoryMapper
+                                        .class), new JsonUtil(new ObjectMapper()));
+        assertThat(jdbc.queryForObject(
+                                "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE"
+                                        + " TABLE_NAME='APPROVAL_APPLICATION' AND"
+                                        + " COLUMN_NAME='VERSION'", String.class))
                 .isEqualTo("NO");
-        assertThat(jdbc.queryForObject("SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='APPROVAL_DEFINITION' AND COLUMN_NAME='VERSION'", String.class))
+        assertThat(jdbc.queryForObject(
+                                "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE"
+                                    + " TABLE_NAME='APPROVAL_DEFINITION' AND COLUMN_NAME='VERSION'", String.class))
                 .isEqualTo("YES");
     }
 
@@ -56,13 +68,20 @@ class JdbcDefinitionDraftRepositoryTest {
         Flyway.configure().dataSource(dataSource).target("1").load().migrate();
         JdbcTemplate schema = new JdbcTemplate(dataSource);
 
-        assertThat(schema.queryForObject("SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='APPROVAL_DEFINITION' AND COLUMN_NAME='VERSION'", String.class))
+        assertThat(schema.queryForObject(
+                                "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE"
+                                    + " TABLE_NAME='APPROVAL_DEFINITION' AND COLUMN_NAME='VERSION'", String.class))
                 .isEqualTo("NO");
         Flyway.configure().dataSource(dataSource).load().migrate();
 
-        assertThat(schema.queryForObject("SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='APPROVAL_DEFINITION' AND COLUMN_NAME='VERSION'", String.class))
+        assertThat(schema.queryForObject(
+                                "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE"
+                                    + " TABLE_NAME='APPROVAL_DEFINITION' AND COLUMN_NAME='VERSION'", String.class))
                 .isEqualTo("YES");
-        assertThat(schema.queryForObject("SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='APPROVAL_APPLICATION' AND COLUMN_NAME='VERSION'", String.class))
+        assertThat(schema.queryForObject(
+                                "SELECT IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE"
+                                        + " TABLE_NAME='APPROVAL_APPLICATION' AND"
+                                        + " COLUMN_NAME='VERSION'", String.class))
                 .isEqualTo("NO");
     }
 

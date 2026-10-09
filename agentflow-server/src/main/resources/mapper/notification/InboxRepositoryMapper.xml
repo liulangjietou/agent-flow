@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.notification.mapper.InboxRepositoryMapper">
+    <insert id="append">
+        INSERT INTO notification_inbox
+        (id,tenant_id,recipient_id,event_key,application_id,title,business_no,kind,actor_id,task_id,node_name,round_no,created_at,content)
+        SELECT #{id},#{tenantId},#{recipient},#{eventKey},#{applicationId},#{title},#{businessNo},#{kind},#{actor},#{taskId},#{nodeName},#{roundNo},#{createdAt},#{content} WHERE NOT EXISTS
+        (SELECT 1 FROM notification_inbox WHERE tenant_id=#{expectedTenantId} AND recipient_id=#{recipientId} AND event_key=#{expectedEventKey})
+    </insert>
+
+    <select id="unreadCount" resultType="Long">
+        SELECT COUNT(*) FROM notification_inbox WHERE tenant_id=#{tenantId} AND recipient_id=#{userId} AND read_at IS NULL
+    </select>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM notification_inbox WHERE tenant_id=#{tenantId} AND recipient_id=#{userId} AND id=#{id}
+    </select>
+
+    <update id="saveRead">
+        UPDATE notification_inbox SET read_at=#{readAt} WHERE tenant_id=#{tenantId} AND recipient_id=#{recipient} AND id=#{id} AND read_at IS NULL
+    </update>
+
+    <select id="saveRead2" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM notification_inbox WHERE tenant_id=#{tenantId} AND recipient_id=#{recipient} AND id=#{id}
+    </select>
+    <select id="listQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM notification_inbox WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND recipient_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}<choose><when test="unreadOnlySelected"> AND read_at IS NULL</when><otherwise></otherwise></choose><choose><when test="hasBeforeTime"> AND (created_at&lt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} OR (created_at=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} AND id&lt;<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5}))</when><otherwise></otherwise></choose> ORDER BY created_at DESC,id DESC LIMIT <bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6}
+    </select>
+</mapper>

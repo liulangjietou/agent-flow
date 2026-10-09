@@ -18,6 +18,8 @@
         <java.version>17</java.version>
         <maven.compiler.release>17</maven.compiler.release>
         <flowable.version>7.2.0</flowable.version>
+        <mybatis-spring-boot.version>3.0.5</mybatis-spring-boot.version>
+        <mybatis.version>3.5.19</mybatis.version>
         <!-- 修复 H2 2.3.232 关闭压缩后回退到旧数据的问题，见上游 #4247 / #4249。 -->
         <h2.version>2.5.250</h2.version>
         <!-- 依赖版本变化时重新生成普通 jar，避免 repackage 复用包含旧驱动的可执行 jar。 -->

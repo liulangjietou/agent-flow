@@ -1,11 +1,21 @@
 package io.agentflow.approval.operations;
+import static io.agentflow.definition.DefinitionModels.*;
+import static io.agentflow.support.MutationRequests.post;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
+
+import io.agentflow.approval.history.JdbcSubmissionHistoryGapQuery;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.DefinitionApplicationService;
-import io.agentflow.approval.history.JdbcSubmissionHistoryGapQuery;
+
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
 import org.junit.jupiter.api.Test;
@@ -16,28 +26,22 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import static io.agentflow.definition.DefinitionModels.*;
-import static io.agentflow.support.MutationRequests.post;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
  * 运营查询覆盖轮次口径、日期边界、租户权限、真实会签待办和返回上限。
+ *
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {
@@ -68,9 +72,15 @@ class ApprovalOperationsIntegrationTest {
         organization("demo", app, 2, "另一部门");
         jdbc.update("UPDATE approval_application SET round_no=2 WHERE id=?", app);
         String recovered = delivery("demo", app, 1, "ACCEPTED", "EMAIL");
-        jdbc.update("INSERT INTO notification_delivery_event(delivery_id,version,status,attempts,cycle_attempts,occurred_at) VALUES(?,1,'RETRY_WAIT',1,1,?)",
+        jdbc.update(
+                "INSERT INTO"
+                    + " notification_delivery_event(delivery_id,version,status,attempts,cycle_attempts,occurred_at)"
+                    + " VALUES(?,1,'RETRY_WAIT',1,1,?)",
                 recovered, Timestamp.from(Instant.parse("2020-01-05T00:00:00Z")));
-        jdbc.update("INSERT INTO notification_delivery_event(delivery_id,version,status,attempts,cycle_attempts,occurred_at) VALUES(?,2,'FAILED',3,3,?)",
+        jdbc.update(
+                "INSERT INTO"
+                    + " notification_delivery_event(delivery_id,version,status,attempts,cycle_attempts,occurred_at)"
+                    + " VALUES(?,2,'FAILED',3,3,?)",
                 recovered, Timestamp.from(Instant.parse("2020-01-05T00:01:00Z")));
         for (String status : List.of("FAILED", "RETRY_WAIT", "UNKNOWN", "SUPPRESSED", "PENDING", "IN_FLIGHT")) delivery("demo", app, 1, status, "ENTERPRISE_IM");
         for (String status : List.of("ADOPTED", "ADOPTED", "DISMISSED", "COMPLETED", "FAILED", "QUEUED", "RUNNING")) assist("demo", app, 1, status);
@@ -115,8 +125,12 @@ class ApprovalOperationsIntegrationTest {
         assertThat(sla.path("violationRatePercent").decimalValue()).isEqualByComparingTo("50.0");
         for (String field : List.of("withoutDeadlineTasks", "invalidTimingTasks", "cancelledTasks", "unfinishedTasks", "unrecordedDecisionTasks"))
             assertThat(sla.path(field).asLong()).as(field).isEqualTo(1);
-        String instance = jdbc.queryForObject("SELECT process_instance_id FROM approval_submission_round WHERE application_id=?", String.class, app);
-        jdbc.update("UPDATE ACT_HI_VARINST SET TEXT_='foreign' WHERE PROC_INST_ID_=? AND NAME_='tenantId'", instance);
+        String instance = jdbc.queryForObject(
+                        "SELECT process_instance_id FROM approval_submission_round WHERE"
+                                + " application_id=?", String.class, app);
+        jdbc.update(
+                "UPDATE ACT_HI_VARINST SET TEXT_='foreign' WHERE PROC_INST_ID_=? AND"
+                        + " NAME_='tenantId'", instance);
         var invalidBinding = report(key).path("sla");
         assertThat(invalidBinding.path("decidedTasks").asLong()).isZero();
         assertThat(invalidBinding.has("violationRatePercent")).isFalse();
@@ -133,7 +147,13 @@ class ApprovalOperationsIntegrationTest {
                 liveAction(flow.get("app"), "finance", action);
                 var sla = report(flow.get("key")).path("sla");
                 assertThat(sla.path("decidedTasks").asLong()).isEqualTo(1);
-                assertThat(sla.path("timedTasks").asLong()).as("sla=%s, tasks=%s", sla, jdbc.queryForList("SELECT h.START_TIME_,h.END_TIME_,h.DUE_DATE_,h.DELETE_REASON_ FROM ACT_HI_TASKINST h JOIN approval_submission_round r ON r.process_instance_id=h.PROC_INST_ID_ WHERE r.application_id=?", flow.get("app"))).isEqualTo(1);
+                assertThat(sla.path("timedTasks").asLong()).as("sla=%s, tasks=%s", sla, jdbc.queryForList(
+                                        "SELECT"
+                                            + " h.START_TIME_,h.END_TIME_,h.DUE_DATE_,h.DELETE_REASON_"
+                                            + " FROM ACT_HI_TASKINST h JOIN"
+                                            + " approval_submission_round r ON"
+                                            + " r.process_instance_id=h.PROC_INST_ID_ WHERE"
+                                            + " r.application_id=?", flow.get("app"))).isEqualTo(1);
                 assertThat(sla.path("violatedTasks").asLong()).isEqualTo(1);
                 assertThat(sla.path("cancelledTasks").asLong()).isEqualTo(1);
                 assertThat(sla.path("unrecordedDecisionTasks").asLong()).isZero();
@@ -184,7 +204,11 @@ class ApprovalOperationsIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":1}")).andExpect(status().isOk());
         // 只调整提交窗口夹具；任务期限及后续办理均来自真实引擎和公开接口。
         jdbc.update("UPDATE approval_submission_round SET submitted_at=? WHERE application_id=?", Timestamp.from(Instant.parse("2020-01-01T09:00:00Z")), app);
-        assertThat(jdbc.queryForList("SELECT h.DUE_DATE_ FROM ACT_HI_TASKINST h JOIN approval_submission_round r ON r.process_instance_id=h.PROC_INST_ID_ WHERE r.application_id=?", Timestamp.class, app))
+        assertThat(jdbc.queryForList(
+                                "SELECT h.DUE_DATE_ FROM ACT_HI_TASKINST h JOIN"
+                                        + " approval_submission_round r ON"
+                                        + " r.process_instance_id=h.PROC_INST_ID_ WHERE"
+                                        + " r.application_id=?", Timestamp.class, app))
                 .hasSize(2).allSatisfy(due -> assertThat(due.toInstant()).isEqualTo(Instant.parse("2020-01-01T09:10:00Z")));
         return Map.of("app", app, "key", key);
     }
@@ -207,44 +231,57 @@ class ApprovalOperationsIntegrationTest {
 
     private String delivery(String tenant, String app, int round, String status, String channel) {
         String inbox = UUID.randomUUID().toString(), id = UUID.randomUUID().toString();
-        jdbc.update("""
-                INSERT INTO notification_inbox(id,tenant_id,recipient_id,event_key,application_id,title,business_no,kind,actor_id,round_no,created_at)
-                VALUES(?,?,'recipient@example.invalid',?,?,'sensitive-body',?,'APPROVED','actor',?,?)
-                """, inbox, tenant, inbox, app, app, round, Timestamp.from(Instant.parse("2020-01-05T00:00:00Z")));
-        jdbc.update("""
-                INSERT INTO notification_dispatch(id,tenant_id,recipient_id,inbox_id,channel,consent_generation,status,created_at,updated_at)
-                VALUES(?,?,'recipient@example.invalid',?,?,1,?,?,?)
-                """, id, tenant, inbox, channel, status, Timestamp.from(Instant.now()), Timestamp.from(Instant.now()));
+        jdbc.update(
+                """
+INSERT INTO notification_inbox(id,tenant_id,recipient_id,event_key,application_id,title,business_no,kind,actor_id,round_no,created_at)
+VALUES(?,?,'recipient@example.invalid',?,?,'sensitive-body',?,'APPROVED','actor',?,?)
+""", inbox, tenant, inbox, app, app, round, Timestamp.from(Instant.parse("2020-01-05T00:00:00Z")));
+        jdbc.update(
+                """
+INSERT INTO notification_dispatch(id,tenant_id,recipient_id,inbox_id,channel,consent_generation,status,created_at,updated_at)
+VALUES(?,?,'recipient@example.invalid',?,?,1,?,?,?)
+""", id, tenant, inbox, channel, status, Timestamp.from(Instant.now()), Timestamp.from(Instant.now()));
         return id;
     }
 
     private void assist(String tenant, String app, int round, String status) {
         int version = switch (status) { case "QUEUED" -> 1; case "RUNNING" -> 2; case "COMPLETED", "FAILED" -> 3; default -> 4; };
-        jdbc.update("""
-                INSERT INTO agent_assist_run(id,tenant_id,application_id,application_version,round_no,status,version,context_json,state_json,created_at)
-                VALUES(?,?,?,1,?,?,?, 'sensitive-body','sensitive-body',?)
-                """, UUID.randomUUID().toString(), tenant, app, round, status, version, Timestamp.from(Instant.now()));
+        jdbc.update(
+                """
+INSERT INTO agent_assist_run(id,tenant_id,application_id,application_version,round_no,status,version,context_json,state_json,created_at)
+VALUES(?,?,?,1,?,?,?, 'sensitive-body','sensitive-body',?)
+""", UUID.randomUUID().toString(), tenant, app, round, status, version, Timestamp.from(Instant.now()));
     }
 
     private void historicalTask(String app, String completed, String due, String deleted, String decision) {
-        String instance = jdbc.queryForObject("SELECT process_instance_id FROM approval_submission_round WHERE application_id=?", String.class, app);
+        String instance = jdbc.queryForObject(
+                        "SELECT process_instance_id FROM approval_submission_round WHERE"
+                                + " application_id=?", String.class, app);
         if (jdbc.queryForObject("SELECT COUNT(*) FROM ACT_HI_VARINST WHERE PROC_INST_ID_=?", Long.class, instance) == 0) {
             for (var entry : Map.of("tenantId", "demo", "applicationId", app).entrySet())
-                jdbc.update("INSERT INTO ACT_HI_VARINST(ID_,PROC_INST_ID_,EXECUTION_ID_,NAME_,VAR_TYPE_,TEXT_) VALUES(?,?,?,?,'string',?)",
+                jdbc.update(
+                        "INSERT INTO"
+                            + " ACT_HI_VARINST(ID_,PROC_INST_ID_,EXECUTION_ID_,NAME_,VAR_TYPE_,TEXT_)"
+                            + " VALUES(?,?,?,?,'string',?)",
                         UUID.randomUUID().toString(), instance, instance, entry.getKey(), entry.getValue());
-            jdbc.update("INSERT INTO ACT_HI_VARINST(ID_,PROC_INST_ID_,EXECUTION_ID_,NAME_,VAR_TYPE_,LONG_) VALUES(?,?,?,'roundNo','integer',1)",
+            jdbc.update(
+                    "INSERT INTO"
+                        + " ACT_HI_VARINST(ID_,PROC_INST_ID_,EXECUTION_ID_,NAME_,VAR_TYPE_,LONG_)"
+                        + " VALUES(?,?,?,'roundNo','integer',1)",
                     UUID.randomUUID().toString(), instance, instance);
         }
         String task = UUID.randomUUID().toString();
-        jdbc.update("""
-                INSERT INTO ACT_HI_TASKINST(ID_,PROC_INST_ID_,TENANT_ID_,START_TIME_,END_TIME_,DUE_DATE_,DELETE_REASON_)
-                VALUES(?,?,'demo',?,?,?,?)
-                """, task, instance, Timestamp.from(Instant.parse("2020-01-01T00:00:00Z")),
+        jdbc.update(
+                """
+INSERT INTO ACT_HI_TASKINST(ID_,PROC_INST_ID_,TENANT_ID_,START_TIME_,END_TIME_,DUE_DATE_,DELETE_REASON_)
+VALUES(?,?,'demo',?,?,?,?)
+""", task, instance, Timestamp.from(Instant.parse("2020-01-01T00:00:00Z")),
                 completed == null ? null : Timestamp.from(Instant.parse(completed)), due == null ? null : Timestamp.from(Instant.parse(due)), deleted);
-        if (decision != null) jdbc.update("""
-                INSERT INTO audit_event(id,tenant_id,event_id,aggregate_type,aggregate_id,aggregate_version,application_id,action,actor_id,payload_json,occurred_at)
-                VALUES(?,'demo',?,'Task',?,1,?,?,'finance','sensitive-body',?)
-                """, UUID.randomUUID().toString(), UUID.randomUUID().toString(), task, app, decision, Timestamp.from(Instant.now()));
+        if (decision != null) jdbc.update(
+                    """
+INSERT INTO audit_event(id,tenant_id,event_id,aggregate_type,aggregate_id,aggregate_version,application_id,action,actor_id,payload_json,occurred_at)
+VALUES(?,'demo',?,'Task',?,1,?,?,'finance','sensitive-body',?)
+""", UUID.randomUUID().toString(), UUID.randomUUID().toString(), task, app, decision, Timestamp.from(Instant.now()));
     }
 
     @Test
@@ -261,7 +298,9 @@ class ApprovalOperationsIntegrationTest {
         seedApplication("demo", UUID.randomUUID().toString(), key, 2);
         String foreign = seed("foreign", key, "RETURNED", "2020-01-01T12:00:00Z", "2020-01-01T13:00:00Z");
         organization("foreign", foreign, 1, "研发%_!部");
-        var before = jdbc.queryForList("SELECT * FROM approval_submission_round WHERE application_id=? ORDER BY round_no", app);
+        var before = jdbc.queryForList(
+                        "SELECT * FROM approval_submission_round WHERE application_id=? ORDER BY"
+                                + " round_no", app);
         var report = report(key, "%_!");
         var metrics = report.path("metrics");
         assertThat(report.path("organization").asText()).isEqualTo("%_!");
@@ -279,7 +318,9 @@ class ApprovalOperationsIntegrationTest {
         var empty = report(key, "不存在的组织");
         assertThat(empty.path("metrics").path("submittedRounds").asLong()).isZero();
         assertThat(empty.path("unrecordedHistoricalRounds").asLong()).isEqualTo(2);
-        assertThat(jdbc.queryForList("SELECT * FROM approval_submission_round WHERE application_id=? ORDER BY round_no", app)).isEqualTo(before);
+        assertThat(jdbc.queryForList(
+                                "SELECT * FROM approval_submission_round WHERE application_id=?"
+                                        + " ORDER BY round_no", app)).isEqualTo(before);
     }
 
     @Test
@@ -292,7 +333,9 @@ class ApprovalOperationsIntegrationTest {
         seed("demo", key, "WITHDRAWN", "2020-01-03T00:00:00Z", "2020-01-03T02:00:00Z");
         seed("demo", key, "IN_APPROVAL", "2020-01-03T23:59:59Z", null);
         seed("demo", key, "APPROVED", "2020-01-04T00:00:00Z", "2020-01-04T00:01:00Z");
-        var before = jdbc.queryForList("SELECT * FROM approval_submission_round WHERE application_id=? ORDER BY round_no", app);
+        var before = jdbc.queryForList(
+                        "SELECT * FROM approval_submission_round WHERE application_id=? ORDER BY"
+                                + " round_no", app);
         JsonNode report = report(key);
         JsonNode metrics = report.path("metrics");
         assertThat(metrics.path("submittedRounds").asLong()).isEqualTo(5);
@@ -304,7 +347,9 @@ class ApprovalOperationsIntegrationTest {
         assertThat(report.path("daily").findValuesAsText("submittedRounds")).containsExactly("1", "2", "2");
         assertThat(report.path("processes")).hasSize(1);
         assertThat(report.toString()).doesNotContain("secret-value", "payload", "reason");
-        assertThat(jdbc.queryForList("SELECT * FROM approval_submission_round WHERE application_id=? ORDER BY round_no", app)).isEqualTo(before);
+        assertThat(jdbc.queryForList(
+                                "SELECT * FROM approval_submission_round WHERE application_id=?"
+                                        + " ORDER BY round_no", app)).isEqualTo(before);
     }
 
     @Test
@@ -349,7 +394,9 @@ class ApprovalOperationsIntegrationTest {
         for (int version = 1; version <= 52; version++) {
             String app = seed("demo", key, "APPROVED", "2020-01-02T00:00:00Z", "2020-01-02T00:01:00Z");
             jdbc.update("UPDATE approval_application SET definition_version=? WHERE id=?", version, app);
-            jdbc.update("UPDATE approval_submission_round SET definition_version=? WHERE application_id=?", version, app);
+            jdbc.update(
+                    "UPDATE approval_submission_round SET definition_version=? WHERE"
+                            + " application_id=?", version, app);
         }
         var report = reader.read("demo", query(key), Instant.now());
         assertThat(report.metrics().submittedRounds()).isEqualTo(52);
@@ -411,7 +458,9 @@ class ApprovalOperationsIntegrationTest {
             for (int member = 0; member < (group == 22 ? 3 : 1); member++) {
                 String app = UUID.randomUUID().toString();
                 seedApplication(tenant, app, "flow-" + group, 1);
-                jdbc.update("UPDATE approval_application SET status='IN_APPROVAL',definition_version=? WHERE id=?", group, app);
+                jdbc.update(
+                        "UPDATE approval_application SET status='IN_APPROVAL',definition_version=?"
+                                + " WHERE id=?", group, app);
                 var process = runtime.startProcessInstanceByKey("expense-reimbursement",
                         Map.of("applicationId", app, "tenantId", tenant, "roundNo", 1));
                 jdbc.update("UPDATE ACT_RU_TASK SET CREATE_TIME_=? WHERE PROC_INST_ID_=?",
@@ -420,8 +469,16 @@ class ApprovalOperationsIntegrationTest {
         }
         var statements = new ArrayList<String>();
         var observedJdbc = observedJdbc(statements);
-        var observedReader = new JdbcApprovalOperationsReadAdapter(observedJdbc,
-                new JdbcSubmissionHistoryGapQuery(observedJdbc, json));
+        var observedReader = new JdbcApprovalOperationsReadAdapter(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (observedJdbc).getDataSource(),
+                                io.agentflow.approval.operations.mapper
+                                        .ApprovalOperationsReadAdapterMapper.class),
+                        new JdbcSubmissionHistoryGapQuery(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (observedJdbc).getDataSource(),
+                                        io.agentflow.approval.history.mapper
+                                                .SubmissionHistoryGapQueryMapper.class), json));
         var report = observedReader.read(tenant, query(""), created.plusSeconds(60));
         assertThat(report.pendingTasks()).isEqualTo(24);
         assertThat(report.waitingNodes()).hasSize(20);
@@ -480,16 +537,18 @@ class ApprovalOperationsIntegrationTest {
         seedApplication(tenant, app, key, 1); seedRound(tenant, app, 1, state, submitted, completed); return app;
     }
     private void seedApplication(String tenant, String app, String key, int rounds) {
-        jdbc.update("""
-                INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version)
-                VALUES(?,?,?,?,1,'alice','历史轮次测试','{"secret":"secret-value"}','APPROVED',?,5)
-                """, app, tenant, app, key, rounds);
+        jdbc.update(
+                """
+INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version)
+VALUES(?,?,?,?,1,'alice','历史轮次测试','{"secret":"secret-value"}','APPROVED',?,5)
+""", app, tenant, app, key, rounds);
     }
     private void seedRound(String tenant, String app, int round, String state, String submitted, String completed) {
-        jdbc.update("""
-                INSERT INTO approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status,completed_by,completed_at)
-                VALUES(?,?,?,?,1,'历史轮次测试','{"secret":"secret-value"}','alice',?,?,?,?)
-                """, tenant, app, round, UUID.randomUUID().toString(), OffsetDateTime.parse(submitted), state,
+        jdbc.update(
+                """
+INSERT INTO approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status,completed_by,completed_at)
+VALUES(?,?,?,?,1,'历史轮次测试','{"secret":"secret-value"}','alice',?,?,?,?)
+""", tenant, app, round, UUID.randomUUID().toString(), OffsetDateTime.parse(submitted), state,
                 completed == null ? null : "finance", completed == null ? null : OffsetDateTime.parse(completed));
     }
     private String token(String user) { return "Bearer " + auth.login("demo", user, "demo").token(); }
@@ -497,9 +556,10 @@ class ApprovalOperationsIntegrationTest {
     private void organization(String tenant, String app, int round, String department) {
         var snapshot = new io.agentflow.organization.InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1,
                 UUID.randomUUID(), "验收法人", UUID.randomUUID(), department, UUID.randomUUID(), "Reviewer");
-        jdbc.update("""
-                UPDATE approval_submission_round SET initiator_context_json=?,initiator_legal_entity_name=?,initiator_department_name=?,initiator_position_name=?
-                WHERE tenant_id=? AND application_id=? AND round_no=?
-                """, json.write(snapshot), snapshot.legalEntityName(), snapshot.departmentName(), snapshot.positionName(), tenant, app, round);
+        jdbc.update(
+                """
+UPDATE approval_submission_round SET initiator_context_json=?,initiator_legal_entity_name=?,initiator_department_name=?,initiator_position_name=?
+WHERE tenant_id=? AND application_id=? AND round_no=?
+""", json.write(snapshot), snapshot.legalEntityName(), snapshot.departmentName(), snapshot.positionName(), tenant, app, round);
     }
 }

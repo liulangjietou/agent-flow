@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.process.mapper.FlowableTaskEscalationsMapper">
+    <select id="escalate" resultType="String">
+        SELECT ID_ FROM ACT_RU_TASK WHERE ID_=#{taskId} FOR UPDATE
+    </select>
+    <select id="candidatesQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT t.ID_,v.LONG_,t.TENANT_ID_,o.trace_id,t.PROC_INST_ID_ AS process_instance_id,business.business_no FROM ACT_RU_TASK t JOIN ACT_RU_VARIABLE v ON v.TASK_ID_=t.ID_
+        LEFT JOIN workflow_execution_origin o ON o.tenant_id=t.TENANT_ID_ AND o.object_kind='TASK' AND o.object_id=t.ID_
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=t.TENANT_ID_ AND submitted.process_instance_id=t.PROC_INST_ID_
+        LEFT JOIN approval_application business ON business.tenant_id=submitted.tenant_id AND business.id=submitted.application_id
+        WHERE t.SUSPENSION_STATE_=1 AND v.NAME_=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND v.TYPE_='date' AND v.LONG_&lt;=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}
+        AND NOT EXISTS (SELECT 1 FROM ACT_RU_VARIABLE marker WHERE marker.TASK_ID_=t.ID_ AND marker.NAME_=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3})
+        <choose><when test="condition0"> AND (v.LONG_&gt;<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} OR (v.LONG_=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} AND t.ID_&gt;<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6}))</when><otherwise></otherwise></choose> ORDER BY v.LONG_,t.ID_ LIMIT <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}
+    </select>
+</mapper>

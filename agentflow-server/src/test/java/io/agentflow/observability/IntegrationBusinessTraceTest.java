@@ -1,21 +1,23 @@
 package io.agentflow.observability;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.agentflow.common.JsonUtil;
 import io.agentflow.event.*;
 import io.agentflow.finance.callback.*;
 import io.agentflow.notification.*;
 import io.agentflow.servicetask.*;
 import io.agentflow.signature.*;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.UUID;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,12 +29,15 @@ import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * 真实候选 SQL 核对原业务、原轮次及通知归属；完整业务约束由各集成模块的持久化和公开接口测试覆盖。
+ *
  * @author owlzhangfq@gmail.com
  */
 class IntegrationBusinessTraceTest {
@@ -44,15 +49,29 @@ class IntegrationBusinessTraceTest {
 
     @BeforeEach void schema() {
         jdbc = new JdbcTemplate(new DriverManagerDataSource("jdbc:h2:mem:integration-business-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", ""));
-        jdbc.execute("CREATE TABLE approval_application(tenant_id VARCHAR(64),id VARCHAR(36),business_no VARCHAR(128),round_no INT)");
-        jdbc.execute("CREATE TABLE approval_submission_round(tenant_id VARCHAR(64),application_id VARCHAR(36),round_no INT,process_instance_id VARCHAR(128))");
-        jdbc.execute("CREATE TABLE notification_inbox(tenant_id VARCHAR(64),id VARCHAR(36),recipient_id VARCHAR(128),application_id VARCHAR(36),business_no VARCHAR(128),round_no INT,task_id VARCHAR(128))");
+        jdbc.execute(
+                "CREATE TABLE approval_application(tenant_id VARCHAR(64),id VARCHAR(36),business_no"
+                        + " VARCHAR(128),round_no INT)");
+        jdbc.execute(
+                "CREATE TABLE approval_submission_round(tenant_id VARCHAR(64),application_id"
+                        + " VARCHAR(36),round_no INT,process_instance_id VARCHAR(128))");
+        jdbc.execute(
+                "CREATE TABLE notification_inbox(tenant_id VARCHAR(64),id VARCHAR(36),recipient_id"
+                    + " VARCHAR(128),application_id VARCHAR(36),business_no VARCHAR(128),round_no"
+                    + " INT,task_id VARCHAR(128))");
         for (String table : new String[]{"payment_authorization", "supplier_payment_authorization"})
-            jdbc.execute("CREATE TABLE " + table + "(tenant_id VARCHAR(64),id VARCHAR(36),application_id VARCHAR(36),round_no INT)");
+            jdbc.execute("CREATE TABLE " + table + "(tenant_id VARCHAR(64),id VARCHAR(36),application_id"
+                            + " VARCHAR(36),round_no INT)");
         for (String table : new String[]{"service_task_operation", "signature_operation", "event_inbox", "payment_callback", "notification_dispatch"}) {
-            jdbc.execute("CREATE TABLE " + table + "(tenant_id VARCHAR(64),id VARCHAR(36),application_id VARCHAR(36),round_no INT,process_instance_id VARCHAR(128),"
-                    + "recipient_id VARCHAR(128),inbox_id VARCHAR(36),payment_kind VARCHAR(16),employee_payment_id VARCHAR(36),supplier_payment_id VARCHAR(36),trace_id VARCHAR(36),"
-                    + "status VARCHAR(32),progress VARCHAR(16),active_guard INT,created_at TIMESTAMP,updated_at TIMESTAMP,received_at TIMESTAMP,poll_at TIMESTAMP,next_attempt_at TIMESTAMP,lease_until TIMESTAMP)");
+            jdbc.execute("CREATE TABLE " + table + "(tenant_id VARCHAR(64),id VARCHAR(36),application_id"
+                            + " VARCHAR(36),round_no INT,process_instance_id"
+                            + " VARCHAR(128),recipient_id VARCHAR(128),inbox_id"
+                            + " VARCHAR(36),payment_kind VARCHAR(16),employee_payment_id"
+                            + " VARCHAR(36),supplier_payment_id VARCHAR(36),trace_id"
+                            + " VARCHAR(36),status VARCHAR(32),progress VARCHAR(16),active_guard"
+                            + " INT,created_at TIMESTAMP,updated_at TIMESTAMP,received_at"
+                            + " TIMESTAMP,poll_at TIMESTAMP,next_attempt_at TIMESTAMP,lease_until"
+                            + " TIMESTAMP)");
         }
     }
 
@@ -151,7 +170,8 @@ class IntegrationBusinessTraceTest {
         if (kind == Kind.EMPLOYEE_CALLBACK || kind == Kind.SUPPLIER_CALLBACK)
             jdbc.update("INSERT INTO " + authorization(kind) + " VALUES(?,?,?,1)", TENANT, runId.toString(), applicationId.toString());
         var now = Timestamp.from(Instant.now().minusSeconds(1));
-        jdbc.update("INSERT INTO " + table + "(tenant_id,id,application_id,round_no,process_instance_id,recipient_id,inbox_id,payment_kind,employee_payment_id,supplier_payment_id,trace_id,status,progress,active_guard,created_at,updated_at,received_at,poll_at,next_attempt_at) VALUES(?,?,?,1,?,'recipient',?,?,?,?,?,'PENDING','PENDING',1,?,?,?,?,?)",
+        jdbc.update("INSERT INTO " + table + "(tenant_id,id,application_id,round_no,process_instance_id,recipient_id,inbox_id,payment_kind,employee_payment_id,supplier_payment_id,trace_id,status,progress,active_guard,created_at,updated_at,received_at,poll_at,next_attempt_at)"
+                        + " VALUES(?,?,?,1,?,'recipient',?,?,?,?,?,'PENDING','PENDING',1,?,?,?,?,?)",
                 TENANT, runId.toString(), applicationId.toString(), INSTANCE, inboxId.toString(), kind == Kind.SUPPLIER_CALLBACK ? "SUPPLIER" : "EMPLOYEE",
                 kind == Kind.EMPLOYEE_CALLBACK ? runId.toString() : null, kind == Kind.SUPPLIER_CALLBACK ? runId.toString() : null, traceId, now, now, now, now, now);
     }
@@ -163,18 +183,37 @@ class IntegrationBusinessTraceTest {
         return switch (kind) {
             case SERVICE -> {
                 var service = mock(ServiceTaskOperationService.class); doAnswer(observation).when(service).claim(anyString(), any(), any());
-                yield new Harness(new ServiceTaskWorker(new JdbcServiceTaskOperationRepository(jdbc, json), service, mock(ServiceTaskGateway.class))::poll, ServiceTaskWorker.class);
+                yield new Harness(new ServiceTaskWorker(new JdbcServiceTaskOperationRepository(
+                                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                        (jdbc).getDataSource(),
+                                                        io.agentflow.servicetask.mapper
+                                                                .ServiceTaskOperationRepositoryMapper
+                                                                .class), json), service, mock(ServiceTaskGateway.class))::poll, ServiceTaskWorker.class);
             }
             case SIGNATURE -> {
                 var service = mock(SignatureOperationService.class); doAnswer(observation).when(service).claim(anyString(), any(), any());
-                yield new Harness(new SignatureWorker(new JdbcSignatureOperationRepository(jdbc, json), mock(JdbcSignatureEvidenceRepository.class), service, mock(SignatureGateway.class))::poll, SignatureWorker.class);
+                yield new Harness(new SignatureWorker(new JdbcSignatureOperationRepository(
+                                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                        (jdbc).getDataSource(),
+                                                        io.agentflow.signature.mapper
+                                                                .SignatureOperationRepositoryMapper
+                                                                .class), json), mock(JdbcSignatureEvidenceRepository.class), service, mock(SignatureGateway.class))::poll, SignatureWorker.class);
             }
             case NOTIFICATION -> {
                 var service = mock(NotificationDeliveryService.class); doAnswer(observation).when(service).claim(any(), any());
-                yield new Harness(new NotificationDeliveryWorker(new JdbcNotificationDeliveryStore(jdbc), mock(SmtpNotificationTransport.class), mock(WeComNotificationTransport.class), service)::runOnce, NotificationDeliveryWorker.class);
+                yield new Harness(new NotificationDeliveryWorker(new JdbcNotificationDeliveryStore(
+                                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                        (jdbc).getDataSource(),
+                                                        io.agentflow.notification.mapper
+                                                                .NotificationDeliveryStoreMapper
+                                                                .class)), mock(SmtpNotificationTransport.class), mock(WeComNotificationTransport.class), service)::runOnce, NotificationDeliveryWorker.class);
             }
             case EVENT -> {
-                var repository = spy(new JdbcEventInboxRepository(jdbc, json));
+                var repository = spy(new JdbcEventInboxRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.event.mapper.EventInboxRepositoryMapper
+                                                        .class), json));
                 var signal = new EventSignal(1, TENANT, "source", "done", applicationId, 1, "original-wait", "contract", 1);
                 var item = EventInboxItem.receive(new ReceivedEvent("event", "1".repeat(64), 1, signal), Instant.now());
                 doReturn(item).when(repository).get(TENANT, runId);
@@ -182,7 +221,11 @@ class IntegrationBusinessTraceTest {
                 yield new Harness(new EventInboxWorker(repository, service)::poll, EventInboxWorker.class);
             }
             case EMPLOYEE_CALLBACK, SUPPLIER_CALLBACK -> {
-                var repository = spy(new JdbcPaymentCallbackRepository(jdbc, json));
+                var repository = spy(new JdbcPaymentCallbackRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.finance.callback.mapper
+                                                        .PaymentCallbackRepositoryMapper.class), json));
                 doAnswer(invocation -> { observation.answer(invocation); return mock(PaymentCallback.class); }).when(repository).get(anyString(), any());
                 yield new Harness(new PaymentCallbackWorker(repository, mock(PaymentCallbackService.class))::poll, PaymentCallbackWorker.class);
             }

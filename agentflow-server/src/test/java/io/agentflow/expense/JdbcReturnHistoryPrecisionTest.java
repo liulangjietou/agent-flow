@@ -1,22 +1,26 @@
 package io.agentflow.expense;
 
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.AdvanceDisbursementReturnPort;
 import io.agentflow.finance.ExpensePaymentReturnPort;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
+
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.UUID;
 
 /**
  * 用固定纳秒原件验证数据库微秒投影，不依赖操作系统时钟精度。
+ *
  * @author owlzhangfq@gmail.com
  */
 class JdbcReturnHistoryPrecisionTest {
@@ -30,20 +34,22 @@ class JdbcReturnHistoryPrecisionTest {
     @BeforeEach
     void database() {
         jdbc = new JdbcTemplate(new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", ""));
-        jdbc.execute("""
-                CREATE TABLE expense_payment_return_registration (
-                    tenant_id VARCHAR, id VARCHAR, report_id VARCHAR, return_version BIGINT,
-                    check_id VARCHAR, outcome VARCHAR, registered_by VARCHAR,
-                    observed_at TIMESTAMP(6) WITH TIME ZONE, registered_at TIMESTAMP(6) WITH TIME ZONE,
-                    state_json VARCHAR)
-                """);
-        jdbc.execute("""
-                CREATE TABLE advance_disbursement_resolution (
-                    tenant_id VARCHAR, id VARCHAR, advance_id VARCHAR, advance_version BIGINT,
-                    check_id VARCHAR, outcome VARCHAR, resolved_by VARCHAR,
-                    observed_at TIMESTAMP(6) WITH TIME ZONE, resolved_at TIMESTAMP(6) WITH TIME ZONE,
-                    state_json VARCHAR)
-                """);
+        jdbc.execute(
+                """
+CREATE TABLE expense_payment_return_registration (
+    tenant_id VARCHAR, id VARCHAR, report_id VARCHAR, return_version BIGINT,
+    check_id VARCHAR, outcome VARCHAR, registered_by VARCHAR,
+    observed_at TIMESTAMP(6) WITH TIME ZONE, registered_at TIMESTAMP(6) WITH TIME ZONE,
+    state_json VARCHAR)
+""");
+        jdbc.execute(
+                """
+CREATE TABLE advance_disbursement_resolution (
+    tenant_id VARCHAR, id VARCHAR, advance_id VARCHAR, advance_version BIGINT,
+    check_id VARCHAR, outcome VARCHAR, resolved_by VARCHAR,
+    observed_at TIMESTAMP(6) WITH TIME ZONE, resolved_at TIMESTAMP(6) WITH TIME ZONE,
+    state_json VARCHAR)
+""");
     }
 
     @ParameterizedTest
@@ -119,13 +125,19 @@ class JdbcReturnHistoryPrecisionTest {
     }
 
     private JdbcExpensePaymentReturnRepository expenses() {
-        return new JdbcExpensePaymentReturnRepository(jdbc, json, mock(JdbcExpensePaymentReturnCheckRepository.class),
+        return new JdbcExpensePaymentReturnRepository(
+                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                        (jdbc).getDataSource(),
+                        io.agentflow.expense.mapper.ExpensePaymentReturnRepositoryMapper.class), json, mock(JdbcExpensePaymentReturnCheckRepository.class),
                 mock(JdbcExpensePaymentReturnsRepository.class), mock(JdbcExpenseSettlementRepository.class),
                 mock(io.agentflow.finance.JdbcFinanceReceiptCreditRepository.class));
     }
 
     private JdbcDisbursementResolutionRepository disbursements() {
-        return new JdbcDisbursementResolutionRepository(jdbc, json, mock(JdbcDisbursementReturnCheckRepository.class),
+        return new JdbcDisbursementResolutionRepository(
+                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                        (jdbc).getDataSource(),
+                        io.agentflow.expense.mapper.DisbursementResolutionRepositoryMapper.class), json, mock(JdbcDisbursementReturnCheckRepository.class),
                 mock(JdbcAdvanceReceiptCreditRepository.class));
     }
 }

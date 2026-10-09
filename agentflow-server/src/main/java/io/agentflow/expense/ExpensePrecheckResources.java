@@ -1,11 +1,17 @@
 package io.agentflow.expense;
 
+
+import static io.agentflow.expense.ExpensePrecheckEvidence.ResourceKind;
+import static io.agentflow.expense.ExpensePrecheckEvidence.ResourceVersion;
+
 import io.agentflow.common.DomainException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import io.agentflow.expense.mapper.ExpensePrecheckResourcesMapper;
+import io.agentflow.mybatis.SqlRows;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -14,37 +20,46 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import static io.agentflow.expense.ExpensePrecheckEvidence.ResourceKind;
-import static io.agentflow.expense.ExpensePrecheckEvidence.ResourceVersion;
 
 /**
  * 预检按实际引用批量读取资源，最终提交复用同一版本和成功验票凭据校验。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
 public class ExpensePrecheckResources {
+    private final ExpensePrecheckResourcesMapper sqlMapper;
     private final InvoiceRepository invoices;
     private final ExpenseRequestRepository requests;
     private final EmployeeAdvanceRepository advances;
     private final JdbcInvoiceVerificationRepository verifications;
-    private final NamedParameterJdbcTemplate jdbc;
 
     /** 保留各自仓储的快照一致性校验，不从未经验证的 JSON 拼出余额。 */
-    public ExpensePrecheckResources(InvoiceRepository invoices, ExpenseRequestRepository requests, EmployeeAdvanceRepository advances,
-            JdbcInvoiceVerificationRepository verifications, JdbcTemplate jdbc) {
-        this.invoices = invoices; this.requests = requests; this.advances = advances; this.verifications = verifications;
-        this.jdbc = new NamedParameterJdbcTemplate(jdbc);
+    public ExpensePrecheckResources(
+            InvoiceRepository invoices,
+            ExpenseRequestRepository requests,
+            EmployeeAdvanceRepository advances,
+            JdbcInvoiceVerificationRepository verifications,
+            ExpensePrecheckResourcesMapper sqlMapper) {
+        this.sqlMapper = sqlMapper;
+        this.invoices = invoices;
+        this.requests = requests;
+        this.advances = advances;
+        this.verifications = verifications;
     }
 
     /** 正式提交在同一短事务固定资源引用，阻止新验票任务在复核凭据后插入。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public void lockReferences(String tenant, List<ResourceVersion> references) {
         for (var kind : ResourceKind.values()) {
-            var ids = references.stream().filter(value -> value.kind() == kind).map(value -> value.id().toString()).sorted().toList();
-            if (!ids.isEmpty()) jdbc.queryForList("""
-                    SELECT id FROM finance_resource WHERE tenant_id=:tenant AND resource_type=:kind AND id IN (:ids)
-                    ORDER BY id FOR UPDATE
-                    """, Map.of("tenant", tenant, "kind", kind.name(), "ids", ids), String.class);
+            var ids =
+                    references.stream()
+                            .filter(value -> value.kind() == kind)
+                            .map(value -> value.id().toString())
+                            .sorted()
+                            .toList();
+            if (!ids.isEmpty())
+                sqlMapper.lockReferences(Map.of("tenant", tenant, "kind", kind.name(), "ids", ids));
         }
     }
 
@@ -84,16 +99,44 @@ public class ExpensePrecheckResources {
 
     /** 有效占用键也要参与预检，不能只检查当前文件是否 AVAILABLE。 */
     public void requireClaimsAvailable(String tenant, ExpenseSubmissionResources.Plan plan) {
-        var released = plan.invoices().stream().filter(change -> change.operation() == ExpenseSubmissionResources.Operation.RELEASE)
-                .map(change -> change.after().id()).collect(Collectors.toSet());
-        var wanted = plan.invoices().stream().filter(change -> change.operation() != ExpenseSubmissionResources.Operation.RELEASE)
-                .collect(Collectors.toMap(change -> change.after().facts().key().canonical(), change -> change.after().id()));
+        var released =
+                plan.invoices().stream()
+                        .filter(
+                                change ->
+                                        change.operation()
+                                                == ExpenseSubmissionResources.Operation.RELEASE)
+                        .map(change -> change.after().id())
+                        .collect(Collectors.toSet());
+        var wanted =
+                plan.invoices().stream()
+                        .filter(
+                                change ->
+                                        change.operation()
+                                                != ExpenseSubmissionResources.Operation.RELEASE)
+                        .collect(
+                                Collectors.toMap(
+                                        change -> change.after().facts().key().canonical(),
+                                        change -> change.after().id()));
         if (wanted.isEmpty()) return;
-        var claims = jdbc.query("SELECT invoice_key,invoice_id FROM invoice_active_claim WHERE tenant_id=:tenant AND invoice_key IN (:keys)",
-                Map.of("tenant", tenant, "keys", wanted.keySet()), (row, index) -> new InvoiceClaim(row.getString("invoice_key"),
-                        row.getString("invoice_id") == null ? null : UUID.fromString(row.getString("invoice_id"))));
-        if (claims.stream().anyMatch(value -> value.invoiceId() == null || !wanted.get(value.key()).equals(value.invoiceId()) && !released.contains(value.invoiceId()))) {
-            throw new DomainException("INVOICE_OCCUPIED", "A canonical invoice has another active or consumed occupation");
+        var claims =
+                SqlRows.map(
+                        sqlMapper.requireClaimsAvailable(
+                                Map.of("tenant", tenant, "keys", wanted.keySet())),
+                        row ->
+                                new InvoiceClaim(
+                                        row.getString("invoice_key"),
+                                        row.getString("invoice_id") == null
+                                                ? null
+                                                : UUID.fromString(row.getString("invoice_id"))));
+        if (claims.stream()
+                .anyMatch(
+                        value ->
+                                value.invoiceId() == null
+                                        || !wanted.get(value.key()).equals(value.invoiceId())
+                                                && !released.contains(value.invoiceId()))) {
+            throw new DomainException(
+                    "INVOICE_OCCUPIED",
+                    "A canonical invoice has another active or consumed occupation");
         }
     }
 
@@ -148,7 +191,8 @@ public class ExpensePrecheckResources {
 
     /**
      * 原采购应付没有员工上传文件标识，仍是有效且不可被报销释放的票号归属。
+     *
      * @author owlzhangfq@gmail.com
      */
-    private record InvoiceClaim(String key, UUID invoiceId) { }
+    private record InvoiceClaim(String key, UUID invoiceId) {}
 }

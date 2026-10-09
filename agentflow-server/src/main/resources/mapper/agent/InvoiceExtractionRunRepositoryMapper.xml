@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.agent.mapper.InvoiceExtractionRunRepositoryMapper">
+    <insert id="create">
+        INSERT INTO agent_invoice_extraction_run(id,tenant_id,invoice_id,owner_id,original_id,original_digest,
+            original_format,original_bytes,page_count,method,target_digest,status,version,context_json,state_json,created_at,active_invoice_id,trace_id)
+        SELECT #{id},tenant_id,invoice_id,owner_id,id,sha256,format,byte_size,#{pageCount},#{method},#{targetDigest},'QUEUED',1,#{stateJson},#{stateJson2},#{createdAt},invoice_id,#{traceId}
+        FROM invoice_original WHERE tenant_id=#{tenantId} AND invoice_id=#{invoiceId} AND owner_id=#{requestedBy} AND id=#{originalId} AND sha256=#{originalDigest}
+            AND format=#{format} AND byte_size=#{originalBytes} AND status='READY'
+    </insert>
+
+    <update id="update">
+        UPDATE agent_invoice_extraction_run SET status=#{status},version=#{version},state_json=#{stateJson},lease_until=#{leaseUntil},active_invoice_id=#{invoiceId}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND status=#{previous} AND context_json=#{contextJson}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM agent_invoice_extraction_run WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="lock" resultType="String">
+        SELECT id FROM agent_invoice_extraction_run WHERE tenant_id=#{tenant} AND id=#{id} FOR UPDATE
+    </select>
+
+    <select id="activeId" resultType="String">
+        SELECT id FROM agent_invoice_extraction_run WHERE tenant_id=#{tenant} AND active_invoice_id=#{invoiceId}
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT tenant_id,id,trace_id FROM agent_invoice_extraction_run
+        WHERE status='QUEUED' OR (status='RUNNING' AND lease_until&lt;=#{leaseUntil}) ORDER BY created_at,id LIMIT #{BATCH_SIZE}
+    </select>
+
+    <select id="lease" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT lease_until FROM agent_invoice_extraction_run WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="page" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,method,status,version,created_at FROM agent_invoice_extraction_run
+        WHERE tenant_id=#{tenant} AND invoice_id=#{invoiceId} ORDER BY created_at DESC,id DESC LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="page2" resultType="Long">
+        SELECT COUNT(*) FROM agent_invoice_extraction_run WHERE tenant_id=#{tenant} AND invoice_id=#{invoiceId}
+    </select>
+
+    <insert id="append">
+        INSERT INTO agent_invoice_extraction_transition(tenant_id,run_id,run_version,status,state_json) VALUES(#{tenantId},#{runId},#{runVersion},#{status},#{stateJson})
+    </insert>
+
+    <insert id="append2">
+        INSERT INTO audit_event(id,tenant_id,event_id,aggregate_type,aggregate_id,aggregate_version,action,actor_id,payload_json,occurred_at)
+        VALUES(#{id},#{tenantId},#{eventId},'InvoiceExtractionRun',#{aggregateId},#{aggregateVersion},#{action},#{actorId},#{payloadJson},#{occurredAt})
+    </insert>
+</mapper>

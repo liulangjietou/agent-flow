@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.reporting.mapper.ExpenseReportingActivityMapper">
+    <select id="read" resultType="String">
+        SELECT id FROM expense_precheck_job WHERE tenant_id=#{tenant} AND report_id=#{id} AND created_at&gt;=#{startAt} AND created_at&lt;#{endAt} ORDER BY id
+    </select>
+
+    <select id="read2" resultType="Long">
+        SELECT COUNT(*) FROM expense_submission_rejection WHERE tenant_id=#{tenant} AND report_id=#{id} AND round_no=#{roundNo} AND occurred_at&gt;=#{startAt} AND occurred_at&lt;#{endAt}
+    </select>
+
+    <select id="read3" resultType="String">
+        SELECT id FROM invoice_verification_job WHERE tenant_id=#{tenant} AND invoice_id=#{getKey} AND created_at&gt;=#{startAt} AND created_at&lt;#{endAt} AND created_at&lt;=#{getValueAt} ORDER BY id
+    </select>
+
+    <select id="read4" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT started_at FROM expense_reporting_coverage WHERE fact_type='DUPLICATE_SUBMISSION'
+    </select>
+</mapper>

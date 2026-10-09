@@ -1,16 +1,42 @@
 package io.agentflow.agent;
+import static io.agentflow.agent.InvoiceExtractionRun.Status.*;
+import static io.agentflow.agent.InvoiceExtractionService.ReviewAction.*;
+import static io.agentflow.agent.InvoiceExtractionSuggestion.Field.INVOICE_NUMBER;
+import static io.agentflow.agent.InvoiceExtractionSuggestion.Method.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.reset;
 
 import com.sun.net.httpserver.HttpServer;
+
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
-import io.agentflow.observability.DiagnosticContext;
-import org.slf4j.MDC;
 import io.agentflow.expense.InvoiceOriginal;
 import io.agentflow.expense.InvoiceOriginalFiles;
 import io.agentflow.expense.InvoiceWalletService;
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.organization.OrganizationService;
+
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
 import java.io.ByteArrayInputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -26,32 +52,10 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.support.TransactionTemplate;
-import static io.agentflow.agent.InvoiceExtractionRun.Status.*;
-import static io.agentflow.agent.InvoiceExtractionService.ReviewAction.*;
-import static io.agentflow.agent.InvoiceExtractionSuggestion.Field.INVOICE_NUMBER;
-import static io.agentflow.agent.InvoiceExtractionSuggestion.Method.*;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.reset;
 
 /**
  * 实际原件、数据库和回环模型验证持久抽取、身份隔离、租约及不修改财务状态。
+ *
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {
@@ -116,12 +120,16 @@ class InvoiceExtractionIntegrationTest {
         actors.clear();
         assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
         assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
-        assertThat(jdbc.queryForMap("SELECT * FROM agent_invoice_extraction_run WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM agent_invoice_extraction_run WHERE"
+                                                + " tenant_id='demo' AND id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         LAST_TRACE.set(null);
         worker.poll();
         assertThat(LAST_TRACE.get()).isEqualTo(expectedTrace);
-        assertThat(jdbc.queryForMap("SELECT * FROM agent_invoice_extraction_run WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM agent_invoice_extraction_run WHERE"
+                                                + " tenant_id='demo' AND id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
         assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
@@ -331,7 +339,11 @@ class InvoiceExtractionIntegrationTest {
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> service.prepare(invoice))).isInstanceOf(org.springframework.transaction.IllegalTransactionStateException.class);
         assertThatThrownBy(() -> transaction.executeWithoutResult(status -> worker.poll())).isInstanceOf(IllegalStateException.class);
         UUID id = queue(service.prepare(invoice), null); worker.poll();
-        var reopened = new JdbcInvoiceExtractionRunRepository(jdbc, new JsonUtil(new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()));
+        var reopened = new JdbcInvoiceExtractionRunRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.agent.mapper.InvoiceExtractionRunRepositoryMapper
+                                        .class), new JsonUtil(new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules()));
         assertThat(reopened.find("demo", id).orElseThrow().state()).isEqualTo(runs.find("demo", id).orElseThrow().state());
         assertThat(reopened.due(Instant.now())).noneMatch(value -> value.id().equals(id));
     }
@@ -348,7 +360,9 @@ class InvoiceExtractionIntegrationTest {
     }
     private String target() { return configuration.targetDigest(InvoiceExtractionRun.CONTRACT_VERSION); }
     private Map<String, Object> financial(UUID invoice) { return jdbc.queryForMap("SELECT * FROM finance_resource WHERE resource_type='INVOICE' AND id=?", invoice.toString()); }
-    private List<String> transitions(UUID id) { return jdbc.queryForList("SELECT status FROM agent_invoice_extraction_transition WHERE run_id=? ORDER BY run_version", String.class, id.toString()); }
+    private List<String> transitions(UUID id) { return jdbc.queryForList(
+                "SELECT status FROM agent_invoice_extraction_transition WHERE run_id=? ORDER BY"
+                        + " run_version", String.class, id.toString()); }
     private static void fails(String code, Runnable action) { assertThatThrownBy(action::run).isInstanceOfSatisfying(DomainException.class, failure -> assertThat(failure.code()).isEqualTo(code)); }
     private static InvoiceExtractionSuggestion proposal(InvoiceExtractionRun.Context context) {
         return new InvoiceExtractionSuggestion(MODEL, "fixture-provider", "fixture-model", InvoiceExtractionRun.CONTRACT_VERSION,

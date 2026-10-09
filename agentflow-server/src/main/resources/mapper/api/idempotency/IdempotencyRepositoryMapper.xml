@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.api.idempotency.mapper.IdempotencyRepositoryMapper">
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM request_idempotency WHERE tenant_id=#{tenantId} AND idempotency_key=#{key}
+    </select>
+
+    <insert id="claim">
+        INSERT INTO request_idempotency
+        (tenant_id,idempotency_key,actor_id,roles_hash,request_hash,created_at,expires_at)
+        VALUES (#{tenantId},#{idempotencyKey},#{actorId},#{rolesHash},#{requestHash},#{createdAt},#{expiresAt})
+    </insert>
+
+    <update id="complete">
+        UPDATE request_idempotency SET response_status=#{responseStatus},response_body=#{body}
+        WHERE tenant_id=#{tenantId} AND idempotency_key=#{key} AND response_status IS NULL
+    </update>
+</mapper>

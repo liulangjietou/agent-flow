@@ -1,27 +1,20 @@
 package io.agentflow.agent;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+
 import io.agentflow.auth.DeferredActorAuthentication;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.JdbcExpenseReportRepository;
+
 import jakarta.servlet.http.HttpServletRequest;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,12 +31,24 @@ import org.springframework.transaction.annotation.AnnotationTransactionAttribute
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 使用实际迁移、仓储和 Spring 事务执行队列；来源授权及模型使用受控桩，不代替真实审批和企业模型验收。
+ *
  * @author owlzhangfq@gmail.com
  */
 class ExpenseRiskExecutionTest {
@@ -78,8 +83,16 @@ class ExpenseRiskExecutionTest {
         var db = new DriverManagerDataSource("jdbc:h2:mem:risk-execution-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
         Flyway.configure().dataSource(db).load().migrate(); jdbc = new JdbcTemplate(db); manager = new DataSourceTransactionManager(db);
         seed(PRIMARY, PRIMARY_APP); seed(COMPARISON, COMPARISON_APP);
-        runs = transactional(new JdbcExpenseRiskRepository(jdbc, json));
-        reportTarget = spy(new JdbcExpenseReportRepository(jdbc, json)); reports = transactional(reportTarget);
+        runs = transactional(new JdbcExpenseRiskRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.agent.mapper.ExpenseRiskRepositoryMapper
+                                                .class), json));
+        reportTarget = spy(new JdbcExpenseReportRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.expense.mapper.ExpenseReportRepositoryMapper
+                                                .class), json)); reports = transactional(reportTarget);
         access = transactional(accessTarget); current.set(catalog()); actors.set(REQUESTER);
         configuration.setEnabled(true); configuration.setEndpoint("http://127.0.0.1:9/v1/responses"); configuration.setModel("synthetic-risk"); configuration.setTimeoutSeconds(5);
         when(accessTarget.available(any(), any(), anyString(), any(), any())).thenAnswer(call -> current.get());
@@ -293,7 +306,9 @@ class ExpenseRiskExecutionTest {
     }
     private List<String> sourceIds() { return current.get().sources().stream().map(value -> value.reference().sourceId()).toList(); }
     private ExpenseRiskRun loaded(ExpenseRiskService.Receipt receipt) { return runs.find(TENANT, receipt.id()).orElseThrow().run(); }
-    private List<Long> versions(ExpenseRiskService.Receipt receipt) { return jdbc.queryForList("SELECT run_version FROM agent_expense_risk_transition WHERE run_id=? ORDER BY run_version", Long.class, receipt.id().toString()); }
+    private List<Long> versions(ExpenseRiskService.Receipt receipt) { return jdbc.queryForList(
+                "SELECT run_version FROM agent_expense_risk_transition WHERE run_id=? ORDER BY"
+                        + " run_version", Long.class, receipt.id().toString()); }
     private int runCount() { return jdbc.queryForObject("SELECT COUNT(*) FROM agent_expense_risk_run", Integer.class); }
     private void assertFailed(ExpenseRiskService.Receipt receipt, AssistRun.Failure failure) {
         var state = loaded(receipt).state(); assertThat(state.status()).isEqualTo(ExpenseRiskRun.Status.FAILED); assertThat(state.failure()).isEqualTo(failure);
@@ -324,10 +339,23 @@ class ExpenseRiskExecutionTest {
                         List.of("人工核对用途和行程"), context.input().sources().stream().map(AssistModelPort.Source::reference).toList())));
     }
     private void seed(UUID report, UUID app) {
-        jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,?,?,'fixture',1,'employee','保留申请','{}','IN_APPROVAL',1,1,'EXPENSE',?)", app.toString(), TENANT, "RISK-" + app, report.toString());
-        jdbc.update("INSERT INTO expense_report(id,tenant_id,application_id,employee_id,version,state_json) VALUES(?,?,?,'employee',1,'{\"retained\":true}')", report.toString(), TENANT, app.toString());
-        jdbc.update("INSERT INTO expense_report_revision(tenant_id,report_id,financial_version,actor_id,operation,state_json) SELECT tenant_id,id,version,employee_id,'CREATE',state_json FROM expense_report WHERE id=?", report.toString());
-        jdbc.update("INSERT INTO approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status) VALUES(?,?,1,?,1,'原轮次','{}','employee',?,'IN_APPROVAL')", TENANT, app.toString(), "fixture-" + app, Timestamp.from(Instant.now().minusSeconds(60).truncatedTo(ChronoUnit.MILLIS)));
+        jdbc.update(
+                "INSERT INTO"
+                    + " approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)"
+                    + " VALUES(?,?,?,'fixture',1,'employee','保留申请','{}','IN_APPROVAL',1,1,'EXPENSE',?)", app.toString(), TENANT, "RISK-" + app, report.toString());
+        jdbc.update(
+                "INSERT INTO"
+                    + " expense_report(id,tenant_id,application_id,employee_id,version,state_json)"
+                    + " VALUES(?,?,?,'employee',1,'{\"retained\":true}')", report.toString(), TENANT, app.toString());
+        jdbc.update(
+                "INSERT INTO"
+                    + " expense_report_revision(tenant_id,report_id,financial_version,actor_id,operation,state_json)"
+                    + " SELECT tenant_id,id,version,employee_id,'CREATE',state_json FROM"
+                    + " expense_report WHERE id=?", report.toString());
+        jdbc.update(
+                "INSERT INTO"
+                    + " approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status)"
+                    + " VALUES(?,?,1,?,1,'原轮次','{}','employee',?,'IN_APPROVAL')", TENANT, app.toString(), "fixture-" + app, Timestamp.from(Instant.now().minusSeconds(60).truncatedTo(ChronoUnit.MILLIS)));
     }
     private List<List<Map<String, Object>>> businessRows() {
         return List.of("approval_application", "expense_report", "expense_report_revision", "approval_submission_round").stream().map(table -> jdbc.queryForList("SELECT * FROM " + table)).toList();

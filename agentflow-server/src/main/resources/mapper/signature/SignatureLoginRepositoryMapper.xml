@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.signature.mapper.SignatureLoginRepositoryMapper">
+    <insert id="insert">
+        INSERT INTO signature_login_authorization(tenant_id,operation_id,authentication_kind,login_reference) VALUES(#{tenantId},#{operationId},#{authenticationKind},#{loginReference})
+    </insert>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT authentication_kind,login_reference FROM signature_login_authorization WHERE tenant_id=#{tenantId} AND operation_id=#{id}
+    </select>
+</mapper>

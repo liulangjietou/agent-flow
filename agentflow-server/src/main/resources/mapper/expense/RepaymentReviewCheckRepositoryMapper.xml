@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.RepaymentReviewCheckRepositoryMapper">
+    <insert id="create">
+        INSERT INTO repayment_review_check(trace_id,tenant_id,id,advance_id,repayment_id,requested_by,input_json,state_json,version,status,created_at,updated_at)
+        VALUES(#{traceId},#{tenantId},#{id},#{advanceId},#{repaymentId},#{requestedBy},#{inputJson},#{stateJson},1,'QUEUED',#{createdAt},#{updatedAt})
+    </insert>
+
+    <update id="update">
+        UPDATE repayment_review_check SET version=#{version},status=#{status},state_json=#{stateJson},updated_at=#{updatedAt},lease_until=#{leaseUntil} WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND input_json=#{inputJson}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM repayment_review_check WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="latest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM repayment_review_check WHERE tenant_id=#{tenant} AND repayment_id=#{repaymentId} AND requested_by=#{actor} ORDER BY created_at DESC,id DESC LIMIT 1
+    </select>
+
+    <select id="history" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM repayment_review_check WHERE tenant_id=#{tenant} AND repayment_id=#{repaymentId} AND status IN ('CHECKED','RESOLVED') ORDER BY updated_at DESC,id DESC
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,a.business_no,r.process_instance_id AS process_instance_id FROM repayment_review_check q
+        LEFT JOIN advance_repayment repayment ON repayment.tenant_id=q.tenant_id AND repayment.id=q.repayment_id AND repayment.advance_id=q.advance_id
+        LEFT JOIN advance_repayment_check original_check ON original_check.tenant_id=repayment.tenant_id AND original_check.id=repayment.check_id AND original_check.advance_id=q.advance_id
+        LEFT JOIN payment_authorization origin ON origin.tenant_id=original_check.tenant_id AND origin.id=original_check.payment_id
+        LEFT JOIN approval_application a ON a.tenant_id=origin.tenant_id AND a.id=origin.application_id
+        LEFT JOIN approval_submission_round r ON r.tenant_id=a.tenant_id AND r.application_id=a.id AND r.round_no=origin.round_no
+        WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until&lt;=#{leaseUntil}) ORDER BY q.created_at,q.id LIMIT 10
+    </select>
+
+    <insert id="append">
+        INSERT INTO repayment_review_check_revision(tenant_id,check_id,version,state_json) VALUES(#{tenantId},#{checkId},#{version},#{stateJson})
+    </insert>
+</mapper>

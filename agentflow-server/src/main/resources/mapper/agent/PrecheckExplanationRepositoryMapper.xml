@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.agent.mapper.PrecheckExplanationRepositoryMapper">
+    <insert id="create">
+        INSERT INTO agent_precheck_explanation_run(tenant_id,id,report_id,application_id,requested_by,
+            application_version,financial_version,precheck_id,precheck_attempt,status,version,active_report_id,context_json,state_json,created_at,trace_id)
+        SELECT r.tenant_id,#{id},r.id,r.application_id,r.employee_id,a.version,r.version,j.id,j.attempt_no,'QUEUED',1,r.id,#{stateJson},#{stateJson2},#{createdAt},#{traceId}
+        FROM expense_report r JOIN approval_application a ON a.tenant_id=r.tenant_id AND a.id=r.application_id
+        JOIN expense_precheck_job j ON j.tenant_id=r.tenant_id AND j.report_id=r.id
+        WHERE r.tenant_id=#{tenantId} AND r.id=#{reportId} AND r.application_id=#{applicationId} AND r.employee_id=#{requestedBy} AND a.created_by=r.employee_id
+        AND a.version=#{applicationVersion} AND r.version=#{financialVersion} AND j.id=#{precheckId} AND j.attempt_no=#{attempt} AND j.version=3 AND j.status=#{result}
+        AND j.application_version=a.version AND j.financial_version=r.version
+    </insert>
+
+    <update id="update">
+        UPDATE agent_precheck_explanation_run SET status=#{status},version=#{version},state_json=#{stateJson},active_report_id=#{reportId},lease_until=#{leaseUntil}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND status=#{previous} AND context_json=#{contextJson}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM agent_precheck_explanation_run WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="lock" resultType="String">
+        SELECT id FROM agent_precheck_explanation_run WHERE tenant_id=#{tenant} AND id=#{id} FOR UPDATE
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,a.business_no FROM agent_precheck_explanation_run q
+        LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+        WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until&lt;=#{leaseUntil})
+        ORDER BY q.created_at,q.id LIMIT 10
+    </select>
+
+    <select id="page" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,precheck_id,precheck_attempt,application_version,financial_version,status,version,created_at
+        FROM agent_precheck_explanation_run WHERE tenant_id=#{tenant} AND report_id=#{reportId} ORDER BY created_at DESC,id DESC LIMIT #{size} OFFSET #{offset}
+    </select>
+
+    <select id="page2" resultType="Long">
+        SELECT COUNT(*) FROM agent_precheck_explanation_run WHERE tenant_id=#{tenant} AND report_id=#{reportId}
+    </select>
+
+    <insert id="append">
+        INSERT INTO agent_precheck_explanation_transition(tenant_id,run_id,run_version,status,state_json) VALUES(#{tenantId},#{runId},#{runVersion},#{status},#{stateJson})
+    </insert>
+</mapper>

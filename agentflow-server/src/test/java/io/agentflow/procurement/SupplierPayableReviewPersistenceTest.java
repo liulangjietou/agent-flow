@@ -1,9 +1,13 @@
 package io.agentflow.procurement;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import io.agentflow.approval.JdbcApplicationRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -14,16 +18,7 @@ import io.agentflow.finance.FinanceResult;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.PaymentPersonnel;
 import io.agentflow.organization.InitiatorContext;
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,12 +31,21 @@ import org.springframework.transaction.annotation.AnnotationTransactionAttribute
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 真实数据库验证原应付读取、财务单次授权与队列的事务边界，ERP 使用合成响应。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SupplierPayableReviewPersistenceTest {
@@ -74,13 +78,42 @@ class SupplierPayableReviewPersistenceTest {
         new JdbcTemplate(dataSource).execute("CREATE SCHEMA \"" + schema + "\""); dataSource.setSchema(schema);
         var migration = Flyway.configure().dataSource(dataSource).defaultSchema(schema); if (target != null) migration.target(target);
         migration.load().migrate(); jdbc = target == null ? new JdbcTemplate(dataSource) : new SupplierMigrationJdbcTemplate(dataSource); manager = new DataSourceTransactionManager(dataSource); tx = new TransactionTemplate(manager);
-        requests = new JdbcProcurementPaymentRepository(jdbc, json);
+        requests = new JdbcProcurementPaymentRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper.ProcurementPaymentRepositoryMapper
+                                        .class), json);
         // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。
-        var returnGuard = target == null ? new SupplierPayableReturnGuard(jdbc) : mock(SupplierPayableReturnGuard.class);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, requests, new JdbcProcurementInvoiceClaims(jdbc), returnGuard, new JdbcSupplierAdjustmentCompletions(jdbc, json));
-        sources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), requests, reservations, returnGuard);
-        authorizations = new JdbcSupplierPaymentAuthorizationRepository(jdbc, json, sources); operations = new JdbcSupplierPayableHoldRepository(jdbc, json, authorizations);
-        reviews = new JdbcSupplierPayableReviewRepository(jdbc, json, sources, authorizations);
+        var returnGuard = target == null ? new SupplierPayableReturnGuard(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierPayableReturnGuardMapper.class)) : mock(SupplierPayableReturnGuard.class);
+        reservations = new JdbcProcurementPayableReservationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .ProcurementPayableReservationRepositoryMapper.class), json, requests, new JdbcProcurementInvoiceClaims(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .ProcurementInvoiceClaimsMapper.class)),
+                        returnGuard,
+                        new JdbcSupplierAdjustmentCompletions(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierAdjustmentCompletionsMapper.class), json));
+        sources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.approval.mapper.ApplicationRepositoryMapper
+                                                .class), json), requests, reservations, returnGuard);
+        authorizations = new JdbcSupplierPaymentAuthorizationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentAuthorizationRepositoryMapper.class), json, sources); operations = new JdbcSupplierPayableHoldRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper.SupplierPayableHoldRepositoryMapper
+                                        .class), json, authorizations);
+        reviews = new JdbcSupplierPayableReviewRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPayableReviewRepositoryMapper.class), json, sources, authorizations);
         var personnel = mock(PaymentPersonnel.class);
         doAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
@@ -98,13 +131,19 @@ class SupplierPayableReviewPersistenceTest {
         assertThat(reviews.latest(tenant, requestId(source), "finance")).contains(ready);
         assertThat(count("supplier_payment_authorization")).isZero(); assertThat(count("supplier_payable_hold_operation")).isZero();
         var hold = authorize(ready); var authorization = hold.command().authorization();
-        var reopened = new JdbcSupplierPayableReviewRepository(jdbc, json, sources, authorizations);
+        var reopened = new JdbcSupplierPayableReviewRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPayableReviewRepositoryMapper.class),
+                        json, sources, authorizations);
         var consumed = reopened.find(tenant, queued.input().id()).orElseThrow();
         assertThat(consumed.status()).isEqualTo(SupplierPayableReview.Status.CONSUMED); assertThat(consumed.supports(authorization)).isTrue();
         assertThat(reopened.forAuthorization(tenant, authorization.id())).contains(consumed);
         assertThat(authorization.source()).isEqualTo(source); assertThat(authorization.payable()).isEqualTo(ready.payable());
         assertThat(operations.find(tenant, authorization.id())).contains(hold);
-        assertThat(jdbc.queryForList("SELECT state_json FROM supplier_payable_review_revision WHERE tenant_id=? ORDER BY version", String.class, tenant))
+        assertThat(jdbc.queryForList(
+                                "SELECT state_json FROM supplier_payable_review_revision WHERE"
+                                        + " tenant_id=? ORDER BY version", String.class, tenant))
                 .hasSize(4).first().isEqualTo(json.write(queued));
         fails("SUPPLIER_PAYABLE_REVIEW_UNAVAILABLE", () -> authorize(ready));
         tx.executeWithoutResult(status -> holds.retire(tenant, authorization.id(), hold.version(), "finance", hold.updatedAt()));
@@ -127,11 +166,15 @@ class SupplierPayableReviewPersistenceTest {
 
     @Test void consumptionFailureRollsBackAuthorizationQueueAndEvidenceTogether() {
         var ready = ready(register(approved()));
-        jdbc.execute("ALTER TABLE supplier_payable_review_revision ADD CONSTRAINT fixture_no_consumption CHECK(version<4)");
+        jdbc.execute(
+                "ALTER TABLE supplier_payable_review_revision ADD CONSTRAINT fixture_no_consumption"
+                        + " CHECK(version<4)");
         assertThatThrownBy(() -> authorize(ready)).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(reviews.find(tenant, ready.input().id())).contains(ready);
         assertThat(count("supplier_payment_authorization")).isZero(); assertThat(count("supplier_payable_hold_operation")).isZero(); assertThat(count("supplier_payable_hold_revision")).isZero();
-        jdbc.execute("ALTER TABLE supplier_payable_review_revision DROP CONSTRAINT fixture_no_consumption");
+        jdbc.execute(
+                "ALTER TABLE supplier_payable_review_revision DROP CONSTRAINT"
+                        + " fixture_no_consumption");
         assertThat(authorize(ready).status()).isEqualTo(SupplierPayableHoldOperation.Status.QUEUED);
     }
 
@@ -207,7 +250,10 @@ class SupplierPayableReviewPersistenceTest {
 
     @Test void persistedInputAndConsumptionCannotSwitchToAnotherApprovedRequest() {
         var first = ready(register(approved())); var second = ready(register(approved())); var hold = authorize(first);
-        assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payable_review SET consumed_authorization_id=? WHERE tenant_id=? AND id=?",
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE supplier_payable_review SET"
+                                            + " consumed_authorization_id=? WHERE tenant_id=? AND"
+                                            + " id=?",
                 hold.command().id().toString(), tenant, second.input().id().toString())).isInstanceOf(DataIntegrityViolationException.class);
         jdbc.update("UPDATE supplier_payable_review SET input_json=? WHERE tenant_id=? AND id=?", json.write(first.input()), tenant, second.input().id().toString());
         assertThatThrownBy(() -> reviews.find(tenant, second.input().id())).isInstanceOf(IllegalStateException.class).hasMessageContaining("identity is inconsistent");
@@ -236,12 +282,18 @@ class SupplierPayableReviewPersistenceTest {
         var catalog = new FinanceCatalog("alice", "v1", now.plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(entity, "法人", "CNY", false, "v1", "Asia/Shanghai")), List.of(), List.of(), List.of(), List.of());
         var initiator = new InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1, entity, "法人", UUID.randomUUID(), "部门", UUID.randomUUID(), "岗位");
         return tx.execute(status -> {
-            jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,?,?,'fixture',1,'alice','采购付款','{}','DRAFT',1,1,'PROCUREMENT_PAYMENT',?)",
+            jdbc.update(
+                            "INSERT INTO"
+                                + " approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)"
+                                + " VALUES(?,?,?,'fixture',1,'alice','采购付款','{}','DRAFT',1,1,'PROCUREMENT_PAYMENT',?)",
                     request.applicationId().toString(), tenant, ref, request.id().toString());
             requests.create(request, "alice"); request.freeze(1, 1, catalog, "a".repeat(64), payable, initiator, now); requests.update(request, 1, "alice", "SUBMIT");
             var hold = ProcurementPayableReservation.hold(UUID.randomUUID(), request, now); reservations.create(hold);
             request.approve(2, 1, 8, "manager", now.plusSeconds(1)); requests.update(request, 2, "manager", "APPROVE");
-            jdbc.update("UPDATE approval_application SET status='APPROVED',version=8,payload_json=? WHERE tenant_id=? AND id=?", json.write(ProcurementPaymentFormContract.submittedPayload(request.currentRound())), tenant, request.applicationId().toString());
+            jdbc.update(
+                            "UPDATE approval_application SET"
+                                + " status='APPROVED',version=8,payload_json=? WHERE tenant_id=?"
+                                + " AND id=?", json.write(ProcurementPaymentFormContract.submittedPayload(request.currentRound())), tenant, request.applicationId().toString());
             return ApprovedProcurementPayment.from(request, hold);
         });
     }

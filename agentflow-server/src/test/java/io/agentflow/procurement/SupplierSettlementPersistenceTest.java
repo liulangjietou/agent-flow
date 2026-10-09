@@ -1,36 +1,27 @@
 package io.agentflow.procurement;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+
 import io.agentflow.approval.JdbcApplicationRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.FinanceJsonConfiguration;
 import io.agentflow.expense.InvoiceKey;
-import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.AccountingPeriodPort;
-import java.time.Duration;
-import java.time.ZoneId;
+import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.FinanceResult;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.PaymentAccountsPort;
 import io.agentflow.finance.PaymentObservation;
 import io.agentflow.finance.PaymentPersonnel;
 import io.agentflow.organization.InitiatorContext;
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,12 +34,25 @@ import org.springframework.transaction.annotation.AnnotationTransactionAttribute
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 真实数据库验证财务结算准备、原银行独占、安全结束及占用完成的原子边界。
+ *
  * @author owlzhangfq@gmail.com
  */
 class SupplierSettlementPersistenceTest {
@@ -88,12 +92,38 @@ class SupplierSettlementPersistenceTest {
         schema = "supplier_settlement_" + UUID.randomUUID().toString().replace("-", ""); new JdbcTemplate(dataSource).execute("CREATE SCHEMA \"" + schema + "\""); dataSource.setSchema(schema);
         var migration = Flyway.configure().dataSource(dataSource).defaultSchema(schema); if (target != null) migration.target(target); migration.load().migrate();
         jdbc = target == null ? new JdbcTemplate(dataSource) : new SupplierMigrationJdbcTemplate(dataSource); manager = new DataSourceTransactionManager(dataSource); tx = new TransactionTemplate(manager);
-        procurements = new JdbcProcurementPaymentRepository(jdbc, json);
+        procurements = new JdbcProcurementPaymentRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper.ProcurementPaymentRepositoryMapper
+                                        .class), json);
         // 旧版本迁移夹具只建立当时的原件，V80 新守卫由当前版本用例验证。
-        var returnGuard = target == null ? new SupplierPayableReturnGuard(jdbc) : mock(SupplierPayableReturnGuard.class);
-        reservations = new JdbcProcurementPayableReservationRepository(jdbc, json, procurements, new JdbcProcurementInvoiceClaims(jdbc), returnGuard, new JdbcSupplierAdjustmentCompletions(jdbc, json));
-        approvedSources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(jdbc, json), procurements, reservations, returnGuard);
-        authorizations = new JdbcSupplierPaymentAuthorizationRepository(jdbc, json, approvedSources); holds = new JdbcSupplierPayableHoldRepository(jdbc, json, authorizations);
+        var returnGuard = target == null ? new SupplierPayableReturnGuard(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierPayableReturnGuardMapper.class)) : mock(SupplierPayableReturnGuard.class);
+        reservations = new JdbcProcurementPayableReservationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .ProcurementPayableReservationRepositoryMapper.class), json, procurements, new JdbcProcurementInvoiceClaims(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .ProcurementInvoiceClaimsMapper.class)),
+                        returnGuard,
+                        new JdbcSupplierAdjustmentCompletions(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierAdjustmentCompletionsMapper.class), json));
+        approvedSources = new ApprovedSupplierPaymentSources(new JdbcApplicationRepository(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.approval.mapper.ApplicationRepositoryMapper
+                                                .class), json), procurements, reservations, returnGuard);
+        authorizations = new JdbcSupplierPaymentAuthorizationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentAuthorizationRepositoryMapper.class), json, approvedSources); holds = new JdbcSupplierPayableHoldRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper.SupplierPayableHoldRepositoryMapper
+                                        .class), json, authorizations);
         var personnel = mock(PaymentPersonnel.class);
         doAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
@@ -102,11 +132,23 @@ class SupplierSettlementPersistenceTest {
         }).when(personnel).requireEligible(eq(tenant), anyString(), eq(entity));
         holdService = proxy(new SupplierPayableHoldService(approvedSources, authorizations, holds, personnel, 30, event -> { }));
         sources = new SupplierPaymentSources(approvedSources, authorizations, holds, personnel);
-        requests = new JdbcSupplierPaymentExecutionRepository(jdbc, json, holds);
-        payments = new JdbcSupplierPaymentOperationRepository(jdbc, json, requests, holds, authorizations);
+        requests = new JdbcSupplierPaymentExecutionRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentExecutionRepositoryMapper.class), json, holds);
+        payments = new JdbcSupplierPaymentOperationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentOperationRepositoryMapper.class), json, requests, holds, authorizations);
         preparation = proxy(new SupplierPaymentExecutionService(sources, requests, payments, event -> { }, 30)); bank = proxy(new SupplierPaymentService(sources, payments, event -> { }, 30));
-        intents = new JdbcSupplierSettlementPreparationRepository(jdbc, json, payments);
-        settlements = new JdbcSupplierPayableSettlementRepository(jdbc, json, intents, payments, reservations);
+        intents = new JdbcSupplierSettlementPreparationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierSettlementPreparationRepositoryMapper.class), json, payments);
+        settlements = new JdbcSupplierPayableSettlementRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPayableSettlementRepositoryMapper.class), json, intents, payments, reservations);
         var settlementSources = new SupplierSettlementSources(sources, approvedSources, payments, personnel, returnGuard);
         settlementPreparation = proxy(new SupplierSettlementPreparationService(settlementSources, intents, settlements, org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class), 30));
         settlementExecution = proxy(new SupplierSettlementService(settlementSources, settlements, reservations, org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class), 30));
@@ -114,8 +156,14 @@ class SupplierSettlementPersistenceTest {
 
     @Test void immutableIntentAndCommandSurviveRecreationWithExactPaidSourceAndTenantIsolation() {
         var payment = supplierBank(); var queued = settlement(payment); var id = queued.command().id();
-        var reopenedIntents = new JdbcSupplierSettlementPreparationRepository(jdbc, json, payments);
-        var reopened = new JdbcSupplierPayableSettlementRepository(jdbc, json, reopenedIntents, payments, reservations);
+        var reopenedIntents = new JdbcSupplierSettlementPreparationRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierSettlementPreparationRepositoryMapper.class), json, payments);
+        var reopened = new JdbcSupplierPayableSettlementRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPayableSettlementRepositoryMapper.class), json, reopenedIntents, payments, reservations);
         assertThat(reopened.find(tenant, id)).contains(queued); assertThat(reopened.find("other", id)).isEmpty();
         assertThat(reopenedIntents.find(tenant, id).orElseThrow().status()).isEqualTo(SupplierSettlementPreparation.Status.READY);
         assertThat(reopenedIntents.active(tenant, payment.command().id())).isEmpty(); assertThat(reopened.active(tenant, payment.command().id())).contains(queued);
@@ -145,7 +193,10 @@ class SupplierSettlementPersistenceTest {
 
     @Test void readyRevisionFailureRollsBackTheCommandAndPreservesTheOriginalReadClaim() {
         var claimed = claim(intent(supplierBank())); var id = claimed.input().id();
-        jdbc.update("INSERT INTO supplier_settlement_preparation_revision(tenant_id,preparation_id,version,state_json) VALUES(?,?,?,?)", tenant, id.toString(), claimed.version() + 1, json.write(claimed));
+        jdbc.update(
+                "INSERT INTO"
+                    + " supplier_settlement_preparation_revision(tenant_id,preparation_id,version,state_json)"
+                    + " VALUES(?,?,?,?)", tenant, id.toString(), claimed.version() + 1, json.write(claimed));
         assertThatThrownBy(() -> registerSettlement(claimed)).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(intents.find(tenant, id)).contains(claimed); assertThat(count("supplier_payable_settlement_operation")).isZero(); assertThat(count("supplier_payable_settlement_revision")).isZero();
     }
@@ -179,7 +230,10 @@ class SupplierSettlementPersistenceTest {
         var sent = dispatch(settlement(supplierBank()));
         var receipt = new SupplierPayableSettlementObservation(sent.command().id(), sent.command().digest(), SupplierPayableSettlementObservation.Status.REJECTED, 1L, sent.updatedAt(), null, SupplierPayableSettlementObservation.Rejection.ACCOUNTING_PERIOD_CLOSED);
         var rejected = sent.complete(new FinanceResult.Success<>(receipt), sent.updatedAt()); tx.executeWithoutResult(status -> settlements.update(rejected));
-        assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payable_settlement_operation SET retired_version=version,active_payment_id=NULL WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE supplier_payable_settlement_operation SET"
+                                                + " retired_version=version,active_payment_id=NULL"
+                                                + " WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
         var decision = SupplierSettlementRetirement.from(rejected, "finance", rejected.updatedAt()); tx.executeWithoutResult(status -> settlements.retire(tenant, decision));
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> settlements.update(rejected.requestQuery(rejected.updatedAt())))).isInstanceOf(DomainException.class);
         assertThat(settlements.find(tenant, rejected.command().id())).contains(rejected); assertThat(count("supplier_payable_settlement_revision")).isEqualTo(4);
@@ -215,7 +269,10 @@ class SupplierSettlementPersistenceTest {
 
     @Test void completionFailureRollsBackErpResultProofAndLocalOccupancyAsOneUnit() {
         var payment = supplierBank(); var sent = dispatch(settlement(payment)); var original = sent.command().payment().holdCommand().authorization().source().reservation();
-        jdbc.update("INSERT INTO procurement_payable_reservation_revision(tenant_id,reservation_id,version,state_json) VALUES(?,?,2,?)", tenant, original.id().toString(), json.write(original));
+        jdbc.update(
+                "INSERT INTO"
+                    + " procurement_payable_reservation_revision(tenant_id,reservation_id,version,state_json)"
+                    + " VALUES(?,?,2,?)", tenant, original.id().toString(), json.write(original));
         var done = settled(sent);
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> { settlements.update(done); reservations.complete(done, payment, done.updatedAt()); })).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(settlements.find(tenant, sent.command().id())).contains(sent); assertThat(reservations.active(tenant, original.source().requestId())).contains(original);
@@ -235,12 +292,24 @@ class SupplierSettlementPersistenceTest {
 
     @Test void foreignKeysRejectFabricatedReadyPaymentRevisionAndCompletionMarkers() {
         var payment = supplierBank(); var pending = intent(payment);
-        assertThatThrownBy(() -> jdbc.update("UPDATE supplier_settlement_preparation SET status='READY',attempts=1,active_payment_id=NULL,next_attempt_at=NULL,registered_operation_id=id WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE supplier_settlement_preparation SET"
+                                            + " status='READY',attempts=1,active_payment_id=NULL,next_attempt_at=NULL,registered_operation_id=id"
+                                            + " WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
         var queued = registerSettlement(claim(pending));
-        assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payable_settlement_operation SET payment_version=999 WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> jdbc.update("UPDATE supplier_payable_settlement_operation SET preparation_version=999 WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> jdbc.update("UPDATE procurement_payable_reservation SET version=2,active_request_id=NULL,active_payable_reference=NULL,settled_at=CURRENT_TIMESTAMP,settlement_id=?,settlement_version=1 WHERE tenant_id=?", queued.command().id().toString(), tenant)).isInstanceOf(DataIntegrityViolationException.class);
-        jdbc.update("UPDATE supplier_payable_settlement_operation SET command_digest=? WHERE tenant_id=?", "f".repeat(64), tenant);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE supplier_payable_settlement_operation SET"
+                                                + " payment_version=999 WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE supplier_payable_settlement_operation SET"
+                                                + " preparation_version=999 WHERE tenant_id=?", tenant)).isInstanceOf(DataIntegrityViolationException.class);
+        assertThatThrownBy(() -> jdbc.update(
+                                        "UPDATE procurement_payable_reservation SET"
+                                            + " version=2,active_request_id=NULL,active_payable_reference=NULL,settled_at=CURRENT_TIMESTAMP,settlement_id=?,settlement_version=1"
+                                            + " WHERE tenant_id=?", queued.command().id().toString(), tenant)).isInstanceOf(DataIntegrityViolationException.class);
+        jdbc.update(
+                "UPDATE supplier_payable_settlement_operation SET command_digest=? WHERE"
+                        + " tenant_id=?", "f".repeat(64), tenant);
         assertThatThrownBy(() -> settlements.find(tenant, queued.command().id())).isInstanceOf(IllegalStateException.class).hasMessageContaining("inconsistent");
     }
 
@@ -367,11 +436,16 @@ class SupplierSettlementPersistenceTest {
     @Test void failedAtomicCompletionBecomesOriginalQueryAndCanRecoverWithoutResending() {
         var payment = supplierBank(); var queued = serviceSettlement(payment); var claim = settlementExecution.claim(tenant, queued.command().id(), at());
         var sent = settlementExecution.ready(claim, read(payment, at(), date()), at()); var original = payment.command().holdCommand().authorization().source().reservation();
-        jdbc.update("INSERT INTO procurement_payable_reservation_revision(tenant_id,reservation_id,version,state_json) VALUES(?,?,2,?)", tenant, original.id().toString(), json.write(original));
+        jdbc.update(
+                "INSERT INTO"
+                    + " procurement_payable_reservation_revision(tenant_id,reservation_id,version,state_json)"
+                    + " VALUES(?,?,2,?)", tenant, original.id().toString(), json.write(original));
         assertThatThrownBy(() -> settlementExecution.finish(sent, new FinanceResult.Success<>(settled(sent).observation()), at())).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(settlements.find(tenant, queued.command().id())).contains(sent); settlementExecution.fail(sent, at());
         var unknown = settlements.find(tenant, queued.command().id()).orElseThrow(); assertThat(unknown.status()).isEqualTo(SupplierPayableSettlementOperation.Status.UNKNOWN);
-        jdbc.update("DELETE FROM procurement_payable_reservation_revision WHERE tenant_id=? AND reservation_id=? AND version=2", tenant, original.id().toString());
+        jdbc.update(
+                "DELETE FROM procurement_payable_reservation_revision WHERE tenant_id=? AND"
+                        + " reservation_id=? AND version=2", tenant, original.id().toString());
         var query = settlementExecution.claim(tenant, queued.command().id(), unknown.nextAttemptAt()); settlementExecution.finish(query, new FinanceResult.Success<>(settled(query).observation()), query.updatedAt());
         assertThat(settlements.find(tenant, queued.command().id()).orElseThrow().dispatches()).isEqualTo(1); assertThat(count("supplier_settlement_completion")).isEqualTo(1);
     }
@@ -406,7 +480,10 @@ class SupplierSettlementPersistenceTest {
                 disputed.updatedAt().plusNanos(333), old.posting(), null);
         var fresh = querySettlement(disputed, precise); var decision = settlementDecision(fresh);
         var resolved = tx.execute(status -> settlements.resolve(decision));
-        var reopened = new JdbcSupplierPayableSettlementRepository(jdbc, json, intents, payments, reservations);
+        var reopened = new JdbcSupplierPayableSettlementRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPayableSettlementRepositoryMapper.class), json, intents, payments, reservations);
         assertThat(reopened.find(tenant, old.operationId())).contains(resolved); assertThat(reopened.latestResolution(tenant, old.operationId())).contains(decision);
         assertThat(reopened.latestResolution("other", old.operationId())).isEmpty();
         assertThat(reopened.revision(tenant, old.operationId(), fresh.version())).contains(fresh);
@@ -422,7 +499,9 @@ class SupplierSettlementPersistenceTest {
 
     @Test void resolutionInsertFailureRollsBackStateAndRevisionTogether() {
         var disputed = disputedSettlement(); var decision = settlementDecision(disputed);
-        jdbc.execute("ALTER TABLE supplier_settlement_dispute_resolution ADD CONSTRAINT synthetic_resolution_failure CHECK (resolved_by<>'finance')");
+        jdbc.execute(
+                "ALTER TABLE supplier_settlement_dispute_resolution ADD CONSTRAINT"
+                        + " synthetic_resolution_failure CHECK (resolved_by<>'finance')");
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> settlements.resolve(decision))).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(settlements.find(tenant, decision.settlementId())).contains(disputed);
         assertThat(settlements.revision(tenant, decision.settlementId(), decision.resolvedVersion())).isEmpty();
@@ -461,12 +540,15 @@ class SupplierSettlementPersistenceTest {
 
     @Test void brokenHistoryCannotAuthorizeResolutionAndForeignKeysProtectBothRevisions() {
         var disputed = disputedSettlement(); var d = settlementDecision(disputed);
-        assertThatThrownBy(() -> jdbc.update("""
-                INSERT INTO supplier_settlement_dispute_resolution(tenant_id,id,settlement_id,disputed_version,resolved_version,outcome,resolved_by,observed_at,resolved_at,state_json)
-                VALUES(?,?,?,?,?,'SETTLED','finance',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,?)
-                """, tenant, d.id().toString(), d.settlementId().toString(), d.disputedVersion(), d.resolvedVersion(), json.write(d)))
+        assertThatThrownBy(() -> jdbc.update(
+                                        """
+INSERT INTO supplier_settlement_dispute_resolution(tenant_id,id,settlement_id,disputed_version,resolved_version,outcome,resolved_by,observed_at,resolved_at,state_json)
+VALUES(?,?,?,?,?,'SETTLED','finance',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,?)
+""", tenant, d.id().toString(), d.settlementId().toString(), d.disputedVersion(), d.resolvedVersion(), json.write(d)))
                 .isInstanceOf(DataIntegrityViolationException.class);
-        jdbc.update("DELETE FROM supplier_payable_settlement_revision WHERE tenant_id=? AND operation_id=? AND version=2", tenant, d.settlementId().toString());
+        jdbc.update(
+                "DELETE FROM supplier_payable_settlement_revision WHERE tenant_id=? AND"
+                        + " operation_id=? AND version=2", tenant, d.settlementId().toString());
         assertThatThrownBy(() -> tx.executeWithoutResult(status -> settlements.resolve(d))).isInstanceOf(DomainException.class);
         assertThat(settlements.find(tenant, d.settlementId())).contains(disputed); assertThat(count("supplier_settlement_dispute_resolution")).isZero();
     }
@@ -583,13 +665,25 @@ class SupplierSettlementPersistenceTest {
         var sent = settlementExecution.ready(claimed, read(payment, at(), date()), at());
         settlementExecution.finish(sent, new FinanceResult.Success<>(settled(sent).observation()), at());
         var request = new SupplierPaymentReturnPort.Request(payment.command(), payment.observation());
-        var ledgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json));
+        var ledgers = new JdbcSupplierPaymentReturnsRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentReturnsRepositoryMapper.class), json, payments, new SupplierPayableReturnGuard(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierPayableReturnGuardMapper.class)),
+                        new JdbcSupplierAdjustmentCompletions(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierAdjustmentCompletionsMapper.class), json));
         tx.executeWithoutResult(status -> ledgers.create(SupplierPaymentReturns.open(request, clock())));
         var frozen = new CountDownLatch(1); var release = new CountDownLatch(1); var attempting = new CountDownLatch(1); var pool = Executors.newFixedThreadPool(2);
         try {
             var first = pool.submit(() -> tx.executeWithoutResult(status -> {
                 sources.lock(tenant, payment.command().id()); ledgers.requireReview(tenant, payment.command().id(), clock()); frozen.countDown();
-                try { if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException("Synthetic freeze release timed out"); }
+                try { if (!release.await(10, TimeUnit.SECONDS)) throw new IllegalStateException(
+                                                                "Synthetic freeze release timed"
+                                                                        + " out"); }
                 catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); throw new IllegalStateException(interrupted); }
             }));
             assertThat(frozen.await(10, TimeUnit.SECONDS)).isTrue();
@@ -612,7 +706,10 @@ class SupplierSettlementPersistenceTest {
                 error -> assertThat(error.code()).isEqualTo("SUPPLIER_PAYMENT_RETURN_REVIEW_REQUIRED"));
         assertThat(count("supplier_payment_returns")).isZero(); assertThat(reservations.find(tenant, original.id())).contains(completed);
         var query = bank.claim(tenant, payment.command().id(), clock()); bank.finish(query, new FinanceResult.Success<>(paid(payment.command(), clock())), clock());
-        assertThat(new SupplierPayableReturnGuard(jdbc).blocked(tenant, original.source().round().content())).isFalse();
+        assertThat(new SupplierPayableReturnGuard(
+                                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                                io.agentflow.procurement.mapper
+                                                        .SupplierPayableReturnGuardMapper.class)).blocked(tenant, original.source().round().content())).isFalse();
     }
 
     @Test void localCompletionQueueExcludesAnEarlierCompletedPaymentWithNewBankUncertainty() {
@@ -633,7 +730,17 @@ class SupplierSettlementPersistenceTest {
     }
 
     private void freezeReturn(SupplierPaymentOperation payment) {
-        var ledgers = new JdbcSupplierPaymentReturnsRepository(jdbc, json, payments, new SupplierPayableReturnGuard(jdbc), new JdbcSupplierAdjustmentCompletions(jdbc, json)); var current = clock();
+        var ledgers = new JdbcSupplierPaymentReturnsRepository(
+                        SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                io.agentflow.procurement.mapper
+                                        .SupplierPaymentReturnsRepositoryMapper.class), json, payments, new SupplierPayableReturnGuard(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierPayableReturnGuardMapper.class)),
+                        new JdbcSupplierAdjustmentCompletions(
+                                SupplierMigrationJdbcTemplate.mapper(jdbc,
+                                        io.agentflow.procurement.mapper
+                                                .SupplierAdjustmentCompletionsMapper.class), json)); var current = clock();
         tx.executeWithoutResult(status -> {
             sources.lock(tenant, payment.command().id());
             ledgers.create(SupplierPaymentReturns.open(new SupplierPaymentReturnPort.Request(payment.command(), payment.observation()), current));
@@ -710,12 +817,18 @@ class SupplierSettlementPersistenceTest {
         var payable = payable(request); var catalog = new FinanceCatalog("alice", "v1", now.plusSeconds(600), List.of(new FinanceCatalog.LegalEntity(entity, "法人", "CNY", false, "v1", "Asia/Shanghai")), List.of(), List.of(), List.of(), List.of());
         var initiator = new InitiatorContext(UUID.randomUUID(), UUID.randomUUID(), "alice", 1, entity, "法人", UUID.randomUUID(), "部门", UUID.randomUUID(), "岗位");
         return tx.execute(status -> {
-            jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,?,?,'fixture',1,'alice','采购付款','{}','DRAFT',1,1,'PROCUREMENT_PAYMENT',?)",
+            jdbc.update(
+                            "INSERT INTO"
+                                + " approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)"
+                                + " VALUES(?,?,?,'fixture',1,'alice','采购付款','{}','DRAFT',1,1,'PROCUREMENT_PAYMENT',?)",
                     request.applicationId().toString(), tenant, ref, request.id().toString());
             procurements.create(request, "alice"); request.freeze(1, 1, catalog, "a".repeat(64), payable, initiator, now); procurements.update(request, 1, "alice", "SUBMIT");
             var hold = ProcurementPayableReservation.hold(UUID.randomUUID(), request, now); reservations.create(hold);
             request.approve(2, 1, 8, "manager", now.plusSeconds(1)); procurements.update(request, 2, "manager", "APPROVE");
-            jdbc.update("UPDATE approval_application SET status='APPROVED',version=8,payload_json=? WHERE tenant_id=? AND id=?", json.write(ProcurementPaymentFormContract.submittedPayload(request.currentRound())), tenant, request.applicationId().toString());
+            jdbc.update(
+                            "UPDATE approval_application SET"
+                                + " status='APPROVED',version=8,payload_json=? WHERE tenant_id=?"
+                                + " AND id=?", json.write(ProcurementPaymentFormContract.submittedPayload(request.currentRound())), tenant, request.applicationId().toString());
             return new SupplierPaymentAuthorization(UUID.randomUUID(), ApprovedProcurementPayment.from(request, hold), payable, "finance", authorizedAt(), authorizedAt().plusSeconds(86400));
         });
     }

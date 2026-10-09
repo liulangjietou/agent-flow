@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.onboarding.mapper.TenantInitializationRepositoryMapper">
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT snapshot_json FROM tenant_initialization WHERE tenant_id=#{tenantId}
+    </select>
+
+    <insert id="append">
+        INSERT INTO tenant_initialization
+        (tenant_id,id,workspace_name,initialized_by,initialized_at,administrator_person_id,
+         administrator_appointment_id,calendar_id,calendar_revision,snapshot_json) VALUES (#{tenantId},#{id},#{workspaceName},#{initializedBy},#{initializedAt},#{administratorPersonId},#{administratorAppointmentId},#{calendarId},#{calendarRevision},#{snapshotJson})
+    </insert>
+
+    <insert id="append2">
+        INSERT INTO audit_event
+        (id,tenant_id,event_id,aggregate_type,aggregate_id,aggregate_version,action,actor_id,payload_json,occurred_at)
+        VALUES (#{id},#{tenantId},#{eventId},'TenantInitialization',#{aggregateId},1,'TENANT_INITIALIZE',#{actorId},#{payloadJson},#{occurredAt})
+    </insert>
+</mapper>

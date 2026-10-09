@@ -1,33 +1,46 @@
 package io.agentflow.expense.reporting;
 
+
 import io.agentflow.common.CurrentActor;
 import io.agentflow.expense.EmployeeAdvanceRepository;
 import io.agentflow.expense.ExpenseRequestRepository;
+import io.agentflow.expense.reporting.mapper.ExpenseReportingResourcesMapper;
+import io.agentflow.mybatis.SqlRows;
+
+import org.springframework.stereotype.Service;
+
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Service;
 
 /**
  * 当前余额沿平台原批准业务读取，外部导入且没有原轮次读取依据的资源不获得新访问权。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
 public class ExpenseReportingResources {
-    private final JdbcTemplate jdbc;
+    private final ExpenseReportingResourcesMapper sqlMapper;
     private final CurrentActor actors;
     private final ExpenseReportScope scope;
     private final EmployeeAdvanceRepository advances;
     private final ExpenseRequestRepository requests;
 
     /** 余额使用领域聚合的真实消费与还款计算，查询不访问外部财务系统。 */
-    public ExpenseReportingResources(JdbcTemplate jdbc, CurrentActor actors, ExpenseReportScope scope,
-                                     EmployeeAdvanceRepository advances, ExpenseRequestRepository requests) {
-        this.jdbc = jdbc; this.actors = actors; this.scope = scope; this.advances = advances; this.requests = requests;
+    public ExpenseReportingResources(
+            ExpenseReportingResourcesMapper sqlMapper,
+            CurrentActor actors,
+            ExpenseReportScope scope,
+            EmployeeAdvanceRepository advances,
+            ExpenseRequestRepository requests) {
+        this.sqlMapper = sqlMapper;
+        this.actors = actors;
+        this.scope = scope;
+        this.advances = advances;
+        this.requests = requests;
     }
 
     /** 所选日期仅约束轮次指标；这里明确返回生成时的已授权存量。 */
@@ -67,17 +80,20 @@ public class ExpenseReportingResources {
         return new ExpenseFinancialReport.Resources(now, query.categoryCode() == null,
                 ExpenseResourceMetrics.advances(advanceValues), ExpenseResourceMetrics.priorRequests(priorValues));
     }
+
     private List<Candidate> candidates(String kind) {
         // 表名仅来自内部两种既有来源，筛选值和租户始终使用绑定参数。
         String table = kind.equals("ADVANCE") ? "advance_request" : "expense_plan";
-        return jdbc.query("SELECT p.id,s.round_no FROM "+table+" p JOIN finance_resource f ON f.tenant_id=p.tenant_id AND f.id=p.id AND f.resource_type=? "
-                + "JOIN approval_submission_round s ON s.tenant_id=p.tenant_id AND s.application_id=p.application_id AND s.status='APPROVED' "
-                + "WHERE p.tenant_id=? ORDER BY p.id,s.round_no", (row, index) -> new Candidate(UUID.fromString(row.getString("id")), row.getInt("round_no")),
-                kind, actors.actor().tenantId());
+        return SqlRows.map(
+                sqlMapper.candidatesQuery(
+                        kind.equals("ADVANCE"), new Object[] {kind, actors.actor().tenantId()}),
+                row -> new Candidate(UUID.fromString(row.getString("id")), row.getInt("round_no")));
     }
+
     /**
      * 只扫描来源标识，敏感余额在逐轮授权之后读取。
+     *
      * @author owlzhangfq@gmail.com
      */
-    private record Candidate(UUID id, int round) { }
+    private record Candidate(UUID id, int round) {}
 }

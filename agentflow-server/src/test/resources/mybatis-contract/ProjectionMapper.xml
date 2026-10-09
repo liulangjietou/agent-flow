@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.mybatis.MyBatisMappingContractTest$ProjectionMapper">
+    <select id="projection" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT CAST(NULL AS INTEGER) AS nullable_number,
+               CAST(NULL AS VARCHAR) AS nullable_text,
+               CAST(#{at} AS TIMESTAMP WITH TIME ZONE) AS recorded_at,
+               CAST(#{date} AS DATE) AS due_on
+    </select>
+    <insert id="insert">
+        INSERT INTO mybatis_mapping_contract(id, value_text) VALUES (#{id}, #{value})
+    </insert>
+    <select id="values" resultType="String">
+        SELECT value_text FROM mybatis_mapping_contract WHERE id=#{id}
+    </select>
+</mapper>

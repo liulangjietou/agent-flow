@@ -1,23 +1,16 @@
 package io.agentflow.organization;
-
-import io.agentflow.observability.DiagnosticContext;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.doReturn;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.Actor;
 import io.agentflow.common.JsonUtil;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import io.agentflow.observability.DiagnosticContext;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,12 +27,22 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.doReturn;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 真实鉴权、幂等、工作器和回环来源贯通管理 API，接收事实不代替人工应用。
+ *
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:organization-sync-api;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000",
@@ -145,7 +148,11 @@ class OrganizationSyncApiIntegrationTest {
 
     @Test void restoredOriginalLeaseExpiresWithoutResendingAndLateCompletionCannotReplaceTimeout() throws Exception {
         String id = queued(); var claim = service.claim(admin.tenantId(), UUID.fromString(id), Instant.now());
-        assertThat(new JdbcOrganizationSyncRepository(jdbc, json).find(admin.tenantId(), UUID.fromString(id)).orElseThrow().state().leaseUntil()).isEqualTo(claim.leaseUntil());
+        assertThat(new JdbcOrganizationSyncRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.organization.mapper
+                                                        .OrganizationSyncRepositoryMapper.class), json).find(admin.tenantId(), UUID.fromString(id)).orElseThrow().state().leaseUntil()).isEqualTo(claim.leaseUntil());
         worker.poll(); assertThat(fixture.calls).isEmpty(); assertThat(service.claim(admin.tenantId(), UUID.fromString(id), claim.leaseUntil())).isNull();
         service.finish(claim, new HttpOrganizationSyncSource.Result(new OrganizationSyncDelta("hr", 0, 1, List.of(), List.of(), List.of()), null), claim.leaseUntil().plusSeconds(1));
         worker.poll(); assertThat(read("/batches/" + id, 200).at("/state/failure").asText()).isEqualTo("SOURCE_TIMEOUT"); assertThat(fixture.calls).isEmpty();
@@ -205,10 +212,16 @@ class OrganizationSyncApiIntegrationTest {
     @Test void historyUsesTheAlreadyReadVersionAndRejectsMissingOrMismatchedTransitions() throws Exception {
         String id = queued(); var original = batches.find(admin.tenantId(), UUID.fromString(id)).orElseThrow(); worker.poll();
         assertThat(batches.transitions(original)).hasSize(1); assertThat(read("/batches/" + id + "/transitions", 200)).hasSize(3);
-        jdbc.update("UPDATE organization_sync_transition SET status='FAILED' WHERE tenant_id=? AND batch_id=? AND batch_version=2", admin.tenantId(), id);
+        jdbc.update(
+                "UPDATE organization_sync_transition SET status='FAILED' WHERE tenant_id=? AND"
+                        + " batch_id=? AND batch_version=2", admin.tenantId(), id);
         assertThatThrownBy(() -> service.transitions(admin, UUID.fromString(id))).isInstanceOf(IllegalStateException.class);
-        jdbc.update("UPDATE organization_sync_transition SET status='FETCHING' WHERE tenant_id=? AND batch_id=? AND batch_version=2", admin.tenantId(), id);
-        jdbc.update("DELETE FROM organization_sync_transition WHERE tenant_id=? AND batch_id=? AND batch_version=2", admin.tenantId(), id);
+        jdbc.update(
+                "UPDATE organization_sync_transition SET status='FETCHING' WHERE tenant_id=? AND"
+                        + " batch_id=? AND batch_version=2", admin.tenantId(), id);
+        jdbc.update(
+                "DELETE FROM organization_sync_transition WHERE tenant_id=? AND batch_id=? AND"
+                        + " batch_version=2", admin.tenantId(), id);
         assertThatThrownBy(() -> service.transitions(admin, UUID.fromString(id))).isInstanceOf(IllegalStateException.class);
     }
 
@@ -224,7 +237,10 @@ class OrganizationSyncApiIntegrationTest {
     }
 
     @Test void firstQueueFailureRollsBackImplicitSourceRegistrationAndItsAudit() {
-        jdbc.execute("ALTER TABLE organization_sync_transition ADD CONSTRAINT refuse_new_sync CHECK(tenant_id<>'" + admin.tenantId() + "')");
+        jdbc.execute(
+                "ALTER TABLE organization_sync_transition ADD CONSTRAINT refuse_new_sync"
+                        + " CHECK(tenant_id<>'"
+                        + admin.tenantId() + "')");
         try {
             assertThatThrownBy(() -> service.queue(admin, 0, configuration.require(admin.tenantId()).digest(admin.tenantId()))).isInstanceOf(DataIntegrityViolationException.class);
             assertThat(count("organization_sync_source")).isZero(); assertThat(count("organization_sync_batch")).isZero(); assertThat(count("organization_sync_transition")).isZero();
@@ -292,8 +308,10 @@ class OrganizationSyncApiIntegrationTest {
         String output = System.getProperty("agentflow.organization-sync-contract-output"); if (output == null) return;
         Path path = Path.of(output); Files.createDirectories(path.getParent()); Files.writeString(path, new JsonUtil(new ObjectMapper()).write(EXCHANGES));
     }
+
     /**
      * 独立契约核对读取实际接口请求和响应，不手写成功响应样例。
+     *
      * @author owlzhangfq@gmail.com
      */
     private record Exchange(String method, String template, String path, int status, String rawRequest, JsonNode response, String cacheControl, String replayed) { }

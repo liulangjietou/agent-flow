@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.agent.mapper.AssistRunRepositoryMapper">
+    <insert id="create">
+        INSERT INTO agent_assist_run
+          (id,tenant_id,application_id,application_version,round_no,status,version,context_json,state_json,created_at)
+        SELECT #{id},tenant_id,id,version,round_no,#{status},1,#{contextJson},#{stateJson},#{createdAt} FROM approval_application
+        WHERE tenant_id=#{tenantId} AND id=#{applicationId} AND version=#{applicationVersion} AND round_no=#{roundNo}
+    </insert>
+
+    <select id="update" resultType="String">
+        SELECT id FROM approval_application WHERE tenant_id=#{tenantId} AND id=#{applicationId} AND version=#{applicationVersion} AND round_no=#{roundNo} FOR UPDATE
+    </select>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM agent_assist_run WHERE tenant_id=#{tenantId} AND id=#{runId}
+    </select>
+
+    <insert id="append">
+        INSERT INTO agent_assist_transition(tenant_id,run_id,run_version,status,state_json) VALUES(#{tenantId},#{runId},#{runVersion},#{status},#{stateJson})
+    </insert>
+    <update id="updateQuery">
+        <bind name="position" value="0"/>
+        UPDATE agent_assist_run SET status=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position + 1"/>#{argument1},version=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position + 1"/>#{argument2},state_json=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position + 1"/>#{argument3}
+        WHERE tenant_id=<bind name="argument4" value="parameters[position]"/><bind name="position" value="position + 1"/>#{argument4} AND id=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position + 1"/>#{argument5} AND version=<bind name="argument6" value="parameters[position]"/><bind name="position" value="position + 1"/>#{argument6} AND status=<bind name="argument7" value="parameters[position]"/><bind name="position" value="position + 1"/>#{argument7} AND context_json=<bind name="argument8" value="parameters[position]"/><bind name="position" value="position + 1"/>#{argument8}
+    </update>
+</mapper>

@@ -1,19 +1,22 @@
 package io.agentflow.finance;
+import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
+
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
-import io.agentflow.observability.DiagnosticContext;
-import org.slf4j.MDC;
 import io.agentflow.expense.*;
+import io.agentflow.observability.DiagnosticContext;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -22,6 +25,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -39,10 +43,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
-import static org.assertj.core.api.Assertions.*;
 
 /**
  * 数据库、真实 HTTP 与后台执行器共同验证预算副作用恢复；金额和外部服务均为合成夹具。
+ *
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.finance-gateway.enabled=true", "agentflow.budgets.worker-enabled=false",
@@ -95,7 +99,10 @@ class BudgetOperationIntegrationTest {
     void removeOnlyFixtureBudgetTasks() {
         // 保留合成报销历史；清理本测试的任务，防止其他测试的 poll 消费这些故意留下的未知结果。
         for (var report : fixtures) {
-            jdbc.update("DELETE FROM budget_operation_revision WHERE tenant_id='demo' AND operation_id IN (SELECT id FROM budget_operation WHERE tenant_id='demo' AND report_id=?)", report.toString());
+            jdbc.update(
+                    "DELETE FROM budget_operation_revision WHERE tenant_id='demo' AND operation_id"
+                            + " IN (SELECT id FROM budget_operation WHERE tenant_id='demo' AND"
+                            + " report_id=?)", report.toString());
             jdbc.update("DELETE FROM budget_operation WHERE tenant_id='demo' AND report_id=?", report.toString());
             jdbc.update("DELETE FROM budget_occupation_revision WHERE tenant_id='demo' AND report_id=?", report.toString());
             jdbc.update("DELETE FROM budget_occupation WHERE tenant_id='demo' AND report_id=?", report.toString());
@@ -111,13 +118,17 @@ class BudgetOperationIntegrationTest {
         UUID id = queued.input().command().id();
         assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
         assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
-        assertThat(jdbc.queryForMap("SELECT * FROM budget_operation WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM budget_operation WHERE tenant_id='demo' AND"
+                                                + " id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         TRACES.clear();
         worker.poll();
         assertThat(reload(queued).status()).isEqualTo(BudgetOperation.Status.APPLIED);
         assertThat(TRACES).isNotEmpty().containsOnly(expectedTrace);
-        assertThat(jdbc.queryForMap("SELECT * FROM budget_operation WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM budget_operation WHERE tenant_id='demo' AND"
+                                                + " id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
         assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
@@ -147,7 +158,9 @@ class BudgetOperationIntegrationTest {
     }
 
     private List<String> noticeRecipients(UUID id, String fact) {
-        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? ORDER BY recipient_id",
+        return jdbc.queryForList(
+                "SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key=?"
+                        + " ORDER BY recipient_id",
                 String.class, "budget:" + id + ":" + fact);
     }
 
@@ -175,33 +188,51 @@ class BudgetOperationIntegrationTest {
         var report = report(true); var job = reserve(report); UUID id = job.input().command().id();
         var claim = execution.claim("demo", id, job.createdAt());
         try {
-            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT budget_notice_fixture CHECK(application_id<>'" + report.applicationId() + "' OR kind<>'BUDGET_ATTENTION')");
+            jdbc.execute(
+                    "ALTER TABLE notification_inbox ADD CONSTRAINT budget_notice_fixture"
+                            + " CHECK(application_id<>'"
+                            + report.applicationId() + "' OR kind<>'BUDGET_ATTENTION')");
             try { assertThatThrownBy(() -> execution.fail(claim, claim.updatedAt().plusSeconds(1))).isInstanceOf(DataIntegrityViolationException.class); }
             finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT budget_notice_fixture"); }
             assertThat(reload(job)).isEqualTo(claim); assertThat(noticeRecipients(id, "UNKNOWN")).isEmpty();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox n ON d.inbox_id=n.id WHERE n.application_id=?", Long.class,
+            assertThat(jdbc.queryForObject(
+                                    "SELECT COUNT(*) FROM notification_dispatch d JOIN"
+                                            + " notification_inbox n ON d.inbox_id=n.id WHERE"
+                                            + " n.application_id=?", Long.class,
                     report.applicationId().toString())).isZero();
             execution.fail(claim, claim.updatedAt().plusSeconds(1));
-            String messageId = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", String.class, "budget:" + id + ":UNKNOWN");
-            var deliveries = jdbc.queryForList("SELECT id FROM notification_dispatch WHERE tenant_id='demo' AND inbox_id=?", String.class, messageId);
+            String messageId = jdbc.queryForObject(
+                            "SELECT id FROM notification_inbox WHERE tenant_id='demo' AND"
+                                    + " event_key=? AND recipient_id='alice'", String.class, "budget:" + id + ":UNKNOWN");
+            var deliveries = jdbc.queryForList(
+                            "SELECT id FROM notification_dispatch WHERE tenant_id='demo' AND"
+                                    + " inbox_id=?", String.class, messageId);
             assertThat(deliveries).hasSize(1); UUID deliveryId = UUID.fromString(deliveries.get(0));
             var other = reserve(report(true)); UUID otherId = other.input().command().id();
             var otherClaim = execution.claim("demo", otherId, other.createdAt()); execution.fail(otherClaim, otherClaim.updatedAt().plusSeconds(1));
-            String otherMessage = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", String.class, "budget:" + otherId + ":UNKNOWN");
-            UUID otherDelivery = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE tenant_id='demo' AND inbox_id=?", String.class, otherMessage));
+            String otherMessage = jdbc.queryForObject(
+                            "SELECT id FROM notification_inbox WHERE tenant_id='demo' AND"
+                                    + " event_key=? AND recipient_id='alice'", String.class, "budget:" + otherId + ":UNKNOWN");
+            UUID otherDelivery = UUID.fromString(jdbc.queryForObject(
+                                    "SELECT id FROM notification_dispatch WHERE tenant_id='demo'"
+                                            + " AND inbox_id=?", String.class, otherMessage));
             jdbc.update("UPDATE notification_inbox SET round_no=2 WHERE id=?", otherMessage);
             try { assertThat(notificationDeliveries.claim(otherDelivery, now().plusSeconds(30))).isNull(); }
             finally { jdbc.update("UPDATE notification_inbox SET round_no=1 WHERE id=?", otherMessage); }
             var mismatched = notificationStore.get(recipient, otherDelivery).orElseThrow();
             assertThat(mismatched.progress().errorCode()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.FailureCode.MESSAGE_UNAVAILABLE);
             assertThat(mismatched.progress().attempts()).isZero();
-            jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='alice'");
+            jdbc.update(
+                    "UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND"
+                            + " subject='alice'");
             assertThat(notificationDeliveries.claim(deliveryId, now().plusSeconds(30))).isNull();
             var delivery = notificationStore.get(recipient, deliveryId).orElseThrow();
             assertThat(delivery.progress().errorCode()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.FailureCode.RECIPIENT_INACTIVE);
             assertThat(delivery.progress().attempts()).isZero();
         } finally {
-            jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject='alice'");
+            jdbc.update(
+                    "UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND"
+                            + " subject='alice'");
             var current = notificationPreferences.get(recipient); notificationPreferences.revise(recipient, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
         }
     }
@@ -226,7 +257,11 @@ class BudgetOperationIntegrationTest {
         assertThat(occupation(report).frozenFor(position(report))).isTrue(); assertThat(occupation(report).version()).isEqualTo(2);
         assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isZero(); assertThat(LAST_KEY.get()).isEqualTo(job.input().command().id().toString());
         assertThat(revisions(job)).containsExactly(1L, 2L, 3L);
-        assertThat(new JdbcBudgetOperationRepository(jdbc, json).find("demo", job.input().command().id())).contains(done);
+        assertThat(new JdbcBudgetOperationRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.finance.mapper
+                                                        .BudgetOperationRepositoryMapper.class), json).find("demo", job.input().command().id())).contains(done);
         assertThat(operations.find("foreign", job.input().command().id())).isEmpty();
     }
 
@@ -236,7 +271,9 @@ class BudgetOperationIntegrationTest {
         assertThatThrownBy(() -> tx().executeWithoutResult(transaction -> {
             freeze(report); reports.update(report, 1, "alice", "SYNTHETIC_SUBMIT");
             execution.reserve("demo", report.id(), 2, DATE, target(), now());
-            throw new IllegalStateException("synthetic failure after outbox registration");
+            throw new IllegalStateException(
+                                                            "synthetic failure after outbox"
+                                                                    + " registration");
         })).hasMessageContaining("synthetic failure");
         assertThat(reports.find("demo", report.id()).orElseThrow().version()).isEqualTo(1);
         assertThat(occupations.find("demo", report.id())).isEmpty();
@@ -391,7 +428,9 @@ class BudgetOperationIntegrationTest {
     private BudgetOccupation occupation(ExpenseReport report) { return occupations.find("demo", report.id()).orElseThrow(); }
     private BudgetPrecheckPort.Request position(ExpenseReport report) { return BudgetPrecheckPort.Request.fromCurrent(report, DATE); }
     private BudgetOperation reload(BudgetOperation operation) { return operations.find("demo", operation.input().command().id()).orElseThrow(); }
-    private List<Long> revisions(BudgetOperation operation) { return jdbc.queryForList("SELECT version FROM budget_operation_revision WHERE tenant_id='demo' AND operation_id=? ORDER BY version", Long.class, operation.input().command().id().toString()); }
+    private List<Long> revisions(BudgetOperation operation) { return jdbc.queryForList(
+                "SELECT version FROM budget_operation_revision WHERE tenant_id='demo' AND"
+                        + " operation_id=? ORDER BY version", Long.class, operation.input().command().id().toString()); }
     private TransactionTemplate tx() { return new TransactionTemplate(transactions); }
     private String target() { return configuration.destination("demo").orElseThrow().digest("demo"); }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }

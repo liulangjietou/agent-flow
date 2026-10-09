@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.history.mapper.SubmissionHistoryGapQueryMapper">
+    <select id="countQuery" resultType="Long">
+        <bind name="position" value="0"/>
+        SELECT COALESCE(SUM(GREATEST(0,a.round_no-(SELECT COUNT(*) FROM approval_submission_round r
+         WHERE r.tenant_id=a.tenant_id AND r.application_id=a.id AND r.definition_version=a.definition_version)
+        )),0) FROM approval_application a WHERE a.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1}<choose><when test="condition0"> AND a.process_key=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}</when><otherwise></otherwise></choose><choose><when test="condition1"> AND a.definition_version=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</when><otherwise></otherwise></choose> AND a.status&lt;&gt;'DRAFT'
+    </select>
+    <select id="countRows" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT a.id,e.payload_json,COUNT(*) OVER (PARTITION BY a.id) AS audit_matches
+        FROM approval_application a JOIN audit_event e ON e.tenant_id=a.tenant_id
+          AND e.aggregate_type='Application' AND e.aggregate_id=a.id AND e.application_id=a.id
+          AND e.aggregate_version=a.version AND e.action='CANCEL'
+         WHERE a.tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1}<choose><when test="condition0"> AND a.process_key=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}</when><otherwise></otherwise></choose><choose><when test="condition1"> AND a.definition_version=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}</when><otherwise></otherwise></choose> AND a.status='CANCELLED' AND a.round_no=1 AND (SELECT COUNT(*) FROM approval_submission_round r
+         WHERE r.tenant_id=a.tenant_id AND r.application_id=a.id AND r.definition_version=a.definition_version)
+        =0
+    </select>
+</mapper>

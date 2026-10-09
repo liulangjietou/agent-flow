@@ -1,20 +1,23 @@
 package io.agentflow.finance;
+import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
+
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
-import io.agentflow.common.DomainException;
 import io.agentflow.common.Actor;
+import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
-import io.agentflow.observability.DiagnosticContext;
-import org.slf4j.MDC;
 import io.agentflow.expense.*;
 import io.agentflow.notification.NotificationTexts;
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.organization.InitiatorContext;
+
 import org.junit.jupiter.api.*;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -27,6 +30,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -45,10 +49,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
-import static org.assertj.core.api.Assertions.*;
 
 /**
  * 合成借款实际聚合、数据库和回环 ERP 共同验证持久副作用，不替代企业 ERP 验收。
+ *
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.finance-gateway.enabled=true", "agentflow.vouchers.worker-enabled=false",
@@ -111,9 +115,15 @@ class VoucherOperationIntegrationTest {
     }
     @AfterEach void removeOnlyFixtureOperations() {
         for (var business : fixtures) {
-            jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id IN (SELECT id FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?)", business.toString());
+            jdbc.update(
+                    "DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND"
+                            + " preparation_id IN (SELECT id FROM voucher_preparation WHERE"
+                            + " tenant_id='demo' AND business_id=?)", business.toString());
             jdbc.update("DELETE FROM voucher_preparation WHERE tenant_id='demo' AND business_id=?", business.toString());
-            jdbc.update("DELETE FROM voucher_operation_revision WHERE tenant_id='demo' AND operation_id IN (SELECT id FROM voucher_operation WHERE tenant_id='demo' AND business_id=?)", business.toString());
+            jdbc.update(
+                    "DELETE FROM voucher_operation_revision WHERE tenant_id='demo' AND operation_id"
+                            + " IN (SELECT id FROM voucher_operation WHERE tenant_id='demo' AND"
+                            + " business_id=?)", business.toString());
             jdbc.update("DELETE FROM voucher_operation WHERE tenant_id='demo' AND business_id=?", business.toString());
         }
     }
@@ -125,12 +135,16 @@ class VoucherOperationIntegrationTest {
         VoucherPreparation queued;
         try (var trace = new DiagnosticContext(expectedTrace, "demo").open()) { queued = enqueue(advance); }
         UUID id = queued.input().id();
-        assertThat(jdbc.queryForMap("SELECT * FROM voucher_preparation WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM voucher_preparation WHERE tenant_id='demo'"
+                                                + " AND id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         TRACES.clear(); RESPONDER.set(VoucherOperationIntegrationTest::accountingEvidence);
         preparationWorker.poll();
         assertThat(reload(queued).status()).isEqualTo(VoucherPreparation.Status.READY);
-        assertThat(jdbc.queryForMap("SELECT * FROM voucher_operation WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM voucher_operation WHERE tenant_id='demo' AND"
+                                                + " id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         worker.poll();
         assertThat(operations.find("demo", id).orElseThrow().status()).isEqualTo(VoucherOperation.Status.POSTED);
@@ -146,13 +160,17 @@ class VoucherOperationIntegrationTest {
         UUID id = command.id();
         assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
         assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
-        assertThat(jdbc.queryForMap("SELECT * FROM voucher_operation WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM voucher_operation WHERE tenant_id='demo' AND"
+                                                + " id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         TRACES.clear();
         worker.poll();
         assertThat(reload(queued).status()).isEqualTo(VoucherOperation.Status.POSTED);
         assertThat(TRACES).isNotEmpty().containsOnly(expectedTrace);
-        assertThat(jdbc.queryForMap("SELECT * FROM voucher_operation WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM voucher_operation WHERE tenant_id='demo' AND"
+                                                + " id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
         assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
@@ -163,7 +181,9 @@ class VoucherOperationIntegrationTest {
         preparationWorker.poll();
         assertThat(reload(preparation).status()).isEqualTo(VoucherPreparation.Status.UNAVAILABLE);
         assertThat(voucherNoticeRecipients(preparation.input().id())).containsExactlyInAnyOrder("alice", "manager");
-        assertThat(jdbc.queryForList("SELECT content FROM notification_inbox WHERE tenant_id='demo' AND event_key LIKE ?", String.class,
+        assertThat(jdbc.queryForList(
+                                "SELECT content FROM notification_inbox WHERE tenant_id='demo' AND"
+                                        + " event_key LIKE ?", String.class,
                 "voucher:" + preparation.input().id() + ":%")).allSatisfy(content ->
                 assertThat(content).contains("准备", "尚未登记过账命令").doesNotContain("100.00", "synthetic-account", "1234", "合成用途"));
         assertThat(operations.find("demo", preparation.input().id())).isEmpty(); assertThat(WRITES.get()).isZero();
@@ -213,12 +233,20 @@ class VoucherOperationIntegrationTest {
         // 最小提示不赋予财务字段权限，夹具没有给原发起人原轮次明细读取权限。
         assertThat(noticeGet(ownManager, "manager").getStatus()).isIn(403, 404);
         String key = "voucher:" + first.input().id() + ":PREPARATION_UNAVAILABLE";
-        jdbc.update("UPDATE notification_inbox SET round_no=2 WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", key);
+        jdbc.update(
+                "UPDATE notification_inbox SET round_no=2 WHERE tenant_id='demo' AND event_key=?"
+                        + " AND recipient_id='alice'", key);
         try { assertThat(noticeGet(path, "alice").getStatus()).isEqualTo(404); }
-        finally { jdbc.update("UPDATE notification_inbox SET round_no=1 WHERE tenant_id='demo' AND event_key=? AND recipient_id='alice'", key); }
-        jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='alice'");
+        finally { jdbc.update(
+                    "UPDATE notification_inbox SET round_no=1 WHERE tenant_id='demo' AND"
+                            + " event_key=? AND recipient_id='alice'", key); }
+        jdbc.update(
+                "UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND"
+                        + " subject='alice'");
         try { assertThat(noticeGet(path, "alice").getStatus()).isIn(403, 404); }
-        finally { jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject='alice'"); }
+        finally { jdbc.update(
+                    "UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND"
+                            + " subject='alice'"); }
     }
 
     @Test void voucherPendingAndExplicitRecheckAreQuietWhileNewResultsAndConflictsAreDistinct() {
@@ -235,7 +263,9 @@ class VoucherOperationIntegrationTest {
         tx().executeWithoutResult(status -> execution.query("demo", id, posted.version(), now()));
         claimed = execution.claim("demo", id, now()); execution.finish(claimed, new FinanceResult.Success<>(notFound(operation.input().command())), now());
         assertThat(operations.find("demo", id).orElseThrow().status()).isEqualTo(VoucherOperation.Status.RECONCILING);
-        assertThat(jdbc.queryForList("SELECT DISTINCT event_key FROM notification_inbox WHERE tenant_id='demo' AND event_key LIKE ?", String.class, "voucher:" + id + ":%"))
+        assertThat(jdbc.queryForList(
+                                "SELECT DISTINCT event_key FROM notification_inbox WHERE"
+                                        + " tenant_id='demo' AND event_key LIKE ?", String.class, "voucher:" + id + ":%"))
                 .containsExactlyInAnyOrder("voucher:" + id + ":POSTED", "voucher:" + id + ":RECONCILING");
     }
 
@@ -245,24 +275,38 @@ class VoucherOperationIntegrationTest {
         var preparation = enqueue(advance()); var work = preparationService.claim("demo", preparation.input().id(), now());
         UUID id = preparation.input().id();
         try {
-            jdbc.execute("ALTER TABLE notification_inbox ADD CONSTRAINT voucher_notice_fixture CHECK(application_id<>'" + preparation.input().source().applicationId() + "' OR kind<>'VOUCHER_ATTENTION')");
+            jdbc.execute(
+                    "ALTER TABLE notification_inbox ADD CONSTRAINT voucher_notice_fixture"
+                            + " CHECK(application_id<>'"
+                            + preparation.input().source().applicationId() + "' OR kind<>'VOUCHER_ATTENTION')");
             try { assertThatThrownBy(() -> preparationService.claim("demo", id, work.preparation().leaseUntil())).isInstanceOf(DataIntegrityViolationException.class); }
             finally { jdbc.execute("ALTER TABLE notification_inbox DROP CONSTRAINT voucher_notice_fixture"); }
             assertThat(reload(preparation)).isEqualTo(work.preparation()); assertThat(voucherNoticeRecipients(id)).isEmpty();
-            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM notification_dispatch d JOIN notification_inbox n ON d.inbox_id=n.id WHERE n.application_id=? AND n.kind='VOUCHER_ATTENTION'", Long.class,
+            assertThat(jdbc.queryForObject(
+                                    "SELECT COUNT(*) FROM notification_dispatch d JOIN"
+                                            + " notification_inbox n ON d.inbox_id=n.id WHERE"
+                                            + " n.application_id=? AND n.kind='VOUCHER_ATTENTION'", Long.class,
                     preparation.input().source().applicationId().toString())).isZero();
             preparationService.claim("demo", id, work.preparation().leaseUntil());
             assertThat(voucherNoticeRecipients(id)).containsExactlyInAnyOrder("alice", "manager");
-            String messageId = jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND event_key=? AND recipient_id='manager'", String.class,
+            String messageId = jdbc.queryForObject(
+                            "SELECT id FROM notification_inbox WHERE tenant_id='demo' AND"
+                                    + " event_key=? AND recipient_id='manager'", String.class,
                     "voucher:" + id + ":PREPARATION_UNAVAILABLE");
-            UUID deliveryId = UUID.fromString(jdbc.queryForObject("SELECT id FROM notification_dispatch WHERE tenant_id='demo' AND inbox_id=?", String.class, messageId));
-            jdbc.update("UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND subject='manager'");
+            UUID deliveryId = UUID.fromString(jdbc.queryForObject(
+                                    "SELECT id FROM notification_dispatch WHERE tenant_id='demo'"
+                                            + " AND inbox_id=?", String.class, messageId));
+            jdbc.update(
+                    "UPDATE organization_person SET active=FALSE WHERE tenant_id='demo' AND"
+                            + " subject='manager'");
             assertThat(notificationDeliveries.claim(deliveryId, now().plusSeconds(30))).isNull();
             var delivery = notificationStore.get(recipient, deliveryId).orElseThrow();
             assertThat(delivery.progress().errorCode()).isEqualTo(io.agentflow.notification.NotificationDeliveryProgress.FailureCode.RECIPIENT_INACTIVE);
             assertThat(delivery.progress().attempts()).isZero();
         } finally {
-            jdbc.update("UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND subject='manager'");
+            jdbc.update(
+                    "UPDATE organization_person SET active=TRUE WHERE tenant_id='demo' AND"
+                            + " subject='manager'");
             var current = notificationPreferences.get(recipient); notificationPreferences.revise(recipient, current.version(), preference.emailEnabled(), preference.enterpriseImEnabled());
         }
     }
@@ -274,7 +318,9 @@ class VoucherOperationIntegrationTest {
         assertThat(voucherNoticeRecipients(preparation.input().id())).containsExactlyInAnyOrder("alice", "manager");
         assertThat(operations.find("demo", preparation.input().id()).orElseThrow().status()).isEqualTo(VoucherOperation.Status.EXPIRED);
         var another = enqueue(advance()); preparationWorker.poll();
-        jdbc.update("UPDATE approval_application SET status='REVOKED',version=version+1 WHERE tenant_id='demo' AND id=?", another.input().source().applicationId().toString());
+        jdbc.update(
+                "UPDATE approval_application SET status='REVOKED',version=version+1 WHERE"
+                        + " tenant_id='demo' AND id=?", another.input().source().applicationId().toString());
         execution.claim("demo", another.input().id(), now());
         assertThat(voucherNoticeRecipients(another.input().id())).containsExactlyInAnyOrder("alice", "manager");
         assertThat(operations.find("demo", another.input().id()).orElseThrow().status()).isEqualTo(VoucherOperation.Status.VOIDED); assertThat(WRITES.get()).isZero();
@@ -287,7 +333,9 @@ class VoucherOperationIntegrationTest {
                 io.agentflow.approval.model.SubmissionRound.Status.APPROVED, null, "manager", now().minusSeconds(119), original.formSchema())));
     }
     private String voucherNoticePath(UUID id, String recipient, String fact) {
-        return "/api/v1/notifications/" + jdbc.queryForObject("SELECT id FROM notification_inbox WHERE tenant_id='demo' AND recipient_id=? AND event_key=?", String.class,
+        return "/api/v1/notifications/" + jdbc.queryForObject(
+                        "SELECT id FROM notification_inbox WHERE tenant_id='demo' AND"
+                                + " recipient_id=? AND event_key=?", String.class,
                 recipient, "voucher:" + id + ":" + fact) + "/voucher-target";
     }
     private org.springframework.mock.web.MockHttpServletResponse noticeGet(String path, String user) throws Exception {
@@ -296,7 +344,9 @@ class VoucherOperationIntegrationTest {
     }
 
     private List<String> voucherNoticeRecipients(UUID id) {
-        return jdbc.queryForList("SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key LIKE ? ORDER BY recipient_id",
+        return jdbc.queryForList(
+                "SELECT recipient_id FROM notification_inbox WHERE tenant_id='demo' AND event_key"
+                        + " LIKE ? ORDER BY recipient_id",
                 String.class, "voucher:" + id + ":%");
     }
 
@@ -326,7 +376,11 @@ class VoucherOperationIntegrationTest {
         assertThat(done.version()).isEqualTo(3); assertThat(done.attempts()).isEqualTo(1);
         assertThat(WRITES.get()).isEqualTo(1); assertThat(QUERIES.get()).isZero(); assertThat(LAST_KEY.get()).isEqualTo(command.id().toString());
         assertThat(revisions(job)).containsExactly(1L, 2L, 3L);
-        assertThat(new JdbcVoucherOperationRepository(jdbc, json).find("demo", command.id())).contains(done);
+        assertThat(new JdbcVoucherOperationRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.finance.mapper
+                                                        .VoucherOperationRepositoryMapper.class), json).find("demo", command.id())).contains(done);
         assertThat(operations.find("foreign", command.id())).isEmpty();
     }
 
@@ -397,7 +451,11 @@ class VoucherOperationIntegrationTest {
         RESPONDER.set((path, request) -> pending(job.input().command(), 8)); recheck(job); worker.poll();
         var disputed = reload(job); assertThat(disputed.status()).isEqualTo(VoucherOperation.Status.RECONCILING);
         assertThat(disputed.observation()).isEqualTo(accepted); assertThat(disputed.highestRevision()).isEqualTo(8); assertThat(disputed.usablePosted()).isFalse();
-        assertThat(new JdbcVoucherOperationRepository(jdbc, json).find("demo", job.input().command().id())).contains(disputed);
+        assertThat(new JdbcVoucherOperationRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.finance.mapper
+                                                        .VoucherOperationRepositoryMapper.class), json).find("demo", job.input().command().id())).contains(disputed);
         RESPONDER.set((path, request) -> accepted); recheck(job); worker.poll();
         assertThat(reload(job).highestRevision()).isEqualTo(8); assertThat(reload(job).failure()).isEqualTo(VoucherOperation.Failure.STALE_OBSERVATION);
         assertThat(reload(job).observation()).isEqualTo(accepted); assertThat(reload(job).status()).isEqualTo(VoucherOperation.Status.RECONCILING);
@@ -405,7 +463,9 @@ class VoucherOperationIntegrationTest {
 
     @Test void approvalChangedBeforeDispatchVoidsCommandAndRegistrationRejectsForgedSource() {
         var advance = advance(); var job = register(command(advance)); var original = job.input().command();
-        jdbc.update("UPDATE approval_application SET status='REVOKED',version=version+1 WHERE tenant_id='demo' AND id=?", advance.applicationId().toString());
+        jdbc.update(
+                "UPDATE approval_application SET status='REVOKED',version=version+1 WHERE"
+                        + " tenant_id='demo' AND id=?", advance.applicationId().toString());
         worker.poll(); assertThat(reload(job).status()).isEqualTo(VoucherOperation.Status.VOIDED); assertThat(WRITES.get()).isZero();
         var unregistered = advance(); var command = command(unregistered);
         jdbc.update("UPDATE approval_application SET payload_json='{}' WHERE tenant_id='demo' AND id=?", unregistered.applicationId().toString());
@@ -474,7 +534,11 @@ class VoucherOperationIntegrationTest {
             var first = threads.submit(preparationWorker::poll); assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
             threads.submit(preparationWorker::poll).get(1, TimeUnit.SECONDS); assertThat(QUERIES.get()).isEqualTo(1);
             threads.submit(() -> tx().executeWithoutResult(transaction -> {
-                advances.lock("demo", advance.id()); jdbc.update("UPDATE approval_application SET status='REVOKED',version=version+1 WHERE tenant_id='demo' AND id=?", advance.applicationId().toString());
+                advances.lock("demo", advance.id()); jdbc.update(
+                                                                "UPDATE approval_application SET"
+                                                                    + " status='REVOKED',version=version+1"
+                                                                    + " WHERE tenant_id='demo' AND"
+                                                                    + " id=?", advance.applicationId().toString());
             })).get(1, TimeUnit.SECONDS);
             release.countDown(); first.get(5, TimeUnit.SECONDS);
             assertThat(reload(preparation).status()).isEqualTo(VoucherPreparation.Status.VOIDED);
@@ -493,10 +557,15 @@ class VoucherOperationIntegrationTest {
 
     @Test void preparationAuditFailureRollsBackNewVoucherAndKeepsTheOriginalClaim() {
         var preparation = enqueue(advance()); var work = preparationService.claim("demo", preparation.input().id(), now()); var command = prepared(work);
-        jdbc.update("INSERT INTO voucher_preparation_revision(tenant_id,preparation_id,version,state_json) VALUES('demo',?,3,'{}')", preparation.input().id().toString());
+        jdbc.update(
+                "INSERT INTO"
+                    + " voucher_preparation_revision(tenant_id,preparation_id,version,state_json)"
+                    + " VALUES('demo',?,3,'{}')", preparation.input().id().toString());
         assertThatThrownBy(() -> preparationService.finish(work.preparation(), command, null, now())).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(operations.find("demo", command.id())).isEmpty(); assertThat(reload(preparation).status()).isEqualTo(VoucherPreparation.Status.RUNNING);
-        jdbc.update("DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id=? AND version=3", preparation.input().id().toString());
+        jdbc.update(
+                "DELETE FROM voucher_preparation_revision WHERE tenant_id='demo' AND"
+                        + " preparation_id=? AND version=3", preparation.input().id().toString());
         preparationService.finish(work.preparation(), command, null, now());
         assertThat(reload(preparation).status()).isEqualTo(VoucherPreparation.Status.READY); assertThat(operations.find("demo", command.id())).isPresent();
         assertThat(WRITES.get()).isZero();
@@ -539,15 +608,21 @@ class VoucherOperationIntegrationTest {
 
     @Test void aPersistedSelectionAndOriginalPostingSurviveLaterPublication() {
         var preparation = enqueue(advance()); var first = publishMapping("first", true);
-        String originalInput = jdbc.queryForObject("SELECT input_json FROM voucher_preparation WHERE tenant_id='demo' AND id=?", String.class, preparation.input().id().toString());
+        String originalInput = jdbc.queryForObject(
+                        "SELECT input_json FROM voucher_preparation WHERE tenant_id='demo' AND"
+                                + " id=?", String.class, preparation.input().id().toString());
         assertThat(json.write(preparation)).doesNotContain("mappingRequest");
         var work = preparationService.claim("demo", preparation.input().id(), now());
         assertThat(reload(preparation)).isEqualTo(work.preparation());
         var command = prepared(work); preparationService.finish(work.preparation(), command, null, now());
         var original = operations.find("demo", command.id()).orElseThrow();
         assertThat(reload(preparation).mappingRequest()).isEqualTo(command.mapping().request());
-        assertThat(jdbc.queryForObject("SELECT input_json FROM voucher_preparation WHERE tenant_id='demo' AND id=?", String.class, command.id().toString())).isEqualTo(originalInput);
-        var history = jdbc.queryForList("SELECT state_json FROM voucher_preparation_revision WHERE tenant_id='demo' AND preparation_id=? ORDER BY version", String.class, command.id().toString());
+        assertThat(jdbc.queryForObject(
+                                "SELECT input_json FROM voucher_preparation WHERE tenant_id='demo'"
+                                        + " AND id=?", String.class, command.id().toString())).isEqualTo(originalInput);
+        var history = jdbc.queryForList(
+                        "SELECT state_json FROM voucher_preparation_revision WHERE tenant_id='demo'"
+                                + " AND preparation_id=? ORDER BY version", String.class, command.id().toString());
         assertThat(history).hasSize(3);
         assertThat(json.read(history.get(1), VoucherPreparation.class).mappingRequest()).isEqualTo(work.preparation().mappingRequest());
         assertThat(json.read(history.get(2), VoucherPreparation.class)).isEqualTo(reload(preparation));
@@ -737,7 +812,9 @@ class VoucherOperationIntegrationTest {
         return posted(wire.read(data.path("command").toString(), VoucherCommand.class), 1);
     }
     private void recheck(VoucherOperation value) { tx().executeWithoutResult(transaction -> operations.update(reload(value).requestQuery(now()))); }
-    private List<Long> revisions(VoucherOperation value) { return jdbc.queryForList("SELECT version FROM voucher_operation_revision WHERE tenant_id='demo' AND operation_id=? ORDER BY version", Long.class, value.input().command().id().toString()); }
+    private List<Long> revisions(VoucherOperation value) { return jdbc.queryForList(
+                "SELECT version FROM voucher_operation_revision WHERE tenant_id='demo' AND"
+                        + " operation_id=? ORDER BY version", Long.class, value.input().command().id().toString()); }
     private String target() { return configuration.destination("demo").orElseThrow().digest("demo"); }
     private TransactionTemplate tx() { return new TransactionTemplate(transactions); }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
@@ -769,6 +846,7 @@ class VoucherOperationIntegrationTest {
 
     /**
      * 模拟业务消费者在 ERP 已过账后本地落账失败，验证真实事务代理的回滚边界。
+     *
      * @author owlzhangfq@gmail.com
      */
     static class FailureListener {
@@ -777,8 +855,10 @@ class VoucherOperationIntegrationTest {
             if (event.current().status() == VoucherOperation.Status.POSTED && reject.compareAndSet(true, false)) throw new IllegalStateException("Synthetic settlement failure");
         }
     }
+
     /**
      * 仅本测试上下文启用故障消费者。
+     *
      * @author owlzhangfq@gmail.com
      */
     @TestConfiguration(proxyBeanMethods = false)

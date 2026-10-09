@@ -1,14 +1,15 @@
 package io.agentflow.approval.history;
 
+import io.agentflow.approval.history.mapper.AuditHistoryAdapterMapper;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.service.TaskAuditPort.MembershipChange;
 import io.agentflow.common.JsonUtil;
+import io.agentflow.mybatis.SqlRow;
+import io.agentflow.mybatis.SqlRows;
 import io.agentflow.organization.ApprovalProxyUse;
-import org.springframework.jdbc.core.JdbcTemplate;
+
 import org.springframework.stereotype.Repository;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -18,40 +19,54 @@ import java.util.UUID;
 
 /**
  * 申请范围内查询真实追加审计；旧任务事件仅通过已核实的历史任务关联。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Repository
 public class JdbcAuditHistoryAdapter implements AuditHistoryPort {
-    private final JdbcTemplate jdbc;
+    private final AuditHistoryAdapterMapper sqlMapper;
     private final JsonUtil json;
 
     /** 注入审计存储与统一 JSON 解码器。 */
-    public JdbcAuditHistoryAdapter(JdbcTemplate jdbc, JsonUtil json) {
-        this.jdbc = jdbc;
+    public JdbcAuditHistoryAdapter(AuditHistoryAdapterMapper sqlMapper, JsonUtil json) {
+        this.sqlMapper = sqlMapper;
         this.json = json;
     }
 
     @Override
-    public List<HistoryEvent> read(String tenantId, UUID applicationId, ProcessHistoryPort.ProcessHistory history,
-                                   List<SubmissionRound> rounds) {
-        List<Object> parameters = new ArrayList<>(List.of(tenantId, applicationId.toString(), applicationId.toString()));
+    public List<HistoryEvent> read(
+            String tenantId,
+            UUID applicationId,
+            ProcessHistoryPort.ProcessHistory history,
+            List<SubmissionRound> rounds) {
+        List<Object> parameters =
+                new ArrayList<>(
+                        List.of(tenantId, applicationId.toString(), applicationId.toString()));
         String legacyTasks = "";
         if (!history.tasks().isEmpty()) {
-            legacyTasks = " OR (application_id IS NULL AND aggregate_type='Task' AND aggregate_id IN ("
-                    + String.join(",", Collections.nCopies(history.tasks().size(), "?")) + "))";
+            legacyTasks =
+                    " OR (application_id IS NULL AND aggregate_type='Task' AND aggregate_id IN ("
+                            + String.join(",", Collections.nCopies(history.tasks().size(), "?"))
+                            + "))";
             parameters.addAll(history.tasks().keySet());
         }
-        String sql = """
-                SELECT * FROM audit_event WHERE tenant_id=? AND (
-                  (application_id=? AND aggregate_type IN ('Application','Task'))
-                  OR (application_id IS NULL AND aggregate_type='Application' AND aggregate_id=?)
-                """ + legacyTasks + ")";
-        return jdbc.query(sql, (row, index) -> event(row, applicationId, history, rounds), parameters.toArray())
-                .stream().filter(Objects::nonNull).toList();
+
+        return SqlRows.map(
+                        sqlMapper.readQuery(
+                                history.tasks().size(),
+                                (!history.tasks().isEmpty()),
+                                parameters.toArray()),
+                        row -> event(row, applicationId, history, rounds))
+                .stream()
+                .filter(Objects::nonNull)
+                .toList();
     }
 
-    private HistoryEvent event(ResultSet row, UUID applicationId, ProcessHistoryPort.ProcessHistory history,
-                               List<SubmissionRound> rounds) throws SQLException {
+    private HistoryEvent event(
+            SqlRow row,
+            UUID applicationId,
+            ProcessHistoryPort.ProcessHistory history,
+            List<SubmissionRound> rounds) {
         Map<String, Object> payload = json.map(row.getString("payload_json"));
         String recordedApplication = string(payload, "applicationId");
         if (recordedApplication != null && !applicationId.toString().equals(recordedApplication)) return null;

@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpenseConfigurationRepositoryMapper">
+    <insert id="lock">
+        INSERT INTO expense_configuration (tenant_id) VALUES (#{tenantId})
+    </insert>
+
+    <insert id="saveCategories">
+        INSERT INTO expense_category_revision (tenant_id,revision,category_count,state_json,updated_by,updated_at,comment) VALUES (#{tenantId},#{revision},#{categoryCount},#{stateJson},#{updatedBy},#{updatedAt},#{comment})
+    </insert>
+
+    <update id="saveCategories2">
+        UPDATE expense_configuration SET category_revision=#{version} WHERE tenant_id=#{tenantId} AND category_revision=#{categoryRevision}
+    </update>
+
+    <select id="draft" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_policy_draft WHERE tenant_id=#{tenant} AND policy_key=#{key}
+    </select>
+
+    <insert id="saveDraft">
+        INSERT INTO expense_policy_draft (tenant_id,policy_key,id,name,revision,published_version,published_draft_revision,state_json,updated_by,updated_at)
+        VALUES (#{tenantId},#{policyKey},#{id},#{name},#{revision},#{publishedVersion},#{publishedDraftRevision},#{stateJson},#{updatedBy},#{updatedAt})
+    </insert>
+
+    <update id="saveDraft2">
+        UPDATE expense_policy_draft SET name=#{definition},revision=#{revision},state_json=#{stateJson},updated_by=#{userId},updated_at=#{updatedAt}
+        WHERE tenant_id=#{tenantId} AND policy_key=#{key} AND revision=#{expectedRevision} AND published_version=#{publishedVersion}
+    </update>
+
+    <insert id="saveDraft3">
+        INSERT INTO expense_policy_draft_revision (tenant_id,policy_id,revision,name,definition_json,updated_by,updated_at,comment)
+        VALUES (#{tenantId},#{policyId},#{revision},#{name},#{definitionJson},#{updatedBy},#{updatedAt},#{comment})
+    </insert>
+
+    <update id="publish">
+        UPDATE expense_policy_draft SET published_version=#{version},published_draft_revision=#{draftRevision},state_json=#{stateJson}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND revision=#{revision} AND published_version=#{publishedVersion}
+    </update>
+
+    <insert id="publish2">
+        INSERT INTO expense_policy_version (tenant_id,policy_id,version,draft_revision,category_revision,name,state_json,published_by,published_at,comment)
+        VALUES (#{tenantId},#{policyId},#{version},#{draftRevision},#{categoryRevision},#{name},#{stateJson},#{publishedBy},#{publishedAt},#{comment})
+    </insert>
+
+    <insert id="publish3">
+        INSERT INTO expense_policy_activation (tenant_id,revision,policy_id,policy_version,activated_by,activated_at,comment)
+        VALUES (#{tenantId},#{revision},#{policyId},#{policyVersion},#{activatedBy},#{activatedAt},#{comment})
+    </insert>
+
+    <update id="publish4">
+        UPDATE expense_configuration SET active_revision=#{activeRevision},active_policy_id=#{policyId},active_policy_version=#{version}
+        WHERE tenant_id=#{tenantId} AND active_revision=#{expectedActiveRevision} AND category_revision=#{categoryRevision}
+    </update>
+
+    <select id="version" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_policy_version WHERE tenant_id=#{tenant} AND policy_id=#{policyId} AND version=#{version}
+    </select>
+
+    <select id="list" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,policy_key,name,revision,published_version,published_draft_revision,updated_by,updated_at
+        FROM expense_policy_draft WHERE tenant_id=#{tenant} AND policy_key&gt;#{policyKey} ORDER BY policy_key LIMIT #{limit}
+    </select>
+
+    <select id="versions" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT version,draft_revision,category_revision,name,published_by,published_at,comment FROM expense_policy_version
+        WHERE tenant_id=#{tenant} AND policy_id=#{id} AND version&lt;#{before} ORDER BY version DESC LIMIT #{limit}
+    </select>
+
+    <select id="categoryVersions" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT revision,category_count,updated_by,updated_at,comment FROM expense_category_revision
+        WHERE tenant_id=#{tenant} AND revision&lt;#{before} ORDER BY revision DESC LIMIT #{limit}
+    </select>
+
+    <select id="categoryRevision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_category_revision WHERE tenant_id=#{tenant} AND revision=#{revision}
+    </select>
+
+    <select id="draftRevision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_policy_draft_revision WHERE tenant_id=#{tenant} AND policy_id=#{id} AND revision=#{revision}
+    </select>
+
+    <select id="activations" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT a.*,d.policy_key FROM expense_policy_activation a JOIN expense_policy_draft d
+        ON d.tenant_id=a.tenant_id AND d.id=a.policy_id WHERE a.tenant_id=#{tenant} AND a.revision&lt;#{before} ORDER BY a.revision DESC LIMIT #{limit}
+    </select>
+    <select id="headsQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM expense_configuration WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1}<choose><when test="condition0"> FOR UPDATE</when><otherwise></otherwise></choose>
+    </select>
+</mapper>

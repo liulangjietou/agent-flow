@@ -1,10 +1,11 @@
 package io.agentflow.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.agentflow.common.JsonUtil;
-import java.time.Instant;
-import java.util.Map;
-import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -13,12 +14,14 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.jwt.Jwt;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
-import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * 验证迁移保护、签发方/客户端隔离和数据库顺序，避免身份源时钟影响注销范围。
+ *
  * @author owlzhangfq@gmail.com
  */
 class OidcLogoutScopesTest {
@@ -36,9 +39,18 @@ class OidcLogoutScopesTest {
         assertThat(jdbc.queryForList("SELECT * FROM AF_OIDC_LOGOUT_SCOPE")).isEmpty();
         var manager = new DataSourceTransactionManager(source);
         var json = new JsonUtil(new ObjectMapper());
-        var original = new OidcLogoutScopes(jdbc, json, properties("https://id.example", "flow"), manager);
-        var otherClient = new OidcLogoutScopes(jdbc, json, properties("https://id.example", "other"), manager);
-        var otherIssuer = new OidcLogoutScopes(jdbc, json, properties("https://other.example", "flow"), manager);
+        var original = new OidcLogoutScopes(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.auth.mapper.OidcLogoutScopesMapper.class), json, properties("https://id.example", "flow"), manager);
+        var otherClient = new OidcLogoutScopes(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.auth.mapper.OidcLogoutScopesMapper.class), json, properties("https://id.example", "other"), manager);
+        var otherIssuer = new OidcLogoutScopes(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.auth.mapper.OidcLogoutScopesMapper.class), json, properties("https://other.example", "flow"), manager);
         Instant time = Instant.parse("2026-09-24T00:00:00Z");
         var logout = Jwt.withTokenValue("verified-in-test").header("alg", "RS256")
                 .subject("person").jti("unique-event").issuedAt(time).expiresAt(time.plusSeconds(120)).build();

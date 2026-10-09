@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpenseArchiveRepositoryMapper">
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_archive WHERE tenant_id=#{tenant} AND report_id=#{report} AND round_no=#{round}
+    </select>
+
+    <insert id="blocked">
+        INSERT INTO expense_archive(tenant_id,report_id,round_no,settlement_version,issue,checked_at) VALUES(#{tenantId},#{reportId},#{roundNo},#{settlementVersion},#{issue},#{checkedAt})
+    </insert>
+
+    <update id="blocked2">
+        UPDATE expense_archive SET issue=#{issue},settlement_version=#{version},checked_at=#{checkedAt} WHERE tenant_id=#{tenantId} AND report_id=#{businessId} AND round_no=#{roundNo} AND archived_at IS NULL
+    </update>
+
+    <insert id="seal">
+        INSERT INTO expense_archive(tenant_id,report_id,round_no,settlement_version,checked_at,archived_at,manifest_json,manifest_sha256)
+        VALUES(#{tenantId},#{reportId},#{roundNo},#{settlementVersion},#{checkedAt},#{archivedAt},#{manifestJson},#{manifestSha256})
+    </insert>
+
+    <update id="seal2">
+        UPDATE expense_archive SET issue=NULL,settlement_version=#{version},checked_at=#{at},archived_at=#{archivedAt},manifest_json=#{encoded},manifest_sha256=#{digest}
+        WHERE tenant_id=#{tenantId} AND report_id=#{businessId} AND round_no=#{roundNo} AND archived_at IS NULL
+    </update>
+
+    <insert id="seal3">
+        INSERT INTO expense_archive_original(tenant_id,report_id,round_no,original_id)
+        SELECT tenant_id,#{businessId},#{roundNo},id FROM invoice_original WHERE tenant_id=#{tenantId} AND id=#{id} AND invoice_id=#{invoiceId} AND owner_id=#{employeeId} AND sha256=#{sha256} AND status='READY'
+    </insert>
+
+    <insert id="seal4">
+        INSERT INTO audit_event(id,tenant_id,event_id,aggregate_type,aggregate_id,aggregate_version,application_id,action,actor_id,payload_json,occurred_at)
+        VALUES(#{id},#{tenantId},#{eventId},'ExpenseArchive',#{aggregateId},1,#{applicationId},'EXPENSE_ARCHIVED','expense-archive',#{payloadJson},#{occurredAt})
+    </insert>
+    <select id="candidatesQuery" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT s.tenant_id,s.report_id,s.trace_id,business.business_no,submitted.process_instance_id FROM expense_settlement s
+        LEFT JOIN approval_application business ON business.tenant_id=s.tenant_id AND business.id=s.application_id
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=s.round_no
+        WHERE s.status='SETTLED'
+        AND NOT EXISTS(SELECT 1 FROM expense_archive a WHERE a.tenant_id=s.tenant_id AND a.report_id=s.report_id AND a.round_no=s.round_no AND a.archived_at IS NOT NULL)
+        <choose><when test="condition0"> AND (s.tenant_id&gt;<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} OR (s.tenant_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND s.report_id&gt;<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3}))</when><otherwise></otherwise></choose> ORDER BY s.tenant_id,s.report_id LIMIT 10
+    </select>
+</mapper>

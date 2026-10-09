@@ -1,19 +1,14 @@
 package io.agentflow.organization;
+import static io.agentflow.organization.OrganizationSyncKey.Kind.*;
+import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,11 +23,20 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
-import static io.agentflow.organization.OrganizationSyncKey.Kind.*;
-import static org.assertj.core.api.Assertions.*;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 真正组织用例、持久计划及同事务应用覆盖冲突、乱序关系、并发和失败回滚。
+ *
  * @author owlzhangfq@gmail.com
  */
 class OrganizationSyncApplicationTest {
@@ -51,8 +55,20 @@ class OrganizationSyncApplicationTest {
         var data = new DriverManagerDataSource("jdbc:h2:mem:sync-application-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=10000", "sa", "");
         Flyway.configure().dataSource(data).load().migrate(); jdbc = new JdbcTemplate(data);
         var manager = new DataSourceTransactionManager(data); tx = new TransactionTemplate(manager);
-        organization = new JdbcOrganizationRepository(jdbc, json); local = new OrganizationService(organization);
-        sync = new JdbcOrganizationSyncRepository(jdbc, json); plans = new JdbcOrganizationSyncPlanRepository(jdbc, json);
+        organization = new JdbcOrganizationRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.organization.mapper.OrganizationRepositoryMapper
+                                        .class), json); local = new OrganizationService(organization);
+        sync = new JdbcOrganizationSyncRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.organization.mapper.OrganizationSyncRepositoryMapper
+                                        .class), json); plans = new JdbcOrganizationSyncPlanRepository(
+                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                (jdbc).getDataSource(),
+                                io.agentflow.organization.mapper
+                                        .OrganizationSyncPlanRepositoryMapper.class), json);
         configuration = new OrganizationSyncConfiguration(); configuration.setEnabled(true);
         var target = new OrganizationSyncConfiguration.Target(); target.setSourceKey("hr"); target.setEndpoint("https://organization.invalid/"); target.setToken("synthetic-token");
         configuration.setTenants(java.util.Map.of("tenant", target)); configuration.validate();
@@ -67,7 +83,12 @@ class OrganizationSyncApplicationTest {
         assertThat(saved.plan().ready()).isTrue(); assertThat(saved.plan().changedRecords()).isEqualTo(8);
         assertThat(count("organization_unit")).isZero(); assertThat(count("organization_person")).isZero();
         assertThat(organization.revision("tenant")).isEqualTo(1); assertThat(sync.source("tenant").orElseThrow().appliedRevision()).isZero();
-        assertThat(new JdbcOrganizationSyncPlanRepository(jdbc, json).find("tenant", saved.plan().id()).orElseThrow()).isEqualTo(saved);
+        assertThat(new JdbcOrganizationSyncPlanRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.organization.mapper
+                                                        .OrganizationSyncPlanRepositoryMapper
+                                                        .class), json).find("tenant", saved.plan().id()).orElseThrow()).isEqualTo(saved);
         var state = service.apply(ADMIN, batch.context().id(), 3, saved.plan().id(), "已逐项核对");
         assertThat(state.status()).isEqualTo(OrganizationSyncBatch.Status.APPLIED); assertThat(organization.revision("tenant")).isEqualTo(9);
         assertThat(count("organization_change")).isEqualTo(8); assertThat(count("organization_sync_binding")).isEqualTo(8);

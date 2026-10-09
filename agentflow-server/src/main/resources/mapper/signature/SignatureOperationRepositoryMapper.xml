@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.signature.mapper.SignatureOperationRepositoryMapper">
+    <select id="create" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id FROM approval_application WHERE tenant_id=#{tenantId} AND id=#{applicationId} AND status='APPROVED'
+        AND round_no=#{roundNo} AND version=#{applicationVersion} AND process_key=#{processKey} AND definition_version=#{definitionVersion} FOR UPDATE
+    </select>
+
+    <select id="create2" resultType="Integer">
+        SELECT COUNT(*) FROM approval_submission_round WHERE tenant_id=#{tenantId} AND application_id=#{applicationId} AND round_no=#{roundNo}
+        AND definition_version=#{definitionVersion} AND status='APPROVED'
+    </select>
+
+    <select id="create3" resultType="Integer">
+        SELECT COUNT(*) FROM signature_operation WHERE tenant_id=#{tenantId} AND application_id=#{applicationId} AND round_no=#{roundNo} AND active_guard=1
+    </select>
+
+    <insert id="create4">
+        INSERT INTO signature_operation(tenant_id,id,application_id,round_no,request_digest,target_digest,input_json,state_json,
+        version,status,attempts,authorized_at,updated_at,next_attempt_at,poll_at,active_guard,trace_id)
+        VALUES(#{tenantId},#{id},#{applicationId},#{roundNo},#{requestDigest},#{targetDigest},#{inputJson},#{stateJson},1,'QUEUED',0,#{authorizedAt},#{updatedAt},#{nextAttemptAt},#{pollAt},1,#{traceId})
+    </insert>
+
+    <update id="update">
+        UPDATE signature_operation SET version=#{version},status=#{status},attempts=#{attempts},state_json=#{stateJson},updated_at=#{updatedAt},next_attempt_at=#{nextAttemptAt},lease_until=#{leaseUntil},poll_at=#{pollAt},active_guard=#{terminal}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND request_digest=#{digest} AND target_digest=#{targetDigest} AND active_guard=1
+    </update>
+
+    <insert id="update2">
+        INSERT INTO signature_result_file(tenant_id,operation_id,document_id,content_id,byte_size,sha256,receipt_digest,created_version,status)
+        VALUES(#{tenantId},#{operationId},#{documentId},#{contentId},#{byteSize},#{sha256},#{receiptDigest},#{createdVersion},'RESERVED')
+    </insert>
+
+    <update id="markArtifactReady">
+        UPDATE signature_result_file SET status='READY',saved_at=#{savedAt},saved_version=#{version} WHERE tenant_id=#{tenantId} AND operation_id=#{id} AND document_id=#{documentId}
+        AND content_id=#{contentId} AND byte_size=#{size} AND sha256=#{sha256} AND status='RESERVED'
+    </update>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,a.business_no,s.process_instance_id FROM signature_operation q
+        LEFT JOIN approval_application a ON a.tenant_id=q.tenant_id AND a.id=q.application_id
+        LEFT JOIN approval_submission_round s ON s.tenant_id=a.tenant_id AND s.application_id=a.id AND s.round_no=q.round_no
+        WHERE q.poll_at&lt;=#{pollAt} AND q.active_guard=1 ORDER BY q.poll_at,q.tenant_id,q.id LIMIT #{DUE_LIMIT}
+    </select>
+
+    <select id="history" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT version,state_json,occurred_at FROM signature_operation_revision
+        WHERE tenant_id=#{tenantId} AND operation_id=#{id} AND version&gt;#{afterVersion} AND version&lt;=#{version} ORDER BY version LIMIT #{limit}
+    </select>
+
+    <select id="resultFiles" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM signature_result_file WHERE tenant_id=#{tenantId} AND operation_id=#{id} AND created_version&lt;=#{version} ORDER BY document_id
+    </select>
+
+    <insert id="insertSource">
+        INSERT INTO signature_source_document(tenant_id,operation_id,application_id,round_no,attachment_id,original_content_id,field_path,filename,byte_size,sha256,original_status)
+        SELECT a.tenant_id,#{id},a.application_id,#{roundNo},a.id,COALESCE(a.content_id,a.id),a.field_path,a.filename,a.byte_size,a.sha256,'READY'
+        FROM approval_attachment a JOIN approval_attachment_round r ON r.tenant_id=a.tenant_id AND r.application_id=a.application_id AND r.attachment_id=a.id AND r.field_path=a.field_path
+        WHERE a.tenant_id=#{tenantId} AND a.application_id=#{applicationId} AND r.round_no=#{expectedRoundNo} AND a.id=#{attachmentId} AND COALESCE(a.content_id,a.id)=#{contentId}
+        AND a.field_path=#{fieldPath} AND a.filename=#{filename} AND a.byte_size=#{size} AND a.sha256=#{sha256} AND a.status='READY'
+    </insert>
+
+    <select id="read" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT attachment_id,original_content_id,field_path,filename,byte_size,sha256 FROM signature_source_document
+        WHERE tenant_id=#{tenantId} AND operation_id=#{id}
+    </select>
+
+    <insert id="append">
+        INSERT INTO signature_operation_revision(tenant_id,operation_id,version,state_json,occurred_at) VALUES(#{tenantId},#{operationId},#{version},#{stateJson},#{occurredAt})
+    </insert>
+    <select id="findRows" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM signature_operation WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2}
+    </select>
+    <select id="lockRows" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM signature_operation WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} FOR UPDATE
+    </select>
+    <select id="forRoundRows" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM signature_operation WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND application_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND round_no=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} ORDER BY authorized_at,id LIMIT <bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4}
+    </select>
+    <select id="forRoundRows2" resultType="io.agentflow.mybatis.SqlRow">
+        <bind name="position" value="0"/>
+        SELECT * FROM signature_operation WHERE tenant_id=<bind name="argument1" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument1} AND application_id=<bind name="argument2" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument2} AND round_no=<bind name="argument3" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument3} AND (authorized_at&gt;<bind name="argument4" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument4} OR (authorized_at=<bind name="argument5" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument5} AND id&gt;<bind name="argument6" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument6})) ORDER BY authorized_at,id LIMIT <bind name="argument7" value="parameters[position]"/><bind name="position" value="position+1"/>#{argument7}
+    </select>
+</mapper>

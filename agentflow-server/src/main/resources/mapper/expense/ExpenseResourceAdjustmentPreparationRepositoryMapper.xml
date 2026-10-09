@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpenseResourceAdjustmentPreparationRepositoryMapper">
+    <insert id="create">
+        INSERT INTO expense_resource_adjustment_preparation(trace_id,tenant_id,id,report_id,settlement_version,consumption_id,consumed_version,
+        accrual_reversal_id,payment_returns_version,payment_voucher_id,payment_voucher_version,payment_voucher_reversal_id,requested_by,
+        input_json,state_json,version,status,created_at,updated_at)
+        VALUES(#{traceId},#{tenantId},#{id},#{reportId},#{settlementVersion},#{consumptionId},#{consumedVersion},#{accrualReversalId},#{paymentReturnsVersion},#{paymentVoucherId},#{paymentVoucherVersion},#{paymentVoucherReversalId},#{requestedBy},#{inputJson},#{stateJson},1,'QUEUED',#{createdAt},#{updatedAt})
+    </insert>
+
+    <update id="update">
+        UPDATE expense_resource_adjustment_preparation SET state_json=#{stateJson},version=#{version},status=#{status},updated_at=#{updatedAt},lease_until=#{leaseUntil}
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND version=#{expectedVersion} AND input_json=#{inputJson} AND status&lt;&gt;'AUTHORIZED'
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_resource_adjustment_preparation WHERE tenant_id=#{tenant} AND id=#{id}
+    </select>
+
+    <select id="latest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_resource_adjustment_preparation WHERE tenant_id=#{tenant} AND report_id=#{report} AND requested_by=#{actor} ORDER BY created_at DESC,id DESC LIMIT 1
+    </select>
+
+    <select id="revision" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM expense_resource_adjustment_preparation_revision WHERE tenant_id=#{tenant} AND preparation_id=#{id} AND version=#{version}
+    </select>
+
+    <select id="due" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT q.tenant_id,q.id,q.trace_id,business.business_no,submitted.process_instance_id FROM expense_resource_adjustment_preparation q
+        LEFT JOIN expense_settlement origin ON origin.tenant_id=q.tenant_id AND origin.report_id=q.report_id AND origin.budget_operation_id=q.consumption_id
+        LEFT JOIN approval_application business ON business.tenant_id=q.tenant_id AND business.id=origin.application_id
+        LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=business.tenant_id AND submitted.application_id=business.id AND submitted.round_no=origin.round_no
+        WHERE q.status='QUEUED' OR (q.status='RUNNING' AND q.lease_until&lt;=#{leaseUntil}) ORDER BY q.created_at,q.id LIMIT 10
+    </select>
+
+    <insert id="append">
+        INSERT INTO expense_resource_adjustment_preparation_revision(tenant_id,preparation_id,version,state_json) VALUES(#{tenantId},#{preparationId},#{version},#{stateJson})
+    </insert>
+</mapper>

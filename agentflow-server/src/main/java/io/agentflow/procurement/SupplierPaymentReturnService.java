@@ -2,30 +2,35 @@ package io.agentflow.procurement;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.FinanceResult;
+import io.agentflow.procurement.mapper.SupplierPaymentReturnServiceMapper;
+
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 原付款只读查询、独立资金登记与原应付冻结编排，银行资金不自动改写 ERP。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
@@ -38,15 +43,29 @@ public class SupplierPaymentReturnService {
     private final JdbcSupplierPaymentReturnCheckRepository checks;
     private final JdbcSupplierPaymentReturnsRepository ledgers;
     private final JdbcSupplierPaymentReturnRepository registrations;
-    private final JdbcTemplate jdbc;
+    private final SupplierPaymentReturnServiceMapper sqlMapper;
     private final JsonUtil json;
 
     /** 网络读取留给事务外工作器，财务决定与审计在原申请事务内保存。 */
-    public SupplierPaymentReturnService(CurrentActor actors, SupplierSettlementAccess access, SupplierPaymentReturnSources sources,
-            JdbcSupplierPaymentReturnCheckRepository checks, JdbcSupplierPaymentReturnsRepository ledgers,
-            JdbcSupplierPaymentReturnRepository registrations, JdbcTemplate jdbc, JsonUtil json, ApplicationEventPublisher events) {
-        this.actors = actors; this.events = events; this.access = access; this.sources = sources; this.checks = checks; this.ledgers = ledgers;
-        this.registrations = registrations; this.jdbc = jdbc; this.json = json;
+    public SupplierPaymentReturnService(
+            CurrentActor actors,
+            SupplierSettlementAccess access,
+            SupplierPaymentReturnSources sources,
+            JdbcSupplierPaymentReturnCheckRepository checks,
+            JdbcSupplierPaymentReturnsRepository ledgers,
+            JdbcSupplierPaymentReturnRepository registrations,
+            SupplierPaymentReturnServiceMapper sqlMapper,
+            JsonUtil json,
+            ApplicationEventPublisher events) {
+        this.actors = actors;
+        this.events = events;
+        this.access = access;
+        this.sources = sources;
+        this.checks = checks;
+        this.ledgers = ledgers;
+        this.registrations = registrations;
+        this.sqlMapper = sqlMapper;
+        this.json = json;
     }
 
     /** 幂等回放也核对当前独立财务岗位、法人任职及原轮次完整字段权限。 */
@@ -71,22 +90,53 @@ public class SupplierPaymentReturnService {
     /** 原件、累计登记、单次消费、跨业务防重及审计任一失败都整体回滚。 */
     @Transactional
     public ActionReceipt register(UUID paymentId, RegisterInput input) {
-        var source = locked(paymentId); var actor = actors.actor(); var now = time(Instant.now());
-        var ledger = ledgers.find(actor.tenantId(), paymentId).orElseThrow(SupplierPaymentReturnService::conflict);
-        var check = checks.find(actor.tenantId(), input.checkId()).orElseThrow(SupplierPaymentReturnService::conflict);
-        if (source.payment().version() != input.operationVersion() || ledger.version() != input.returnVersion() || check.version() != input.checkVersion()
+        var source = locked(paymentId);
+        var actor = actors.actor();
+        var now = time(Instant.now());
+        var ledger =
+                ledgers.find(actor.tenantId(), paymentId)
+                        .orElseThrow(SupplierPaymentReturnService::conflict);
+        var check =
+                checks.find(actor.tenantId(), input.checkId())
+                        .orElseThrow(SupplierPaymentReturnService::conflict);
+        if (source.payment().version() != input.operationVersion()
+                || ledger.version() != input.returnVersion()
+                || check.version() != input.checkVersion()
                 || !check.input().requestedBy().equals(actor.userId())
-                || !checks.latest(actor.tenantId(), paymentId, actor.userId()).map(value -> value.input().id().equals(check.input().id())).orElse(false)) throw conflict();
-        sources.requireCheck(check, source); var issue = registrationIssue(source, ledger, check, now);
-        if (issue != null) throw new DomainException(issue, "Supplier return registration requires fresh complete evidence and the current independent finance decision");
-        if (input.outcome() != check.receipt().status()) throw new DomainException("SUPPLIER_PAYMENT_RETURN_OUTCOME_CHANGED", "Registration must match the displayed supplier return outcome");
-        var decision = new SupplierPaymentReturn(UUID.randomUUID(), actor.tenantId(), check.input().id(), check.receipt(), actor.userId(), now, input.evidenceReference().trim(), input.comment());
+                || !checks.latest(actor.tenantId(), paymentId, actor.userId())
+                        .map(value -> value.input().id().equals(check.input().id()))
+                        .orElse(false)) throw conflict();
+        sources.requireCheck(check, source);
+        var issue = registrationIssue(source, ledger, check, now);
+        if (issue != null)
+            throw new DomainException(
+                    issue,
+                    "Supplier return registration requires fresh complete evidence and the current"
+                            + " independent finance decision");
+        if (input.outcome() != check.receipt().status())
+            throw new DomainException(
+                    "SUPPLIER_PAYMENT_RETURN_OUTCOME_CHANGED",
+                    "Registration must match the displayed supplier return outcome");
+        var decision =
+                new SupplierPaymentReturn(
+                        UUID.randomUUID(),
+                        actor.tenantId(),
+                        check.input().id(),
+                        check.receipt(),
+                        actor.userId(),
+                        now,
+                        input.evidenceReference().trim(),
+                        input.comment());
         SupplierPaymentReturns next;
-        try { next = registrations.register(decision, ledger.version(), check.version()); }
-        catch (DuplicateKeyException duplicate) {
-            throw new DomainException("SUPPLIER_PAYMENT_RETURN_ALREADY_RECORDED", "Bank receipt is already registered to a financial source");
+        try {
+            next = registrations.register(decision, ledger.version(), check.version());
+        } catch (DuplicateKeyException duplicate) {
+            throw new DomainException(
+                    "SUPPLIER_PAYMENT_RETURN_ALREADY_RECORDED",
+                    "Bank receipt is already registered to a financial source");
         }
-        var resolved = check.resolve(decision, now); var event = audit(source, decision.id(), next.version(), "REGISTER", input.comment(), now);
+        var resolved = check.resolve(decision, now);
+        var event = audit(source, decision.id(), next.version(), "REGISTER", input.comment(), now);
         events.publishEvent(new SupplierPaymentReturnChanged(resolved));
         return receipt(source, resolved, decision.id(), next, event);
     }
@@ -142,63 +192,125 @@ public class SupplierPaymentReturnService {
     private void save(SupplierPaymentReturnCheck value) {
         checks.update(value); events.publishEvent(new SupplierPaymentReturnChanged(value));
     }
+
     private boolean evidenceChanged(SupplierPaymentReturnCheck check, SupplierPaymentReturns ledger) {
         return checks.history(check.input().tenantId(), check.input().request().command().id()).stream().anyMatch(value -> !check.receipt().continues(value.receipt()))
                 || ledgers.accountingReceipts(ledger).stream().anyMatch(value -> !check.receipt().continues(value));
     }
+
     private SupplierPaymentReturnSources.Source locked(UUID paymentId) {
         requireFinance(paymentId); var actor = actors.actor(); var source = sources.locked(actor.tenantId(), paymentId);
         requireFinance(paymentId); sources.requireFinance(source, actor.userId()); return source;
     }
+
     private boolean available(SupplierPaymentReturnCheck check, SupplierPaymentReturnSources.Source source, Instant now) {
         try { sources.requireCheck(check, source); sources.requireFinance(source, check.input().requestedBy()); return true; }
         catch (DomainException changed) { save(check.voidSource(now)); return false; }
     }
+
     private SupplierPaymentReturnCheck current(SupplierPaymentReturnCheck claimed) {
         return checks.find(claimed.input().tenantId(), claimed.input().id()).filter(value -> value.equals(claimed) && value.status() == SupplierPaymentReturnCheck.Status.RUNNING).orElse(null);
     }
-    private UUID audit(SupplierPaymentReturnSources.Source source, UUID aggregate, long version, String action, String comment, Instant at) {
-        var original = source.request().command().holdCommand().authorization().source().reservation().source(); var event = UUID.randomUUID();
-        var payload = Map.of("requestId", original.requestId(), "roundNo", original.round().roundNo(), "paymentId", source.payment().command().id(), "authorizedRole", "FINANCE", "comment", comment.trim());
-        jdbc.update("""
-                INSERT INTO audit_event(id,tenant_id,event_id,aggregate_type,aggregate_id,aggregate_version,application_id,action,actor_id,payload_json,occurred_at)
-                VALUES(?,?,?,'SupplierPaymentReturn',?,?,?,?,?,?,?)
-                """, UUID.randomUUID().toString(), original.tenantId(), event.toString(), aggregate.toString(), version, original.applicationId().toString(),
-                "SUPPLIER_PAYMENT_RETURN_" + action, actors.actor().userId(), json.write(payload), Timestamp.from(at));
+
+    private UUID audit(
+            SupplierPaymentReturnSources.Source source,
+            UUID aggregate,
+            long version,
+            String action,
+            String comment,
+            Instant at) {
+        var original =
+                source.request()
+                        .command()
+                        .holdCommand()
+                        .authorization()
+                        .source()
+                        .reservation()
+                        .source();
+        var event = UUID.randomUUID();
+        var payload =
+                Map.of(
+                        "requestId",
+                        original.requestId(),
+                        "roundNo",
+                        original.round().roundNo(),
+                        "paymentId",
+                        source.payment().command().id(),
+                        "authorizedRole",
+                        "FINANCE",
+                        "comment",
+                        comment.trim());
+        sqlMapper.audit(
+                UUID.randomUUID().toString(),
+                original.tenantId(),
+                event.toString(),
+                aggregate.toString(),
+                version,
+                original.applicationId().toString(),
+                "SUPPLIER_PAYMENT_RETURN_" + action,
+                actors.actor().userId(),
+                json.write(payload),
+                Timestamp.from(at));
         return event;
     }
+
     private static ActionReceipt receipt(SupplierPaymentReturnSources.Source source, SupplierPaymentReturnCheck check, UUID registrationId, SupplierPaymentReturns ledger, UUID event) {
         return new ActionReceipt(source.payment().command().id(), source.payment().version(), check.input().id(), check.version(), registrationId, ledger.version(), event);
     }
+
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
+
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed original supplier payment, return ledger or query changed"); }
 
     /**
      * 查询只确认展示的原银行和账本版本，不接受替代交易或账号。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public record QueryInput(@Positive long operationVersion, @Min(0) long returnVersion, @NotBlank @Size(max = 2000) String comment) {
+    public record QueryInput(
+            @Positive long operationVersion,
+            @Min(0) long returnVersion,
+            @NotBlank @Size(max = 2000) String comment) {
         /** 未声明的财务事实不允许静默忽略。 */
         @JsonAnySetter public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown supplier return query field"); }
     }
+
     /**
      * 明确登记只消费已展示原件，金额与收款账户全部由服务端派生。
+     *
      * @author owlzhangfq@gmail.com
      */
-    public record RegisterInput(@Positive long operationVersion, @Positive long returnVersion, @NotNull UUID checkId, @Positive long checkVersion,
-            @NotNull SupplierPaymentReturnPort.Status outcome, @NotBlank @Size(max = 128) @Pattern(regexp = "[^\\p{Cntrl}]+") String evidenceReference,
+    public record RegisterInput(
+            @Positive long operationVersion,
+            @Positive long returnVersion,
+            @NotNull UUID checkId,
+            @Positive long checkVersion,
+            @NotNull SupplierPaymentReturnPort.Status outcome,
+            @NotBlank @Size(max = 128) @Pattern(regexp = "[^\\p{Cntrl}]+") String evidenceReference,
             @NotBlank @Size(max = 2000) String comment) {
         /** 未核清只能展示，不能被人工声明为已经登记的结论。 */
         public RegisterInput {
-            if (outcome == SupplierPaymentReturnPort.Status.UNRESOLVED) throw new IllegalArgumentException("An explicit supplier return outcome is required");
+            if (outcome == SupplierPaymentReturnPort.Status.UNRESOLVED)
+                throw new IllegalArgumentException(
+                        "An explicit supplier return outcome is required");
         }
+
         /** 客户端不能覆盖网关回款金额、修订或账号。 */
         @JsonAnySetter public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown supplier return registration field"); }
     }
+
     /**
      * 动作回执仅定位本地保存版本，不把查询受理当作资金或 ERP 完成。
+     *
      * @author owlzhangfq@gmail.com
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record ActionReceipt(UUID paymentId, long operationVersion, UUID checkId, long checkVersion, UUID registrationId, long returnVersion, UUID auditEventId) { }
+    public record ActionReceipt(
+            UUID paymentId,
+            long operationVersion,
+            UUID checkId,
+            long checkVersion,
+            UUID registrationId,
+            long returnVersion,
+            UUID auditEventId) {}
 }

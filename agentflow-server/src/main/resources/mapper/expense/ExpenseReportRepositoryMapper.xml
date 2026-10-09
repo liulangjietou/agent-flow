@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpenseReportRepositoryMapper">
+    <select id="lock" resultType="String">
+        SELECT application_id FROM expense_report WHERE tenant_id=#{tenant} AND id=#{reportId}
+    </select>
+
+    <select id="lock2" resultType="String">
+        SELECT id FROM approval_application WHERE tenant_id=#{tenant} AND id=#{id} FOR UPDATE
+    </select>
+
+    <select id="lock3" resultType="String">
+        SELECT id FROM expense_report WHERE tenant_id=#{tenant} AND id=#{reportId} FOR UPDATE
+    </select>
+
+    <insert id="create">
+        INSERT INTO expense_report(id,tenant_id,application_id,employee_id,version,state_json)
+        SELECT #{id},tenant_id,id,created_by,1,#{stateJson} FROM approval_application
+        WHERE tenant_id=#{tenantId} AND id=#{applicationId} AND created_by=#{employeeId} AND business_type='EXPENSE' AND business_id=#{businessId} AND status='DRAFT'
+    </insert>
+
+    <update id="update">
+        UPDATE expense_report SET version=#{version},state_json=#{stateJson},current_round_no=#{roundNo},current_submitted_at=#{submittedAt},
+            current_legal_entity_id=#{legalEntityId},current_base_currency=#{baseCurrency},updated_at=CURRENT_TIMESTAMP
+        WHERE tenant_id=#{tenantId} AND id=#{id} AND application_id=#{applicationId} AND employee_id=#{employeeId} AND version=#{expectedVersion}
+    </update>
+
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_report WHERE tenant_id=#{tenantId} AND id=#{id}
+    </select>
+
+    <select id="findByApplication" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_report WHERE tenant_id=#{tenantId} AND application_id=#{applicationId}
+    </select>
+
+    <insert id="append">
+        INSERT INTO expense_report_revision(tenant_id,report_id,financial_version,actor_id,operation,state_json) VALUES(#{tenantId},#{reportId},#{financialVersion},#{actorId},#{operation},#{stateJson})
+    </insert>
+</mapper>

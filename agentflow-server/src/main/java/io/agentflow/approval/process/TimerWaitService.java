@@ -1,11 +1,14 @@
 package io.agentflow.approval.process;
 
+
 import com.fasterxml.jackson.annotation.JsonAnySetter;
+
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.SubprocessExecutionLocks;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
+import io.agentflow.approval.process.mapper.TimerWaitServiceMapper;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.approval.service.ApplicationAuditPort;
@@ -14,20 +17,23 @@ import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionDraftRepository;
 import io.agentflow.definition.DefinitionModels;
+import io.agentflow.mybatis.SqlRows;
 import io.agentflow.notification.ApprovalNotificationService;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+
 import org.flowable.engine.ManagementService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.impl.util.CommandContextUtil;
 import org.flowable.job.api.Job;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,6 +43,7 @@ import java.util.UUID;
 
 /**
  * 单次定时等待的应用编排；真实任务、到期与失败状态均由 Flowable 持久化。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
@@ -55,38 +62,64 @@ public class TimerWaitService {
     private final ApprovalNotificationService notifications;
     private final ApplicationAuditPort audit;
     private final CurrentActor actors;
-    private final JdbcTemplate jdbc;
+    private final TimerWaitServiceMapper sqlMapper;
 
     /** 原生异步执行器不得绕过申请事务；等待调度始终经本用例推进。 */
-    public TimerWaitService(ManagementService jobs, RuntimeService runtime,
-            ApplicationRepository applications, SubmissionRoundRepository rounds, DefinitionDraftRepository definitions,
-            ApprovalApplicationFacade reads, ApprovalCompletionService completion, ApprovalNotificationService notifications,
-            ApplicationAuditPort audit, CurrentActor actors, JdbcTemplate jdbc, SubprocessProgressService subprocesses,
+    public TimerWaitService(
+            ManagementService jobs,
+            RuntimeService runtime,
+            ApplicationRepository applications,
+            SubmissionRoundRepository rounds,
+            DefinitionDraftRepository definitions,
+            ApprovalApplicationFacade reads,
+            ApprovalCompletionService completion,
+            ApprovalNotificationService notifications,
+            ApplicationAuditPort audit,
+            CurrentActor actors,
+            TimerWaitServiceMapper sqlMapper,
+            SubprocessProgressService subprocesses,
             @Value("${flowable.async-executor-activate:false}") boolean nativeAsync) {
-        if (nativeAsync) throw new IllegalStateException("Timer waits require the platform dispatcher and flowable.async-executor-activate=false");
-        this.jobs = jobs; this.runtime = runtime; this.applications = applications;
-        this.rounds = rounds; this.definitions = definitions; this.reads = reads; this.completion = completion;
-        this.notifications = notifications; this.audit = audit; this.actors = actors; this.jdbc = jdbc;
+        if (nativeAsync)
+            throw new IllegalStateException(
+                    "Timer waits require the platform dispatcher and"
+                        + " flowable.async-executor-activate=false");
+        this.jobs = jobs;
+        this.runtime = runtime;
+        this.applications = applications;
+        this.rounds = rounds;
+        this.definitions = definitions;
+        this.reads = reads;
+        this.completion = completion;
+        this.notifications = notifications;
+        this.audit = audit;
+        this.actors = actors;
+        this.sqlMapper = sqlMapper;
         this.subprocesses = subprocesses;
     }
 
     /** 到期与标识共同分页，无关或不可执行的引擎任务不会阻塞后续页面。 */
     @Transactional(readOnly = true)
     public List<Candidate> candidates(Instant now, Candidate after) {
-        StringBuilder sql = new StringBuilder("""
-                SELECT j.ID_,j.DUEDATE_,j.TENANT_ID_,o.trace_id,j.PROCESS_INSTANCE_ID_ AS process_instance_id,business.business_no FROM ACT_RU_TIMER_JOB j
-                LEFT JOIN workflow_execution_origin o ON o.tenant_id=j.TENANT_ID_ AND o.object_kind='TIMER' AND o.object_id=j.ID_
-                LEFT JOIN approval_submission_round submitted ON submitted.tenant_id=j.TENANT_ID_ AND submitted.process_instance_id=j.PROCESS_INSTANCE_ID_
-                LEFT JOIN approval_application business ON business.tenant_id=submitted.tenant_id AND business.id=submitted.application_id
-                WHERE j.DUEDATE_<=?
-                """);
-        var parameters = new ArrayList<Object>(); parameters.add(Timestamp.from(now));
+
+        var parameters = new ArrayList<Object>();
+        parameters.add(Timestamp.from(now));
         if (after != null) {
-            sql.append(" AND (j.DUEDATE_>? OR (j.DUEDATE_=? AND j.ID_>?))");
-            parameters.add(Timestamp.from(after.dueAt())); parameters.add(Timestamp.from(after.dueAt())); parameters.add(after.jobId());
+
+            parameters.add(Timestamp.from(after.dueAt()));
+            parameters.add(Timestamp.from(after.dueAt()));
+            parameters.add(after.jobId());
         }
-        sql.append(" ORDER BY j.DUEDATE_,j.ID_ LIMIT ?"); parameters.add(BATCH_SIZE);
-        return jdbc.query(sql.toString(), (row, index) -> new Candidate(row.getString("ID_"), row.getTimestamp("DUEDATE_").toInstant(), row.getString("TENANT_ID_"), row.getString("trace_id"), row.getString("business_no"), row.getString("process_instance_id")), parameters.toArray());
+        parameters.add(BATCH_SIZE);
+        return SqlRows.map(
+                sqlMapper.candidatesQuery((after != null), parameters.toArray()),
+                row ->
+                        new Candidate(
+                                row.getString("ID_"),
+                                row.getTimestamp("DUEDATE_").toInstant(),
+                                row.getString("TENANT_ID_"),
+                                row.getString("trace_id"),
+                                row.getString("business_no"),
+                                row.getString("process_instance_id")));
     }
 
     /** 到期后只推进精确绑定的等待执行，提前、暂停、已撤回或已经消费时不执行。 */
@@ -229,28 +262,81 @@ public class TimerWaitService {
         }
         return EXECUTION_FAILED;
     }
+
     private static String safeCode(String code) { return code != null && code.matches("[A-Z][A-Z0-9_]{0,79}") ? code : EXECUTION_FAILED; }
+
     private static DomainException unavailable() { return new DomainException("NOT_FOUND", "The bound timer wait is not available"); }
 
-    /** @author owlzhangfq@gmail.com */
-    private record Binding(Application application, SubmissionRound round, DefinitionModels.Node node, boolean suspended) { }
-    /** @author owlzhangfq@gmail.com */
-    public record Candidate(String jobId, Instant dueAt, String tenantId, String traceId, String businessNo, String processInstanceId) {
+    /**
+     * @author owlzhangfq@gmail.com
+     */
+    private record Binding(
+            Application application,
+            SubmissionRound round,
+            DefinitionModels.Node node,
+            boolean suspended) {}
+
+    /**
+     * @author owlzhangfq@gmail.com
+     */
+    public record Candidate(
+            String jobId,
+            Instant dueAt,
+            String tenantId,
+            String traceId,
+            String businessNo,
+            String processInstanceId) {
         /** 旧扫描不推测业务关联；已知的原生任务编号仍可用于诊断。 */
         public Candidate(String jobId, Instant dueAt, String tenantId, String traceId) { this(jobId, dueAt, tenantId, traceId, null, null); }
+
         /** 历史等待仍按原到期和原 ID 执行，缺失来源保持空值。 */
         public Candidate(String jobId, Instant dueAt) { this(jobId, dueAt, null, null); }
     }
-    /** @author owlzhangfq@gmail.com */
-    public enum State { WAITING, FAILED, SUSPENDED }
-    /** @author owlzhangfq@gmail.com */
-    public record Entry(String jobId, String nodeId, String nodeName, String executionId, Instant dueAt, State state, String errorCode, boolean canRetry) { }
-    /** @author owlzhangfq@gmail.com */
-    public record View(UUID applicationId, int roundNo, long applicationVersion, List<Entry> items) { }
-    /** @author owlzhangfq@gmail.com */
-    public record Receipt(UUID applicationId, int roundNo, long applicationVersion, String jobId, String nodeId, ApplicationStatus applicationStatus) { }
-    /** @author owlzhangfq@gmail.com */
-    public record RetryInput(@NotNull @Positive Long expectedVersion, @NotBlank @Size(max = 2000) String reason) {
+
+    /**
+     * @author owlzhangfq@gmail.com
+     */
+    public enum State {
+        WAITING,
+        FAILED,
+        SUSPENDED
+    }
+
+    /**
+     * @author owlzhangfq@gmail.com
+     */
+    public record Entry(
+            String jobId,
+            String nodeId,
+            String nodeName,
+            String executionId,
+            Instant dueAt,
+            State state,
+            String errorCode,
+            boolean canRetry) {}
+
+    /**
+     * @author owlzhangfq@gmail.com
+     */
+    public record View(
+            UUID applicationId, int roundNo, long applicationVersion, List<Entry> items) {}
+
+    /**
+     * @author owlzhangfq@gmail.com
+     */
+    public record Receipt(
+            UUID applicationId,
+            int roundNo,
+            long applicationVersion,
+            String jobId,
+            String nodeId,
+            ApplicationStatus applicationStatus) {}
+
+    /**
+     * @author owlzhangfq@gmail.com
+     */
+    public record RetryInput(
+            @NotNull @Positive Long expectedVersion, @NotBlank @Size(max = 2000) String reason) {
         /** 原等待的版本、节点和到期时间不能由请求替换。 */
         @JsonAnySetter public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown timer retry field"); }
     }

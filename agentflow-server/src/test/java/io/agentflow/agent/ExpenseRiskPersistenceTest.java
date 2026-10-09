@@ -1,19 +1,13 @@
 package io.agentflow.agent;
+import static org.assertj.core.api.Assertions.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+
 import io.agentflow.auth.DeferredActorAuthentication;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -29,10 +23,20 @@ import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.TransactionTemplate;
-import static org.assertj.core.api.Assertions.*;
+
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 使用实际迁移和 JDBC 事务验证来源绑定、独占队列及审计回滚；合成 SQL 来源不冒充完整费用审批运行。
+ *
  * @author owlzhangfq@gmail.com
  */
 class ExpenseRiskPersistenceTest {
@@ -65,7 +69,11 @@ class ExpenseRiskPersistenceTest {
         }
         beforeMigration = migrated;
         var manager = new DataSourceTransactionManager(source); tx = new TransactionTemplate(manager);
-        var proxy = new ProxyFactory(new JdbcExpenseRiskRepository(jdbc, json));
+        var proxy = new ProxyFactory(new JdbcExpenseRiskRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.agent.mapper.ExpenseRiskRepositoryMapper
+                                                .class), json));
         proxy.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource()));
         runs = (JdbcExpenseRiskRepository) proxy.getProxy();
     }
@@ -159,7 +167,9 @@ class ExpenseRiskPersistenceTest {
 
     @Test void failedReviewAuditRollsBackStateAndOriginalOutputSurvivesRetry() {
         var run = completed(); var original = run.state();
-        jdbc.execute("ALTER TABLE agent_expense_risk_transition ADD CONSTRAINT fixture_deny_adoption CHECK(status<>'ADOPTED')");
+        jdbc.execute(
+                "ALTER TABLE agent_expense_risk_transition ADD CONSTRAINT fixture_deny_adoption"
+                        + " CHECK(status<>'ADOPTED')");
         run.adopt(3, run.context().input(), "reviewer", List.of(CONCERN), null, AT.plusSeconds(3));
         assertThatThrownBy(() -> tx.executeWithoutResult(ignored -> runs.update(run, 3))).isInstanceOf(DataIntegrityViolationException.class);
         assertThat(loaded(run).state()).isEqualTo(original); assertThat(versions(run)).containsExactly(1L, 2L, 3L);
@@ -170,7 +180,9 @@ class ExpenseRiskPersistenceTest {
     }
 
     @Test void failedInitialAuditLeavesNeitherSourcesNorAnOccupiedActiveSlot() {
-        jdbc.execute("ALTER TABLE agent_expense_risk_transition ADD CONSTRAINT fixture_deny_initial CHECK(run_version>1)");
+        jdbc.execute(
+                "ALTER TABLE agent_expense_risk_transition ADD CONSTRAINT fixture_deny_initial"
+                        + " CHECK(run_version>1)");
         assertThatThrownBy(() -> tx.executeWithoutResult(ignored -> runs.create(fresh(), LOGIN))).isInstanceOf(DataIntegrityViolationException.class);
         assertEmptyRiskTables(); jdbc.execute("ALTER TABLE agent_expense_risk_transition DROP CONSTRAINT fixture_deny_initial");
         var next = fresh(); tx.executeWithoutResult(ignored -> runs.create(next, LOGIN)); assertThat(loaded(next).state().status()).isEqualTo(ExpenseRiskRun.Status.QUEUED);
@@ -183,7 +195,9 @@ class ExpenseRiskPersistenceTest {
             case "requested-by" -> jdbc.update("UPDATE agent_expense_risk_run SET requested_by='different' WHERE id=?", id);
             case "task-id" -> jdbc.update("UPDATE agent_expense_risk_run SET task_id='different-task' WHERE id=?", id);
             case "created-at" -> jdbc.update("UPDATE agent_expense_risk_run SET created_at=? WHERE id=?", Timestamp.from(AT.plusSeconds(1)), id);
-            case "document-version" -> jdbc.update("UPDATE agent_expense_risk_document SET application_version=99 WHERE run_id=? AND ordinal=2", id);
+            case "document-version" -> jdbc.update(
+                            "UPDATE agent_expense_risk_document SET application_version=99 WHERE"
+                                    + " run_id=? AND ordinal=2", id);
             case "missing-document" -> jdbc.update("DELETE FROM agent_expense_risk_document WHERE run_id=? AND ordinal=2", id);
             case "source-content" -> jdbc.update("UPDATE agent_expense_risk_run SET context_json=? WHERE id=?", json.write(contextWithTamperedSource(run)), id);
             case "state" -> jdbc.update("UPDATE agent_expense_risk_run SET state_json=? WHERE id=?", json.write(new ExpenseRiskRun.State(ExpenseRiskRun.Status.COMPLETED, 3, null, null, null, null, null, null)), id);
@@ -210,10 +224,23 @@ class ExpenseRiskPersistenceTest {
     }
 
     private void seed(UUID report, UUID application) {
-        jdbc.update("INSERT INTO approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id) VALUES(?,?,?,'fixture',1,'employee','保留申请','{}','IN_APPROVAL',1,1,'EXPENSE',?)", application.toString(), TENANT, "RISK-" + application, report.toString());
-        jdbc.update("INSERT INTO expense_report(id,tenant_id,application_id,employee_id,version,state_json) VALUES(?,?,?,'employee',1,'{\"retained\":true}')", report.toString(), TENANT, application.toString());
-        jdbc.update("INSERT INTO expense_report_revision(tenant_id,report_id,financial_version,actor_id,operation,state_json) SELECT tenant_id,id,version,employee_id,'CREATE',state_json FROM expense_report WHERE id=?", report.toString());
-        jdbc.update("INSERT INTO approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status) VALUES(?,?,1,?,1,'原轮次','{}','employee',?,'IN_APPROVAL')", TENANT, application.toString(), "fixture-" + application, Timestamp.from(AT.minusSeconds(60)));
+        jdbc.update(
+                "INSERT INTO"
+                    + " approval_application(id,tenant_id,business_no,process_key,definition_version,created_by,title,payload_json,status,round_no,version,business_type,business_id)"
+                    + " VALUES(?,?,?,'fixture',1,'employee','保留申请','{}','IN_APPROVAL',1,1,'EXPENSE',?)", application.toString(), TENANT, "RISK-" + application, report.toString());
+        jdbc.update(
+                "INSERT INTO"
+                    + " expense_report(id,tenant_id,application_id,employee_id,version,state_json)"
+                    + " VALUES(?,?,?,'employee',1,'{\"retained\":true}')", report.toString(), TENANT, application.toString());
+        jdbc.update(
+                "INSERT INTO"
+                    + " expense_report_revision(tenant_id,report_id,financial_version,actor_id,operation,state_json)"
+                    + " SELECT tenant_id,id,version,employee_id,'CREATE',state_json FROM"
+                    + " expense_report WHERE id=?", report.toString());
+        jdbc.update(
+                "INSERT INTO"
+                    + " approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,title,payload_json,submitted_by,submitted_at,status)"
+                    + " VALUES(?,?,1,?,1,'原轮次','{}','employee',?,'IN_APPROVAL')", TENANT, application.toString(), "fixture-" + application, Timestamp.from(AT.minusSeconds(60)));
     }
     private ExpenseRiskRun fresh() {
         var documents = List.of(new ExpenseRiskInput.Document(1, primaryReport, primaryApplication, 1, 1, 1, "a".repeat(64), List.of(1)),
@@ -247,7 +274,9 @@ class ExpenseRiskPersistenceTest {
             List.of(new ExpenseRiskSuggestion.Item(CONCERN, ExpenseRiskInput.Kind.CROSS_DOCUMENT, "所选单据包含同类费用", "只限已选范围，不能认定规避审批", List.of("人工核对行程与用途"),
                     input.sources().stream().map(AssistModelPort.Source::reference).toList()))); }
     private ExpenseRiskRun loaded(ExpenseRiskRun run) { return runs.find(TENANT, run.context().id()).orElseThrow().run(); }
-    private List<Long> versions(ExpenseRiskRun run) { return jdbc.queryForList("SELECT run_version FROM agent_expense_risk_transition WHERE run_id=? ORDER BY run_version", Long.class, run.context().id().toString()); }
+    private List<Long> versions(ExpenseRiskRun run) { return jdbc.queryForList(
+                "SELECT run_version FROM agent_expense_risk_transition WHERE run_id=? ORDER BY"
+                        + " run_version", Long.class, run.context().id().toString()); }
     private List<List<Map<String, Object>>> businessRows() { return BUSINESS_TABLES.stream().map(table -> jdbc.queryForList("SELECT * FROM " + table + " ORDER BY 1,2")).toList(); }
     private void assertEmptyRiskTables() { for (var table : List.of("agent_expense_risk_run", "agent_expense_risk_document", "agent_expense_risk_transition")) assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class)).isZero(); }
     private static void error(String code, Runnable action) { assertThatThrownBy(action::run).isInstanceOfSatisfying(DomainException.class, failure -> assertThat(failure.code()).isEqualTo(code)); }

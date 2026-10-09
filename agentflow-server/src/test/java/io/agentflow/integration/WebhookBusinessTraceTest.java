@@ -1,20 +1,18 @@
 package io.agentflow.integration;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import io.agentflow.common.JsonUtil;
 import io.agentflow.observability.DiagnosticContext;
-import java.net.URI;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,12 +23,19 @@ import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import java.net.URI;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 原签名正文不重写；业务号从原索引读取，实例只使用匹配信封声明的原轮次。
+ *
  * @author owlzhangfq@gmail.com
  */
 class WebhookBusinessTraceTest {
@@ -42,8 +47,12 @@ class WebhookBusinessTraceTest {
 
     @BeforeEach void schema() {
         jdbc = new JdbcTemplate(new DriverManagerDataSource("jdbc:h2:mem:webhook-business-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", ""));
-        jdbc.execute("CREATE TABLE approval_application(tenant_id VARCHAR(64),id VARCHAR(36),business_no VARCHAR(128),round_no INT)");
-        jdbc.execute("CREATE TABLE approval_submission_round(tenant_id VARCHAR(64),application_id VARCHAR(36),round_no INT,process_instance_id VARCHAR(128))");
+        jdbc.execute(
+                "CREATE TABLE approval_application(tenant_id VARCHAR(64),id VARCHAR(36),business_no"
+                        + " VARCHAR(128),round_no INT)");
+        jdbc.execute(
+                "CREATE TABLE approval_submission_round(tenant_id VARCHAR(64),application_id"
+                        + " VARCHAR(36),round_no INT,process_instance_id VARCHAR(128))");
     }
 
     @AfterEach void cleanup() { MDC.clear(); jdbc.execute("DROP ALL OBJECTS"); }
@@ -86,7 +95,10 @@ class WebhookBusinessTraceTest {
     }
 
     private List<Map<String, String>> sendTwice(String body) {
-        var store = spy(new JdbcWebhookStore(jdbc)); var targets = mock(WebhookTargets.class); var now = Instant.now();
+        var store = spy(new JdbcWebhookStore(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.integration.mapper.WebhookStoreMapper.class))); var targets = mock(WebhookTargets.class); var now = Instant.now();
         var delivery = new JdbcWebhookStore.Delivery(deliveryId, TENANT, "local", "digest", eventId, "TaskActionAccepted", applicationId,
                 1, body, now, now, DeliveryProgress.pending(now).claim(now, "lease"));
         doReturn(List.of(deliveryId)).when(store).due(any()); doReturn(delivery).when(store).claim(eq(deliveryId), any());

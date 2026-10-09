@@ -1,6 +1,8 @@
 package io.agentflow.notification;
 
+
 import com.fasterxml.jackson.annotation.JsonInclude;
+
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
@@ -16,23 +18,27 @@ import io.agentflow.finance.VoucherCommand;
 import io.agentflow.finance.VoucherOperation;
 import io.agentflow.finance.VoucherPreparation;
 import io.agentflow.finance.VoucherWorkspace;
+import io.agentflow.mybatis.SqlRows;
+import io.agentflow.notification.mapper.VoucherNotificationAccessMapper;
 import io.agentflow.organization.OrganizationPerson;
 import io.agentflow.organization.OrganizationRepository;
-import java.util.List;
-import java.util.UUID;
-import org.springframework.jdbc.core.JdbcTemplate;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.UUID;
+
 /**
  * 原消息只定位原会计准备或操作；当前业务字段权限决定能否读取详情。
+ *
  * @author owlzhangfq@gmail.com
  */
 @Service
 public class VoucherNotificationAccess {
     private final CurrentActor actors;
-    private final JdbcTemplate jdbc;
+    private final VoucherNotificationAccessMapper sqlMapper;
     private final ApplicationRepository applications;
     private final JdbcVoucherPreparationRepository preparations;
     private final JdbcVoucherOperationRepository operations;
@@ -43,13 +49,27 @@ public class VoucherNotificationAccess {
     private final VoucherAccess access;
 
     /** 使用原仓储身份与既有财务读取入口，不通过通知补授管理员或财务角色。 */
-    public VoucherNotificationAccess(CurrentActor actors, JdbcTemplate jdbc, ApplicationRepository applications,
-            JdbcVoucherPreparationRepository preparations, JdbcVoucherOperationRepository operations,
-            AdvanceRequestRepository advances, ExpenseReportRepository expenses, OrganizationRepository organization,
-            PaymentPersonnel personnel, VoucherAccess access) {
-        this.actors = actors; this.jdbc = jdbc; this.applications = applications; this.preparations = preparations;
-        this.operations = operations; this.advances = advances; this.expenses = expenses; this.organization = organization;
-        this.personnel = personnel; this.access = access;
+    public VoucherNotificationAccess(
+            CurrentActor actors,
+            VoucherNotificationAccessMapper sqlMapper,
+            ApplicationRepository applications,
+            JdbcVoucherPreparationRepository preparations,
+            JdbcVoucherOperationRepository operations,
+            AdvanceRequestRepository advances,
+            ExpenseReportRepository expenses,
+            OrganizationRepository organization,
+            PaymentPersonnel personnel,
+            VoucherAccess access) {
+        this.actors = actors;
+        this.sqlMapper = sqlMapper;
+        this.applications = applications;
+        this.preparations = preparations;
+        this.operations = operations;
+        this.advances = advances;
+        this.expenses = expenses;
+        this.organization = organization;
+        this.personnel = personnel;
+        this.access = access;
     }
 
     /** 原准备失败后，即使同轮已重新准备成功，也不会把新编号的过账混入旧消息。 */
@@ -114,30 +134,58 @@ public class VoucherNotificationAccess {
     }
 
     private Row row(String tenant, String recipient, UUID messageId) {
-        return jdbc.query("""
-                SELECT event_key,kind,application_id,round_no FROM notification_inbox
-                WHERE tenant_id=? AND recipient_id=? AND id=? AND kind IN ('VOUCHER_RESULT','VOUCHER_ATTENTION')
-                """, (row, index) -> new Row(row.getString("event_key"), InboxMessage.Kind.valueOf(row.getString("kind")),
-                UUID.fromString(row.getString("application_id")), row.getInt("round_no")), tenant, recipient, messageId.toString()).stream().findFirst().orElse(null);
+        return SqlRows.map(
+                        sqlMapper.row(tenant, recipient, messageId.toString()),
+                        row ->
+                                new Row(
+                                        row.getString("event_key"),
+                                        InboxMessage.Kind.valueOf(row.getString("kind")),
+                                        UUID.fromString(row.getString("application_id")),
+                                        row.getInt("round_no")))
+                .stream()
+                .findFirst()
+                .orElse(null);
     }
+
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Voucher notification is unavailable in the current scope"); }
 
     /**
      * 内部来源含接收关系，不能作为 HTTP 响应公开。
+     *
      * @author owlzhangfq@gmail.com
      */
-    record Source(UUID id, Application application, int roundNo, VoucherCommand.Kind kind, String employee, UUID entity,
-                  List<String> recipients, VoucherPreparation preparation, VoucherOperation operation) { }
+    record Source(
+            UUID id,
+            Application application,
+            int roundNo,
+            VoucherCommand.Kind kind,
+            String employee,
+            UUID entity,
+            List<String> recipients,
+            VoucherPreparation preparation,
+            VoucherOperation operation) {}
+
     /**
      * 消息身份只取当前接收人的持久行。
+     *
      * @author owlzhangfq@gmail.com
      */
-    private record Row(String eventKey, InboxMessage.Kind kind, UUID applicationId, int roundNo) { }
+    private record Row(String eventKey, InboxMessage.Kind kind, UUID applicationId, int roundNo) {}
+
     /**
      * 原准备与过账摘要没有会计命令、账户或写入动作。
+     *
      * @author owlzhangfq@gmail.com
      */
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    public record Target(UUID messageId, UUID voucherId, UUID applicationId, UUID businessId, int roundNo, VoucherCommand.Kind kind,
-                         VoucherWorkspace.Preparation preparation, VoucherWorkspace.Operation operation, boolean reversalBound) { }
+    public record Target(
+            UUID messageId,
+            UUID voucherId,
+            UUID applicationId,
+            UUID businessId,
+            int roundNo,
+            VoucherCommand.Kind kind,
+            VoucherWorkspace.Preparation preparation,
+            VoucherWorkspace.Operation operation,
+            boolean reversalBound) {}
 }

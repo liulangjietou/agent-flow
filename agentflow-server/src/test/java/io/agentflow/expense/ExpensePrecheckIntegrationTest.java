@@ -1,7 +1,12 @@
 package io.agentflow.expense;
+import static io.agentflow.expense.ExpensePrecheckJob.*;
+import static org.assertj.core.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
+
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
@@ -11,23 +16,24 @@ import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
-import io.agentflow.observability.DiagnosticContext;
-import org.slf4j.MDC;
 import io.agentflow.finance.BudgetPrecheckPort;
 import io.agentflow.finance.EmployeeAccountPort;
 import io.agentflow.finance.EmployeeAccountSnapshot;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.FinanceGatewayConfiguration;
 import io.agentflow.finance.Money;
+import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.organization.OrganizationAppointment;
 import io.agentflow.organization.OrganizationService;
 import io.agentflow.organization.OrganizationUnit;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.MockMvcPrint;
@@ -39,6 +45,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
+
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
 import java.net.InetSocketAddress;
@@ -61,13 +68,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
-import static io.agentflow.expense.ExpensePrecheckJob.*;
-import static org.assertj.core.api.Assertions.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
  * 认证、持久任务、真实 HTTP 财务适配器和原件文件的消费者回归；外部业务数据均为合成夹具。
+ *
  * @author owlzhangfq@gmail.com
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.finance-gateway.enabled=true",
@@ -132,7 +136,9 @@ class ExpensePrecheckIntegrationTest {
         entity = organization.createUnit(admin, OrganizationUnit.Kind.LEGAL_ENTITY, "合成预检法人", null, null, true).id();
         var department = organization.createUnit(admin, OrganizationUnit.Kind.DEPARTMENT, "合成部门", entity, null, true);
         var position = organization.createUnit(admin, OrganizationUnit.Kind.POSITION, "合成岗位", entity, null, true);
-        var people = jdbc.queryForList("SELECT id FROM organization_person WHERE tenant_id='demo' AND subject='alice'", String.class);
+        var people = jdbc.queryForList(
+                        "SELECT id FROM organization_person WHERE tenant_id='demo' AND"
+                                + " subject='alice'", String.class);
         UUID person = people.isEmpty() ? organization.createPerson(admin, "alice", "测试员工", true, false).id() : UUID.fromString(people.get(0));
         appointment = organization.createAppointment(admin, person, department.id(), position.id(), true);
         RESPONDER.set(this::normal);
@@ -154,13 +160,17 @@ class ExpensePrecheckIntegrationTest {
         UUID id = id(queued); String expectedTrace = queued.getHeader("X-Trace-Id");
         assertThat(DiagnosticContext.validTrace(expectedTrace)).isTrue();
         assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
-        assertThat(jdbc.queryForMap("SELECT * FROM expense_precheck_job WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM expense_precheck_job WHERE tenant_id='demo'"
+                                                + " AND id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         TRACES.clear();
         worker.poll();
         assertThat(job(id).status()).isEqualTo(Status.READY);
         assertThat(TRACES).isNotEmpty().containsOnly(expectedTrace);
-        assertThat(jdbc.queryForMap("SELECT * FROM expense_precheck_job WHERE tenant_id='demo' AND id=?", id.toString())
+        assertThat(jdbc.queryForMap(
+                                        "SELECT * FROM expense_precheck_job WHERE tenant_id='demo'"
+                                                + " AND id=?", id.toString())
                 .get("TRACE_ID")).isEqualTo(expectedTrace);
         assertThat(MDC.get(DiagnosticContext.TRACE_ID)).isNull();
         assertThat(MDC.get(DiagnosticContext.TENANT_ID)).isNull();
@@ -181,7 +191,11 @@ class ExpensePrecheckIntegrationTest {
         assertThat(Instant.parse(observation.path("validUntil").asText())).isAfter(checked.completedAt());
         assertThat(execution.explanationFailure(checked, report, Instant.now())).isNull();
         assertThat(execution.readyFailure(checked, report, Instant.now())).isEqualTo("PRECHECK_NOT_READY");
-        assertThat(new JdbcExpensePrecheckRepository(jdbc, json).find("demo", id)).contains(checked);
+        assertThat(new JdbcExpensePrecheckRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpensePrecheckRepositoryMapper.class), json).find("demo", id)).contains(checked);
         assertThat(tree(read(report, "/prechecks/" + id, "alice")).toString()).doesNotContain("observation", "dependencyDigest");
         assertThat(reports.find("demo", report.id()).orElseThrow().state()).isEqualTo(report.state());
         assertThat(execution.explanationFailure(checked, report, checked.result().observation().validUntil())).isEqualTo("FACTS_EXPIRED");
@@ -283,11 +297,15 @@ class ExpensePrecheckIntegrationTest {
         ((com.fasterxml.jackson.databind.node.ObjectNode) old.path("result")).remove("observation");
         String oldJson = old.toString();
         jdbc.update("UPDATE expense_precheck_job SET state_json=? WHERE tenant_id='demo' AND id=?", oldJson, id.toString());
-        jdbc.update("UPDATE expense_precheck_revision SET state_json=? WHERE tenant_id='demo' AND job_id=? AND version=3", oldJson, id.toString());
+        jdbc.update(
+                "UPDATE expense_precheck_revision SET state_json=? WHERE tenant_id='demo' AND"
+                        + " job_id=? AND version=3", oldJson, id.toString());
         var retained = job(id); assertThat(retained.result().observation()).isNull();
         assertThat(execution.explanationFailure(retained, report, Instant.now())).isEqualTo("PRECHECK_EXPLANATION_REFRESH_REQUIRED");
         assertThat(read(report, "/prechecks/" + id, "alice").getStatus()).isEqualTo(200);
-        assertThat(jdbc.queryForObject("SELECT state_json FROM expense_precheck_job WHERE tenant_id='demo' AND id=?", String.class, id.toString())).isEqualTo(oldJson);
+        assertThat(jdbc.queryForObject(
+                                "SELECT state_json FROM expense_precheck_job WHERE tenant_id='demo'"
+                                        + " AND id=?", String.class, id.toString())).isEqualTo(oldJson);
         assertThat(count("budget-precheck")).isEqualTo(1);
     }
 
@@ -312,7 +330,10 @@ class ExpensePrecheckIntegrationTest {
             assertThat(tree(submit).path("code").asText()).isEqualTo("POLICY_CONFIGURATION_CHANGED");
             assertThat(reports.find("demo", report.id()).orElseThrow().version()).isEqualTo(1);
         } finally {
-            jdbc.update("UPDATE expense_configuration SET active_revision=0,active_policy_id=NULL,active_policy_version=NULL WHERE tenant_id='demo'");
+            jdbc.update(
+                    "UPDATE expense_configuration SET"
+                            + " active_revision=0,active_policy_id=NULL,active_policy_version=NULL"
+                            + " WHERE tenant_id='demo'");
             for (var table : List.of("expense_policy_activation", "expense_policy_version", "expense_policy_draft_revision", "expense_policy_draft", "expense_category_revision", "expense_configuration")) jdbc.update("DELETE FROM " + table + " WHERE tenant_id='demo'");
         }
     }
@@ -399,7 +420,10 @@ class ExpensePrecheckIntegrationTest {
     }
 
     private void clearExpenseConfiguration() {
-        jdbc.update("UPDATE expense_configuration SET active_revision=0,active_policy_id=NULL,active_policy_version=NULL WHERE tenant_id='demo'");
+        jdbc.update(
+                "UPDATE expense_configuration SET"
+                    + " active_revision=0,active_policy_id=NULL,active_policy_version=NULL WHERE"
+                    + " tenant_id='demo'");
         for (var table : List.of("expense_policy_activation", "expense_policy_version", "expense_policy_draft_revision", "expense_policy_draft", "expense_category_revision", "expense_configuration")) jdbc.update("DELETE FROM " + table + " WHERE tenant_id='demo'");
     }
 
@@ -436,19 +460,27 @@ class ExpensePrecheckIntegrationTest {
             report.freeze(1, 1, preview.baseCurrency(), preview.account(), Map.of(1, preview.originalLines().get(0).assessment()), "alice", submittedAt);
             reports.update(report, 1, "alice", "SYNTHETIC_FREEZE");
             // 此测试验证存储边界，审批轮次为明确的合成夹具；实际 Flowable 提交由专门消费者测试验收。
-            jdbc.update("""
-                    INSERT INTO approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,
-                    title,payload_json,submitted_by,submitted_at,status)
-                    VALUES('demo',?,1,?,1,'合成财务控制','{}','alice',?,'IN_APPROVAL')
-                    """, report.applicationId().toString(), "synthetic-control-" + UUID.randomUUID(), java.sql.Timestamp.from(submittedAt));
+            jdbc.update(
+                                    """
+INSERT INTO approval_submission_round(tenant_id,application_id,round_no,process_instance_id,definition_version,
+title,payload_json,submitted_by,submitted_at,status)
+VALUES('demo',?,1,?,1,'合成财务控制','{}','alice',?,'IN_APPROVAL')
+""", report.applicationId().toString(), "synthetic-control-" + UUID.randomUUID(), java.sql.Timestamp.from(submittedAt));
             controls.create(value);
         });
         assertThat(controls.find("demo", report.id(), 1)).contains(value);
         assertThat(controls.find("foreign", report.id(), 1)).isEmpty(); assertThat(controls.find("demo", report.id(), 2)).isEmpty();
         var signed = value.receive("synthetic-task", "receipt", "manager", "合成纸件已核对", submittedAt.plusSeconds(1));
         new TransactionTemplate(transactions).executeWithoutResult(transaction -> controls.update(signed));
-        assertThat(new JdbcExpenseSubmissionControlRepository(jdbc, json).find("demo", report.id(), 1)).contains(signed);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM expense_submission_control_revision WHERE tenant_id='demo' AND report_id=?", Integer.class, report.id().toString())).isEqualTo(2);
+        assertThat(new JdbcExpenseSubmissionControlRepository(
+                                        io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                                (jdbc).getDataSource(),
+                                                io.agentflow.expense.mapper
+                                                        .ExpenseSubmissionControlRepositoryMapper
+                                                        .class), json).find("demo", report.id(), 1)).contains(signed);
+        assertThat(jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM expense_submission_control_revision WHERE"
+                                        + " tenant_id='demo' AND report_id=?", Integer.class, report.id().toString())).isEqualTo(2);
         assertThatThrownBy(() -> new TransactionTemplate(transactions).executeWithoutResult(transaction -> controls.update(signed))).isInstanceOf(DomainException.class);
         assertThat(reports.find("demo", report.id()).orElseThrow().version()).isEqualTo(2);
     }
@@ -461,7 +493,11 @@ class ExpensePrecheckIntegrationTest {
         var advance = advances.find("demo", fixture.advance().id()).orElseThrow().state();
         String key = UUID.randomUUID().toString(); var first = queue(report, "alice", key, input(report), 202); UUID id = id(first);
         assertThat(count("catalog")).isZero();
-        new ExpensePrecheckWorker(new JdbcExpensePrecheckRepository(jdbc, json), execution, evaluator).poll();
+        new ExpensePrecheckWorker(new JdbcExpensePrecheckRepository(
+                                io.agentflow.mybatis.MyBatisTestSupport.mapper(
+                                        (jdbc).getDataSource(),
+                                        io.agentflow.expense.mapper.ExpensePrecheckRepositoryMapper
+                                                .class), json), execution, evaluator).poll();
         var job = job(id); assertThat(job.status()).isEqualTo(Status.READY);
         var evidence = job.result().evidence();
         assertThat(evidence.preview().approvedGross()).isEqualTo(money("710", "CNY"));
@@ -757,7 +793,9 @@ class ExpensePrecheckIntegrationTest {
     private JsonNode tree(MockHttpServletResponse response) throws Exception { return json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class); }
     private UUID id(MockHttpServletResponse response) throws Exception { return UUID.fromString(tree(response).path("id").asText()); }
     private ExpensePrecheckJob job(UUID id) { return jobs.find("demo", id).orElseThrow(); }
-    private int journal(UUID id) { return jdbc.queryForObject("SELECT COUNT(*) FROM expense_precheck_revision WHERE tenant_id='demo' AND job_id=?", Integer.class, id.toString()); }
+    private int journal(UUID id) { return jdbc.queryForObject(
+                "SELECT COUNT(*) FROM expense_precheck_revision WHERE tenant_id='demo' AND"
+                        + " job_id=?", Integer.class, id.toString()); }
     private static Money money(String value, String currency) { return new Money(new BigDecimal(value), currency); }
     private static int count(String operation) { return CALLS.getOrDefault(operation, new AtomicInteger()).get(); }
     private Invoice.VerifiedFacts facts(String digest) { return new Invoice.VerifiedFacts(new InvoiceKey(InvoiceKey.Type.DIGITAL, null, invoiceNumber), entity, money("100", "USD"), money("6", "USD"), LocalDate.now(), digest, "synthetic-invoice", Instant.now().minusSeconds(1), Instant.now().plusSeconds(600)); }
@@ -791,8 +829,10 @@ class ExpensePrecheckIntegrationTest {
             }); server.start(); return server;
         } catch (java.io.IOException failed) { throw new IllegalStateException(failed); }
     }
+
     /**
      * 合成外部事实的本地关联，不代表正式提交或真实放款联调。
+     *
      * @author owlzhangfq@gmail.com
      */
     private record Fixture(ExpenseReport report, UUID invoice, ExpenseRequest prior, EmployeeAdvance advance) { }
