@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ExpenseTaskActivity, ExpenseReturnRequest } from './expenses'
 import WorkspaceTabs from './components/WorkspaceTabs.vue'
+import AgentWorkspace from './components/AgentWorkspace.vue'
 import AccountMappingManager from './components/AccountMappingManager.vue'
 import { mappingDrafts } from './accountMappingDrafts'
 import ExpenseConfigurationManager from './components/ExpenseConfigurationManager.vue'
@@ -243,6 +244,7 @@ const validationMessage = computed(() => validation.loading ? '正在检查最�
     : branchDiagnostics.value.length ? `未发现阻断错误，有 ${branchDiagnostics.value.length} 项提醒，请核对业务规则。` : '服务端校验通过。'
     : validationOpened.value ? '内容已修改，正在等待重新校验。' : '尚未校验，发布前将运行服务端校验。'))
 const newApplicationOpen = ref(false)
+const applicationDialog = ref<HTMLElement | null>(null)
 const recordApplicationId = ref('')
 const recordInitialRoundNo = ref<number | null>(null)
 watch(recordApplicationId, () => { recordInitialRoundNo.value = null }, { flush: 'sync' })
@@ -262,6 +264,9 @@ const applicationPayload = ref<Record<string, unknown>>({})
 const applicationFieldErrors = ref<FieldErrors>({})
 const applicationFormError = ref('')
 const applicationFormSchema = computed(() => createdApplication.value ? createdApplication.value.formSchema ?? null : applicationSelection.definition?.formSchema ?? null)
+const applicationInitialSnapshot = ref('')
+const applicationFormDirty = computed(() => newApplicationOpen.value && (createdApplication.value
+  ? !!initiatorAppointmentId.value : applicationFormSnapshot() !== applicationInitialSnapshot.value))
 const conditionLanguageVersion = ref<1 | 2>(2)
 const definitionRiskPolicy = ref<RiskPolicy | null>(null)
 const designerMode = ref<'quick' | 'advanced'>('quick')
@@ -551,11 +556,11 @@ async function logout(scope: 'local' | 'provider' = 'local') {
   }, () => !busy.value && !pendingWrites.value.some(operation => operation.sending))
 }
 /** 打开摘要时取得最新任务版本，旧列表不能直接产生审批命令。 */
-async function selectTask(item: { taskId: string }) {
+async function selectTask(item: { taskId: string }, initialTab: 'detail' | 'assist' = 'detail') {
   if (busy.value || writesBlocked.value) return
   const scope = actorScope.value, controller = new AbortController()
   taskDetailRequest?.abort(); taskDetailRequest = controller; detailLoading.value = true
-  activeTask.value = null; activeApplication.value = null; detailError.value = ''; taskTab.value = 'detail'
+  activeTask.value = null; activeApplication.value = null; detailError.value = ''; taskTab.value = initialTab
   const timeout = setTimeout(() => controller.abort(), 12_000)
   try {
     const task = await api.task(item.taskId, controller.signal)
@@ -565,7 +570,8 @@ async function selectTask(item: { taskId: string }) {
     if (!controller.signal.aborted && actorScope.value === scope && taskDetailRequest === controller) {
       activeApplication.value = application
       await nextTick()
-      if (actorScope.value === scope && taskDetailRequest === controller && page.value === 'workbench') {
+      if (actorScope.value === scope && taskDetailRequest === controller && page.value === 'workbench'
+        && !newApplicationOpen.value && !recordApplicationId.value && !confirmationOpen.value) {
         taskDetailPanel.value?.scrollIntoView({ block: 'start' })
         taskDetailPanel.value?.focus({ preventScroll: true })
       }
@@ -578,6 +584,12 @@ async function selectTask(item: { taskId: string }) {
   } finally { clearTimeout(timeout); if (taskDetailRequest === controller) detailLoading.value = false }
 }
 function clearTaskSelection() { taskDetailRequest?.abort(); taskDetailRequest = null; detailLoading.value = false; activeTask.value = null; activeApplication.value = null }
+/** 助理入口只设置初始页签；读取完成不能覆盖期间主动选择的新页签。 */
+async function openTaskAssistant(item: { taskId: string }) {
+  if (busy.value || writesBlocked.value) return
+  page.value = 'workbench'
+  await selectTask(item, 'assist')
+}
 /** 财务变更同时影响详情、待办摘要金额及领取状态，必须刷新同一工作区。 */
 function expenseTaskChanged() {
   const task = activeTask.value
@@ -598,22 +610,34 @@ async function prepareExpenseReturn(request: ExpenseReturnRequest) {
 async function performAction(input: TaskActionInput) {
   if (!activeTask.value || busy.value || writesBlocked.value || expenseTaskBusy.value) return
   const scope = actorScope.value, taskId = activeTask.value.taskId
-  let showResult = false
+  const sameContext = () => actorScope.value === scope && (!activeTask.value || activeTask.value.taskId === taskId)
+  let showResult = false, continueClaim = false
+  let resultNotice = ''
   busy.value = true
   try {
     const result = await api.taskAction(taskId, input)
     if (actorScope.value !== scope || activeTask.value?.taskId !== taskId) return
     activeTask.value = null; activeApplication.value = null
+    continueClaim = input.action === 'CLAIM'
     await refreshWorkspace()
     if (actorScope.value !== scope || activeTask.value) return
-    notice.value = `${taskActionLabels[input.action]}已完成，申请状态：${statusLabel(result.applicationStatus)}`
+    resultNotice = `${taskActionLabels[input.action]}已完成，申请状态：${statusLabel(result.applicationStatus)}`
+    notice.value = resultNotice
     showResult = true
   } catch (error) {
     if (actorScope.value === scope && activeTask.value?.taskId === taskId) { notice.value = errorMessage(error); showResult = true }
   } finally {
     busy.value = false
+    // 领取只改变处理权；写入解锁后重读最新版本，审批仍由用户明确提交。
+    if (continueClaim && actorScope.value === scope && !activeTask.value && page.value === 'workbench') {
+      await selectTask({ taskId })
+      if (sameContext()) {
+        notice.value = detailError.value ? `${resultNotice}。${detailError.value}` : `${resultNotice}，可继续办理。`
+      }
+    }
     await nextTick()
     if (showResult && actorScope.value === scope && page.value === 'workbench'
+      && !newApplicationOpen.value && !recordApplicationId.value && !confirmationOpen.value
       && (!activeTask.value || activeTask.value.taskId === taskId)) operationStatus.value?.focus({ preventScroll: true })
   }
 }
@@ -1202,24 +1226,72 @@ function keyHandler(event: KeyboardEvent) {
   }
   node.x = position.x; node.y = position.y
 }
-/** 表单只依赖当前选中的完整发布配置；切换选择立即取消旧读取。 */
+/** 记录本次输入，不把自动生成的单号或默认配置误判为用户修改。 */
+function applicationFormSnapshot() {
+  return JSON.stringify([applicationTitle.value, applicationBusinessNo.value, applicationPayload.value,
+    applicationAmount.value, applicationDescription.value, initiatorAppointmentId.value])
+}
+/** 所有丢弃入口共用同一确认；原写入未确认时只能先恢复请求。 */
+async function confirmLeaveApplication(confirmLabel: string, operation: () => void | Promise<void>, description: string) {
+  const scope = actorScope.value
+  const current = () => viewActive && !!scope && actorScope.value === scope && newApplicationOpen.value && !busy.value && !writesBlocked.value
+  if (!current() || confirmationOpen.value) return
+  if (applicationFormDirty.value) confirmationReturnFocus.value = document.activeElement as HTMLElement | null
+  if (await confirmation.confirm(confirmLabel, current, applicationFormDirty.value,
+    { title: '有未保存的申请内容', description }) && current()) await operation()
+}
+/** 遮罩、关闭按钮和 Escape 都先保护尚未保存的申请输入。 */
+async function closeApplicationForm() {
+  await confirmLeaveApplication('放弃输入并关闭', () => { newApplicationOpen.value = false; createdApplication.value = null },
+    '当前输入尚未保存，关闭后将丢失。选择“继续编辑”返回表单，也可以先保存草稿。已保存的草稿不会被删除。')
+}
+/** 创建已成功时直接进入同一草稿记录，不再创建第二份申请。 */
+async function openCreatedApplication() {
+  const saved = createdApplication.value
+  if (!saved) return
+  await confirmLeaveApplication('打开已保存草稿', () => {
+    if (createdApplication.value?.id !== saved.id) return
+    newApplicationOpen.value = false; createdApplication.value = null; page.value = 'drafts'
+    recordApplicationId.value = saved.id
+  }, '将打开这张已保存的草稿继续修改；当前尚未提交的岗位选择不会保存，可在草稿中重新选择。')
+}
+/** 弹窗支持键盘关闭，Tab 焦点保持在当前申请中。 */
+function handleApplicationKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); void closeApplicationForm(); return }
+  if (event.key !== 'Tab' || !applicationDialog.value) return
+  const controls = [...applicationDialog.value.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex="0"]')]
+    .filter(element => !element.closest('[hidden], [inert], fieldset:disabled'))
+  const first = controls[0], last = controls[controls.length - 1]
+  if (!first) { event.preventDefault(); applicationDialog.value.focus(); return }
+  if (event.shiftKey && (document.activeElement === first || document.activeElement === applicationDialog.value)) { event.preventDefault(); last?.focus() }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus() }
+}
+/** 表单只依赖当前选中的完整发布配置；确认后切换，取消旧读取。 */
 async function selectApplicationDefinition(id: string) {
-  requestedApplicationDefinition.value = id
-  initiatorAppointmentId.value = ''
-  applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; applicationFieldErrors.value = {}; applicationFormError.value = ''
-  await applicationSelection.load(actorScope.value, id, { publishedOnly: true, startEnabledOnly: true })
+  if (createdApplication.value || (id && applicationSelection.definition?.id === id)) return
+  await confirmLeaveApplication('清空业务字段并切换', async () => {
+    requestedApplicationDefinition.value = id
+    initiatorAppointmentId.value = ''
+    applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; applicationFieldErrors.value = {}; applicationFormError.value = ''
+    await applicationSelection.load(actorScope.value, id, { publishedOnly: true, startEnabledOnly: true })
+  }, '切换流程会清空已填写的业务字段和岗位选择，标题与业务单号会保留。选择“继续编辑”可返回当前申请。')
 }
 async function prepareApplication(id = '') {
+  if (newApplicationOpen.value || confirmationOpen.value) return
   if (busy.value || writesBlocked.value) { notice.value = '请先恢复上次操作，再发起新申请。'; return }
   createdApplication.value = null; applicationTitle.value = ''; applicationBusinessNo.value = `APP-${Date.now()}`
+  applicationPayload.value = {}; applicationAmount.value = ''; applicationDescription.value = ''; initiatorAppointmentId.value = ''
+  applicationInitialSnapshot.value = applicationFormSnapshot()
   newApplicationOpen.value = true
+  await nextTick()
+  applicationDialog.value?.focus()
   await selectApplicationDefinition(id)
 }
 async function openApplicationForm() { await prepareApplication() }
 /** 引导始终读取指定版本，目标失效时不能静默切换到另一流程。 */
 async function startGuidedApplication(id: string) { await prepareApplication(id) }
 async function createAndSubmitApplication(submit = true) {
-  if (busy.value || writesBlocked.value || applicationSelection.loading) return
+  if (!newApplicationOpen.value || busy.value || writesBlocked.value || confirmationOpen.value || applicationSelection.loading) return
   applicationFormError.value = ''; applicationFieldErrors.value = {}
   if (submit && (applicationFormError.value = applicationRequirements.submissionError(initiatorAppointmentId.value))) return
   const definition = applicationSelection.definition
@@ -1233,19 +1305,33 @@ async function createAndSubmitApplication(submit = true) {
   }
   applicationFieldErrors.value = validatePayload(applicationFormSchema.value, payload, submit)
   if (Object.keys(applicationFieldErrors.value).length) { applicationFormError.value = '请按字段提示修改后再操作。'; return }
+  const scope = actorScope.value
   busy.value = true
   try {
-    if (!createdApplication.value) createdApplication.value = await api.createApplication({ businessNo: applicationBusinessNo.value.trim(), processKey: definition!.key, definitionVersion: definition!.version, title: applicationTitle.value.trim(), payload })
+    if (!createdApplication.value) {
+      const created = await api.createApplication({ businessNo: applicationBusinessNo.value.trim(), processKey: definition!.key, definitionVersion: definition!.version, title: applicationTitle.value.trim(), payload })
+      if (actorScope.value !== scope || !newApplicationOpen.value) return
+      createdApplication.value = created
+    }
     if (!submit) {
       const saved = createdApplication.value
-      newApplicationOpen.value = false; createdApplication.value = null; page.value = 'drafts'; templateRefresh.value++; await refreshWorkspace(); notice.value = `草稿 ${saved.businessNo} 已保存，可在我的草稿中继续填写。`; if (saved.formSchema?.fields.some(field => field.type === 'ATTACHMENT' || field.columns?.some(column => column.type === 'ATTACHMENT'))) recordApplicationId.value = saved.id; return
+      newApplicationOpen.value = false; createdApplication.value = null; page.value = 'drafts'; templateRefresh.value++
+      await refreshWorkspace()
+      if (actorScope.value !== scope) return
+      notice.value = `草稿 ${saved.businessNo} 已保存，可在我的草稿中继续填写。`
+      if (saved.formSchema?.fields.some(field => field.type === 'ATTACHMENT' || field.columns?.some(column => column.type === 'ATTACHMENT'))) recordApplicationId.value = saved.id
+      return
     }
     const submitted = await api.submitApplication(createdApplication.value.id, createdApplication.value.version, initiatorAppointmentId.value)
-    newApplicationOpen.value = false; createdApplication.value = null; page.value = 'started'; templateRefresh.value++; await refreshWorkspace(); notice.value = `申请 ${submitted.businessNo} 已提交，状态：${statusLabel(submitted.status)}`
+    if (actorScope.value !== scope || !newApplicationOpen.value) return
+    newApplicationOpen.value = false; createdApplication.value = null; page.value = 'started'; templateRefresh.value++
+    await refreshWorkspace()
+    if (actorScope.value === scope) notice.value = `申请 ${submitted.businessNo} 已提交，状态：${statusLabel(submitted.status)}`
   } catch (error) {
+    if (actorScope.value !== scope || !newApplicationOpen.value) return
     applicationFieldErrors.value = (error as ApiError).details?.fieldErrors ?? {}
     applicationFormError.value = `${errorMessage(error)}${createdApplication.value ? '；草稿已保留，可在申请记录中补充填写或重试提交。' : ''}`
-  } finally { busy.value = false }
+  } finally { if (actorScope.value === scope) busy.value = false }
 }
 /** 新申请读取点选版本；创建后的重试只读取已保存申请的原绑定。 */
 function loadApplicationRequirements() {
@@ -1487,7 +1573,7 @@ async function recoverOperation(id: string) {
 }
 function warnBeforeUnload(event: BeforeUnloadEvent) {
   if (providerNavigation) return
-  if (writeRequests.hasUnconfirmed() || configurationDrafts.hasDrafts() || mappingDrafts.hasDrafts() || extractionDrafts.hasDrafts() || initializationDrafts.hasDrafts() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || organizationSyncDrafts.hasDrafts() || approvalProxyDrafts.hasDrafts() || expenseDrafts.hasDrafts() || planDrafts.hasDrafts() || advanceDrafts.hasDrafts() || procurementDrafts.hasDrafts() || budgetAdjustmentDrafts.hasDrafts() || invoiceUploads.hasPending() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
+  if (applicationFormDirty.value || writeRequests.hasUnconfirmed() || configurationDrafts.hasDrafts() || mappingDrafts.hasDrafts() || extractionDrafts.hasDrafts() || initializationDrafts.hasDrafts() || commentDrafts.hasDrafts() || calendarDrafts.hasDrafts() || organizationDrafts.hasDrafts() || organizationSyncDrafts.hasDrafts() || approvalProxyDrafts.hasDrafts() || expenseDrafts.hasDrafts() || planDrafts.hasDrafts() || advanceDrafts.hasDrafts() || procurementDrafts.hasDrafts() || budgetAdjustmentDrafts.hasDrafts() || invoiceUploads.hasPending() || (!readonlyDefinition.value && (dirty.value || publicationNote.value.trim()))) { event.preventDefault(); event.returnValue = '' }
 }
 defaultGraph(); savedSnapshot.value = snapshot()
 /** 企业身份仅从服务端会话恢复，前端不读取或保存 OIDC 令牌。 */
@@ -1515,10 +1601,14 @@ function reopenEnterpriseLogin() {
   if (authOptions.value?.mode === 'OIDC') window.open(authOptions.value.loginUrl!, '_blank', 'noopener,noreferrer')
 }
 async function restoreEnterpriseSession() {
+  if (busy.value) return false
   if (pendingWrites.value.some(operation => operation.sending)) { notice.value = '请等待当前请求结束后恢复会话。'; return false }
+  const scope = actorScope.value
+  busy.value = true
   try {
     authOptions.value = await api.authOptions()
     const result = await api.me()
+    if (actorScope.value !== scope) return false
     if (actor.value?.tenantId !== result.actor.tenantId || actor.value?.userId !== result.actor.userId) {
       sessionExpired.value = true
       notice.value = '当前企业账号与本页不同，请在登录窗口恢复原账号后重试；原页面和未确认操作已保留。'
@@ -1527,7 +1617,8 @@ async function restoreEnterpriseSession() {
     actor.value = result.actor; bindAuthenticationActor(result.actor); sessionExpired.value = false
     notice.value = '会话已恢复，可以继续核对并恢复原操作。'
     return true
-  } catch (error) { sessionExpired.value = true; notice.value = errorMessage(error); return false }
+  } catch (error) { if (actorScope.value === scope) { sessionExpired.value = true; notice.value = errorMessage(error) }; return false }
+  finally { if (actorScope.value === scope) busy.value = false }
 }
 onMounted(async () => {
   window.addEventListener('beforeunload', warnBeforeUnload)
@@ -1627,10 +1718,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
             </div>
           </div>
         </section>
-        <section v-else-if="page === 'assist'" class="content">
-          <div class="page-heading"><div><p class="eyebrow">APPROVAL ASSISTANT</p><h2>Agent 助理</h2><p class="subhead">从当前待办选择材料，生成摘要后逐条核对来源。</p></div><button class="primary" @click="page = 'workbench'; taskTab = 'assist'">打开待办摘要</button></div>
-          <div class="panel queue-empty"><strong>由你决定发送哪些内容</strong><p>在待办的“Agent 摘要”中勾选可读字段，确认模型目的地后生成。敏感字段和附件不发送。服务未配置时，输入面板会显示具体原因。</p><p>生成结果可修改后采纳，也可记录未采纳意见。复核记录与原文分别保留，审批仍需单独办理。</p><button class="secondary" @click="page = 'applications'">查看申请中的历史摘要</button></div>
-        </section>
+        <AgentWorkspace v-else-if="page === 'assist'" :key="actorScope" :scope-key="actorScope" :refresh-version="taskRefresh" :locked="busy || writesBlocked" @select="openTaskAssistant" @navigate="page = $event" />
         <IntegrationWorkspace v-else-if="page === 'webhooks' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <AuditSearch v-else-if="page === 'audit' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <ApplicationSearch v-else-if="page === 'applications'" :key="actorScope" :scope-key="actorScope" :administrator="canInspectSystem" :user-id="actor?.userId ?? ''" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
@@ -1739,9 +1827,10 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
       </main>
       <CopyRecord v-if="selectedCopy && actor" :key="actorScope + selectedCopy.applicationId + selectedCopy.roundNo" :application-id="selectedCopy.applicationId" :round-no="selectedCopy.roundNo" :scope-key="actorScope" @close="selectedCopy = null" />
       <ApplicationRecord v-if="recordApplicationId && actor" :key="recordApplicationId + ':' + recordRefresh" :application-id="recordApplicationId" :initial-round-no="recordInitialRoundNo" @open-related="openRelatedRound" :user-id="actor.userId" :scope-key="actorScope" :comment-refresh-version="commentRefresh" @comment-posted="commentRefresh++" :pending-writes="pendingWrites" :recovery-error="recoveryError" @recover="recoverOperation" @close="recordApplicationId = ''" @changed="applicationRecordChanged" />
-      <div v-if="newApplicationOpen" class="modal-backdrop" @click.self="!busy && (newApplicationOpen = false)">
-        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="application-form-title" tabindex="-1">
-          <div class="modal-heading"><div><p class="eyebrow">NEW APPLICATION</p><h2 id="application-form-title">发起表单审批</h2></div><button aria-label="关闭申请表单" :disabled="busy" @click="newApplicationOpen = false">×</button></div>
+      <div v-if="newApplicationOpen" class="modal-backdrop" @click.self="closeApplicationForm">
+        <section ref="applicationDialog" class="modal" role="dialog" aria-modal="true" aria-labelledby="application-form-title" tabindex="-1" @keydown="handleApplicationKeydown">
+          <div class="modal-heading"><div><p class="eyebrow">NEW APPLICATION</p><h2 id="application-form-title">发起表单审批</h2></div><button aria-label="关闭申请表单" :disabled="busy || writesBlocked" @click="closeApplicationForm">×</button></div>
+          <div v-if="sessionExpired" class="session-notice application-session-notice" role="alert"><div><strong>需要恢复企业会话</strong><p>请在新窗口登录原账号，再恢复当前会话；已填写内容和未确认操作会保留。</p><p v-if="notice">{{ notice }}</p></div><button type="button" class="secondary" :disabled="busy || pendingWrites.some(operation => operation.sending)" @click="reopenEnterpriseLogin">重新登录</button><button type="button" class="secondary" :disabled="busy || pendingWrites.some(operation => operation.sending)" @click="restoreEnterpriseSession">恢复当前会话</button></div>
           <DefinitionPicker v-if="!createdApplication" :scope-key="actorScope" label="申请流程" published-only start-enabled-only :selected-id="applicationDefinitionId" :selected-label="applicationSelection.definition ? applicationSelection.definition.name + ' · v' + applicationSelection.definition.version : ''" :locked="busy || writesBlocked" @select="selectApplicationDefinition($event.id)" />
           <p v-if="applicationSelection.loading" role="status" class="unavailable">正在读取所选流程的表单配置…</p>
           <p v-else-if="applicationSelection.error" role="alert" class="inline-error">{{ applicationSelection.error }}<button type="button" class="quiet" @click="selectApplicationDefinition(requestedApplicationDefinition)">重试读取表单</button></p>
@@ -1758,9 +1847,9 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
             </fieldset>
             <InitiatorRequirementNotice :state="applicationRequirements" :disabled="busy || writesBlocked" @retry="loadApplicationRequirements" />
             <InitiatorAppointmentPicker v-model="initiatorAppointmentId" :scope-key="actorScope" :required="applicationRequirements.required === true" :disabled="busy || writesBlocked" />
-            <p v-if="createdApplication" class="unavailable">草稿 {{ createdApplication.businessNo }} 已保留。重试只会提交这张草稿；需要修改时请关闭后从申请记录打开。</p>
+            <p v-if="createdApplication" class="unavailable">草稿 {{ createdApplication.businessNo }} 已保留。重试只会提交这张草稿；需要修改时，点击“打开已保存草稿”继续填写。</p>
             <p v-else class="field-help">必填字段在提交时检查，未填完整也可先保存草稿。</p>
-            <div class="form-actions"><button type="button" class="secondary" :disabled="busy" @click="newApplicationOpen = false">关闭</button><button v-if="!createdApplication" type="button" class="secondary" :disabled="busy || writesBlocked || !applicationSelection.definition" @click="createAndSubmitApplication(false)">保存草稿</button><button class="primary" :disabled="busy || writesBlocked || (!createdApplication && !applicationSelection.definition)">{{ busy ? '处理中…' : createdApplication ? '重试提交草稿' : '创建并提交' }}</button></div>
+            <div class="form-actions"><button type="button" class="secondary" :disabled="busy || writesBlocked" @click="closeApplicationForm">关闭</button><button v-if="createdApplication" type="button" class="secondary" :disabled="busy || writesBlocked" @click="openCreatedApplication">打开已保存草稿</button><button v-if="!createdApplication" type="button" class="secondary" :disabled="busy || writesBlocked || !applicationSelection.definition" @click="createAndSubmitApplication(false)">保存草稿</button><button class="primary" :disabled="busy || writesBlocked || (!createdApplication && !applicationSelection.definition)">{{ busy ? '处理中…' : createdApplication ? '重试提交草稿' : '创建并提交' }}</button></div>
           </form>
         </section>
       </div>
@@ -1776,6 +1865,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
 
 .session-notice{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:22px 30px;padding:18px 22px;border:1px solid #dfcfac;border-radius:12px;background:#fff8e9;color:var(--ink);font-size:13px;line-height:1.7}
 .session-notice>div{flex:1 1 340px;min-width:0;overflow-wrap:anywhere}.session-notice p{margin:6px 0 0}.session-notice button{flex-shrink:0}
+.application-session-notice{margin:16px 0;padding:16px}
 @media(max-width:650px){.session-notice{margin:16px;padding:16px}.session-notice>div{flex-basis:100%}}
 
 .designer-validation{margin-top:16px;min-width:0}.validation-live-help{font-size:11px;color:var(--muted);line-height:1.8}.designer-validation>ul{padding-left:22px;font-size:12px;color:var(--red)}.designer-validation>ul li{margin:8px 0}.flow-node.invalid{border:2px solid var(--red);box-shadow:0 0 0 3px #ba4d3b20}.validation-strip .secondary{margin-left:auto;font-size:11px}

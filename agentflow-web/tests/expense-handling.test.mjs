@@ -9,6 +9,7 @@ const model = await import(new URL('expenseHandling.js', apiUrl))
 const recovery = await import(new URL('financeRecovery.js', apiUrl))
 const { default: Panel } = await import(pathToFileURL(process.env.AGENTFLOW_TEST_EXPENSEHANDLINGPANELPANEL))
 const { default: Approval } = await import(pathToFileURL(process.env.AGENTFLOW_TEST_EXPENSEAPPROVALASSISTANTPANEL))
+const { default: Usage } = await import(pathToFileURL(process.env.AGENTFLOW_TEST_AGENTUSAGEPANELRENDERED))
 const originals = { ...api }, originalFetch = globalThis.fetch, storage = globalThis.localStorage
 afterEach(() => { Object.assign(api, originals); globalThis.fetch = originalFetch; globalThis.localStorage = storage; bindAuthenticationActor(null) })
 const uuid = n => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
@@ -24,6 +25,30 @@ function mount(Component, props) {
   const app = renderer.createApp({ ...Component, setup: (_, ctx) => Component.setup(props, ctx), render: () => null }, props)
   return { app, state: app.mount({}).$.setupState }
 }
+function mountUsage() {
+  const node = (tag, text = '') => ({ tag, text, children: [], props: {} })
+  const remove = value => { if (value.parent) value.parent.children.splice(value.parent.children.indexOf(value), 1) }
+  const host = createRenderer({ createElement: node, createText: value => node('#text', value), createComment: () => node('#comment'),
+    insert(value, parent, anchor) { remove(value); value.parent = parent; const index = parent.children.indexOf(anchor); parent.children.splice(index < 0 ? parent.children.length : index, 0, value) }, remove,
+    parentNode: value => value.parent, nextSibling: value => value.parent?.children[value.parent.children.indexOf(value) + 1],
+    setText(value, text) { value.text = text }, setElementText(value, text) { value.text = text; value.children = [] }, patchProp(value, key, _old, next) { value.props[key] = next } })
+  const props = reactive({ scopeKey: 'demo:alice', subjectId: uuid(2) }), root = node('root')
+  const app = host.createApp({ ...Usage, setup: (_, ctx) => Usage.setup(props, ctx) }, props), state = app.mount(root).$.setupState
+  const content = value => value.tag === '#comment' ? '' : value.text + value.children.map(content).join(' ')
+  return { app, state, text: () => content(root), props }
+}
+
+test('用量读取失败只显示错误，重试成功后才显示空态', async () => {
+  api.agentUsage = async () => { throw { status: 503 } }
+  const panel = mountUsage()
+  try {
+    panel.state.toggle({ target: { open: true } }); await settle()
+    assert.match(panel.text(), /用量记录暂不可读/)
+    assert.doesNotMatch(panel.text(), /当前没有可读取的执行记录/)
+    api.agentUsage = async () => []; await panel.state.load(); await nextTick()
+    assert.doesNotMatch(panel.text(), /用量记录暂不可读/); assert.match(panel.text(), /当前没有可读取的执行记录/)
+  } finally { panel.app.unmount() }
+})
 
 test('办理历史拒绝跨单、重复记录、超过上限与伪造审批状态', () => {
   assert.deepEqual(model.readHandlingTasks([task()], uuid(2)), [task()])
