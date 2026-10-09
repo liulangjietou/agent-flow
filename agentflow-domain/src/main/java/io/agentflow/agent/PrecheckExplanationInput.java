@@ -31,7 +31,7 @@ public record PrecheckExplanationInput(UUID reportId, UUID applicationId, long a
             if (source == null || source.reference() == null || StringUtils.isBlank(source.label()) || source.label().length() > 256
                     || source.content() == null || !ids.add(source.reference().sourceId())) throw invalid();
             String id = source.reference().sourceId();
-            if (!id.equals(RESULT_SOURCE) && !id.matches("(?:precheck:finding|expense:line)\\[[0-9]{1,3}\\]")) throw invalid();
+            if (!id.equals(RESULT_SOURCE) && !id.matches("(?:precheck:finding|expense:line|expense:policy)\\[[0-9]{1,3}\\]")) throw invalid();
             if (id.startsWith(FINDING_PREFIX)) issues++;
         }
         if (!ids.contains(RESULT_SOURCE) || issues > MAX_ISSUES

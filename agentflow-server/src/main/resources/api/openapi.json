@@ -53203,6 +53203,184 @@
           }
         }
       }
+    },
+    "/api/v1/expense-reports/{id}/precheck-explanations/{runId}/correct": {
+      "post": {
+        "operationId": "correctExpense",
+        "tags": [
+          "费用报销"
+        ],
+        "summary": "确认补正并接续费用预检",
+        "description": "同租户原申请人明确确认当前费用正文。服务端复核原解释、原预检时效、所选问题及双版本；在同一事务内记录采纳、保存费用与申请新版本、沿用原任职及会计日期排队新预检，并保存补正关联。任一步失败整体回滚。成功只表示保存及排队，不表示预检或审批通过，不触发付款。重复原键返回同一回执。已失效、已采纳或 READY 的解释不能用来补正。未知属性及查询参数被拒绝。",
+        "x-access": "同租户原申请人；管理员身份本身不授予权限",
+        "x-idempotency": true,
+        "responses": {
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "原检查失效、双版本或运行版本冲突、已有活动运行、或已确认模型目的地变化",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseCorrectionReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "runId",
+            "in": "path",
+            "required": true,
+            "description": "绑定本费用单的解释运行标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExpenseCorrectionRequest"
+              },
+              "example": {
+                "applicationVersion": 1,
+                "financialVersion": 1,
+                "content": {
+                  "legalEntityId": "11111111-1111-1111-1111-111111111111",
+                  "type": "DAILY",
+                  "title": "费用草稿",
+                  "lines": [],
+                  "advanceOffsets": []
+                },
+                "expectedRunVersion": 3,
+                "selectedIssueIds": [
+                  "precheck:finding[0]"
+                ],
+                "comment": "本人已按所选建议核对费用"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -86936,7 +87114,7 @@
               "$ref": "#/components/schemas/AssistSource"
             },
             "minItems": 0,
-            "maxItems": 411
+            "maxItems": 611
           }
         },
         "required": [
@@ -87097,6 +87275,9 @@
                 "type": "null"
               }
             ]
+          },
+          "correction": {
+            "$ref": "#/components/schemas/ExpenseCorrection"
           }
         },
         "required": [
@@ -96969,6 +97150,132 @@
           "applicationVersion",
           "financialVersion",
           "status"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseCorrectionRequest": {
+        "type": "object",
+        "properties": {
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "expectedRunVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "selectedIssueIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 150
+            },
+            "minItems": 1,
+            "maxItems": 20,
+            "uniqueItems": true
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "content": {
+            "$ref": "#/components/schemas/ExpenseContent"
+          }
+        },
+        "required": [
+          "expectedRunVersion",
+          "applicationVersion",
+          "financialVersion",
+          "selectedIssueIds",
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseCorrection": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reportId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "precheckId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 2
+          },
+          "financialVersion": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 2
+          },
+          "appliedBy": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "appliedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "runId",
+          "reportId",
+          "applicationId",
+          "precheckId",
+          "applicationVersion",
+          "financialVersion",
+          "appliedBy",
+          "appliedAt"
+        ],
+        "additionalProperties": false
+      },
+      "ExpenseCorrectionReceipt": {
+        "type": "object",
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "precheckId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expense": {
+            "$ref": "#/components/schemas/ExpenseResponse"
+          }
+        },
+        "required": [
+          "runId",
+          "precheckId",
+          "expense"
         ],
         "additionalProperties": false
       }

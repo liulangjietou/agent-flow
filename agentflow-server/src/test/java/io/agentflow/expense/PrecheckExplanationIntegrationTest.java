@@ -93,6 +93,75 @@ class PrecheckExplanationIntegrationTest {
     @Autowired PrecheckExplanationWorker worker;
     @Autowired JdbcPrecheckExplanationRepository runs;
     @Autowired AssistConfiguration configuration;
+    @Autowired ExpenseCorrectionRepository corrections;
+
+    @Test void confirmedCorrectionAtomicallySavesNewVersionsAndQueuesAuthoritativeRecheck() throws Exception {
+        var report = report(); var job = checked(report); UUID id = queue(report, job); worker.poll();
+        var content = new ExpenseContent(entity, report.content().type(), "本人确认的补正", report.content().lines(), List.of());
+        var body = correction(content); String key = UUID.randomUUID().toString();
+        var receipt = send(report, "/" + id + "/correct", "alice", body, key, 200);
+        assertThat(receipt.path("runId").asText()).isEqualTo(id.toString());
+        assertThat(receipt.at("/expense/applicationVersion").asLong()).isEqualTo(2);
+        assertThat(receipt.at("/expense/financialVersion").asLong()).isEqualTo(2);
+        assertThat(receipt.at("/expense/applicationStatus").asText()).isEqualTo("DRAFT");
+        assertThat(receipt.at("/expense/content/title").asText()).isEqualTo(content.title());
+        UUID nextId = UUID.fromString(receipt.path("precheckId").asText());
+        var next = jobs.find("demo", nextId).orElseThrow();
+        assertThat(next.status()).isEqualTo(Status.QUEUED);
+        assertThat(next.input().applicationVersion()).isEqualTo(2);
+        assertThat(next.input().financialVersion()).isEqualTo(2);
+        assertThat(next.input().initiator()).isEqualTo(job.input().initiator());
+        assertThat(next.input().accountingDate()).isEqualTo(job.input().accountingDate());
+        assertThat(next.input().targetDigest()).isEqualTo(job.input().targetDigest());
+        assertThat(jobs.find("demo", job.input().id())).contains(job);
+        var history = read(report, "/" + id, "alice", 200);
+        assertThat(history.path("status").asText()).isEqualTo("ADOPTED");
+        assertThat(history.at("/correction/precheckId").asText()).isEqualTo(nextId.toString());
+        assertThat(history.at("/correction/appliedBy").asText()).isEqualTo("alice");
+        assertThat(send(report, "/" + id + "/correct", "alice", body, key, 200)).isEqualTo(receipt);
+        send(report, "/" + id + "/correct", "alice", body, UUID.randomUUID().toString(), 409);
+        assertThat(reports.find("demo", report.id()).orElseThrow().version()).isEqualTo(2);
+        assertThat(jobs.latestAttempt("demo", report.id())).isEqualTo(2);
+        assertThat(transitions(id)).isEqualTo(4);
+        assertThat(corrections.find("foreign", id)).isEmpty();
+        for (String user : List.of("bob", "admin", "manager")) send(report, "/" + id + "/correct", user, body, key, 404);
+    }
+
+    @Test void recheckFailureRollsBackAdoptionFinancialRevisionAndReceipt() throws Exception {
+        var report = report(); var original = report.state(); UUID id = queue(report, checked(report)); worker.poll();
+        // 空费用草稿可以保存，但不能预检，用来验证最后一步拒绝时前两步也回滚。
+        var empty = new ExpenseContent(entity, report.content().type(), "缺少费用行", List.of(), List.of());
+        send(report, "/" + id + "/correct", "alice", correction(empty), UUID.randomUUID().toString(), 422);
+        assertThat(reports.find("demo", report.id()).orElseThrow().state()).isEqualTo(original);
+        assertThat(applications.findById("demo", report.applicationId()).orElseThrow().version()).isEqualTo(1);
+        assertThat(runs.find("demo", id).orElseThrow().state().status()).isEqualTo(PrecheckExplanationRun.Status.COMPLETED);
+        assertThat(transitions(id)).isEqualTo(3);
+        assertThat(jobs.latestAttempt("demo", report.id())).isEqualTo(1);
+        assertThat(corrections.find("demo", id)).isEmpty();
+        // 回滚后的解释仍可由本人修正后重新确认。
+        send(report, "/" + id + "/correct", "alice", correction(report.content()), UUID.randomUUID().toString(), 200);
+    }
+
+    @Test void correctionRejectsStaleVersionsAndCannotSmuggleApprovalCommands() throws Exception {
+        var report = report(); UUID id = queue(report, checked(report)); worker.poll();
+        var body = (ObjectNode) json.read(json.write(correction(report.content())), JsonNode.class);
+        body.put("applicationVersion", 2);
+        send(report, "/" + id + "/correct", "alice", body, UUID.randomUUID().toString(), 409);
+        body.put("applicationVersion", 1).put("approve", true);
+        send(report, "/" + id + "/correct", "alice", body, UUID.randomUUID().toString(), 400);
+        body.remove("approve"); body.putArray("selectedIssueIds").add(ISSUE).add(ISSUE);
+        send(report, "/" + id + "/correct", "alice", body, UUID.randomUUID().toString(), 422);
+        checked(report);
+        send(report, "/" + id + "/correct", "alice", correction(report.content()), UUID.randomUUID().toString(), 409);
+        assertThat(reports.find("demo", report.id()).orElseThrow().version()).isEqualTo(1);
+        assertThat(transitions(id)).isEqualTo(3);
+        assertThat(corrections.find("demo", id)).isEmpty();
+    }
+
+    private Map<String, Object> correction(ExpenseContent content) {
+        return Map.of("expectedRunVersion", 3, "applicationVersion", 1, "financialVersion", 1,
+                "selectedIssueIds", List.of(ISSUE), "comment", "本人已核对补正", "content", content);
+    }
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry properties) {
         properties.add("agentflow.assist.endpoint", () -> ENDPOINT);
@@ -251,7 +320,7 @@ class PrecheckExplanationIntegrationTest {
 
     @Test void reviewAndTransitionAppendRollBackTogether() throws Exception {
         var report = report(); UUID id = queue(report, checked(report)); worker.poll();
-        jdbc.execute("ALTER TABLE agent_precheck_explanation_transition ADD CONSTRAINT fixture_no_adoption CHECK(status<>'ADOPTED')");
+        jdbc.execute("ALTER TABLE agent_precheck_explanation_transition ADD CONSTRAINT fixture_no_adoption CHECK(run_id<>'" + id + "' OR status<>'ADOPTED')");
         actors.set(alice);
         try {
             assertThatThrownBy(() -> service.review(report.id(), id, 3, AssistExecutionService.ReviewAction.ADOPT, List.of(ISSUE), "失败后一起回滚"))
