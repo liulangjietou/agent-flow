@@ -143,7 +143,7 @@ class AgentBusinessTraceTest {
                                                 io.agentflow.mybatis.MyBatisTestSupport.mapper(
                                                         (jdbc).getDataSource(),
                                                         io.agentflow.agent.mapper
-                                                                .AssistJobRepositoryMapper.class), json), service, mock(AssistModelPort.class))::poll, AssistWorker.class);
+                                                                .AssistJobRepositoryMapper.class), json), service, mock(AssistModelPort.class), mock(AgentExecutionTelemetry.class))::poll, AssistWorker.class);
             }
             case DRAFT -> {
                 var service = mock(DraftAssistService.class); doAnswer(claim).when(service).claim(anyString(), any(), any());
@@ -152,7 +152,7 @@ class AgentBusinessTraceTest {
                                                         (jdbc).getDataSource(),
                                                         io.agentflow.agent.mapper
                                                                 .DraftAssistRunRepositoryMapper
-                                                                .class), json), service, mock(DraftAssistModelPort.class))::poll, DraftAssistWorker.class);
+                                                                .class), json), service, mock(DraftAssistModelPort.class), mock(AgentExecutionTelemetry.class))::poll, DraftAssistWorker.class);
             }
             case EXPENSE -> {
                 var service = mock(ExpenseDraftAssistService.class); doAnswer(claim).when(service).claim(anyString(), any(), any());
@@ -162,7 +162,7 @@ class AgentBusinessTraceTest {
                                                         io.agentflow.agent.mapper
                                                                 .ExpenseDraftAssistRepositoryMapper
                                                                 .class), json), service,
-                        mock(ExpenseDraftAssistPreparation.class), mock(ExpenseDraftModelPort.class))::poll, ExpenseDraftAssistWorker.class);
+                        mock(ExpenseDraftAssistPreparation.class), mock(ExpenseDraftModelPort.class), mock(AgentExecutionTelemetry.class))::poll, ExpenseDraftAssistWorker.class);
             }
             case PRECHECK -> {
                 var service = mock(PrecheckExplanationService.class); doAnswer(claim).when(service).claim(anyString(), any(), any());
@@ -171,7 +171,7 @@ class AgentBusinessTraceTest {
                                                         (jdbc).getDataSource(),
                                                         io.agentflow.agent.mapper
                                                                 .PrecheckExplanationRepositoryMapper
-                                                                .class), json), service, mock(PrecheckExplanationModelPort.class))::poll, PrecheckExplanationWorker.class);
+                                                                .class), json), service, mock(PrecheckExplanationModelPort.class), mock(AgentExecutionTelemetry.class))::poll, PrecheckExplanationWorker.class);
             }
             case RISK -> {
                 var service = mock(ExpenseRiskService.class); doAnswer(claim).when(service).claim(anyString(), any(), any());
@@ -179,7 +179,7 @@ class AgentBusinessTraceTest {
                                                 io.agentflow.mybatis.MyBatisTestSupport.mapper(
                                                         (jdbc).getDataSource(),
                                                         io.agentflow.agent.mapper
-                                                                .ExpenseRiskRepositoryMapper.class), json), service, mock(ExpenseRiskModelPort.class))::poll, ExpenseRiskWorker.class);
+                                                                .ExpenseRiskRepositoryMapper.class), json), service, mock(ExpenseRiskModelPort.class), mock(AgentExecutionTelemetry.class))::poll, ExpenseRiskWorker.class);
             }
         };
     }

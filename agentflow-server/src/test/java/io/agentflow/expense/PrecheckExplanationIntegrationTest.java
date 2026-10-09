@@ -94,6 +94,101 @@ class PrecheckExplanationIntegrationTest {
     @Autowired JdbcPrecheckExplanationRepository runs;
     @Autowired AssistConfiguration configuration;
     @Autowired ExpenseCorrectionRepository corrections;
+    @Autowired ExpenseHandlingRepository handling;
+    @Autowired AgentUsageRepository usage;
+
+    @Test void handlingResumesOriginalStepsAndCorrectionVersionsWithoutSendingAgain() throws Exception {
+        var report = report(); String root = handlingPath(report);
+        var start = Map.of("applicationVersion", 1, "financialVersion", 1, "goal", "核对本次出差并补正");
+        String key = UUID.randomUUID().toString();
+        var task = command(root, "alice", start, key, 201);
+        assertThat(command(root, "alice", start, key, 201)).isEqualTo(task);
+        command(root, "alice", start, UUID.randomUUID().toString(), 409);
+        String inspect = root + "/" + task.path("id").asText() + "/inspect";
+        var readInput = Map.of("expectedVersion", 1, "tool", "EXPENSE"); String readKey = UUID.randomUUID().toString();
+        var receipt = command(inspect, "alice", readInput, readKey, 200);
+        assertThat(receipt.at("/task/steps/0/referenceId").asText()).isEqualTo(report.id().toString());
+        assertThat(command(inspect, "alice", readInput, readKey, 200)).isEqualTo(receipt);
+        var job = checked(report); UUID runId = queue(report, job); worker.poll();
+        var before = query(root, "alice", 200).get(0);
+        assertThat(before.path("steps")).hasSize(3);
+        assertThat(before.path("status").asText()).isEqualTo("NEEDS_CONFIRMATION");
+        int requests = REQUESTS.get(); worker.poll();
+        // 用全新仓储实例读取原持久状态，模拟应用对象重建而不是重跑模型。
+        var restored = new ExpenseHandlingRepository(io.agentflow.mybatis.MyBatisTestSupport.mapper(jdbc.getDataSource(),
+                io.agentflow.agent.mapper.ExpenseHandlingMapper.class), json).find("demo", UUID.fromString(task.path("id").asText())).orElseThrow();
+        assertThat(restored.state().steps()).hasSize(3);
+        assertThat(query(root, "alice", 200).get(0)).isEqualTo(before);
+        assertThat(REQUESTS.get()).isEqualTo(requests);
+        var observation = query("/api/v1/agent-executions/usage?subjectId=" + report.id(), "alice", 200);
+        assertThat(observation).hasSize(1);
+        assertThat(observation.get(0).path("runId").asText()).isEqualTo(runId.toString());
+        assertThat(observation.get(0).path("usageStatus").asText()).isEqualTo("REPORTED");
+        assertThat(observation.get(0).path("totalTokens").asLong()).isEqualTo(12);
+        assertThat(observation.get(0).path("queueMillis").asLong()).isGreaterThanOrEqualTo(0);
+        send(report, "/" + runId + "/correct", "alice", correction(report.content()), UUID.randomUUID().toString(), 200);
+        var corrected = query(root, "alice", 200).get(0);
+        assertThat(corrected.path("financialVersion").asLong()).isEqualTo(2);
+        assertThat(corrected.path("applicationVersion").asLong()).isEqualTo(2);
+        assertThat(corrected.path("current").asBoolean()).isTrue();
+        assertThat(corrected.path("status").asText()).isEqualTo("WAITING");
+        assertThat(corrected.path("steps")).hasSize(6);
+        assertThat(query("/api/v1/agent-executions/usage?subjectId=" + report.id(), "bob", 200)).isEmpty();
+        assertThat(usage.list("foreign", "alice", report.id())).isEmpty();
+        assertThat(handling.find("foreign", restored.context().id())).isEmpty();
+    }
+
+    @Test void handlingToolsRejectUnauthorizedIdentitiesStaleVersionsAndExtraCommands() throws Exception {
+        var report = report(); String root = handlingPath(report);
+        var start = Map.of("applicationVersion", 1, "financialVersion", 1, "goal", "整理资料");
+        var task = command(root, "alice", start, UUID.randomUUID().toString(), 201);
+        String inspect = root + "/" + task.path("id").asText() + "/inspect";
+        for (String user : List.of("bob", "admin", "manager")) {
+            query(root, user, 404);
+            command(inspect, user, Map.of("expectedVersion", 1, "tool", "EXPENSE"), UUID.randomUUID().toString(), 404);
+        }
+        command(inspect, "alice", Map.of("expectedVersion", 1, "tool", "APPROVE"), UUID.randomUUID().toString(), 400);
+        command(inspect, "alice", Map.of("expectedVersion", 1, "tool", "EXPENSE", "tenantId", "foreign"), UUID.randomUUID().toString(), 400);
+        command(inspect, "alice", Map.of("expectedVersion", 1, "tool", "EXPENSE", "lineNo", 1), UUID.randomUUID().toString(), 422);
+        command(inspect, "alice", Map.of("expectedVersion", 2, "tool", "EXPENSE"), UUID.randomUUID().toString(), 409);
+        command(inspect, "alice", Map.of("expectedVersion", 1, "tool", "INVOICE", "referenceId", UUID.randomUUID()), UUID.randomUUID().toString(), 404);
+        query(root + "?owner=alice", "alice", 400);
+        query("/api/v1/agent-executions/usage?subjectId=" + report.id() + "&subjectId=" + report.id(), "alice", 400);
+        var closed = command(root + "/" + task.path("id").asText() + "/close", "alice", Map.of("expectedVersion", 1), UUID.randomUUID().toString(), 200);
+        assertThat(closed.path("status").asText()).isEqualTo("CLOSED");
+        command(inspect, "alice", Map.of("expectedVersion", 2, "tool", "EXPENSE"), UUID.randomUUID().toString(), 409);
+        assertThat(reports.find("demo", report.id()).orElseThrow().version()).isEqualTo(1);
+    }
+
+    @Test void failedCorrectionAlsoRollsBackHandlingStepsAndUnknownUsageStaysUnknown() throws Exception {
+        var report = report(); String root = handlingPath(report);
+        command(root, "alice", Map.of("applicationVersion", 1, "financialVersion", 1, "goal", "补齐材料"), UUID.randomUUID().toString(), 201);
+        UUID runId = queue(report, checked(report)); worker.poll();
+        var before = query(root, "alice", 200);
+        var empty = new ExpenseContent(entity, report.content().type(), "缺少费用行", List.of(), List.of());
+        send(report, "/" + runId + "/correct", "alice", correction(empty), UUID.randomUUID().toString(), 422);
+        assertThat(query(root, "alice", 200)).isEqualTo(before);
+        var second = report(); UUID pending = queue(second, checked(second));
+        var interrupted = usage.begin("demo", "alice", AgentExecutionUsage.Kind.PRECHECK_EXPLANATION, pending, Instant.now());
+        var persisted = usage.list("demo", "alice", second.id()).get(0);
+        assertThat(persisted).isEqualTo(interrupted);
+        assertThat(persisted.outcome()).isEqualTo("IN_PROGRESS");
+        assertThat(persisted.totalTokens()).isNull();
+        assertThat(persisted.completedAt()).isNull();
+    }
+
+    private static String handlingPath(ExpenseReport report) { return "/api/v1/expense-reports/" + report.id() + "/handling-tasks"; }
+    private JsonNode query(String path, String user, int expected) throws Exception {
+        var response = mvc.perform(get(path).header("Authorization", token(user))).andReturn().getResponse();
+        assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(expected);
+        return json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class);
+    }
+    private JsonNode command(String path, String user, Object body, String key, int expected) throws Exception {
+        var response = mvc.perform(post(path).header("Authorization", token(user)).header("Idempotency-Key", key)
+                .contentType("application/json").content(json.write(body))).andReturn().getResponse();
+        assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(expected);
+        return json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class);
+    }
 
     @Test void confirmedCorrectionAtomicallySavesNewVersionsAndQueuesAuthoritativeRecheck() throws Exception {
         var report = report(); var job = checked(report); UUID id = queue(report, job); worker.poll();
@@ -336,6 +431,9 @@ class PrecheckExplanationIntegrationTest {
         var value = runs.find("demo", id).orElseThrow(); assertThat(value.state().status()).isEqualTo(PrecheckExplanationRun.Status.FAILED);
         assertThat(value.state().failure()).isEqualTo(AssistRun.Failure.INVALID_MODEL_OUTPUT); assertThat(value.state().suggestion()).isNull();
         assertThat(reports.find("demo", report.id()).orElseThrow().version()).isEqualTo(1);
+        var observed = usage.list("demo", "alice", report.id()).get(0);
+        assertThat(observed.outcome()).isEqualTo("INVALID_MODEL_OUTPUT");
+        assertThat(observed.totalTokens()).isEqualTo(12L);
     }
 
     @Test void transportErrorsBecomeStableFailuresAndDoNotAutomaticallyRetry() throws Exception {
@@ -455,7 +553,7 @@ class PrecheckExplanationIntegrationTest {
                 if (!Set.of("omitted", "duplicate").contains(mode)) output.putArray("items").add(item);
                 var message = wire.read(wire.write(Map.of("role", "assistant", "content", wire.write(output))), ObjectNode.class);
                 if (mode.equals("tool")) message.putArray("tool_calls").addObject().put("id", "forbidden");
-                byte[] response = wire.write(Map.of("model", "synthetic-explanation-v1", "choices", List.of(Map.of("finish_reason", mode.equals("truncated") ? "length" : "stop", "message", message)))).getBytes(StandardCharsets.UTF_8);
+                byte[] response = wire.write(Map.of("model", "synthetic-explanation-v1", "usage", Map.of("prompt_tokens", 8, "completion_tokens", 4, "total_tokens", 12), "choices", List.of(Map.of("finish_reason", mode.equals("truncated") ? "length" : "stop", "message", message)))).getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().set("Content-Type", "application/json"); exchange.sendResponseHeaders(mode.equals("http-error") ? 503 : 200, response.length);
                 try { exchange.getResponseBody().write(response); } finally { exchange.close(); }
             }); server.start(); return server;

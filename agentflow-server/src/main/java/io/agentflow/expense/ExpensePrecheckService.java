@@ -32,6 +32,7 @@ public class ExpensePrecheckService {
     private static final int DEFAULT_LIMIT = 25;
     private static final int MAX_LIMIT = 100;
     private final CurrentActor actors;
+    private final io.agentflow.agent.ExpenseHandlingJournal journal;
     private final ExpenseReportRepository reports;
     private final ApprovalApplicationFacade applications;
     private final ApplicationRepository applicationRepository;
@@ -49,9 +50,9 @@ public class ExpensePrecheckService {
             ApplicationRepository applicationRepository, OrganizationInitiatorDirectory initiators, FinanceGatewayConfiguration configuration,
             JdbcExpensePrecheckRepository jobs, ExpensePrecheckResources resources, ExpensePolicyConfiguration policyConfiguration,
             ExpensePrecheckObservations observations, InvoiceOccupationQueries occupations,
-            @Value("${agentflow.expenses.precheck-timeout-seconds:300}") int timeoutSeconds) {
+            @Value("${agentflow.expenses.precheck-timeout-seconds:300}") int timeoutSeconds, io.agentflow.agent.ExpenseHandlingJournal journal) {
         if (timeoutSeconds < 15 || timeoutSeconds > 900) throw new IllegalArgumentException("Expense precheck timeout must be between 15 and 900 seconds");
-        this.actors = actors; this.reports = reports; this.applications = applications; this.applicationRepository = applicationRepository;
+        this.actors = actors; this.journal = journal; this.reports = reports; this.applications = applications; this.applicationRepository = applicationRepository;
         this.initiators = initiators; this.configuration = configuration; this.jobs = jobs; this.resources = resources; this.timeoutSeconds = timeoutSeconds;
         this.policyConfiguration = policyConfiguration;
         this.observations = observations;
@@ -84,7 +85,7 @@ public class ExpensePrecheckService {
         if (jobs.active(actor.tenantId(), reportId)) throw new DomainException("EXPENSE_PRECHECK_ACTIVE", "Expense report already has an active precheck");
         var input = new Input(UUID.randomUUID(), actor.tenantId(), reportId, report.applicationId(), actor.userId(), application.version(), report.version(),
                 application.nextSubmissionRound(), jobs.nextAttempt(actor.tenantId(), reportId), initiator, request.accountingDate(), request.targetDigest());
-        jobs.create(ExpensePrecheckJob.queue(input, time(Instant.now()))); return new Receipt(input.id());
+        var job = ExpensePrecheckJob.queue(input, time(Instant.now())); jobs.create(job); record(job); return new Receipt(input.id());
     }
 
     /** 只向本人展示候选金额；账户内部引用、摘要和外部响应正文均不返回。 */
@@ -128,11 +129,11 @@ public class ExpensePrecheckService {
         var found = jobs.find(tenant, id).orElse(null); if (found == null) return null;
         reports.lock(tenant, found.input().reportId());
         var job = jobs.find(tenant, id).orElseThrow(); Instant now = time(at);
-        if (job.expired(now)) { jobs.update(job.finish(Result.unavailable(Stage.SYSTEM, "TIMEOUT"), now)); return null; }
+        if (job.expired(now)) { saveJob(job.finish(Result.unavailable(Stage.SYSTEM, "TIMEOUT"), now)); return null; }
         if (job.status() != Status.QUEUED) return null;
-        job = job.start(now, now.plusSeconds(timeoutSeconds)); jobs.update(job);
+        job = job.start(now, now.plusSeconds(timeoutSeconds)); saveJob(job);
         String failure = contextFailure(job);
-        if (failure != null) { jobs.update(job.finish(Result.unavailable(Stage.CONTEXT, failure), now)); return null; }
+        if (failure != null) { saveJob(job.finish(Result.unavailable(Stage.CONTEXT, failure), now)); return null; }
         return job;
     }
 
@@ -151,7 +152,7 @@ public class ExpensePrecheckService {
                 result = Result.unavailable(Stage.RESOURCES, "RESOURCES_CHANGED");
             }
         }
-        jobs.update(job.finish(result, now));
+        saveJob(job.finish(result, now));
     }
 
     /** 正式提交和页面提示共用有效性判断；不从历史 READY 回退到旧事实。 */
@@ -199,6 +200,13 @@ public class ExpensePrecheckService {
         return null;
     }
     private ExpenseReport owned(UUID id) { return reports.find(actors.actor().tenantId(), id).filter(value -> value.employeeId().equals(actors.actor().userId())).orElseThrow(ExpensePrecheckService::notFound); }
+    private void saveJob(ExpensePrecheckJob job) { jobs.update(job); record(job); }
+    private void record(ExpensePrecheckJob job) {
+        var input = job.input();
+        journal.record(input.tenantId(), input.reportId(), io.agentflow.agent.ExpenseHandlingTask.Tool.PRECHECK, input.id(), job.version(),
+                job.status().name(), input.applicationVersion(), input.financialVersion(), input, job.createdAt());
+    }
+
     private static Summary summary(ExpensePrecheckJob job) { return new Summary(job.input().id(), job.version(), job.status(), job.input().applicationVersion(), job.input().financialVersion(), job.input().attempt(), job.createdAt(), job.startedAt(), job.completedAt()); }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MILLIS); }
     private static DomainException changed() { return new DomainException("CONCURRENCY_CONFLICT", "Expense or application version changed"); }

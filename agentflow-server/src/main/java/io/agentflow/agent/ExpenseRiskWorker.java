@@ -21,10 +21,11 @@ public class ExpenseRiskWorker {
     private final JdbcExpenseRiskRepository runs;
     private final ExpenseRiskService service;
     private final ExpenseRiskModelPort model;
+    private final AgentExecutionTelemetry telemetry;
 
     /** 每批候选仅含定位，认证及来源由服务在即将外发时重新核对。 */
-    public ExpenseRiskWorker(JdbcExpenseRiskRepository runs, ExpenseRiskService service, ExpenseRiskModelPort model) {
-        this.runs = runs; this.service = service; this.model = model;
+    public ExpenseRiskWorker(JdbcExpenseRiskRepository runs, ExpenseRiskService service, ExpenseRiskModelPort model, AgentExecutionTelemetry telemetry) {
+        this.runs = runs; this.service = service; this.model = model; this.telemetry = telemetry;
     }
 
     /** 禁止调用者把模型 HTTP 包进事务；已到期租约只记失败，不再次请求提供者。 */
@@ -36,7 +37,8 @@ public class ExpenseRiskWorker {
                     TRACE_SOURCE, candidate.id().toString())
                     .withBusiness(candidate.businessNo(), candidate.processInstanceId(), candidate.taskId()).open()) {
                 try {
-                    var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
+                    Instant claimedAt = Instant.now();
+                    var context = service.claim(candidate.tenantId(), candidate.id(), claimedAt);
                     if (context == null) continue;
                     LOG.info("Agent execution claimed, errorCode={}, runId={}", "NONE", candidate.id());
                     try { if (!service.sendable(context, Instant.now())) continue; }
@@ -46,7 +48,7 @@ public class ExpenseRiskWorker {
                         continue;
                     }
                     ExpenseRiskSuggestion suggestion = null; AssistRun.Failure failure = null;
-                    try { suggestion = model.generate(context); }
+                    try { suggestion = telemetry.execute(candidate.tenantId(), context.requestedBy(), AgentExecutionUsage.Kind.EXPENSE_RISK, context.id(), claimedAt, () -> model.generate(context)); }
                     catch (AssistModelPort.ModelFailure unavailable) { failure = unavailable.failure(); }
                     service.finish(context.tenantId(), context.id(), suggestion, failure, Instant.now());
                 } catch (RuntimeException failure) {

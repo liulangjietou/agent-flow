@@ -81,7 +81,7 @@ class AgentWorkerTraceTest {
                         new JdbcAssistJobRepository.Candidate("tenant-b", LEGACY, null),
                         new JdbcAssistJobRepository.Candidate("tenant-a", LEGACY, PRIVATE)));
                 doAnswer(claim).when(service).claim(anyString(), any(UUID.class), any(Instant.class));
-                yield new Harness(new AssistWorker(runs, service, mock(AssistModelPort.class))::poll, AssistWorker.class);
+                yield new Harness(new AssistWorker(runs, service, mock(AssistModelPort.class), mock(AgentExecutionTelemetry.class))::poll, AssistWorker.class);
             }
             case DRAFT -> {
                 var runs = mock(JdbcDraftAssistRunRepository.class); var service = mock(DraftAssistService.class);
@@ -90,7 +90,7 @@ class AgentWorkerTraceTest {
                         new JdbcDraftAssistRunRepository.Candidate("tenant-b", LEGACY, null),
                         new JdbcDraftAssistRunRepository.Candidate("tenant-a", LEGACY, PRIVATE)));
                 doAnswer(claim).when(service).claim(anyString(), any(UUID.class), any(Instant.class));
-                yield new Harness(new DraftAssistWorker(runs, service, mock(DraftAssistModelPort.class))::poll, DraftAssistWorker.class);
+                yield new Harness(new DraftAssistWorker(runs, service, mock(DraftAssistModelPort.class), mock(AgentExecutionTelemetry.class))::poll, DraftAssistWorker.class);
             }
             case INVOICE -> {
                 var runs = mock(JdbcInvoiceExtractionRunRepository.class); var service = mock(InvoiceExtractionService.class);
@@ -99,7 +99,7 @@ class AgentWorkerTraceTest {
                         new JdbcInvoiceExtractionRunRepository.Candidate("tenant-b", LEGACY, null),
                         new JdbcInvoiceExtractionRunRepository.Candidate("tenant-a", LEGACY, PRIVATE)));
                 doAnswer(claim).when(service).claim(anyString(), any(UUID.class), any(Instant.class));
-                yield new Harness(new InvoiceExtractionWorker(runs, service, mock(InvoiceExtractionPort.class))::poll, InvoiceExtractionWorker.class);
+                yield new Harness(new InvoiceExtractionWorker(runs, service, mock(InvoiceExtractionPort.class), mock(AgentExecutionTelemetry.class))::poll, InvoiceExtractionWorker.class);
             }
             case EXPENSE -> {
                 var runs = mock(JdbcExpenseDraftAssistRepository.class); var service = mock(ExpenseDraftAssistService.class);
@@ -109,7 +109,7 @@ class AgentWorkerTraceTest {
                         new JdbcExpenseDraftAssistRepository.Candidate("tenant-a", LEGACY, PRIVATE)));
                 doAnswer(claim).when(service).claim(anyString(), any(UUID.class), any(Instant.class));
                 yield new Harness(new ExpenseDraftAssistWorker(runs, service, mock(ExpenseDraftAssistPreparation.class),
-                        mock(ExpenseDraftModelPort.class))::poll, ExpenseDraftAssistWorker.class);
+                        mock(ExpenseDraftModelPort.class), mock(AgentExecutionTelemetry.class))::poll, ExpenseDraftAssistWorker.class);
             }
             case PRECHECK -> {
                 var runs = mock(JdbcPrecheckExplanationRepository.class); var service = mock(PrecheckExplanationService.class);
@@ -118,7 +118,7 @@ class AgentWorkerTraceTest {
                         new JdbcPrecheckExplanationRepository.Candidate("tenant-b", LEGACY, null),
                         new JdbcPrecheckExplanationRepository.Candidate("tenant-a", LEGACY, PRIVATE)));
                 doAnswer(claim).when(service).claim(anyString(), any(UUID.class), any(Instant.class));
-                yield new Harness(new PrecheckExplanationWorker(runs, service, mock(PrecheckExplanationModelPort.class))::poll, PrecheckExplanationWorker.class);
+                yield new Harness(new PrecheckExplanationWorker(runs, service, mock(PrecheckExplanationModelPort.class), mock(AgentExecutionTelemetry.class))::poll, PrecheckExplanationWorker.class);
             }
             case RISK -> {
                 var runs = mock(JdbcExpenseRiskRepository.class); var service = mock(ExpenseRiskService.class);
@@ -127,7 +127,7 @@ class AgentWorkerTraceTest {
                         new JdbcExpenseRiskRepository.Candidate("tenant-b", LEGACY, null),
                         new JdbcExpenseRiskRepository.Candidate("tenant-a", LEGACY, PRIVATE)));
                 doAnswer(claim).when(service).claim(anyString(), any(UUID.class), any(Instant.class));
-                yield new Harness(new ExpenseRiskWorker(runs, service, mock(ExpenseRiskModelPort.class))::poll, ExpenseRiskWorker.class);
+                yield new Harness(new ExpenseRiskWorker(runs, service, mock(ExpenseRiskModelPort.class), mock(AgentExecutionTelemetry.class))::poll, ExpenseRiskWorker.class);
             }
         };
     }

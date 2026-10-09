@@ -1,3 +1,4 @@
+import { handlingPath, readHandlingTasks, validateHandlingReceipt, readAgentUsage, type HandlingTask, type HandlingStart, type HandlingInspect, type HandlingReceipt } from './expenseHandling.js'
 import { readProjectOwners } from './expenseProjectApproval.js'
 import { readPriorRequestPage, readPriorAssessments } from './expensePriorControl.js'
 import type { ExpensePartialAdjustmentNotificationTarget } from './expensePartialAdjustmentNotification'
@@ -613,6 +614,7 @@ export const writeRequests = new PendingWrites(async (operation, key) => {
   if (comment) validateCommentReceipt(result, decodeURIComponent(comment[1]!), JSON.parse(operation.body!) as CommentDraft)
   const taskAction = /^\/tasks\/([^/?]+)\/actions$/.exec(operation.path)
   if (taskAction) validateTaskAssignmentReceipt(result, decodeURIComponent(taskAction[1]!), JSON.parse(operation.body!) as TaskActionInput)
+  if (/^\/expense-reports\/[^/?]+\/handling-tasks(?:\/[^/?]+\/(close|inspect))?$/.test(operation.path)) validateHandlingReceipt(result, operation.path, operation.body!)
   validateEventMutation(result, operation.path, operation.body ?? '{}')
   const membership = /^\/tasks\/([^/?]+)\/countersign-changes$/.exec(operation.path)
   if (membership) validateCountersignReceipt(result as CountersignReceipt, decodeURIComponent(membership[1]!), JSON.parse(operation.body!) as CountersignInput)
@@ -632,6 +634,11 @@ function write<T>(path: string, method: WriteRequest['method'], label: string, b
 }
 
 export const api = {
+  expenseHandlingTasks: (id: string, signal: AbortSignal) => request(handlingPath(id), { signal, cache: 'no-store' }).then(value => readHandlingTasks(value, id)),
+  startExpenseHandling: (id: string, body: HandlingStart) => write<HandlingTask>(handlingPath(id), 'POST', '开始本人报销办理', body),
+  closeExpenseHandling: (id: string, taskId: string, expectedVersion: number) => write<HandlingTask>(handlingPath(id) + '/' + encodeURIComponent(taskId) + '/close', 'POST', '结束本人办理记录', { expectedVersion }),
+  inspectExpenseHandling: (id: string, taskId: string, body: HandlingInspect) => write<HandlingReceipt>(handlingPath(id) + '/' + encodeURIComponent(taskId) + '/inspect', 'POST', '核对本人报销依据', body),
+  agentUsage: (subjectId: string | undefined, signal: AbortSignal) => request('/agent-executions/usage' + (subjectId ? '?subjectId=' + encodeURIComponent(subjectId) : ''), { signal, cache: 'no-store' }).then(value => readAgentUsage(value, subjectId)),
   accountMappings: (filters: Partial<MappingScope>, afterKey: string | undefined, signal: AbortSignal) => configurationRead('/admin/account-mappings' + historyQuery({ ...filters, afterKey, limit: 25 }), signal, value => readMappingDirectory(value, filters, afterKey)),
   accountMappingCurrent: (scope: MappingScope, signal: AbortSignal) => configurationRead('/admin/account-mappings/current' + historyQuery({ legalEntityId: scope.legalEntityId, currency: scope.currency }), signal, (value, actor) => readMappingCurrent(value, actor, scope)),
   accountMappingDraft: (key: string, signal: AbortSignal) => configurationRead('/admin/account-mappings/' + encodeURIComponent(key) + '/draft', signal, (value, actor) => readMappingDraft(value, actor, key)),

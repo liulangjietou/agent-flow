@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ExpenseCorrectionService {
     private final CurrentActor actors;
+    private final io.agentflow.agent.ExpenseHandlingJournal journal;
     private final PrecheckExplanationService explanations;
     private final ExpenseDraftService drafts;
     private final ExpenseReportRepository reports;
@@ -28,8 +29,8 @@ public class ExpenseCorrectionService {
     /** 各领域仍执行自己的规则；本服务不解释模型文本或直接改变金额。 */
     public ExpenseCorrectionService(CurrentActor actors, PrecheckExplanationService explanations, ExpenseDraftService drafts,
             ExpenseReportRepository reports, JdbcExpensePrecheckRepository jobs, ExpensePrecheckService checks,
-            ExpenseCorrectionRepository corrections) {
-        this.actors = actors; this.explanations = explanations; this.drafts = drafts; this.reports = reports;
+            ExpenseCorrectionRepository corrections, io.agentflow.agent.ExpenseHandlingJournal journal) {
+        this.actors = actors; this.journal = journal; this.explanations = explanations; this.drafts = drafts; this.reports = reports;
         this.jobs = jobs; this.checks = checks; this.corrections = corrections;
     }
 
@@ -54,6 +55,8 @@ public class ExpenseCorrectionService {
                 original.initiator().appointmentId(), original.accountingDate(), original.targetDigest()));
         corrections.save(actor.tenantId(), new ExpenseCorrection(runId, reportId, expense.applicationId(),
                 expense.applicationVersion(), expense.financialVersion(), next.id(), actor.userId(), Instant.now().truncatedTo(ChronoUnit.MILLIS)));
+        journal.record(actor.tenantId(), reportId, io.agentflow.agent.ExpenseHandlingTask.Tool.CORRECTION, runId, expense.financialVersion(), "SAVED",
+                expense.applicationVersion(), expense.financialVersion(), expense.content(), Instant.now());
         return new Receipt(runId, next.id(), expense);
     }
 

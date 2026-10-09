@@ -18,10 +18,11 @@ public class AssistWorker {
     private final JdbcAssistJobRepository jobs;
     private final AssistExecutionService execution;
     private final AssistModelPort model;
+    private final AgentExecutionTelemetry telemetry;
 
     /** 原始输入只交给模型端口，不写入运行日志。 */
-    public AssistWorker(JdbcAssistJobRepository jobs, AssistExecutionService execution, AssistModelPort model) {
-        this.jobs = jobs; this.execution = execution; this.model = model;
+    public AssistWorker(JdbcAssistJobRepository jobs, AssistExecutionService execution, AssistModelPort model, AgentExecutionTelemetry telemetry) {
+        this.jobs = jobs; this.execution = execution; this.model = model; this.telemetry = telemetry;
     }
 
     /** 每批最多十项；进程异常保留租约，后续记录超时而不盲目重发。 */
@@ -32,11 +33,12 @@ public class AssistWorker {
                     TRACE_SOURCE, candidate.runId().toString())
                     .withBusiness(candidate.businessNo(), candidate.processInstanceId(), candidate.taskId()).open()) {
                 try {
-                    var job = execution.claim(candidate.tenantId(), candidate.runId(), Instant.now());
+                    Instant claimedAt = Instant.now();
+                    var job = execution.claim(candidate.tenantId(), candidate.runId(), claimedAt);
                     if (job == null) continue;
                     LOG.info("Agent execution claimed, errorCode={}, runId={}", "NONE", candidate.runId());
                     AssistSuggestion suggestion = null; AssistRun.Failure failure = null;
-                    try { suggestion = model.generate(AssistConfiguration.PROMPT_VERSION, job.sources()); }
+                    try { suggestion = telemetry.execute(candidate.tenantId(), job.requester().userId(), AgentExecutionUsage.Kind.SUMMARY, candidate.runId(), claimedAt, () -> model.generate(AssistConfiguration.PROMPT_VERSION, job.sources())); }
                     catch (AssistModelPort.ModelFailure modelFailure) { failure = modelFailure.failure(); }
                     execution.finish(job, suggestion, failure, Instant.now());
                 } catch (RuntimeException failure) {

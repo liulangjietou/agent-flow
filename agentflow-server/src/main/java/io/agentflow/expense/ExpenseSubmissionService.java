@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 @Service
 public class ExpenseSubmissionService {
     private final CurrentActor actors;
+    private final io.agentflow.agent.ExpenseHandlingJournal journal;
     private final ExpenseReportRepository reports;
     private final ApprovalApplicationFacade applications;
     private final DefinitionDraftRepository definitions;
@@ -41,8 +42,8 @@ public class ExpenseSubmissionService {
             DefinitionDraftRepository definitions, JdbcExpensePrecheckRepository prechecks, ExpensePrecheckService validation,
             ExpensePrecheckResources resources, ExpenseResourceChanges changes, JdbcExpenseSubmissionControlRepository controls,
             BudgetOperationService budgets, ExpensePolicyConfiguration policyConfiguration, ExpenseSplitRoutingService splitRouting,
-            JdbcExpensePriorControlRepository priorControls, ExpenseBudgetReviewService budgetReviews, JdbcExpenseProjectApprovalRepository projects) {
-        this.actors = actors; this.reports = reports; this.applications = applications; this.definitions = definitions;
+            JdbcExpensePriorControlRepository priorControls, ExpenseBudgetReviewService budgetReviews, JdbcExpenseProjectApprovalRepository projects, io.agentflow.agent.ExpenseHandlingJournal journal) {
+        this.actors = actors; this.journal = journal; this.reports = reports; this.applications = applications; this.definitions = definitions;
         this.prechecks = prechecks; this.validation = validation; this.resources = resources; this.changes = changes;
         this.controls = controls; this.budgets = budgets;
         this.policyConfiguration = policyConfiguration;
@@ -105,6 +106,8 @@ public class ExpenseSubmissionService {
         var operation = budgets.reserve(actor.tenantId(), id, report.version(), checked.input().accountingDate(), checked.input().targetDigest(), now);
         budgetReviews.submitted(control, operation, evidence.budget().exceptionPolicy(), budgetNode);
         if (!evidence.validUntil().isAfter(Instant.now())) throw new DomainException("FACTS_EXPIRED", "Expense precheck expired during submission");
+        journal.record(actor.tenantId(), id, io.agentflow.agent.ExpenseHandlingTask.Tool.SUBMISSION, application.id(), application.version(), "SUBMITTED",
+                application.version(), report.version(), input, java.time.Instant.now());
         return new Receipt(id, application.id(), application.version(), report.version(), application.roundNo(), operation.input().command().id());
     }
 

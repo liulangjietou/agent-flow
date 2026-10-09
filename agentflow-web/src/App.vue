@@ -47,6 +47,7 @@ import ApplicationHistory from './components/ApplicationHistory.vue'
 import RoundComparison from './components/RoundComparison.vue'
 import ApplicationComments from './components/ApplicationComments.vue'
 import AssistRunRecords from './components/AssistRunRecords.vue'
+import ExpenseApprovalAssistant from './components/ExpenseApprovalAssistant.vue'
 import { commentDrafts, type CommentDraft, type ApplicationComment } from './applicationComments'
 import RequestRecovery from './components/RequestRecovery.vue'
 import FormFields from './components/FormFields.vue'
@@ -1429,6 +1430,8 @@ async function recoverOperation(id: string) {
       } else if (/^\/expense-reports\/[^/?]+\/risk-explanations(?:\/[^/?]+\/review)?$/.test(request.path)) {
         acknowledgeRisk(actorScope.value, request.path, request.body!, result as RiskReceipt)
         notice.value = '原风险复核操作已确认，请核对同一条记录。'
+      } else if (/^\/expense-reports\/[^/?]+\/handling-tasks(?:\/[^/?]+\/(close|inspect))?$/.test(request.path)) {
+        notice.value = '原办理操作已确认，请刷新办理记录继续。'
       } else if (request.path.startsWith('/expense-reports')) {
         if (request.body && (request.path === '/expense-reports' || request.path.endsWith('/revise'))) {
           const value = result as ExpenseDetailData
@@ -1589,7 +1592,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
                 <div v-else-if="taskTab === 'compare'" class="timeline-full"><RoundComparison v-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" /><p v-else class="unavailable">请先刷新并加载当前申请。</p></div>
                 <div v-else-if="taskTab === 'timeline'" class="timeline-full"><button class="secondary" @click="recordApplicationId = activeTask.applicationId">查看提交轮次与历史内容</button><ApplicationHistory :application-id="activeTask.applicationId" mode="timeline" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
                 <div v-else-if="taskTab === 'audit'" class="audit-list"><ApplicationHistory :application-id="activeTask.applicationId" mode="audit" :round-no-max="activeApplication?.roundNo ?? 1" :version="activeTask.version" /></div>
-                <div v-else-if="taskTab === 'assist'" class="timeline-full"><AssistRunRecords v-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :round-no="activeApplication.roundNo" :task-id="activeTask.taskId" :locked="busy || writesBlocked" :refresh-version="assistRefresh" /><p v-else class="unavailable">请先刷新并加载当前申请。</p></div>
+                <div v-else-if="taskTab === 'assist'" class="timeline-full"><ExpenseApprovalAssistant v-if="activeApplication?.businessReference?.type === 'EXPENSE'" :key="actorScope + activeTask.taskId + activeApplication.version" :report-id="activeApplication.businessReference.id" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :round-no="activeApplication.roundNo" :task-id="activeTask.taskId" :locked="busy || writesBlocked" :refresh-version="assistRefresh" @task-activity="expenseTaskActivity" /><AssistRunRecords v-else-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :round-no="activeApplication.roundNo" :task-id="activeTask.taskId" :locked="busy || writesBlocked" :refresh-version="assistRefresh" /><p v-else class="unavailable">请先刷新并加载当前申请。</p></div>
                 <ApplicationComments v-else-if="activeApplication" :application-id="activeApplication.id" :scope-key="actorScope" :version="activeApplication.version" :status="activeApplication.status" :round-no="activeApplication.roundNo" :locked="busy || writesBlocked || !!detailError" :refresh-version="commentRefresh" @posted="commentRefresh++" @refresh-application="selectTask(activeTask)" />
                 </WorkspaceTabs>
                 <TaskDeadlineStatus :due-at="activeTask.dueAt" />

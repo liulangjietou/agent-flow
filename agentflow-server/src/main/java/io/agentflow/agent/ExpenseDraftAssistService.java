@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ExpenseDraftAssistService {
     private static final long LEASE_GRACE_SECONDS = 30;
     private final CurrentActor actors;
+    private final ExpenseHandlingJournal journal;
     private final ExpenseReportRepository reports;
     private final ApprovalApplicationFacade applications;
     private final ApplicationRepository applicationRepository;
@@ -35,8 +36,8 @@ public class ExpenseDraftAssistService {
     /** 助手不持有费用保存服务，无法通过生成或确认动作改写费用和审批。 */
     public ExpenseDraftAssistService(CurrentActor actors, ExpenseReportRepository reports, ApprovalApplicationFacade applications,
             ApplicationRepository applicationRepository, JdbcExpenseDraftAssistRepository runs,
-            AssistConfiguration configuration, FinanceGatewayConfiguration finance) {
-        this.actors = actors; this.reports = reports; this.applications = applications; this.applicationRepository = applicationRepository;
+            AssistConfiguration configuration, FinanceGatewayConfiguration finance, ExpenseHandlingJournal journal) {
+        this.actors = actors; this.journal = journal; this.reports = reports; this.applications = applications; this.applicationRepository = applicationRepository;
         this.runs = runs; this.configuration = configuration; this.finance = finance;
     }
 
@@ -73,7 +74,7 @@ public class ExpenseDraftAssistService {
         if (!prepared.input().currentAt(at)) throw changed("FACTS_EXPIRED");
         var run = new ExpenseDraftAssistRun(new ExpenseDraftAssistRun.Context(UUID.randomUUID(), current.report().tenantId(),
                 actors.actor().userId(), time(at), prepared.input(), targetDigest));
-        requireCurrent(currentFailure(current, run.context(), at)); runs.create(run); return receipt(run);
+        requireCurrent(currentFailure(current, run.context(), at)); runs.create(run); record(run); return receipt(run);
     }
 
     /** 历史目录只返回本人报销的轻量索引，不暴露其他单据的数量。 */
@@ -114,7 +115,7 @@ public class ExpenseDraftAssistService {
         if (!run.context().input().equals(prepared.input()) || !run.context().targetDigest().equals(prepared.targetDigest())) throw changed("SOURCES_CHANGED");
         Instant now = Instant.now(); requireCurrent(currentFailure(snapshot, run.context(), now));
         run.confirm(expectedVersion, snapshot.application().version(), snapshot.report().version(), actors.actor().userId(), selected, comment, now);
-        runs.update(run, expectedVersion); return receipt(run);
+        save(run, expectedVersion); return receipt(run);
     }
 
     /** 过期或不再可编辑的单据仍可放弃旧建议，不触发目录或模型网络调用。 */
@@ -122,7 +123,7 @@ public class ExpenseDraftAssistService {
     public Receipt dismiss(UUID reportId, UUID runId, long expectedVersion, String comment) {
         var snapshot = owned(reportId); requireRun(snapshot.report(), runId); runs.lock(snapshot.report().tenantId(), runId);
         var run = requireRun(snapshot.report(), runId); run.dismiss(expectedVersion, actors.actor().userId(), comment, time(Instant.now()));
-        runs.update(run, expectedVersion); return receipt(run);
+        save(run, expectedVersion); return receipt(run);
     }
 
     /** 原租约只领取一次；执行中崩溃恢复为超时失败，不重新发送模型输入。 */
@@ -134,7 +135,7 @@ public class ExpenseDraftAssistService {
         if (run.expired(now)) { fail(run, AssistRun.Failure.MODEL_TIMEOUT, now); return null; }
         if (run.state().status() != ExpenseDraftAssistRun.Status.QUEUED) return null;
         String modelFailure = modelFailure(run.context().targetDigest());
-        run.start(1, now, now.plusSeconds(LEASE_GRACE_SECONDS + (modelFailure == null ? configuration.getTimeoutSeconds() : 0))); runs.update(run, 1);
+        run.start(1, now, now.plusSeconds(LEASE_GRACE_SECONDS + (modelFailure == null ? configuration.getTimeoutSeconds() : 0))); save(run, 1);
         if (modelFailure != null) { fail(run, AssistRun.Failure.MODEL_UNAVAILABLE, now); return null; }
         // 外部事实有效期可能带微秒；只规范化存储时间，不能向前舍入判定时间。
         if (currentFailure(load(tenant, run.context().input().reportId()), run.context(), at) != null) {
@@ -167,7 +168,7 @@ public class ExpenseDraftAssistService {
         if (failure != null) { fail(run, failure, now); return; }
         try { run.complete(2, suggestion, now); }
         catch (DomainException invalid) { fail(run, AssistRun.Failure.INVALID_MODEL_OUTPUT, now); return; }
-        runs.update(run, 2);
+        save(run, 2);
     }
 
     private void requirePrepared(ExpenseDraftAssistPreparation.Prepared prepared, Snapshot snapshot) {
@@ -203,7 +204,13 @@ public class ExpenseDraftAssistService {
         return runs.find(report.tenantId(), id).filter(run -> run.context().input().reportId().equals(report.id())
                 && run.context().requestedBy().equals(actors.actor().userId())).orElseThrow(ExpenseDraftAssistService::notFound);
     }
-    private void fail(ExpenseDraftAssistRun run, AssistRun.Failure failure, Instant now) { run.fail(2, failure, now); runs.update(run, 2); }
+    private void save(ExpenseDraftAssistRun run, long expectedVersion) { runs.update(run, expectedVersion); record(run); }
+    private void record(ExpenseDraftAssistRun run) {
+        var context = run.context(); var input = context.input();
+        journal.record(context.tenantId(), input.reportId(), ExpenseHandlingTask.Tool.DRAFT, context.id(), run.state().version(),
+                run.state().status().name(), input.applicationVersion(), input.financialVersion(), input, context.createdAt());
+    }
+    private void fail(ExpenseDraftAssistRun run, AssistRun.Failure failure, Instant now) { run.fail(2, failure, now); save(run, 2); }
     private static void requireCurrent(String failure) { if (failure != null) throw changed(failure); }
     private static DomainException changed(String reason) { return new DomainException("AGENT_INPUT_CHANGED", "Refresh expense draft sources: " + reason); }
     private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense draft run version changed"); }

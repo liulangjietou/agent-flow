@@ -20,11 +20,12 @@ public class ExpenseDraftAssistWorker {
     private final ExpenseDraftAssistService service;
     private final ExpenseDraftAssistPreparation preparation;
     private final ExpenseDraftModelPort model;
+    private final AgentExecutionTelemetry telemetry;
 
     /** 网络调用发生在两次持久状态事务之间，目录和模型目的地均来自部署配置。 */
     public ExpenseDraftAssistWorker(JdbcExpenseDraftAssistRepository runs, ExpenseDraftAssistService service,
-            ExpenseDraftAssistPreparation preparation, ExpenseDraftModelPort model) {
-        this.runs = runs; this.service = service; this.preparation = preparation; this.model = model;
+            ExpenseDraftAssistPreparation preparation, ExpenseDraftModelPort model, AgentExecutionTelemetry telemetry) {
+        this.runs = runs; this.service = service; this.preparation = preparation; this.model = model; this.telemetry = telemetry;
     }
 
     /** 原队列最多扫描十项；失效或已领取项不会转发给模型。 */
@@ -35,7 +36,8 @@ public class ExpenseDraftAssistWorker {
                     TRACE_SOURCE, candidate.id().toString())
                     .withBusiness(candidate.businessNo(), null, null).open()) {
                 try {
-                    var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
+                    Instant claimedAt = Instant.now();
+                    var context = service.claim(candidate.tenantId(), candidate.id(), claimedAt);
                     if (context == null || !service.sendable(context, Instant.now())) continue;
                     LOG.info("Agent execution claimed, errorCode={}, runId={}", "NONE", candidate.id());
                     try { preparation.refresh(context); }
@@ -44,7 +46,7 @@ public class ExpenseDraftAssistWorker {
                     }
                     if (!service.sendable(context, Instant.now())) continue;
                     ExpenseDraftSuggestion suggestion = null; AssistRun.Failure failure = null;
-                    try { suggestion = model.generate(context); }
+                    try { suggestion = telemetry.execute(candidate.tenantId(), context.requestedBy(), AgentExecutionUsage.Kind.EXPENSE_DRAFT, context.id(), claimedAt, () -> model.generate(context)); }
                     catch (AssistModelPort.ModelFailure unavailable) { failure = unavailable.failure(); }
                     service.finish(context.tenantId(), context.id(), suggestion, failure, Instant.now());
                 } catch (RuntimeException failure) {

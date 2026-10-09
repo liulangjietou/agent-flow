@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.agent.mapper.AgentUsageMapper">
+    <select id="source" resultType="io.agentflow.mybatis.SqlRow">
+        <choose>
+            <when test="kind == 'SUMMARY'">SELECT created_at, application_id AS subject_id FROM agent_assist_run</when>
+            <when test="kind == 'DRAFT'">SELECT created_at, application_id AS subject_id FROM agent_draft_assist_run</when>
+            <when test="kind == 'INVOICE'">SELECT created_at, invoice_id AS subject_id FROM agent_invoice_extraction_run</when>
+            <when test="kind == 'EXPENSE_DRAFT'">SELECT created_at, report_id AS subject_id FROM agent_expense_draft_run</when>
+            <when test="kind == 'PRECHECK_EXPLANATION'">SELECT created_at, report_id AS subject_id FROM agent_precheck_explanation_run</when>
+            <otherwise>SELECT created_at, report_id AS subject_id FROM agent_expense_risk_run</otherwise>
+        </choose>
+        WHERE tenant_id=#{tenant} AND id=#{runId}
+    </select>
+    <insert id="insert">
+        INSERT INTO agent_execution_usage(tenant_id,run_id,kind,owner_id,subject_id,state_json)
+        VALUES(#{tenant},#{runId},#{kind},#{owner},#{subject},#{state})
+    </insert>
+    <update id="finish">UPDATE agent_execution_usage SET state_json=#{state} WHERE tenant_id=#{tenant} AND run_id=#{runId} AND kind=#{kind}</update>
+    <select id="list" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM agent_execution_usage WHERE tenant_id=#{tenant} AND owner_id=#{owner}
+        <if test="subject != null">AND subject_id=#{subject}</if>
+        ORDER BY recorded_at DESC,run_id DESC LIMIT 100
+    </select>
+</mapper>
