@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.agent.mapper.ExpenseHandlingMapper">
+    <insert id="insert">INSERT INTO agent_expense_handling(tenant_id,id,report_id,application_id,owner_id,active_report_id,version,context_json,state_json)
+        VALUES(#{tenant},#{id},#{report},#{application},#{owner},#{report},1,#{context},#{state})</insert>
+    <update id="update">UPDATE agent_expense_handling SET version=#{version},active_report_id=#{active},state_json=#{state}
+        WHERE tenant_id=#{tenant} AND id=#{id} AND version=#{previous}</update>
+    <select id="list" resultType="io.agentflow.mybatis.SqlRow">SELECT context_json,state_json FROM agent_expense_handling
+        WHERE tenant_id=#{tenant} AND report_id=#{report} ORDER BY created_at DESC,id DESC LIMIT 20</select>
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">SELECT context_json,state_json FROM agent_expense_handling WHERE tenant_id=#{tenant} AND id=#{id}</select>
+    <select id="active" resultType="io.agentflow.mybatis.SqlRow">SELECT context_json,state_json FROM agent_expense_handling WHERE tenant_id=#{tenant} AND active_report_id=#{report} FOR UPDATE</select>
+    <insert id="append">INSERT INTO agent_expense_handling_transition(tenant_id,handling_id,version,state_json) VALUES(#{tenant},#{id},#{version},#{state})</insert>
+</mapper>

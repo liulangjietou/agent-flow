@@ -18,9 +18,10 @@ public class DraftAssistWorker {
     private final JdbcDraftAssistRunRepository runs;
     private final DraftAssistService service;
     private final DraftAssistModelPort model;
+    private final AgentExecutionTelemetry telemetry;
     /** 独立事务负责领取和结算，模型端口仅处理冻结输入。 */
-    public DraftAssistWorker(JdbcDraftAssistRunRepository runs, DraftAssistService service, DraftAssistModelPort model) {
-        this.runs = runs; this.service = service; this.model = model;
+    public DraftAssistWorker(JdbcDraftAssistRunRepository runs, DraftAssistService service, DraftAssistModelPort model, AgentExecutionTelemetry telemetry) {
+        this.runs = runs; this.service = service; this.model = model; this.telemetry = telemetry;
     }
     /** 每批最多十项；崩溃租约由领取服务结算超时。 */
     public void poll() {
@@ -30,11 +31,12 @@ public class DraftAssistWorker {
                     TRACE_SOURCE, candidate.id().toString())
                     .withBusiness(candidate.businessNo(), null, null).open()) {
                 try {
-                    var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
+                    Instant claimedAt = Instant.now();
+                    var context = service.claim(candidate.tenantId(), candidate.id(), claimedAt);
                     if (context == null) continue;
                     LOG.info("Agent execution claimed, errorCode={}, runId={}", "NONE", candidate.id());
                     DraftSuggestion suggestion = null; AssistRun.Failure failure = null;
-                    try { suggestion = model.generate(context); }
+                    try { suggestion = telemetry.execute(candidate.tenantId(), context.requestedBy(), AgentExecutionUsage.Kind.DRAFT, context.id(), claimedAt, () -> model.generate(context)); }
                     catch (AssistModelPort.ModelFailure unavailable) { failure = unavailable.failure(); }
                     service.finish(context.tenantId(), context.id(), suggestion, failure, Instant.now());
                 } catch (RuntimeException failure) {

@@ -20,14 +20,15 @@ public class ExpenseDraftService {
     private final ApprovalApplicationFacade applications;
     private final ApplicationFieldViews fields;
     private final CurrentActor actors;
+    private final io.agentflow.agent.ExpenseHandlingJournal journal;
     private final ExpenseAllowancePreparation allowances;
     private final JdbcExpenseBudgetRetentionRepository retentions;
 
     /** 注入已有申请授权及字段投影，不根据 ADMIN 角色放宽财务读取。 */
     public ExpenseDraftService(ExpenseReportRepository reports, ApprovalApplicationFacade applications,
                                 ApplicationFieldViews fields, CurrentActor actors, ExpenseAllowancePreparation allowances,
-                                JdbcExpenseBudgetRetentionRepository retentions) {
-        this.reports = reports; this.applications = applications; this.fields = fields; this.actors = actors; this.allowances = allowances;
+                                JdbcExpenseBudgetRetentionRepository retentions, io.agentflow.agent.ExpenseHandlingJournal journal) {
+        this.reports = reports; this.applications = applications; this.fields = fields; this.actors = actors; this.journal = journal; this.allowances = allowances;
         this.retentions = retentions;
     }
 
@@ -54,6 +55,8 @@ public class ExpenseDraftService {
         application = applications.reviseBusiness(application.id(), applicationVersion, content.title(),
                 ExpenseFormContract.draftPayload(), application.businessReference());
         reports.update(report, financialVersion, actors.actor().userId(), "REVISE");
+        journal.record(report.tenantId(), reportId, io.agentflow.agent.ExpenseHandlingTask.Tool.EXPENSE_SAVED, reportId, report.version(), "SAVED",
+                application.version(), report.version(), report.state(), java.time.Instant.now());
         return response(application, report, null, true);
     }
 

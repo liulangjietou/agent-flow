@@ -133,6 +133,14 @@ class Sources:
                       "assessedGross": data["line"]["claimedGross"], "allowedGross": data["line"]["claimedGross"], "decision": "WITHIN_LIMIT",
                       "taxRuleReference": "synthetic-tax", "evidenceReference": "synthetic-policy"},
                      "deductibleTax": data["line"]["claimedTax"], "priorRequestRequired": False, "validUntil": instant(self.valid_seconds)}
+        elif operation == "expense-policy-guidance":
+            assert not data.get("managedPolicy")
+            value = {"policyId": "00000000-0000-4000-8000-000000000001", "policyVersion": 1,
+                     "policyName": "合成办公费制度", "ruleKey": "office", "ruleName": "合成办公费标准",
+                     "constraints": {"effect": "ALLOW", "unitPriceLimit": None, "limitUnit": None,
+                         "invoiceMaxAgeDays": None, "invoiceAgeAction": None, "allowedServiceLevels": [],
+                         "priorRequestRequired": False, "fixedAllowance": None},
+                     "factSourceReference": "synthetic-policy", "validUntil": instant(self.valid_seconds), "selection": None}
         elif operation == "budget-precheck":
             if self.budget == "BLOCKED":
                 return {**envelope, "outcome": "REJECTED", "reason": "BUDGET_INSUFFICIENT"}, 200
@@ -167,6 +175,10 @@ class Runtime:
             probe.bind(("127.0.0.1", 0))
             self.port = probe.getsockname()[1]
         self.settings = {"server.address": "127.0.0.1", "server.port": self.port,
+                         # 验收属于本次目录，不能沿用安装包或机器默认数据库；强退前提交必须落盘。
+                         "spring.datasource.url": "jdbc:h2:file:" + str(directory / "data/agentflow") + ";WRITE_DELAY=0",
+                         "spring.datasource.username": "sa", "spring.datasource.password": "",
+                         "spring.datasource.driver-class-name": "org.h2.Driver",
                          "agentflow.attachments.directory": str(directory / "attachments"),
                          "agentflow.auth.demo-enabled": True, "agentflow.sla.reminders-enabled": False,
                          "agentflow.notifications.proxy-reminders-enabled": False, "agentflow.advances.overdue.reminders-enabled": False,

@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PrecheckExplanationService {
     private static final long LEASE_GRACE_SECONDS = 30;
     private final CurrentActor actors;
+    private final ExpenseHandlingJournal journal;
     private final ExpenseReportRepository reports;
     private final ApprovalApplicationFacade applications;
     private final JdbcExpensePrecheckRepository prechecks;
@@ -38,8 +39,8 @@ public class PrecheckExplanationService {
     /** 原检查服务是业务有效性的唯一判定方，解释只投影已授权的事实。 */
     public PrecheckExplanationService(CurrentActor actors, ExpenseReportRepository reports, ApprovalApplicationFacade applications,
             JdbcExpensePrecheckRepository prechecks, ExpensePrecheckService checks, PrecheckExplanationSources sources,
-            JdbcPrecheckExplanationRepository runs, AssistConfiguration configuration, ExpenseCorrectionRepository corrections) {
-        this.actors = actors; this.reports = reports; this.applications = applications; this.prechecks = prechecks;
+            JdbcPrecheckExplanationRepository runs, AssistConfiguration configuration, ExpenseCorrectionRepository corrections, ExpenseHandlingJournal journal) {
+        this.actors = actors; this.journal = journal; this.reports = reports; this.applications = applications; this.prechecks = prechecks;
         this.checks = checks; this.sources = sources; this.runs = runs; this.configuration = configuration;
         this.corrections = corrections;
     }
@@ -77,7 +78,7 @@ public class PrecheckExplanationService {
         }
         var run = new PrecheckExplanationRun(new PrecheckExplanationRun.Context(UUID.randomUUID(), report.tenantId(),
                 actors.actor().userId(), now, sources.select(report, job, sourceIds), targetDigest));
-        runs.create(run); return receipt(run);
+        runs.create(run); record(run); return receipt(run);
     }
 
     /** 仅返回本人单据的轻量索引，管理员角色不能绕过申请人资格。 */
@@ -112,7 +113,7 @@ public class PrecheckExplanationService {
             requireCurrent(currentFailure(report, run.context(), now));
             run.adopt(expectedVersion, actors.actor().userId(), selectedIssueIds, comment, now);
         } else throw new DomainException("INVALID_AGENT_REVIEW", "Explanation review action is required");
-        runs.update(run, expectedVersion); return receipt(run);
+        save(run, expectedVersion); return receipt(run);
     }
 
     /** 单据到运行的锁顺序与费用写入一致；租约过期的执行只记失败，不重发。 */
@@ -125,7 +126,7 @@ public class PrecheckExplanationService {
         if (run.expired(now)) { fail(run, AssistRun.Failure.MODEL_TIMEOUT, now); return null; }
         if (run.state().status() != PrecheckExplanationRun.Status.QUEUED) return null;
         String modelUnavailable = modelFailure(run.context().targetDigest());
-        run.start(1, now, now.plusSeconds(LEASE_GRACE_SECONDS + (modelUnavailable == null ? configuration.getTimeoutSeconds() : 0))); runs.update(run, 1);
+        run.start(1, now, now.plusSeconds(LEASE_GRACE_SECONDS + (modelUnavailable == null ? configuration.getTimeoutSeconds() : 0))); save(run, 1);
         if (modelUnavailable != null) { fail(run, AssistRun.Failure.MODEL_UNAVAILABLE, now); return null; }
         var report = reports.find(tenant, run.context().input().reportId()).orElseThrow();
         if (currentFailure(report, run.context(), now) != null) { fail(run, AssistRun.Failure.INPUT_UNAVAILABLE, now); return null; }
@@ -156,7 +157,7 @@ public class PrecheckExplanationService {
         if (failure != null) { fail(run, failure, now); return; }
         try { run.complete(2, suggestion, now); }
         catch (DomainException invalid) { fail(run, AssistRun.Failure.INVALID_MODEL_OUTPUT, now); return; }
-        runs.update(run, 2);
+        save(run, 2);
     }
 
     private String currentFailure(ExpenseReport report, PrecheckExplanationRun.Context context, Instant now) {
@@ -188,7 +189,13 @@ public class PrecheckExplanationService {
         return runs.find(report.tenantId(), id).filter(value -> value.context().input().reportId().equals(report.id())
                 && value.context().requestedBy().equals(actors.actor().userId())).orElseThrow(PrecheckExplanationService::notFound);
     }
-    private void fail(PrecheckExplanationRun run, AssistRun.Failure failure, Instant now) { run.fail(2, failure, now); runs.update(run, 2); }
+    private void save(PrecheckExplanationRun run, long expectedVersion) { runs.update(run, expectedVersion); record(run); }
+    private void record(PrecheckExplanationRun run) {
+        var context = run.context(); var input = context.input();
+        journal.record(context.tenantId(), input.reportId(), ExpenseHandlingTask.Tool.EXPLANATION, context.id(), run.state().version(),
+                run.state().status().name(), input.applicationVersion(), input.financialVersion(), input, context.createdAt());
+    }
+    private void fail(PrecheckExplanationRun run, AssistRun.Failure failure, Instant now) { run.fail(2, failure, now); save(run, 2); }
     private static void requireCurrent(String failure) { if (failure != null) throw changed(failure); }
     private static DomainException changed(String reason) { return new DomainException("AGENT_INPUT_CHANGED", "Refresh the current expense precheck: " + reason); }
     private static DomainException notFound() { return new DomainException("NOT_FOUND", "Precheck explanation not found"); }

@@ -294,7 +294,7 @@ class ExpenseRiskExecutionTest {
 
     private void restartServices() {
         service = transactional(new ExpenseRiskService(actors, reports, access, sources, runs, authentication, configuration, json));
-        worker = transactional(new ExpenseRiskWorker(runs, service, model));
+        worker = transactional(new ExpenseRiskWorker(runs, service, model, new AgentExecutionTelemetry(transactional(new AgentUsageRepository(io.agentflow.mybatis.MyBatisTestSupport.mapper(jdbc.getDataSource(), io.agentflow.agent.mapper.AgentUsageMapper.class), json)))));
     }
     @SuppressWarnings("unchecked") private <T> T transactional(T target) {
         var proxy = new ProxyFactory(target); proxy.setProxyTargetClass(true);

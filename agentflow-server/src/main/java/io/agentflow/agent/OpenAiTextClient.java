@@ -68,7 +68,7 @@ final class OpenAiTextClient {
         try {
             var response = future.get(timeout, TimeUnit.SECONDS);
             if (response.statusCode() != 200) throw new AssistModelPort.ModelFailure(AssistRun.Failure.MODEL_UNAVAILABLE);
-            var reply = parse(provider, new String(response.body(), StandardCharsets.UTF_8));
+            var reply = parse(provider, promptVersion, new String(response.body(), StandardCharsets.UTF_8));
             var usage = reply.usage();
             LOG.info("Agent model response received, errorCode={}, promptVersion={}, elapsedMs={}, usageStatus={}, inputTokens={}, outputTokens={}, totalTokens={}",
                     "NONE", promptVersion, elapsed(started), usage.status(), usage.inputTokens(), usage.outputTokens(), usage.totalTokens());
@@ -90,16 +90,20 @@ final class OpenAiTextClient {
         } finally { if (!future.isDone()) future.cancel(true); }
     }
 
-    private Reply parse(String provider, String body) {
+    private Reply parse(String provider, String promptVersion, String body) {
         try {
             JsonNode response = json.readStrict(body, JsonNode.class);
+            var reportedUsage = usage(response.path("usage"));
+            String modelVersion = response.path("model").isTextual() && !response.path("model").asText().isBlank()
+                    ? response.path("model").asText() : null;
+            AgentExecutionTelemetry.received(promptVersion, provider, modelVersion, reportedUsage);
             var choices = response.path("choices");
             if (!choices.isArray() || choices.size() != 1 || !response.path("model").isTextual()) throw invalid();
             var choice = choices.get(0); var message = choice.path("message");
             if (!"stop".equals(choice.path("finish_reason").asText()) || !"assistant".equals(message.path("role").asText())
                     || !message.path("content").isTextual() || message.hasNonNull("refusal") || message.hasNonNull("function_call")
                     || message.has("tool_calls") && !message.path("tool_calls").isEmpty()) throw invalid();
-            return new Reply(provider, response.path("model").asText(), json.readStrict(message.path("content").asText(), JsonNode.class), usage(response.path("usage")));
+            return new Reply(provider, response.path("model").asText(), json.readStrict(message.path("content").asText(), JsonNode.class), reportedUsage);
         } catch (RuntimeException invalid) { throw invalid(); }
     }
     private static AssistModelPort.ModelFailure invalid() { return new AssistModelPort.ModelFailure(AssistRun.Failure.INVALID_MODEL_OUTPUT); }

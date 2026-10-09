@@ -19,9 +19,10 @@ public class InvoiceExtractionWorker {
     private final JdbcInvoiceExtractionRunRepository runs;
     private final InvoiceExtractionService service;
     private final InvoiceExtractionPort extraction;
+    private final AgentExecutionTelemetry telemetry;
     /** 领取和结算依赖事务代理，模型端口不能控制数据库状态。 */
-    public InvoiceExtractionWorker(JdbcInvoiceExtractionRunRepository runs, InvoiceExtractionService service, InvoiceExtractionPort extraction) {
-        this.runs = runs; this.service = service; this.extraction = extraction;
+    public InvoiceExtractionWorker(JdbcInvoiceExtractionRunRepository runs, InvoiceExtractionService service, InvoiceExtractionPort extraction, AgentExecutionTelemetry telemetry) {
+        this.runs = runs; this.service = service; this.extraction = extraction; this.telemetry = telemetry;
     }
     /** 每批最多十项，线程中断后不再领取新的原件。 */
     public void poll() {
@@ -31,11 +32,12 @@ public class InvoiceExtractionWorker {
             try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(),
                     TRACE_SOURCE, candidate.id().toString()).open()) {
                 try {
-                    var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
+                    Instant claimedAt = Instant.now();
+                    var context = service.claim(candidate.tenantId(), candidate.id(), claimedAt);
                     if (context == null) continue;
                     LOG.info("Agent execution claimed, errorCode={}, runId={}", "NONE", candidate.id());
                     InvoiceExtractionSuggestion suggestion = null; InvoiceExtractionRun.Failure failure = null;
-                    try { suggestion = extraction.generate(context); }
+                    try { suggestion = telemetry.execute(candidate.tenantId(), context.requestedBy(), AgentExecutionUsage.Kind.INVOICE, context.id(), claimedAt, () -> extraction.generate(context)); }
                     catch (AssistModelPort.ModelFailure rejected) {
                         failure = switch (rejected.failure()) {
                             case MODEL_UNAVAILABLE -> InvoiceExtractionRun.Failure.MODEL_UNAVAILABLE;

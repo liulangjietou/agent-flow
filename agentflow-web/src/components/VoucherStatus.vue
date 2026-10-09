@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api, writeRequests } from '../api'
+import { voucherRecovery } from '../financeRecovery'
+import FinanceRecoveryNote from './FinanceRecoveryNote.vue'
 import VoucherReversal from './VoucherReversal.vue'
 import VoucherReversalExecution from './VoucherReversalExecution.vue'
 import { voucherOutcomeLabels, operationLabels, preparationLabels, validateVoucherReceipt, validateVoucherView, voucherActionInput, voucherActionLabels, voucherDisputeInput, validateVoucherDisputeReceipt, voucherDisputeIssue, voucherError, voucherIssue, type VoucherAction, type VoucherBinding, type VoucherView } from '../vouchers'
@@ -100,6 +102,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
     <p v-if="unconfirmed && !saving" class="voucher-error" role="alert">上次操作结果尚未确认，请在未确认操作中恢复后刷新状态。</p>
     <p v-if="requiresRefresh && !error && !unconfirmed && !loading" class="voucher-help" role="status">上次操作已恢复，请刷新凭证状态后再办理。</p>
     <template v-if="view">
+      <FinanceRecoveryNote :advice="voucherRecovery(view)" />
       <p v-if="payment && !view.preparation && !view.operation" class="voucher-help">{{ revoked ? '本轮没有付款凭证记录，审批撤销不代表外部结果可以抹去。' : '成功付款后生成付款凭证；全额冲销或零金额结算不生成付款凭证。' }}</p>
       <div class="voucher-stages"><article><small>会计依据</small><strong>{{ view.preparation ? preparationLabels[view.preparation.status] : '尚无凭证准备记录' }}</strong><p v-if="view.preparation">第 {{ view.preparation.attempt }} 次准备 · {{ timeLabel(view.preparation.createdAt) }}</p><p v-if="view.preparation?.issue">{{ voucherIssue(view.preparation.issue) }}</p></article>
         <article :class="{ posted: view.operation?.status === 'POSTED' }"><small>ERP 过账</small><strong>{{ view.operation ? operationLabels[view.operation.status] : '尚无过账记录' }}</strong><p v-if="view.operation">会计日期 {{ view.operation.accountingDate }} · 尝试处理 {{ view.operation.attempts }} 次</p><p v-if="view.operation?.issue">{{ voucherIssue(view.operation.issue) }}</p></article></div>

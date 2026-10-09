@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { api, writeRequests } from '../api'
+import { paymentRecovery } from '../financeRecovery'
+import FinanceRecoveryNote from './FinanceRecoveryNote.vue'
 import PaymentFacts from './PaymentFacts.vue'
 import { financePaymentInput, financePaymentLabels, financePaymentActionKeys, payeeReviewLabels, validateFinancePayment, validateFinancePaymentReceipt, validatePayeeReviewReceipt, paymentDisputeInput, validatePaymentDisputeReceipt, disputeOutcomeLabels, disputeIssueLabels, paymentError, paymentIssue, type FinancePaymentAction, type FinancePaymentView, type PaymentBinding } from '../payments'
 const props = defineProps<{ applicationId: string; businessId: string; roundNo: number; applicationVersion: number; businessVersion: number; scopeKey: string; locked?: boolean; revoked?: boolean }>()
@@ -78,6 +80,7 @@ onUnmounted(() => { stop(); unsubscribe(); emit('busy', false) })
     <p v-if="unconfirmed && !saving" class="payment-error" role="alert">上次操作结果尚未确认，请在未确认操作中恢复原请求后刷新。</p>
     <p v-if="requiresRefresh && !unconfirmed && !error" class="payment-help" role="status">请刷新付款状态，核对恢复后的原操作。</p>
     <template v-if="view">
+      <FinanceRecoveryNote :advice="paymentRecovery(view)" />
       <PaymentFacts v-if="view.payment" :payment="view.payment" />
       <p v-else class="payment-help">{{ revoked ? '本轮没有付款授权记录。' : '尚无本轮付款授权。' }}<span v-if="view.payable">本次应付 {{ view.payable.currency }} {{ view.payable.value }}。</span></p>
       <div v-if="view.payeeReview" class="payee-review" aria-label="本人账户复核">

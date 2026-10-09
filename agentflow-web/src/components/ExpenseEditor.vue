@@ -10,6 +10,7 @@ import ExpenseLineEditor from './ExpenseLineEditor.vue'
 import ExpenseFundingPicker from './ExpenseFundingPicker.vue'
 import ExpenseSubmission from './ExpenseSubmission.vue'
 import ExpenseInvoiceAssist from './ExpenseInvoiceAssist.vue'
+import ExpenseHandlingPanel from './ExpenseHandlingPanel.vue'
 import PrecheckExplanationPanel from './PrecheckExplanationPanel.vue'
 import ExpenseDraftAssistPanel from './ExpenseDraftAssistPanel.vue'
 import { fillExpenseFromAssist, expenseAssistError, type ExpenseAssistDetail } from '../expenseDraftAssist'
@@ -20,12 +21,13 @@ const props = defineProps<{ scopeKey: string; initial?: ExpenseDetail; locked?: 
 const emit = defineEmits<{ close: []; submitted: [applicationId: string]; busy: [value: boolean] }>()
 const state = ref<ExpenseDraftState>({ detail: null, content: emptyExpense(), businessNo: '', definition: null, baseline: JSON.stringify(emptyExpense()), pending: null, requiresRefresh: false })
 const catalog = ref<FinanceCatalog | null>(null), loading = ref(false), saving = ref(false), childBusy = ref(false), error = ref(''), notice = ref(''), discard = ref(false)
-const assistBusy = ref(false)
+const assistBusy = ref(false), handlingBusy = ref(false)
 const explanationBusy = ref(false), explanationDirty = ref(false), explanationRefresh = ref(0)
 const draftAssistBusy = ref(false), draftAssistDirty = ref(false)
+const handlingRefresh = ref(0)
 const draftLocked = computed(() => draftAssistBusy.value || draftAssistDirty.value)
 const explanationLocked = computed(() => explanationBusy.value || explanationDirty.value)
-const assistantLocked = computed(() => explanationLocked.value || draftLocked.value)
+const assistantLocked = computed(() => explanationLocked.value || draftLocked.value || handlingBusy.value)
 const selection = reactive(new DefinitionSelection(api.searchDefinitions, api.getDefinition))
 const sessionKey = computed(() => props.initial?.id ?? '')
 const dirty = computed(() => !!state.value.correction || JSON.stringify(state.value.content) !== state.value.baseline || !state.value.detail && !!state.value.businessNo.trim())
@@ -37,12 +39,17 @@ function locateFinding(finding: PrecheckView['findings'][number]) {
   if (blocked.value || dirty.value) return
   lineEditors.value.find(editor => editor.lineNo === finding.lineNo)?.focusFinding(finding.code)
 }
+const editorRoot = ref<HTMLElement | null>(null)
+/** 同一编辑器内定位已有用例，不自动执行写入或跳过来源确认。 */
+function navigateHandling(target: 'invoice' | 'draft' | 'check' | 'explanation') {
+  editorRoot.value?.querySelector<HTMLElement>(`[data-handling="${target}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 let epoch = 0, controller: AbortController | null = null, leaving = false
 function preserve() { expenseDrafts.put(props.scopeKey, sessionKey.value, state.value) }
 function stop() { epoch++; controller?.abort(); controller = null; selection.clear() }
 function initialize() {
   leaving = false
-  draftAssistBusy.value = false; draftAssistDirty.value = false
+  draftAssistBusy.value = false; draftAssistDirty.value = false; handlingBusy.value = false
   explanationBusy.value = false; explanationDirty.value = false; explanationRefresh.value = 0
   stop(); loading.value = false; saving.value = false; childBusy.value = false; assistBusy.value = false; discard.value = false; error.value = ''; notice.value = ''; catalog.value = null
   const restored = expenseDrafts.get(props.scopeKey, sessionKey.value)
@@ -176,17 +183,19 @@ const unsubscribe = expenseDrafts.subscribe((scope, key) => {
 })
 watch(() => [props.scopeKey, props.initial?.id], initialize, { immediate: true, flush: 'sync' })
 watch(state, preserve, { deep: true, flush: 'sync' })
+watch(() => childBusy.value || draftAssistBusy.value || explanationBusy.value, (busy, previous) => { if (previous && !busy) handlingRefresh.value++ })
 watch(() => [saving.value, childBusy.value, assistBusy.value, assistantLocked.value, dirty.value, !!state.value.pending], () => emit('busy', saving.value || childBusy.value || assistBusy.value || assistantLocked.value || dirty.value || !!state.value.pending), { immediate: true, flush: 'sync' })
 onUnmounted(() => { if (!leaving) preserve(); stop(); unsubscribe(); emit('busy', false) })
 </script>
 
 <template>
-  <section class="expense-editor" aria-label="报销填报">
+  <section ref="editorRoot" class="expense-editor" aria-label="报销填报">
     <div class="editor-heading"><div><p class="eyebrow">EXPENSE APPLICATION</p><h3>{{ state.detail ? '编辑报销与提交' : '填写新的报销单' }}</h3><p>{{ state.detail ? `${state.businessNo} · 保存后沿用原流程版本` : '先填写费用并保存，再核对本轮财务事实。' }}</p></div><button type="button" class="secondary" :disabled="saving || childBusy || assistBusy || assistantLocked || locked" @click="close">返回</button></div>
     <p v-if="notice" class="editor-notice" role="status">{{ notice }}</p>
     <p v-if="error || selection.error" class="editor-error" role="alert">{{ error || selection.error }}</p>
     <div v-if="discard" class="discard-confirmation" role="group" aria-label="处理未保存的费用内容"><p>本地内容尚未保存。返回会放弃这些修改；已经保存的单据和待恢复请求仍保留。</p><button type="button" class="secondary" @click="discard = false">继续填写</button><button type="button" class="return" :disabled="saving || childBusy || assistBusy || assistantLocked || locked" @click="leave">放弃本地修改并返回</button></div>
     <div v-if="state.requiresRefresh && !state.pending" class="editor-notice"><p>请先核对服务器当前版本。读取会替换本地未保存内容，不会自动再次保存。</p><button v-if="state.detail" type="button" class="secondary" :disabled="saving || childBusy || assistBusy || assistantLocked || locked" @click="reloadSaved">放弃本地修改并读取服务器版本</button><button v-else type="button" class="secondary" :disabled="locked" @click="state.requiresRefresh = false">修正填报内容</button></div>
+    <ExpenseHandlingPanel v-if="state.detail" :report="state.detail" :scope-key="scopeKey" :dirty="dirty" :refresh-version="handlingRefresh + explanationRefresh" :locked="!!locked || saving || childBusy || assistBusy || explanationLocked || draftLocked || state.requiresRefresh" @busy="handlingBusy = $event" @navigate="navigateHandling" />
     <p v-if="loading" class="editor-help" role="status">正在读取本人可用的财务目录…</p>
     <button type="button" class="quiet catalog-refresh" :disabled="loading || saving || childBusy || assistBusy || assistantLocked || locked" @click="loadCatalog">{{ catalog ? '刷新财务目录' : '重试财务目录' }}</button>
     <section v-if="state.correction" class="correction-checklist" aria-label="本次补正清单">
@@ -203,16 +212,16 @@ onUnmounted(() => { if (!leaving) preserve(); stop(); unsubscribe(); emit('busy'
         <p v-if="entity" class="editor-help">{{ entity.paperReceiptRequired ? '该法人要求提交纸质原件，后续需在收单节点签收。' : '该法人当前不要求纸质原件签收。' }}</p>
         <ExpenseLineEditor v-for="(line, index) in state.content.lines" ref="lineEditors" :key="line.lineNo" v-model="state.content.lines[index]!" :catalog="catalog" :legal-entity-id="state.content.legalEntityId" :report-type="state.content.type" :scope-key="scopeKey" :locked="!!blocked" @remove="state.content.lines.splice(index, 1)" />
         <button type="button" class="secondary" :disabled="blocked || !entity || state.content.lines.length >= 200" @click="addLine">＋ 添加费用行</button>
-        <ExpenseInvoiceAssist v-model="state.content" :scope-key="scopeKey" :report-id="state.detail?.id" :locked="!!locked || saving || childBusy || loading || assistantLocked || state.requiresRefresh" @busy="assistBusy = $event" />
+        <ExpenseInvoiceAssist data-handling="invoice" v-model="state.content" :scope-key="scopeKey" :report-id="state.detail?.id" :locked="!!locked || saving || childBusy || loading || assistantLocked || state.requiresRefresh" @busy="assistBusy = $event" />
         <ExpenseFundingPicker v-model="state.content" :scope-key="scopeKey" :report-id="state.detail?.id" :base-currency="entity?.baseCurrency ?? ''" :locked="!!blocked" />
         <div class="save-toolbar"><span>{{ dirty ? '有未保存的内容' : state.detail ? '当前费用内容已保存' : '允许先保存不含费用行的草稿' }}</span><button class="primary" :disabled="blocked || loading || selection.loading || !state.detail && !state.definition">{{ saving ? '正在保存…' : state.correction ? '确认补正并重新预检' : '保存费用草稿' }}</button></div>
       </fieldset>
     </form>
-    <ExpenseDraftAssistPanel v-if="state.detail && catalog" :scope-key="scopeKey" :report="state.detail" :catalog="catalog" :application-dirty="dirty" :locked="!!locked || saving || childBusy || assistBusy || explanationLocked || loading || state.requiresRefresh" @busy="draftAssistBusy = $event" @dirty="draftAssistDirty = $event" @fill="applyDraftAssist" />
+    <ExpenseDraftAssistPanel data-handling="draft" v-if="state.detail && catalog" :scope-key="scopeKey" :report="state.detail" :catalog="catalog" :application-dirty="dirty" :locked="!!locked || saving || childBusy || assistBusy || explanationLocked || handlingBusy || loading || state.requiresRefresh" @busy="draftAssistBusy = $event" @dirty="draftAssistDirty = $event" @fill="applyDraftAssist" />
     <p v-else-if="!state.detail" class="editor-help">保存费用草稿后，可按行程生成费用行、类别和分摊建议。</p>
-    <ExpenseSubmission v-if="state.detail?.editable && !dirty && !state.requiresRefresh && entity" :detail="state.detail" :queued-precheck-id="state.queuedPrecheckId" :scope-key="scopeKey" :time-zone="entity.timeZone" :locked="!!locked || saving || assistBusy || assistantLocked" @busy="childBusy = $event" @submitted="submitted" @offsets="applyOffsets" @checked="explanationRefresh++" @locate="locateFinding" />
+    <ExpenseSubmission data-handling="check" v-if="state.detail?.editable && !dirty && !state.requiresRefresh && entity" :detail="state.detail" :queued-precheck-id="state.queuedPrecheckId" :scope-key="scopeKey" :time-zone="entity.timeZone" :locked="!!locked || saving || assistBusy || assistantLocked" @busy="childBusy = $event" @submitted="submitted" @offsets="applyOffsets" @checked="explanationRefresh++" @locate="locateFinding" />
     <p v-else-if="state.detail && dirty" class="editor-help">请先保存当前修改，再执行费用预检或提交。</p>
-    <PrecheckExplanationPanel v-if="state.detail" correction-enabled :report-id="state.detail.id" :scope-key="scopeKey" :application-version="state.detail.applicationVersion" :financial-version="state.detail.financialVersion" :editable="state.detail.editable" :application-dirty="dirty" :refresh-version="explanationRefresh" :locked="!!locked || saving || childBusy || assistBusy || draftLocked || loading || state.requiresRefresh" @busy="explanationBusy = $event" @dirty="explanationDirty = $event" @correct="beginCorrection" />
+    <PrecheckExplanationPanel data-handling="explanation" v-if="state.detail" correction-enabled :report-id="state.detail.id" :scope-key="scopeKey" :application-version="state.detail.applicationVersion" :financial-version="state.detail.financialVersion" :editable="state.detail.editable" :application-dirty="dirty" :refresh-version="explanationRefresh" :locked="!!locked || saving || childBusy || assistBusy || draftLocked || handlingBusy || loading || state.requiresRefresh" @busy="explanationBusy = $event" @dirty="explanationDirty = $event" @correct="beginCorrection" />
   </section>
 </template>
 

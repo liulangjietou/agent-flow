@@ -18,9 +18,10 @@ public class PrecheckExplanationWorker {
     private final JdbcPrecheckExplanationRepository runs;
     private final PrecheckExplanationService service;
     private final PrecheckExplanationModelPort model;
+    private final AgentExecutionTelemetry telemetry;
     /** 持久队列统一协调多进程领取，模型只接收冻结的授权来源。 */
-    public PrecheckExplanationWorker(JdbcPrecheckExplanationRepository runs, PrecheckExplanationService service, PrecheckExplanationModelPort model) {
-        this.runs = runs; this.service = service; this.model = model;
+    public PrecheckExplanationWorker(JdbcPrecheckExplanationRepository runs, PrecheckExplanationService service, PrecheckExplanationModelPort model, AgentExecutionTelemetry telemetry) {
+        this.runs = runs; this.service = service; this.model = model; this.telemetry = telemetry;
     }
     /** 每批最多十项，已失效或已被其他进程领取的记录不会外发。 */
     public void poll() {
@@ -30,11 +31,12 @@ public class PrecheckExplanationWorker {
                     TRACE_SOURCE, candidate.id().toString())
                     .withBusiness(candidate.businessNo(), null, null).open()) {
                 try {
-                    var context = service.claim(candidate.tenantId(), candidate.id(), Instant.now());
+                    Instant claimedAt = Instant.now();
+                    var context = service.claim(candidate.tenantId(), candidate.id(), claimedAt);
                     if (context == null || !service.sendable(context, Instant.now())) continue;
                     LOG.info("Agent execution claimed, errorCode={}, runId={}", "NONE", candidate.id());
                     PrecheckExplanationSuggestion suggestion = null; AssistRun.Failure failure = null;
-                    try { suggestion = model.generate(context); }
+                    try { suggestion = telemetry.execute(candidate.tenantId(), context.requestedBy(), AgentExecutionUsage.Kind.PRECHECK_EXPLANATION, context.id(), claimedAt, () -> model.generate(context)); }
                     catch (AssistModelPort.ModelFailure unavailable) { failure = unavailable.failure(); }
                     service.finish(context.tenantId(), context.id(), suggestion, failure, Instant.now());
                 } catch (RuntimeException failure) {
