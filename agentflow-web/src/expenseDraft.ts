@@ -195,6 +195,8 @@ export function fillExpenseLineFromInvoice(line: ExpenseLine, invoice: InvoiceIt
 export interface ExpenseDraftState {
   detail: ExpenseDetail | null; content: ExpenseContent; businessNo: string; definition: Definition | null; baseline: string
   pending: { path: string; body: string } | null; requiresRefresh: boolean
+  correction?: import('./precheckExplanation').ExpenseCorrectionSelection | null
+  queuedPrecheckId?: string
 }
 function copy<T>(value: T): T { return JSON.parse(JSON.stringify(value)) as T }
 /** 页面内的费用输入按身份和编辑入口隔离；仅原保存回执可以推进原版本。 */
@@ -204,15 +206,15 @@ export class ExpenseDrafts {
   get(scope: string, key: string) { const value = this.drafts.get(JSON.stringify([scope, key])); return value ? copy(value) : null }
   put(scope: string, key: string, value: ExpenseDraftState) { if (scope) this.drafts.set(JSON.stringify([scope, key]), copy(value)) }
   clear(scope: string, key: string) { this.drafts.delete(JSON.stringify([scope, key])) }
-  hasDrafts() { return [...this.drafts.values()].some(value => JSON.stringify(value.content) !== value.baseline || !value.detail && !!value.businessNo.trim() || !!value.pending) }
+  hasDrafts() { return [...this.drafts.values()].some(value => JSON.stringify(value.content) !== value.baseline || !value.detail && !!value.businessNo.trim() || !!value.pending || !!value.correction) }
   subscribe(listener: (scope: string, key: string) => void) { this.listeners.add(listener); return () => this.listeners.delete(listener) }
-  acknowledge(scope: string, path: string, body: string, result: ExpenseDetail): boolean {
-    if (path !== '/expense-reports' && !/^\/expense-reports\/[^/]+\/revise$/.test(path)) return false
+  acknowledge(scope: string, path: string, body: string, result: ExpenseDetail, queuedPrecheckId?: string): boolean {
+    if (path !== '/expense-reports' && !/^\/expense-reports\/[^/]+\/(?:revise|precheck-explanations\/[^/]+\/correct)$/.test(path)) return false
     for (const [storedKey, state] of this.drafts) {
       const [owner, key] = JSON.parse(storedKey) as [string, string]
       if (owner !== scope || state.pending?.path !== path || state.pending.body !== body || !result.id || !result.applicationId
         || state.detail && (state.detail.id !== result.id || state.detail.applicationId !== result.applicationId)) continue
-      const next = { ...state, detail: result, content: result.content, businessNo: result.businessNo, baseline: JSON.stringify(result.content), pending: null, requiresRefresh: false }
+      const next = { ...state, detail: result, content: result.content, businessNo: result.businessNo, baseline: JSON.stringify(result.content), pending: null, requiresRefresh: false, correction: null, queuedPrecheckId }
       this.put(scope, key, next)
       this.listeners.forEach(listener => listener(scope, key))
       return true

@@ -119,7 +119,7 @@ import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type
 import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage, type FinancialNotificationTarget, type VoucherNotificationTarget, type BudgetNotificationTarget, type ReversalNotificationTarget, type DisbursementReturnNotificationTarget, type RepaymentReviewNotificationTarget, type ExpensePartialAdjustmentNotificationTarget, type ExpenseAdjustmentNotificationTarget, type SupplierPayableNotificationTarget, type BudgetAdjustmentNotificationTarget, type RepaymentNotificationTarget, type ExpenseReturnNotificationTarget, type SupplierReturnNotificationTarget, type SupplierAdjustmentNotificationTarget, type SupplierSettlementNotificationTarget, type ExpenseSettlementNotificationTarget, type ReversalCheckNotificationTarget } from './api'
 import type { PendingWrite } from './pendingWrites.js'
 import { rememberDraftRun, type DraftAssistReceipt } from './draftAssist'
-import { acknowledgeExplanation, type ExplanationReceipt } from './precheckExplanation'
+import { acknowledgeExplanation, type ExpenseCorrectionReceipt, type ExplanationReceipt } from './precheckExplanation'
 import { acknowledgeRisk, type RiskReceipt } from './expenseRisk'
 import { acknowledgeExpenseAssist, type ExpenseAssistReceipt } from './expenseDraftAssist'
 import { acknowledgeExtraction, extractionDrafts, type ExtractionReceipt } from './invoiceExtraction'
@@ -1420,6 +1420,12 @@ async function recoverOperation(id: string) {
       } else if (/^\/expense-reports\/[^/?]+\/precheck-explanations(?:\/[^/?]+\/review)?$/.test(request.path)) {
         acknowledgeExplanation(actorScope.value, request.path, result as ExplanationReceipt)
         notice.value = '原预检解释操作已确认，请核对同一条记录；费用金额、检查结论和审批状态保持不变。'
+      } else if (/^\/expense-reports\/[^/?]+\/precheck-explanations\/[^/?]+\/correct$/.test(request.path)) {
+        const value = result as ExpenseCorrectionReceipt
+        const restored = expenseDrafts.acknowledge(actorScope.value, request.path, request.body!, value.expense, value.precheckId)
+        if (!restored) recordApplicationId.value = value.expense.applicationId
+        notice.value = '原补正已保存并排队预检，请查看新检查结果，再明确提交审批。'
+        templateRefresh.value++
       } else if (/^\/expense-reports\/[^/?]+\/risk-explanations(?:\/[^/?]+\/review)?$/.test(request.path)) {
         acknowledgeRisk(actorScope.value, request.path, request.body!, result as RiskReceipt)
         notice.value = '原风险复核操作已确认，请核对同一条记录。'

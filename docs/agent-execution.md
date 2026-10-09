@@ -39,7 +39,7 @@
 
 ## 部署与运行
 
-默认 `agentflow.assist.enabled=false`。普通 Java 部署通过 `AGENTFLOW_ASSIST_ENABLED`、`AGENTFLOW_ASSIST_ENDPOINT`、`AGENTFLOW_ASSIST_PROVIDER`、`AGENTFLOW_ASSIST_MODEL`、`AGENTFLOW_ASSIST_API_KEY` 和 `AGENTFLOW_ASSIST_TIMEOUT_SECONDS` 配置；超时 1–120 秒，默认 45 秒。`AGENTFLOW_ASSIST_WORKER_ENABLED=false` 可停止新任务轮询，持久任务与历史仍保留。启用后每秒扫描最多 10 项，模型使用专用单线程池；普通调度和 Flowable 继续使用原自动配置。
+默认 `agentflow.assist.enabled=false`。普通 Java 部署通过 `AGENTFLOW_ASSIST_ENABLED`、`AGENTFLOW_ASSIST_ENDPOINT`、`AGENTFLOW_ASSIST_PROVIDER`、`AGENTFLOW_ASSIST_MODEL`、`AGENTFLOW_ASSIST_API_KEY` 和 `AGENTFLOW_ASSIST_TIMEOUT_SECONDS` 配置；超时 1–120 秒，默认 45 秒。`AGENTFLOW_ASSIST_WORKER_ENABLED=false` 可停止新任务轮询，持久任务与历史仍保留。启用后摘要、普通草稿、预检解释、费用填报、费用风险五类任务分别按固定延时轮询，每类每批最多 10 项，共用专用的五线程有界调度池。一个慢模型请求不再阻塞其他类别；同类固定延时任务不会重叠，不同实例仍由数据库租约领取。普通调度和 Flowable 继续使用原自动配置。
 
 生产 Compose 叠加 `compose.assist.yml`，模型 API key 放到受控文件，`AGENTFLOW_ASSIST_API_KEY_FILE` 只保存路径；入口拒绝空文件、不可读文件以及正文/文件双配置，不打印凭据。先用维护身份执行 V32 迁移，再滚动启动服务；历史 Agent 记录不会自动调用模型。端点必须是可信部署配置，前端只能确认指纹，不能改地址。示例 `model.example` 不是可调用服务。
 
@@ -48,3 +48,9 @@
 合成夹具先运行 `python3 scripts/assist_model_fixture.py --port 18219`，演示服务模型端点设置为 `http://127.0.0.1:18219/v1/chat/completions`、模型名设置为 `loopback-synthetic-model`、提供者为 `loopback-fixture`。夹具不读取真实凭据、不记录正文，只能用于合成材料。
 
 协议复验脚本：`python3 scripts/check-assist-execution.py http://127.0.0.1:18210 --exercise`，仅允许显式回环演示地址，要求已启用配套合成模型（期望响应模型标识 `loopback-synthetic-model-v1`），保留合成申请。真实凭据、真实模型质量和企业环境验收仍未完成。
+
+## 模型用量与耗时（2026-10-09）
+
+六类 OpenAI 兼容适配器共用的 `OpenAiTextClient` 记录响应耗时、提示版本和提供者返回的 `prompt_tokens`、`completion_tokens`、`total_tokens`，沿用工作器恢复的追踪上下文。`REPORTED` 表示收到一致的非负整数，`NOT_REPORTED` 表示提供者未给出用量，`INVALID` 表示格式、范围或合计不一致。后两者的 token 值为 null，不能按零计费。传输失败单独记录受控错误码与耗时，不输出凭据、发送正文、响应正文或账户数据。
+
+这些日志用于接入日志系统观察传输情况，没有模型定价、账单核算或用量持久台账；收到合法 JSON 也不代表业务建议通过校验。企业模型厂商尚未选定，当前证据来自本机合成模型。

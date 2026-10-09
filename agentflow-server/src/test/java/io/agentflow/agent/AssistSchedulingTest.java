@@ -15,6 +15,40 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AssistSchedulingTest {
     @Test
+    void slowSummaryDoesNotBlockExpenseRiskOrCorrections() {
+        var entered = new java.util.concurrent.CountDownLatch(1);
+        var release = new java.util.concurrent.CountDownLatch(1);
+        var summaries = org.mockito.Mockito.mock(AssistWorker.class);
+        var explanations = org.mockito.Mockito.mock(PrecheckExplanationWorker.class);
+        var risks = org.mockito.Mockito.mock(ExpenseRiskWorker.class);
+        org.mockito.Mockito.doAnswer(invocation -> {
+            entered.countDown();
+            release.await();
+            return null;
+        }).when(summaries).poll();
+        new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, AssistScheduling.class)
+                .withConfiguration(AutoConfigurations.of(TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
+                .withBean(AssistWorker.class, () -> summaries)
+                .withBean(DraftAssistWorker.class, () -> org.mockito.Mockito.mock(DraftAssistWorker.class))
+                .withBean(PrecheckExplanationWorker.class, () -> explanations)
+                .withBean(ExpenseDraftAssistWorker.class, () -> org.mockito.Mockito.mock(ExpenseDraftAssistWorker.class))
+                .withBean(ExpenseRiskWorker.class, () -> risks)
+                .withBean(org.springframework.transaction.PlatformTransactionManager.class, () ->
+                        new org.springframework.jdbc.datasource.DataSourceTransactionManager(
+                                new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:h2:mem:assist-concurrent", "sa", "")))
+                .withPropertyValues("agentflow.assist.enabled=true", "agentflow.assist.poll-delay-ms=10")
+                .run(context -> {
+                    try {
+                        assertThat(entered.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+                        org.mockito.Mockito.verify(explanations, org.mockito.Mockito.timeout(1000).atLeastOnce()).poll();
+                        org.mockito.Mockito.verify(risks, org.mockito.Mockito.timeout(1000).atLeastOnce()).poll();
+                    } finally {
+                        release.countDown();
+                    }
+                });
+    }
+
+    @Test
     void enabledPollerActuallySchedulesExpenseDraftWork() {
         var summaries = org.mockito.Mockito.mock(AssistWorker.class);
         var ordinaryDrafts = org.mockito.Mockito.mock(DraftAssistWorker.class);
@@ -33,9 +67,9 @@ class AssistSchedulingTest {
                 .run(context -> {
                     assertThat(context).hasBean("assistPoller");
                     org.mockito.Mockito.verify(expenseDrafts, org.mockito.Mockito.timeout(5000).atLeastOnce()).poll();
-                    org.mockito.Mockito.verify(summaries, org.mockito.Mockito.atLeastOnce()).poll();
-                    org.mockito.Mockito.verify(ordinaryDrafts, org.mockito.Mockito.atLeastOnce()).poll();
-                    org.mockito.Mockito.verify(explanations, org.mockito.Mockito.atLeastOnce()).poll();
+                    org.mockito.Mockito.verify(summaries, org.mockito.Mockito.timeout(5000).atLeastOnce()).poll();
+                    org.mockito.Mockito.verify(ordinaryDrafts, org.mockito.Mockito.timeout(5000).atLeastOnce()).poll();
+                    org.mockito.Mockito.verify(explanations, org.mockito.Mockito.timeout(5000).atLeastOnce()).poll();
                     org.mockito.Mockito.verify(expenseRisks, org.mockito.Mockito.timeout(5000).atLeastOnce()).poll();
                 });
     }

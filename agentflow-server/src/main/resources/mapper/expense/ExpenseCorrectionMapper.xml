@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.expense.mapper.ExpenseCorrectionMapper">
+    <insert id="insert">
+        INSERT INTO expense_correction(tenant_id,run_id,report_id,application_id,application_version,
+            financial_version,precheck_id,applied_by,applied_at)
+        VALUES(#{tenant},#{runId},#{reportId},#{applicationId},#{applicationVersion},#{financialVersion},
+            #{precheckId},#{appliedBy},#{appliedAt})
+    </insert>
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT * FROM expense_correction WHERE tenant_id=#{tenant} AND run_id=#{runId}
+    </select>
+</mapper>

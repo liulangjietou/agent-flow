@@ -5,6 +5,8 @@ import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.ExpenseLine;
 import io.agentflow.expense.ExpensePrecheckJob;
 import io.agentflow.expense.ExpenseReport;
+import io.agentflow.expense.ExpensePolicyConfiguration;
+import io.agentflow.expense.ExpensePolicyDefinition;
 import io.agentflow.finance.Money;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +15,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
@@ -24,8 +27,9 @@ import org.springframework.stereotype.Component;
 @Component
 public class PrecheckExplanationSources {
     private final JsonUtil json;
+    private final ExpensePolicyConfiguration policies;
     /** 序列化后的原始来源文本与 SHA-256 一同冻结。 */
-    public PrecheckExplanationSources(JsonUtil json) { this.json = json; }
+    public PrecheckExplanationSources(JsonUtil json, ExpensePolicyConfiguration policies) { this.json = json; this.policies = policies; }
 
     /** 账户、票号、原件、自由文本和资源归属不属于可发送目录。 */
     public List<AssistModelPort.Source> available(ExpenseReport report, ExpensePrecheckJob job) {
@@ -42,7 +46,27 @@ public class PrecheckExplanationSources {
                     new LineFact(line.lineNo(), line.categoryCode(), line.incurredOn(), line.endedOn(), line.cityCode(),
                             line.quantity(), line.unit(), line.claimedGross(), line.claimedTax(), line.invoiceIds().size(), line.priorRequest() != null)));
         }
+        appendPolicies(report, job, sources);
         return List.copyOf(sources);
+    }
+
+    /** 只投影同一制度版本下确定适用的条款，不外发其他法人或尚待企业事实匹配的规则。 */
+    private void appendPolicies(ExpenseReport report, ExpensePrecheckJob job, List<AssistModelPort.Source> sources) {
+        var observation = job.result().observation();
+        if (observation == null || observation.policySelection() == null) return;
+        var snapshot = policies.snapshot(report.tenantId());
+        if (!Objects.equals(snapshot.selection(), observation.policySelection())) return;
+        var selection = snapshot.selection();
+        for (var line : report.content().lines()) {
+            var candidate = snapshot.current().activePolicy().definition().rules().stream()
+                    .filter(rule -> rule.match().acceptsKnownFacts(report.content().legalEntityId(), line)).findFirst().orElse(null);
+            if (candidate == null) continue;
+            // 首个候选依赖未知事实时不能跳到后面的兜底规则，否则会绕过真实优先级。
+            if (!candidate.match().employeeGrades().isEmpty() || !candidate.match().cityTiers().isEmpty()) continue;
+            sources.add(source("expense:policy[" + line.lineNo() + "]", "第 " + line.lineNo() + " 行适用制度条款",
+                    new PolicyFact(line.lineNo(), selection.policyVersion(), selection.definitionDigest(), candidate.key(), candidate.name(),
+                            candidate.match().fromDate(), candidate.match().throughDate(), candidate.constraints())));
+        }
     }
 
     /** 只保存明确勾选的来源；至少包含结论，业务失败还须选择具体问题。 */
@@ -79,4 +103,11 @@ public class PrecheckExplanationSources {
     private record LineFact(int lineNo, String categoryCode, LocalDate incurredOn, LocalDate endedOn, String cityCode,
                             BigDecimal quantity, ExpenseLine.Unit unit, Money claimedGross, Money claimedTax,
                             int invoiceCount, boolean priorRequestSelected) { }
+
+    /**
+     * 制度版本、正文摘要和规则键支持溯源，最终预检仍核对企业事实与整单依赖。
+     * @author owlzhangfq@gmail.com
+     */
+    private record PolicyFact(int lineNo, long policyVersion, String policyDigest, String ruleKey, String ruleName,
+                              LocalDate fromDate, LocalDate throughDate, ExpensePolicyDefinition.Constraints constraints) { }
 }

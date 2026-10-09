@@ -11,7 +11,7 @@ import AdvanceOffsetSuggestion from './AdvanceOffsetSuggestion.vue'
 import type { AdvanceOffsetSuggestion as OffsetSuggestion } from '../advanceOffsetSuggestion'
 import { invoiceOccupationLabel, type InvoiceConflict } from '../invoiceWallet'
 
-const props = defineProps<{ detail: ExpenseDetail; scopeKey: string; timeZone: string; locked: boolean }>()
+const props = defineProps<{ detail: ExpenseDetail; scopeKey: string; timeZone: string; locked: boolean; queuedPrecheckId?: string }>()
 const emit = defineEmits<{ submitted: [applicationId: string]; busy: [value: boolean]; offsets: [suggestion: OffsetSuggestion]; checked: []; locate: [finding: PrecheckView['findings'][number]] }>()
 const appointment = ref(''), accountingDate = ref(''), options = ref<PrecheckOptions | null>(null), result = ref<PrecheckView | null>(null)
 const reading = ref(false), saving = ref(false), confirm = ref(false), error = ref(''), requiresRefresh = ref(false)
@@ -53,6 +53,11 @@ async function load(jobId?: string, focusOwner?: Element) {
     if (available.applicationVersion !== props.detail.applicationVersion || available.financialVersion !== props.detail.financialVersion) throw new Error('version')
     if (view && view.job.id !== id) throw new Error('binding')
     options.value = available; result.value = view; requiresRefresh.value = false
+    // 只接续本次补正明确返回的新任务；旧任务或他处发起的预检不替用户选择任职。
+    if (view && view.job.id === props.queuedPrecheckId && view.job.applicationVersion === props.detail.applicationVersion
+        && view.job.financialVersion === props.detail.financialVersion && !appointment.value && !accountingDate.value) {
+      appointment.value = view.initiator.appointmentId; accountingDate.value = view.accountingDate
+    }
     if (view?.usable && view.validUntil) expiry = setTimeout(() => {
       if (version !== epoch || !result.value) return
       result.value = { ...result.value, usable: false, unavailableCode: 'FACTS_EXPIRED' }; confirm.value = false
@@ -106,9 +111,10 @@ async function submit() {
 }
 watch(() => [appointment.value, accountingDate.value], () => { confirm.value = false })
 watch(() => result.value ? `${result.value.job.id}:${result.value.job.status}` : '', (value, old) => { if (value && value !== old) emit('checked') })
-watch(() => [props.scopeKey, props.detail.id, props.detail.applicationVersion, props.detail.financialVersion], () => {
+watch(() => [props.scopeKey, props.detail.id, props.detail.applicationVersion, props.detail.financialVersion, props.queuedPrecheckId], () => {
   stop(); appointment.value = ''; accountingDate.value = ''; options.value = null; result.value = null; submissionConflicts.value = []; error.value = ''; saving.value = false; emit('busy', false); requiresRefresh.value = false
-  if (props.scopeKey) void load()
+  pollUntil = props.queuedPrecheckId ? Date.now() + 90_000 : 0
+  if (props.scopeKey) void load(props.queuedPrecheckId)
 }, { immediate: true, flush: 'sync' })
 onUnmounted(() => { stop(); emit('busy', false) })
 </script>

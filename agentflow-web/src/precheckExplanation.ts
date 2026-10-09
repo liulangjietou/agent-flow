@@ -1,6 +1,7 @@
 import type { AssistReference, AssistSource, AssistStatus } from './assistRuns.js'
 import { ownValue } from './formSchema.js'
 import { precheckIssues, precheckStages, precheckStatuses } from './expenseDraft.js'
+import type { ExpenseContent, ExpenseDetail } from './expenses.js'
 
 /** 解释只引用已保存的检查事实，采纳仅记录人工复核。@author owlzhangfq@gmail.com */
 export interface ExplanationInput {
@@ -22,7 +23,17 @@ export interface ExplanationDetail extends ExplanationSummary {
   failure: 'MODEL_UNAVAILABLE' | 'MODEL_TIMEOUT' | 'INVALID_MODEL_OUTPUT' | 'INPUT_UNAVAILABLE' | null
   review: { actor: string; at: string; selectedIssueIds: string[]; comment?: string | null } | null
   canAdopt: boolean; unavailableCode: string | null
+  correction?: { runId: string; reportId: string; applicationId: string; applicationVersion: number; financialVersion: number; precheckId: string; appliedBy: string; appliedAt: string }
 }
+export interface ExpenseCorrectionSelection {
+  runId: string; expectedRunVersion: number; applicationVersion: number; financialVersion: number
+  selectedIssueIds: string[]; comment: string; validUntil: string; items: ExplanationItem[]
+}
+export interface ExpenseCorrectionInput {
+  expectedRunVersion: number; applicationVersion: number; financialVersion: number
+  selectedIssueIds: string[]; comment: string; content: ExpenseContent
+}
+export interface ExpenseCorrectionReceipt { runId: string; precheckId: string; expense: ExpenseDetail }
 export interface ExplanationGenerate { precheckId: string; applicationVersion: number; financialVersion: number; targetDigest: string; sourceIds: string[] }
 export interface ExplanationReview { expectedRunVersion: number; action: 'ADOPT' | 'DISMISS'; selectedIssueIds?: string[]; comment?: string }
 export interface ExplanationReceipt { id: string; status: AssistStatus; version: number }
@@ -49,7 +60,7 @@ function summary(v: unknown): v is ExplanationSummary {
 function sources(v: unknown, maximum: number): v is AssistSource[] {
   return Array.isArray(v) && v.length <= maximum && v.every(s => object(s) && text(s.label) && typeof s.content === 'string'
     && object(s.reference) && typeof s.reference.sourceId === 'string'
-    && /^(?:precheck:result|precheck:finding\[(?:0|[1-9][0-9]*)\]|expense:line\[[1-9][0-9]*\])$/.test(s.reference.sourceId)
+    && /^(?:precheck:result|precheck:finding\[(?:0|[1-9][0-9]*)\]|expense:(?:line|policy)\[[1-9][0-9]*\])$/.test(s.reference.sourceId)
     && digest(s.reference.contentDigest)) && new Set(v.map(s => s.reference.sourceId)).size === v.length
 }
 function issueIds(result: string, values: AssistSource[]) {
@@ -63,7 +74,7 @@ export function readExplanationInput(value: unknown, precheckId: string): Explan
   if (!object(value) || !uuid(value.precheckId) || value.precheckId !== precheckId || !positive(value.applicationVersion)
       || !positive(value.financialVersion) || !positive(value.attempt) || !ownValue(precheckStatuses, String(value.result))
       || !nullableTime(value.checkedAt) || !nullableTime(value.validUntil) || typeof value.enabled !== 'boolean'
-      || !nullableText(value.unavailableCode) || !sources(value.sources, 411)) throw unreadable()
+      || !nullableText(value.unavailableCode) || !sources(value.sources, 611)) throw unreadable()
   if (value.enabled) {
     if (!terminal(value.result) || !time(value.checkedAt) || !time(value.validUntil) || Date.parse(value.validUntil) <= Date.parse(value.checkedAt)
         || value.unavailableCode !== null || !text(value.providerId) || !text(value.model) || !text(value.destination) || !digest(value.targetDigest)) throw unreadable()
@@ -112,7 +123,41 @@ export function readExplanationDetail(value: unknown, id: string): ExplanationDe
         || r.comment != null && (typeof r.comment !== 'string' || r.comment.length > 2000)
         || (d.status === 'ADOPTED' ? !r.selectedIssueIds.length || Date.parse(r.at) >= Date.parse(d.validUntil) : r.selectedIssueIds.length > 0)) throw unreadable()
   } else if (d.review !== null) throw unreadable()
+  if (d.correction != null) {
+    const c = d.correction
+    if (d.status !== 'ADOPTED' || d.result === 'READY' || c.runId !== d.id || !uuid(c.reportId) || !uuid(c.applicationId)
+        || !uuid(c.precheckId) || c.precheckId === d.precheckId || c.applicationVersion !== d.applicationVersion + 1
+        || c.financialVersion !== d.financialVersion + 1 || c.appliedBy !== d.review?.actor || !time(c.appliedAt)
+        || Date.parse(c.appliedAt) < Date.parse(d.review!.at)) throw unreadable()
+  }
   return d
+}
+/** 开始补正只保留已核对的解释，不把模型文字变成金额或审批指令。 */
+export function correctionSelection(detail: ExplanationDetail, selected: string[], comment: string, now = Date.now()): ExpenseCorrectionSelection {
+  if (!detail.canAdopt || detail.status !== 'COMPLETED' || detail.result === 'READY' || Date.parse(detail.validUntil) <= now
+      || !selected.length || new Set(selected).size !== selected.length || comment.length > 2000
+      || !selected.every(id => detail.suggestion?.items.some(item => item.issueSourceId === id))) throw new Error('请核对仍有效的失败检查并勾选要补正的问题。')
+  return { runId: detail.id, expectedRunVersion: detail.version, applicationVersion: detail.applicationVersion,
+    financialVersion: detail.financialVersion, selectedIssueIds: [...selected], comment, validUntil: detail.validUntil,
+    items: JSON.parse(JSON.stringify(detail.suggestion!.items.filter(item => selected.includes(item.issueSourceId)))) }
+}
+/** 成功响应必须绑定原解释、单据及递增双版本，缺失的新预检回执继续按未知写入恢复。 */
+export function validateCorrectionReceipt(value: unknown, path: string, body: string): ExpenseCorrectionReceipt {
+  const route = /^\/expense-reports\/([^/?]+)\/precheck-explanations\/([^/?]+)\/correct$/.exec(path)
+  const input = JSON.parse(body) as ExpenseCorrectionInput
+  if (!route || !object(value) || value.runId !== decodeURIComponent(route[2]!) || !uuid(value.precheckId) || !object(value.expense)) throw unreadable()
+  const expense = value.expense
+  if (expense.id !== decodeURIComponent(route[1]!) || !uuid(expense.applicationId) || !text(expense.businessNo)
+      || expense.applicationVersion !== input.applicationVersion + 1 || expense.financialVersion !== input.financialVersion + 1
+      || !positive(expense.roundNo) || expense.editable !== true || !['DRAFT', 'RETURNED', 'WITHDRAWN'].includes(String(expense.applicationStatus))
+      || expense.financialRound != null || !object(expense.content) || expense.content.legalEntityId !== input.content.legalEntityId
+      || expense.content.type !== input.content.type || !text(expense.content.title) || !Array.isArray(expense.content.lines)
+      || expense.content.lines.length !== input.content.lines.length || !Array.isArray(expense.content.advanceOffsets)
+      || new Set(expense.content.lines.map(line => object(line) ? line.lineNo : null)).size !== expense.content.lines.length
+      || !expense.content.lines.every(line => object(line) && input.content.lines.some(original => original.lineNo === line.lineNo)
+        && text(line.categoryCode) && text(line.incurredOn) && object(line.claimedGross) && text(line.claimedGross.currency)
+        && typeof line.claimedGross.value === 'string' && object(line.claimedTax) && Array.isArray(line.allocations) && Array.isArray(line.invoiceIds))) throw unreadable()
+  return value as unknown as ExpenseCorrectionReceipt
 }
 /** 核对成功回执后才能清除原幂等请求；错误编号或状态仍属于结果未知。 */
 export function validateExplanationReceipt(value: unknown, path: string, body: string): ExplanationReceipt {
@@ -156,6 +201,7 @@ export function explanationSourceLabel(source: AssistSource): string {
 const messages: Record<string, string> = {
   AGENT_MODEL_DISABLED: '模型服务尚未启用，请联系管理员配置。', AGENT_MODEL_UNCONFIGURED: '模型配置不可用，请联系管理员检查。',
   AGENT_TARGET_CHANGED: '模型目的地已变化，请刷新发送目录后重新选择。', AGENT_INPUT_CHANGED: '检查依据已变化，请重新预检。',
+  AGENT_CORRECTION_NOT_REQUIRED: '本次预检已通过，无需从这条解释发起补正。',
   PRECHECK_EXPLANATION_REFRESH_REQUIRED: '这次检查没有可用的解释依据，请重新执行费用预检。',
   AGENT_RUN_ACTIVE: '本单已有解释正在生成，请刷新记录。', AGENT_RUN_STATE_CONFLICT: '解释已被处理，请刷新记录。',
   CONCURRENCY_CONFLICT: '单据或解释版本已变化，请刷新后核对。', VERSION_CHANGED: '单据版本已变化，请重新预检。',

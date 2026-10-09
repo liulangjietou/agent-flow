@@ -4,13 +4,13 @@ import { api } from '../api'
 import { precheckStatuses } from '../expenseDraft'
 import { isDefinitiveWriteFailure } from '../pendingWrites'
 import { explanationError, explanationFailures, explanationSelection, explanationSourceLabel, explanationStatuses,
-  focusedExplanation, rememberExplanation, subscribeExplanationRecovery,
-  type ExplanationInput, type ExplanationPage, type ExplanationDetail, type ExplanationReview } from '../precheckExplanation'
+  focusedExplanation, rememberExplanation, subscribeExplanationRecovery, correctionSelection,
+  type ExplanationInput, type ExplanationPage, type ExplanationDetail, type ExplanationReview, type ExpenseCorrectionSelection } from '../precheckExplanation'
 import type { AssistReference } from '../assistRuns'
 
 const props = defineProps<{ reportId: string; scopeKey: string; applicationVersion: number; financialVersion: number
-  editable: boolean; locked: boolean; applicationDirty: boolean; refreshVersion?: number }>()
-const emit = defineEmits<{ busy: [value: boolean]; dirty: [value: boolean] }>()
+  editable: boolean; locked: boolean; applicationDirty: boolean; refreshVersion?: number; correctionEnabled?: boolean }>()
+const emit = defineEmits<{ busy: [value: boolean]; dirty: [value: boolean]; correct: [value: ExpenseCorrectionSelection] }>()
 const options = ref<ExplanationInput | null>(null), page = ref<ExplanationPage | null>(null), detail = ref<ExplanationDetail | null>(null)
 const sourceIds = ref<string[]>([]), selected = ref<string[]>([]), selectedId = ref(''), comment = ref('')
 const error = ref(''), notice = ref(''), sending = ref(false), unknown = ref(false), denied = ref(false), now = ref(Date.now())
@@ -95,6 +95,15 @@ function writeFailed(cause: unknown) {
   error.value = explanationError(cause)
   unknown.value = !isDefinitiveWriteFailure(cause)
 }
+/** 先进入人工编辑，最终保存成功时才记录采纳并生成新预检。 */
+function startCorrection() {
+  now.value = Date.now()
+  if (!props.correctionEnabled || !canReview.value || !current.value || !detail.value) return
+  try {
+    const selection = correctionSelection(detail.value, selected.value, comment.value)
+    clearSelection(); emit('correct', selection)
+  } catch (cause) { error.value = explanationError(cause) }
+}
 /** 发送的只有来源标识及固定版本，正文、金额和业务结论由服务器读取。 */
 async function generate() {
   now.value = Date.now()
@@ -157,7 +166,7 @@ onUnmounted(() => { active = false; abortReads(); clearTimeout(expiry); unsubscr
 <template>
   <section class="precheck-explanation" aria-label="预检解释与补正建议">
     <header><div><h3>预检解释与补正建议</h3><p>选择要解释的检查问题，核对来源后记录人工意见。</p></div><span class="explanation-tag">人工复核</span></header>
-    <p>模型解释供补正参考，采纳只记录意见。金额、费用检查结论和审批状态由原业务流程确定。</p>
+    <p>可记录复核意见，也可按建议进入补正。核对并保存费用后，系统接续预检；正式提交审批仍由本人确认。</p>
     <p v-if="applicationDirty" class="explanation-warning">费用有未保存修改，请先保存，再生成或采纳解释。</p>
     <p v-if="error" class="explanation-error" role="alert">{{ error }}</p><p v-if="notice" role="status">{{ notice }}</p>
     <p v-if="unknown" class="explanation-warning" role="status">写入结果尚未确认，请使用页面的“恢复原操作”，不要重新发起。</p>
@@ -171,7 +180,7 @@ onUnmounted(() => { active = false; abortReads(); clearTimeout(expiry); unsubscr
         <template v-else>
           <p class="explanation-destination">发送至 {{ options.providerId }} · {{ options.model }} · {{ options.destination }}</p>
           <p v-if="!inputCurrent" class="explanation-warning">检查依据已过期或单据已变化，请重新预检并刷新目录。</p>
-          <p>勾选原检查结论及要解释的问题，可附选费用行。最多 20 个问题、64 项来源；未勾选的内容不发送。</p>
+          <p>勾选原检查结论及要解释的问题，可附选费用行和适用制度条款。最多 20 个问题、64 项来源；未勾选的内容不发送。</p>
           <fieldset :disabled="locked || reviewDirty || !inputCurrent"><legend>已选 {{ sourceIds.length }} 项来源</legend>
             <div v-for="source in options.sources" :key="source.reference.sourceId" class="explanation-source">
               <label><input v-model="sourceIds" type="checkbox" :value="source.reference.sourceId" />{{ explanationSourceLabel(source) }}</label>
@@ -206,10 +215,11 @@ onUnmounted(() => { active = false; abortReads(); clearTimeout(expiry); unsubscr
           </article>
           <template v-if="detail.status === 'COMPLETED'">
             <label class="explanation-comment">复核说明（可选）<textarea v-model="comment" rows="3" maxlength="2000" :disabled="!canReview" /></label>
-            <div class="explanation-toolbar"><button type="button" class="secondary" :disabled="!canReview || !current || !selected.length" @click="review('ADOPT')">记录采纳所选解释</button><button type="button" class="quiet" :disabled="!canReview" @click="review('DISMISS')">放弃本条解释</button></div>
+            <div class="explanation-toolbar"><button v-if="correctionEnabled && detail.result !== 'READY'" type="button" class="primary" :disabled="!canReview || !current || !selected.length" @click="startCorrection">按所选建议补正</button><button type="button" class="secondary" :disabled="!canReview || !current || !selected.length" @click="review('ADOPT')">仅记录采纳意见</button><button type="button" class="quiet" :disabled="!canReview" @click="review('DISMISS')">放弃本条解释</button></div>
           </template>
         </template>
         <section v-if="detail.review" aria-label="人工复核记录"><p>{{ detail.review.actor }} · {{ timeLabel(detail.review.at) }} · {{ detail.status === 'ADOPTED' ? `采纳 ${detail.review.selectedIssueIds.length} 个问题` : '放弃本条解释' }}</p><p v-if="detail.review.comment" class="preserved">{{ detail.review.comment }}</p></section>
+        <section v-if="detail.correction" aria-label="补正回执"><p>已保存补正：申请版本 {{ detail.correction.applicationVersion }} · 费用版本 {{ detail.correction.financialVersion }}</p><p>新预检 {{ detail.correction.precheckId }} · {{ timeLabel(detail.correction.appliedAt) }}。可在费用预检区域核对结果。</p></section>
       </article>
     </section>
     <button v-if="dirty" type="button" class="quiet" :disabled="sending || unknown || props.locked" @click="clearSelection">清除本页未提交的选择和说明</button>

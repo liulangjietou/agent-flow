@@ -13,6 +13,7 @@ const { default: Editor } = await import(process.env.AGENTFLOW_TEST_EXPENSEEDITO
 const { default: Detail } = await import(process.env.AGENTFLOW_TEST_EXPENSEDETAIL)
 const { createRecovery } = await import(process.env.AGENTFLOW_TEST_TIMER_RECOVERY)
 const { api, writeRequests, bindAuthenticationActor } = await import(process.env.AGENTFLOW_TEST_API)
+const { expenseDrafts } = await import(process.env.AGENTFLOW_TEST_EXPENSE_DRAFT)
 const originals = { ...api }, originalFetch = globalThis.fetch, originalStorage = globalThis.localStorage, originalDocument = globalThis.document
 afterEach(() => { Object.assign(api, originals); globalThis.fetch = originalFetch; globalThis.localStorage = originalStorage; globalThis.document = originalDocument; bindAuthenticationActor(null) })
 const uuid = n => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
@@ -41,11 +42,105 @@ function panel(Component = Panel, initial = {}) {
   const props = reactive({ reportId: uuid(1), scopeKey: `demo/explanation-${++scope}`, applicationVersion: 2, financialVersion: 4,
     editable: true, locked: false, applicationDirty: false, ...initial }), events = []
   const app = renderer.createApp({ ...Component, setup: (_, ctx) => Component.setup(props, ctx), render: () => null }, {
-    ...props, onBusy: value => events.push(['busy', value]), onDirty: value => events.push(['dirty', value]), onClose: () => events.push(['close'])
+    ...props, onBusy: value => events.push(['busy', value]), onDirty: value => events.push(['dirty', value]), onClose: () => events.push(['close']), onCorrect: value => events.push(['correct', value])
   })
   return { state: app.mount({}).$.setupState, props, events, close: () => app.unmount() }
 }
 const unreadable = error => error.code === 'RESPONSE_UNREADABLE'
+
+const correctionReport = () => ({ id: uuid(1), applicationId: uuid(4), businessNo: 'EXP-CORRECTION', applicationStatus: 'DRAFT',
+  applicationVersion: 2, financialVersion: 4, roundNo: 1, editable: true, financialRound: null,
+  content: { legalEntityId: uuid(5), type: 'DAILY', title: '办公报销', advanceOffsets: [], lines: [{ lineNo: 1, categoryCode: 'OFFICE',
+    cityCode: 'SH', incurredOn: '2026-10-09', endedOn: null, quantity: '1', unit: 'ITEM', claimedGross: { value: '100.00', currency: 'CNY' },
+    claimedTax: { value: '0.00', currency: 'CNY' }, invoiceIds: [], priorRequest: null, description: '办公费', exceptionReason: null,
+    allocations: [{ costCenter: 'IT', projectCode: null, amount: { value: '100.00', currency: 'CNY' } }] }] } })
+const correctionBody = () => ({ expectedRunVersion: 3, applicationVersion: 2, financialVersion: 4, selectedIssueIds: [finding], comment: '已核对', content: correctionReport().content })
+const correctionReceipt = () => ({ runId: uuid(2), precheckId: uuid(6), expense: { ...correctionReport(), applicationVersion: 3, financialVersion: 5 } })
+const correctionPath = model.explanationPath(uuid(1)) + '/' + uuid(2) + '/correct'
+
+test('补正开始只移交所选文字建议，失效、重复选择和 READY 解释不能进入补正', async () => {
+  const original = detail(), selection = model.correctionSelection(reactive(original), [finding], '已核对')
+  selection.items[0].corrections[0] = '本地改动'
+  assert.notEqual(original.suggestion.items[0].corrections[0], '本地改动')
+  for (const [value, ids] of [[{ ...original, result: 'READY' }, [finding]], [{ ...original, validUntil: checkedAt }, [finding]], [original, [finding, finding]], [original, ['precheck:finding[9]']]]) {
+    assert.throws(() => model.correctionSelection(value, ids, ''), /核对/)
+  }
+  stubReads(); const p = panel(Panel, { correctionEnabled: true }); let writes = 0
+  api.reviewPrecheckExplanation = async () => { writes++; return receipt('ADOPTED') }
+  try {
+    await settle(); await p.state.loadDetail(uuid(2)); p.state.selected = [finding]; p.state.startCorrection()
+    assert.equal(writes, 0); assert.equal(p.state.dirty, false)
+    assert.equal(p.events.find(e => e[0] === 'correct')[1].runId, uuid(2))
+    assert.equal(p.state.detail.status, 'COMPLETED')
+  } finally { p.close() }
+})
+
+test('补正回执严格绑定新预检及递增双版本，旧历史可读且不允许伪造补正关联', () => {
+  assert.deepEqual(model.validateCorrectionReceipt(correctionReceipt(), correctionPath, JSON.stringify(correctionBody())), correctionReceipt())
+  for (const mutate of [r => { delete r.precheckId }, r => { r.runId = uuid(99) }, r => { r.expense.id = uuid(99) },
+    r => { r.expense.financialVersion = 4 }, r => { r.expense.applicationStatus = 'APPROVED' }, r => { delete r.expense.content },
+    r => { r.expense.content.lines = [] }]) {
+    const value = correctionReceipt(); mutate(value); assert.throws(() => model.validateCorrectionReceipt(value, correctionPath, JSON.stringify(correctionBody())), unreadable)
+  }
+  const history = { ...detail(), status: 'ADOPTED', version: 4, canAdopt: false, unavailableCode: 'AGENT_RUN_NOT_REVIEWABLE',
+    review: { actor: 'alice', at: checkedAt, selectedIssueIds: [finding] }, correction: { runId: uuid(2), reportId: uuid(1), applicationId: uuid(4),
+      applicationVersion: 3, financialVersion: 5, precheckId: uuid(6), appliedBy: 'alice', appliedAt: checkedAt } }
+  assert.deepEqual(model.readExplanationDetail(history, uuid(2)), history)
+  history.correction.precheckId = uuid(3); assert.throws(() => model.readExplanationDetail(history, uuid(2)), unreadable)
+  const policy = input(); policy.sources.push(source('expense:policy[1]'))
+  assert.equal(model.readExplanationInput(policy, uuid(3)).sources.length, 3)
+})
+
+test('费用草稿序列化省略空财务轮次时，补正回执仍符合既有 ExpenseResponse 契约', () => {
+  const value = correctionReceipt(); delete value.expense.financialRound
+  assert.deepEqual(model.validateCorrectionReceipt(value, correctionPath, JSON.stringify(correctionBody())), value)
+})
+
+test('补正未知响应恢复使用原正文原幂等键，恢复入口只承接既有新预检', async () => {
+  globalThis.localStorage = { getItem: () => null }; bindAuthenticationActor({ tenantId: 'demo', userId: 'correction-recovery' })
+  const sent = [], body = correctionBody(), value = correctionReceipt()
+  globalThis.fetch = async (_, options) => { sent.push(options); return Response.json(sent.length === 1 ? { ...value, precheckId: null } : value) }
+  await assert.rejects(api.correctExpense(uuid(1), uuid(2), body), unreadable)
+  const pending = writeRequests.pending()[0], scopeKey = 'demo/correction-recovery'; assert.ok(pending)
+  const before = correctionReport()
+  expenseDrafts.put(scopeKey, before.id, { detail: before, content: before.content, businessNo: before.businessNo, definition: null,
+    baseline: JSON.stringify(before.content), pending: { path: correctionPath, body: JSON.stringify(body) }, requiresRefresh: true,
+    correction: model.correctionSelection(detail(), [finding], '') })
+  body.content.title = '后续输入不能改变恢复正文'
+  const box = value => ({ value }); globalThis.document = { querySelector: () => null }
+  const env = { expenseDrafts, actorScope: box(scopeKey), pendingWrites: box([pending]), draftScope: box(''),
+    confirmReplaceDefinition: async (_, action) => action(), busy: box(false), recoveryError: box(''), notice: box(''), recordApplicationId: box(''),
+    recordRefresh: box(0), templateRefresh: box(0), writeRequests, refreshWorkspace: async () => {}, nextTick, workspace: box(null), errorMessage: error => error.message }
+  try {
+    await createRecovery(env)(pending.id)
+    assert.equal(env.recoveryError.value, ''); assert.equal(writeRequests.pending().length, 0)
+    assert.equal(sent[0].body, sent[1].body); assert.equal(sent[0].headers.get('Idempotency-Key'), sent[1].headers.get('Idempotency-Key'))
+    const restored = expenseDrafts.get(scopeKey, before.id)
+    assert.equal(restored.detail.financialVersion, 5); assert.equal(restored.queuedPrecheckId, uuid(6))
+    assert.equal(restored.correction, null); assert.equal(restored.pending, null); assert.equal(restored.requiresRefresh, false)
+  } finally { expenseDrafts.clear(scopeKey, before.id) }
+})
+
+test('费用编辑器确认补正时使用人工编辑正文并承接新检查，退出保留编辑而不记录采纳', async () => {
+  api.financeCatalog = async () => ({ employeeId: 'alice', sourceVersion: 'v1', validUntil,
+    legalEntities: [{ id: uuid(5), name: '合成法人', baseCurrency: 'CNY', timeZone: 'Asia/Shanghai' }],
+    categories: [{ code: 'OFFICE', name: '办公费', units: ['ITEM'] }], cities: [{ code: 'SH', name: '上海' }],
+    costCenters: [{ legalEntityId: uuid(5), code: 'IT', name: '研发' }], projects: [] })
+  const p = panel(Editor, { initial: correctionReport() }), writes = []
+  api.correctExpense = async (id, runId, body) => { writes.push([id, runId, JSON.parse(JSON.stringify(body))]); return { ...correctionReceipt(), expense: { ...correctionReceipt().expense, content: body.content } } }
+  try {
+    await settle(); p.state.beginCorrection(model.correctionSelection(detail(), [finding], '本人核对'))
+    assert.equal(p.state.dirty, true); assert.equal(p.state.blocked, false)
+    p.state.state.content.title = '本人修正的标题'; p.state.cancelCorrection()
+    assert.equal(p.state.state.content.title, '本人修正的标题'); assert.equal(writes.length, 0)
+    p.state.state.content.title = '办公报销'; p.state.beginCorrection(model.correctionSelection(detail(), [finding], '本人核对'))
+    p.state.state.content.title = '本人修正的标题'; await p.state.save()
+    assert.equal(writes.length, 1); assert.equal(writes[0][2].content.title, '本人修正的标题')
+    assert.equal(writes[0][2].expectedRunVersion, 3); assert.deepEqual(writes[0][2].selectedIssueIds, [finding])
+    assert.equal(p.state.state.detail.financialVersion, 5); assert.equal(p.state.state.queuedPrecheckId, uuid(6))
+    assert.equal(p.state.dirty, false); assert.equal(p.state.state.detail.applicationStatus, 'DRAFT')
+  } finally { p.close(); expenseDrafts.clear(p.props.scopeKey, uuid(1)) }
+})
 
 test('输入、分页及原解释契约绑定预检、运行、双版本和来源摘要', () => {
   assert.deepEqual(model.readExplanationInput(input(), uuid(3)), input())
@@ -240,7 +335,7 @@ test('实际模板转义来源、模型文本和复核说明，独立显示原�
   model.rememberExplanation(props.scopeKey, props.reportId, uuid(2))
   const html = await renderToString(createSSRApp({ ...Rendered, async setup(props, ctx) { const render = Rendered.setup(props, ctx); await settle(); await settle(); return render } }, props))
   assert.match(html, /&lt;img/); assert.match(html, /&lt;script&gt;/); assert.ok(!html.includes('<script>'))
-  assert.match(html, /原检查结论：费用检查未通过/); assert.match(html, /记录采纳所选解释/); assert.match(html, /查看将发送的原文/)
+  assert.match(html, /原检查结论：费用检查未通过/); assert.match(html, /仅记录采纳意见/); assert.match(html, /查看将发送的原文/)
 })
 
 test('读取禁用缓存；错误成功回执保留原请求字节及幂等键供恢复', async () => {

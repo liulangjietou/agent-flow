@@ -8,6 +8,8 @@ import io.agentflow.expense.ExpensePrecheckJob;
 import io.agentflow.expense.ExpensePrecheckService;
 import io.agentflow.expense.ExpenseReport;
 import io.agentflow.expense.ExpenseReportRepository;
+import io.agentflow.expense.ExpenseCorrection;
+import io.agentflow.expense.ExpenseCorrectionRepository;
 import io.agentflow.expense.JdbcExpensePrecheckRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -31,13 +33,15 @@ public class PrecheckExplanationService {
     private final PrecheckExplanationSources sources;
     private final JdbcPrecheckExplanationRepository runs;
     private final AssistConfiguration configuration;
+    private final ExpenseCorrectionRepository corrections;
 
     /** 原检查服务是业务有效性的唯一判定方，解释只投影已授权的事实。 */
     public PrecheckExplanationService(CurrentActor actors, ExpenseReportRepository reports, ApprovalApplicationFacade applications,
             JdbcExpensePrecheckRepository prechecks, ExpensePrecheckService checks, PrecheckExplanationSources sources,
-            JdbcPrecheckExplanationRepository runs, AssistConfiguration configuration) {
+            JdbcPrecheckExplanationRepository runs, AssistConfiguration configuration, ExpenseCorrectionRepository corrections) {
         this.actors = actors; this.reports = reports; this.applications = applications; this.prechecks = prechecks;
         this.checks = checks; this.sources = sources; this.runs = runs; this.configuration = configuration;
+        this.corrections = corrections;
     }
 
     /** 幂等回放前也核对当前本人权限；历史读取不要求旧预检仍可采纳。 */
@@ -90,7 +94,8 @@ public class PrecheckExplanationService {
         var input = context.input();
         return new Detail(context.id(), input.precheckId(), input.applicationVersion(), input.financialVersion(), input.attempt(),
                 input.result(), input.checkedAt(), input.validUntil(), state.status(), state.version(), context.createdAt(),
-                state.startedAt(), state.completedAt(), input.sources(), state.suggestion(), state.failure(), state.review(), unavailable == null, unavailable);
+                state.startedAt(), state.completedAt(), input.sources(), state.suggestion(), state.failure(), state.review(), unavailable == null, unavailable,
+                corrections.find(report.tenantId(), runId).orElse(null));
     }
 
     /** 人工确认只追加解释复核轨迹，不调用财务修改或审批入口。 */
@@ -211,5 +216,6 @@ public class PrecheckExplanationService {
     public record Detail(UUID id, UUID precheckId, long applicationVersion, long financialVersion, long attempt, ExpensePrecheckJob.Status result,
             Instant checkedAt, Instant validUntil, PrecheckExplanationRun.Status status, long version, Instant createdAt, Instant startedAt,
             Instant completedAt, List<AssistModelPort.Source> sources, PrecheckExplanationSuggestion suggestion, AssistRun.Failure failure,
-            PrecheckExplanationRun.Review review, boolean canAdopt, String unavailableCode) { }
+            PrecheckExplanationRun.Review review, boolean canAdopt, String unavailableCode,
+            @JsonInclude(JsonInclude.Include.NON_NULL) ExpenseCorrection correction) { }
 }

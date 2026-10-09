@@ -20,6 +20,18 @@ class PrecheckExplanationRunTest {
     private static final String ISSUE = "precheck:finding[0]";
     private static final AssistInput.Reference REFERENCE = new AssistInput.Reference(ISSUE, "a".repeat(64));
 
+    @Test void selectedPolicyIsEvidenceWithoutBecomingAnAdditionalCheckIssue() {
+        var policy = source("expense:policy[1]");
+        var input = input(ExpensePrecheckJob.Status.BLOCKED, List.of(source("precheck:result"), source(ISSUE), policy));
+        assertThat(input.issueIds()).containsExactly(ISSUE);
+        var suggestion = new PrecheckExplanationSuggestion("fixture", "model-v1", PrecheckExplanationRun.PROMPT_VERSION,
+                List.of(new PrecheckExplanationSuggestion.Item(ISSUE, "请核对已发布条款", List.of("人工核对费用后重新预检"), List.of(REFERENCE, policy.reference()))));
+        assertThatCode(() -> suggestion.requireMatches(input)).doesNotThrowAnyException();
+        var changed = new AssistModelPort.Source(new AssistInput.Reference("expense:policy[1]", "b".repeat(64)), "修改条款", "{}");
+        assertThatThrownBy(() -> suggestion.requireMatches(input(ExpensePrecheckJob.Status.BLOCKED,
+                List.of(source("precheck:result"), source(ISSUE), changed)))).isInstanceOf(DomainException.class);
+    }
+
     @Test void recordsOnlySelectedReviewsAndRestoresWithoutReinterpretingExpiredHistory() {
         var run = run(); var input = run.context().input(); var suggestion = suggestion(REFERENCE);
         run.start(1, AT.plusSeconds(1), AT.plusSeconds(60)); run.complete(2, suggestion, AT.plusSeconds(2));
