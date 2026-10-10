@@ -54,6 +54,12 @@ AgentFlow 是面向 OA、表单审批和结构化财务业务的 DDD 工作流�
 
 ## 全景架构图
 
+[![AgentFlow 全景架构：用户入口、可信接入、领域与审批运行时、Agent 与财务执行、运营集成与交付](docs/assets/agentflow-panorama.png)](docs/assets/agentflow-panorama.png)
+
+[查看高分辨率 PNG](docs/assets/agentflow-panorama.png) · [打开可缩放 SVG](docs/assets/agentflow-panorama.svg) · [内容与源码索引](docs/architecture/source-map.json) · [图稿维护说明](docs/architecture/README.md)
+
+原图保留完整展示，图稿基线为 2026-10-03；下方 Mermaid 图补充当前代码的职责与依赖关系。
+
 ```mermaid
 flowchart TB
     WEB["Vue 工作台<br/>设计 / 申请 / 审批 / 财务 / Agent"]
@@ -75,7 +81,7 @@ flowchart TB
     WORKER -- "事务外 HTTP" --> EXT
 ```
 
-同一后端承载这些职责。一次业务不必经过所有栏目，具体入口和节点由业务类型及已发布流程决定。历史五栏图可查看 [PNG](docs/assets/agentflow-panorama.png)、[SVG](docs/assets/agentflow-panorama.svg) 和[历史源码索引](docs/architecture/source-map.json)；其中 JDBC、模板数量及未开放节点等旧描述以本文为准。
+同一后端承载这些职责。一次业务不必经过所有栏目，具体入口和节点由业务类型及已发布流程决定。原图中 JDBC、模板数量及未开放节点等旧描述以当前正文为准。
 
 | 层次 | 主要调用方与入口 | 核心职责 | 下游与持久结果 |
 | --- | --- | --- | --- |
@@ -87,7 +93,11 @@ flowchart TB
 
 ## 端到端流程图
 
-下面使用**专用报销链路**展示详细流程。事前申请、借款、采购付款和预算调整复用审批与执行基础设施，并保留自己的聚合、来源和金额规则。纸件签收、业务会签、财务审核与复核的具体要求来自发布定义及法人配置。历史长图保留在 [PNG](docs/assets/agentflow-business-flow.png) / [SVG](docs/assets/agentflow-business-flow.svg)。
+[![AgentFlow 端到端业务流程：设计发布、可信提交、人工审批、独立财务执行、核销归档及 Agent 侧路](docs/assets/agentflow-business-flow.png)](docs/assets/agentflow-business-flow.png)
+
+[查看高分辨率 PNG](docs/assets/agentflow-business-flow.png) · [打开可缩放 SVG](docs/assets/agentflow-business-flow.svg)
+
+原图保留完整展示，图稿基线为 2026-10-03。下面使用**专用报销链路**展示详细流程。事前申请、借款、采购付款和预算调整复用审批与执行基础设施，并保留自己的聚合、来源和金额规则。纸件签收、业务会签、财务审核与复核的具体要求来自发布定义及法人配置。
 
 ```mermaid
 flowchart LR
