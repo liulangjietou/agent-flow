@@ -86,6 +86,8 @@ docker compose --env-file /etc/agentflow/production.env -f compose.production.ym
 - 会话使用 JDBC，容器重启后可恢复尚未过期且身份配置仍匹配的登录。共享会话不是多实例高可用验收。
 - 代理覆盖或移除外来转发头，应用不依赖这些头生成回调；生产 Cookie 为 Secure、HttpOnly、SameSite=Lax。
 - 代理访问日志只记录无查询参数的路径与状态，不记录 Cookie、Authorization、请求体或 Referer。OIDC 路径的 Nginx 原始错误日志关闭，保留无参数的状态日志，具体失败通过后端受控日志和身份服务诊断。
+- 代理按客户端地址限流：`/api/v1/auth/oidc/` 每地址 10 次/秒（突发 50），其余接口 100 次/秒（突发 200），超限直接返回 429、不转发后端。企业出口 NAT 后多人共用一个地址时额度按整个出口计算；高峰仍触发 429 时调整 [nginx.conf](../deploy/production/nginx.conf) 中的 `limit_req_zone`。
+- 代理统一补齐 HSTS、CSP、X-Frame-Options、X-Content-Type-Options 和 Referrer-Policy；后端已自行设置的同名头（例如企业退出跳转页的 nonce CSP）原样保留，不叠加第二条。HSTS 生效后浏览器在一年内只用 HTTPS 访问该域名。
 - 只开放 readiness，其他 actuator 路径返回 404。可叠加[指标与告警规则](production-monitoring.md)；企业通知渠道、审计留存、证书自动续期、正式压测及灾备仍需完成。
 - 本阶段使用本地测试 CA 和签名身份夹具验证协议与部署；企业 IdP、企业 CA、域名及防火墙必须在目标环境重新验收。
 
