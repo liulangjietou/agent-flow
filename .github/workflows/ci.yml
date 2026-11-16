@@ -11,7 +11,9 @@ env:
 jobs:
   dependency-review:
     # 只在 PR 上比对新增依赖的已知漏洞，高危及以上阻断合并。
-    if: github.event_name == 'pull_request'
+    # 该 Action 依赖仓库开启 Dependency graph（Settings → Code security）；开启后把仓库变量
+    # DEPENDENCY_REVIEW_ENABLED 设为 true 才运行，未开启时跳过而非固定失败。npm audit 与 Dependabot 不受影响。
+    if: github.event_name == 'pull_request' && vars.DEPENDENCY_REVIEW_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
