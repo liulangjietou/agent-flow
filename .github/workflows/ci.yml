@@ -184,3 +184,61 @@ jobs:
           npm run lint
           npm run test:requests
           npm run build
+
+  release-images:
+    # 仅推送 vMAJOR.MINOR.PATCH 标签且全部检查通过后发布镜像；分支推送与 PR 只验证不发布。
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: [verify, postgres-schema]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve release version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "Release tag must look like v1.2.3, got $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          # GHCR 镜像名必须小写。
+          echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Stamp release version into the build
+        # 只改写本次构建工作区，不回写仓库；镜像内包名与 MANIFEST 均为发布版本而非 SNAPSHOT。
+        run: mvn -B -ntp versions:set -DnewVersion="$VERSION" -DprocessAllModules=true -DgenerateBackupPoms=false
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push server image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.server
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-server:${{ env.VERSION }}
+          labels: |
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile.web
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}-web:${{ env.VERSION }}
+          labels: |
+            org.opencontainers.image.version=${{ env.VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}

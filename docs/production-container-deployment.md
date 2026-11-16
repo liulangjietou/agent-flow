@@ -20,6 +20,8 @@ docker build -f deploy/Dockerfile.web -t registry.example/agentflow-web:release 
 
 镜像地址和 `release` 必须替换成自己的发布版本；是否推送由企业镜像发布流程决定。本仓库不附带镜像仓库凭证。
 
+也可以使用仓库自带的发布流水线：推送 `vMAJOR.MINOR.PATCH` 形式的标签（如 `v1.2.3`）后，CI 在全部检查通过后把工作区版本改写为 `1.2.3`，构建并推送 `ghcr.io/<owner>/<repo>-server:1.2.3` 与 `-web:1.2.3`，镜像带 OCI 版本、提交与来源标签。其他形式的标签会让发布作业失败，分支推送和 PR 只验证不发布。部署时用 `docker buildx imagetools inspect` 记录镜像摘要，并以 `镜像@sha256:...` 写入 `AGENTFLOW_SERVER_IMAGE` / `AGENTFLOW_WEB_IMAGE`。
+
 ## 配置文件与密钥
 
 将 [环境模板](../deploy/production/production.env.example) 和 [企业映射模板](../deploy/production/enterprise.example.yml) 复制到代码目录之外的受控部署目录，例如 `/etc/agentflow/production.env` 与 `/etc/agentflow/enterprise.yml`，逐项替换占位值。环境文件仅存地址、账号、开关和文件路径，不存密码或私钥。
