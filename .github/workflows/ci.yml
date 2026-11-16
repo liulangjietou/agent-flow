@@ -23,6 +23,7 @@ jobs:
 
   postgres-schema:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     services:
       postgres:
         image: postgres:17@sha256:0d938e975177bef9f1f61f3f9dbcf2e0aa0a139568f66d3415ed8892eb97f6ac
@@ -127,6 +128,8 @@ jobs:
 
   verify:
     runs-on: ubuntu-latest
+    # 正常全量约半小时；堆泄漏会让 GC 抖动拖到默认 6 小时上限，超时即失败以便尽早暴露。
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - name: Prepare isolated test artifacts
