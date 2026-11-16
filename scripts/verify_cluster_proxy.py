@@ -13,6 +13,8 @@ import uuid
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# 测试临时根目录：AGENTFLOW_TMP_DIR 优先，未设置时使用系统临时目录。
+TMP_ROOT = os.environ.get("AGENTFLOW_TMP_DIR") or tempfile.gettempdir()
 NGINX_IMAGE = os.environ.get("AGENTFLOW_PROXY_TEST_NGINX_IMAGE",
                              "nginx@sha256:bf3201ab56f23e5954646379c775d511fc466e9f11376d9725361064ad07ed35")
 PYTHON_IMAGE = os.environ.get("AGENTFLOW_PROXY_TEST_PYTHON_IMAGE",
@@ -21,8 +23,6 @@ BACKEND = '''import json,os,socket
 from http.server import BaseHTTPRequestHandler,HTTPServer
 from urllib.parse import urlsplit
 
-# 测试临时根目录：AGENTFLOW_TMP_DIR 优先，未设置时使用系统临时目录。
-TMP_ROOT = os.environ.get("AGENTFLOW_TMP_DIR") or tempfile.gettempdir()
 class Handler(BaseHTTPRequestHandler):
     """隔离故障后端。@author owlzhangfq@gmail.com"""
     def log_message(self,*args): pass
