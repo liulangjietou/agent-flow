@@ -11,7 +11,10 @@ import io.agentflow.approval.service.TaskRecipientDirectory;
 import io.agentflow.definition.DefinitionAssigneeDirectory;
 import java.util.List;
 import io.agentflow.common.DomainException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -31,6 +34,8 @@ import java.security.NoSuchAlgorithmException;
 @Service
 public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDirectory {
     private static final Logger LOG = LoggerFactory.getLogger(AuthService.class);
+    /** 生产配置文件名；演示登录与不安全回环例外都以它为界。 */
+    static final Profiles PRODUCTION = Profiles.of("prod", "production");
     /** 演示账号共用的固定口令，仅在演示认证开启时有效。 */
     private static final String DEMO_PASSWORD = "demo";
     private static final Map<String, Set<String>> DEMO_ROLES = Map.of(
@@ -49,10 +54,20 @@ public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDi
     private final String demoTenant;
     private final Duration tokenTtl;
 
-    /** 创建认证服务；演示令牌按配置时长过期，默认 12 小时。 */
+    /**
+     * 容器入口：prod 配置文件虽写死关闭演示登录，环境变量或命令行仍能把它覆盖成开启；
+     * 演示口令公开固定，生产实例出现这种组合时直接拒绝启动，而不是带着公开口令上线。
+     */
+    @Autowired
     public AuthService(@Value("${agentflow.auth.demo-enabled:false}") boolean demoEnabled,
                        @Value("${agentflow.auth.demo-tenant:demo}") String demoTenant,
-                       @Value("${agentflow.auth.demo-token-ttl:PT12H}") Duration tokenTtl) {
+                       @Value("${agentflow.auth.demo-token-ttl:PT12H}") Duration tokenTtl,
+                       Environment environment) {
+        this(requireOutsideProduction(demoEnabled, environment), demoTenant, tokenTtl);
+    }
+
+    /** 创建认证服务；演示令牌按配置时长过期，默认 12 小时。 */
+    public AuthService(boolean demoEnabled, String demoTenant, Duration tokenTtl) {
         if (tokenTtl.isNegative() || tokenTtl.isZero()) throw new IllegalArgumentException("agentflow.auth.demo-token-ttl must be positive");
         this.demoEnabled = demoEnabled;
         this.demoTenant = demoTenant;
@@ -62,6 +77,13 @@ public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDi
             LOG.info("Demo authentication is ENABLED with shared demo credentials; never expose this instance, errorCode={}, tenant={}",
                     "DEMO_AUTH_ENABLED", demoTenant);
         }
+    }
+
+    private static boolean requireOutsideProduction(boolean demoEnabled, Environment environment) {
+        if (demoEnabled && environment.acceptsProfiles(PRODUCTION)) {
+            throw new IllegalStateException("Demo authentication must stay disabled under the prod profile");
+        }
+        return demoEnabled;
     }
 
     private static Set<String> roles(SystemRole... roles) {
