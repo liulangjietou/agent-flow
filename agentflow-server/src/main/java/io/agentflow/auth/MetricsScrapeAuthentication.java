@@ -1,5 +1,6 @@
 package io.agentflow.auth;
 
+import org.springframework.http.HttpMethod;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -51,7 +52,7 @@ public class MetricsScrapeAuthentication {
             response.setHeader("WWW-Authenticate", "Bearer realm=\"metrics\"");
             return false;
         }
-        if (!"GET".equals(request.getMethod()) && !"HEAD".equals(request.getMethod())) {
+        if (!HttpMethod.GET.matches(request.getMethod()) && !HttpMethod.HEAD.matches(request.getMethod())) {
             response.setStatus(HttpServletResponse.SC_METHOD_NOT_ALLOWED);
             response.setHeader("Allow", "GET, HEAD");
             return false;

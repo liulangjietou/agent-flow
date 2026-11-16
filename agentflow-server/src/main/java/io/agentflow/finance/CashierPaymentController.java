@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,7 +45,7 @@ public class CashierPaymentController {
     }
     private static Map<String, String> single(MultiValueMap<String, String> parameters) {
         if (parameters.values().stream().anyMatch(values -> values.size() != 1)) {
-            throw new DomainException("INVALID_PAYMENT_QUERY", "Each cashier filter or pagination parameter must occur only once");
+            throw new DomainException(ErrorCode.INVALID_PAYMENT_QUERY, "Each cashier filter or pagination parameter must occur only once");
         }
         return parameters.toSingleValueMap();
     }

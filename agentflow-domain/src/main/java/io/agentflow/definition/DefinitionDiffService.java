@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.NotificationTexts;
@@ -124,7 +125,7 @@ public final class DefinitionDiffService {
         Map<String, T> indexed = new LinkedHashMap<>();
         for (T value : values) {
             String id = identity.apply(value);
-            if (indexed.put(id, value) != null) throw new DomainException("COMPARISON_ID_AMBIGUOUS", "Comparison requires unique object identifiers");
+            if (indexed.put(id, value) != null) throw new DomainException(ErrorCode.COMPARISON_ID_AMBIGUOUS, "Comparison requires unique object identifiers");
         }
         return indexed;
     }

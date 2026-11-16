@@ -1,5 +1,6 @@
 package io.agentflow.approval.model;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import io.agentflow.organization.InitiatorContext;
@@ -77,7 +78,7 @@ public record SubmissionRound(String tenantId, UUID applicationId, int roundNo, 
         /** 结论更新不能将已提交轮次重新变为审批中。 */
         public void requireTerminal() {
             if (this == IN_APPROVAL) {
-                throw new DomainException("DOMAIN_RULE_VIOLATION", "A submission round conclusion must be terminal");
+                throw new DomainException(ErrorCode.DOMAIN_RULE_VIOLATION, "A submission round conclusion must be terminal");
             }
         }
     }

@@ -1,6 +1,7 @@
 package io.agentflow.approval.operations;
 
 
+import io.agentflow.common.SystemRole;
 import io.agentflow.approval.operations.mapper.ApplicationSearchAdapterMapper;
 import io.agentflow.approval.process.FlowableParticipationParameters;
 import io.agentflow.common.Actor;
@@ -32,7 +33,7 @@ public class JdbcApplicationSearchAdapter implements ApplicationSearchPort {
     public List<Item> search(Actor actor, Query query) {
         var parameters = new ArrayList<Object>(List.of(actor.tenantId()));
 
-        if (!actor.hasRole("ADMIN")) {
+        if (!actor.hasRole(SystemRole.ADMIN)) {
             parameters.add(actor.userId());
             FlowableParticipationParameters.append(actor, parameters);
             // 转交会改变引擎指派人，真实办理审计保留原办理人的读取权限。
@@ -80,7 +81,7 @@ public class JdbcApplicationSearchAdapter implements ApplicationSearchPort {
                 sqlMapper.searchQuery(
                         actor.roles().size(),
                         (!actor.roles().isEmpty()),
-                        (!actor.hasRole("ADMIN")),
+                        (!actor.hasRole(SystemRole.ADMIN)),
                         (!query.text().isEmpty()),
                         (!query.status().isEmpty()),
                         (!query.processKey().isEmpty()),

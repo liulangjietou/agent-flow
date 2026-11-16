@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import io.agentflow.finance.PaymentPersonnel;
@@ -94,12 +95,12 @@ public class SupplierPayableReviewService {
         var source = expected.reservation().source();
         if (!expected.equals(sources.derive(source.tenantId(), source.requestId()))) throw unavailable();
         personnel.requireEligible(source.tenantId(), finance, source.round().content().legalEntityId());
-        if (authorizations.activeForRequest(source.tenantId(), source.requestId()).isPresent()) throw new DomainException("SUPPLIER_PAYMENT_ALREADY_AUTHORIZED", "Original supplier authorization must be safely ended before a new review");
+        if (authorizations.activeForRequest(source.tenantId(), source.requestId()).isPresent()) throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_ALREADY_AUTHORIZED, "Original supplier authorization must be safely ended before a new review");
     }
     private void persist(SupplierPayableReview value) {
         reviews.update(value);
         events.publishEvent(new SupplierPayableChanged.Review(value));
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException unavailable() { return new DomainException("SUPPLIER_PAYABLE_REVIEW_UNAVAILABLE", "Fresh payable review for this finance actor and unchanged approved source is required"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.SUPPLIER_PAYABLE_REVIEW_UNAVAILABLE, "Fresh payable review for this finance actor and unchanged approved source is required"); }
 }

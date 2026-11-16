@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.util.UUID;
@@ -11,6 +12,6 @@ import java.util.UUID;
 public record AdvanceOffset(UUID advanceId, Money amount) {
     /** 借款所有人、法人和可用余额由借款聚合及应用服务校验。 */
     public AdvanceOffset {
-        if (advanceId == null || amount == null) throw new DomainException("INVALID_ADVANCE_OFFSET", "An advance and offset amount are required");
+        if (advanceId == null || amount == null) throw new DomainException(ErrorCode.INVALID_ADVANCE_OFFSET, "An advance and offset amount are required");
     }
 }

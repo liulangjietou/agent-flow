@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
@@ -62,16 +63,16 @@ public class ApprovedVoucherSources {
         var control = controls.find(source.tenantId(), report.id(), source.roundNo()).orElseThrow(ApprovedVoucherSources::changed);
         var budget = budgets.find(source.tenantId(), report.id()).orElseThrow(ApprovedVoucherSources::changed);
         if (requireFrozenBudget && !budget.frozenFor(BudgetPrecheckPort.Request.fromCurrent(report, control.input().accountingDate()))) {
-            throw new DomainException("VOUCHER_BUDGET_NOT_FROZEN", "Current expense amount must retain its confirmed budget reservation");
+            throw new DomainException(ErrorCode.VOUCHER_BUDGET_NOT_FROZEN, "Current expense amount must retain its confirmed budget reservation");
         }
         return VoucherSource.expense(application, report, control);
     }
     /** 命令身份仅用于定位，真实字段由 derive 重新核验。 */
     public VoucherPreparation.Source reference(VoucherCommand command) {
-        if (command.kind() == VoucherCommand.Kind.PAYMENT) throw new DomainException("VOUCHER_PAYMENT_SOURCE_REQUIRED", "A persisted successful payment is required before registering its voucher");
+        if (command.kind() == VoucherCommand.Kind.PAYMENT) throw new DomainException(ErrorCode.VOUCHER_PAYMENT_SOURCE_REQUIRED, "A persisted successful payment is required before registering its voucher");
         var binding = command.binding();
         return new VoucherPreparation.Source(command.tenantId(), command.kind() == VoucherCommand.Kind.EMPLOYEE_ADVANCE ? BusinessReference.Type.ADVANCE_REQUEST : BusinessReference.Type.EXPENSE,
                 binding.businessId(), binding.applicationId(), binding.roundNo(), binding.applicationVersion(), binding.businessVersion(), command.employeeId());
     }
-    private static DomainException changed() { return new DomainException("VOUCHER_SOURCE_CHANGED", "Original approved financial source has changed or is unavailable"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.VOUCHER_SOURCE_CHANGED, "Original approved financial source has changed or is unavailable"); }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.approval.operations;
 
+import io.agentflow.common.SystemRole;
 import io.agentflow.common.CurrentActor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,7 +30,7 @@ public class ApprovalOperationsController {
     @GetMapping("/approvals")
     public ResponseEntity<ApprovalOperationsReadPort.Report> approvals(@RequestParam Map<String, String> raw) {
         var actor = currentActor.actor();
-        actor.requireRole("ADMIN");
+        actor.requireRole(SystemRole.ADMIN);
         Instant now = Instant.now();
         var query = OperationsQueryParameters.parse(raw, now.atOffset(ZoneOffset.UTC).toLocalDate());
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(reader.read(actor.tenantId(), query, now));

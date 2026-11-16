@@ -1,5 +1,7 @@
 package io.agentflow.signature;
 
+import org.springframework.http.HttpMethod;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
@@ -31,7 +33,7 @@ public class SignatureCallbackVerifier {
     }
 
     /** 仅此 POST 免除用户会话和 CSRF，其他方法、尾斜杠和子路径仍由原认证链处理。 */
-    public static boolean matches(HttpServletRequest request) { return "POST".equals(request.getMethod()) && PATH.equals(request.getRequestURI()); }
+    public static boolean matches(HttpServletRequest request) { return HttpMethod.POST.matches(request.getMethod()) && PATH.equals(request.getRequestURI()); }
 
     /** 有界原文先验签再解析，重复头、查询串、压缩体及非 UTF-8 JSON 不进入业务状态机。 */
     public Callback verify(HttpServletRequest request, Instant now) throws IOException {
@@ -63,9 +65,9 @@ public class SignatureCallbackVerifier {
         var values = request.getHeaders(name); if (values == null || !values.hasMoreElements()) return null;
         String value = values.nextElement(); if (values.hasMoreElements() || value.length() > 256) throw unauthenticated(); return value;
     }
-    private static DomainException unauthenticated() { return new DomainException("SIGNATURE_CALLBACK_UNAUTHENTICATED", "Signature callback authentication failed"); }
-    private static DomainException invalid() { return new DomainException("INVALID_SIGNATURE_CALLBACK", "Signature callback request is invalid"); }
-    private static DomainException tooLarge() { return new DomainException("SIGNATURE_CALLBACK_TOO_LARGE", "Signature callback body exceeds the byte limit"); }
+    private static DomainException unauthenticated() { return new DomainException(ErrorCode.SIGNATURE_CALLBACK_UNAUTHENTICATED, "Signature callback authentication failed"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SIGNATURE_CALLBACK, "Signature callback request is invalid"); }
+    private static DomainException tooLarge() { return new DomainException(ErrorCode.SIGNATURE_CALLBACK_TOO_LARGE, "Signature callback body exceeds the byte limit"); }
 
     /**
      * 内部编排携带不可变原输入和完整证据，公开回调响应不返回该对象。

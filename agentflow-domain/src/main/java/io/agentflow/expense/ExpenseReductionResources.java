@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.ReservedAmount;
@@ -80,5 +81,5 @@ public final class ExpenseReductionResources {
     private static void owner(ExpenseReport report, String tenant, String employee) {
         if (!report.tenantId().equals(tenant) || !report.employeeId().equals(employee)) throw conflict();
     }
-    private static DomainException conflict() { return new DomainException("EXPENSE_RESERVATION_CHANGED", "Expense resource reservations no longer match the approved amounts"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.EXPENSE_RESERVATION_CHANGED, "Expense resource reservations no longer match the approved amounts"); }
 }

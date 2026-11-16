@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.util.ArrayList;
@@ -123,7 +124,7 @@ public record ExpenseAdjustmentAmounts(ExpenseReport.State original, List<Line> 
     }
 
     private static Money totalGross(List<Line> lines, String currency) { return lines.stream().map(Line::gross).reduce(Money.zero(currency), Money::plus); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_ADJUSTMENT_AMOUNTS", "Expense adjustment must reduce original cost, tax and offset positions without rewriting the approved report"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_ADJUSTMENT_AMOUNTS, "Expense adjustment must reduce original cost, tax and offset positions without rewriting the approved report"); }
 
     /**
      * 税额与不含税成本分别保留在原位置，零位置不能删除后重新编号。

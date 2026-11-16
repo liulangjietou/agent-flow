@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import java.time.Duration;
@@ -84,7 +85,7 @@ public record SupplierPayableHoldOperation(SupplierPayableHoldCommand command, l
     /** 与具名结束记录同事务停止队列；已确认拒绝和已有停止原因保留原修订。 */
     public SupplierPayableHoldOperation stopForRetirement(Instant now) {
         requireTime(now);
-        if (retirementBasis() == null) throw new DomainException("SUPPLIER_AUTHORIZATION_RETIREMENT_UNSAFE", "Original payable hold has not been proven safely finished");
+        if (retirementBasis() == null) throw new DomainException(ErrorCode.SUPPLIER_AUTHORIZATION_RETIREMENT_UNSAFE, "Original payable hold has not been proven safely finished");
         return status == Status.QUEUED ? changed(Status.VOIDED, now, null, null, null, null, 0, Failure.FINANCE_RETIRED) : this;
     }
 
@@ -135,7 +136,7 @@ public record SupplierPayableHoldOperation(SupplierPayableHoldCommand command, l
     public void requireHeldAt(Instant now) {
         requireTime(now);
         if (status != Status.HELD || !now.isBefore(observation.observedAt().plus(ProcurementPayablePort.MAX_EVIDENCE_AGE))) {
-            throw new DomainException("SUPPLIER_PAYABLE_HOLD_UNAVAILABLE", "A fresh undisputed original payable hold is required");
+            throw new DomainException(ErrorCode.SUPPLIER_PAYABLE_HOLD_UNAVAILABLE, "A fresh undisputed original payable hold is required");
         }
     }
 
@@ -170,8 +171,8 @@ public record SupplierPayableHoldOperation(SupplierPayableHoldCommand command, l
     }
     private Instant retryAt(Instant now) { return now.plusSeconds(Math.min(MAX_BACKOFF_SECONDS, INITIAL_BACKOFF_SECONDS << Math.min(attempts - 1, 6))); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYABLE_HOLD_OPERATION", "Payable hold recovery must preserve the original command and external evidence"); }
-    private static DomainException conflict() { return new DomainException("SUPPLIER_PAYABLE_HOLD_STATE_CONFLICT", "Payable hold operation no longer allows this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYABLE_HOLD_OPERATION, "Payable hold recovery must preserve the original command and external evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.SUPPLIER_PAYABLE_HOLD_STATE_CONFLICT, "Payable hold operation no longer allows this transition"); }
 
     /** 日志仅保存状态与计数，不打印财务依据。 */
     @Override public String toString() { return "SupplierPayableHoldOperation[id=" + command.id() + ", version=" + version + ", status=" + status + "]"; }

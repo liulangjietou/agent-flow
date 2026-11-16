@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpenseReportRepositoryMapper;
@@ -39,7 +40,7 @@ public class JdbcExpenseReportRepository implements ExpenseReportRepository {
     public void lock(String tenant, UUID reportId) {
         var application = sqlMapper.lock(tenant, reportId.toString());
         if (application.isEmpty())
-            throw new DomainException("NOT_FOUND", "Expense report not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Expense report not found");
         sqlMapper.lock2(tenant, application.get(0));
         sqlMapper.lock3(tenant, reportId.toString());
     }
@@ -138,9 +139,9 @@ public class JdbcExpenseReportRepository implements ExpenseReportRepository {
 
     private static void requireAudit(String actor, String operation) {
         if (StringUtils.isBlank(actor) || actor.length() > 128 || operation == null || !operation.matches("[A-Z][A-Z0-9_]{0,63}")) {
-            throw new DomainException("INVALID_EXPENSE_AUDIT", "Financial changes require an actor and operation");
+            throw new DomainException(ErrorCode.INVALID_EXPENSE_AUDIT, "Financial changes require an actor and operation");
         }
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense binding or financial version has changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense binding or financial version has changed"); }
 }

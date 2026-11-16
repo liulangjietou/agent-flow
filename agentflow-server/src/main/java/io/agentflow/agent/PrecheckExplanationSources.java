@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.ExpenseLine;
@@ -84,7 +85,7 @@ public class PrecheckExplanationSources {
         var selected = new ArrayList<AssistModelPort.Source>();
         for (var id : sourceIds) {
             var value = choices.get(id);
-            if (value == null) throw new DomainException("FORBIDDEN", "Selected precheck source is not sendable");
+            if (value == null) throw new DomainException(ErrorCode.FORBIDDEN, "Selected precheck source is not sendable");
             selected.add(value);
         }
         if (json.write(selected).getBytes(StandardCharsets.UTF_8).length > AssistInputService.MAX_INPUT_BYTES) throw invalid();
@@ -96,7 +97,7 @@ public class PrecheckExplanationSources {
         String content = json.write(value);
         return new AssistModelPort.Source(new AssistInput.Reference(id, AssistConfiguration.digest(content)), label, content);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_INPUT", "Select bounded precheck explanation sources"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Select bounded precheck explanation sources"); }
 
     /**
      * 结论不含申请、人员或外部系统标识，模型不能更新它。

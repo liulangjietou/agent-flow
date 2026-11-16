@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -56,14 +57,14 @@ public class AssistRunController {
     @GetMapping("/{runId}")
     public ResponseEntity<AssistRunQueryService.Detail> get(@PathVariable UUID id, @PathVariable UUID runId,
                                                           @RequestParam MultiValueMap<String, String> raw) {
-        if (!raw.isEmpty()) throw new DomainException("INVALID_AGENT_QUERY", "Assist run detail does not accept query parameters");
+        if (!raw.isEmpty()) throw new DomainException(ErrorCode.INVALID_AGENT_QUERY, "Assist run detail does not accept query parameters");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(queries.get(applications.get(id), runId));
     }
 
     /** 服务端生成可发送目录，不能由客户端指定正文或模型目的地。 */
     @GetMapping("/input")
     public ResponseEntity<AssistExecutionService.InputOptions> input(@PathVariable UUID id, @RequestParam String taskId) {
-        if (taskId.isBlank() || taskId.length() > 128) throw new DomainException("INVALID_AGENT_QUERY", "A bounded task identifier is required");
+        if (taskId.isBlank() || taskId.length() > 128) throw new DomainException(ErrorCode.INVALID_AGENT_QUERY, "A bounded task identifier is required");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(execution.input(id, taskId));
     }
 

@@ -61,7 +61,7 @@ class InvoiceExtractionApiIntegrationTest {
     private static final byte[] LOCAL = ("<EInvoice><Header><Version>0.31</Version></Header>"
             + "<TaxSupervisionInfo><InvoiceNumber>000077</InvoiceNumber></TaxSupervisionInfo></EInvoice>").getBytes(StandardCharsets.UTF_8);
     private static final byte[] FALLBACK = "<Invoice><Number>000077</Number></Invoice>".getBytes(StandardCharsets.UTF_8);
-    private static final Path DIRECTORY = Path.of("/fyoung/tmp/agentflow-extraction-api-" + UUID.randomUUID());
+    private static final Path DIRECTORY = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-extraction-api-" + UUID.randomUUID());
     @Autowired MockMvc mvc;
     @Autowired CurrentActor actors;
     @MockitoSpyBean AuthService auth;

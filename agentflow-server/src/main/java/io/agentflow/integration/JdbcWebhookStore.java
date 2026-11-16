@@ -1,5 +1,6 @@
 package io.agentflow.integration;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.integration.mapper.WebhookStoreMapper;
 import io.agentflow.mybatis.SqlRow;
@@ -137,7 +138,7 @@ public class JdbcWebhookStore {
     public Delivery get(String tenant, UUID id) {
         return SqlRows.map(sqlMapper.get(tenant, id.toString()), MAPPER).stream()
                 .findFirst()
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Webhook delivery not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Webhook delivery not found"));
     }
 
     /** 人工重试与请求审计同事务；事件 ID、目标摘要和正文永不重建。 */
@@ -145,8 +146,7 @@ public class JdbcWebhookStore {
     public Delivery retry(Delivery current, long expectedVersion, String actor, Instant now) {
         var next = current.progress().retry(expectedVersion, now);
         if (!update(current, next, now))
-            throw new DomainException(
-                    "WEBHOOK_DELIVERY_CONFLICT", "Webhook delivery state has changed");
+            throw new DomainException(ErrorCode.WEBHOOK_DELIVERY_CONFLICT, "Webhook delivery state has changed");
         sqlMapper.retry(
                 UUID.randomUUID().toString(),
                 current.id().toString(),

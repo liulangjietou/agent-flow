@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AccountingPeriodPort;
 import java.time.Instant;
@@ -57,6 +58,6 @@ public record SupplierPayableAdjustmentEvidence(SupplierPaymentReturnPort.Receip
         return end;
     }
     private static boolean fresh(Instant observed, Instant now) { return !observed.isAfter(now) && observed.plus(ProcurementPayablePort.MAX_EVIDENCE_AGE).isAfter(now); }
-    private static DomainException changed() { return new DomainException("SUPPLIER_PAYABLE_ADJUSTMENT_EVIDENCE_CHANGED", "Fresh bank receipts, original ERP facts and the fixed accounting period are required"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.SUPPLIER_PAYABLE_ADJUSTMENT_EVIDENCE_CHANGED, "Fresh bank receipts, original ERP facts and the fixed accounting period are required"); }
     @Override public String toString() { return "SupplierPayableAdjustmentEvidence[checkedAt=" + checkedAt + "]"; }
 }

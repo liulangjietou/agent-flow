@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.HashSet;
@@ -23,15 +24,15 @@ public final class PrecheckExplanationRun {
     /** 租约随首次领取固定，进程恢复不能延长或重复执行原模型请求。 */
     public void start(long version, Instant at, Instant leaseUntil) {
         require(version, Status.QUEUED); time(at, context.createdAt());
-        if (leaseUntil == null || !leaseUntil.isAfter(at)) throw new DomainException("INVALID_AGENT_TIME", "Invalid explanation lease");
+        if (leaseUntil == null || !leaseUntil.isAfter(at)) throw new DomainException(ErrorCode.INVALID_AGENT_TIME, "Invalid explanation lease");
         state = new State(Status.RUNNING, version + 1, at, leaseUntil, null, null, null, null);
     }
 
     /** 完成仅记录带来源的建议；超时结果不能成为可复核建议。 */
     public void complete(long version, PrecheckExplanationSuggestion suggestion, Instant at) {
         require(version, Status.RUNNING); time(at, state.startedAt());
-        if (expired(at)) throw new DomainException("AGENT_RUN_STATE_CONFLICT", "Explanation lease expired");
-        if (suggestion == null || !java.util.Set.of(PROMPT_VERSION, "expense-precheck-explanation-v1").contains(suggestion.promptVersion())) throw new DomainException("INVALID_AGENT_OUTPUT", "Explanation prompt changed");
+        if (expired(at)) throw new DomainException(ErrorCode.AGENT_RUN_STATE_CONFLICT, "Explanation lease expired");
+        if (suggestion == null || !java.util.Set.of(PROMPT_VERSION, "expense-precheck-explanation-v1").contains(suggestion.promptVersion())) throw new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Explanation prompt changed");
         suggestion.requireMatches(context.input());
         state = new State(Status.COMPLETED, version + 1, state.startedAt(), state.leaseUntil(), at, suggestion, null, null);
     }
@@ -45,7 +46,7 @@ public final class PrecheckExplanationRun {
     /** 本人明确采纳所选解释，只保存核对记录，不写回财务字段。 */
     public void adopt(long version, String actor, List<String> selected, String comment, Instant at) {
         require(version, Status.COMPLETED);
-        if (!context.input().currentAt(at)) throw new DomainException("AGENT_INPUT_CHANGED", "Precheck explanation expired");
+        if (!context.input().currentAt(at)) throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Precheck explanation expired");
         if (selected == null || selected.isEmpty() || selected.size() > PrecheckExplanationInput.MAX_ISSUES
                 || selected.stream().anyMatch(Objects::isNull) || new HashSet<>(selected).size() != selected.size()
                 || !context.input().issueIds().containsAll(selected)) throw invalidReview();
@@ -83,13 +84,13 @@ public final class PrecheckExplanationRun {
     public boolean active() { return state.status() == Status.QUEUED || state.status() == Status.RUNNING; }
     public boolean expired(Instant at) { return state.status() == Status.RUNNING && !state.leaseUntil().isAfter(at); }
     private void require(long version, Status status) {
-        if (version != state.version()) throw new DomainException("CONCURRENCY_CONFLICT", "Explanation run version changed");
-        if (state.status() != status) throw new DomainException("AGENT_RUN_STATE_CONFLICT", "Explanation transition is unavailable");
+        if (version != state.version()) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Explanation run version changed");
+        if (state.status() != status) throw new DomainException(ErrorCode.AGENT_RUN_STATE_CONFLICT, "Explanation transition is unavailable");
     }
     private static void time(Instant at, Instant previous) {
-        if (at == null || at.isBefore(previous)) throw new DomainException("INVALID_AGENT_TIME", "Explanation time moved backwards");
+        if (at == null || at.isBefore(previous)) throw new DomainException(ErrorCode.INVALID_AGENT_TIME, "Explanation time moved backwards");
     }
-    private static DomainException invalidReview() { return new DomainException("INVALID_AGENT_REVIEW", "Only selected explanations can be reviewed by the original applicant"); }
+    private static DomainException invalidReview() { return new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Only selected explanations can be reviewed by the original applicant"); }
 
     /**
      * 完整执行身份仅在本地持久化，模型只收到其中明确授权的来源。
@@ -100,7 +101,7 @@ public final class PrecheckExplanationRun {
         public Context {
             if (id == null || StringUtils.isBlank(tenantId) || tenantId.length() > 64 || StringUtils.isBlank(requestedBy)
                     || requestedBy.length() > 128 || createdAt == null || input == null || !input.currentAt(createdAt)
-                    || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}")) throw new DomainException("INVALID_AGENT_INPUT", "Invalid explanation context");
+                    || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}")) throw new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Invalid explanation context");
         }
     }
     /**

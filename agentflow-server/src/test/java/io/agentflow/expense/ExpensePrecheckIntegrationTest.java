@@ -78,7 +78,7 @@ import java.util.function.BiFunction;
         "agentflow.invoices.verification-worker-enabled=false", "agentflow.expenses.precheck-worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class ExpensePrecheckIntegrationTest {
-    private static final Path DIRECTORY = Path.of("/fyoung/tmp/agentflow-expense-precheck-" + UUID.randomUUID());
+    private static final Path DIRECTORY = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-expense-precheck-" + UUID.randomUUID());
     private static final HttpServer SERVER = server();
     private static final String ENDPOINT = "http://127.0.0.1:" + SERVER.getAddress().getPort() + "/finance";
     private static final AtomicReference<BiFunction<String, JsonNode, String>> RESPONDER = new AtomicReference<>();

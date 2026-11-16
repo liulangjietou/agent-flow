@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.PrecheckExplanationService;
 import io.agentflow.common.DomainException;
 import java.util.List;
@@ -30,11 +31,11 @@ public class ExpenseStructuredCorrectionService {
         if (!detail.canAdopt() || detail.version() != input.expectedRunVersion() || !expense.editable()
                 || detail.applicationVersion() != input.applicationVersion() || expense.applicationVersion() != input.applicationVersion()
                 || detail.financialVersion() != input.financialVersion() || expense.financialVersion() != input.financialVersion()) {
-            throw new DomainException("AGENT_INPUT_CHANGED", "Structured correction input changed");
+            throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Structured correction input changed");
         }
         var all = detail.suggestion().items().stream().flatMap(item -> item.patches().stream()).toList();
         var selected = input.selectedPatchIds().stream().map(id -> all.stream().filter(patch -> patch.sourceId().equals(id)).findFirst()
-                .orElseThrow(() -> new DomainException("INVALID_AGENT_REVIEW", "Selected patch is not in the original suggestion"))).toList();
+                .orElseThrow(() -> new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Selected patch is not in the original suggestion"))).toList();
         var issues = detail.suggestion().items().stream().filter(item -> item.patches().stream().anyMatch(selected::contains))
                 .map(io.agentflow.agent.PrecheckExplanationSuggestion.Item::issueSourceId).toList();
         var content = ExpenseFieldPatch.apply(expense.content(), selected);

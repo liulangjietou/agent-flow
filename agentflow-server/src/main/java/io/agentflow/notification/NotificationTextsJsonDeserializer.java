@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
@@ -32,6 +33,6 @@ public class NotificationTextsJsonDeserializer extends JsonDeserializer<Notifica
     }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_NOTIFICATION_TEXT", "Notification texts require supported event names and string values");
+        return new DomainException(ErrorCode.INVALID_NOTIFICATION_TEXT, "Notification texts require supported event names and string values");
     }
 }

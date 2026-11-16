@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.agentflow.approval.model.Application;
@@ -147,7 +148,7 @@ public class VoucherNotificationAccess {
                 .orElse(null);
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Voucher notification is unavailable in the current scope"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Voucher notification is unavailable in the current scope"); }
 
     /**
      * 内部来源含接收关系，不能作为 HTTP 响应公开。

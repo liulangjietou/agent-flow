@@ -1,5 +1,6 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 
 import java.time.Duration;
@@ -113,6 +114,6 @@ public record ServiceTaskOperation(Input input, long version, Status status, int
     public enum Failure { NOT_CONFIGURED, TARGET_CHANGED, OPERATION_DISABLED, TIMEOUT, CONNECTION, AUTHENTICATION, REMOTE_FAILURE,
         INVALID_RESPONSE, RESPONSE_TOO_LARGE, LEASE_EXPIRED, INTERNAL_ERROR }
 
-    private static DomainException invalid() { return new DomainException("INVALID_SERVICE_TASK_OPERATION", "Service task operation state or observation is inconsistent"); }
-    private static DomainException conflict() { return new DomainException("SERVICE_TASK_OPERATION_CONFLICT", "Service task operation is no longer executable with this claim"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SERVICE_TASK_OPERATION, "Service task operation state or observation is inconsistent"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.SERVICE_TASK_OPERATION_CONFLICT, "Service task operation is no longer executable with this claim"); }
 }

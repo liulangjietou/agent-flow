@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.time.Instant;
@@ -143,7 +144,7 @@ public record VoucherOperation(Input input, long version, Status status, int att
         requireTime(now);
         if (id == null || !id.equals(reversalId) || status != Status.POSTED || observation == null || observation.observedAt().isAfter(now)
                 || !now.isBefore(observation.observedAt().plus(DISPUTE_EVIDENCE_LIFETIME))) {
-            throw new DomainException("VOUCHER_REVERSAL_ORIGINAL_RECHECK_REQUIRED", "Original posted voucher must be freshly confirmed before releasing its reversal hold");
+            throw new DomainException(ErrorCode.VOUCHER_REVERSAL_ORIGINAL_RECHECK_REQUIRED, "Original posted voucher must be freshly confirmed before releasing its reversal hold");
         }
         return new VoucherOperation(input, Math.incrementExact(version), status, attempts, createdAt, now, null, null,
                 observation, conflictingObservation, highestRevision, failure, null);
@@ -168,7 +169,7 @@ public record VoucherOperation(Input input, long version, Status status, int att
     /** 采用已持久化候选并保留原命令；普通查询仍不能解除争议。 */
     public VoucherOperation resolveDispute(VoucherObservation.Status outcome, VoucherObservation originalPosting, boolean postingObserved, Instant now) {
         if (resolutionIssue(now, originalPosting, postingObserved) != null || outcome != conflictingObservation.status()) {
-            throw new DomainException("VOUCHER_DISPUTE_UNRESOLVABLE", "Dispute requires recent terminal evidence for the original posting");
+            throw new DomainException(ErrorCode.VOUCHER_DISPUTE_UNRESOLVABLE, "Dispute requires recent terminal evidence for the original posting");
         }
         return changed(Status.valueOf(outcome.name()), now, null, conflictingObservation, null, highestRevision, null);
     }
@@ -204,8 +205,8 @@ public record VoucherOperation(Input input, long version, Status status, int att
     }
     private Instant retryAt(Instant now) { return now.plusSeconds(Math.min(MAX_BACKOFF_SECONDS, INITIAL_BACKOFF_SECONDS << Math.min(attempts - 1, 6))); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_OPERATION", "Voucher operation must preserve original input, external revisions and recovery state"); }
-    private static DomainException conflict() { return new DomainException("VOUCHER_OPERATION_STATE_CONFLICT", "Voucher operation can no longer perform the requested transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_OPERATION, "Voucher operation must preserve original input, external revisions and recovery state"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.VOUCHER_OPERATION_STATE_CONFLICT, "Voucher operation can no longer perform the requested transition"); }
 
     /**
      * 命令和财务目标一旦登记就不可替换。

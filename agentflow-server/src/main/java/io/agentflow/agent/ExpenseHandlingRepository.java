@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.mapper.ExpenseHandlingMapper;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -33,7 +34,7 @@ public class ExpenseHandlingRepository {
     public void save(ExpenseHandlingTask task, long previous) {
         var c = task.context();
         if (mapper.update(c.tenantId(), c.id().toString(), previous, task.state().version(), task.active() ? c.reportId().toString() : null,
-                json.write(task.state())) != 1) throw new DomainException("CONCURRENCY_CONFLICT", "Expense handling record changed");
+                json.write(task.state())) != 1) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense handling record changed");
         append(task);
     }
     /** 仅返回当前单据的最近二十次办理。 */

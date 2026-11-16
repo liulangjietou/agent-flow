@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApplicationFieldViews;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.process.FlowableTaskFacade;
@@ -37,14 +38,14 @@ public class AssistInputService {
     /** 只允许当轮可作出批准决定的人使用摘要，不因管理员或历史参与身份放宽。 */
     public void requireDecision(Application application, String taskId, Actor actor) {
         if (!tasks.canDecide(taskId, actor, application.id())) {
-            throw new DomainException("FORBIDDEN", "A current decision task is required for assist operations");
+            throw new DomainException(ErrorCode.FORBIDDEN, "A current decision task is required for assist operations");
         }
     }
 
     /** 列出可选择的来源，缺省全部不选；无表单旧流程仅提供标题。 */
     public List<AssistModelPort.Source> available(Application application, int roundNo) {
         var round = rounds.findByRound(application.tenantId(), application.id(), roundNo)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Submission round not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Submission round not found"));
         var result = new ArrayList<AssistModelPort.Source>();
         result.add(source("application:title", "申请标题", round.title()));
         var schema = round.formSchema();
@@ -80,7 +81,7 @@ public class AssistInputService {
         var selected = new ArrayList<AssistModelPort.Source>();
         for (String id : sourceIds) {
             var source = available.get(id);
-            if (source == null) throw new DomainException("FORBIDDEN", "Selected assist source is not sendable");
+            if (source == null) throw new DomainException(ErrorCode.FORBIDDEN, "Selected assist source is not sendable");
             selected.add(source);
         }
         if (json.write(selected).getBytes(StandardCharsets.UTF_8).length > MAX_INPUT_BYTES) throw invalid();
@@ -92,7 +93,7 @@ public class AssistInputService {
         var readable = available(application, run.input().roundNo()).stream().map(AssistModelPort.Source::reference).collect(Collectors.toSet());
         if (!sources.stream().map(AssistModelPort.Source::reference).toList().equals(run.input().references())
                 || !readable.containsAll(run.input().references())) {
-            throw new DomainException("FORBIDDEN", "Current field permissions do not cover the selected assist input");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Current field permissions do not cover the selected assist input");
         }
     }
 
@@ -104,5 +105,5 @@ public class AssistInputService {
         String content = json.write(value);
         return new AssistModelPort.Source(new AssistInput.Reference(id, AssistConfiguration.digest(content)), label, content);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_INPUT", "Select one to 64 sources within 64 KiB"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Select one to 64 sources within 64 KiB"); }
 }

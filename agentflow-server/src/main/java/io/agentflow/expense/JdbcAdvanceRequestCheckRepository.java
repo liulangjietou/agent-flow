@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.AdvanceRequestCheckRepositoryMapper;
@@ -58,8 +59,7 @@ public class JdbcAdvanceRequestCheckRepository {
                     input.requestId().toString(),
                     Timestamp.from(job.createdAt()));
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "ADVANCE_REQUEST_CHECK_ACTIVE",
+            throw new DomainException(ErrorCode.ADVANCE_REQUEST_CHECK_ACTIVE,
                     "Advance request already has an active precheck");
         }
         append(job);
@@ -185,7 +185,7 @@ public class JdbcAdvanceRequestCheckRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Advance request check input or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Advance request check input or version changed"); }
 
     /**
      * 扫描项不复制敏感快照，领取后在锁内重新读取。

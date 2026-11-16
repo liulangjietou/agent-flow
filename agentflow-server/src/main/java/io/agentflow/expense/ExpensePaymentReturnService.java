@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
@@ -48,7 +50,7 @@ public class ExpensePaymentReturnService {
         var actor = actors.actor(); var source = sources.find(actor.tenantId(), reportId); var command = source.request().command();
         access.requireFinanceAuthorization(command.id());
         if (actor.userId().equals(command.payee().employeeId()) || actor.userId().equals(command.authorization().executedBy())) {
-            throw new DomainException("FORBIDDEN", "Applicant and original payment executor cannot register expense returns");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Applicant and original payment executor cannot register expense returns");
         }
     }
     /** 原身份、目标与首次成功修订先保存，事务提交后才允许外部查询。 */
@@ -58,14 +60,14 @@ public class ExpensePaymentReturnService {
         var ledger = ledgers.find(actor.tenantId(), reportId).orElse(null);
         if (source.settlement().version() != input.settlementVersion() || (ledger == null ? 0 : ledger.version()) != input.returnVersion()) throw conflict();
         var latest = checks.latest(actor.tenantId(), reportId, actor.userId()).orElse(null);
-        if (latest != null && latest.active()) throw new DomainException("EXPENSE_PAYMENT_RETURN_PENDING", "Current finance actor has a pending expense payment return query");
+        if (latest != null && latest.active()) throw new DomainException(ErrorCode.EXPENSE_PAYMENT_RETURN_PENDING, "Current finance actor has a pending expense payment return query");
         var now = time(Instant.now());
         if (ledger == null) { ledger = ExpensePaymentReturns.open(source.request(), now); ledgers.create(ledger); }
         else if (!ledger.request().equals(source.request())) throw conflict();
         var check = ExpensePaymentReturnCheck.queue(new ExpensePaymentReturnCheck.Input(UUID.randomUUID(), actor.tenantId(), source.authorization().terms().targetDigest(),
                 source.paymentVersion(), source.request(), actor.userId(), now));
         checks.create(check);
-        var event = audit.record(source.authorization(), check.input().id(), check.version(), "FINANCE", "EXPENSE_PAYMENT_RETURN_QUERY", null, check.status().name(), input.comment(), now);
+        var event = audit.record(source.authorization(), check.input().id(), check.version(), SystemRole.FINANCE.name(), "EXPENSE_PAYMENT_RETURN_QUERY", null, check.status().name(), input.comment(), now);
         return new ActionReceipt(reportId, check.input().id(), check.version(), null, ledger.version(), source.settlement().version(), event);
     }
     /** 消费查询、登记、防重、独立账本及结算冻结使用同一报销事务。 */
@@ -79,14 +81,14 @@ public class ExpensePaymentReturnService {
                 || !checks.latest(actor.tenantId(), reportId, actor.userId()).map(value -> value.input().id().equals(check.input().id())).orElse(false)) throw conflict();
         sources.requireCheck(check, source); var now = time(Instant.now()); var issue = registrationIssue(source, ledger, check, now);
         if (issue != null) throw new DomainException(issue, "Expense return registration requires fresh cumulative evidence and an independent finance decision");
-        if (input.outcome() != check.receipt().status()) throw new DomainException("EXPENSE_PAYMENT_RETURN_OUTCOME_CHANGED", "Registration must match the displayed expense return outcome");
+        if (input.outcome() != check.receipt().status()) throw new DomainException(ErrorCode.EXPENSE_PAYMENT_RETURN_OUTCOME_CHANGED, "Registration must match the displayed expense return outcome");
         var decision = new ExpensePaymentReturn(UUID.randomUUID(), actor.tenantId(), check.input().id(), check.receipt(), actor.userId(), now, input.evidenceReference(), input.comment());
         var next = ledger.register(decision); ledgers.update(next);
         var settlement = decision.applyTo(source.settlement()); if (!settlement.equals(source.settlement())) settlementChanges.persist(source.settlement(), settlement);
         var resolved = check.resolve(decision, now); checks.update(resolved); registrations.create(decision, next);
         events.publishEvent(new ExpensePaymentReturnChanged(resolved));
         events.publishEvent(new ExpensePaymentReturnRegistered(decision, next));
-        var event = audit.record(source.authorization(), decision.id(), next.version(), "FINANCE", "EXPENSE_PAYMENT_RETURN_REGISTER", check.status().name(), resolved.status().name(), input.comment(), now);
+        var event = audit.record(source.authorization(), decision.id(), next.version(), SystemRole.FINANCE.name(), "EXPENSE_PAYMENT_RETURN_REGISTER", check.status().name(), resolved.status().name(), input.comment(), now);
         return new ActionReceipt(reportId, check.input().id(), resolved.version(), decision.id(), next.version(), settlements.find(actor.tenantId(), reportId).orElseThrow().version(), event);
     }
     /** 页面和写入口共享原件守卫，各财务看到的最高版本共同约束登记。 */
@@ -156,7 +158,7 @@ public class ExpensePaymentReturnService {
         checks.update(value); events.publishEvent(new ExpensePaymentReturnChanged(value));
     }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed expense settlement, return ledger or query changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed expense settlement, return ledger or query changed"); }
 
     /**
      * 客户端只能确认当前结算与退回版本，原付款及科目由服务端派生。

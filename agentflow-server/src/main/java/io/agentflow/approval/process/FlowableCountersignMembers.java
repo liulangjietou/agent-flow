@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.service.TaskRecipientDirectory;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.ApprovalPolicy;
@@ -62,7 +63,7 @@ public class FlowableCountersignMembers {
         while (!root.isMultiInstanceRoot() && root.getParent() != null) root = root.getParent();
         String tenant = root.getTenantId();
         if (!root.isMultiInstanceRoot() || tenant == null || !tenant.equals(root.getVariable("tenantId"))) {
-            throw new DomainException("COUNTERSIGN_STATE_INVALID", "Countersign execution tenant or scope is invalid");
+            throw new DomainException(ErrorCode.COUNTERSIGN_STATE_INVALID, "Countersign execution tenant or scope is invalid");
         }
         if (root.getVariableLocal(MEMBERS) instanceof List<?> snapshot) return snapshot.stream().map(String.class::cast).toList();
         String rule = new String(Base64.getDecoder().decode(encodedRule), StandardCharsets.UTF_8);
@@ -75,7 +76,7 @@ public class FlowableCountersignMembers {
                 : io.agentflow.definition.FormAssigneePolicy.isFieldRule(rule) || io.agentflow.organization.LocalOrganizationDirectory.isLocalRule(rule)
                     ? organization.resolve(root, encodedRule) : directory.members(tenant, users, roles);
         List<String> members = new ArrayList<>(selected.stream().distinct().sorted().toList());
-        if (members.isEmpty()) throw new DomainException("COUNTERSIGN_NO_MEMBERS", "No active approvers are available for the countersign node");
+        if (members.isEmpty()) throw new DomainException(ErrorCode.COUNTERSIGN_NO_MEMBERS, "No active approvers are available for the countersign node");
         ApprovalPolicy policy = new ApprovalPolicy(ApprovalMode.valueOf(mode), percentage);
         if (policy.mode() != ApprovalMode.ALL) {
             root.setVariableLocal(MODE, policy.mode().name());

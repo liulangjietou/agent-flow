@@ -1,5 +1,6 @@
 package io.agentflow.calendar;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.calendar.mapper.BusinessCalendarRepositoryMapper;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -47,8 +48,7 @@ public class JdbcBusinessCalendarRepository implements BusinessCalendarRepositor
                     calendar.updatedBy(),
                     Timestamp.from(calendar.updatedAt()));
         } catch (DuplicateKeyException exception) {
-            throw new DomainException(
-                    "CALENDAR_KEY_CONFLICT",
+            throw new DomainException(ErrorCode.CALENDAR_KEY_CONFLICT,
                     "A calendar with this key already exists in the tenant");
         }
         appendVersion(calendar);
@@ -68,8 +68,7 @@ public class JdbcBusinessCalendarRepository implements BusinessCalendarRepositor
                         calendar.id().toString(),
                         expectedRevision);
         if (affected != 1)
-            throw new DomainException(
-                    "CONCURRENCY_CONFLICT", "Calendar changed before this revision was saved");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Calendar changed before this revision was saved");
         appendVersion(calendar);
     }
 

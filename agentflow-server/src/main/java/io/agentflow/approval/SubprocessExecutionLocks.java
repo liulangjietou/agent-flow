@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubprocessCall;
@@ -80,7 +81,7 @@ public class SubprocessExecutionLocks {
         UUID current = applicationId;
         while (true) {
             if (!seen.add(current) || result.size() > SubprocessPolicy.MAX_CALL_DEPTH) {
-                throw new DomainException("SUBPROCESS_RELATION_INVALID", "The subprocess origin chain is invalid");
+                throw new DomainException(ErrorCode.SUBPROCESS_RELATION_INVALID, "The subprocess origin chain is invalid");
             }
             var origin = calls.findByChild(tenant, current);
             if (origin.isEmpty()) return List.copyOf(result);
@@ -92,12 +93,12 @@ public class SubprocessExecutionLocks {
     /** 子申请的输入和生命周期跟随父调用，不允许申请人将其作为独立根申请重提或撤回。 */
     public void requireRoot(Application application) {
         if (calls.findByChild(application.tenantId(), application.id()).isPresent()) {
-            throw new DomainException("SUBPROCESS_PARENT_CONTROL_REQUIRED", "Subprocess lifecycle must be controlled through its root application");
+            throw new DomainException(ErrorCode.SUBPROCESS_PARENT_CONTROL_REQUIRED, "Subprocess lifecycle must be controlled through its root application");
         }
     }
 
     private Application lock(String tenant, UUID id) {
-        return applications.lockById(tenant, id).orElseThrow(() -> new DomainException("NOT_FOUND", "Application not found"));
+        return applications.lockById(tenant, id).orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Application not found"));
     }
 
     /** 暂停及过期是异步消费的正常结果，不通过事务代理异常把收件事务标为只能回滚。

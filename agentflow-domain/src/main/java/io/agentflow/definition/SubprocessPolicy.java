@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import java.util.Collections;
@@ -28,11 +29,11 @@ public record SubprocessPolicy(String processKey, long version, Map<String, Stri
         if (processKey == null || processKey.isBlank() || processKey.length() > MAX_PROCESS_KEY_LENGTH
                 || !processKey.equals(processKey.strip()) || processKey.contains("${") || processKey.contains("#{")
                 || processKey.codePoints().anyMatch(Character::isISOControl) || version < 1 || version > Integer.MAX_VALUE) {
-            throw new DomainException("SUBPROCESS_REFERENCE_INVALID", "An explicit process key and published version are required");
+            throw new DomainException(ErrorCode.SUBPROCESS_REFERENCE_INVALID, "An explicit process key and published version are required");
         }
         if (inputs == null || inputs.size() > FormSchema.MAX_FIELDS || inputs.entrySet().stream()
                 .anyMatch(entry -> !fieldKey(entry.getKey()) || !fieldKey(entry.getValue()))) {
-            throw new DomainException("SUBPROCESS_INPUT_MAPPING_INVALID", "Subprocess inputs must map declared field names");
+            throw new DomainException(ErrorCode.SUBPROCESS_INPUT_MAPPING_INVALID, "Subprocess inputs must map declared field names");
         }
         inputs = Collections.unmodifiableMap(new LinkedHashMap<>(inputs));
     }
@@ -41,10 +42,10 @@ public record SubprocessPolicy(String processKey, long version, Map<String, Stri
     public static SubprocessPolicy fromProperties(Map<String, String> properties) {
         String key = properties.get(KEY_PROPERTY), version = properties.get(VERSION_PROPERTY);
         if (key == null || version == null) {
-            throw new DomainException("SUBPROCESS_REFERENCE_REQUIRED", "Select a published subprocess version");
+            throw new DomainException(ErrorCode.SUBPROCESS_REFERENCE_REQUIRED, "Select a published subprocess version");
         }
         if (!version.matches("[1-9][0-9]{0,9}")) {
-            throw new DomainException("SUBPROCESS_REFERENCE_INVALID", "Subprocess version must be a canonical positive integer");
+            throw new DomainException(ErrorCode.SUBPROCESS_REFERENCE_INVALID, "Subprocess version must be a canonical positive integer");
         }
         var inputs = new LinkedHashMap<String, String>();
         properties.forEach((name, source) -> {

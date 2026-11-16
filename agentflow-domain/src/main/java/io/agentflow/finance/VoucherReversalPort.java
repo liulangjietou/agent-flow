@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -125,5 +126,5 @@ public interface VoucherReversalPort {
                 && Objects.equals(left.debitTotal(), right.debitTotal()) && Objects.equals(left.creditTotal(), right.creditTotal()) && Objects.equals(left.postedAt(), right.postedAt());
     }
     private static boolean invalidText(String value) { return StringUtils.isBlank(value) || value.length() > 128; }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_REVERSAL_RECEIPT", "Voucher reversal requires the original posting and a distinct fully posted reverse voucher with matching line dimensions"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_REVERSAL_RECEIPT, "Voucher reversal requires the original posting and a distinct fully posted reverse voucher with matching line dimensions"); }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.InvoiceVerificationPort;
 import java.io.File;
@@ -39,7 +40,7 @@ final class InvoiceDocumentProcess {
     /** 只有子进程正常结束且完整结果通过校验才返回；停止失败时保留占位，防止进程继续累积。 */
     <T> T execute(Program program, byte[] original, List<String> arguments, ResultReader<T> reader) {
         if (original.length < 1 || original.length > InvoiceVerificationPort.Request.MAX_ORIGINAL_BYTES) throw unavailable();
-        if (!SLOT.tryAcquire()) throw new DomainException("INVOICE_EXTRACTION_SOURCE_BUSY", "Invoice document preparation is busy");
+        if (!SLOT.tryAcquire()) throw new DomainException(ErrorCode.INVOICE_EXTRACTION_SOURCE_BUSY, "Invoice document preparation is busy");
         Path directory = null;
         Process process = null;
         boolean interrupted = false;
@@ -119,7 +120,7 @@ final class InvoiceDocumentProcess {
     }
 
     private static DomainException unavailable() {
-        return new DomainException("INVOICE_EXTRACTION_SOURCE_UNAVAILABLE", "Invoice document preparation failed or exceeded its limits");
+        return new DomainException(ErrorCode.INVOICE_EXTRACTION_SOURCE_UNAVAILABLE, "Invoice document preparation failed or exceeded its limits");
     }
 
     /**

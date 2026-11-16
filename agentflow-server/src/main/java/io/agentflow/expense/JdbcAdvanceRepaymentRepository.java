@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.AdvanceRepaymentRepositoryMapper;
@@ -82,8 +83,7 @@ public class JdbcAdvanceRepaymentRepository {
                     json.write(value));
             credits.record(value);
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "ADVANCE_REPAYMENT_ALREADY_RECORDED",
+            throw new DomainException(ErrorCode.ADVANCE_REPAYMENT_ALREADY_RECORDED,
                     "Receipt, received funds or accounting entry has already been recorded");
         }
     }
@@ -108,8 +108,7 @@ public class JdbcAdvanceRepaymentRepository {
         if (before != null) {
             var dates = sqlMapper.list(tenant, advanceId.toString(), before.toString());
             if (dates.isEmpty())
-                throw new DomainException(
-                        "INVALID_ADVANCE_REPAYMENT_QUERY",
+                throw new DomainException(ErrorCode.INVALID_ADVANCE_REPAYMENT_QUERY,
                         "Repayment cursor must belong to this advance");
             filter = " AND (recorded_at<? OR (recorded_at=? AND id<?))";
             args.add(dates.get(0));
@@ -212,8 +211,7 @@ public class JdbcAdvanceRepaymentRepository {
     }
 
     private static DomainException changed() {
-        return new DomainException(
-                "ADVANCE_REPAYMENT_SOURCE_CHANGED",
+        return new DomainException(ErrorCode.ADVANCE_REPAYMENT_SOURCE_CHANGED,
                 "Recorded repayment must match the consumed check and both original advance"
                     + " revisions");
     }

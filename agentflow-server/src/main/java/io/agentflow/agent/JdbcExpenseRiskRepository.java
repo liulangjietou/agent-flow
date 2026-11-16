@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.mapper.ExpenseRiskRepositoryMapper;
 import io.agentflow.auth.DeferredActorAuthentication;
 import io.agentflow.common.DomainException;
@@ -45,8 +46,7 @@ public class JdbcExpenseRiskRepository {
         if (run.state().status() != ExpenseRiskRun.Status.QUEUED || run.state().version() != 1)
             throw conflict();
         if (!sourceDigestsMatch(context.input()))
-            throw new DomainException(
-                    "INVALID_AGENT_INPUT", "Risk source content digest does not match");
+            throw new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Risk source content digest does not match");
         Objects.requireNonNull(login);
         try {
             int count =
@@ -68,8 +68,7 @@ public class JdbcExpenseRiskRepository {
                             primary.roundNo());
             if (count != 1) throw changed();
         } catch (DuplicateKeyException active) {
-            throw new DomainException(
-                    "AGENT_RUN_ACTIVE", "Expense report already has an active risk explanation");
+            throw new DomainException(ErrorCode.AGENT_RUN_ACTIVE, "Expense report already has an active risk explanation");
         }
         for (var document : context.input().documents()) {
             int count =
@@ -225,9 +224,9 @@ public class JdbcExpenseRiskRepository {
                 json.write(run.state()));
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense risk run changed before persistence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense risk run changed before persistence"); }
 
-    private static DomainException changed() { return new DomainException("AGENT_INPUT_CHANGED", "Expense risk source versions changed before persistence"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Expense risk source versions changed before persistence"); }
 
     private static IllegalStateException inconsistent() { return new IllegalStateException("Persisted expense risk binding is inconsistent"); }
 

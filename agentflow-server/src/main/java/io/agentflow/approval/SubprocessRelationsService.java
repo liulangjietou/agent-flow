@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.model.SubprocessCall;
@@ -33,7 +34,7 @@ public class SubprocessRelationsService {
     public Page read(UUID applicationId, int roundNo, UUID afterId, int limit) {
         var source = applications.get(applicationId);
         var round = rounds.findByRound(source.tenantId(), applicationId, roundNo)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Submission round is not available"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Submission round is not available"));
         var origin = calls.findByChild(source.tenantId(), applicationId).orElse(null);
         if (origin != null && (roundNo != SubprocessCall.CHILD_ROUND || !round.processInstanceId().equals(origin.childProcessInstanceId())
                 || round.definitionVersion() != origin.policy().version() || !source.processKey().equals(origin.policy().processKey()))) throw unavailable();
@@ -56,12 +57,12 @@ public class SubprocessRelationsService {
                     .map(round -> new Reference(id, application.businessNo(), application.processKey(), round.definitionVersion(), roundNo, round.title(), round.status()))
                     .orElse(null);
         } catch (DomainException exception) {
-            if ("NOT_FOUND".equals(exception.code())) return null;
+            if (exception.is(ErrorCode.NOT_FOUND)) return null;
             throw exception;
         }
     }
 
-    private static DomainException unavailable() { return new DomainException("SUBPROCESS_RELATION_UNAVAILABLE", "Subprocess relation does not match the saved round"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.SUBPROCESS_RELATION_UNAVAILABLE, "Subprocess relation does not match the saved round"); }
 
     /** 已授权的最小原轮次引用，不包含表单、自由文本意见、发起任职或附件。
      * @author owlzhangfq@gmail.com

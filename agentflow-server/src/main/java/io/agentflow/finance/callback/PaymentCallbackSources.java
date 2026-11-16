@@ -1,5 +1,6 @@
 package io.agentflow.finance.callback;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.ApprovedPaymentSources;
 import io.agentflow.finance.JdbcPaymentAuthorizationRepository;
@@ -62,7 +63,7 @@ public class PaymentCallbackSources {
                 ? employeeService.callbackQuery(signal.tenantId(), signal.authorizationId(), version, now).version()
                 : supplierService.callbackQuery(signal.tenantId(), signal.authorizationId(), version, now).version();
     }
-    private static DomainException missing() { return new DomainException("NOT_FOUND", "Original payment operation was not found"); }
+    private static DomainException missing() { return new DomainException(ErrorCode.NOT_FOUND, "Original payment operation was not found"); }
 
     /**
      * 最小状态只用于排队，不向运维列表暴露原金额、账户或申请内容。

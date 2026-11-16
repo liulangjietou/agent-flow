@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -49,5 +50,5 @@ public record AssistInput(UUID applicationId, long applicationVersion, int round
         }
     }
 
-    private static DomainException invalid(String message) { return new DomainException("INVALID_AGENT_INPUT", message); }
+    private static DomainException invalid(String message) { return new DomainException(ErrorCode.INVALID_AGENT_INPUT, message); }
 }

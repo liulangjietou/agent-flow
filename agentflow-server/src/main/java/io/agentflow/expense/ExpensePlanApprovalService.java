@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
@@ -31,10 +32,10 @@ public class ExpensePlanApprovalService {
     public void approved(Application application, String actor) {
         if (!bound(application) || application.status() != ApplicationStatus.APPROVED) return;
         var plan = plans.find(application.tenantId(), application.businessReference().id()).orElseThrow(
-                () -> new DomainException("NOT_FOUND", "Approved expense plan not found"));
+                () -> new DomainException(ErrorCode.NOT_FOUND, "Approved expense plan not found"));
         if (!plan.applicationId().equals(application.id()) || !plan.employeeId().equals(application.createdBy())
                 || !ExpensePlanFormContract.submittedPayload(plan.currentRound()).equals(application.payload())) {
-            throw new DomainException("EXPENSE_PLAN_APPROVAL_MISMATCH", "Approval must match the frozen expense plan and applicant");
+            throw new DomainException(ErrorCode.EXPENSE_PLAN_APPROVAL_MISMATCH, "Approval must match the frozen expense plan and applicant");
         }
         requests.create(plan.approvedRequest(application.roundNo()), actor);
     }

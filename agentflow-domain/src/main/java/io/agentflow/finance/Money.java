@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -40,8 +41,8 @@ public record Money(BigDecimal value, String currency) implements Comparable<Mon
 
     /** 判断币种一致，不通过自动换算隐藏输入错误。 */
     public void sameCurrency(Money other) {
-        if (other == null || !currency.equals(other.currency)) throw new DomainException("CURRENCY_MISMATCH", "Money currencies must match");
+        if (other == null || !currency.equals(other.currency)) throw new DomainException(ErrorCode.CURRENCY_MISMATCH, "Money currencies must match");
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_MONEY", "A non-negative two-decimal currency amount within the supported limit is required"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_MONEY, "A non-negative two-decimal currency amount within the supported limit is required"); }
 }

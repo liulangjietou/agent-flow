@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -17,7 +18,7 @@ public record PublishedExpensePolicy(UUID policyId, String tenantId, String key,
         if (policyId == null || StringUtils.isBlank(tenantId) || tenantId.length() > 64 || !ExpensePolicyDraft.validKey(key)
                 || version < 1 || draftRevision < version || categoryRevision < 1 || definition == null || definition.rules().isEmpty()
                 || StringUtils.isBlank(publishedBy) || publishedBy.length() > 128 || publishedAt == null
-                || StringUtils.isBlank(comment) || comment.length() > 2000) throw new DomainException("INVALID_EXPENSE_POLICY_PUBLICATION", "Expense policy publication requires immutable source versions and audit facts");
+                || StringUtils.isBlank(comment) || comment.length() > 2000) throw new DomainException(ErrorCode.INVALID_EXPENSE_POLICY_PUBLICATION, "Expense policy publication requires immutable source versions and audit facts");
         comment = comment.strip();
     }
 }

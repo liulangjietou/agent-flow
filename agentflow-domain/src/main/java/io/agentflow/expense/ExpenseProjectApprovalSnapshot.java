@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -56,6 +57,6 @@ public record ExpenseProjectApprovalSnapshot(int ruleVersion, ExpensePrecheckJob
     public boolean hasProjects() { return !owners.projects().isEmpty(); }
 
     private static DomainException invalid() {
-        return new DomainException("EXPENSE_PROJECT_SNAPSHOT_INVALID", "Project approval evidence must match the original ready precheck and unadjusted submission revision");
+        return new DomainException(ErrorCode.EXPENSE_PROJECT_SNAPSHOT_INVALID, "Project approval evidence must match the original ready precheck and unadjusted submission revision");
     }
 }

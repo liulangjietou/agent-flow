@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -48,8 +49,7 @@ public class JdbcOrganizationSyncRepository {
                     source.registeredBy(),
                     Timestamp.from(source.registeredAt()));
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "ORGANIZATION_SYNC_SOURCE_CONFLICT",
+            throw new DomainException(ErrorCode.ORGANIZATION_SYNC_SOURCE_CONFLICT,
                     "A synchronization source is already registered for this tenant");
         }
     }
@@ -132,8 +132,7 @@ public class JdbcOrganizationSyncRepository {
                             id(context.retryOf()));
             changed(inserted);
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "ORGANIZATION_SYNC_BATCH_ACTIVE",
+            throw new DomainException(ErrorCode.ORGANIZATION_SYNC_BATCH_ACTIVE,
                     "A synchronization batch is already pending for this tenant");
         }
         append(batch);
@@ -358,8 +357,7 @@ public class JdbcOrganizationSyncRepository {
                                 value.sourceRevision(),
                                 Timestamp.from(value.updatedAt())));
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "ORGANIZATION_SYNC_BINDING_CONFLICT",
+            throw new DomainException(ErrorCode.ORGANIZATION_SYNC_BINDING_CONFLICT,
                     "The source key or local organization entity is already bound");
         }
         sqlMapper.save3(
@@ -401,7 +399,7 @@ public class JdbcOrganizationSyncRepository {
 
     private static void changed(int count) { if (count != 1) throw conflict(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Organization synchronization state changed before persistence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Organization synchronization state changed before persistence"); }
 
     private static IllegalStateException inconsistent() { return new IllegalStateException("Persisted organization synchronization binding is inconsistent"); }
 

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.PaymentPersonnel;
@@ -29,7 +30,7 @@ public class ExpenseSettlementAccess {
     /** 同法人有效任职不能被历史财务参与记录代替。 */
     public VoucherAccess.Context requireFinance(UUID reportId, int round) {
         var context = read(reportId, round);
-        if (!canManage(context, reportId)) throw new DomainException("FORBIDDEN", "Current finance appointment and original financial access are required");
+        if (!canManage(context, reportId)) throw new DomainException(ErrorCode.FORBIDDEN, "Current finance appointment and original financial access are required");
         return context;
     }
     /** 页面提示与写入入口复用同一岗位判断，锁后仍须重新授权。 */
@@ -38,5 +39,5 @@ public class ExpenseSettlementAccess {
         var report = reports.find(actors.actor().tenantId(), reportId).orElseThrow(ExpenseSettlementAccess::notFound);
         return personnel.eligible(actors.actor().tenantId(), actors.actor().userId(), report.content().legalEntityId());
     }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense settlement is unavailable in the current scope"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Expense settlement is unavailable in the current scope"); }
 }

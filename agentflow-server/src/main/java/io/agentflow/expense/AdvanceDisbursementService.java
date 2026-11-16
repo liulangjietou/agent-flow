@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.JdbcPaymentOperationRepository;
 import io.agentflow.finance.PaymentCommand;
@@ -85,5 +86,5 @@ public class AdvanceDisbursementService {
                 && payment.observation().revision() >= decision.receipt().current().revision()).isPresent();
     }
 
-    private static DomainException mismatch() { return new DomainException("ADVANCE_PAYMENT_MISMATCH", "Original successful advance payment and existing disbursement must match"); }
+    private static DomainException mismatch() { return new DomainException(ErrorCode.ADVANCE_PAYMENT_MISMATCH, "Original successful advance payment and existing disbursement must match"); }
 }

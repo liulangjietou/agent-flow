@@ -1,5 +1,6 @@
 package io.agentflow.finance.callback;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceGatewayConfiguration;
@@ -36,7 +37,7 @@ public class PaymentCallbackService {
                 if (existing != null) return same(existing, input);
                 var source = sources.lock(input.signal());
                 if (!source.commandDigest().equals(input.signal().commandDigest()) || !source.targetDigest().equals(input.targetDigest())) {
-                    throw new DomainException("PAYMENT_CALLBACK_SOURCE_CONFLICT", "Payment callback does not match the original command and gateway");
+                    throw new DomainException(ErrorCode.PAYMENT_CALLBACK_SOURCE_CONFLICT, "Payment callback does not match the original command and gateway");
                 }
                 // 同源并发者可能在等待原申请锁时已经提交。
                 existing = callbacks.byEvent(input.signal().tenantId(), input.eventId()).orElse(null);
@@ -82,12 +83,12 @@ public class PaymentCallbackService {
     public PaymentCallback retry(Actor actor, UUID id, long expectedVersion, String reason, Instant now) {
         return transaction.execute(status -> {
             var current = callbacks.lock(actor.tenantId(), id);
-            if (current.version() != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Payment callback version changed");
+            if (current.version() != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Payment callback version changed");
             var next = current.retry(actor.userId(), reason, time(now)); callbacks.update(next); return next;
         });
     }
     private static PaymentCallback same(PaymentCallback existing, PaymentCallbackVerifier.Verified input) {
-        if (!existing.input().equals(input)) throw new DomainException("PAYMENT_CALLBACK_EVENT_CONFLICT", "Payment callback event ID was reused with different content");
+        if (!existing.input().equals(input)) throw new DomainException(ErrorCode.PAYMENT_CALLBACK_EVENT_CONFLICT, "Payment callback event ID was reused with different content");
         return existing;
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.organization.InitiatorContext;
 import java.util.List;
@@ -18,7 +19,7 @@ public record ExpenseSelfApprovalSnapshot(String tenantId, UUID applicationId, i
     /** 节点必须来自本轮已发布图，不能在缺失快照时回退到另一套选人规则。 */
     public Selection node(String id) {
         var selected = nodes.get(id);
-        if (selected == null) throw new DomainException("EXPENSE_APPROVAL_SNAPSHOT_MISSING", "The expense round has no frozen selection for this node");
+        if (selected == null) throw new DomainException(ErrorCode.EXPENSE_APPROVAL_SNAPSHOT_MISSING, "The expense round has no frozen selection for this node");
         return selected;
     }
 

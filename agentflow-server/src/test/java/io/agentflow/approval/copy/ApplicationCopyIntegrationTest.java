@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class ApplicationCopyIntegrationTest {
-    private static final String ATTACHMENT_DIRECTORY = "/fyoung/tmp/agentflow-copy-files-" + UUID.randomUUID();
+    private static final String ATTACHMENT_DIRECTORY = System.getProperty("java.io.tmpdir") + "/agentflow-copy-files-" + UUID.randomUUID();
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry properties) {
         properties.add("spring.datasource.url", () -> System.getenv().getOrDefault("AGENTFLOW_COPY_TEST_URL", "jdbc:h2:mem:copy-tests;DB_CLOSE_DELAY=-1"));

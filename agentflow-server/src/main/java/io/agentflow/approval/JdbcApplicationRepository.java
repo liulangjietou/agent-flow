@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.mapper.ApplicationRepositoryMapper;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
@@ -100,7 +101,7 @@ public class JdbcApplicationRepository implements ApplicationRepository {
                         application.id().toString(),
                         expectedVersion);
         if (updated != 1) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Application version has changed");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Application version has changed");
         }
         return application;
     }

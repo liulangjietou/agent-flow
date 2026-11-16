@@ -16,7 +16,7 @@ import java.util.Map;
 public final class ExpenseRiskOidcFixture {
     /** 启动真实 PKCE、签名和 JWKS 夹具，原会话可跨应用进程恢复。 */
     public static void main(String[] args) throws Exception {
-        if (args.length < 1 || args.length > 2 || !args[0].startsWith("/fyoung/tmp/")
+        if (args.length < 1 || args.length > 2 || !java.nio.file.Path.of(args[0]).toAbsolutePath().normalize().startsWith(java.nio.file.Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize())
                 || args.length == 2 && !List.of("bob-approver", "financial-reporting").contains(args[1])) {
             throw new IllegalArgumentException("Expected owned temporary metadata path");
         }

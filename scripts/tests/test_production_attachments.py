@@ -1,3 +1,4 @@
+import os
 """附件与数据库配套恢复的失败边界，不把单独数据库回执当作完整恢复。"""
 import hashlib
 import json
@@ -12,10 +13,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import production_attachments as attachments
 import production_database as db
 
+# 测试临时根目录：AGENTFLOW_TMP_DIR 优先，未设置时使用系统临时目录。
+TMP_ROOT = os.environ.get("AGENTFLOW_TMP_DIR") or tempfile.gettempdir()
+
 
 class PairedAttachmentRecoveryTest(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(dir='/fyoung/tmp', prefix='agentflow-attachment-recovery-')
+        self.temp = tempfile.TemporaryDirectory(dir=TMP_ROOT, prefix='agentflow-attachment-recovery-')
         self.root = Path(self.temp.name)
         self.source = db.private_directory(self.root / 'source')
         self.record = {'id': str(uuid.uuid4()), 'size': 3, 'sha256': hashlib.sha256(b'abc').hexdigest(), 'status': 'READY'}

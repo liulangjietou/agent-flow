@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.auth.DeferredActorAuthentication;
 import io.agentflow.common.Actor;
@@ -57,7 +58,7 @@ public class ExpenseRiskService {
         boolean enabled = unavailable == null;
         return new InputOptions(enabled, unavailable, enabled ? fingerprint(actor, taskId, catalog) : null,
                 enabled ? configuration.targetDigest(ExpenseRiskRun.PROMPT_VERSION) : null,
-                enabled ? configuration.getProviderId() : null, enabled ? configuration.getModel() : null,
+                enabled ? configuration.getProviderId() : null, enabled ? configuration.modelFor(ExpenseRiskRun.PROMPT_VERSION) : null,
                 enabled ? configuration.uri().getAuthority() : null,
                 enabled ? catalog.concerns() : List.of(), enabled ? catalog.sources() : List.of());
     }
@@ -72,7 +73,7 @@ public class ExpenseRiskService {
         if (!fingerprint(actor, taskId, catalog).equals(inputDigest)) throw changed();
         configuration.requireAvailable();
         if (!configuration.targetDigest(ExpenseRiskRun.PROMPT_VERSION).equals(targetDigest)) {
-            throw new DomainException("AGENT_TARGET_CHANGED", "Refresh the risk model destination");
+            throw new DomainException(ErrorCode.AGENT_TARGET_CHANGED, "Refresh the risk model destination");
         }
         var input = sources.select(catalog, sourceIds);
         var login = authentication.capture(request, actor, now);
@@ -83,7 +84,7 @@ public class ExpenseRiskService {
     /** 排队回执重放仍须逐单可读，但不重新要求已经结束的决定任务存在。 */
     @Transactional(readOnly = true)
     public void authorizeSelection(UUID reportId, ExpenseRiskAccess.Selection selection) {
-        if (!selection.documents().get(0).reportId().equals(reportId)) throw new DomainException("INVALID_AGENT_INPUT", "Primary expense must be first in the selection");
+        if (!selection.documents().get(0).reportId().equals(reportId)) throw new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Primary expense must be first in the selection");
         var actor = actors.actor();
         for (var document : selection.documents()) access.requirePrimaryReadable(actor, document.reportId(), document.roundNo());
     }
@@ -129,9 +130,9 @@ public class ExpenseRiskService {
         if (action == AssistExecutionService.ReviewAction.ADOPT) {
             run.adopt(expectedVersion, currentInput(actor, context, now), actor.userId(), selectedConcernIds, comment, now);
         } else if (action == AssistExecutionService.ReviewAction.DISMISS) {
-            if (!CollectionUtils.isEmpty(selectedConcernIds)) throw new DomainException("INVALID_AGENT_REVIEW", "Dismissal cannot adopt risk explanations");
+            if (!CollectionUtils.isEmpty(selectedConcernIds)) throw new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Dismissal cannot adopt risk explanations");
             run.dismiss(expectedVersion, actor.userId(), comment, now);
-        } else throw new DomainException("INVALID_AGENT_REVIEW", "Risk review action is required");
+        } else throw new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Risk review action is required");
         runs.update(run, expectedVersion); return receipt(run);
     }
 
@@ -212,8 +213,8 @@ public class ExpenseRiskService {
         } catch (DomainException unavailable) { return unavailable.code(); }
     }
     private void fail(ExpenseRiskRun run, AssistRun.Failure failure, Instant now) { run.fail(2, failure, now); runs.update(run, 2); }
-    private static DomainException changed() { return new DomainException("AGENT_INPUT_CHANGED", "Refresh the selected risk evidence before confirming delivery"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense risk run not found"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Refresh the selected risk evidence before confirming delivery"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Expense risk run not found"); }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MILLIS); }
     private static Receipt receipt(ExpenseRiskRun run) { return new Receipt(run.context().id(), run.state().status(), run.state().version()); }
 

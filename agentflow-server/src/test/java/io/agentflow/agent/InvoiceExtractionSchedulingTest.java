@@ -14,11 +14,11 @@ class InvoiceExtractionSchedulingTest {
         new ApplicationContextRunner().withUserConfiguration(InvoiceExtractionScheduling.class)
                 .withBean(InvoiceExtractionWorker.class, () -> mock(InvoiceExtractionWorker.class))
                 .withPropertyValues("agentflow.assist.enabled=false")
-                .run(context -> assertThat(context).hasBean("invoiceExtractionTaskScheduler").hasBean("invoiceExtractionPoller"));
+                .run(context -> assertThat(context).hasBean("invoiceExtractionPoller"));
     }
     @Test void workerCanBeDisabledWithoutDisablingHistoricalReads() {
         new ApplicationContextRunner().withUserConfiguration(InvoiceExtractionScheduling.class)
                 .withPropertyValues("agentflow.invoices.extraction-worker-enabled=false", "agentflow.assist.enabled=true")
-                .run(context -> assertThat(context).doesNotHaveBean("invoiceExtractionTaskScheduler").doesNotHaveBean("invoiceExtractionPoller"));
+                .run(context -> assertThat(context).doesNotHaveBean("invoiceExtractionPoller"));
     }
 }

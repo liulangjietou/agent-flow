@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.DomainException;
@@ -98,7 +99,7 @@ public class ExpenseRiskController {
         try { int parsed = Integer.parseInt(value); if (parsed < minimum || parsed > maximum) throw invalid(); return parsed; }
         catch (NumberFormatException malformed) { throw invalid(); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_QUERY", "Invalid expense risk query"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_QUERY, "Invalid expense risk query"); }
     private static IllegalArgumentException unknown() { return new IllegalArgumentException("Unknown expense risk request field"); }
 
     /**

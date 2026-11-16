@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -66,8 +67,7 @@ public class JdbcSupplierPaymentAuthorizationRepository {
                     json.write(value),
                     source.requestId().toString());
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "SUPPLIER_PAYMENT_ALREADY_AUTHORIZED",
+            throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_ALREADY_AUTHORIZED,
                     "Approved procurement already has an original supplier payment authorization");
         }
     }
@@ -209,5 +209,5 @@ public class JdbcSupplierPaymentAuthorizationRepository {
         return saved.get(0);
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Supplier authorization retirement or original hold evidence changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Supplier authorization retirement or original hold evidence changed"); }
 }

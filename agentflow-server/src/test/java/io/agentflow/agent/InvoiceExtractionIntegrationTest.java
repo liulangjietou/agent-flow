@@ -74,7 +74,7 @@ class InvoiceExtractionIntegrationTest {
     private static final AtomicReference<String> LAST_TRACE = new AtomicReference<>();
     private static final AtomicReference<String> LAST_BODY = new AtomicReference<>("");
     private static final HttpServer MODEL_SERVER = model();
-    private static final Path DIRECTORY = Path.of("/fyoung/tmp/agentflow-extraction-" + UUID.randomUUID());
+    private static final Path DIRECTORY = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-extraction-" + UUID.randomUUID());
     private final List<JdbcInvoiceExtractionRunRepository.Candidate> queued = new ArrayList<>();
     @Autowired CurrentActor actors;
     @Autowired InvoiceWalletService wallet;

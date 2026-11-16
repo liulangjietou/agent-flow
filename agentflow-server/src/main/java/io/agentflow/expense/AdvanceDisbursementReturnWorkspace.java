@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -40,8 +42,8 @@ public class AdvanceDisbursementReturnWorkspace {
         Integer round = null;
         if (parameters.containsKey("roundNo")) { var raw = parameters.get("roundNo"); if (!raw.matches("[1-9][0-9]{0,8}")) throw invalid(); round = Integer.valueOf(raw); }
         var detail = requests.read(advanceId, round); var actor = actors.actor(); var source = sources.find(actor.tenantId(), advanceId); var funding = source.funding();
-        if (funding.authorization().terms().binding().roundNo() != detail.roundNo()) throw new DomainException("NOT_FOUND", "Original disbursement is unavailable in this round");
-        boolean finance = actor.hasRole("FINANCE") && !actor.userId().equals(funding.advance().employeeId())
+        if (funding.authorization().terms().binding().roundNo() != detail.roundNo()) throw new DomainException(ErrorCode.NOT_FOUND, "Original disbursement is unavailable in this round");
+        boolean finance = actor.hasRole(SystemRole.FINANCE) && !actor.userId().equals(funding.advance().employeeId())
                 && !actor.userId().equals(source.request().command().authorization().executedBy()) && personnel.eligible(actor.tenantId(), actor.userId(), funding.advance().legalEntityId());
         var latest = finance ? checks.latest(actor.tenantId(), advanceId, actor.userId()).orElse(null) : null;
         var decision = decisions.latest(actor.tenantId(), advanceId).orElse(null); var original = source.request().original();
@@ -56,7 +58,7 @@ public class AdvanceDisbursementReturnWorkspace {
                 receipt == null ? null : new Evidence(receipt.status(), receipt.revision(), receipt.observedAt(), receipt.validUntil(),
                         receipt.current() == null ? null : receipt.current().revision(), receipt.current() == null ? null : receipt.current().status(), receipt.returns()), issue == null, issue);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_DISBURSEMENT_RETURN_QUERY", "Disbursement return query is invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_DISBURSEMENT_RETURN_QUERY, "Disbursement return query is invalid"); }
     /**
      * 最小原放款身份与累计余额，不包括内部命令或银行账户引用。
      * @author owlzhangfq@gmail.com

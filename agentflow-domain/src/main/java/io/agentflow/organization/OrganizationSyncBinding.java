@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -19,7 +20,7 @@ public record OrganizationSyncBinding(String tenantId, String sourceKey, Organiz
 
     /** 保留原对象身份；调岗和主体更换不能通过更新映射覆盖历史关系。 */
     public OrganizationSyncBinding applied(long expectedVersion, long localRevision, long sourceRevision, UUID batchId, Instant at) {
-        if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Organization source binding changed");
+        if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Organization source binding changed");
         if (localRevision < this.localRevision || sourceRevision <= this.sourceRevision || at == null || at.isBefore(updatedAt)) throw invalid();
         return new OrganizationSyncBinding(tenantId, sourceKey, key, localId, localRevision, sourceRevision, version + 1, batchId, at);
     }

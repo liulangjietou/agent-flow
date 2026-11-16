@@ -1,5 +1,6 @@
 package io.agentflow.approval.model;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.Locale;
 
@@ -13,6 +14,6 @@ public enum TaskAction {
     /** 在动作入口将外部字符串转为固定动作集合。 */
     public static TaskAction parse(String value) {
         try { return valueOf(value == null ? "" : value.toUpperCase(Locale.ROOT)); }
-        catch (IllegalArgumentException exception) { throw new DomainException("INVALID_REQUEST", "Unsupported task action"); }
+        catch (IllegalArgumentException exception) { throw new DomainException(ErrorCode.INVALID_REQUEST, "Unsupported task action"); }
     }
 }

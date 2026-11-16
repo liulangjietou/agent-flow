@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.*;
 import java.util.UUID;
@@ -48,7 +49,7 @@ public class ExpensePaymentReturnSources {
         if (!check.input().tenantId().equals(source.report().tenantId()) || check.input().paymentVersion() != source.paymentVersion()
                 || !check.input().targetDigest().equals(source.authorization().terms().targetDigest()) || !check.input().request().equals(source.request())) throw changed();
     }
-    private static DomainException changed() { return new DomainException("EXPENSE_PAYMENT_RETURN_SOURCE_CHANGED", "Original successful expense payment and settlement source are unavailable or inconsistent"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.EXPENSE_PAYMENT_RETURN_SOURCE_CHANGED, "Original successful expense payment and settlement source are unavailable or inconsistent"); }
     /**
      * 原结算、当前付款与固定首次成功修订分开，退回不追随当前账户变化。
      * @author owlzhangfq@gmail.com

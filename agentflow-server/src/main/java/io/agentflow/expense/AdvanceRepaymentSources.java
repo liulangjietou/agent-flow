@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AdvanceRepaymentPort;
@@ -48,7 +49,7 @@ public class AdvanceRepaymentSources {
         if (!proof.settleable() || !proof.input().equals(current.payment().input()) || !input.paymentId().equals(current.authorization().terms().id())
                 || !input.targetDigest().equals(current.authorization().terms().targetDigest()) || !input.request().equals(current.request(input.request().receiptReference()))) throw changed();
     }
-    private static DomainException changed() { return new DomainException("ADVANCE_REPAYMENT_SOURCE_CHANGED", "The actual original advance disbursement is unavailable or inconsistent"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.ADVANCE_REPAYMENT_SOURCE_CHANGED, "The actual original advance disbursement is unavailable or inconsistent"); }
     /**
      * 原放款与当前余额是不同事实，查询不修改二者。
      * @author owlzhangfq@gmail.com

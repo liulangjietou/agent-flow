@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -86,8 +87,8 @@ public class ExpenseResourceAdjustmentWorkspace {
                 command.period().request().accountingDate(), command.evidenceReference(), command.reason(), budget,
                 finance ? actions.availableActions(value, operation, now) : List.of(), finance && actions.canRetire(value, operation, now), retirement);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_ADJUSTMENT_QUERY", "Expense adjustment query only accepts a positive roundNo"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Consumed expense settlement is unavailable in this round"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_ADJUSTMENT_QUERY, "Expense adjustment query only accepts a positive roundNo"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Consumed expense settlement is unavailable in this round"); }
 
     /**
      * 本人准备不向其他读者展示；已授权调整是原轮次财务历史的一部分。

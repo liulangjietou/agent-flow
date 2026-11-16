@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseLine;
@@ -37,7 +38,7 @@ public record FinanceCatalog(String employeeId, String sourceVersion, Instant va
     /** 按稳定标识选择本次法人，目录失效时应用服务重新读取。 */
     public LegalEntity legalEntity(UUID id) {
         return legalEntities.stream().filter(entity -> entity.id().equals(id)).findFirst()
-                .orElseThrow(() -> new DomainException("FINANCE_LEGAL_ENTITY_UNAVAILABLE", "Legal entity is not available to this employee"));
+                .orElseThrow(() -> new DomainException(ErrorCode.FINANCE_LEGAL_ENTITY_UNAVAILABLE, "Legal entity is not available to this employee"));
     }
 
     private static <T> List<T> copy(List<T> entries, int maximum) {
@@ -45,7 +46,7 @@ public record FinanceCatalog(String employeeId, String sourceVersion, Instant va
         return List.copyOf(entries);
     }
     private static void text(String value, int maximum) { if (StringUtils.isBlank(value) || value.length() > maximum) throw invalid(); }
-    private static DomainException invalid() { return new DomainException("INVALID_FINANCE_CATALOG", "Finance catalog entries are invalid or inconsistent"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_FINANCE_CATALOG, "Finance catalog entries are invalid or inconsistent"); }
 
     /**
      * 法人本位币和纸质签收制度来自真实主数据。

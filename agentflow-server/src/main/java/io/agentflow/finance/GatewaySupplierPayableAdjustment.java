@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.procurement.SupplierPayableAdjustmentCommand;
 import io.agentflow.procurement.SupplierPayableAdjustmentEvidence;
@@ -22,7 +23,7 @@ public class GatewaySupplierPayableAdjustment implements SupplierPayableAdjustme
     /** 新鲜查询只决定能否发送，不改变原授权的命令字节和外部幂等键。 */
     @Override public FinanceResult<SupplierPayableAdjustmentObservation> adjust(SupplierPayableAdjustmentCommand command, SupplierPayableAdjustmentEvidence evidence) {
         if (evidence == null || !evidence.matches(command, Instant.now())) {
-            throw new DomainException("SUPPLIER_PAYABLE_ADJUSTMENT_EVIDENCE_CHANGED", "Fresh bank returns and original ERP accounting facts are required before adjustment");
+            throw new DomainException(ErrorCode.SUPPLIER_PAYABLE_ADJUSTMENT_EVIDENCE_CHANGED, "Fresh bank returns and original ERP accounting facts are required before adjustment");
         }
         return client.adjustSupplierPayable(command.tenantId(), command.targetDigest(), command.id(), new Execute(command, command.digest()),
                 SupplierPayableAdjustmentObservation.class, value -> command.matches(value, false, Instant.now()));

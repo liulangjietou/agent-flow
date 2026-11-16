@@ -8,7 +8,7 @@ const { default: Inbox } = await import(process.env.AGENTFLOW_TEST_NOTIFICATIONI
 const { createNavigation } = await import(process.env.AGENTFLOW_TEST_VOUCHER_NOTIFICATION_NAVIGATION)
 const originals = { ...api }, originalFetch = globalThis.fetch
 const id = n => `12345678-1234-1234-1234-${String(n).padStart(12, '0')}`
-const when = '2026-10-03T12:00:00Z', settle = () => new Promise(resolve => setImmediate(resolve)), clone = value => JSON.parse(JSON.stringify(value))
+const when = '2026-10-03T12:00:00Z', settle = () => new Promise(resolve => setImmediate(resolve))
 globalThis.localStorage = { getItem: () => 'test-token' }
 const message = () => ({ id: id(1), applicationId: id(3), title: '凭证处理需核对', businessNo: 'V-1', kind: 'VOUCHER_ATTENTION', actor: 'system:vouchers', roundNo: 2, createdAt: when, readAt: null, content: '原凭证准备暂不可用' })
 const target = () => ({ messageId: id(1), voucherId: id(2), applicationId: id(3), businessId: id(4), roundNo: 2, kind: 'EXPENSE_ACCRUAL', reversalBound: false,

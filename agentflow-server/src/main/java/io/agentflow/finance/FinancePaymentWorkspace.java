@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.common.CurrentActor;
@@ -70,7 +71,7 @@ public class FinancePaymentWorkspace {
                         finance && authorization != null && authorization.canRetire(operation, actors.actor().userId()),
                         reviewSource && (review == null || !review.active()), reviewSource && review != null && review.usable(now) && review.matchesSource(authorization, voucher, now)));
     }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_QUERY", "Only a positive roundNo is accepted for application payment status"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_QUERY, "Only a positive roundNo is accepted for application payment status"); }
     /**
      * 双版本及凭证版本让用户的人工授权绑定其刚刚查看的事实。
      * @author owlzhangfq@gmail.com

@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.SubmissionRisk;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
@@ -25,13 +26,13 @@ public class GraphJsonDeserializer extends JsonDeserializer<Graph> {
     @Override
     public Graph deserialize(JsonParser parser, DeserializationContext context) throws IOException {
         JsonNode root = parser.getCodec().readTree(parser);
-        if (!root.isObject()) throw new DomainException("INVALID_DEFINITION", "Graph must be an object");
+        if (!root.isObject()) throw new DomainException(ErrorCode.INVALID_DEFINITION, "Graph must be an object");
         root.fieldNames().forEachRemaining(name -> {
-            if (!FIELDS.contains(name)) throw new DomainException("INVALID_DEFINITION", "Unknown graph property");
+            if (!FIELDS.contains(name)) throw new DomainException(ErrorCode.INVALID_DEFINITION, "Unknown graph property");
         });
         JsonNode version = root.get("conditionLanguageVersion");
         if (version != null && (!version.isIntegralNumber() || !version.canConvertToInt())) {
-            throw new DomainException("INVALID_CONDITION_VERSION", "Condition language version must be an integer");
+            throw new DomainException(ErrorCode.INVALID_CONDITION_VERSION, "Condition language version must be an integer");
         }
         List<Node> nodes = root.path("nodes").isMissingNode() || root.path("nodes").isNull() ? List.of()
                 : Arrays.asList(parser.getCodec().treeToValue(root.get("nodes"), Node[].class));
@@ -57,5 +58,5 @@ public class GraphJsonDeserializer extends JsonDeserializer<Graph> {
         return new ApprovalRiskPolicy(rules);
     }
 
-    private DomainException invalidRisk() { return new DomainException("INVALID_RISK_POLICY", "Risk policy must contain explicit typed rules"); }
+    private DomainException invalidRisk() { return new DomainException(ErrorCode.INVALID_RISK_POLICY, "Risk policy must contain explicit typed rules"); }
 }

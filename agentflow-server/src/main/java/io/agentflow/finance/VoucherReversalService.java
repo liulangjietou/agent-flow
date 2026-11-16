@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -75,7 +77,7 @@ public class VoucherReversalService {
         var context = access.requireFinance(applicationId, operationId, input.roundNo()); var source = sources.find(context, operationId);
         requireVersions(context, source, input.applicationVersion(), input.businessVersion(), input.operationVersion()); requireRecordableSource(source);
         var actor = actors.actor(); var latest = checks.latest(actor.tenantId(), operationId, actor.userId()).orElse(null);
-        if (latest != null && latest.active()) throw new DomainException("VOUCHER_REVERSAL_PENDING", "Current finance actor already has a pending reversal query");
+        if (latest != null && latest.active()) throw new DomainException(ErrorCode.VOUCHER_REVERSAL_PENDING, "Current finance actor already has a pending reversal query");
         var now = time(Instant.now()); var check = VoucherReversalCheck.queue(new VoucherReversalCheck.Input(UUID.randomUUID(), actor.tenantId(), source.current().input().targetDigest(),
                 source.originalVersion(), source.request(), actor.userId(), now));
         checks.create(check); var event = audit(source, check.input().id(), check.version(), "VOUCHER_REVERSAL_QUERY", input.comment(), now);
@@ -203,19 +205,17 @@ public class VoucherReversalService {
         if (records.forOperation(
                         source.request().command().tenantId(), source.request().command().id())
                 .isPresent())
-            throw new DomainException(
-                    "VOUCHER_REVERSAL_ALREADY_RECORDED",
+            throw new DomainException(ErrorCode.VOUCHER_REVERSAL_ALREADY_RECORDED,
                     "Original voucher already has an independent reversal record");
         if (source.current().status() != VoucherOperation.Status.REVERSED)
-            throw new DomainException(
-                    "VOUCHER_REVERSAL_ORIGINAL_UNRESOLVED",
+            throw new DomainException(ErrorCode.VOUCHER_REVERSAL_ORIGINAL_UNRESOLVED,
                     "Resolve the original voucher as reversed before verifying its independent"
                             + " reverse posting");
     }
 
     private void requireCheck(VoucherReversalCheck check, VoucherReversalSources.Source source) {
         if (check.input().originalVersion() != source.originalVersion() || !check.input().targetDigest().equals(source.current().input().targetDigest()) || !check.input().request().equals(source.request())) {
-            throw new DomainException("VOUCHER_REVERSAL_SOURCE_CHANGED", "Original accepted posting or fixed reversal query source changed");
+            throw new DomainException(ErrorCode.VOUCHER_REVERSAL_SOURCE_CHANGED, "Original accepted posting or fixed reversal query source changed");
         }
     }
 
@@ -250,7 +250,7 @@ public class VoucherReversalService {
                                 "roundNo",
                                 command.binding().roundNo(),
                                 "authorizedRole",
-                                "FINANCE",
+                                SystemRole.FINANCE.name(),
                                 "comment",
                                 comment)),
                 Timestamp.from(at));
@@ -263,7 +263,7 @@ public class VoucherReversalService {
 
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed application, business, voucher or reversal query changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed application, business, voucher or reversal query changed"); }
 
     /**
      * 页面只提交看到的版本，不接受 ERP 目标、科目或金额。

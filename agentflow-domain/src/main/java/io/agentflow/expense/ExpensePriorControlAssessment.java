@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.util.ArrayList;
@@ -41,7 +42,7 @@ public record ExpensePriorControlAssessment(int lineNo, UUID requestId, long req
             if (previous == null || next == null || !previous.approvedLines().equals(next.approvedLines())) throw invalid();
             var source = previous.approvedLines().stream().filter(line -> line.lineNo() == reference.lineNo()).findFirst().orElseThrow(ExpensePriorControlAssessment::invalid);
             if (source.control() != null && !source.control().categoryCode().equals(original.categoryCode())) {
-                throw new DomainException("PRIOR_REQUEST_CATEGORY_MISMATCH", "Expense category must match the frozen prior request category");
+                throw new DomainException(ErrorCode.PRIOR_REQUEST_CATEGORY_MISMATCH, "Expense category must match the frozen prior request category");
             }
             var balance = next.balances().get(reference.lineNo());
             var use = new ExpenseUse(reportId, round.roundNo(), original.lineNo());
@@ -52,7 +53,7 @@ public record ExpensePriorControlAssessment(int lineNo, UUID requestId, long req
             var assessment = new ExpensePriorControlAssessment(original.lineNo(), reference.requestId(), previous.version(), source, balance.limit(),
                     balance.consumed(), balance.reserved().minus(reserved), reserved, amount, total, balance.exceeded());
             if (assessment.requiresApproval() && StringUtils.isBlank(original.exceptionReason())) {
-                throw new DomainException("PRIOR_REQUEST_EXCEPTION_REASON_REQUIRED", "Each expense line exceeding cumulative prior tolerance requires an explanation");
+                throw new DomainException(ErrorCode.PRIOR_REQUEST_EXCEPTION_REASON_REQUIRED, "Each expense line exceeding cumulative prior tolerance requires an explanation");
             }
             results.add(assessment);
         }
@@ -60,5 +61,5 @@ public record ExpensePriorControlAssessment(int lineNo, UUID requestId, long req
     }
 
     private static Money excess(Money total, Money threshold) { return total.compareTo(threshold) > 0 ? total.minus(threshold) : Money.zero(threshold.currency()); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PRIOR_ASSESSMENT", "Prior request exposure must match the original line and complete reservation plan"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PRIOR_ASSESSMENT, "Prior request exposure must match the original line and complete reservation plan"); }
 }

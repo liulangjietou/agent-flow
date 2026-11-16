@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceGatewayConfiguration;
@@ -56,14 +57,14 @@ public class InvoiceVerificationService {
         var actor = actors.actor();
         jobs.lockInvoice(actor.tenantId(), invoiceId);
         var invoice = owned(invoiceId);
-        if (invoice.version() != request.expectedInvoiceVersion()) throw new DomainException("CONCURRENCY_CONFLICT", "Invoice changed before verification was requested");
+        if (invoice.version() != request.expectedInvoiceVersion()) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Invoice changed before verification was requested");
         var original = originals.find(actor.tenantId(), invoiceId).orElseThrow(InvoiceVerificationService::notFound); original.requireReady();
         if (invoice.facts() != null && !invoice.facts().legalEntityId().equals(request.legalEntityId())) {
-            throw new DomainException("INVOICE_TITLE_MISMATCH", "Confirmed invoice buyer cannot be replaced by a verification request");
+            throw new DomainException(ErrorCode.INVOICE_TITLE_MISMATCH, "Confirmed invoice buyer cannot be replaced by a verification request");
         }
-        var destination = configuration.destination(actor.tenantId()).orElseThrow(() -> new DomainException("FINANCE_GATEWAY_UNAVAILABLE", "Invoice verification is not configured for this tenant"));
-        if (!destination.digest(actor.tenantId()).equals(request.targetDigest())) throw new DomainException("FINANCE_TARGET_CHANGED", "Refresh the verification destination before queuing");
-        if (jobs.active(actor.tenantId(), invoiceId)) throw new DomainException("INVOICE_VERIFICATION_ACTIVE", "Invoice already has an active verification job");
+        var destination = configuration.destination(actor.tenantId()).orElseThrow(() -> new DomainException(ErrorCode.FINANCE_GATEWAY_UNAVAILABLE, "Invoice verification is not configured for this tenant"));
+        if (!destination.digest(actor.tenantId()).equals(request.targetDigest())) throw new DomainException(ErrorCode.FINANCE_TARGET_CHANGED, "Refresh the verification destination before queuing");
+        if (jobs.active(actor.tenantId(), invoiceId)) throw new DomainException(ErrorCode.INVOICE_VERIFICATION_ACTIVE, "Invoice already has an active verification job");
         var input = new InvoiceVerificationJob.Input(UUID.randomUUID(), actor.tenantId(), invoiceId, actor.userId(), invoice.version(),
                 request.legalEntityId(), original.id(), original.sha256(), request.targetDigest());
         var job = InvoiceVerificationJob.queue(input, time(Instant.now())); jobs.create(job);
@@ -173,8 +174,8 @@ public class InvoiceVerificationService {
     }
     private Invoice owned(UUID id) { return invoices.find(actors.actor().tenantId(), id).filter(invoice -> invoice.ownerId().equals(actors.actor().userId())).orElseThrow(InvoiceVerificationService::notFound); }
     private static Instant time(Instant value) { return Objects.requireNonNull(value).truncatedTo(ChronoUnit.MILLIS); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Invoice verification context not found"); }
-    private static DomainException invalidQuery() { return new DomainException("INVALID_INVOICE_QUERY", "Invoice verification query is invalid"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Invoice verification context not found"); }
+    private static DomainException invalidQuery() { return new DomainException(ErrorCode.INVALID_INVOICE_QUERY, "Invoice verification query is invalid"); }
     private static InvoiceVerificationJob.Rejection rejection(FinanceResult.Reason reason) {
         return switch (reason) {
             case INVOICE_INVALID -> InvoiceVerificationJob.Rejection.INVOICE_INVALID;

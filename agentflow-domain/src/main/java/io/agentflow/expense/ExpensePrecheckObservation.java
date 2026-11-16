@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 
@@ -15,7 +16,7 @@ public record ExpensePrecheckObservation(Instant observedAt, Instant validUntil,
     public ExpensePrecheckObservation {
         if (observedAt == null || validUntil == null || validUntil.isAfter(observedAt.plusSeconds(MAX_VALIDITY_SECONDS))
                 || dependencyDigest == null || !dependencyDigest.matches("[a-f0-9]{64}")) {
-            throw new DomainException("INVALID_EXPENSE_PRECHECK", "Expense precheck observation is invalid");
+            throw new DomainException(ErrorCode.INVALID_EXPENSE_PRECHECK, "Expense precheck observation is invalid");
         }
     }
 

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpenseSettlementRepositoryMapper;
@@ -193,7 +194,7 @@ public class JdbcExpenseSettlementRepository {
 
     private static String id(UUID value) { return value == null ? null : value.toString(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense settlement input or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense settlement input or version changed"); }
 
     /**
      * 调度候选不携带金额、回单或其他敏感数据。

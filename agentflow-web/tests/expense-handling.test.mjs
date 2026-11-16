@@ -13,7 +13,7 @@ const { default: Usage } = await import(pathToFileURL(process.env.AGENTFLOW_TEST
 const originals = { ...api }, originalFetch = globalThis.fetch, storage = globalThis.localStorage
 afterEach(() => { Object.assign(api, originals); globalThis.fetch = originalFetch; globalThis.localStorage = storage; bindAuthenticationActor(null) })
 const uuid = n => `00000000-0000-0000-0000-${String(n).padStart(12, '0')}`
-const at = '2026-10-09T00:00:00Z', copy = value => structuredClone(value)
+const at = '2026-10-09T00:00:00Z'
 const task = () => ({ id: uuid(1), reportId: uuid(2), applicationId: uuid(3), goal: '核对材料', createdAt: at, version: 1, status: 'OPEN', applicationVersion: 1, financialVersion: 1, current: true, steps: [] })
 const expense = () => ({ id: uuid(2), applicationId: uuid(3), applicationVersion: 1, financialVersion: 1, editable: true, roundNo: 0, content: { lines: [], advanceOffsets: [] } })
 const step = () => ({ number: 1, tool: 'EXPENSE', referenceId: uuid(2), sourceVersion: 1, outcome: 'READ', applicationVersion: 1, financialVersion: 1, inputDigest: 'a'.repeat(64), startedAt: at, updatedAt: at })

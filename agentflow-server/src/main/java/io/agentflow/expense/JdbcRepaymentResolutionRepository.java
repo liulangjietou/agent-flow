@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.RepaymentResolutionRepositoryMapper;
@@ -88,8 +89,7 @@ public class JdbcRepaymentResolutionRepository {
                         entry.amount().value(),
                         entry.amount().currency());
             } catch (DuplicateKeyException duplicate) {
-                throw new DomainException(
-                        "REPAYMENT_RETURN_ALREADY_RECORDED",
+                throw new DomainException(ErrorCode.REPAYMENT_RETURN_ALREADY_RECORDED,
                         "Returned funds or accounting entry already belongs to a repayment"
                             + " adjustment");
             }
@@ -252,5 +252,5 @@ public class JdbcRepaymentResolutionRepository {
 
     private static Timestamp timestamp(Instant at) { return Timestamp.from(at.truncatedTo(ChronoUnit.MICROS)); }
 
-    private static DomainException changed() { return new DomainException("ADVANCE_REPAYMENT_SOURCE_CHANGED", "Repayment resolution must match the consumed review and both advance revisions"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.ADVANCE_REPAYMENT_SOURCE_CHANGED, "Repayment resolution must match the consumed review and both advance revisions"); }
 }

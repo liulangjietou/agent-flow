@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
@@ -87,7 +88,7 @@ public class VoucherWorkspace {
                 selected == null ? null : selected.activeRevision(), selected == null ? null : selected.definitionDigest(),
                 mapping == null ? null : mapping.sourceVersion());
     }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_QUERY", "Only a positive roundNo is accepted for voucher status"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_QUERY, "Only a positive roundNo is accepted for voucher status"); }
     /**
      * 所有状态均限定在明确的业务与轮次，客户端须核对绑定后展示。
      * @author owlzhangfq@gmail.com

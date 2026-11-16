@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
@@ -21,7 +22,7 @@ public class ReversalCheckNotificationController {
     /** 不缓存财务摘要，也不在读取中准备、授权或发送冲销。 */
     @GetMapping("/api/v1/notifications/{id}/reversal-check-target")
     public ResponseEntity<ReversalCheckNotificationAccess.Target> target(@PathVariable UUID id, HttpServletRequest request) {
-        if (!request.getParameterMap().isEmpty()) throw new DomainException("INVALID_INBOX_QUERY", "Reversal check notification target does not accept query parameters");
+        if (!request.getParameterMap().isEmpty()) throw new DomainException(ErrorCode.INVALID_INBOX_QUERY, "Reversal check notification target does not accept query parameters");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(access.target(id));
     }
 }

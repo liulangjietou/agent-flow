@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseLine;
 import java.math.BigDecimal;
@@ -83,5 +84,5 @@ public record ExpenseDraftSuggestion(String providerId, String modelVersion, Str
         }
     }
     private static boolean identifier(String value) { return StringUtils.isNotBlank(value) && value.length() <= AssistSuggestion.MAX_VERSION_LENGTH; }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_OUTPUT", "Expense draft suggestion does not match the authorized itinerary and catalog"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Expense draft suggestion does not match the authorized itinerary and catalog"); }
 }

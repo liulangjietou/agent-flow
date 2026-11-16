@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import org.apache.commons.lang3.StringUtils;
@@ -34,7 +35,7 @@ public record ExpensePolicySnapshot(UUID policyId, long version, Money assessedG
                 || managedPolicy != null && (!policyId.equals(managedPolicy.selection().policyId()) || version != managedPolicy.selection().policyVersion())) throw invalid();
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_POLICY", "A consistent versioned expense and tax policy assessment is required"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_POLICY, "A consistent versioned expense and tax policy assessment is required"); }
 
     /**
      * 超标只表示需要审批例外，不表示制度已经批准超支。

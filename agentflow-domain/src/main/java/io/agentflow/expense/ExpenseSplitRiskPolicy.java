@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.ConditionParser;
 import io.agentflow.definition.DefinitionModels.Comparison;
@@ -53,7 +54,7 @@ public final class ExpenseSplitRiskPolicy {
             }
             if (node.properties().containsKey(GATEWAY_PROPERTY)) {
                 if (node.type() != NodeType.EXCLUSIVE_GATEWAY || !AGGREGATE_AMOUNT.equals(node.properties().get(GATEWAY_PROPERTY))) {
-                    throw new DomainException("EXPENSE_SPLIT_ROUTING_INVALID", "Aggregate routing requires an explicit exclusive gateway");
+                    throw new DomainException(ErrorCode.EXPENSE_SPLIT_ROUTING_INVALID, "Aggregate routing requires an explicit exclusive gateway");
                 }
                 gateways.add(node.id());
             }
@@ -72,14 +73,14 @@ public final class ExpenseSplitRiskPolicy {
         var configuration = from(graph);
         if (configuration.mode() == Mode.UNCONFIGURED) return;
         if (!ExpenseFormContract.structured(schema)) {
-            throw new DomainException("EXPENSE_SPLIT_RISK_REQUIRES_EXPENSE_FORM", "Split risk policy requires a structured expense form");
+            throw new DomainException(ErrorCode.EXPENSE_SPLIT_RISK_REQUIRES_EXPENSE_FORM, "Split risk policy requires a structured expense form");
         }
         ExpenseFormContract.requireSchema(schema);
         var parser = new ConditionParser();
         for (String gateway : configuration.gatewayIds()) {
             boolean usesAmount = graph.edges().stream().filter(edge -> gateway.equals(edge.source()) && !edge.condition().isBlank())
                     .anyMatch(edge -> referencesAmount(parser.parse(edge.condition(), graph.conditionLanguageVersion())));
-            if (!usesAmount) throw new DomainException("EXPENSE_SPLIT_ROUTING_AMOUNT_REQUIRED", "Aggregate routing requires a condition on the expense amount");
+            if (!usesAmount) throw new DomainException(ErrorCode.EXPENSE_SPLIT_ROUTING_AMOUNT_REQUIRED, "Aggregate routing requires a condition on the expense amount");
         }
         requireBeforeFinance(graph, configuration.gatewayIds());
     }
@@ -111,12 +112,12 @@ public final class ExpenseSplitRiskPolicy {
         while (!pending.isEmpty()) {
             String node = pending.removeFirst();
             if (!visited.add(node)) continue;
-            if (gateways.contains(node)) throw new DomainException("EXPENSE_SPLIT_ROUTING_AFTER_FINANCE", "Aggregate amount cannot replace financial review amount");
+            if (gateways.contains(node)) throw new DomainException(ErrorCode.EXPENSE_SPLIT_ROUTING_AFTER_FINANCE, "Aggregate amount cannot replace financial review amount");
             pending.addAll(outgoing.getOrDefault(node, List.of()));
         }
     }
 
-    private static DomainException invalid() { return new DomainException("EXPENSE_SPLIT_RISK_POLICY_INVALID", "Split risk configuration must explicitly define a supported rule"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.EXPENSE_SPLIT_RISK_POLICY_INVALID, "Split risk configuration must explicitly define a supported rule"); }
 
     /**
      * 未配置与管理员明确关闭具有不同语义，任何一项都不能声称已完成风险计算。
@@ -147,7 +148,7 @@ public final class ExpenseSplitRiskPolicy {
                     || mode == Mode.ENABLED && rule == null) throw invalid();
             gatewayIds = Collections.unmodifiableSet(new TreeSet<>(gatewayIds));
             if (mode == Mode.ENABLED && gatewayIds.isEmpty()) {
-                throw new DomainException("EXPENSE_SPLIT_ROUTING_REQUIRED", "Enabled split risk policy requires a business routing gateway");
+                throw new DomainException(ErrorCode.EXPENSE_SPLIT_ROUTING_REQUIRED, "Enabled split risk policy requires a business routing gateway");
             }
         }
     }

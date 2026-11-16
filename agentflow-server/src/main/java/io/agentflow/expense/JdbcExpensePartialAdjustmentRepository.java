@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpensePartialAdjustmentRepositoryMapper;
@@ -668,9 +669,9 @@ public class JdbcExpensePartialAdjustmentRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException pending() { return new DomainException("EXPENSE_PARTIAL_ADJUSTMENT_PENDING", "Another partial adjustment already protects this expense"); }
+    private static DomainException pending() { return new DomainException(ErrorCode.EXPENSE_PARTIAL_ADJUSTMENT_PENDING, "Another partial adjustment already protects this expense"); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Partial adjustment source, current operation or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Partial adjustment source, current operation or version changed"); }
 
     private static IllegalStateException inconsistent() { return new IllegalStateException("Persisted partial adjustment identity or command registration is inconsistent"); }
 

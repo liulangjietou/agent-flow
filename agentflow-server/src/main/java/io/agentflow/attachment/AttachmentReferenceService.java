@@ -1,5 +1,6 @@
 package io.agentflow.attachment;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
@@ -20,8 +21,8 @@ public class AttachmentReferenceService {
         for (var reference : AttachmentReferences.collect(application.formSchema(), application.payload())) {
             Attachment file;
             try { file = files.get(application.tenantId(), application.id(), reference.id()); }
-            catch (DomainException missing) { throw new DomainException("INVALID_ATTACHMENT_REFERENCE", "Attachment does not belong to this application"); }
-            if (!file.fieldPath().equals(reference.fieldPath())) throw new DomainException("INVALID_ATTACHMENT_REFERENCE", "Attachment belongs to a different field");
+            catch (DomainException missing) { throw new DomainException(ErrorCode.INVALID_ATTACHMENT_REFERENCE, "Attachment does not belong to this application"); }
+            if (!file.fieldPath().equals(reference.fieldPath())) throw new DomainException(ErrorCode.INVALID_ATTACHMENT_REFERENCE, "Attachment belongs to a different field");
             if (submitted) { file.requireReady(); store.read(file); }
         }
     }

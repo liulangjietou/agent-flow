@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.JdbcBudgetConsumptionReversalRepository;
 import java.time.Instant;
@@ -58,5 +59,5 @@ public class ExpenseResourceAdjustmentExecution {
         return current.version() == candidate.version() && current.status() == ExpenseResourceAdjustment.Status.READY;
     }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense resource adjustment changed before execution"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense resource adjustment changed before execution"); }
 }

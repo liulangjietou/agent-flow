@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Duration;
@@ -101,7 +102,7 @@ public record PaymentOperation(Input input, long version, Status status, int att
     /** 使未发送队列及正在复查账户的旧领取失效，已确认失败和已停止状态保留原外部事实。 */
     public PaymentOperation stopForRetirement(Instant now) {
         requireTime(now);
-        if (retirementBasis() == null) throw new DomainException("PAYMENT_RETIREMENT_UNSAFE", "Original payment is not proven safely finished");
+        if (retirementBasis() == null) throw new DomainException(ErrorCode.PAYMENT_RETIREMENT_UNSAFE, "Original payment is not proven safely finished");
         return status == Status.QUEUED || status == Status.CHECKING
                 ? changed(Status.VOIDED, now, null, null, null, null, null, 0, Failure.FINANCE_RETIRED) : this;
     }
@@ -181,7 +182,7 @@ public record PaymentOperation(Input input, long version, Status status, int att
     public PaymentOperation resolveDispute(PaymentObservation.Status outcome, PaymentObservation originalSuccess, boolean fundingObserved, Instant now) {
         requireTime(now);
         if (resolutionIssue(now, originalSuccess, fundingObserved) != null || conflictingObservation.status() != outcome) {
-            throw new DomainException("PAYMENT_DISPUTE_UNRESOLVABLE", "A recent terminal observation of the unchanged original payment is required");
+            throw new DomainException(ErrorCode.PAYMENT_DISPUTE_UNRESOLVABLE, "A recent terminal observation of the unchanged original payment is required");
         }
         return changed(Status.valueOf(outcome.name()), now, null, null, accountEvidence, conflictingObservation, null, highestRevision, null);
     }
@@ -243,8 +244,8 @@ public record PaymentOperation(Input input, long version, Status status, int att
     }
     private Instant retryAt(Instant now) { return now.plusSeconds(Math.min(MAX_BACKOFF_SECONDS, INITIAL_BACKOFF_SECONDS << Math.min(attempts - 1, 6))); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_OPERATION", "Payment recovery state must preserve original command and external facts"); }
-    private static DomainException conflict() { return new DomainException("PAYMENT_OPERATION_STATE_CONFLICT", "Payment operation no longer allows this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_OPERATION, "Payment recovery state must preserve original command and external facts"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.PAYMENT_OPERATION_STATE_CONFLICT, "Payment operation no longer allows this transition"); }
 
     /** 日志只带状态和计数，不暴露金额、人员或账户。 */
     @Override public String toString() { return "PaymentOperation[id=" + input.command().id() + ", version=" + version + ", status=" + status + "]"; }
@@ -275,7 +276,7 @@ public record PaymentOperation(Input input, long version, Status status, int att
             var request = new PaymentAccountsPort.Request(input.command().payee().legalEntityId(), input.command().amount().currency(), input.command().authorization().executedBy());
             if (directory == null || !directory.matches(request, now) || !directory.account(input.debitAccount().reference(), now).equals(input.debitAccount())
                     || payee == null || !payee.snapshot().equals(input.command().payee()) || !payee.validUntil().isAfter(now)) {
-                throw new DomainException("PAYMENT_ACCOUNT_CHANGED", "Original payment accounts must remain available and unchanged");
+                throw new DomainException(ErrorCode.PAYMENT_ACCOUNT_CHANGED, "Original payment accounts must remain available and unchanged");
             }
             return new AccountEvidence(request, directory.sourceVersion(), input.debitAccount(), payee.snapshot(), directory.observedAt(), now,
                     directory.validUntil().isBefore(payee.validUntil()) ? directory.validUntil() : payee.validUntil());

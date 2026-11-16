@@ -1,5 +1,6 @@
 package io.agentflow.approval.history;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.common.DomainException;
@@ -40,11 +41,11 @@ public class RoundDiagramController {
             if (!parameters.isEmpty() || !roundNo.matches("[1-9][0-9]{0,9}")) throw new NumberFormatException();
             number = Integer.parseInt(roundNo);
         } catch (NumberFormatException exception) {
-            throw new DomainException("INVALID_DIAGRAM_QUERY", "A positive round number and no query parameters are required");
+            throw new DomainException(ErrorCode.INVALID_DIAGRAM_QUERY, "A positive round number and no query parameters are required");
         }
         var application = applications.get(id);
         var round = rounds.findByRound(application.tenantId(), id, number)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Submission round is not available"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Submission round is not available"));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(diagrams.read(application, round));
     }
 }

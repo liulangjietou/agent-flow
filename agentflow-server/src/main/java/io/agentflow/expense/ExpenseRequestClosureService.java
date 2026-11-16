@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -39,7 +40,7 @@ public class ExpenseRequestClosureService {
 
     private ExpenseRequest owned(Actor actor, UUID id) {
         return requests.find(actor.tenantId(), id).filter(value -> value.employeeId().equals(actor.userId()))
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Owned prior request credit not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Owned prior request credit not found"));
     }
 
     /**

@@ -1,5 +1,6 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
@@ -41,7 +42,7 @@ public class ServiceTaskRuntimeService {
         var application = applications.get(id);
         String tenant = application.tenantId();
         var round = rounds.findByRound(tenant, id, query.roundNo())
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Submission round not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Submission round not found"));
         ServiceTaskOperation cursor = null;
         if (query.afterId() != null) {
             cursor = operations.find(tenant, query.afterId()).orElseThrow(ServiceTaskRuntimeQuery::invalid).operation();
@@ -65,7 +66,7 @@ public class ServiceTaskRuntimeService {
         if (!round.processInstanceId().equals(binding.processInstanceId()) || round.definitionVersion() != binding.definitionVersion()
                 || !definition.key().equals(binding.processKey()) || !definition.digest().equals(binding.definitionDigest())
                 || node == null || node.type() != DefinitionModels.NodeType.SERVICE_TASK) {
-            throw new DomainException("SERVICE_TASK_DEFINITION_MISMATCH", "Service task record must match its original submission round");
+            throw new DomainException(ErrorCode.SERVICE_TASK_DEFINITION_MISMATCH, "Service task record must match its original submission round");
         }
         boolean available = catalog.available(command.tenantId(), new ServiceTaskCatalog.Installed(command.contract(), operation.input().targetDigest()));
         Instant completedAt = operation.observation() == null ? null : operation.observation().completedAt();

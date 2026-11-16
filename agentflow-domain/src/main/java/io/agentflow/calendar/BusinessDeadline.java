@@ -1,5 +1,6 @@
 package io.agentflow.calendar;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.time.Instant;
@@ -20,7 +21,7 @@ public final class BusinessDeadline {
     /** 试算以明确日历规则和本地开始时间为输入，不读取系统时钟或修改审批状态。 */
     public static Result calculate(CalendarRules rules, LocalDateTime startLocal, CalendarRules.OverlapChoice overlapChoice, int workingMinutes) {
         if (startLocal == null || startLocal.getYear() < 1 || startLocal.getYear() > 9998 || workingMinutes < 1 || workingMinutes > MAX_WORKING_MINUTES) {
-            throw new DomainException("INVALID_CALENDAR_CALCULATION", "Start year must be 1..9998 and working minutes 1..527040");
+            throw new DomainException(ErrorCode.INVALID_CALENDAR_CALCULATION, "Start year must be 1..9998 and working minutes 1..527040");
         }
         Instant start = rules.resolveStart(startLocal, overlapChoice);
         return calculateFrom(rules, start, workingMinutes);
@@ -29,11 +30,11 @@ public final class BusinessDeadline {
     /** 引擎已有真实创建时刻，直接沿时间轴计算，避免夏令时重复钟点被重新解释。 */
     public static Result calculate(CalendarRules rules, Instant start, int workingMinutes) {
         if (start == null || workingMinutes < 1 || workingMinutes > MAX_WORKING_MINUTES) {
-            throw new DomainException("INVALID_CALENDAR_CALCULATION", "A start instant and supported working minutes are required");
+            throw new DomainException(ErrorCode.INVALID_CALENDAR_CALCULATION, "A start instant and supported working minutes are required");
         }
         LocalDate date = start.atZone(ZoneId.of(rules.zoneId())).toLocalDate();
         if (date.getYear() < 1 || date.getYear() > 9998) {
-            throw new DomainException("INVALID_CALENDAR_CALCULATION", "Start year must be 1..9998");
+            throw new DomainException(ErrorCode.INVALID_CALENDAR_CALCULATION, "Start year must be 1..9998");
         }
         return calculateFrom(rules, start, workingMinutes);
     }
@@ -49,7 +50,7 @@ public final class BusinessDeadline {
      */
     public static Instant resume(CalendarRules rules, Instant pausedAt, Instant originalDueAt, Instant resumedAt) {
         if (pausedAt == null || originalDueAt == null || resumedAt == null || resumedAt.isBefore(pausedAt)) {
-            throw new DomainException("INVALID_DEADLINE_RESUME", "Resume time must not precede the recorded pause");
+            throw new DomainException(ErrorCode.INVALID_DEADLINE_RESUME, "Resume time must not precede the recorded pause");
         }
         if (!originalDueAt.isAfter(pausedAt) || resumedAt.equals(pausedAt)) return originalDueAt;
         ZoneId zone = ZoneId.of(rules.zoneId());
@@ -65,7 +66,7 @@ public final class BusinessDeadline {
         }
         if (!date.isAfter(last)) throw horizonExceeded();
         if (remaining.isZero()) {
-            throw new DomainException("DEADLINE_STATE_INVALID", "The original deadline has no remaining bound working time");
+            throw new DomainException(ErrorCode.DEADLINE_STATE_INVALID, "The original deadline has no remaining bound working time");
         }
         int year = resumedAt.atZone(zone).getYear();
         if (year < 1 || year > 9998) throw horizonExceeded();
@@ -94,7 +95,7 @@ public final class BusinessDeadline {
     }
 
     private static DomainException horizonExceeded() {
-        return new DomainException("CALENDAR_HORIZON_EXCEEDED", "Insufficient working time within the supported calendar horizon");
+        return new DomainException(ErrorCode.CALENDAR_HORIZON_EXCEEDED, "Insufficient working time within the supported calendar horizon");
     }
 
     /** @author owlzhangfq@gmail.com */

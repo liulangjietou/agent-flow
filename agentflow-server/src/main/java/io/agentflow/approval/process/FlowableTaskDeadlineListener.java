@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.calendar.BusinessCalendarRepository;
 import io.agentflow.calendar.BusinessDeadline;
 import io.agentflow.common.DomainException;
@@ -62,7 +63,7 @@ public class FlowableTaskDeadlineListener implements FlowableEventListener {
         definition.get().graph().nodes().stream().filter(node -> node.id().equals(task.getTaskDefinitionKey()))
                 .findFirst().ifPresent(node -> TaskDeadlinePolicy.fromProperties(node.properties()).ifPresent(policy -> {
                     var calendar = calendars.findVersion(tenantId, policy.calendarId(), policy.calendarRevision())
-                            .orElseThrow(() -> new DomainException("DEADLINE_CALENDAR_UNAVAILABLE", "Bound deadline calendar is unavailable"));
+                            .orElseThrow(() -> new DomainException(ErrorCode.DEADLINE_CALENDAR_UNAVAILABLE, "Bound deadline calendar is unavailable"));
                     var deadline = BusinessDeadline.calculate(calendar.rules(), task.getCreateTime().toInstant(), policy.workingMinutes());
                     // 创建事件发生时历史任务已建立；公开命令同时更新运行与历史期限，终止路径也能保留原事实。
                     tasks.getObject().setDueDate(task.getId(), Date.from(deadline.dueAt()));

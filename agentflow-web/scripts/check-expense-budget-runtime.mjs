@@ -1,8 +1,9 @@
+import { tmpdir } from 'node:os'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
 import Ajv2020 from 'ajv/dist/2020.js'
 import addFormats from 'ajv-formats'
 import ts from 'typescript'
@@ -20,7 +21,7 @@ function validate(schema, value, context) {
   if (!validators.has(key)) validators.set(key, ajv.compile(JSON.parse(key)))
   const check = validators.get(key); assert.ok(check(value), context + ': ' + JSON.stringify(check.errors))
 }
-const root = fileURLToPath(new URL('../', import.meta.url)), output = mkdtempSync('/fyoung/tmp/agentflow-budget-parser-')
+const root = fileURLToPath(new URL('../', import.meta.url)), output = mkdtempSync(join(process.env.AGENTFLOW_TMP_DIR ?? tmpdir(), 'agentflow-budget-parser-'))
 const source = readFileSync(resolve(root, 'src/expenseBudgetReview.ts'), 'utf8')
 writeFileSync(resolve(output, 'package.json'), '{"type":"module"}')
 writeFileSync(resolve(output, 'expenseBudgetReview.js'), ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)

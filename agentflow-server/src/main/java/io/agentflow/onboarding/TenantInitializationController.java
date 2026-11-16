@@ -1,5 +1,7 @@
 package io.agentflow.onboarding;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
@@ -48,8 +50,8 @@ public class TenantInitializationController {
     }
 
     private Actor administrator(Map<String, String> query) {
-        var actor = actors.actor(); actor.requireRole("ADMIN");
-        if (!query.isEmpty()) throw new DomainException("INVALID_INITIALIZATION_QUERY", "Initialization does not accept query parameters");
+        var actor = actors.actor(); actor.requireRole(SystemRole.ADMIN);
+        if (!query.isEmpty()) throw new DomainException(ErrorCode.INVALID_INITIALIZATION_QUERY, "Initialization does not accept query parameters");
         return actor;
     }
 }

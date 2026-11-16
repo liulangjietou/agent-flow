@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.SubprocessStartService;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -58,7 +59,7 @@ public class FlowableSubprocessStartInterceptor implements StartProcessInstanceI
                 || !Boolean.FALSE.equals(activity.getFallbackToDefaultTenant())
                 || !CollectionUtils.isEmpty(context.getInParameters()) || !CollectionUtils.isEmpty(activity.getOutParameters())
                 || StringUtils.hasText(activity.getBusinessKey()) || StringUtils.hasText(activity.getProcessInstanceIdVariableName())) {
-            throw new DomainException("SUBPROCESS_VARIABLE_BINDING_INVALID", "Platform subprocesses require explicit isolated variables and a fixed definition id");
+            throw new DomainException(ErrorCode.SUBPROCESS_VARIABLE_BINDING_INVALID, "Platform subprocesses require explicit isolated variables and a fixed definition id");
         }
         UUID parentId;
         try { parentId = UUID.fromString(id); }
@@ -100,6 +101,6 @@ public class FlowableSubprocessStartInterceptor implements StartProcessInstanceI
     }
 
     private static DomainException invalidContext() {
-        return new DomainException("SUBPROCESS_CONTEXT_INVALID", "Native subprocess context does not identify a platform application");
+        return new DomainException(ErrorCode.SUBPROCESS_CONTEXT_INVALID, "Native subprocess context does not identify a platform application");
     }
 }

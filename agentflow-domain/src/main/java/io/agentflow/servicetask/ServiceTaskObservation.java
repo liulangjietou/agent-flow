@@ -1,5 +1,6 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 
 import java.time.Instant;
@@ -33,5 +34,5 @@ public record ServiceTaskObservation(UUID operationId, String commandDigest, Sta
      */
     public enum Status { APPLIED, REJECTED, PENDING, NOT_FOUND }
 
-    private static DomainException invalid() { return new DomainException("INVALID_SERVICE_TASK_OBSERVATION", "Service task observation must identify the original command and a bounded, consistent result"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SERVICE_TASK_OBSERVATION, "Service task observation must identify the original command and a bounded, consistent result"); }
 }

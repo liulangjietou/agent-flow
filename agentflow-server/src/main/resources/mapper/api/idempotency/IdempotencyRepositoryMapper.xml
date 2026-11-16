@@ -15,4 +15,14 @@
         UPDATE request_idempotency SET response_status=#{responseStatus},response_body=#{body}
         WHERE tenant_id=#{tenantId} AND idempotency_key=#{key} AND response_status IS NULL
     </update>
+
+    <!-- 只清空已过期回执的状态与正文；键、主体和请求摘要保留，过期键仍被拒绝而不是重新执行。 -->
+    <update id="purgeExpiredResponses">
+        UPDATE request_idempotency SET response_status=NULL, response_body=NULL
+        WHERE (tenant_id, idempotency_key) IN (
+            SELECT tenant_id, idempotency_key FROM request_idempotency
+            WHERE expires_at &lt; #{now} AND response_body IS NOT NULL
+            ORDER BY expires_at
+            LIMIT #{limit})
+    </update>
 </mapper>

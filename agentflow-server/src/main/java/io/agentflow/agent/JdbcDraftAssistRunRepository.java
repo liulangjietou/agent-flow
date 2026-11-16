@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.mapper.DraftAssistRunRepositoryMapper;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -51,8 +52,7 @@ public class JdbcDraftAssistRunRepository implements DraftAssistRunRepository {
                         context.input().applicationVersion(),
                         context.requestedBy());
         if (changed != 1)
-            throw new DomainException(
-                    "AGENT_INPUT_CHANGED", "Draft changed before queue persistence");
+            throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Draft changed before queue persistence");
         append(run);
     }
 
@@ -165,7 +165,7 @@ public class JdbcDraftAssistRunRepository implements DraftAssistRunRepository {
         return DraftAssistRun.restore(context, state);
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Draft assist changed before persistence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Draft assist changed before persistence"); }
 
     /**
      * 工作扫描只返回不透明标识。

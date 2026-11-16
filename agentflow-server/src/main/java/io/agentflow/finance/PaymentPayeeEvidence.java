@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
 import java.util.HashSet;
@@ -45,5 +46,5 @@ public class PaymentPayeeEvidence {
                 || !authorization.execution().debitAccount().equals(payment.input().debitAccount())) throw changed();
         requireAuthorizedAccount(authorization, approvedAccount); return authorization.terms().payee();
     }
-    private static DomainException changed() { return new DomainException("PAYMENT_PAYEE_EVIDENCE_CHANGED", "Payment account must have intact authorization evidence from the original approved account"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.PAYMENT_PAYEE_EVIDENCE_CHANGED, "Payment account must have intact authorization evidence from the original approved account"); }
 }

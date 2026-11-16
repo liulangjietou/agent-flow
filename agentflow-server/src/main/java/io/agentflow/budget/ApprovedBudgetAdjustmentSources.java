@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
@@ -39,5 +40,5 @@ public class ApprovedBudgetAdjustmentSources {
     public void requireCurrent(ApprovedBudgetAdjustment source) {
         if (!source.equals(derive(source.tenantId(), source.requestId()))) throw changed();
     }
-    private static DomainException changed() { return new DomainException("BUDGET_ADJUSTMENT_SOURCE_CHANGED", "Actual approved budget application or original round changed"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.BUDGET_ADJUSTMENT_SOURCE_CHANGED, "Actual approved budget application or original round changed"); }
 }

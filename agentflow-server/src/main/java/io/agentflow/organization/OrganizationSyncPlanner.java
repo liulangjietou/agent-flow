@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
@@ -176,8 +177,8 @@ public final class OrganizationSyncPlanner {
     private record Target(UUID id, Object before, long bindingVersion, boolean selected) {
         private <T> Change<T> change(OrganizationSyncKey key, T before, T after) { return new Change<>(key, bindingVersion, before, after, selected); }
     }
-    private static DomainException missing() { return new DomainException("ORGANIZATION_SYNC_REFERENCE_MISSING", "A referenced organization source or local record is missing"); }
-    private static DomainException immutable() { return new DomainException("ORGANIZATION_SYNC_IDENTITY_IMMUTABLE", "Organization identity or ownership cannot be replaced by synchronization"); }
-    private static DomainException duplicate() { return new DomainException("ORGANIZATION_SYNC_DUPLICATE_IDENTITY", "Multiple source records claim the same organization identity"); }
-    private static DomainException invalidSelection() { return new DomainException("INVALID_ORGANIZATION_SYNC_SELECTION", "Selections must uniquely identify facts in this batch"); }
+    private static DomainException missing() { return new DomainException(ErrorCode.ORGANIZATION_SYNC_REFERENCE_MISSING, "A referenced organization source or local record is missing"); }
+    private static DomainException immutable() { return new DomainException(ErrorCode.ORGANIZATION_SYNC_IDENTITY_IMMUTABLE, "Organization identity or ownership cannot be replaced by synchronization"); }
+    private static DomainException duplicate() { return new DomainException(ErrorCode.ORGANIZATION_SYNC_DUPLICATE_IDENTITY, "Multiple source records claim the same organization identity"); }
+    private static DomainException invalidSelection() { return new DomainException(ErrorCode.INVALID_ORGANIZATION_SYNC_SELECTION, "Selections must uniquely identify facts in this batch"); }
 }

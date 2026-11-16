@@ -1,5 +1,6 @@
 package io.agentflow.approval.history;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 
 import java.nio.charset.StandardCharsets;
@@ -96,7 +97,7 @@ public record HistoryQueryParameters(Instant from, Instant to, String action, In
     }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_HISTORY_QUERY", "Invalid history filter or cursor");
+        return new DomainException(ErrorCode.INVALID_HISTORY_QUERY, "Invalid history filter or cursor");
     }
 
     /**

@@ -1,5 +1,6 @@
 package io.agentflow.integration;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -63,5 +64,5 @@ public record WebhookQueryParameters(String target, String status, UUID applicat
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (java.security.NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 unavailable", impossible); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_WEBHOOK_QUERY", "Invalid webhook filter or cursor"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_WEBHOOK_QUERY, "Invalid webhook filter or cursor"); }
 }

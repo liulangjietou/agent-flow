@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
@@ -32,7 +33,7 @@ public final class ExpenseSplitRiskEvidence {
         if (rule == null || primary == null || candidates == null || candidates.stream().anyMatch(java.util.Objects::isNull)
                 || at == null || !at.equals(primary.submittedAt())) throw invalid();
         if (!rule.threshold().currency().equals(primary.scope().currency())) {
-            throw new DomainException("EXPENSE_SPLIT_CURRENCY_MISMATCH", "Split risk threshold must use the submitted base currency");
+            throw new DomainException(ErrorCode.EXPENSE_SPLIT_CURRENCY_MISMATCH, "Split risk threshold must use the submitted base currency");
         }
         Instant from = at.minus(Duration.ofDays(rule.windowDays()));
         var own = primary.lines().stream().map(Line::approvedGross).reduce(Money.zero(primary.scope().currency()), Money::plus);
@@ -51,7 +52,7 @@ public final class ExpenseSplitRiskEvidence {
             if (amounts.isEmpty()) continue;
             if (!reports.add(candidate.reportId()) || !applications.add(candidate.applicationId())) throw invalid();
             if (sources.size() == MAX_DOCUMENTS) {
-                throw new DomainException("EXPENSE_SPLIT_SOURCE_LIMIT", "Split risk source count exceeds the supported limit");
+                throw new DomainException(ErrorCode.EXPENSE_SPLIT_SOURCE_LIMIT, "Split risk source count exceeds the supported limit");
             }
             sources.add(candidate);
             // 同单先合并同类行，再增加一次单据数量；不能把零额和多行误算成多单。
@@ -77,7 +78,7 @@ public final class ExpenseSplitRiskEvidence {
     }
 
     private static DomainException invalid() {
-        return new DomainException("EXPENSE_SPLIT_EVIDENCE_INVALID", "Split risk evidence must retain unique current report and line bindings");
+        return new DomainException(ErrorCode.EXPENSE_SPLIT_EVIDENCE_INVALID, "Split risk evidence must retain unique current report and line bindings");
     }
 
     /**

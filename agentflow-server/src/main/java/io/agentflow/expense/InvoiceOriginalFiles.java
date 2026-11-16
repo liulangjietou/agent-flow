@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.storage.LocalDocumentStore;
 import org.springframework.stereotype.Component;
@@ -122,5 +123,5 @@ public class InvoiceOriginalFiles {
         @Override public void error(SAXParseException failure) throws SAXException { throw failure; }
         @Override public void fatalError(SAXParseException failure) throws SAXException { throw failure; }
     }
-    private static DomainException invalid() { return new DomainException("INVOICE_ORIGINAL_FORMAT_MISMATCH", "Original content does not match its declared invoice format"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVOICE_ORIGINAL_FORMAT_MISMATCH, "Original content does not match its declared invoice format"); }
 }

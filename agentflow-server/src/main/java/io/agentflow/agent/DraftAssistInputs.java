@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -26,7 +27,7 @@ public class DraftAssistInputs {
     /** 只暴露可生成字段的业务契约，不发送审批权限、路由或其他内部配置。 */
     public FormSchema schema(Application application) {
         if (application.businessReference() != null || application.formSchema() == null) {
-            throw new DomainException("AGENT_DRAFT_UNSUPPORTED", "Draft generation requires a versioned ordinary application form");
+            throw new DomainException(ErrorCode.AGENT_DRAFT_UNSUPPORTED, "Draft generation requires a versioned ordinary application form");
         }
         return new FormSchema(application.formSchema().schemaVersion(), application.formSchema().fields().stream()
                 .filter(DraftAssistInput::generatable).map(DraftAssistInputs::target).toList());
@@ -51,7 +52,7 @@ public class DraftAssistInputs {
         selected.add(source(DraftAssistInput.BRIEF, "本次生成要求", brief));
         for (String id : sourceIds) {
             var source = choices.get(id);
-            if (source == null) throw new DomainException("FORBIDDEN", "Selected draft source is not sendable");
+            if (source == null) throw new DomainException(ErrorCode.FORBIDDEN, "Selected draft source is not sendable");
             selected.add(source);
         }
         if (json.write(selected).getBytes(StandardCharsets.UTF_8).length > AssistInputService.MAX_INPUT_BYTES) throw invalid();
@@ -66,5 +67,5 @@ public class DraftAssistInputs {
         String content = json.write(value);
         return new AssistModelPort.Source(new AssistInput.Reference(id, AssistConfiguration.digest(content)), label, content);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_INPUT", "Draft instructions and selected sources exceed allowed bounds"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Draft instructions and selected sources exceed allowed bounds"); }
 }

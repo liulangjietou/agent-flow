@@ -1,5 +1,6 @@
 package io.agentflow.approval.operations;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.LocalDate;
 import java.time.DateTimeException;
@@ -37,6 +38,6 @@ public final class OperationsQueryParameters {
     }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_OPERATIONS_QUERY", "Invalid UTC date range, process or organization filter");
+        return new DomainException(ErrorCode.INVALID_OPERATIONS_QUERY, "Invalid UTC date range, process or organization filter");
     }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -38,7 +39,7 @@ public class VoucherOperationService {
         var existing = operations.forRound(command.tenantId(), command.binding().applicationId(), command.binding().roundNo(), command.kind()).orElse(null);
         if (existing != null) {
             if (existing.input().equals(input)) return existing;
-            throw new DomainException("VOUCHER_OPERATION_EXISTS", "This business round already has an original voucher operation");
+            throw new DomainException(ErrorCode.VOUCHER_OPERATION_EXISTS, "This business round already has an original voucher operation");
         }
         requireSource(command);
         var operation = VoucherOperation.queue(input, time(now)); operations.create(operation); return operation;
@@ -63,7 +64,7 @@ public class VoucherOperationService {
     public void voidUnsent(VoucherOperation operation, Instant now) {
         var command = operation.input().command();
         var current = currentVersion(command.tenantId(), command.id(), operation.version());
-        if (!current.neverSent()) throw new DomainException("EXPENSE_REVOCATION_VOUCHER_STARTED", "Voucher execution has already started");
+        if (!current.neverSent()) throw new DomainException(ErrorCode.EXPENSE_REVOCATION_VOUCHER_STARTED, "Voucher execution has already started");
         if (current.status() == VoucherOperation.Status.QUEUED) complete(current, current.voidBeforeSend(time(now)));
     }
 
@@ -96,7 +97,7 @@ public class VoucherOperationService {
     private VoucherOperation currentVersion(String tenant, UUID id, long expectedVersion) {
         var initial = operations.find(tenant, id).orElseThrow(VoucherOperationService::notFound); lock(initial.input().command());
         var current = operations.find(tenant, id).orElseThrow(VoucherOperationService::notFound);
-        if (current.version() != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Voucher operation version changed");
+        if (current.version() != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Voucher operation version changed");
         return current;
     }
 
@@ -111,9 +112,9 @@ public class VoucherOperationService {
     private void lock(VoucherCommand command) { sources.lock(sources.reference(command)); }
     private void requireSource(VoucherCommand command) {
         if (!sources.derive(sources.reference(command)).matches(command)) {
-            throw new DomainException("VOUCHER_SOURCE_MISMATCH", "Voucher command no longer matches the approved financial source");
+            throw new DomainException(ErrorCode.VOUCHER_SOURCE_MISMATCH, "Voucher command no longer matches the approved financial source");
         }
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Voucher financial source or operation not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Voucher financial source or operation not found"); }
 }

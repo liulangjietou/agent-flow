@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.HashSet;
 import java.util.UUID;
@@ -28,7 +29,7 @@ public final class OrganizationRelations {
         UUID parent = value.parentDepartmentId();
         var seen = new HashSet<UUID>(); seen.add(value.id());
         while (parent != null) {
-            if (!seen.add(parent)) throw new DomainException("ORGANIZATION_DEPARTMENT_CYCLE", "Department hierarchy cannot contain a cycle");
+            if (!seen.add(parent)) throw new DomainException(ErrorCode.ORGANIZATION_DEPARTMENT_CYCLE, "Department hierarchy cannot contain a cycle");
             var department = kind(parent, OrganizationUnit.Kind.DEPARTMENT);
             if (!value.legalEntityId().equals(department.legalEntityId())) throw relation();
             if (value.active() && !department.active()) throw inactive();
@@ -78,7 +79,7 @@ public final class OrganizationRelations {
     private OrganizationUnit kind(UUID id, OrganizationUnit.Kind kind) {
         var value = units.apply(id); if (value.kind() != kind) throw relation(); return value;
     }
-    private static DomainException supervisorCycle() { return new DomainException("ORGANIZATION_SUPERVISOR_CYCLE", "Supervisor chain cannot repeat an appointment or person"); }
-    private static DomainException relation() { return new DomainException("ORGANIZATION_RELATION_INVALID", "Organization relation type or legal entity does not match"); }
-    private static DomainException inactive() { return new DomainException("ORGANIZATION_RELATION_INACTIVE", "An active relation requires active referenced records"); }
+    private static DomainException supervisorCycle() { return new DomainException(ErrorCode.ORGANIZATION_SUPERVISOR_CYCLE, "Supervisor chain cannot repeat an appointment or person"); }
+    private static DomainException relation() { return new DomainException(ErrorCode.ORGANIZATION_RELATION_INVALID, "Organization relation type or legal entity does not match"); }
+    private static DomainException inactive() { return new DomainException(ErrorCode.ORGANIZATION_RELATION_INACTIVE, "An active relation requires active referenced records"); }
 }

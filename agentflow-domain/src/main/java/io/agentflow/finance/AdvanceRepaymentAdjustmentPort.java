@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -130,5 +131,5 @@ public interface AdvanceRepaymentAdjustmentPort {
     }
 
     private static boolean reference(String value) { return StringUtils.isNotBlank(value) && value.length() <= 128 && value.equals(value.trim()) && value.chars().noneMatch(Character::isISOControl); }
-    private static DomainException invalid() { return new DomainException("INVALID_REPAYMENT_ADJUSTMENT_RECEIPT", "Repayment adjustment requires matching original receipt, actual returned funds and posted receivable debit"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_REPAYMENT_ADJUSTMENT_RECEIPT, "Repayment adjustment requires matching original receipt, actual returned funds and posted receivable debit"); }
 }

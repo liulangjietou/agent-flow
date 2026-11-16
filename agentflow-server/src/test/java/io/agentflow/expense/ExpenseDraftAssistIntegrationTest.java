@@ -67,7 +67,7 @@ class ExpenseDraftAssistIntegrationTest {
     private static final java.util.concurrent.ExecutorService HTTP_THREADS = Executors.newFixedThreadPool(4);
     private static final HttpServer SERVER = server();
     private static final String ORIGIN = "http://127.0.0.1:" + SERVER.getAddress().getPort();
-    private static final Path OBSERVATION_DIRECTORY = Path.of("/fyoung/tmp/agentflow-remaining-20260928", "a03-backend-observations-" + UUID.randomUUID());
+    private static final Path OBSERVATION_DIRECTORY = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-remaining-20260928", "a03-backend-observations-" + UUID.randomUUID());
     private static JsonUtil wire;
     private final List<UUID> queued = new ArrayList<>();
     @Autowired MockMvc mvc;

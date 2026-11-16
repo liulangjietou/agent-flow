@@ -1,5 +1,6 @@
 package io.agentflow.event;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -39,5 +40,5 @@ public record EventContract(String tenantId, String key, long version, String na
         return reason.strip();
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_EVENT_CONTRACT", "Event contract settings are invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EVENT_CONTRACT, "Event contract settings are invalid"); }
 }

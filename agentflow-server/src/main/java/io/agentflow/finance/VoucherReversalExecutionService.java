@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -98,7 +99,7 @@ public class VoucherReversalExecutionService {
                 || (held ? !prepared.command().id().equals(original.reversalId()) : !original.usablePosted() || original.version() != input.operationVersion())
                 || original.highestRevision() > prepared.command().verifiedOriginal().revision()
                 || !prepared.command().source().matchesOriginal(original.observation()) || records.forOperation(command.tenantId(), command.id()).isPresent()) {
-            throw new DomainException("VOUCHER_REVERSAL_SOURCE_CHANGED", "Original posting or reversal authorization changed before first send");
+            throw new DomainException(ErrorCode.VOUCHER_REVERSAL_SOURCE_CHANGED, "Original posting or reversal authorization changed before first send");
         }
         sources.requireVersions(input); personnel.requireEligible(command.tenantId(), input.requestedBy(), command.legalEntityId());
     }
@@ -114,6 +115,6 @@ public class VoucherReversalExecutionService {
     private void persist(VoucherReversalOperation previous, VoucherReversalOperation next) {
         operations.update(next); events.publishEvent(new VoucherReversalOperationChanged(previous, next));
     }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Reversal operation or displayed version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Reversal operation or displayed version changed"); }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
 }

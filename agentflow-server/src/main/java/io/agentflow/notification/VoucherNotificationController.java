@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
@@ -22,7 +23,7 @@ public class VoucherNotificationController {
     /** 禁止通过查询参数替换凭证号或轮次，禁止缓存财务响应。 */
     @GetMapping("/api/v1/notifications/{id}/voucher-target")
     public ResponseEntity<VoucherNotificationAccess.Target> target(@PathVariable UUID id, HttpServletRequest request) {
-        if (!request.getParameterMap().isEmpty()) throw new DomainException("INVALID_INBOX_QUERY", "Voucher notification target does not accept query parameters");
+        if (!request.getParameterMap().isEmpty()) throw new DomainException(ErrorCode.INVALID_INBOX_QUERY, "Voucher notification target does not accept query parameters");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(access.target(id));
     }
 }

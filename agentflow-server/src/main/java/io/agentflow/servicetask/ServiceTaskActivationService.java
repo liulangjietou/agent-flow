@@ -1,5 +1,6 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionModels;
@@ -53,5 +54,5 @@ public class ServiceTaskActivationService {
         operations.create(ServiceTaskOperation.queue(input, Instant.now().truncatedTo(ChronoUnit.MICROS)));
     }
 
-    private static DomainException invalid() { return new DomainException("SERVICE_TASK_CONTEXT_INVALID", "Service task activation does not identify its original platform application and node"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.SERVICE_TASK_CONTEXT_INVALID, "Service task activation does not identify its original platform application and node"); }
 }

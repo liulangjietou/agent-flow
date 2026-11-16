@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import org.springframework.util.MultiValueMap;
@@ -54,5 +55,5 @@ public record AssistRunQueryParameters(AssistRunReadPort.Query query, String con
                 (context + "\n" + item.createdAt() + "\n" + item.id()).getBytes(StandardCharsets.UTF_8));
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_QUERY", "Invalid assist run filter or cursor"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_QUERY, "Invalid assist run filter or cursor"); }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.approval.copy;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.common.DomainException;
@@ -37,7 +38,7 @@ public class CopyDeliveryService {
                         String rule, InitiatorContext context) {
         if (recipients.delivered(tenant, applicationId, roundNo, instance, nodeId)) return;
         var application = applications.findById(tenant, applicationId)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Application not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Application not found"));
         var round = rounds.findByRound(tenant, applicationId, roundNo).orElse(null);
         String title = round == null ? application.title() : round.title();
         var selection = directory.resolveCopy(tenant, rule, context);

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 
 import io.agentflow.approval.model.ApplicationStatus;
@@ -98,7 +99,7 @@ public class ExpenseSettlementActions {
                 reportId, context.application().id(), input.roundNo(), next.version(), event);
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Original approval, financial or settlement version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Original approval, financial or settlement version changed"); }
 
     /**
      * 不接受客户端付款事实、金额、账户或替代核销状态。

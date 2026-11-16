@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.model.Application;
 import io.agentflow.common.DomainException;
@@ -42,7 +43,7 @@ public class AssistRunQueryService {
     public Detail get(Application application, UUID runId) {
         var run = repository.find(application.tenantId(), runId)
                 .filter(value -> value.input().applicationId().equals(application.id()))
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Assist run not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Assist run not found"));
         var job = jobs.find(application.tenantId(), run.id());
         if (job.isPresent()) inputs.requireReadable(application, run, job.get().sources());
         else fields.requireFullAssistInput(application, run.input().roundNo());

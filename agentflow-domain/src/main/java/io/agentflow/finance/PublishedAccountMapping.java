@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -19,14 +20,14 @@ public record PublishedAccountMapping(UUID mappingId, String tenantId, String ke
                 || categoryRevision == 0 && definition.entries().stream().anyMatch(entry -> entry.key().role() == AccountMappingPort.Role.EXPENSE)
                 || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}") || StringUtils.isBlank(publishedBy) || publishedBy.length() > 128
                 || publishedAt == null || StringUtils.isBlank(comment) || comment.length() > 2000) {
-            throw new DomainException("INVALID_ACCOUNT_MAPPING_PUBLICATION", "Account mapping publication requires immutable source versions, target and audit facts");
+            throw new DomainException(ErrorCode.INVALID_ACCOUNT_MAPPING_PUBLICATION, "Account mapping publication requires immutable source versions, target and audit facts");
         }
         comment = comment.strip();
     }
 
     /** 只将本次必要科目送往 ERP 校验，原选择不能被无声重新绑定。 */
     public AccountMappingPort.Request request(AccountMappingPort.Request original, long activeRevision) {
-        if (original.managedMapping() != null) throw new DomainException("ACCOUNT_MAPPING_SCOPE_MISMATCH", "An accounting request already binds its published mapping");
+        if (original.managedMapping() != null) throw new DomainException(ErrorCode.ACCOUNT_MAPPING_SCOPE_MISMATCH, "An accounting request already binds its published mapping");
         var entries = definition.select(original);
         var selection = new AccountMappingSelection(mappingId, version, categoryRevision, activeRevision, definition.digest(), targetDigest);
         return new AccountMappingPort.Request(original.legalEntityId(), original.currency(), original.keys(),

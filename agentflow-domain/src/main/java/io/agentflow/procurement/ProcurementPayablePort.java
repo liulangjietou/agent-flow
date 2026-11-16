@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.InvoiceKey;
 import io.agentflow.finance.FinanceResult;
@@ -121,6 +122,6 @@ public interface ProcurementPayablePort {
         return StringUtils.isBlank(value) || value.length() > maximum || !value.equals(value.trim()) || value.chars().anyMatch(Character::isISOControl);
     }
     private static DomainException invalid() {
-        return new DomainException("INVALID_PROCUREMENT_PAYABLE", "Procurement payable requires consistent supplier, order, acceptance, verified invoices and posted payable evidence");
+        return new DomainException(ErrorCode.INVALID_PROCUREMENT_PAYABLE, "Procurement payable requires consistent supplier, order, acceptance, verified invoices and posted payable evidence");
     }
 }

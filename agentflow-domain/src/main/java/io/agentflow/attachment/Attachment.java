@@ -1,5 +1,6 @@
 package io.agentflow.attachment;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -20,7 +21,7 @@ public record Attachment(UUID id, String tenantId, UUID applicationId, String fi
     public Attachment {
         if (contentId == null) contentId = id;
         if (!id.equals(contentId) && status != Status.READY) {
-            throw new DomainException("ATTACHMENT_NOT_READY", "A shared attachment must reference ready content");
+            throw new DomainException(ErrorCode.ATTACHMENT_NOT_READY, "A shared attachment must reference ready content");
         }
     }
 
@@ -33,18 +34,18 @@ public record Attachment(UUID id, String tenantId, UUID applicationId, String fi
 
     /** 共享引用不接受上传，防止通过另一个申请触碰原件。 */
     public void requireUploadOwner() {
-        if (!id.equals(contentId)) throw new DomainException("ATTACHMENT_SHARED_CONTENT", "Shared attachment content cannot be uploaded");
+        if (!id.equals(contentId)) throw new DomainException(ErrorCode.ATTACHMENT_SHARED_CONTENT, "Shared attachment content cannot be uploaded");
     }
 
     /** 只有内容已校验的附件可进入提交快照。 */
     public void requireReady() {
-        if (status != Status.READY) throw new DomainException("ATTACHMENT_NOT_READY", "Referenced attachment content is not ready");
+        if (status != Status.READY) throw new DomainException(ErrorCode.ATTACHMENT_NOT_READY, "Referenced attachment content is not ready");
     }
 
     /** 内容与登记事实必须逐字节对应；失败的上传可使用原标识重试。 */
     public void verify(long actualSize, String actualDigest) {
         if (actualSize != size || !sha256.equals(actualDigest)) {
-            throw new DomainException("ATTACHMENT_CONTENT_MISMATCH", "Attachment content differs from its registered fingerprint");
+            throw new DomainException(ErrorCode.ATTACHMENT_CONTENT_MISMATCH, "Attachment content differs from its registered fingerprint");
         }
     }
 

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -88,8 +89,7 @@ public class JdbcExpenseSplitRoutingRepository {
                                                                                 .signum()
                                                                         > 0)) return;
                         if (documents.size() == ExpenseSplitRiskEvidence.MAX_DOCUMENTS - 1) {
-                            throw new DomainException(
-                                    "EXPENSE_SPLIT_SOURCE_LIMIT",
+                            throw new DomainException(ErrorCode.EXPENSE_SPLIT_SOURCE_LIMIT,
                                     "Split risk source count exceeds the supported limit");
                         }
                         documents.add(document);
@@ -125,8 +125,7 @@ public class JdbcExpenseSplitRoutingRepository {
                         snapshot.processKey(),
                         snapshot.definitionVersion());
         if (inserted != 1)
-            throw new DomainException(
-                    "CONCURRENCY_CONFLICT",
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT,
                     "Split routing preparation requires the original editable application,"
                             + " financial revision and published definition");
         for (int ordinal = 1; ordinal < snapshot.sources().size(); ordinal++) {

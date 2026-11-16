@@ -1,6 +1,7 @@
 package io.agentflow.finance;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.mapper.VoucherDisputeResolutionRepositoryMapper;
@@ -100,5 +101,5 @@ public class JdbcVoucherDisputeResolutionRepository {
     // 外部原件保留纳秒；关系列使用数据库可重复保存的微秒，避免隐式四舍五入改变身份校验。
     private static Timestamp timestamp(Instant value) { return Timestamp.from(value.truncatedTo(ChronoUnit.MICROS)); }
 
-    private static DomainException mismatch() { return new DomainException("VOUCHER_DISPUTE_EVIDENCE_CHANGED", "Resolution must match both persisted original voucher revisions"); }
+    private static DomainException mismatch() { return new DomainException(ErrorCode.VOUCHER_DISPUTE_EVIDENCE_CHANGED, "Resolution must match both persisted original voucher revisions"); }
 }

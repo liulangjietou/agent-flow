@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.organization.ApprovalProxyUse;
 import org.apache.commons.lang3.StringUtils;
@@ -34,7 +35,7 @@ public record ExpenseSubmissionControl(Input input, long version, Instant submit
     /** 有期限代理签收同时保留实际人员和当时授权，不替换原节点审批责任。 */
     public ExpenseSubmissionControl receive(String taskId, String nodeId, String actor, String comment, Instant at, ApprovalProxyUse proxyUse) {
         if (!input.paperReceiptRequired() || receipt != null || stage(nodeId) != ExpenseProcessPolicy.Stage.RECEIPT) {
-            throw new DomainException("EXPENSE_RECEIPT_NOT_ALLOWED", "Paper receipt is not required or has already been recorded for this round");
+            throw new DomainException(ErrorCode.EXPENSE_RECEIPT_NOT_ALLOWED, "Paper receipt is not required or has already been recorded for this round");
         }
         return new ExpenseSubmissionControl(input, 2, submittedAt, new PaperReceipt(taskId, nodeId, actor, comment, at, proxyUse));
     }
@@ -42,13 +43,13 @@ public record ExpenseSubmissionControl(Input input, long version, Instant submit
     /** 节点必须来自本轮冻结的已发布流程，未知任务没有默认财务职责。 */
     public ExpenseProcessPolicy.Stage stage(String nodeId) {
         var stage = input.stages().get(nodeId);
-        if (stage == null) throw new DomainException("EXPENSE_TASK_CONTEXT_CHANGED", "Task is not part of the frozen expense process");
+        if (stage == null) throw new DomainException(ErrorCode.EXPENSE_TASK_CONTEXT_CHANGED, "Task is not part of the frozen expense process");
         return stage;
     }
 
     /** 不需纸件的法人可以放行；需纸件的本轮必须已留下人工确认。 */
     public boolean paperReady() { return !input.paperReceiptRequired() || receipt != null; }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_CONTROL", "Expense submission control or paper receipt is invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_CONTROL, "Expense submission control or paper receipt is invalid"); }
 
     /**
      * 绑定本人单据、申请、轮次、正式冻结版本和当时的法人要求。

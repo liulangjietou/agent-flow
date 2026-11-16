@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.service.TaskRecipientDirectory;
 import io.agentflow.common.DomainException;
@@ -122,14 +123,14 @@ public class FlowableApprovalResponsibilities implements TaskListener {
                 : directory.members(tenant, rule.startsWith("user:") ? Set.of(rule.substring(5)) : Set.of(),
                     rule.startsWith("role:") ? Set.of(rule.substring(5)) : Set.of());
         if (expense != null && original.stream().anyMatch(subject -> !directory.eligible(tenant, subject))) {
-            throw new DomainException("EXPENSE_APPROVER_UNAVAILABLE", "A frozen expense approver is no longer eligible");
+            throw new DomainException(ErrorCode.EXPENSE_APPROVER_UNAVAILABLE, "A frozen expense approver is no longer eligible");
         }
         if (expense != null && expense.node(execution.getCurrentActivityId()).stage() == ExpenseProcessPolicy.Stage.PROJECT_REVIEW
                 && original.stream().anyMatch(excluded::contains)) {
-            throw new DomainException("APPROVAL_RESPONSIBILITY_CONFLICT", "A required project owner conflicts with approval responsibilities; the complete project review cannot start");
+            throw new DomainException(ErrorCode.APPROVAL_RESPONSIBILITY_CONFLICT, "A required project owner conflicts with approval responsibilities; the complete project review cannot start");
         }
         var members = original.stream().filter(subject -> !excluded.contains(subject)).distinct().sorted().toList();
-        if (members.isEmpty()) throw new DomainException("APPROVAL_RESPONSIBILITY_NO_MEMBERS", "No approvers remain after applying responsibility constraints");
+        if (members.isEmpty()) throw new DomainException(ErrorCode.APPROVAL_RESPONSIBILITY_NO_MEMBERS, "No approvers remain after applying responsibility constraints");
         execution.setVariableLocal(variable, json.write(new Snapshot(policy, List.copyOf(excluded), members)));
         if (expense != null) {
             var application = applications.findById(tenant, expense.applicationId()).orElseThrow(FlowableApprovalResponsibilities::invalidScope);
@@ -158,7 +159,7 @@ public class FlowableApprovalResponsibilities implements TaskListener {
 
     /** 冲突不能通过转交、委派和加签成为新的合法责任。 */
     public void requireAllowed(Task task, String subject) {
-        if (!allows(task, subject)) throw new DomainException("APPROVAL_RESPONSIBILITY_CONFLICT", "The selected user conflicts with the frozen approval responsibilities");
+        if (!allows(task, subject)) throw new DomainException(ErrorCode.APPROVAL_RESPONSIBILITY_CONFLICT, "The selected user conflicts with the frozen approval responsibilities");
     }
 
     /** 项目责任取自本轮冻结职责，不能通过通用会签成员入口删改。 */
@@ -200,7 +201,7 @@ public class FlowableApprovalResponsibilities implements TaskListener {
     }
 
     private static String decode(String value) { return new String(Base64.getDecoder().decode(value), StandardCharsets.UTF_8); }
-    private static DomainException invalidScope() { return new DomainException("APPROVAL_RESPONSIBILITY_SCOPE_INVALID", "Approval responsibility scope is invalid"); }
+    private static DomainException invalidScope() { return new DomainException(ErrorCode.APPROVAL_RESPONSIBILITY_SCOPE_INVALID, "Approval responsibility scope is invalid"); }
 
     /**
      * 保留原规则、排除依据的人员集合与实际候选，供当前授权和历史责任核对。

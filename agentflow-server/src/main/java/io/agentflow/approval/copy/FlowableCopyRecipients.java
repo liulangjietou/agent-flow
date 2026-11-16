@@ -1,5 +1,6 @@
 package io.agentflow.approval.copy;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.process.FlowableProcessRuntimeAdapter;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -25,7 +26,7 @@ public class FlowableCopyRecipients {
     public void deliver(DelegateExecution execution, String encodedRule) {
         String tenant = execution.getTenantId();
         if (tenant == null || !tenant.equals(execution.getVariable("tenantId"))) {
-            throw new DomainException("COPY_SCOPE_INVALID", "Copy execution tenant is invalid");
+            throw new DomainException(ErrorCode.COPY_SCOPE_INVALID, "Copy execution tenant is invalid");
         }
         var raw = execution.getVariable(FlowableProcessRuntimeAdapter.INITIATOR_CONTEXT);
         var context = raw instanceof String value ? json.read(value, InitiatorContext.class) : null;

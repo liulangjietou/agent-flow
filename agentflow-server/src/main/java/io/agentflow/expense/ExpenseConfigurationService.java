@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
@@ -59,7 +60,7 @@ public class ExpenseConfigurationService {
     @Transactional
     public Current publish(Actor actor, String key, long expectedDraftRevision, long expectedCategoryRevision, long expectedActiveRevision, String comment) {
         var head = repository.lock(actor.tenantId());
-        if (head.activeRevision() != expectedActiveRevision) throw new DomainException("CONCURRENCY_CONFLICT", "Active expense policy changed before publishing");
+        if (head.activeRevision() != expectedActiveRevision) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Active expense policy changed before publishing");
         var categories = repository.categories(actor.tenantId(), head.categoryRevision());
         categories.requireVersion(expectedCategoryRevision);
         var publication = draft(actor.tenantId(), key).publish(expectedDraftRevision, categories, actor.userId(), now(), comment);
@@ -121,8 +122,8 @@ public class ExpenseConfigurationService {
     }
 
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MILLIS); }
-    private static DomainException missing() { return new DomainException("NOT_FOUND", "Expense configuration or version was not found"); }
-    private static DomainException inconsistent() { return new DomainException("EXPENSE_CONFIGURATION_INCONSISTENT", "Active expense policy version is missing or inconsistent"); }
+    private static DomainException missing() { return new DomainException(ErrorCode.NOT_FOUND, "Expense configuration or version was not found"); }
+    private static DomainException inconsistent() { return new DomainException(ErrorCode.EXPENSE_CONFIGURATION_INCONSISTENT, "Active expense policy version is missing or inconsistent"); }
 
     /**
      * 类别配置和制度生效状态分开展示，未发布时 activePolicy 明确为空。

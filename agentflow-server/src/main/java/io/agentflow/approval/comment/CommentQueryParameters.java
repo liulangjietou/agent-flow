@@ -1,5 +1,6 @@
 package io.agentflow.approval.comment;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import java.nio.charset.StandardCharsets;
@@ -55,6 +56,6 @@ public record CommentQueryParameters(ApplicationCommentRepository.Query query, S
     }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_COMMENT_QUERY", "Invalid comment filter or cursor");
+        return new DomainException(ErrorCode.INVALID_COMMENT_QUERY, "Invalid comment filter or cursor");
     }
 }

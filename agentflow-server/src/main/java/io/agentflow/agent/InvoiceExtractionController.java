@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
@@ -70,7 +71,7 @@ public class InvoiceExtractionController {
         requireNoQuery(raw);
         boolean model = body.method() == InvoiceExtractionSuggestion.Method.MODEL;
         if (model != body.externalSendConfirmed() || model != (body.targetDigest() != null)) {
-            throw new DomainException("INVALID_AGENT_CONSENT", "Invoice extraction method and external transmission confirmation must match");
+            throw new DomainException(ErrorCode.INVALID_AGENT_CONSENT, "Invoice extraction method and external transmission confirmation must match");
         }
         return noStore(idempotency.executePrepared(request, HttpStatus.ACCEPTED,
                 () -> service.prepare(id, body.expectedOriginalId(), body.expectedOriginalDigest()),
@@ -93,7 +94,7 @@ public class InvoiceExtractionController {
         if (!value.matches("0|[1-9][0-9]{0,6}")) throw invalidQuery();
         int number = Integer.parseInt(value); if (number < minimum || number > maximum) throw invalidQuery(); return number;
     }
-    private static DomainException invalidQuery() { return new DomainException("INVALID_AGENT_QUERY", "Invalid invoice extraction query"); }
+    private static DomainException invalidQuery() { return new DomainException(ErrorCode.INVALID_AGENT_QUERY, "Invalid invoice extraction query"); }
     private static <T> ResponseEntity<T> noStore(T body) { return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body); }
     private static ResponseEntity<String> noStore(ResponseEntity<String> result) {
         return ResponseEntity.status(result.getStatusCode()).headers(result.getHeaders()).cacheControl(CacheControl.noStore()).body(result.getBody());

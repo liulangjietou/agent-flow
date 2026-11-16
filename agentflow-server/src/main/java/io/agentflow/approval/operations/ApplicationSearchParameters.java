@@ -1,5 +1,6 @@
 package io.agentflow.approval.operations;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
@@ -81,5 +82,5 @@ public record ApplicationSearchParameters(ApplicationSearchPort.Query query, Str
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 is unavailable", impossible); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_APPLICATION_QUERY", "Invalid application filter or cursor"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_APPLICATION_QUERY, "Invalid application filter or cursor"); }
 }

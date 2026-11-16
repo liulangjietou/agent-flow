@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.ReservedAmount;
@@ -85,6 +86,6 @@ public final class ExpenseResourceReversal {
         if (!report.tenantId().equals(tenant) || !report.employeeId().equals(employee) || !report.content().legalEntityId().equals(entity)) throw conflict();
     }
     private static DomainException conflict() {
-        return new DomainException("EXPENSE_CONSUMPTION_CHANGED", "Adjustment requires the original expense round and exact unreversed consumptions");
+        return new DomainException(ErrorCode.EXPENSE_CONSUMPTION_CHANGED, "Adjustment requires the original expense round and exact unreversed consumptions");
     }
 }

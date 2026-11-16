@@ -1,6 +1,7 @@
 package io.agentflow.api.idempotency;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.mapper.IdempotencyRepositoryMapper;
 import io.agentflow.common.DomainException;
 import io.agentflow.mybatis.SqlRows;
@@ -66,8 +67,12 @@ public class JdbcIdempotencyRepository {
     public void complete(String tenantId, String key, int responseStatus, String body) {
         int updated = sqlMapper.complete(responseStatus, body, tenantId, key);
         if (updated != 1)
-            throw new DomainException(
-                    "CONCURRENCY_CONFLICT", "Idempotency response could not be completed");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Idempotency response could not be completed");
+    }
+
+    /** 清空至多 limit 条已过期回执的正文，保留键墓碑；返回实际清理数。 */
+    public int purgeExpiredResponses(Instant now, int limit) {
+        return sqlMapper.purgeExpiredResponses(now.atOffset(ZoneOffset.UTC), limit);
     }
 
     /**

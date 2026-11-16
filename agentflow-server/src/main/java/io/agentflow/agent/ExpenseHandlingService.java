@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.common.CurrentActor;
@@ -57,7 +58,7 @@ public class ExpenseHandlingService {
     public View start(UUID reportId, long applicationVersion, long financialVersion, String goal) {
         authorize(reportId); var actor = actors.actor(); reports.lock(actor.tenantId(), reportId);
         var expense = drafts.read(reportId, null); requireCurrent(expense, applicationVersion, financialVersion);
-        if (repository.active(actor.tenantId(), reportId).isPresent()) throw new DomainException("AGENT_HANDLING_ACTIVE", "Expense report already has an active handling record");
+        if (repository.active(actor.tenantId(), reportId).isPresent()) throw new DomainException(ErrorCode.AGENT_HANDLING_ACTIVE, "Expense report already has an active handling record");
         var task = ExpenseHandlingTask.start(new ExpenseHandlingTask.Context(UUID.randomUUID(), actor.tenantId(), reportId,
                 expense.applicationId(), actor.userId(), goal, now()), applicationVersion, financialVersion);
         repository.create(task); return view(task, expense);
@@ -83,7 +84,7 @@ public class ExpenseHandlingService {
     public Prepared prepare(UUID reportId, UUID taskId, long expectedVersion, ReadTool tool, UUID referenceId, Integer lineNo) {
         authorize(reportId); var task = requireTask(reportId, taskId); task.requireVersion(expectedVersion);
         var expense = drafts.read(reportId, null); requireCurrent(expense, task.state().applicationVersion(), task.state().financialVersion());
-        if (!task.active() || task.state().steps().size() >= ExpenseHandlingTask.MAX_STEPS) throw new DomainException("AGENT_HANDLING_CLOSED", "Expense handling record cannot accept more steps");
+        if (!task.active() || task.state().steps().size() >= ExpenseHandlingTask.MAX_STEPS) throw new DomainException(ErrorCode.AGENT_HANDLING_CLOSED, "Expense handling record cannot accept more steps");
         ToolResult result;
         UUID reference; long version;
         switch (tool) {
@@ -122,7 +123,7 @@ public class ExpenseHandlingService {
         authorize(reportId); var actor = actors.actor(); reports.lock(actor.tenantId(), reportId);
         var task = requireTask(reportId, prepared.taskId());
         var expense = drafts.read(reportId, null); requireCurrent(expense, prepared.applicationVersion(), prepared.financialVersion());
-        if (!task.active() || task.state().steps().size() >= ExpenseHandlingTask.MAX_STEPS) throw new DomainException("AGENT_HANDLING_CLOSED", "Expense handling record is closed or full");
+        if (!task.active() || task.state().steps().size() >= ExpenseHandlingTask.MAX_STEPS) throw new DomainException(ErrorCode.AGENT_HANDLING_CLOSED, "Expense handling record is closed or full");
         // 原请求幂等保证同一次读取只追加一个步骤，引用仍使用原始业务标识。
         task.observe(ExpenseHandlingTask.Tool.valueOf(prepared.result().tool().name()), prepared.reference(), prepared.sourceVersion(), "READ",
                 prepared.applicationVersion(), prepared.financialVersion(), prepared.digest(), prepared.at(), now());
@@ -136,7 +137,7 @@ public class ExpenseHandlingService {
         if (expectedVersion != null) task.requireVersion(expectedVersion);
         var expense = drafts.read(reportId, null);
         requireCurrent(expense, task.state().applicationVersion(), task.state().financialVersion());
-        if (!task.active() || task.state().steps().size() >= ExpenseHandlingTask.MAX_STEPS) throw new DomainException("AGENT_HANDLING_CLOSED", "Handling cannot accept more steps");
+        if (!task.active() || task.state().steps().size() >= ExpenseHandlingTask.MAX_STEPS) throw new DomainException(ErrorCode.AGENT_HANDLING_CLOSED, "Handling cannot accept more steps");
         return task;
     }
 
@@ -157,9 +158,9 @@ public class ExpenseHandlingService {
     private static void requireCurrent(ExpenseResponse expense, long applicationVersion, long financialVersion) {
         if (!expense.editable() || expense.applicationVersion() != applicationVersion || expense.financialVersion() != financialVersion) throw changed();
     }
-    private static DomainException changed() { return new DomainException("AGENT_INPUT_CHANGED", "Expense handling versions changed"); }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_INPUT", "Tool parameters do not match the selected expense operation"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense handling record not found"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Expense handling versions changed"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Tool parameters do not match the selected expense operation"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Expense handling record not found"); }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MILLIS); }
 
     /**

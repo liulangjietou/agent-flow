@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.observability.DiagnosticContext;
 
 import io.agentflow.common.DomainException;
@@ -51,7 +52,7 @@ public class ExpenseSettlementWorker {
                     execution.consume(candidate);
                 }
                 catch (DomainException problem) {
-                    try { if (!"CONCURRENCY_CONFLICT".equals(problem.code())) execution.block(candidate, problem.code()); }
+                    try { if (!problem.is(ErrorCode.CONCURRENCY_CONFLICT)) execution.block(candidate, problem.code()); }
                     catch (RuntimeException failed) { log(candidate.reportId(), failed); }
                 }
                 catch (RuntimeException failed) { log(candidate.reportId(), failed); }

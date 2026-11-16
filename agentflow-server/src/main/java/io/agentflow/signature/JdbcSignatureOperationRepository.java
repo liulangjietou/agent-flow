@@ -1,5 +1,6 @@
 package io.agentflow.signature;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -70,8 +71,7 @@ public class JdbcSignatureOperationRepository {
                                 source.applicationId().toString(),
                                 source.roundNo()))
                 != 0) {
-            throw new DomainException(
-                    "SIGNATURE_OPERATION_ACTIVE",
+            throw new DomainException(ErrorCode.SIGNATURE_OPERATION_ACTIVE,
                     "The approved round already has an unfinished signature operation");
         }
         sqlMapper.create4(
@@ -303,8 +303,7 @@ public class JdbcSignatureOperationRepository {
                         document.size(),
                         document.sha256());
         if (inserted != 1)
-            throw new DomainException(
-                    "SIGNATURE_SOURCE_CHANGED",
+            throw new DomainException(ErrorCode.SIGNATURE_SOURCE_CHANGED,
                     "A signature source document is not the fixed ready original in the approved"
                         + " round");
     }
@@ -385,7 +384,7 @@ public class JdbcSignatureOperationRepository {
 
     private static boolean signedReceipt(SignatureOperation operation) { return operation.receipt() != null && operation.receipt().status() == SignatureReceipt.Status.SIGNED; }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Signature source, original request, claim or saved files changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Signature source, original request, claim or saved files changed"); }
 
     private static IllegalStateException corrupted() { return new IllegalStateException("Persisted signature identity, source or result metadata is inconsistent"); }
 

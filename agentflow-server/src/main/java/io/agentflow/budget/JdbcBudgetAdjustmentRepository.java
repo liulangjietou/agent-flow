@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.budget.mapper.BudgetAdjustmentRepositoryMapper;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -37,7 +38,7 @@ public class JdbcBudgetAdjustmentRepository implements BudgetAdjustmentRepositor
     public void lock(String tenant, UUID requestId) {
         var application = sqlMapper.lock(tenant, requestId.toString());
         if (application.isEmpty())
-            throw new DomainException("NOT_FOUND", "Budget adjustment not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Budget adjustment not found");
         sqlMapper.lock2(tenant, application.get(0));
         sqlMapper.lock3(tenant, requestId.toString());
     }
@@ -130,9 +131,9 @@ public class JdbcBudgetAdjustmentRepository implements BudgetAdjustmentRepositor
 
     private static void requireAudit(String actor, String operation) {
         if (StringUtils.isBlank(actor) || actor.length() > 128 || operation == null || !operation.matches("[A-Z][A-Z0-9_]{0,63}")) {
-            throw new DomainException("INVALID_BUDGET_ADJUSTMENT_AUDIT", "Budget adjustment changes require an actor and operation");
+            throw new DomainException(ErrorCode.INVALID_BUDGET_ADJUSTMENT_AUDIT, "Budget adjustment changes require an actor and operation");
         }
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Budget adjustment binding or version has changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Budget adjustment binding or version has changed"); }
 }

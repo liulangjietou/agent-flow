@@ -27,7 +27,7 @@ class LocalAttachmentStoreTest {
 
     @Test
     void immutablePublishSurvivesRetryAndMissingTamperedOrLinkedFilesFailClosed() throws Exception {
-        Path root = Files.createTempDirectory(Path.of("/fyoung/tmp"), "agentflow-attachment-store-");
+        Path root = Files.createTempDirectory(Path.of(System.getProperty("java.io.tmpdir")), "agentflow-attachment-store-");
         var store = new LocalAttachmentStore(new io.agentflow.storage.LocalDocumentStore(root.toString(), 1024), 2048, 3);
         byte[] bytes = {1, 2, 3};
         var file = file(bytes);
@@ -53,7 +53,7 @@ class LocalAttachmentStoreTest {
 
     @Test
     void interruptedAndMismatchedBodiesLeaveNoStagingFiles() throws Exception {
-        Path root = Files.createTempDirectory(Path.of("/fyoung/tmp"), "agentflow-attachment-failure-");
+        Path root = Files.createTempDirectory(Path.of(System.getProperty("java.io.tmpdir")), "agentflow-attachment-failure-");
         var store = new LocalAttachmentStore(new io.agentflow.storage.LocalDocumentStore(root.toString(), 1024), 2048, 3);
         var file = file(new byte[]{1, 2});
         assertThatThrownBy(() -> store.stage(file, new ByteArrayInputStream(new byte[]{1}))).isInstanceOf(DomainException.class);
@@ -71,7 +71,7 @@ class LocalAttachmentStoreTest {
 
     @Test
     void sharedReferencesReadTheOriginalAndCannotUploadThroughTheChildIdentity() throws Exception {
-        Path root = Files.createTempDirectory(Path.of("/fyoung/tmp"), "agentflow-shared-attachment-");
+        Path root = Files.createTempDirectory(Path.of(System.getProperty("java.io.tmpdir")), "agentflow-shared-attachment-");
         var store = new LocalAttachmentStore(new io.agentflow.storage.LocalDocumentStore(root.toString(), 1024), 2048, 3);
         byte[] bytes = {1, 3, 5}; var source = file(bytes);
         var staged = store.stage(source, new ByteArrayInputStream(bytes)); store.publish(source, staged); store.discard(staged);

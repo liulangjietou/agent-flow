@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -107,7 +108,7 @@ public record VoucherCommand(UUID id, String tenantId, Kind kind, Binding bindin
 
     /** 过期只禁止新推送，原凭证查询仍须允许。 */
     public void requireSendAt(Instant now) {
-        if (now.isBefore(createdAt) || !now.isBefore(expiresAt)) throw new DomainException("VOUCHER_EVIDENCE_EXPIRED", "Voucher evidence is outside its sending window");
+        if (now.isBefore(createdAt) || !now.isBefore(expiresAt)) throw new DomainException(ErrorCode.VOUCHER_EVIDENCE_EXPIRED, "Voucher evidence is outside its sending window");
     }
 
     /** 凭证摘要日志不携带员工、账户、金额或辅助核算。 */
@@ -129,7 +130,7 @@ public record VoucherCommand(UUID id, String tenantId, Kind kind, Binding bindin
     }
     private static String empty(Object value) { return value == null ? "" : value.toString(); }
     private static boolean invalidText(String value) { return StringUtils.isBlank(value) || value.length() > 128; }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_COMMAND", "Voucher must preserve its business basis, balanced posting roles and versioned ERP evidence"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_COMMAND, "Voucher must preserve its business basis, balanced posting roles and versioned ERP evidence"); }
 
     /**
      * 挂账与实际付款凭证分开，付款凭证必须已有成功到账依据。

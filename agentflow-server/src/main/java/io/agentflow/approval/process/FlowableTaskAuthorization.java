@@ -1,5 +1,7 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.observability.DiagnosticContext;
 import org.slf4j.Logger;
@@ -42,7 +44,7 @@ public class FlowableTaskAuthorization {
     public Task require(String taskId, Actor actor) {
         Task task = requireActive(taskId, actor);
         if (!canAct(actor, task)) {
-            throw new DomainException("FORBIDDEN", "The task is not assigned to or available for the current user");
+            throw new DomainException(ErrorCode.FORBIDDEN, "The task is not assigned to or available for the current user");
         }
         traceAuthorized(task, actor);
         return task;
@@ -53,7 +55,7 @@ public class FlowableTaskAuthorization {
         Task task = requireActive(taskId, actor);
         if (!canAct(actor, task)
                 && !proxies.forActor(actor, java.time.Instant.now()).canRead(task)) {
-            throw new DomainException("FORBIDDEN", "The task is not available for the current user");
+            throw new DomainException(ErrorCode.FORBIDDEN, "The task is not available for the current user");
         }
         traceAuthorized(task, actor);
         return task;
@@ -67,13 +69,13 @@ public class FlowableTaskAuthorization {
             return new AuthorizedTask(task, null);
         }
         if (!FlowableApprovalProxyAccess.DECISIONS.contains(action)) {
-            throw new DomainException("FORBIDDEN", "Approval proxies cannot change or delegate task responsibility");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Approval proxies cannot change or delegate task responsibility");
         }
         UUID selected = proxyId;
         if (selected == null) {
             var options = proxies.forActor(actor, java.time.Instant.now()).options(task);
-            if (options.isEmpty()) throw new DomainException("FORBIDDEN", "No approval proxy is available for this task");
-            if (options.size() != 1) throw new DomainException("APPROVAL_PROXY_SELECTION_REQUIRED", "Select the original approver for this decision");
+            if (options.isEmpty()) throw new DomainException(ErrorCode.FORBIDDEN, "No approval proxy is available for this task");
+            if (options.size() != 1) throw new DomainException(ErrorCode.APPROVAL_PROXY_SELECTION_REQUIRED, "Select the original approver for this decision");
             selected = options.get(0).proxyId();
         }
         return new AuthorizedTask(task, proxies.lockForDecision(actor, task, selected));
@@ -94,11 +96,11 @@ public class FlowableTaskAuthorization {
     }
 
     private Task requireActive(String taskId, Actor actor) {
-        actor.requireRole("APPROVER");
-        if (!recipients.eligible(actor.tenantId(), actor.userId())) throw new DomainException("FORBIDDEN", "Current organization approval eligibility is missing");
+        actor.requireRole(SystemRole.APPROVER);
+        if (!recipients.eligible(actor.tenantId(), actor.userId())) throw new DomainException(ErrorCode.FORBIDDEN, "Current organization approval eligibility is missing");
         Task task = tasks.createTaskQuery().taskId(taskId).includeProcessVariables().includeIdentityLinks().singleResult();
         if (task == null || task.isSuspended() || !actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) {
-            throw new DomainException("NOT_FOUND", "Active task not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Active task not found");
         }
         return task;
     }
@@ -107,13 +109,13 @@ public class FlowableTaskAuthorization {
     public Application application(Actor actor, Task task) {
         try {
             UUID id = UUID.fromString(String.valueOf(task.getProcessVariables().get("applicationId")));
-            return applications.findById(actor.tenantId(), id).orElseThrow(() -> new DomainException("NOT_FOUND", "Application not found"));
-        } catch (IllegalArgumentException invalid) { throw new DomainException("NOT_FOUND", "Application not found"); }
+            return applications.findById(actor.tenantId(), id).orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Application not found"));
+        } catch (IllegalArgumentException invalid) { throw new DomainException(ErrorCode.NOT_FOUND, "Application not found"); }
     }
 
     /** 列表和办理共用当前职责约束；并行候选创建后发生的实际决策也可能使原候选失权。 */
     public boolean canAct(Actor actor, Task task) {
-        if (!actor.hasRole("APPROVER") || !actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) return false;
+        if (!actor.hasRole(SystemRole.APPROVER) || !actor.tenantId().equals(String.valueOf(task.getProcessVariables().get("tenantId")))) return false;
         if (actor.userId().equals(task.getAssignee())) return responsibilities.allows(task, actor.userId());
         if (task.getAssignee() != null) return false;
         return task.getIdentityLinks().stream().anyMatch(link -> actor.userId().equals(link.getUserId())

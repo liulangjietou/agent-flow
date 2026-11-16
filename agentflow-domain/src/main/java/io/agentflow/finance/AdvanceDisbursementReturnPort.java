@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.List;
@@ -106,5 +107,5 @@ public interface AdvanceDisbursementReturnPort {
      * @author owlzhangfq@gmail.com
      */
     enum Status { UNRESOLVED, CONFIRMED, PARTIALLY_RETURNED, RETURNED }
-    private static DomainException invalid() { return new DomainException("INVALID_DISBURSEMENT_RETURN_RECEIPT", "Disbursement return requires the original successful advance, received bank funds and a matching receivable credit"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_DISBURSEMENT_RETURN_RECEIPT, "Disbursement return requires the original successful advance, received bank funds and a matching receivable credit"); }
 }

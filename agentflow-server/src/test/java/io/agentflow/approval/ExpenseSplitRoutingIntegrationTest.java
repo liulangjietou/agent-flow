@@ -107,7 +107,7 @@ class ExpenseSplitRoutingIntegrationTest {
     @DynamicPropertySource static void endpoints(DynamicPropertyRegistry registry) {
         registry.add("agentflow.finance-gateway.tenants.demo.endpoint", GATEWAY::endpoint);
         registry.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> true);
-        registry.add("agentflow.attachments.directory", () -> "/fyoung/tmp/agentflow-split-http-fixtures");
+        registry.add("agentflow.attachments.directory", () -> System.getProperty("java.io.tmpdir") + "/agentflow-split-http-fixtures");
     }
     @BeforeEach void organization() {
         if (jdbc.queryForObject("SELECT COUNT(*) FROM organization_directory WHERE tenant_id='demo'", Integer.class) == 0) organization.initialize(ADMIN);

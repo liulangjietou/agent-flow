@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpenseProjectApprovalRepositoryMapper;
@@ -61,8 +62,7 @@ public class JdbcExpenseProjectApprovalRepository {
                         input.applicationVersion(),
                         input.financialVersion());
         if (inserted != 1)
-            throw new DomainException(
-                    "CONCURRENCY_CONFLICT",
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT,
                     "Project evidence requires the original editable application, frozen financial"
                         + " revision, ready precheck and published definition");
         if (!find(snapshot.tenantId(), snapshot.reportId(), snapshot.roundNo())

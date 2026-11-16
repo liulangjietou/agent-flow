@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.organization.LocalOrganizationDirectory;
 import java.util.HashMap;
@@ -47,19 +48,19 @@ public class DefinitionInitiatorRequirements {
             for (var node : graph.nodes()) {
                 if (node.type() != NodeType.SUB_PROCESS) continue;
                 if (++calls > SubprocessPolicy.MAX_CALL_NODES) {
-                    throw new DomainException("SUBPROCESS_DEPENDENCY_LIMIT_EXCEEDED", "Subprocess dependency graph exceeds the supported size");
+                    throw new DomainException(ErrorCode.SUBPROCESS_DEPENDENCY_LIMIT_EXCEEDED, "Subprocess dependency graph exceeds the supported size");
                 }
-                if (depth >= SubprocessPolicy.MAX_CALL_DEPTH) throw new DomainException("SUBPROCESS_DEPTH_EXCEEDED", "Subprocess nesting exceeds the supported depth");
+                if (depth >= SubprocessPolicy.MAX_CALL_DEPTH) throw new DomainException(ErrorCode.SUBPROCESS_DEPTH_EXCEEDED, "Subprocess nesting exceeds the supported depth");
                 var policy = SubprocessPolicy.fromProperties(node.properties());
                 var reference = new Reference(policy.processKey(), policy.version());
-                if (!ancestors.add(reference)) throw new DomainException("SUBPROCESS_RECURSION_FORBIDDEN", "A subprocess cannot recursively call an ancestor version");
+                if (!ancestors.add(reference)) throw new DomainException(ErrorCode.SUBPROCESS_RECURSION_FORBIDDEN, "A subprocess cannot recursively call an ancestor version");
                 Boolean required = requirements.get(reference);
                 if (required == null) {
                     if (++definitionsRead > SubprocessPolicy.MAX_DEPENDENCIES) {
-                        throw new DomainException("SUBPROCESS_DEPENDENCY_LIMIT_EXCEEDED", "Subprocess dependency graph exceeds the supported size");
+                        throw new DomainException(ErrorCode.SUBPROCESS_DEPENDENCY_LIMIT_EXCEEDED, "Subprocess dependency graph exceeds the supported size");
                     }
                     var target = definitions.findPublished(tenant, policy.processKey(), policy.version()).orElseThrow(() ->
-                            new DomainException("SUBPROCESS_DEFINITION_UNAVAILABLE", "The referenced published subprocess version is unavailable"));
+                            new DomainException(ErrorCode.SUBPROCESS_DEFINITION_UNAVAILABLE, "The referenced published subprocess version is unavailable"));
                     required = required(target.graph(), depth + 1, ancestors);
                     requirements.put(reference, required);
                 }

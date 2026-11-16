@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -25,6 +26,6 @@ public record SupplierPaymentReturn(UUID id, String tenantId, UUID checkId, Supp
     private static boolean invalidReference(String value) {
         return StringUtils.isBlank(value) || value.length() > 128 || !value.equals(value.trim()) || value.chars().anyMatch(Character::isISOControl);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYMENT_RETURN", "Supplier return registration requires fresh bank evidence and an independent finance actor"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYMENT_RETURN, "Supplier return registration requires fresh bank evidence and an independent finance actor"); }
     @Override public String toString() { return "SupplierPaymentReturn[id=" + id + ", paymentId=" + receipt.request().command().id() + "]"; }
 }

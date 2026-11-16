@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
@@ -41,7 +42,7 @@ public record BudgetAdjustmentContent(UUID legalEntityId, String title, String p
         for (var position : ledger.positions()) {
             amount.sameCurrency(position.limit());
             if (position.periodStatus() != BudgetLedgerPort.PeriodStatus.OPEN) {
-                throw new DomainException("BUDGET_PERIOD_CLOSED", "Budget adjustments require an open period");
+                throw new DomainException(ErrorCode.BUDGET_PERIOD_CLOSED, "Budget adjustments require an open period");
             }
         }
         return switch (type) {
@@ -52,7 +53,7 @@ public record BudgetAdjustmentContent(UUID legalEntityId, String title, String p
                 var target = ledger.position(targetBudgetReference);
                 if (!source.periodReference().equals(target.periodReference()) || !source.periodStart().equals(target.periodStart())
                         || !source.periodEnd().equals(target.periodEnd())) {
-                    throw new DomainException("BUDGET_TRANSFER_PERIOD_MISMATCH", "Budget transfers must stay within the same period");
+                    throw new DomainException(ErrorCode.BUDGET_TRANSFER_PERIOD_MISMATCH, "Budget transfers must stay within the same period");
                 }
                 yield List.of(decrease(source), increase(target));
             }
@@ -65,7 +66,7 @@ public record BudgetAdjustmentContent(UUID legalEntityId, String title, String p
 
     private Change decrease(BudgetLedgerPort.Position position) {
         if (amount.compareTo(position.available()) > 0) {
-            throw new DomainException("BUDGET_ADJUSTMENT_INSUFFICIENT", "Budget reduction exceeds the uncommitted and unconsumed balance");
+            throw new DomainException(ErrorCode.BUDGET_ADJUSTMENT_INSUFFICIENT, "Budget reduction exceeds the uncommitted and unconsumed balance");
         }
         return new Change(position.reference(), position.version(), position.limit(), position.limit().minus(amount));
     }
@@ -78,7 +79,7 @@ public record BudgetAdjustmentContent(UUID legalEntityId, String title, String p
     }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_BUDGET_ADJUSTMENT", "Budget adjustment requires a consistent type, period, budget references and positive amount");
+        return new DomainException(ErrorCode.INVALID_BUDGET_ADJUSTMENT, "Budget adjustment requires a consistent type, period, budget references and positive amount");
     }
 
     /**

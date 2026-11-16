@@ -1,6 +1,12 @@
 package io.agentflow.auth;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
+import io.agentflow.common.SystemRole;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.time.Duration;
+import java.time.Instant;
 import io.agentflow.approval.service.TaskRecipientDirectory;
 import io.agentflow.definition.DefinitionAssigneeDirectory;
 import java.util.List;
@@ -24,40 +30,66 @@ import java.security.NoSuchAlgorithmException;
  */
 @Service
 public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDirectory {
+    private static final Logger LOG = LoggerFactory.getLogger(AuthService.class);
+    /** 演示账号共用的固定口令，仅在演示认证开启时有效。 */
+    private static final String DEMO_PASSWORD = "demo";
     private static final Map<String, Set<String>> DEMO_ROLES = Map.of(
-            "admin", Set.of("EMPLOYEE", "APPROVER", "FINANCE", "FINANCE_CONFIG_ADMIN", "PROCESS_ADMIN", "ADMIN"),
-            "finance", Set.of("EMPLOYEE", "APPROVER", "FINANCE"),
-            "cashier", Set.of("EMPLOYEE", "CASHIER"),
-            "manager", Set.of("EMPLOYEE", "APPROVER", "MANAGER"),
-            "employee", Set.of("EMPLOYEE", "APPROVER"),
-            "alice", Set.of("EMPLOYEE", "APPROVER"),
-            "bob", Set.of("EMPLOYEE", "APPROVER"));
+            "admin", roles(SystemRole.EMPLOYEE, SystemRole.APPROVER, SystemRole.FINANCE, SystemRole.FINANCE_CONFIG_ADMIN,
+                    SystemRole.PROCESS_ADMIN, SystemRole.ADMIN),
+            "finance", roles(SystemRole.EMPLOYEE, SystemRole.APPROVER, SystemRole.FINANCE),
+            "cashier", roles(SystemRole.EMPLOYEE, SystemRole.CASHIER),
+            "manager", roles(SystemRole.EMPLOYEE, SystemRole.APPROVER, SystemRole.MANAGER),
+            "employee", roles(SystemRole.EMPLOYEE, SystemRole.APPROVER),
+            "alice", roles(SystemRole.EMPLOYEE, SystemRole.APPROVER),
+            "bob", roles(SystemRole.EMPLOYEE, SystemRole.APPROVER));
     private final Map<String, Actor> tokens = new ConcurrentHashMap<>();
+    /** 令牌过期时刻；与 tokens 分开存放，任一侧缺失都按失效处理。 */
+    private final Map<String, Instant> expiries = new ConcurrentHashMap<>();
     private final boolean demoEnabled;
     private final String demoTenant;
+    private final Duration tokenTtl;
 
-    /** 创建认证服务。 */
+    /** 创建认证服务；演示令牌按配置时长过期，默认 12 小时。 */
     public AuthService(@Value("${agentflow.auth.demo-enabled:false}") boolean demoEnabled,
-                       @Value("${agentflow.auth.demo-tenant:demo}") String demoTenant) {
+                       @Value("${agentflow.auth.demo-tenant:demo}") String demoTenant,
+                       @Value("${agentflow.auth.demo-token-ttl:PT12H}") Duration tokenTtl) {
+        if (tokenTtl.isNegative() || tokenTtl.isZero()) throw new IllegalArgumentException("agentflow.auth.demo-token-ttl must be positive");
         this.demoEnabled = demoEnabled;
         this.demoTenant = demoTenant;
+        this.tokenTtl = tokenTtl;
+        if (demoEnabled) {
+            // 演示认证使用公开的固定口令，只能用于本机开发与演示；生产必须使用 prod 配置关闭。
+            LOG.info("Demo authentication is ENABLED with shared demo credentials; never expose this instance, errorCode={}, tenant={}",
+                    "DEMO_AUTH_ENABLED", demoTenant);
+        }
+    }
+
+    private static Set<String> roles(SystemRole... roles) {
+        return java.util.Arrays.stream(roles).map(SystemRole::name).collect(java.util.stream.Collectors.toUnmodifiableSet());
     }
 
     /** 只在开发配置启用演示账号登录。 */
     public LoginResult login(String tenantId, String username, String password) {
         if (!demoEnabled) {
-            throw new DomainException("AUTH_PROVIDER_NOT_CONFIGURED", "Enterprise identity provider is not configured");
+            throw new DomainException(ErrorCode.AUTH_PROVIDER_NOT_CONFIGURED, "Enterprise identity provider is not configured");
         }
         if (!demoTenant.equals(tenantId)) {
-            throw new DomainException("UNAUTHENTICATED", "Tenant is not available for demo authentication");
+            throw new DomainException(ErrorCode.UNAUTHENTICATED, "Tenant is not available for demo authentication");
         }
-        if (!"demo".equals(password)) {
-            throw new DomainException("UNAUTHENTICATED", "Invalid credentials");
+        if (!DEMO_PASSWORD.equals(password)) {
+            throw new DomainException(ErrorCode.UNAUTHENTICATED, "Invalid credentials");
         }
         Set<String> roles = DEMO_ROLES.get(username);
-        if (roles == null) throw new DomainException("UNAUTHENTICATED", "Invalid credentials");
+        if (roles == null) throw new DomainException(ErrorCode.UNAUTHENTICATED, "Invalid credentials");
         Actor actor = new Actor(tenantId, username, roles);
         String token = UUID.randomUUID().toString();
+        Instant now = Instant.now();
+        expiries.entrySet().removeIf(entry -> {
+            if (!expired(entry.getValue(), now)) return false;
+            tokens.remove(entry.getKey());
+            return true;
+        });
+        expiries.put(token, now.plus(tokenTtl));
         tokens.put(token, actor);
         return new LoginResult(token, actor);
     }
@@ -66,7 +98,7 @@ public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDi
     @Override
     public List<String> approvers(String tenantId) {
         if (!demoEnabled || !demoTenant.equals(tenantId)) return List.of();
-        return DEMO_ROLES.entrySet().stream().filter(entry -> entry.getValue().contains("APPROVER"))
+        return DEMO_ROLES.entrySet().stream().filter(entry -> entry.getValue().contains(SystemRole.APPROVER.name()))
                 .map(Map.Entry::getKey).sorted().toList();
     }
 
@@ -98,8 +130,10 @@ public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDi
     /** 从 Bearer token 解析认证主体。 */
     public Actor authenticate(String token) {
         Actor actor = tokens.get(token);
-        if (actor == null) {
-            throw new DomainException("UNAUTHENTICATED", "Token is invalid or expired");
+        Instant expiresAt = expiries.get(token);
+        if (actor == null || expiresAt == null || expired(expiresAt, Instant.now())) {
+            if (actor != null) logout(token);
+            throw new DomainException(ErrorCode.UNAUTHENTICATED, "Token is invalid or expired");
         }
         return actor;
     }
@@ -113,7 +147,12 @@ public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDi
     /** 注销或进程重启后演示登录失效，不从账号目录重新授予后台权限。 */
     public Optional<Actor> actorForLoginReference(String reference) {
         if (!demoEnabled) return Optional.empty();
-        return tokens.entrySet().stream().filter(entry -> fingerprint(entry.getKey()).equals(reference))
+        Instant now = Instant.now();
+        return tokens.entrySet().stream().filter(entry -> {
+                    Instant expiresAt = expiries.get(entry.getKey());
+                    return expiresAt != null && !expired(expiresAt, now);
+                })
+                .filter(entry -> fingerprint(entry.getKey()).equals(reference))
                 .map(Map.Entry::getValue).findFirst();
     }
 
@@ -125,6 +164,7 @@ public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDi
     /** 注销当前 token。 */
     public void logout(String token) {
         tokens.remove(token);
+        expiries.remove(token);
     }
 
     /**
@@ -132,4 +172,6 @@ public class AuthService implements TaskRecipientDirectory, DefinitionAssigneeDi
      * @author owlzhangfq@gmail.com
      */
     public record LoginResult(String token, Actor actor) { }
+
+    private static boolean expired(Instant expiresAt, Instant now) { return !expiresAt.isAfter(now); }
 }

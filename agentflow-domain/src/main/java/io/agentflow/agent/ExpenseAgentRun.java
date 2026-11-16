@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -104,7 +105,7 @@ public final class ExpenseAgentRun {
         set(status, state.steps(), state.answers(), reason, null, state.childId(), state.childAction(), now);
     }
     /** 用户命令及工作线程均使用乐观版本防止迟到结算。 */
-    public void requireVersion(long expected) { if (state.version() != expected) throw new DomainException("CONCURRENCY_CONFLICT", "Expense agent version changed"); }
+    public void requireVersion(long expected) { if (state.version() != expected) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense agent version changed"); }
     public Context context() { return context; }
     public State state() { return state; }
     public Step last() { return state.steps().get(state.steps().size() - 1); }
@@ -117,7 +118,7 @@ public final class ExpenseAgentRun {
     private void set(Status status, List<Step> steps, List<String> answers, String message, Instant lease, UUID child, Action action, Instant now) {
         state = new State(state.version() + 1, status, steps, answers, message, lease, child, action, now);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_ACTION", "Expense agent action does not match the authorized state"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_ACTION, "Expense agent action does not match the authorized state"); }
     /**
      * 租户与登录引用留在服务器，模型只看到授权的业务投影。
      * @author owlzhangfq@gmail.com

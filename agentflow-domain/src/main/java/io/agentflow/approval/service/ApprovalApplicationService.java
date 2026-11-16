@@ -1,5 +1,6 @@
 package io.agentflow.approval.service;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.model.ApplicationStatus;
@@ -66,7 +67,7 @@ public class ApprovalApplicationService {
                               String userId, String title, Map<String, Object> payload, FormSchema formSchema,
                               String runtimeDefinitionId, NotificationTexts notificationTexts, BusinessReference businessReference) {
         if (repository.findByBusinessNo(tenantId, businessNo).isPresent()) {
-            throw new DomainException("BUSINESS_NO_EXISTS", "Business number already exists");
+            throw new DomainException(ErrorCode.BUSINESS_NO_EXISTS, "Business number already exists");
         }
         Application application = businessReference == null
                 ? Application.draft(UUID.randomUUID(), tenantId, businessNo, processKey, definitionVersion, userId, title, payload,
@@ -86,7 +87,7 @@ public class ApprovalApplicationService {
     /** 把服务端确认的任职同时交给运行端口和轮次仓储，不把它混入用户表单。 */
     public Application submit(String tenantId, UUID id, long expectedVersion, String submittedBy, InitiatorContext initiatorContext) {
         Application application = repository.findById(tenantId, id)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Application not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Application not found"));
         ApplicationStatus previousStatus = application.status();
         SubmissionRound previousRound = application.runtimeDefinitionId() == null
                 ? rounds.findByRound(tenantId, id, application.roundNo()).orElse(null) : null;
@@ -120,7 +121,7 @@ public class ApprovalApplicationService {
         SubmissionRound round = rounds.findByRound(tenantId, id, application.roundNo()).orElse(null);
         if (round != null && (round.status() != SubmissionRound.Status.IN_APPROVAL
                 || round.definitionVersion() != application.definitionVersion())) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Submission round no longer matches the active application");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Submission round no longer matches the active application");
         }
         String instanceId = processRuntime.withdraw(new ProcessRuntimePort.WithdrawProcessCommand(
                 tenantId, id, application.roundNo(), round == null ? null : round.processInstanceId(),
@@ -157,9 +158,9 @@ public class ApprovalApplicationService {
         Application application = get(tenantId, id); ApplicationStatus previousStatus = application.status();
         application.returnToApplicant(expectedVersion);
         var round = rounds.findByRound(tenantId, id, application.roundNo()).orElseThrow(
-                () -> new DomainException("CONCURRENCY_CONFLICT", "Active submission round not found"));
+                () -> new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Active submission round not found"));
         if (round.status() != SubmissionRound.Status.IN_APPROVAL || round.definitionVersion() != application.definitionVersion()) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Submission round no longer matches the active application");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Submission round no longer matches the active application");
         }
         String instanceId = processRuntime.withdraw(new ProcessRuntimePort.WithdrawProcessCommand(tenantId, id, application.roundNo(),
                 round.processInstanceId(), "RETURN by " + actor));
@@ -175,9 +176,9 @@ public class ApprovalApplicationService {
         var application = get(tenantId, id);
         application.adjustBusinessPayload(expectedVersion, reference, payload);
         var round = rounds.findByRound(tenantId, id, application.roundNo()).orElseThrow(
-                () -> new DomainException("CONCURRENCY_CONFLICT", "Active submission round not found"));
+                () -> new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Active submission round not found"));
         if (round.status() != SubmissionRound.Status.IN_APPROVAL || round.definitionVersion() != application.definitionVersion()) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Submission round no longer matches the active application");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Submission round no longer matches the active application");
         }
         processRuntime.updateBusinessPayload(new ProcessRuntimePort.UpdateBusinessPayload(tenantId, id, application.roundNo(), round.processInstanceId(), application.payload()));
         repository.update(application, expectedVersion);
@@ -194,7 +195,7 @@ public class ApprovalApplicationService {
     /** 获取当前租户申请。 */
     public Application get(String tenantId, UUID id) {
         return repository.findById(tenantId, id)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Application not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Application not found"));
     }
 
     /** 按租户读取申请，访问主体规则由接口适配层根据参与关系判断。 */

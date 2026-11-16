@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.agentflow.approval.model.Application;
@@ -68,8 +69,7 @@ public class DisbursementReturnNotificationAccess {
         var row = row(actor.tenantId(), actor.userId(), messageId);
         var source = allowed(actor.tenantId(), actor.userId(), row);
         if (source == null)
-            throw new DomainException(
-                    "NOT_FOUND",
+            throw new DomainException(ErrorCode.NOT_FOUND,
                     "Original disbursement return notification is unavailable in the current"
                         + " scope");
         var check = source.check();

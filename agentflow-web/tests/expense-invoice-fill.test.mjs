@@ -212,7 +212,7 @@ test('真实模板转义来源文本并明确提示日期税额与正式引用�
     return state
   } }, props))
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/); assert.match(html, /&lt;script&gt;model\(\)&lt;\/script&gt;/)
-  assert.match(html, /&lt;script&gt;xml\(\)&lt;\/script&gt;/); assert.match(html, /&lt;img src=x onerror=filename\(\)\&gt;\.xml/)
+  assert.match(html, /&lt;script&gt;xml\(\)&lt;\/script&gt;/); assert.match(html, /&lt;img src=x onerror=filename\(\)&gt;\.xml/)
   assert.ok(!html.includes('<img src=x')); assert.ok(!html.includes('<script>'))
   assert.match(html, /开票日期不等于费用发生日期/); assert.match(html, /票面税额不等于可抵扣税额/); assert.match(html, /正式引用发票仍需先查验/)
 })

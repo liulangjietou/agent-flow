@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import org.apache.commons.lang3.StringUtils;
@@ -20,14 +21,14 @@ public record ExpenseExchangeRate(String fromCurrency, String toCurrency, BigDec
         if (rate == null || rate.signum() <= 0 || rate.compareTo(MAX_RATE) > 0
                 || rate.stripTrailingZeros().scale() > MAX_RATE_SCALE || StringUtils.isBlank(source) || source.length() > 128 || rateDate == null
                 || fromCurrency.equals(toCurrency) && rate.compareTo(BigDecimal.ONE) != 0) {
-            throw new DomainException("INVALID_EXCHANGE_RATE", "An explicit positive exchange rate with source and date is required");
+            throw new DomainException(ErrorCode.INVALID_EXCHANGE_RATE, "An explicit positive exchange rate with source and date is required");
         }
         rate = rate.stripTrailingZeros();
     }
 
     /** 按行折算并四舍五入到本币的分，汇总时不再舍入。 */
     public Money convert(Money amount) {
-        if (!fromCurrency.equals(amount.currency())) throw new DomainException("CURRENCY_MISMATCH", "Exchange rate does not match the source currency");
+        if (!fromCurrency.equals(amount.currency())) throw new DomainException(ErrorCode.CURRENCY_MISMATCH, "Exchange rate does not match the source currency");
         return new Money(amount.value().multiply(rate).setScale(Money.SCALE, RoundingMode.HALF_UP), toCurrency);
     }
 }

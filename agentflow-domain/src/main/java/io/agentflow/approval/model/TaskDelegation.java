@@ -1,5 +1,6 @@
 package io.agentflow.approval.model;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.List;
 
@@ -11,12 +12,12 @@ public record TaskDelegation(String owner, boolean pending) {
     /** 委派期间只能回交，最终决策留给原责任人。 */
     public void requireAction(TaskAction action) {
         if (pending && action != TaskAction.RESOLVE) {
-            throw new DomainException("TASK_DELEGATION_PENDING", "The delegated task must be resolved before further decisions");
+            throw new DomainException(ErrorCode.TASK_DELEGATION_PENDING, "The delegated task must be resolved before further decisions");
         }
         if (action == TaskAction.RESOLVE) {
-            if (!pending) throw new DomainException("TASK_NOT_DELEGATED", "The task is not awaiting delegation resolution");
+            if (!pending) throw new DomainException(ErrorCode.TASK_NOT_DELEGATED, "The task is not awaiting delegation resolution");
             if (owner == null || owner.isBlank()) {
-                throw new DomainException("TASK_DELEGATION_OWNER_MISSING", "The delegation owner is missing; verify the original assignment");
+                throw new DomainException(ErrorCode.TASK_DELEGATION_OWNER_MISSING, "The delegation owner is missing; verify the original assignment");
             }
         }
     }

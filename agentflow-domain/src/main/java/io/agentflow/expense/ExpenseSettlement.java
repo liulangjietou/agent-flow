@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
@@ -88,7 +89,7 @@ public record ExpenseSettlement(Input input, long version, Status status, boolea
                 || !source.applicationId().equals(report.applicationId()) || !source.employeeId().equals(report.employeeId())
                 || source.businessVersion() != report.version() || source.roundNo() != round.roundNo()
                 || !input.gross().equals(round.approvedGross()) || !input.offsets().equals(round.offsetTotal())) {
-            throw new DomainException("EXPENSE_SETTLEMENT_SOURCE_CHANGED", "Settlement must retain its original frozen expense source");
+            throw new DomainException(ErrorCode.EXPENSE_SETTLEMENT_SOURCE_CHANGED, "Settlement must retain its original frozen expense source");
         }
     }
 
@@ -100,8 +101,8 @@ public record ExpenseSettlement(Input input, long version, Status status, boolea
     private static boolean validIssue(String value) { return value != null && value.matches("[A-Z][A-Z0-9_]{0,63}"); }
     private static boolean validDigest(String value) { return value != null && value.matches("[a-f0-9]{64}"); }
     private static boolean reference(String value) { return StringUtils.isNotBlank(value) && value.length() <= 128; }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_SETTLEMENT", "Expense settlement funding and resource lifecycle are inconsistent"); }
-    private static DomainException conflict() { return new DomainException("EXPENSE_SETTLEMENT_STATE_CONFLICT", "Expense settlement no longer allows this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_SETTLEMENT, "Expense settlement funding and resource lifecycle are inconsistent"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.EXPENSE_SETTLEMENT_STATE_CONFLICT, "Expense settlement no longer allows this transition"); }
 
     /**
      * 归档和付款凭证仍是独立步骤，SETTLED 仅表示本地资源及预算实际占用完成。

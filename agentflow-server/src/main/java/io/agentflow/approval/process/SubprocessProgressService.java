@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.SubprocessExecutionLocks;
 import io.agentflow.approval.SubprocessStartService;
 import io.agentflow.approval.model.Application;
@@ -106,7 +107,7 @@ public class SubprocessProgressService {
             boolean ended = normallyEnded(application, round);
             if (!ended && finishedCalls.isEmpty()) continue;
             if (ended && !hasApprovalEvidence(application, round.processInstanceId())) {
-                throw new DomainException("SUBPROCESS_REQUIRES_APPROVAL", "A subprocess cannot replace actual human approval");
+                throw new DomainException(ErrorCode.SUBPROCESS_REQUIRES_APPROVAL, "A subprocess cannot replace actual human approval");
             }
             long version = application.version();
             application.recordRuntimeAction(version);
@@ -153,7 +154,7 @@ public class SubprocessProgressService {
     }
 
     private static DomainException changed() {
-        return new DomainException("SUBPROCESS_RUNTIME_MISMATCH", "Subprocess runtime and application round do not match");
+        return new DomainException(ErrorCode.SUBPROCESS_RUNTIME_MISMATCH, "Subprocess runtime and application round do not match");
     }
 
     /** 仅在当前事务命令前后传递，构造入口不对其他调用方开放。

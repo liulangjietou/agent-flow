@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.util.UUID;
@@ -38,7 +39,7 @@ public record OrganizationUnit(UUID id, Kind kind, String name, UUID legalEntity
         return new OrganizationUnit(id, kind, name, legalEntityId, parentDepartmentId, active, revision + 1, appointmentId);
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_ORGANIZATION_UNIT", "Organization unit fields are invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ORGANIZATION_UNIT, "Organization unit fields are invalid"); }
 
     /**
      * 法人拥有部门与岗位，岗位可通过任职分配到同法人的不同部门。

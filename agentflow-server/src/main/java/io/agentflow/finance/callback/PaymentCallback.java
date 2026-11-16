@@ -1,5 +1,6 @@
 package io.agentflow.finance.callback;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -57,7 +58,7 @@ public record PaymentCallback(UUID id, PaymentCallbackVerifier.Verified input, l
         if (now.isBefore(updatedAt)) throw conflict();
         return new PaymentCallback(id, input, Math.incrementExact(version), next, receivedAt, now, due, count, queried, issue, actor, requestReason);
     }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Payment callback processing state changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Payment callback processing state changed"); }
 
     /**
      * 状态描述回调投递处理，不描述银行交易结果。

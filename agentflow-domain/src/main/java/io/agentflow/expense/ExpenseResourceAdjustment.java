@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.BudgetConsumptionReversalObservation;
 import io.agentflow.finance.BudgetConsumptionReversalOperation;
@@ -91,8 +92,8 @@ public record ExpenseResourceAdjustment(Input input, long version, Status status
                 && original.periodReference().equals(current.periodReference()) && original.accountingDate().equals(current.accountingDate()) && original.appliedAt().equals(current.appliedAt());
     }
     private void requireTime(Instant at) { if (at == null || at.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_RESOURCE_ADJUSTMENT", "Adjustment must preserve original sources and separate budget and resource results"); }
-    private static DomainException conflict() { return new DomainException("EXPENSE_RESOURCE_ADJUSTMENT_CONFLICT", "Adjustment state or original budget reversal has changed"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_RESOURCE_ADJUSTMENT, "Adjustment must preserve original sources and separate budget and resource results"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.EXPENSE_RESOURCE_ADJUSTMENT_CONFLICT, "Adjustment state or original budget reversal has changed"); }
 
     /**
      * 当前仅实现完整取消，不用任意金额输入伪装行级或部分财务调整。

@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.PaymentPersonnel;
 import java.time.Instant;
@@ -64,6 +65,6 @@ public class SupplierSettlementSources {
         if (!command.matchesCurrentPayment(bank, evidence.paid(), now)
                 || !command.payment().matchesCurrentHold(hold, evidence.hold(), now)) throw evidenceChanged();
     }
-    private static DomainException changed() { return new DomainException("SUPPLIER_SETTLEMENT_SOURCE_CHANGED", "Actual approved payable, paid bank or settlement finance eligibility changed"); }
-    private static DomainException evidenceChanged() { return new DomainException("SUPPLIER_SETTLEMENT_EVIDENCE_CHANGED", "Fresh evidence no longer matches the current original bank and payable hold"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.SUPPLIER_SETTLEMENT_SOURCE_CHANGED, "Actual approved payable, paid bank or settlement finance eligibility changed"); }
+    private static DomainException evidenceChanged() { return new DomainException(ErrorCode.SUPPLIER_SETTLEMENT_EVIDENCE_CHANGED, "Fresh evidence no longer matches the current original bank and payable hold"); }
 }

@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.agentflow.approval.model.ApplicationStatus;
@@ -90,8 +92,7 @@ public class VoucherActions {
                 && input.action() != Action.QUERY
                 && (application.status() != ApplicationStatus.APPROVED
                         || application.roundNo() != input.roundNo())) {
-            throw new DomainException(
-                    "VOUCHER_SOURCE_CHANGED", "Original financial approval is no longer current");
+            throw new DomainException(ErrorCode.VOUCHER_SOURCE_CHANGED, "Original financial approval is no longer current");
         }
         UUID preparationId = null, operationId = null;
         Long operationVersion = null;
@@ -142,7 +143,7 @@ public class VoucherActions {
         payload.put("roundNo", input.roundNo());
         payload.put("action", input.action().name());
         payload.put("actor", actor.userId());
-        payload.put("authorizedRole", "FINANCE");
+        payload.put("authorizedRole", SystemRole.FINANCE.name());
         payload.put("applicationVersion", application.version());
         payload.put("businessVersion", context.businessVersion());
         payload.put("previousStatus", previous);
@@ -172,9 +173,9 @@ public class VoucherActions {
                 kind);
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed approval, financial or voucher version has changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed approval, financial or voucher version has changed"); }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Voucher for the selected financial round not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Voucher for the selected financial round not found"); }
 
     /**
      * 重新准备、原操作查询与权威查无后的原编号重发分别授权和审计。
@@ -206,8 +207,7 @@ public class VoucherActions {
                     && (action == Action.PREPARE
                             ? operationId != null || operationVersion != null
                             : operationId == null || operationVersion == null)) {
-                throw new DomainException(
-                        "INVALID_REQUEST",
+                throw new DomainException(ErrorCode.INVALID_REQUEST,
                         "Voucher action must identify exactly its original operation");
             }
         }

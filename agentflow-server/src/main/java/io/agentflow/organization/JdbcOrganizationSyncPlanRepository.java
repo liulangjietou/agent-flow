@@ -1,6 +1,7 @@
 package io.agentflow.organization;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRows;
@@ -150,8 +151,7 @@ public class JdbcOrganizationSyncPlanRepository {
     private static void changed(int count) { if (count != 1) throw conflict(); }
 
     private static DomainException conflict() {
-        return new DomainException(
-                "ORGANIZATION_SYNC_PLAN_STALE",
+        return new DomainException(ErrorCode.ORGANIZATION_SYNC_PLAN_STALE,
                 "Organization synchronization plan no longer matches the current batch or"
                     + " directory");
     }

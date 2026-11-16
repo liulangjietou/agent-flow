@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import org.apache.commons.lang3.StringUtils;
@@ -42,6 +43,6 @@ public interface InvoiceVerificationPort {
         /** 不允许错误日志通过自动 record 文本输出原件或员工信息。 */
         @Override public String toString() { return "InvoiceVerificationRequest[original=redacted]"; }
 
-        private static DomainException invalid() { return new DomainException("INVALID_INVOICE_ORIGINAL", "A supported original file with matching digest is required"); }
+        private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_INVOICE_ORIGINAL, "A supported original file with matching digest is required"); }
     }
 }

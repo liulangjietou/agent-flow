@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -126,5 +127,5 @@ public class PaymentOperationService {
     private PaymentAuthorization authorization(String tenant, UUID id) { return authorizations.find(tenant, id).orElseThrow(PaymentOperationService::conflict); }
     private void complete(PaymentOperation previous, PaymentOperation current) { operations.update(current); events.publishEvent(new PaymentOperationChanged(previous, current)); }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Original payment authorization or execution version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Original payment authorization or execution version changed"); }
 }

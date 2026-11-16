@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.budget.mapper.BudgetAdjustmentOperationRepositoryMapper;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -81,8 +82,7 @@ public class JdbcBudgetAdjustmentOperationRepository {
                     timestamp(value.nextAttemptAt()),
                     source.requestId().toString());
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "BUDGET_ADJUSTMENT_ALREADY_AUTHORIZED",
+            throw new DomainException(ErrorCode.BUDGET_ADJUSTMENT_ALREADY_AUTHORIZED,
                     "Approved budget request already has an original active adjustment command");
         }
         append(value);
@@ -316,7 +316,7 @@ public class JdbcBudgetAdjustmentOperationRepository {
 
     private static Instant instant(Timestamp at) { return at == null ? null : at.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Budget command, ledger evidence, operation or retirement version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Budget command, ledger evidence, operation or retirement version changed"); }
 
     private static IllegalStateException inconsistent() { return new IllegalStateException("Persisted budget adjustment operation identity is inconsistent"); }
 

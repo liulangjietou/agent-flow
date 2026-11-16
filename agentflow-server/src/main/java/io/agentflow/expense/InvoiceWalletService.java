@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import jakarta.validation.constraints.Max;
@@ -55,8 +56,8 @@ public class InvoiceWalletService {
     /** 登记原件和待查验发票，容量、财务资源及幂等回执在同一事务提交。 */
     @Transactional
     public Receipt reserve(UploadInput input) {
-        if (!files.available()) throw new DomainException("FILE_STORAGE_UNAVAILABLE", "Document storage is unavailable");
-        if (input.size() > files.maxFileBytes()) throw new DomainException("FILE_TOO_LARGE", "Invoice original exceeds the configured file limit");
+        if (!files.available()) throw new DomainException(ErrorCode.FILE_STORAGE_UNAVAILABLE, "Document storage is unavailable");
+        if (input.size() > files.maxFileBytes()) throw new DomainException(ErrorCode.FILE_TOO_LARGE, "Invoice original exceeds the configured file limit");
         var actor = actors.actor();
         var original = new InvoiceOriginal(UUID.randomUUID(), UUID.randomUUID(), actor.tenantId(), actor.userId(), input.filename(),
                 input.size(), input.sha256(), input.format(), Instant.now(), InvoiceOriginal.Status.UPLOADING);
@@ -107,7 +108,7 @@ public class InvoiceWalletService {
                 before = UUID.fromString(parameters.get("beforeId"));
                 if (!before.toString().equals(parameters.get("beforeId"))) throw new IllegalArgumentException();
             }
-        } catch (IllegalArgumentException invalid) { throw new DomainException("INVALID_INVOICE_QUERY", "Invoice pagination parameters are invalid"); }
+        } catch (IllegalArgumentException invalid) { throw new DomainException(ErrorCode.INVALID_INVOICE_QUERY, "Invoice pagination parameters are invalid"); }
         var actor = actors.actor(); var entries = originals.list(actor.tenantId(), actor.userId(), before, limit + 1);
         int count = Math.min(limit, entries.size());
         var visible = entries.subList(0, count); var claims = occupations.wallet(visible.stream().map(entry -> entry.invoice()).toList());
@@ -119,7 +120,7 @@ public class InvoiceWalletService {
         var actor = actors.actor();
         return originals.find(actor.tenantId(), id).filter(original -> actor.userId().equals(original.ownerId())).orElseThrow(InvoiceWalletService::notFound);
     }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Invoice original not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Invoice original not found"); }
     private static OriginalMetadata metadata(InvoiceOriginal value) { return new OriginalMetadata(value.id(), value.filename(), value.size(), value.sha256(), value.format(), value.status(), value.createdAt()); }
     private static Item item(InvoiceOriginal original, Invoice value, InvoiceOccupationQueries.View claim) {
         return new Item(value.id(), value.version(), metadata(original), value.verification(), value.occupation(), value.facts(), value.use(), value.failureCode(), value.checkedAt(), claim);

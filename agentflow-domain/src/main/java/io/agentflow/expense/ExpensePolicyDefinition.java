@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import org.apache.commons.lang3.StringUtils;
@@ -27,16 +28,16 @@ public record ExpensePolicyDefinition(String name, List<Rule> rules) {
 
     /** 发布只引用已配置、启用的类别；类别归属在跨聚合边界统一检查。 */
     public void requirePublishable(ExpenseCategoryCatalog categories) {
-        if (rules.isEmpty() || categories.version() == 0) throw new DomainException("EXPENSE_POLICY_INCOMPLETE", "Expense policy rules and a category revision are required before publishing");
+        if (rules.isEmpty() || categories.version() == 0) throw new DomainException(ErrorCode.EXPENSE_POLICY_INCOMPLETE, "Expense policy rules and a category revision are required before publishing");
         var active = new HashSet<>(categories.activeCategories().stream().map(ExpenseCategoryCatalog.Category::code).toList());
         if (active.isEmpty() || rules.stream().flatMap(rule -> rule.match().categoryCodes().stream()).anyMatch(code -> !active.contains(code))) {
-            throw new DomainException("EXPENSE_POLICY_CATEGORY_UNAVAILABLE", "Published expense policy must refer to active categories in the confirmed revision");
+            throw new DomainException(ErrorCode.EXPENSE_POLICY_CATEGORY_UNAVAILABLE, "Published expense policy must refer to active categories in the confirmed revision");
         }
         for (var rule : rules) {
             if (rule.constraints().fixedAllowance() == null) continue;
             if (categories.activeCategories().stream().filter(category -> rule.match().categoryCodes().contains(category.code()))
                     .anyMatch(category -> !category.units().equals(List.of(ExpenseLine.Unit.DAY)))) {
-                throw new DomainException("ALLOWANCE_CATEGORY_UNIT_REQUIRED", "Fixed daily allowances require categories measured only in days");
+                throw new DomainException(ErrorCode.ALLOWANCE_CATEGORY_UNIT_REQUIRED, "Fixed daily allowances require categories measured only in days");
             }
         }
     }
@@ -50,7 +51,7 @@ public record ExpensePolicyDefinition(String name, List<Rule> rules) {
     private static void text(String value, int maximum) {
         if (StringUtils.isBlank(value) || value.length() > maximum || !value.equals(value.strip()) || value.chars().anyMatch(Character::isISOControl)) throw invalid();
     }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_POLICY_DEFINITION", "Expense policy rules, selectors and constraints are invalid or inconsistent"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_POLICY_DEFINITION, "Expense policy rules, selectors and constraints are invalid or inconsistent"); }
 
     /**
      * 列表顺序就是优先级；稳定规则键用于判定证据，不依赖展示名称。

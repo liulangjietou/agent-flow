@@ -1,5 +1,7 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.observability.DiagnosticContext;
 import org.slf4j.Logger;
@@ -7,11 +9,6 @@ import org.slf4j.LoggerFactory;
 import io.agentflow.approval.process.SubprocessProgressService;
 import io.agentflow.approval.process.SubprocessStopService;
 import io.agentflow.approval.model.BusinessReference;
-import io.agentflow.expense.ExpenseFormContract;
-import io.agentflow.expense.ExpensePlanFormContract;
-import io.agentflow.expense.AdvanceRequestFormContract;
-import io.agentflow.procurement.ProcurementPaymentFormContract;
-import io.agentflow.budget.BudgetAdjustmentFormContract;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
@@ -58,6 +55,7 @@ public class ApprovalApplicationFacade {
     private final SubprocessExecutionLocks executionLocks;
     private final SubprocessProgressService subprocesses;
     private final SubprocessStopService subprocessStops;
+    private final BusinessFormBindings formBindings;
 
     /** 创建应用服务。 */
     public ApprovalApplicationFacade(ApplicationRepository repository, ProcessRuntimePort processRuntime,
@@ -65,7 +63,7 @@ public class ApprovalApplicationFacade {
                                      SubmissionRoundRepository rounds, ApplicationAuditPort audit, DefinitionDraftRepository definitions,
                                      ApprovalNotificationService notifications, OrganizationInitiatorDirectory initiators, AttachmentReferenceService attachments,
                                      SubprocessExecutionLocks executionLocks, SubprocessProgressService subprocesses,
-                                     SubprocessStopService subprocessStops) {
+                                     SubprocessStopService subprocessStops, BusinessFormBindings formBindings) {
         this.repository = repository;
         this.currentActor = currentActor;
         this.service = new ApprovalApplicationService(repository, processRuntime, rounds, audit);
@@ -79,6 +77,7 @@ public class ApprovalApplicationFacade {
         this.executionLocks = executionLocks;
         this.subprocesses = subprocesses;
         this.subprocessStops = subprocessStops;
+        this.formBindings = formBindings;
     }
 
     /** 创建申请草稿。 */
@@ -101,22 +100,12 @@ public class ApprovalApplicationFacade {
         DefinitionModels.DefinitionDraft definition = definitions.lockPublished(actor.tenantId(), processKey, definitionVersion).orElse(null);
         // classpath 内置报销 v1 是唯一没有平台定义行的公开 legacy 模板。
         if (definition == null && !(BUNDLED_LEGACY_PROCESS.equals(processKey) && definitionVersion == BUNDLED_LEGACY_VERSION)) {
-            throw new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published process definition is not available");
+            throw new DomainException(ErrorCode.PROCESS_DEFINITION_NOT_FOUND, "Published process definition is not available");
         }
         if (definition != null) definition.requireStartEnabled();
         FormSchema formSchema = definition == null ? null : definition.formSchema();
-        if (reference == null && (ExpenseFormContract.structured(formSchema) || ExpensePlanFormContract.structured(formSchema)
-                || AdvanceRequestFormContract.structured(formSchema) || ProcurementPaymentFormContract.structured(formSchema)
-                || BudgetAdjustmentFormContract.structured(formSchema))) throw businessEndpointRequired();
-        if (reference != null) {
-            switch (reference.type()) {
-                case EXPENSE -> ExpenseFormContract.requireSchema(formSchema);
-                case EXPENSE_PLAN -> ExpensePlanFormContract.requireSchema(formSchema);
-                case ADVANCE_REQUEST -> AdvanceRequestFormContract.requireSchema(formSchema);
-                case PROCUREMENT_PAYMENT -> ProcurementPaymentFormContract.requireSchema(formSchema);
-                case BUDGET_ADJUSTMENT -> BudgetAdjustmentFormContract.requireSchema(formSchema);
-            }
-        }
+        if (reference == null && formBindings.anyStructured(formSchema)) throw businessEndpointRequired();
+        if (reference != null) formBindings.requireSchema(reference.type(), formSchema);
         String runtimeDefinitionId = processRuntime.resolveDefinition(actor.tenantId(), processKey, definitionVersion, definition == null);
         var application = service.create(actor.tenantId(), businessNo, processKey, definitionVersion, actor.userId(), title, payload,
                 formSchema, runtimeDefinitionId, definition == null ? null : definition.notificationTexts(), reference);
@@ -264,7 +253,7 @@ public class ApprovalApplicationFacade {
     public Application getForActor(Actor actor, UUID id) {
         Application application = service.get(actor.tenantId(), id);
         if (!isVisible(actor, application)) {
-            throw new DomainException("NOT_FOUND", "Application not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Application not found");
         }
         traceAuthorized(application);
         return application;
@@ -288,7 +277,7 @@ public class ApprovalApplicationFacade {
     }
 
     private boolean isVisible(Actor actor, Application application) {
-        if (actor.hasRole("ADMIN") || application.createdBy().equals(actor.userId())) {
+        if (actor.hasRole(SystemRole.ADMIN) || application.createdBy().equals(actor.userId())) {
             return true;
         }
         return participantPorts.stream().anyMatch(port -> port.isParticipant(actor.tenantId(), application.id(), actor));
@@ -297,7 +286,7 @@ public class ApprovalApplicationFacade {
     private Application requireApplicant(Actor actor, UUID id) {
         Application application = service.get(actor.tenantId(), id);
         if (!application.createdBy().equals(actor.userId())) {
-            throw new DomainException("FORBIDDEN", "Only the applicant can revise, submit, withdraw or cancel this application");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Only the applicant can revise, submit, withdraw or cancel this application");
         }
         executionLocks.requireRoot(application);
         traceAuthorized(application);
@@ -320,6 +309,6 @@ public class ApprovalApplicationFacade {
     }
 
     private static DomainException businessEndpointRequired() {
-        return new DomainException("USE_BUSINESS_ENDPOINT", "Structured business applications must use their own write endpoint");
+        return new DomainException(ErrorCode.USE_BUSINESS_ENDPOINT, "Structured business applications must use their own write endpoint");
     }
 }

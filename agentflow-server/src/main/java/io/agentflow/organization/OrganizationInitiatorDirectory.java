@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.mybatis.SqlRow;
@@ -42,7 +43,7 @@ public class OrganizationInitiatorDirectory {
     public InitiatorContext snapshot(Actor actor, UUID appointmentId) {
         if (appointmentId == null) return null;
         return findCurrent(actor, appointmentId)
-                .orElseThrow(() -> new DomainException("INITIATOR_APPOINTMENT_UNAVAILABLE", "Selected initiator appointment is not available"));
+                .orElseThrow(() -> new DomainException(ErrorCode.INITIATOR_APPOINTMENT_UNAVAILABLE, "Selected initiator appointment is not available"));
     }
 
     /** 后台预检把失效任职记录为检查结果，不通过事务代理抛异常后再尝试保存该结果。 */

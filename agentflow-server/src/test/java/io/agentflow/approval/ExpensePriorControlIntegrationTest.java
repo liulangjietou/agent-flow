@@ -73,7 +73,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 class ExpensePriorControlIntegrationTest {
     private static final Actor ADMIN = new Actor("demo", "admin", Set.of("ADMIN", "PROCESS_ADMIN"));
     private static final ExpenseSubprocessGatewayFixture GATEWAY = new ExpenseSubprocessGatewayFixture();
-    private static final java.nio.file.Path RESPONSES = java.nio.file.Path.of("/fyoung/tmp/agentflow-remaining-20260928/f05-prior-responses-" + UUID.randomUUID());
+    private static final java.nio.file.Path RESPONSES = java.nio.file.Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-remaining-20260928/f05-prior-responses-" + UUID.randomUUID());
     private final Map<String, String> tokens = new ConcurrentHashMap<>();
     private UUID entity, appointment, manager, finance;
     @Autowired MockMvc mvc;
@@ -99,7 +99,7 @@ class ExpensePriorControlIntegrationTest {
     @DynamicPropertySource static void endpoints(DynamicPropertyRegistry registry) {
         registry.add("agentflow.finance-gateway.tenants.demo.endpoint", GATEWAY::endpoint);
         registry.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> true);
-        registry.add("agentflow.attachments.directory", () -> "/fyoung/tmp/agentflow-prior-control-http-fixtures");
+        registry.add("agentflow.attachments.directory", () -> System.getProperty("java.io.tmpdir") + "/agentflow-prior-control-http-fixtures");
     }
     @BeforeEach void organization() {
         if (jdbc.queryForObject("SELECT COUNT(*) FROM organization_directory WHERE tenant_id='demo'", Integer.class) == 0) organization.initialize(ADMIN);

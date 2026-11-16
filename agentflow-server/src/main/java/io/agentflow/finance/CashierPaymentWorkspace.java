@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -74,16 +75,16 @@ public class CashierPaymentWorkspace {
         var query = new PaymentAccountsPort.Request(terms.payee().legalEntityId(), terms.amount().currency(), actors.actor().userId());
         var directory = accounts.debitAccounts(terms.tenantId(), terms.targetDigest(), query).requireValue();
         var current = selectable(id);
-        if (!authorization.equals(current)) throw new DomainException("CONCURRENCY_CONFLICT", "Payment authorization changed during account lookup");
-        if (!directory.matches(query, Instant.now())) throw new DomainException("PAYMENT_ACCOUNT_EVIDENCE_EXPIRED", "Current cashier account directory is required");
+        if (!authorization.equals(current)) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Payment authorization changed during account lookup");
+        if (!directory.matches(query, Instant.now())) throw new DomainException(ErrorCode.PAYMENT_ACCOUNT_EVIDENCE_EXPIRED, "Current cashier account directory is required");
         return new Accounts(id, authorization.version(), directory.validUntil(), directory.accounts());
     }
     private PaymentAuthorization selectable(UUID id) {
         var value = access.requireExecution(id); var now = Instant.now();
         if (value.status() != PaymentAuthorization.Status.AUTHORIZED || requests.forAuthorization(value.terms().tenantId(), id).isPresent()) {
-            throw new DomainException("PAYMENT_EXECUTION_ALREADY_REQUESTED", "Authorization is no longer awaiting an account selection");
+            throw new DomainException(ErrorCode.PAYMENT_EXECUTION_ALREADY_REQUESTED, "Authorization is no longer awaiting an account selection");
         }
-        if (!now.isBefore(value.decision().expiresAt())) throw new DomainException("PAYMENT_AUTHORIZATION_EXPIRED", "Payment authorization expired");
+        if (!now.isBefore(value.decision().expiresAt())) throw new DomainException(ErrorCode.PAYMENT_AUTHORIZATION_EXPIRED, "Payment authorization expired");
         sources.requireCurrent(value, now); return value;
     }
     private View view(PaymentAuthorization value) {
@@ -137,7 +138,7 @@ public class CashierPaymentWorkspace {
         } catch (IllegalArgumentException failure) { throw invalid(); }
     }
     private static boolean accountKey(String value) { return value.matches("[a-f0-9]{64}"); }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_QUERY", "Cashier filters and pagination must use bounded limits and canonical identifiers in the same scope"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_QUERY, "Cashier filters and pagination must use bounded limits and canonical identifiers in the same scope"); }
     /**
      * 私有分页值不接受外部排序片段。
      * @author owlzhangfq@gmail.com

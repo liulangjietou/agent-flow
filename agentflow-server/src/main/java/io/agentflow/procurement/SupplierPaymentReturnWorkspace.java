@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -79,7 +80,7 @@ public class SupplierPaymentReturnWorkspace {
         } catch (ArithmeticException | NumberFormatException malformed) { throw invalid(); }
     }
     private static long positive(String value) { if (!value.matches("[1-9][0-9]{0,18}")) throw invalid(); return Long.parseLong(value); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYMENT_RETURN_QUERY", "Supplier return history only accepts positive beforeVersion and limit up to 50"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYMENT_RETURN_QUERY, "Supplier return history only accepts positive beforeVersion and limit up to 50"); }
 
     /**
      * 原付款扣除已登记回款仅是资金净额，不构成新的付款授权。

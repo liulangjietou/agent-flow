@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
@@ -41,5 +42,5 @@ public class VoucherSources {
     public VoucherSource.Plan derive(VoucherPreparation.Source source) {
         return source.kind() == VoucherCommand.Kind.PAYMENT ? paid.derive(source) : approved.derive(source);
     }
-    private static DomainException changed() { return new DomainException("PAYMENT_VOUCHER_SOURCE_CHANGED", "Payment accounting command requires its original persisted preparation"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.PAYMENT_VOUCHER_SOURCE_CHANGED, "Payment accounting command requires its original persisted preparation"); }
 }

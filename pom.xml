@@ -31,4 +31,28 @@
         <module>agentflow-domain</module>
         <module>agentflow-server</module>
     </modules>
+    <build>
+        <plugins>
+            <!--
+              格式门禁：只约束不引起整文件重排的基础规则（空格缩进、无行尾空白、文件以换行结束）。
+              仓库刻意采用紧凑的多语句同行写法，不引入会全量重排代码的格式化器，避免破坏 blame 与评审。
+            -->
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>3.4.0</version>
+                <configuration>
+                    <java>
+                        <includes><include>src/**/*.java</include></includes>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                        <indent><spaces>true</spaces><spacesPerTab>4</spacesPerTab></indent>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution><id>format-gate</id><phase>validate</phase><goals><goal>check</goal></goals></execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

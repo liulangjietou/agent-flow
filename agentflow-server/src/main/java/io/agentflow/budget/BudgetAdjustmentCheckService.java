@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.Actor;
@@ -68,10 +69,10 @@ public class BudgetAdjustmentCheckService {
         application.requireEditable(request.applicationVersion());
         if (adjustment.version() != request.requestVersion() || adjustment.rounds().size() + 1 != application.nextSubmissionRound()) throw changed();
         var initiator = initiators.snapshot(actor, request.initiatorAppointmentId());
-        if (!initiator.legalEntityId().equals(adjustment.content().legalEntityId())) throw new DomainException("BUDGET_ADJUSTMENT_INITIATOR_MISMATCH", "Selected appointment and adjustment legal entity must match");
-        var destination = configuration.destination(actor.tenantId()).orElseThrow(() -> new DomainException("FINANCE_GATEWAY_UNAVAILABLE", "Budget adjustment check is not configured for this tenant"));
-        if (!destination.digest(actor.tenantId()).equals(request.targetDigest())) throw new DomainException("FINANCE_TARGET_CHANGED", "Refresh the finance destination before queuing");
-        if (jobs.active(actor.tenantId(), requestId)) throw new DomainException("BUDGET_ADJUSTMENT_CHECK_ACTIVE", "Budget adjustment already has an active precheck");
+        if (!initiator.legalEntityId().equals(adjustment.content().legalEntityId())) throw new DomainException(ErrorCode.BUDGET_ADJUSTMENT_INITIATOR_MISMATCH, "Selected appointment and adjustment legal entity must match");
+        var destination = configuration.destination(actor.tenantId()).orElseThrow(() -> new DomainException(ErrorCode.FINANCE_GATEWAY_UNAVAILABLE, "Budget adjustment check is not configured for this tenant"));
+        if (!destination.digest(actor.tenantId()).equals(request.targetDigest())) throw new DomainException(ErrorCode.FINANCE_TARGET_CHANGED, "Refresh the finance destination before queuing");
+        if (jobs.active(actor.tenantId(), requestId)) throw new DomainException(ErrorCode.BUDGET_ADJUSTMENT_CHECK_ACTIVE, "Budget adjustment already has an active precheck");
         var input = new Input(UUID.randomUUID(), actor.tenantId(), requestId, adjustment.applicationId(), actor.userId(), application.version(), adjustment.version(),
                 application.nextSubmissionRound(), jobs.nextAttempt(actor.tenantId(), requestId), initiator, request.targetDigest(), adjustment.content());
         jobs.create(BudgetAdjustmentCheck.queue(input, time(Instant.now()))); return new Receipt(input.id());
@@ -161,9 +162,9 @@ public class BudgetAdjustmentCheckService {
     private static Summary summary(BudgetAdjustmentCheck job) { return new Summary(job.input().id(), job.version(), job.status(), job.input().applicationVersion(), job.input().requestVersion(), job.input().attempt(), job.createdAt(), job.startedAt(), job.completedAt()); }
     // 与预览采用同一精度和方向，完成时间不能被截断到其证据之前。
     private static Instant time(Instant value) { return value.plusNanos(MICROSECOND_ROUNDING_NANOS).truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException changed() { return new DomainException("CONCURRENCY_CONFLICT", "Budget adjustment or application version changed"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Budget adjustment check context not found"); }
-    private static DomainException invalidQuery() { return new DomainException("INVALID_BUDGET_ADJUSTMENT_QUERY", "Budget adjustment check query is invalid"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Budget adjustment or application version changed"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Budget adjustment check context not found"); }
+    private static DomainException invalidQuery() { return new DomainException(ErrorCode.INVALID_BUDGET_ADJUSTMENT_QUERY, "Budget adjustment check query is invalid"); }
 
     /**
      * 申请人只能选择输入上下文，不能提交核算或预算结论。

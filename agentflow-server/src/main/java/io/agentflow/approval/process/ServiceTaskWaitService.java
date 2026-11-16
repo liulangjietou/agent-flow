@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.SubprocessExecutionLocks;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
@@ -76,7 +77,7 @@ public class ServiceTaskWaitService {
         runtime.trigger(origin.executionId());
         boolean ended = runtime.createProcessInstanceQuery().processInstanceId(origin.processInstanceId()).singleResult() == null;
         if (ended && !subprocesses.hasApprovalEvidence(application, origin.processInstanceId())) {
-            throw new DomainException("SERVICE_TASK_REQUIRES_APPROVAL", "A service task cannot substitute for human approval");
+            throw new DomainException(ErrorCode.SERVICE_TASK_REQUIRES_APPROVAL, "A service task cannot substitute for human approval");
         }
         String actor = "system:service:" + command.contract().key(); String reason = "operationId=" + command.id() + ", nodeId=" + origin.nodeId();
         completion.persistProgress(application, previous, origin.processInstanceId(), ended, actor, reason);

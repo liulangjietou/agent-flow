@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import static io.agentflow.notification.NotificationDeliveryProgress.*;
 
 import io.agentflow.common.Actor;
@@ -227,7 +228,7 @@ public class JdbcNotificationDeliveryStore {
                         previous.id().toString(),
                         previous.progress().version());
         if (changed != 1)
-            throw new DomainException("CONCURRENCY_CONFLICT", "Notification delivery changed");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Notification delivery changed");
         var value = previous.withProgress(next);
         history(value, actor, reason);
         return value;

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.*;
@@ -72,7 +73,7 @@ public class ExpenseSettlementSources {
     public void requireCurrent(ExpenseSettlement settlement, ExpenseReport report) {
         settlement.requireReport(report); var input = settlement.input(); var source = input.source();
         if (returns.find(source.tenantId(), source.businessId()).map(ExpensePaymentReturns::reviewRequired).orElse(false)) {
-            throw new DomainException("EXPENSE_PAYMENT_RETURN_REVIEW_REQUIRED", "Expense payment return requires independent review or adjustment before settlement");
+            throw new DomainException(ErrorCode.EXPENSE_PAYMENT_RETURN_REVIEW_REQUIRED, "Expense payment return requires independent review or adjustment before settlement");
         }
         requireApproved(source, input.gross().value().signum() == 0, settlement.resourcesConsumed());
         if (input.voucherOperationId() == null) {
@@ -81,13 +82,13 @@ public class ExpenseSettlementSources {
         } else {
             var voucher = vouchers.find(source.tenantId(), input.voucherOperationId()).orElseThrow(ExpenseSettlementSources::mismatch);
             if (!voucher.usablePosted() || !voucher.input().command().digest().equals(input.voucherDigest())) {
-                throw new DomainException("EXPENSE_VOUCHER_NOT_CONFIRMED", "Original expense voucher must remain confirmed before consumption");
+                throw new DomainException(ErrorCode.EXPENSE_VOUCHER_NOT_CONFIRMED, "Original expense voucher must remain confirmed before consumption");
             }
         }
         if (input.payment() != null) {
             var payment = payments.find(source.tenantId(), input.payment().operationId()).orElseThrow(ExpenseSettlementSources::mismatch);
             if (!payment.settleable() || !paid(payment, report).equals(input)) {
-                throw new DomainException("EXPENSE_PAYMENT_NOT_CONFIRMED", "Original expense payment must remain confirmed before consumption");
+                throw new DomainException(ErrorCode.EXPENSE_PAYMENT_NOT_CONFIRMED, "Original expense payment must remain confirmed before consumption");
             }
         }
     }
@@ -97,7 +98,7 @@ public class ExpenseSettlementSources {
             if (consumed) approved.deriveAfterResourceConsumption(source); else approved.derive(source);
             if (zero) throw mismatch();
         }
-        catch (DomainException problem) { if (!zero || !"VOUCHER_ZERO_AMOUNT".equals(problem.code())) throw problem; }
+        catch (DomainException problem) { if (!zero || !problem.is(ErrorCode.VOUCHER_ZERO_AMOUNT)) throw problem; }
     }
-    private static DomainException mismatch() { return new DomainException("EXPENSE_SETTLEMENT_SOURCE_CHANGED", "Settlement must match its persisted original financial source"); }
+    private static DomainException mismatch() { return new DomainException(ErrorCode.EXPENSE_SETTLEMENT_SOURCE_CHANGED, "Settlement must match its persisted original financial source"); }
 }

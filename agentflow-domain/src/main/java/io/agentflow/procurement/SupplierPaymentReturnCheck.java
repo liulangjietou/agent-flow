@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import org.apache.commons.lang3.StringUtils;
@@ -62,8 +63,8 @@ public record SupplierPaymentReturnCheck(Input input, long version, Status statu
     public boolean expired(Instant at) { return status == Status.RUNNING && !at.isBefore(leaseUntil); }
     private void requireTime(Instant at) { if (at == null || at.isBefore(updatedAt)) throw conflict(); }
     private void requireRunning(Instant at) { requireTime(at); if (status != Status.RUNNING) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYMENT_RETURN_CHECK", "Supplier payment review must preserve original receipt, lease and evidence"); }
-    private static DomainException conflict() { return new DomainException("SUPPLIER_PAYMENT_RETURN_CHECK_CONFLICT", "Supplier payment review no longer permits this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYMENT_RETURN_CHECK, "Supplier payment review must preserve original receipt, lease and evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.SUPPLIER_PAYMENT_RETURN_CHECK_CONFLICT, "Supplier payment review no longer permits this transition"); }
     @Override public String toString() { return "SupplierPaymentReturnCheck[id=" + input.id() + ", status=" + status + "]"; }
 
     /**

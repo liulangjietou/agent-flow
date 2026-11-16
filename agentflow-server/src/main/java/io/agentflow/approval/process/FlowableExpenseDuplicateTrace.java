@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.ExpenseDuplicateApprovalPolicy;
@@ -71,7 +72,7 @@ public class FlowableExpenseDuplicateTrace implements ExecutionListener, TaskLis
     }
 
     private static DomainException invalid() {
-        return new DomainException("EXPENSE_DUPLICATE_SCOPE_INVALID", "Expense duplicate approval trace scope is invalid");
+        return new DomainException(ErrorCode.EXPENSE_DUPLICATE_SCOPE_INVALID, "Expense duplicate approval trace scope is invalid");
     }
 
     /**

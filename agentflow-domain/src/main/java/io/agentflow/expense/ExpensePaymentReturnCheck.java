@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.ExpensePaymentReturnPort;
 import io.agentflow.finance.FinanceResult;
@@ -63,8 +64,8 @@ public record ExpensePaymentReturnCheck(Input input, long version, Status status
     public boolean expired(Instant at) { return status == Status.RUNNING && !at.isBefore(leaseUntil); }
     private void requireTime(Instant at) { if (at == null || at.isBefore(updatedAt)) throw conflict(); }
     private void requireRunning(Instant at) { requireTime(at); if (status != Status.RUNNING) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PAYMENT_RETURN_CHECK", "ExpensePayment review must preserve original receipt, lease and evidence"); }
-    private static DomainException conflict() { return new DomainException("EXPENSE_PAYMENT_RETURN_CHECK_CONFLICT", "ExpensePayment review no longer permits this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PAYMENT_RETURN_CHECK, "ExpensePayment review must preserve original receipt, lease and evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.EXPENSE_PAYMENT_RETURN_CHECK_CONFLICT, "ExpensePayment review no longer permits this transition"); }
     @Override public String toString() { return "ExpensePaymentReturnCheck[id=" + input.id() + ", status=" + status + "]"; }
 
     /**

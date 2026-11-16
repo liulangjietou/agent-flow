@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
@@ -79,5 +80,5 @@ public record BudgetCommand(UUID id, String tenantId, Action action, BudgetPrech
         }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_COMMAND", "Budget command identity, position and expected ledger are required"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_COMMAND, "Budget command identity, position and expected ledger are required"); }
 }

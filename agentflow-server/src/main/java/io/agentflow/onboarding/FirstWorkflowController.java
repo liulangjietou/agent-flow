@@ -1,5 +1,7 @@
 package io.agentflow.onboarding;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import org.springframework.http.ResponseEntity;
@@ -29,7 +31,7 @@ public class FirstWorkflowController {
     @GetMapping("/api/v1/system/first-workflow")
     public ResponseEntity<FirstWorkflowReadPort.Report> progress(@RequestParam Map<String, String> raw) {
         var actor = currentActor.actor();
-        actor.requireRole("ADMIN");
+        actor.requireRole(SystemRole.ADMIN);
         if (!Set.of("definitionId").containsAll(raw.keySet())) throw invalid();
         UUID id = null;
         if (raw.containsKey("definitionId")) {
@@ -42,6 +44,6 @@ public class FirstWorkflowController {
     }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_FIRST_WORKFLOW_QUERY", "Invalid first workflow query");
+        return new DomainException(ErrorCode.INVALID_FIRST_WORKFLOW_QUERY, "Invalid first workflow query");
     }
 }

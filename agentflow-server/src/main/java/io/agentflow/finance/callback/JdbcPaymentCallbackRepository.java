@@ -1,5 +1,6 @@
 package io.agentflow.finance.callback;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.callback.mapper.PaymentCallbackRepositoryMapper;
@@ -194,9 +195,9 @@ public class JdbcPaymentCallbackRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException missing() { return new DomainException("NOT_FOUND", "Payment callback was not found"); }
+    private static DomainException missing() { return new DomainException(ErrorCode.NOT_FOUND, "Payment callback was not found"); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Payment callback identity or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Payment callback identity or version changed"); }
 
     /**
      * 调度不加载回调正文和资金明细。

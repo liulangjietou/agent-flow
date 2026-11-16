@@ -1,5 +1,6 @@
 package io.agentflow.attachment;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.SubprocessCall;
 import io.agentflow.attachment.mapper.SubprocessAttachmentServiceMapper;
@@ -125,7 +126,7 @@ public class SubprocessAttachmentService {
     }
 
     private static DomainException invalidReference() {
-        return new DomainException("INVALID_ATTACHMENT_REFERENCE", "Subprocess attachment input differs from its declared source");
+        return new DomainException(ErrorCode.INVALID_ATTACHMENT_REFERENCE, "Subprocess attachment input differs from its declared source");
     }
 
     /**

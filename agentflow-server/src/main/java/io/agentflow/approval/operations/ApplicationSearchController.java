@@ -1,5 +1,6 @@
 package io.agentflow.approval.operations;
 
+import io.agentflow.common.SystemRole;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.JsonUtil;
@@ -28,7 +29,7 @@ public class ApplicationSearchController {
     /** 运营检索和导出仍仅对租户管理员开放。 */
     @GetMapping("/api/v1/operations/applications")
     public ResponseEntity<Page> search(@RequestParam Map<String, String> raw) {
-        var actor = currentActor.actor(); actor.requireRole("ADMIN");
+        var actor = currentActor.actor(); actor.requireRole(SystemRole.ADMIN);
         return page(actor, raw);
     }
 

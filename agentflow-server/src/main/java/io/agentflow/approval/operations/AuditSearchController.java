@@ -1,5 +1,6 @@
 package io.agentflow.approval.operations;
 
+import io.agentflow.common.SystemRole;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.JsonUtil;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +28,7 @@ public class AuditSearchController {
     /** 仅 ADMIN 可查看当前租户的操作事实，流程管理员不自动获得该权限。 */
     @GetMapping("/api/v1/operations/audit")
     public ResponseEntity<Page> search(@RequestParam Map<String, String> raw) {
-        var actor = currentActor.actor(); actor.requireRole("ADMIN");
+        var actor = currentActor.actor(); actor.requireRole(SystemRole.ADMIN);
         var parameters = AuditSearchParameters.parse(actor, raw, json);
         var rows = reader.search(actor.tenantId(), parameters.query());
         int count = Math.min(rows.size(), parameters.query().limit());

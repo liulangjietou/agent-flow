@@ -1,5 +1,6 @@
 package io.agentflow.auth;
 
+import org.springframework.http.HttpMethod;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.common.DomainException;
 import com.nimbusds.jwt.SignedJWT;
@@ -45,7 +46,7 @@ public final class OidcBackchannelLogoutFilter extends OncePerRequestFilter {
             return;
         }
         response.setHeader("Cache-Control", "no-store");
-        if (!"POST".equals(request.getMethod())) {
+        if (!HttpMethod.POST.matches(request.getMethod())) {
             response.setHeader("Allow", "POST");
             error(response, 405, "method_not_allowed");
             return;

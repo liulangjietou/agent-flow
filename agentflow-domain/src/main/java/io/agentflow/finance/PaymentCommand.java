@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.nio.ByteBuffer;
@@ -42,7 +43,7 @@ public record PaymentCommand(UUID id, String tenantId, Purpose purpose, Binding 
     /** 有效期只限制新发送；过期后的原交易查询仍必须允许。 */
     public void requireSendAt(Instant now) {
         if (now.isBefore(authorization.authorizedAt()) || !now.isBefore(authorization.expiresAt())) {
-            throw new DomainException("PAYMENT_AUTHORIZATION_EXPIRED", "Payment authorization is outside its sending window");
+            throw new DomainException(ErrorCode.PAYMENT_AUTHORIZATION_EXPIRED, "Payment authorization is outside its sending window");
         }
     }
 
@@ -53,7 +54,7 @@ public record PaymentCommand(UUID id, String tenantId, Purpose purpose, Binding 
         }
     }
     private static boolean invalidReference(String value) { return StringUtils.isBlank(value) || value.length() > 128; }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_COMMAND", "Payment command requires immutable approval, account and separated authorization evidence"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_COMMAND, "Payment command requires immutable approval, account and separated authorization evidence"); }
 
     /** 日志表示不带账户引用、凭证或人员信息。 */
     @Override public String toString() { return "PaymentCommand[id=" + id + ", purpose=" + purpose + "]"; }

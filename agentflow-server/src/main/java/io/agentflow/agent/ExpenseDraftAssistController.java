@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.agent.ExpenseDraftAssistRun.Part;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
@@ -85,7 +86,7 @@ public class ExpenseDraftAssistController {
         if (value == null) return fallback; if (!value.matches("0|[1-9][0-9]{0,4}")) throw invalid();
         int result = Integer.parseInt(value); if (result < minimum || result > maximum) throw invalid(); return result;
     }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_QUERY", "Invalid expense draft assistance query"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_QUERY, "Invalid expense draft assistance query"); }
     private static void unknown() { throw new IllegalArgumentException("Unknown expense draft assistance request field"); }
 
     /**

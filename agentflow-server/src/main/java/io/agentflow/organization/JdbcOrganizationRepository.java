@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -37,8 +38,7 @@ public class JdbcOrganizationRepository implements OrganizationRepository {
         try {
             sqlMapper.initialize(tenantId, actor, Timestamp.from(now));
         } catch (DuplicateKeyException exception) {
-            throw new DomainException(
-                    "ORGANIZATION_ALREADY_INITIALIZED",
+            throw new DomainException(ErrorCode.ORGANIZATION_ALREADY_INITIALIZED,
                     "Local organization is already initialized");
         }
     }
@@ -59,8 +59,7 @@ public class JdbcOrganizationRepository implements OrganizationRepository {
                 .findFirst()
                 .orElseThrow(
                         () ->
-                                new DomainException(
-                                        "ORGANIZATION_NOT_INITIALIZED",
+                                new DomainException(ErrorCode.ORGANIZATION_NOT_INITIALIZED,
                                         "Initialize local organization before editing"));
     }
 
@@ -142,8 +141,7 @@ public class JdbcOrganizationRepository implements OrganizationRepository {
                                 value.id().toString(),
                                 expectedRevision));
         } catch (DuplicateKeyException exception) {
-            throw new DomainException(
-                    "ORGANIZATION_IDENTITY_CONFLICT",
+            throw new DomainException(ErrorCode.ORGANIZATION_IDENTITY_CONFLICT,
                     "The identity already belongs to a person in this tenant");
         }
     }
@@ -202,8 +200,7 @@ public class JdbcOrganizationRepository implements OrganizationRepository {
                                 value.id().toString(),
                                 expectedRevision));
         } catch (DuplicateKeyException exception) {
-            throw new DomainException(
-                    "ORGANIZATION_APPOINTMENT_CONFLICT",
+            throw new DomainException(ErrorCode.ORGANIZATION_APPOINTMENT_CONFLICT,
                     "This appointment already exists; update its active state instead");
         }
     }
@@ -285,5 +282,5 @@ public class JdbcOrganizationRepository implements OrganizationRepository {
 
     private static String id(UUID id) { return id == null ? null : id.toString(); }
 
-    private static void changed(int affected) { if (affected != 1) throw new DomainException("CONCURRENCY_CONFLICT", "Organization record changed concurrently"); }
+    private static void changed(int affected) { if (affected != 1) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Organization record changed concurrently"); }
 }

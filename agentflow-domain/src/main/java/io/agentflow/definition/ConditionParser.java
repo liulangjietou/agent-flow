@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 
 import java.util.ArrayList;
@@ -14,7 +15,7 @@ import static io.agentflow.definition.DefinitionModels.*;
 public final class ConditionParser {
     /** 使用发布时绑定的语法版本；缺省入口继续保留历史语义。 */
     public ConditionAst parse(String source, int version) {
-        if (version != 1 && version != 2) throw new DomainException("INVALID_CONDITION_VERSION", "Unsupported condition language version");
+        if (version != 1 && version != 2) throw new DomainException(ErrorCode.INVALID_CONDITION_VERSION, "Unsupported condition language version");
         return version == 1 ? parse(source) : new ConditionV2Parser(source).parse();
     }
 
@@ -84,14 +85,14 @@ public final class ConditionParser {
 
     private ConditionAst parseComparison(String token) {
         if (token.contains(";") || token.contains("${") || token.contains("#{") || token.contains("(") || token.contains(")")) {
-            throw new DomainException("INVALID_CONDITION", "Only the allowlisted condition grammar is supported");
+            throw new DomainException(ErrorCode.INVALID_CONDITION, "Only the allowlisted condition grammar is supported");
         }
         String[] p = token.split("\\s+", 3);
         if (p.length == 2 && (p[1].equalsIgnoreCase("EXISTS") || p[1].equalsIgnoreCase("NOT_EXISTS"))) {
             return new Comparison(p[0], p[1].equalsIgnoreCase("EXISTS") ? Operator.EXISTS : Operator.NOT_EXISTS, "");
         }
-        if (p.length != 3) throw new DomainException("INVALID_CONDITION", "Condition must be field operator literal");
-        Operator op = switch (p[1]) { case "==" -> Operator.EQ; case "!=" -> Operator.NE; case ">" -> Operator.GT; case ">=" -> Operator.GE; case "<" -> Operator.LT; case "<=" -> Operator.LE; default -> throw new DomainException("INVALID_CONDITION", "Operator is not allowlisted"); };
+        if (p.length != 3) throw new DomainException(ErrorCode.INVALID_CONDITION, "Condition must be field operator literal");
+        Operator op = switch (p[1]) { case "==" -> Operator.EQ; case "!=" -> Operator.NE; case ">" -> Operator.GT; case ">=" -> Operator.GE; case "<" -> Operator.LT; case "<=" -> Operator.LE; default -> throw new DomainException(ErrorCode.INVALID_CONDITION, "Operator is not allowlisted"); };
         String literal = p[2];
         char first = literal.charAt(0);
         if (first == '\'' || first == '"') {
@@ -99,11 +100,11 @@ public final class ConditionParser {
             if (literal.indexOf(first, 1) != literal.length() - 1) throw invalidQuotedLiteral();
             literal = literal.substring(1, literal.length() - 1);
         }
-        if (literal.length() > 256) throw new DomainException("INVALID_CONDITION", "Literal is too long");
+        if (literal.length() > 256) throw new DomainException(ErrorCode.INVALID_CONDITION, "Literal is too long");
         return new Comparison(p[0], op, literal);
     }
 
     private DomainException invalidQuotedLiteral() {
-        return new DomainException("INVALID_CONDITION", "Quoted literal must be closed and cannot have trailing text");
+        return new DomainException(ErrorCode.INVALID_CONDITION, "Quoted literal must be closed and cannot have trailing text");
     }
 }

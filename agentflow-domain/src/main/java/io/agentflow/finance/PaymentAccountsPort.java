@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -75,14 +76,14 @@ public interface PaymentAccountsPort {
         }
         /** 选中的引用必须在本次有效目录内，不接受其他账户或过期选项。 */
         public DebitAccount account(String reference, Instant now) {
-            if (!matches(request, now)) throw new DomainException("PAYMENT_ACCOUNT_EVIDENCE_EXPIRED", "Payment account directory is outside its validity window");
+            if (!matches(request, now)) throw new DomainException(ErrorCode.PAYMENT_ACCOUNT_EVIDENCE_EXPIRED, "Payment account directory is outside its validity window");
             return accounts.stream().filter(account -> account.reference().equals(reference)).findFirst()
-                    .orElseThrow(() -> new DomainException("PAYMENT_DEBIT_ACCOUNT_UNAVAILABLE", "Selected debit account is not available to this cashier"));
+                    .orElseThrow(() -> new DomainException(ErrorCode.PAYMENT_DEBIT_ACCOUNT_UNAVAILABLE, "Selected debit account is not available to this cashier"));
         }
         /** 目录日志只保留条数，不输出资金账户或操作者。 */
         @Override public String toString() { return "PaymentAccountDirectory[accounts=" + accounts.size() + "]"; }
     }
 
     private static boolean invalidText(String value) { return StringUtils.isBlank(value) || value.length() > 128; }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_ACCOUNTS", "Versioned payment accounts must match the original cashier, legal entity and currency"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_ACCOUNTS, "Versioned payment accounts must match the original cashier, legal entity and currency"); }
 }

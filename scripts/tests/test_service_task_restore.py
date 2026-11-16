@@ -1,9 +1,13 @@
+import os
 """配套恢复证据比对只允许无语义的独立约束输出顺序变化。"""
 
 from pathlib import Path
 import runpy
 import tempfile
 import unittest
+
+# 测试临时根目录：AGENTFLOW_TMP_DIR 优先，未设置时使用系统临时目录。
+TMP_ROOT = os.environ.get("AGENTFLOW_TMP_DIR") or tempfile.gettempdir()
 
 
 canonical_content = runpy.run_path(str(Path(__file__).resolve().parents[1] / "check-service-task-restore.py"))["canonical_content"]
@@ -16,7 +20,7 @@ class RestoreComparisonTest(unittest.TestCase):
 
     def compare(self, source, target):
         """所有临时比对文件都位于用户指定根目录。"""
-        with tempfile.TemporaryDirectory(prefix="service-restore-comparison-", dir="/fyoung/tmp") as directory:
+        with tempfile.TemporaryDirectory(prefix="service-restore-comparison-", dir=TMP_ROOT) as directory:
             left, right = Path(directory) / "source.sql", Path(directory) / "restored.sql"
             left.write_text(source)
             right.write_text(target)

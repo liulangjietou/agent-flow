@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.ReservedAmount;
@@ -38,7 +39,7 @@ public final class EmployeeAdvance {
         this.id = Objects.requireNonNull(id); this.legalEntityId = Objects.requireNonNull(legalEntityId);
         if (StringUtils.isBlank(tenantId) || tenantId.length() > 64 || StringUtils.isBlank(employeeId) || employeeId.length() > 128
                 || StringUtils.isBlank(paymentReference) || paymentReference.length() > 128 || paidAmount == null || paidAmount.value().signum() <= 0
-                || paidOn == null || dueOn == null) throw new DomainException("INVALID_ADVANCE", "Verified advance payment identity, amount and dates are required");
+                || paidOn == null || dueOn == null) throw new DomainException(ErrorCode.INVALID_ADVANCE, "Verified advance payment identity, amount and dates are required");
         this.tenantId = tenantId; this.employeeId = employeeId; this.paymentReference = paymentReference;
         this.paidOn = paidOn; this.dueOn = dueOn; balance = ReservedAmount.available(paidAmount);
     }
@@ -128,7 +129,7 @@ public final class EmployeeAdvance {
         }
         requireValidDisbursementReturns(next, balance.limit());
         var total = next.stream().map(AdvanceDisbursementReturn.Entry::amount).reduce(Money.zero(balance.limit().currency()), Money::plus);
-        if (total.plus(repaid()).compareTo(balance.available()) > 0) throw new DomainException("DISBURSEMENT_RETURN_CONFLICTS_WITH_USAGE", "Disbursement return cannot replace existing offsets, net repayments or reservations");
+        if (total.plus(repaid()).compareTo(balance.available()) > 0) throw new DomainException(ErrorCode.DISBURSEMENT_RETURN_CONFLICTS_WITH_USAGE, "Disbursement return cannot replace existing offsets, net repayments or reservations");
         disbursementReturns = List.copyOf(next); paymentReviewRequired = false; version++;
     }
 
@@ -156,9 +157,9 @@ public final class EmployeeAdvance {
     public void repay(long expectedVersion, AdvanceRepayment repayment) {
         requireVersion(expectedVersion);
         if (reviewRequired()) throw review();
-        if (repayment == null || !repayment.belongsTo(this)) throw new DomainException("ADVANCE_REPAYMENT_SOURCE_CHANGED", "Repayment does not belong to this original disbursement");
+        if (repayment == null || !repayment.belongsTo(this)) throw new DomainException(ErrorCode.ADVANCE_REPAYMENT_SOURCE_CHANGED, "Repayment does not belong to this original disbursement");
         if (repayments.stream().anyMatch(item -> item.id().equals(repayment.id()) || item.receiptReference().equals(repayment.receipt().request().receiptReference()))) {
-            throw new DomainException("ADVANCE_REPAYMENT_ALREADY_RECORDED", "The repayment receipt is already included in this advance");
+            throw new DomainException(ErrorCode.ADVANCE_REPAYMENT_ALREADY_RECORDED, "The repayment receipt is already included in this advance");
         }
         if (repayment.amount().compareTo(available()) > 0) throw insufficient();
         var entries = new ArrayList<>(repayments); entries.add(repayment.entry()); repayments = List.copyOf(entries); version++;
@@ -187,9 +188,9 @@ public final class EmployeeAdvance {
         repaymentReviews = repaymentReviews.stream().filter(id -> !id.equals(repaymentId)).toList(); version++;
     }
     private boolean reviewRequired() { return paymentReviewRequired || voucherReviewRequired() || repaymentReviewRequired(); }
-    private DomainException review() { return paymentReviewRequired ? paymentReview() : voucherReviewRequired() ? voucherReview() : new DomainException("ADVANCE_REPAYMENT_REVIEW_REQUIRED", "Repayment evidence requires finance review before further use"); }
+    private DomainException review() { return paymentReviewRequired ? paymentReview() : voucherReviewRequired() ? voucherReview() : new DomainException(ErrorCode.ADVANCE_REPAYMENT_REVIEW_REQUIRED, "Repayment evidence requires finance review before further use"); }
     private void requireRepaymentCapacity(ReservedAmount proposed) { if (proposed.available().compareTo(repaid().plus(returnedDisbursements())) < 0) throw insufficient(); }
-    private static DomainException insufficient() { return new DomainException("INSUFFICIENT_FINANCIAL_BALANCE", "Repayment, reservations and offsets exceed the original advance"); }
+    private static DomainException insufficient() { return new DomainException(ErrorCode.INSUFFICIENT_FINANCIAL_BALANCE, "Repayment, reservations and offsets exceed the original advance"); }
 
     /** 重复确认同一放款时只比较不可变依据，不能覆盖后续预留或冲销。 */
     public boolean sameDisbursement(EmployeeAdvance other) {
@@ -198,19 +199,19 @@ public final class EmployeeAdvance {
                 && paidOn.equals(other.paidOn) && dueOn.equals(other.dueOn) && balance.limit().equals(other.balance.limit());
     }
 
-    private static void requireWholeReport(ExpenseUse use) { if (use == null || use.lineNo() != 0) throw new DomainException("INVALID_ADVANCE_OFFSET", "An advance offset belongs to the whole report"); }
-    private void requireVersion(long expectedVersion) { if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Advance version has changed"); }
+    private static void requireWholeReport(ExpenseUse use) { if (use == null || use.lineNo() != 0) throw new DomainException(ErrorCode.INVALID_ADVANCE_OFFSET, "An advance offset belongs to the whole report"); }
+    private void requireVersion(long expectedVersion) { if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Advance version has changed"); }
 
     /** 恢复同一笔实际放款与额度账本，预留不能改写外部放款引用。 */
     public static EmployeeAdvance restore(State state) {
-        if (state.version() < 1 || state.balance() == null || !state.balance().hardLimit()) throw new DomainException("INVALID_ADVANCE", "Persisted advance balance is invalid");
+        if (state.version() < 1 || state.balance() == null || !state.balance().hardLimit()) throw new DomainException(ErrorCode.INVALID_ADVANCE, "Persisted advance balance is invalid");
         var result = new EmployeeAdvance(state.id(), state.tenantId(), state.legalEntityId(), state.employeeId(), state.balance().limit(),
                 state.paymentReference(), state.paidOn(), state.dueOn());
         if (java.util.stream.Stream.concat(state.balance().reservations().stream(), state.balance().consumptions().stream())
-                .anyMatch(item -> item.use().lineNo() != 0)) throw new DomainException("INVALID_ADVANCE", "Advance uses must belong to whole reports");
+                .anyMatch(item -> item.use().lineNo() != 0)) throw new DomainException(ErrorCode.INVALID_ADVANCE, "Advance uses must belong to whole reports");
         var repaid = state.repayments() == null ? List.<AdvanceRepayment.Entry>of() : List.copyOf(state.repayments());
         if (repaid.stream().map(AdvanceRepayment.Entry::id).distinct().count() != repaid.size()
-                || repaid.stream().map(AdvanceRepayment.Entry::receiptReference).distinct().count() != repaid.size()) throw new DomainException("INVALID_ADVANCE", "Persisted repayments must have unique receipts");
+                || repaid.stream().map(AdvanceRepayment.Entry::receiptReference).distinct().count() != repaid.size()) throw new DomainException(ErrorCode.INVALID_ADVANCE, "Persisted repayments must have unique receipts");
         var returned = state.repaymentReturns() == null ? List.<AdvanceRepaymentResolution.ReturnEntry>of() : List.copyOf(state.repaymentReturns());
         requireValidReturns(repaid, returned);
         // 旧快照只有一个冻结标记，保守地将当时所有还款标为待核对，逐笔裁决后才能恢复。
@@ -229,7 +230,7 @@ public final class EmployeeAdvance {
     private static void requireValidReturns(List<AdvanceRepayment.Entry> repayments, List<AdvanceRepaymentResolution.ReturnEntry> returns) {
         if (returns.stream().map(entry -> entry.proof().fundsIdentity()).distinct().count() != returns.size()
                 || returns.stream().map(entry -> entry.proof().postingIdentity()).distinct().count() != returns.size()) {
-            throw new DomainException("REPAYMENT_RETURN_ALREADY_RECORDED", "Returned funds or accounting entry already belongs to a repayment adjustment");
+            throw new DomainException(ErrorCode.REPAYMENT_RETURN_ALREADY_RECORDED, "Returned funds or accounting entry already belongs to a repayment adjustment");
         }
         if (returns.stream().anyMatch(entry -> repayments.stream().noneMatch(original -> original.id().equals(entry.repaymentId()) && original.amount().currency().equals(entry.amount().currency())))) throw repaymentSourceChanged();
         for (var original : repayments) {
@@ -265,10 +266,10 @@ public final class EmployeeAdvance {
     public List<UUID> repaymentReviews() { return repaymentReviews; }
     public List<AdvanceRepaymentResolution.ReturnEntry> repaymentReturns() { return repaymentReturns; }
     public List<AdvanceDisbursementReturn.Entry> disbursementReturns() { return disbursementReturns; }
-    private static DomainException disbursementSourceChanged() { return new DomainException("DISBURSEMENT_RETURN_SOURCE_CHANGED", "Disbursement adjustment must preserve the original payment and every recorded return"); }
-    private static DomainException repaymentSourceChanged() { return new DomainException("ADVANCE_REPAYMENT_SOURCE_CHANGED", "Repayment decision must retain original recorded receipt and adjustment identity"); }
-    private static DomainException paymentReview() { return new DomainException("ADVANCE_PAYMENT_REVIEW_REQUIRED", "Disputed advance payment requires finance review before further use"); }
-    private static DomainException voucherReview() { return new DomainException("ADVANCE_VOUCHER_REVIEW_REQUIRED", "Original advance voucher requires finance review before further use"); }
+    private static DomainException disbursementSourceChanged() { return new DomainException(ErrorCode.DISBURSEMENT_RETURN_SOURCE_CHANGED, "Disbursement adjustment must preserve the original payment and every recorded return"); }
+    private static DomainException repaymentSourceChanged() { return new DomainException(ErrorCode.ADVANCE_REPAYMENT_SOURCE_CHANGED, "Repayment decision must retain original recorded receipt and adjustment identity"); }
+    private static DomainException paymentReview() { return new DomainException(ErrorCode.ADVANCE_PAYMENT_REVIEW_REQUIRED, "Disputed advance payment requires finance review before further use"); }
+    private static DomainException voucherReview() { return new DomainException(ErrorCode.ADVANCE_VOUCHER_REVIEW_REQUIRED, "Original advance voucher requires finance review before further use"); }
 
     /**
      * 借款持久状态，实际放款金额保留为余额账本的固定上限。

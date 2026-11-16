@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.mapper.AssistRunRepositoryMapper;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -47,8 +48,7 @@ public class JdbcAssistRunRepository implements AssistRunRepository {
                         run.input().applicationVersion(),
                         run.input().roundNo());
         if (inserted != 1)
-            throw new DomainException(
-                    "AGENT_INPUT_CHANGED", "Authorized application context is no longer current");
+            throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Authorized application context is no longer current");
         append(run);
     }
 
@@ -66,8 +66,7 @@ public class JdbcAssistRunRepository implements AssistRunRepository {
                             run.input().applicationVersion(),
                             run.input().roundNo());
             if (CollectionUtils.isEmpty(locked))
-                throw new DomainException(
-                        "AGENT_INPUT_CHANGED", "Application changed before summary adoption");
+                throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Application changed before summary adoption");
         }
         String previous =
                 switch (run.status()) {
@@ -135,7 +134,7 @@ public class JdbcAssistRunRepository implements AssistRunRepository {
 
     private static State state(AssistRun run) { return new State(run.startedAt(), run.completedAt(), run.suggestion(), run.failure(), run.review()); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Assist run or application context has changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Assist run or application context has changed"); }
 
     private static IllegalStateException corrupt() { return new IllegalStateException("Persisted assist run is inconsistent"); }
 

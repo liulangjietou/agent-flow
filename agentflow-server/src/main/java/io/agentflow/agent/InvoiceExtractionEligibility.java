@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.auth.AuthService;
 import io.agentflow.common.DomainException;
 import io.agentflow.organization.OrganizationPerson;
@@ -24,7 +25,7 @@ public class InvoiceExtractionEligibility {
         boolean active = organization.initialized(tenant)
                 ? organization.personBySubject(tenant, owner).map(OrganizationPerson::active).orElse(false)
                 : demo.activeAccount(tenant, owner);
-        if (!active) throw new DomainException("FORBIDDEN", "Invoice extraction owner is inactive");
+        if (!active) throw new DomainException(ErrorCode.FORBIDDEN, "Invoice extraction owner is inactive");
     }
 
     /** 与人员停用串行化，必须先于原件和运行锁取得。 */

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.nio.ByteBuffer;
@@ -56,7 +57,7 @@ public record VoucherReversalCommand(UUID id, VoucherReversalPort.Request source
 
     /** 只禁止新发送；过期后仍查询相同编号与摘要，不能另造冲销命令。 */
     public void requireSendAt(Instant now) {
-        if (now == null || now.isBefore(createdAt) || !now.isBefore(expiresAt)) throw new DomainException("VOUCHER_REVERSAL_EVIDENCE_EXPIRED", "Reversal authorization and accounting evidence are outside their sending window");
+        if (now == null || now.isBefore(createdAt) || !now.isBefore(expiresAt)) throw new DomainException(ErrorCode.VOUCHER_REVERSAL_EVIDENCE_EXPIRED, "Reversal authorization and accounting evidence are outside their sending window");
     }
 
     /** 独立结果必须核对固定日期和期间，ERP 不能静默改期。 */
@@ -79,7 +80,7 @@ public record VoucherReversalCommand(UUID id, VoucherReversalPort.Request source
         for (String value : values) { byte[] bytes = value.getBytes(StandardCharsets.UTF_8); digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array()); digest.update(bytes); }
     }
     private static boolean invalidText(String value, int max) { return StringUtils.isBlank(value) || value.length() > max; }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_REVERSAL_COMMAND", "Reversal must bind a freshly verified original posting, an explicit open period and an independent finance authorization"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_REVERSAL_COMMAND, "Reversal must bind a freshly verified original posting, an explicit open period and an independent finance authorization"); }
 
     /**
      * 实际传输的反向分录；行内容只能由原凭证派生，ERP 返回时补充真实分录编号。

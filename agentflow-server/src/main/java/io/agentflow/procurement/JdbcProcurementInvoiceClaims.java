@@ -1,6 +1,7 @@
 package io.agentflow.procurement;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.mybatis.SqlRows;
 import io.agentflow.procurement.mapper.ProcurementInvoiceClaimsMapper;
@@ -74,7 +75,7 @@ public class JdbcProcurementInvoiceClaims {
         return round.payable().lines().stream().map(line -> line.invoice().canonical()).distinct().sorted().toList();
     }
 
-    private static DomainException occupied() { return new DomainException("INVOICE_OCCUPIED", "Invoice is already occupied or recognized by another financial source"); }
+    private static DomainException occupied() { return new DomainException(ErrorCode.INVOICE_OCCUPIED, "Invoice is already occupied or recognized by another financial source"); }
 
     /**
      * 来源保持原应付身份，当前申请人、付款金额和轮次变化均不能把同票号换到另一笔应付。

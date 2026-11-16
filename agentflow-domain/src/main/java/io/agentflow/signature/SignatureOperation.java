@@ -1,5 +1,6 @@
 package io.agentflow.signature;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 
 import java.time.Duration;
@@ -216,7 +217,7 @@ public record SignatureOperation(Input input, long version, Status status, int a
         REMOTE_FAILURE, INVALID_RESPONSE, RESPONSE_TOO_LARGE, STALE_RESPONSE, CONFLICTING_RECEIPT, NOT_FOUND,
         ARTIFACT_MISMATCH, LEASE_EXPIRED, AUTHORIZATION_EXPIRED, SOURCE_UNAVAILABLE, STORAGE_UNAVAILABLE, INTERNAL_ERROR }
 
-    private static DomainException invalid() { return new DomainException("INVALID_SIGNATURE_OPERATION", "Signature operation state, authorization and artifacts must be consistent"); }
-    private static DomainException conflict() { return new DomainException("SIGNATURE_OPERATION_CONFLICT", "Signature operation is no longer executable with this claim"); }
-    private static DomainException receiptConflict() { return new DomainException("SIGNATURE_RECEIPT_CONFLICT", "Signature receipt does not match the original operation or its accepted revision"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SIGNATURE_OPERATION, "Signature operation state, authorization and artifacts must be consistent"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.SIGNATURE_OPERATION_CONFLICT, "Signature operation is no longer executable with this claim"); }
+    private static DomainException receiptConflict() { return new DomainException(ErrorCode.SIGNATURE_RECEIPT_CONFLICT, "Signature receipt does not match the original operation or its accepted revision"); }
 }

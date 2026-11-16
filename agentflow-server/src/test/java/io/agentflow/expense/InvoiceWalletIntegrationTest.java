@@ -45,7 +45,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
         "agentflow.invoices.max-wallet-bytes=1048576", "agentflow.invoices.max-wallet-uploads=100"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class InvoiceWalletIntegrationTest {
-    private static final Path DIRECTORY = Path.of("/fyoung/tmp/agentflow-invoice-wallet-" + UUID.randomUUID());
+    private static final Path DIRECTORY = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-invoice-wallet-" + UUID.randomUUID());
     private static final byte[] PDF = "%PDF-1.7\nsynthetic-original\n%%EOF".getBytes(StandardCharsets.UTF_8);
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {

@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.time.Instant;
@@ -101,10 +102,10 @@ public record NotificationDeliveryProgress(Status status, long version, int atte
 
     /** 明确人工重试保持累计次数；未知结果必须明确接受可能重复的风险。 */
     public NotificationDeliveryProgress retry(long expectedVersion, boolean acknowledgePossibleDuplicate, Instant now) {
-        if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Notification delivery changed");
+        if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Notification delivery changed");
         if (!retryable()) throw invalid();
         if (status == Status.UNKNOWN && !acknowledgePossibleDuplicate)
-            throw new DomainException("NOTIFICATION_DUPLICATE_ACK_REQUIRED", "Acknowledge possible duplicate notification before retry");
+            throw new DomainException(ErrorCode.NOTIFICATION_DUPLICATE_ACK_REQUIRED, "Acknowledge possible duplicate notification before retry");
         return new NotificationDeliveryProgress(Status.PENDING, version + 1, attempts, 0, now, null, null, null, now);
     }
 
@@ -115,6 +116,6 @@ public record NotificationDeliveryProgress(Status status, long version, int atte
         return new NotificationDeliveryProgress(target, version + 1, attempts, cycleAttempts, null, null, null, code, now);
     }
     private static DomainException invalid() {
-        return new DomainException("NOTIFICATION_DELIVERY_STATE_INVALID", "Notification delivery is not in a permitted state");
+        return new DomainException(ErrorCode.NOTIFICATION_DELIVERY_STATE_INVALID, "Notification delivery is not in a permitted state");
     }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.SystemRole;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
@@ -18,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/admin")
 public class ExpenseConfigurationController {
-    public static final String CONFIGURATION_ROLE = "FINANCE_CONFIG_ADMIN";
+    public static final String CONFIGURATION_ROLE = SystemRole.FINANCE_CONFIG_ADMIN.name();
     private final CurrentActor actors;
     private final IdempotencyExecutor idempotency;
     private final ExpenseConfigurationService service;

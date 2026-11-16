@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.HashSet;
@@ -23,15 +24,15 @@ public final class ExpenseRiskRun {
     /** 首次领取固定租约；不提供延长或重新发送同一运行的状态迁移。 */
     public void start(long version, Instant at, Instant leaseUntil) {
         require(version, Status.QUEUED); time(at, context.createdAt());
-        if (leaseUntil == null || !leaseUntil.isAfter(at)) throw new DomainException("INVALID_AGENT_TIME", "Invalid risk explanation lease");
+        if (leaseUntil == null || !leaseUntil.isAfter(at)) throw new DomainException(ErrorCode.INVALID_AGENT_TIME, "Invalid risk explanation lease");
         state = new State(Status.RUNNING, version + 1, at, leaseUntil, null, null, null, null);
     }
 
     /** 只接受租约内且逐项绑定原证据的解释，晚到输出不能成为可复核结果。 */
     public void complete(long version, ExpenseRiskSuggestion suggestion, Instant at) {
         require(version, Status.RUNNING); time(at, state.startedAt());
-        if (expired(at)) throw new DomainException("AGENT_RUN_STATE_CONFLICT", "Risk explanation lease expired");
-        if (suggestion == null || !PROMPT_VERSION.equals(suggestion.promptVersion())) throw new DomainException("INVALID_AGENT_OUTPUT", "Risk explanation prompt changed");
+        if (expired(at)) throw new DomainException(ErrorCode.AGENT_RUN_STATE_CONFLICT, "Risk explanation lease expired");
+        if (suggestion == null || !PROMPT_VERSION.equals(suggestion.promptVersion())) throw new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Risk explanation prompt changed");
         suggestion.requireMatches(context.input());
         state = new State(Status.COMPLETED, version + 1, state.startedAt(), state.leaseUntil(), at, suggestion, null, null);
     }
@@ -45,7 +46,7 @@ public final class ExpenseRiskRun {
     /** 当前有效审批人可采纳所选解释，所有来源版本和当前选择必须与生成时完全一致。 */
     public void adopt(long version, ExpenseRiskInput currentInput, String actor, List<String> selected, String comment, Instant at) {
         require(version, Status.COMPLETED);
-        if (!context.input().equals(currentInput)) throw new DomainException("AGENT_INPUT_CHANGED", "Refresh changed risk evidence before review");
+        if (!context.input().equals(currentInput)) throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Refresh changed risk evidence before review");
         if (selected == null || selected.isEmpty() || selected.size() > ExpenseRiskInput.MAX_CONCERNS
                 || selected.stream().anyMatch(Objects::isNull) || new HashSet<>(selected).size() != selected.size()
                 || !context.input().concernIds().containsAll(selected)) throw invalidReview();
@@ -85,13 +86,13 @@ public final class ExpenseRiskRun {
     public boolean expired(Instant at) { return state.status() == Status.RUNNING && !state.leaseUntil().isAfter(at); }
 
     private void require(long version, Status status) {
-        if (version != state.version()) throw new DomainException("CONCURRENCY_CONFLICT", "Risk explanation version changed");
-        if (state.status() != status) throw new DomainException("AGENT_RUN_STATE_CONFLICT", "Risk explanation transition is unavailable");
+        if (version != state.version()) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Risk explanation version changed");
+        if (state.status() != status) throw new DomainException(ErrorCode.AGENT_RUN_STATE_CONFLICT, "Risk explanation transition is unavailable");
     }
     private static void time(Instant at, Instant previous) {
-        if (at == null || at.isBefore(previous)) throw new DomainException("INVALID_AGENT_TIME", "Risk explanation time moved backwards");
+        if (at == null || at.isBefore(previous)) throw new DomainException(ErrorCode.INVALID_AGENT_TIME, "Risk explanation time moved backwards");
     }
-    private static DomainException invalidReview() { return new DomainException("INVALID_AGENT_REVIEW", "Select existing risk explanations for an authorized human review"); }
+    private static DomainException invalidReview() { return new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Select existing risk explanations for an authorized human review"); }
 
     /**
      * 本地排队身份及固定模型目的地；整个上下文禁止直接序列化给模型。
@@ -103,7 +104,7 @@ public final class ExpenseRiskRun {
         public Context {
             if (id == null || StringUtils.isBlank(tenantId) || tenantId.length() > 64 || StringUtils.isBlank(requestedBy)
                     || requestedBy.length() > 128 || StringUtils.isBlank(taskId) || taskId.length() > 64 || createdAt == null || input == null
-                    || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}")) throw new DomainException("INVALID_AGENT_INPUT", "Invalid risk explanation context");
+                    || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}")) throw new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Invalid risk explanation context");
         }
     }
 

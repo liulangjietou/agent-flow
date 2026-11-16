@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
@@ -36,7 +37,7 @@ public class PaymentExecutionRequestService {
     public PaymentExecutionRequest register(PaymentAuthorization expected, String cashier, String debitReference, String debitVersion, Instant now) {
         sources.lock(expected); now = time(now); var current = authorization(expected.terms().tenantId(), expected.terms().id());
         if (!current.equals(expected)) throw conflict();
-        if (requests.forAuthorization(current.terms().tenantId(), current.terms().id()).isPresent()) throw new DomainException("PAYMENT_EXECUTION_ALREADY_REQUESTED", "Original authorization already has a fixed cashier request");
+        if (requests.forAuthorization(current.terms().tenantId(), current.terms().id()).isPresent()) throw new DomainException(ErrorCode.PAYMENT_EXECUTION_ALREADY_REQUESTED, "Original authorization already has a fixed cashier request");
         requireSource(current, cashier, now);
         var request = PaymentExecutionRequest.queue(UUID.randomUUID(), current, cashier, debitReference, debitVersion, now); requests.create(request); return request;
     }
@@ -58,7 +59,7 @@ public class PaymentExecutionRequestService {
         PaymentAuthorization executed;
         try { executed = current.register(authorization, directory, payee, sources.requireCurrent(authorization, now), now); }
         catch (DomainException changed) {
-            if (!"PAYMENT_ACCOUNT_CHANGED".equals(changed.code()) && !"PAYMENT_DEBIT_ACCOUNT_UNAVAILABLE".equals(changed.code())) throw changed;
+            if (!changed.is(ErrorCode.PAYMENT_ACCOUNT_CHANGED) && !changed.is(ErrorCode.PAYMENT_DEBIT_ACCOUNT_UNAVAILABLE)) throw changed;
             complete(current, current.block(now)); return;
         }
         authorizations.update(executed); payments.register(executed, now); complete(current, current.ready(executed, now));
@@ -101,7 +102,7 @@ public class PaymentExecutionRequestService {
         requests.update(current); events.publishEvent(new PaymentExecutionRequestChanged(previous, current));
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Payment request or original authorization changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Payment request or original authorization changed"); }
     /**
      * 事务外读取只使用持久授权与原选择，不能由 HTTP 回执改写财务目标。
      * @author owlzhangfq@gmail.com

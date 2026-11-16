@@ -1,5 +1,6 @@
 package io.agentflow.form;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionModels;
 
@@ -74,32 +75,32 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
         if (ast instanceof DefinitionModels.Negation negation) { validateCondition(negation.term()); return; }
         if (ast instanceof DefinitionModels.Membership membership) {
             Field field = fields.stream().filter(candidate -> candidate.key().equals(membership.field())).findFirst()
-                    .orElseThrow(() -> new DomainException("INVALID_CONDITION", "Condition field is not declared in the form schema"));
-            if (field.type() != FieldType.SELECT) throw new DomainException("INVALID_CONDITION", "Membership requires a select field");
+                    .orElseThrow(() -> new DomainException(ErrorCode.INVALID_CONDITION, "Condition field is not declared in the form schema"));
+            if (field.type() != FieldType.SELECT) throw new DomainException(ErrorCode.INVALID_CONDITION, "Membership requires a select field");
             membership.literals().forEach(value -> validateCondition(new DefinitionModels.Comparison(membership.field(), DefinitionModels.Operator.EQ, value)));
             return;
         }
         DefinitionModels.Comparison comparison = (DefinitionModels.Comparison) ast;
         Field field = fields.stream().filter(candidate -> candidate.key().equals(comparison.field())).findFirst()
-                .orElseThrow(() -> new DomainException("INVALID_CONDITION", "Condition field is not declared in the form schema"));
+                .orElseThrow(() -> new DomainException(ErrorCode.INVALID_CONDITION, "Condition field is not declared in the form schema"));
         if (comparison.operator() == DefinitionModels.Operator.EXISTS || comparison.operator() == DefinitionModels.Operator.NOT_EXISTS) return;
         if (field.type() == FieldType.TABLE || field.type() == FieldType.ATTACHMENT) {
-            throw new DomainException("INVALID_CONDITION", "Structured fields only support presence conditions");
+            throw new DomainException(ErrorCode.INVALID_CONDITION, "Structured fields only support presence conditions");
         }
         if (field.type() != FieldType.NUMBER && field.type() != FieldType.DATE
                 && comparison.operator() != DefinitionModels.Operator.EQ && comparison.operator() != DefinitionModels.Operator.NE) {
-            throw new DomainException("INVALID_CONDITION", "Condition operator does not match the field type");
+            throw new DomainException(ErrorCode.INVALID_CONDITION, "Condition operator does not match the field type");
         }
         Object literal = comparison.literal();
         if (field.type() == FieldType.BOOLEAN) {
             if (!"true".equals(literal) && !"false".equals(literal)) {
-                throw new DomainException("INVALID_CONDITION", "Boolean condition literal must be true or false");
+                throw new DomainException(ErrorCode.INVALID_CONDITION, "Boolean condition literal must be true or false");
             }
             literal = Boolean.valueOf(comparison.literal());
         }
         // 分支阈值允许落在表单数值区间之外；但类型、精度和枚举值必须正确。
         if (field.valueError(literal, false) != null) {
-            throw new DomainException("INVALID_CONDITION", "Condition literal does not match the field type");
+            throw new DomainException(ErrorCode.INVALID_CONDITION, "Condition literal does not match the field type");
         }
     }
 
@@ -166,7 +167,7 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
         catch (DateTimeParseException exception) { return false; }
     }
 
-    private static DomainException invalid(String message) { return new DomainException("INVALID_FORM_SCHEMA", message); }
+    private static DomainException invalid(String message) { return new DomainException(ErrorCode.INVALID_FORM_SCHEMA, message); }
 
     /**
      * 六种基础输入与一层重复明细；明细列使用基础类型。

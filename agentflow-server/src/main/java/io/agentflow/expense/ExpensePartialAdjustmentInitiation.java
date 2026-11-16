@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import io.agentflow.common.CurrentActor;
@@ -64,7 +65,7 @@ public class ExpensePartialAdjustmentInitiation {
         var selectedIds = Set.copyOf(input.returnIds());
         var selected = ledger == null ? List.<ExpensePaymentReturns.Entry>of() : ledger.entries().stream().filter(value -> selectedIds.contains(value.proof().fundsIdentity())).toList();
         if (selectedIds.size() != input.returnIds().size() || selected.size() != selectedIds.size() || selected.stream().anyMatch(used::contains)) {
-            throw new DomainException("INVALID_PARTIAL_ADJUSTMENT_RETURNS", "Select distinct whole registered returns not already used by a completed adjustment");
+            throw new DomainException(ErrorCode.INVALID_PARTIAL_ADJUSTMENT_RETURNS, "Select distinct whole registered returns not already used by a completed adjustment");
         }
         var before = previous == null ? ExpenseAdjustmentAmounts.from(report) : previous.input().basis().funding().financial().change().after();
         var currency = before.gross().currency();
@@ -84,10 +85,10 @@ public class ExpensePartialAdjustmentInitiation {
     }
     private void requireNoActive(ExpenseReport report) {
         guard.requirePartialAllowed(report.tenantId(), report.id());
-        if (adjustments.active(report.tenantId(), report.id()).isPresent()) throw new DomainException("EXPENSE_PARTIAL_ADJUSTMENT_PENDING", "Use the active adjustment preparation instead of refreshing its originals or creating another intent");
+        if (adjustments.active(report.tenantId(), report.id()).isPresent()) throw new DomainException(ErrorCode.EXPENSE_PARTIAL_ADJUSTMENT_PENDING, "Use the active adjustment preparation instead of refreshing its originals or creating another intent");
     }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed original finance or completed partial adjustment changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed original finance or completed partial adjustment changed"); }
 
     /**
      * 三种原件的显示修订分别校验，零应付的两个付款版本固定为零。

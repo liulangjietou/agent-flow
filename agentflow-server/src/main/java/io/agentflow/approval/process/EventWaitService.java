@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.SubprocessExecutionLocks;
 import io.agentflow.approval.model.Application;
@@ -80,7 +81,7 @@ public class EventWaitService {
         runtime.messageEventReceived(binding.subscription().getEventName(), binding.subscription().getExecutionId());
         boolean ended = runtime.createProcessInstanceQuery().processInstanceId(binding.round().processInstanceId()).singleResult() == null;
         if (ended && !subprocesses.hasApprovalEvidence(application, binding.round().processInstanceId())) {
-            throw new DomainException("EVENT_REQUIRES_APPROVAL", "An event wait cannot substitute for human approval");
+            throw new DomainException(ErrorCode.EVENT_REQUIRES_APPROVAL, "An event wait cannot substitute for human approval");
         }
         String actor = "system:event:" + contract.sourceKey();
         String reason = "eventId=" + command.eventId() + ", waitId=" + command.waitId();
@@ -97,7 +98,7 @@ public class EventWaitService {
     public View read(UUID applicationId, int roundNo) {
         var application = reads.get(applicationId);
         var round = rounds.findByRound(application.tenantId(), applicationId, roundNo)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Submission round not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Submission round not found"));
         var definition = definitions.findPublished(application.tenantId(), application.processKey(), round.definitionVersion()).orElse(null);
         var instance = runtime.createProcessInstanceQuery().processInstanceId(round.processInstanceId()).singleResult();
         var entries = new ArrayList<Entry>();

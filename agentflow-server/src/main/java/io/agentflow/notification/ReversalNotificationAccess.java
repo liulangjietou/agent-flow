@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.agentflow.common.CurrentActor;
@@ -74,7 +75,7 @@ public class ReversalNotificationAccess {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Target target(UUID messageId) {
         var actor = actors.actor(); var source = allowed(actor.tenantId(), actor.userId(), row(actor.tenantId(), actor.userId(), messageId));
-        if (source == null) throw new DomainException("NOT_FOUND", "Reversal notification is unavailable in the current scope");
+        if (source == null) throw new DomainException(ErrorCode.NOT_FOUND, "Reversal notification is unavailable in the current scope");
         var original = source.original(); access.read(original.application().id(), original.roundNo());
         var prepared = source.preparation(); var input = prepared.input(); var ended = source.retirement();
         return new Target(messageId, input.id(), original.id(), original.application().id(), original.application().businessReference().id(), original.roundNo(),

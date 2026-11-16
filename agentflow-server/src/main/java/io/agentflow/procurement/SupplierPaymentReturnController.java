@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -50,6 +51,6 @@ public class SupplierPaymentReturnController {
     }
 
     private static void requireNoParameters(HttpServletRequest request) {
-        if (!request.getParameterMap().isEmpty()) throw new DomainException("INVALID_SUPPLIER_PAYMENT_RETURN_QUERY", "Supplier return writes do not accept query parameters");
+        if (!request.getParameterMap().isEmpty()) throw new DomainException(ErrorCode.INVALID_SUPPLIER_PAYMENT_RETURN_QUERY, "Supplier return writes do not accept query parameters");
     }
 }

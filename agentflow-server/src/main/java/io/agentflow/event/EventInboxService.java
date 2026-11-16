@@ -1,5 +1,7 @@
 package io.agentflow.event;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.process.ApprovalCompletionService;
 import io.agentflow.approval.process.EventWaitService;
@@ -43,9 +45,9 @@ public class EventInboxService {
                 if (existing != null) return same(existing, input);
                 lockApplication(signal);
                 var contract = contracts.lockVersion(signal.tenantId(), signal.contractKey(), signal.contractVersion())
-                        .orElseThrow(() -> new DomainException("EVENT_CONTRACT_UNAVAILABLE", "Event contract version is unavailable")).contract();
+                        .orElseThrow(() -> new DomainException(ErrorCode.EVENT_CONTRACT_UNAVAILABLE, "Event contract version is unavailable")).contract();
                 if (!contract.sourceKey().equals(signal.sourceKey()) || !contract.eventType().equals(signal.eventType())
-                        || contract.envelopeVersion() != signal.envelopeVersion()) throw new DomainException("EVENT_SOURCE_CONFLICT", "Event does not match its published contract");
+                        || contract.envelopeVersion() != signal.envelopeVersion()) throw new DomainException(ErrorCode.EVENT_SOURCE_CONFLICT, "Event does not match its published contract");
                 existing = inbox.byEvent(signal.tenantId(), signal.sourceKey(), input.eventId()).orElse(null);
                 if (existing != null) return same(existing, input);
                 var item = EventInboxItem.receive(input, time(now)); inbox.create(item); return item;
@@ -89,20 +91,20 @@ public class EventInboxService {
 
     /** 管理员只能对待检查的原事件重新排队，理由与操作者进入同一追加历史。 */
     public EventInboxItem retry(Actor actor, UUID id, long expectedVersion, String reason, Instant now) {
-        actor.requireRole("ADMIN");
+        actor.requireRole(SystemRole.ADMIN);
         return transaction.execute(status -> {
             var current = inbox.lock(actor.tenantId(), id);
-            if (current.version() != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Event inbox version changed");
+            if (current.version() != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Event inbox version changed");
             var next = current.retry(actor.userId(), reason.strip(), time(now)); inbox.update(next); return next;
         });
     }
     private void lockApplication(EventSignal signal) {
         var application = applications.findById(signal.tenantId(), signal.applicationId())
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Event application was not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Event application was not found"));
         completion.lock(application);
     }
     private static EventInboxItem same(EventInboxItem existing, ReceivedEvent input) {
-        if (!existing.input().equals(input)) throw new DomainException("EVENT_ID_CONFLICT", "Event ID was reused with different content or trust revision");
+        if (!existing.input().equals(input)) throw new DomainException(ErrorCode.EVENT_ID_CONFLICT, "Event ID was reused with different content or trust revision");
         return existing;
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }

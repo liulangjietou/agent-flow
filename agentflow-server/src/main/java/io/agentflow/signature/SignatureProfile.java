@@ -1,5 +1,6 @@
 package io.agentflow.signature;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 
 import java.security.GeneralSecurityException;
@@ -66,5 +67,5 @@ public record SignatureProfile(String tenantId, String key, long version, String
     }
 
     @Override public String toString() { return "SignatureProfile[key=" + key + ", version=" + version + "]"; }
-    private static DomainException invalid() { return new DomainException("INVALID_SIGNATURE_PROFILE", "Signature profile requires explicit actors, signers and a canonical Ed25519 public key"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SIGNATURE_PROFILE, "Signature profile requires explicit actors, signers and a canonical Ed25519 public key"); }
 }

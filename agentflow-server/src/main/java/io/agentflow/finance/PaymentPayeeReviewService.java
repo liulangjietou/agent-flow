@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -43,7 +44,7 @@ public class PaymentPayeeReviewService {
         var voucher = requireSource(original, finance, now);
         if (voucher.version() != voucherVersion) throw conflict();
         var previous = reviews.latest(original.terms().tenantId(), original.terms().id(), finance).orElse(null);
-        if (previous != null && previous.active()) throw new DomainException("PAYMENT_PAYEE_REVIEW_PENDING", "The current finance actor already has a pending payee review");
+        if (previous != null && previous.active()) throw new DomainException(ErrorCode.PAYMENT_PAYEE_REVIEW_PENDING, "The current finance actor already has a pending payee review");
         var review = PaymentPayeeReview.queue(UUID.randomUUID(), original, voucher, finance, now);
         reviews.create(review); return review;
     }
@@ -128,7 +129,7 @@ public class PaymentPayeeReviewService {
     }
     private PaymentAuthorization authorization(String tenant, UUID id) { return authorizations.find(tenant, id).orElseThrow(PaymentPayeeReviewService::sourceChanged); }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Payee review or original source version changed"); }
-    private static DomainException sourceChanged() { return new DomainException("PAYMENT_SOURCE_CHANGED", "Only the latest safely ended authorization with current approved voucher allows account review"); }
-    private static DomainException unavailable() { return new DomainException("PAYMENT_PAYEE_REVIEW_UNAVAILABLE", "The current finance actor requires fresh latest account review evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Payee review or original source version changed"); }
+    private static DomainException sourceChanged() { return new DomainException(ErrorCode.PAYMENT_SOURCE_CHANGED, "Only the latest safely ended authorization with current approved voucher allows account review"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.PAYMENT_PAYEE_REVIEW_UNAVAILABLE, "The current finance actor requires fresh latest account review evidence"); }
 }

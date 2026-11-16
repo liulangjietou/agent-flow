@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import java.time.Duration;
@@ -90,5 +91,5 @@ public class SupplierSettlementPreparationService {
         return current != null && current.status() == SupplierSettlementPreparation.Status.RUNNING && current.version() == claimed.version() && current.input().equals(claimed.input()) ? current : null;
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Original paid bank or settlement preparation changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Original paid bank or settlement preparation changed"); }
 }

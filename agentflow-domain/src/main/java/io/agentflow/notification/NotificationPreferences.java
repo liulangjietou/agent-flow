@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 
@@ -17,7 +18,7 @@ public record NotificationPreferences(String tenantId, String recipient, boolean
 
     /** 版本冲突先拒绝；只有渠道启停变化才推进其代次，不影响另一个渠道。 */
     public NotificationPreferences revise(long expectedVersion, boolean email, boolean enterpriseIm, Instant time) {
-        if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Notification preferences changed");
+        if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Notification preferences changed");
         if (emailEnabled == email && enterpriseImEnabled == enterpriseIm) return this;
         return new NotificationPreferences(tenantId, recipient, email, enterpriseIm, version + 1,
                 emailGeneration + (emailEnabled == email ? 0 : 1),

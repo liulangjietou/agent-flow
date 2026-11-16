@@ -34,6 +34,8 @@ function mount(values) {
 
 test('完整 long 版本以文本校验、比较及分页，浮点版本和越界原文被拒绝', () => {
   assert.equal(service.serviceTaskVersion(MAX_VERSION), true)
+  // 故意使用超出 JS 安全整数的字面量，验证版本号不会被精度丢失后的数值误判为合法。
+  // eslint-disable-next-line no-loss-of-precision
   for (const value of [9223372036854775807, '9223372036854775808', '01', '0', '-1', '1e3', 'latest']) assert.equal(service.serviceTaskVersion(value), false)
   const page = { items: [option(MAX_VERSION), option('9007199254740993')], nextBeforeVersion: '9007199254740993' }
   assert.equal(service.readServiceTaskVersions(page, 'receipt.register'), page)

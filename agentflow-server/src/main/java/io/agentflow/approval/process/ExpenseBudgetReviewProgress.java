@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
@@ -86,5 +87,5 @@ public class ExpenseBudgetReviewProgress {
                 && ExpenseBudgetApprovalPolicy.AUTOMATIC_ACTION.equals(task.getVariable("lastAction"))
                 && task.getTenantId()!=null && task.getTenantId().equals(task.getVariable("tenantId"));
     }
-    private static DomainException invalid() { return new DomainException("EXPENSE_BUDGET_TASK_CONTEXT_CHANGED", "Budget checkpoint no longer matches its original native task"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.EXPENSE_BUDGET_TASK_CONTEXT_CHANGED, "Budget checkpoint no longer matches its original native task"); }
 }

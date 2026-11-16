@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.mapper.InvoiceOccupationQueriesMapper;
@@ -54,7 +55,7 @@ public class InvoiceOccupationQueries {
     public List<Conflict> conflicts(UUID reportId) {
         var actor = actors.actor();
         var report = reports.find(actor.tenantId(), reportId).filter(value -> actor.userId().equals(value.employeeId()))
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Expense report not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Expense report not found"));
         return conflicts(report);
     }
 
@@ -62,7 +63,7 @@ public class InvoiceOccupationQueries {
     public List<Conflict> conflicts(ExpenseReport report) {
         var actor = actors.actor();
         if (!actor.tenantId().equals(report.tenantId()) || !actor.userId().equals(report.employeeId())) {
-            throw new DomainException("NOT_FOUND", "Expense report not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Expense report not found");
         }
         var ids = report.content().lines().stream().flatMap(line -> line.invoiceIds().stream()).distinct().toList();
         if (ids.isEmpty()) return List.of();

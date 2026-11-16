@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import jakarta.annotation.PostConstruct;
 import java.net.URI;
@@ -46,7 +47,7 @@ public class OrganizationSyncConfiguration {
 
     /** 新批次需要已配置来源；历史读取和取消不使用此限制。 */
     public Destination require(String tenant) {
-        return destination(tenant).orElseThrow(() -> new DomainException("ORGANIZATION_SYNC_UNAVAILABLE", "Organization synchronization source is not configured"));
+        return destination(tenant).orElseThrow(() -> new DomainException(ErrorCode.ORGANIZATION_SYNC_UNAVAILABLE, "Organization synchronization source is not configured"));
     }
 
     /** 排队、发送、结果接收与人工应用复核同一逻辑来源及部署目标。 */
@@ -57,7 +58,7 @@ public class OrganizationSyncConfiguration {
 
     /** 原目标失效时要求重新核对，不能把旧事实视为来自新的部署地址。 */
     public void requireCurrent(OrganizationSyncBatch.Context context) {
-        if (!matches(context)) throw new DomainException("ORGANIZATION_SYNC_SOURCE_CHANGED", "Organization synchronization source or deployment target changed");
+        if (!matches(context)) throw new DomainException(ErrorCode.ORGANIZATION_SYNC_SOURCE_CHANGED, "Organization synchronization source or deployment target changed");
     }
 
     private static IllegalStateException invalid() { return new IllegalStateException("Organization synchronization configuration is invalid"); }

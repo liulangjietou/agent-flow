@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import org.apache.commons.lang3.StringUtils;
@@ -16,7 +17,7 @@ public record AdvanceRequestContent(UUID legalEntityId, String title, String pur
         if (legalEntityId == null || StringUtils.isBlank(title) || title.length() > 256
                 || StringUtils.isBlank(purpose) || purpose.length() > 2000 || amount == null
                 || amount.value().signum() <= 0 || dueOn == null) {
-            throw new DomainException("INVALID_ADVANCE_REQUEST", "Advance request requires a legal entity, purpose, positive amount and repayment date");
+            throw new DomainException(ErrorCode.INVALID_ADVANCE_REQUEST, "Advance request requires a legal entity, purpose, positive amount and repayment date");
         }
         title = title.trim(); purpose = purpose.trim();
     }

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.Objects;
 
@@ -12,8 +13,8 @@ public sealed interface FinanceResult<T> permits FinanceResult.Success, FinanceR
     @SuppressWarnings("unchecked")
     default T requireValue() {
         if (this instanceof Success<?> success) return (T) success.value();
-        if (this instanceof Rejected<?> rejected) throw new DomainException("FINANCE_RULE_REJECTED", rejected.reason().name());
-        throw new DomainException("FINANCE_GATEWAY_UNAVAILABLE", ((Unavailable<?>) this).failure().name());
+        if (this instanceof Rejected<?> rejected) throw new DomainException(ErrorCode.FINANCE_RULE_REJECTED, rejected.reason().name());
+        throw new DomainException(ErrorCode.FINANCE_GATEWAY_UNAVAILABLE, ((Unavailable<?>) this).failure().name());
     }
 
     /**

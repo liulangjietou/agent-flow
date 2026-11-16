@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.*;
 import java.time.Instant;
@@ -158,8 +159,8 @@ public record ExpensePartialAdjustment(Input input, long version, BudgetConsumpt
     private void requireOpenTime(Instant at) { if (at == null || at.isBefore(updatedAt) || retirement != null) throw conflict(); }
     private void requireAuthorizationTime(Instant at) { requireOpenTime(at); if (completion != null || issue != null) throw conflict(); }
     private static boolean text(String value, int max) { return StringUtils.isNotBlank(value) && value.length() <= max && value.equals(value.trim()) && value.chars().noneMatch(Character::isISOControl); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PARTIAL_ADJUSTMENT", "Partial adjustment must preserve exact sources, separate external operations and immutable completion"); }
-    private static DomainException conflict() { return new DomainException("EXPENSE_PARTIAL_ADJUSTMENT_CONFLICT", "Partial adjustment state or original operation no longer permits this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PARTIAL_ADJUSTMENT, "Partial adjustment must preserve exact sources, separate external operations and immutable completion"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.EXPENSE_PARTIAL_ADJUSTMENT_CONFLICT, "Partial adjustment state or original operation no longer permits this transition"); }
     @Override public String toString() { return "ExpensePartialAdjustment[id=" + id() + ", version=" + version + ", status=" + status() + "]"; }
 
     /**

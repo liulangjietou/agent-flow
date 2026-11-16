@@ -1,5 +1,7 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.agentflow.approval.model.Application;
@@ -57,8 +59,8 @@ public class CountersignMembershipService {
     /** 成功回执重放也要求当前资格，不能要求已经结束的原任务仍然存活。 */
     public Actor requireActor() {
         Actor actor = actors.actor();
-        actor.requireRole("APPROVER");
-        if (!recipients.eligible(actor.tenantId(), actor.userId())) throw new DomainException("FORBIDDEN", "Current organization approval eligibility is missing");
+        actor.requireRole(SystemRole.APPROVER);
+        if (!recipients.eligible(actor.tenantId(), actor.userId())) throw new DomainException(ErrorCode.FORBIDDEN, "Current organization approval eligibility is missing");
         return actor;
     }
 
@@ -105,9 +107,9 @@ public class CountersignMembershipService {
         }
         var state = runtime.read(task).membership();
         var operator = state.pending().stream().filter(member -> taskId.equals(member.taskId())).findFirst().orElseThrow(CountersignMembershipService::changed);
-        if (operator.delegated()) throw new DomainException("TASK_DELEGATION_PENDING", "Resolve delegated assistance before changing countersign responsibilities");
+        if (operator.delegated()) throw new DomainException(ErrorCode.TASK_DELEGATION_PENDING, "Resolve delegated assistance before changing countersign responsibilities");
         if (!actor.userId().equals(operator.user()) || !actor.userId().equals(task.getAssignee())) {
-            throw new DomainException("FORBIDDEN", "Only the current countersign responsibility holder can change membership");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Only the current countersign responsibility holder can change membership");
         }
         application.recordTaskAction(input.expectedVersion());
         var removedAudience = input.action() == Action.REMOVE
@@ -117,7 +119,7 @@ public class CountersignMembershipService {
         if (input.action() == Action.ADD) {
             authorization.requireTargetAllowed(task, input.targetUser());
             if (!recipients.approvers(actor.tenantId()).contains(input.targetUser())) {
-                throw new DomainException("INVALID_TASK_RECIPIENT", "The selected user is not an eligible approver");
+                throw new DomainException(ErrorCode.INVALID_TASK_RECIPIENT, "The selected user is not an eligible approver");
             }
             change = runtime.add(task, input.targetUser());
         } else change = runtime.remove(task, input.targetTaskId());
@@ -146,7 +148,7 @@ public class CountersignMembershipService {
     }
 
     private static DomainException changed() {
-        return new DomainException("CONCURRENCY_CONFLICT", "The current approval round or countersign responsibility has changed");
+        return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "The current approval round or countersign responsibility has changed");
     }
 
     /**

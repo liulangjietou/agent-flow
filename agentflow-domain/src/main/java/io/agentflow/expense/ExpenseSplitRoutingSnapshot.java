@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseSplitRiskEvidence.Assessment;
 import io.agentflow.expense.ExpenseSplitRiskEvidence.Document;
@@ -32,6 +33,6 @@ public record ExpenseSplitRoutingSnapshot(int ruleVersion, UUID definitionId, St
     public List<Document> sources() { return assessment == null ? List.of(primary) : assessment.sources(); }
 
     private static DomainException invalid() {
-        return new DomainException("EXPENSE_SPLIT_SNAPSHOT_INVALID", "Split routing snapshot must retain its original rule, source order and calculation");
+        return new DomainException(ErrorCode.EXPENSE_SPLIT_SNAPSHOT_INVALID, "Split routing snapshot must retain its original rule, source order and calculation");
     }
 }

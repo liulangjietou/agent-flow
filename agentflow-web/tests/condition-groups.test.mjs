@@ -52,7 +52,7 @@ test('金额和文本转义保留原始字符串，多选值不会共享可变�
   tree=edit(tree,{kind:'row',id:tree.children[1].id,row},fields); row.values.push('TRAVEL')
   assert.deepEqual(tree.children[1].row.values,['OTHER'])
   assert.equal(serialize(tree,fields),'amount > "9007199254740993.123456789012345678" AND category IN ["OTHER"]')
-  const text=parse('description == "a\\n\\\"b\\\"\\\\c"',fields,2)
+  const text=parse('description == "a\\n\\"b\\"\\\\c"',fields,2)
   assert.equal(parse(serialize(text,fields),fields,2).children[0].row.value,'a\n"b"\\c')
 })
 

@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.FormAssigneePolicy;
@@ -31,7 +32,7 @@ public class FlowableOrganizationMembers {
     public List<String> resolve(DelegateExecution execution, String encodedRule) {
         String tenant = execution.getTenantId();
         if (tenant == null || !tenant.equals(execution.getVariable("tenantId"))) {
-            throw new DomainException("ORGANIZATION_SCOPE_INVALID", "Organization execution tenant is invalid");
+            throw new DomainException(ErrorCode.ORGANIZATION_SCOPE_INVALID, "Organization execution tenant is invalid");
         }
         String rule = new String(Base64.getDecoder().decode(encodedRule), StandardCharsets.UTF_8);
         OrganizationAssigneeResolver.Selection selection;

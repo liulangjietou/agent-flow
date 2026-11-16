@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.organization.InitiatorContext;
@@ -49,8 +50,8 @@ public record ProcurementPaymentCheck(Input input, long version, Status status, 
     public boolean active() { return status == Status.QUEUED || status == Status.RUNNING; }
     public boolean expired(Instant now) { return status == Status.RUNNING && !leaseUntil.isAfter(now); }
 
-    private static DomainException invalid() { return new DomainException("INVALID_PROCUREMENT_CHECK", "Procurement check must preserve the exact request, source and evidence lifetime"); }
-    private static DomainException conflict() { return new DomainException("PROCUREMENT_CHECK_STATE_CONFLICT", "Procurement check is no longer executable"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PROCUREMENT_CHECK, "Procurement check must preserve the exact request, source and evidence lifetime"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.PROCUREMENT_CHECK_STATE_CONFLICT, "Procurement check is no longer executable"); }
 
     /**
      * 原始内容随双版本保存，不能将同一员工另一张应付的检查结果嫁接进来。

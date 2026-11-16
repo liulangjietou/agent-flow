@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -70,5 +71,5 @@ public final class OrganizationSyncCodec {
         if (node == null || !node.isObject() || node.size() != allowed.length) throw invalid();
         var names = Set.of(allowed); node.fieldNames().forEachRemaining(name -> { if (!names.contains(name)) throw invalid(); });
     }
-    private static DomainException invalid() { return new DomainException("INVALID_ORGANIZATION_SYNC_DATA", "Organization source response does not match the expected contract"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ORGANIZATION_SYNC_DATA, "Organization source response does not match the expected contract"); }
 }

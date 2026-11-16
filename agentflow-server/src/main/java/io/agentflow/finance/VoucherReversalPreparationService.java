@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -81,7 +83,7 @@ public class VoucherReversalPreparationService {
         var context = locked(applicationId, operationId, input.roundNo()); var source = sources.find(context, operationId);
         requireVersions(context, source, input.applicationVersion(), input.businessVersion(), input.operationVersion()); requireOriginal(source);
         var actor = actors.actor(); var latest = preparations.latest(actor.tenantId(), operationId, actor.userId()).orElse(null);
-        if (latest != null && latest.active()) throw new DomainException("VOUCHER_REVERSAL_PENDING", "Current finance actor already has a pending reversal preparation");
+        if (latest != null && latest.active()) throw new DomainException(ErrorCode.VOUCHER_REVERSAL_PENDING, "Current finance actor already has a pending reversal preparation");
         var now = time(Instant.now()); var value = VoucherReversalPreparation.queue(new VoucherReversalPreparation.Input(UUID.randomUUID(), source.originalVersion(), source.current().version(),
                 context.application().version(), context.businessVersion(), source.request(), source.current().input().targetDigest(), input.accountingDate(), actor.userId(), input.evidenceReference(), input.comment(), now));
         preparations.create(value); var audit = audit(value, value.version(), "VOUCHER_REVERSAL_PREPARE", input.comment(), now);
@@ -159,9 +161,9 @@ public class VoucherReversalPreparationService {
 
     private void requireOriginal(VoucherReversalSources.Source source) {
         var original = source.request().command();
-        if (!source.current().usablePosted()) throw new DomainException("VOUCHER_REVERSAL_SOURCE_CHANGED", "Original voucher must remain an available posted voucher");
-        if (operations.forOriginal(original.tenantId(), original.id()).isPresent()) throw new DomainException("VOUCHER_REVERSAL_OPERATION_EXISTS", "Original voucher already has a reversal command");
-        if (records.forOperation(original.tenantId(), original.id()).isPresent()) throw new DomainException("VOUCHER_REVERSAL_ALREADY_RECORDED", "Original voucher already has an independent reversal record");
+        if (!source.current().usablePosted()) throw new DomainException(ErrorCode.VOUCHER_REVERSAL_SOURCE_CHANGED, "Original voucher must remain an available posted voucher");
+        if (operations.forOriginal(original.tenantId(), original.id()).isPresent()) throw new DomainException(ErrorCode.VOUCHER_REVERSAL_OPERATION_EXISTS, "Original voucher already has a reversal command");
+        if (records.forOperation(original.tenantId(), original.id()).isPresent()) throw new DomainException(ErrorCode.VOUCHER_REVERSAL_ALREADY_RECORDED, "Original voucher already has an independent reversal record");
     }
 
     private void requirePreparedSource(VoucherReversalPreparation prepared, VoucherReversalSources.Source source) {
@@ -219,7 +221,7 @@ public class VoucherReversalPreparationService {
                                 "roundNo",
                                 command.binding().roundNo(),
                                 "authorizedRole",
-                                "FINANCE",
+                                SystemRole.FINANCE.name(),
                                 "comment",
                                 comment)),
                 Timestamp.from(now));
@@ -234,7 +236,7 @@ public class VoucherReversalPreparationService {
 
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed source or reversal preparation changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed source or reversal preparation changed"); }
 
     /**
      * 客户端选择日期和原因，原凭证及会计明细始终由服务端定位。

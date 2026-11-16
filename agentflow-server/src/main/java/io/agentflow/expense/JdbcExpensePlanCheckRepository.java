@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpensePlanCheckRepositoryMapper;
@@ -58,8 +59,7 @@ public class JdbcExpensePlanCheckRepository {
                     input.planId().toString(),
                     Timestamp.from(job.createdAt()));
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "EXPENSE_PLAN_CHECK_ACTIVE", "Expense plan already has an active precheck");
+            throw new DomainException(ErrorCode.EXPENSE_PLAN_CHECK_ACTIVE, "Expense plan already has an active precheck");
         }
         append(job);
     }
@@ -181,7 +181,7 @@ public class JdbcExpensePlanCheckRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense plan check input or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense plan check input or version changed"); }
 
     /**
      * 扫描项不复制敏感快照，领取后在锁内重新读取。

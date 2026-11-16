@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
@@ -57,7 +58,7 @@ public record ApprovalRiskPolicy(List<Rule> rules) {
         if (ast instanceof Negation negation) { requirePublicFields(negation.term(), schema); return; }
         String key = ast instanceof Membership membership ? membership.field() : ((Comparison) ast).field();
         if (schema.fields().stream().filter(field -> field.key().equals(key)).anyMatch(FormSchema.Field::restricted)) {
-            throw new DomainException("RISK_FIELD_RESTRICTED", "Risk rules cannot expose a restricted field through a public classification");
+            throw new DomainException(ErrorCode.RISK_FIELD_RESTRICTED, "Risk rules cannot expose a restricted field through a public classification");
         }
     }
 
@@ -73,5 +74,5 @@ public record ApprovalRiskPolicy(List<Rule> rules) {
         }
     }
 
-    private static DomainException invalid(String message) { return new DomainException("INVALID_RISK_POLICY", message); }
+    private static DomainException invalid(String message) { return new DomainException(ErrorCode.INVALID_RISK_POLICY, message); }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -98,8 +99,7 @@ public class SupplierCashierActions {
                     payments.find(tenant, id)
                             .orElseThrow(
                                     () ->
-                                            new DomainException(
-                                                    "NOT_FOUND",
+                                            new DomainException(ErrorCode.NOT_FOUND,
                                                     "Original supplier bank operation is"
                                                             + " unavailable"));
             var next =

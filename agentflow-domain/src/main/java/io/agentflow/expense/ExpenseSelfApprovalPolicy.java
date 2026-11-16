@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionModels.Graph;
 import io.agentflow.definition.DefinitionModels.NodeType;
@@ -22,7 +23,7 @@ public final class ExpenseSelfApprovalPolicy {
         for (var node : graph.nodes()) {
             if (!node.properties().containsKey(PROPERTY)) continue;
             if (node.type() != NodeType.START || !ESCALATE_SUPERVISOR.equals(node.properties().get(PROPERTY))) {
-                throw new DomainException("EXPENSE_SELF_APPROVAL_POLICY_INVALID", "Expense self approval policy requires the supported start-node setting");
+                throw new DomainException(ErrorCode.EXPENSE_SELF_APPROVAL_POLICY_INVALID, "Expense self approval policy requires the supported start-node setting");
             }
             enabled = true;
         }
@@ -32,7 +33,7 @@ public final class ExpenseSelfApprovalPolicy {
     /** 发布时限定结构化费用表单，不能给普通申请或其他财务业务隐式增加上溯规则。 */
     public static void validate(Graph graph, FormSchema schema) {
         if (enabled(graph) && !ExpenseFormContract.structured(schema)) {
-            throw new DomainException("EXPENSE_SELF_APPROVAL_REQUIRES_EXPENSE_FORM", "Expense self approval policy requires an expense form");
+            throw new DomainException(ErrorCode.EXPENSE_SELF_APPROVAL_REQUIRES_EXPENSE_FORM, "Expense self approval policy requires an expense form");
         }
     }
 }

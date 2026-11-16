@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.MultiValueMap;
@@ -43,5 +44,5 @@ public class ExpensePolicyGuidanceController {
                     parameters.getFirst("cityCode"), date, parameters.getFirst("currency"), ExpenseLine.Unit.valueOf(parameters.getFirst("unit")), end);
         } catch (IllegalArgumentException | DateTimeException malformed) { throw invalid(); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_GUIDANCE_QUERY", "Expense policy guidance query is invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_GUIDANCE_QUERY, "Expense policy guidance query is invalid"); }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
@@ -54,8 +55,8 @@ public record VoucherPreparation(Input input, long version, Status status, Insta
     }
     public boolean active() { return status == Status.QUEUED || status == Status.RUNNING; }
     public boolean expired(Instant now) { return status == Status.RUNNING && !leaseUntil.isAfter(now); }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_PREPARATION", "Voucher preparation identity and lifecycle must match"); }
-    private static DomainException conflict() { return new DomainException("VOUCHER_PREPARATION_STATE_CONFLICT", "Voucher preparation is no longer executable"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_PREPARATION, "Voucher preparation identity and lifecycle must match"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.VOUCHER_PREPARATION_STATE_CONFLICT, "Voucher preparation is no longer executable"); }
 
     /**
      * 挂账绑定批准双版本，付款另绑定实际成功回单的本地修订，不随重复查询漂移。

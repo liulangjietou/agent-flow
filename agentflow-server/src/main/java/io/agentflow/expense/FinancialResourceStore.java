@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.mapper.FinancialResourceStoreMapper;
 import io.agentflow.finance.ReservedAmount;
@@ -50,8 +51,7 @@ public class FinancialResourceStore {
                     value.context(),
                     value.state());
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "FINANCIAL_RESOURCE_EXISTS",
+            throw new DomainException(ErrorCode.FINANCIAL_RESOURCE_EXISTS,
                     "Financial resource source already exists in this tenant");
         }
         append(kind, value, actor, "CREATE");
@@ -176,11 +176,11 @@ public class FinancialResourceStore {
 
     private static void requireAudit(String actor, String operation) {
         if (StringUtils.isBlank(actor) || actor.length() > 128 || operation == null || !operation.matches("[A-Z][A-Z0-9_]{0,63}")) {
-            throw new DomainException("INVALID_EXPENSE_AUDIT", "Financial resource changes require an actor and operation");
+            throw new DomainException(ErrorCode.INVALID_EXPENSE_AUDIT, "Financial resource changes require an actor and operation");
         }
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Financial resource version or immutable context changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Financial resource version or immutable context changed"); }
 
     /**
      * 封闭的实际资源种类，不接受任意表名或 SQL 片段。

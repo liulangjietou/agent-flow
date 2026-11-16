@@ -160,7 +160,7 @@ class TaskDelegationIntegrationTest {
                 .isInstanceOfSatisfying(DomainException.class, failure -> assertThat(failure.code()).isEqualTo("NOT_FOUND")); }
         finally { currentActor.clear(); }
         assertThat(auth.approvers("other-tenant")).isEmpty();
-        assertThat(new AuthService(false, "demo").approvers("demo")).isEmpty();
+        assertThat(new AuthService(false, "demo", java.time.Duration.ofHours(12)).approvers("demo")).isEmpty();
     }
 
     @Test

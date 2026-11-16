@@ -1,6 +1,7 @@
 package io.agentflow.approval.comment;
 
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 import io.agentflow.approval.comment.mapper.ApplicationCommentRepositoryMapper;
@@ -47,8 +48,7 @@ public class JdbcApplicationCommentRepository implements ApplicationCommentRepos
                         comment.applicationStatus().name(),
                         comment.roundNo());
         if (inserted != 1)
-            throw new DomainException(
-                    "CONCURRENCY_CONFLICT",
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT,
                     "Application context changed before comment was recorded");
     }
 

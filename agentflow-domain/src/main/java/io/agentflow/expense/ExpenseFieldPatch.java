@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.LocalDate;
 import java.util.List;
@@ -28,9 +29,9 @@ public record ExpenseFieldPatch(int lineNo, Field field, String beforeValue, Str
     public String sourceId() { return "expense:field[" + lineNo + "]." + field.name(); }
     /** 比较值仍匹配原单据才允许应用，其他字段逐字保留。 */
     public ExpenseLine apply(ExpenseLine line) {
-        if (line.lineNo() != lineNo || !field.read(line).equals(beforeValue)) throw new DomainException("AGENT_INPUT_CHANGED", "Expense patch before value changed");
+        if (line.lineNo() != lineNo || !field.read(line).equals(beforeValue)) throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Expense patch before value changed");
         if (line.allowance() != null && field != Field.DESCRIPTION && field != Field.EXCEPTION_REASON) {
-            throw new DomainException("INVALID_AGENT_REVIEW", "Allowance inputs require explicit recalculation");
+            throw new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Allowance inputs require explicit recalculation");
         }
         return new ExpenseLine(line.lineNo(), field == Field.CATEGORY_CODE ? afterValue : line.categoryCode(),
                 field == Field.INCURRED_ON ? date(afterValue) : line.incurredOn(),
@@ -55,7 +56,7 @@ public record ExpenseFieldPatch(int lineNo, Field field, String beforeValue, Str
         try { if (!value.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) throw invalid(); return LocalDate.parse(value); }
         catch (java.time.DateTimeException failure) { throw invalid(); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_OUTPUT", "Expense field patch is invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Expense field patch is invalid"); }
     /**
      * 已保存值是模型的比较基线，人工确认后仍执行原费用业务校验。
      * @author owlzhangfq@gmail.com

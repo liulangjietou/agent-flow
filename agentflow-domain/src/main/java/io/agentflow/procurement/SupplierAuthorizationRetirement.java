@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -33,6 +34,6 @@ public record SupplierAuthorizationRetirement(UUID authorizationId, long operati
 
     /** 默认日志不展开财务处理人或资金来源。 */
     @Override public String toString() { return "SupplierAuthorizationRetirement[authorizationId=" + authorizationId + ", operationVersion=" + operationVersion + "]"; }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_AUTHORIZATION_RETIREMENT", "Supplier authorization retirement requires a named decision and original operation revision"); }
-    private static DomainException unsafe() { return new DomainException("SUPPLIER_AUTHORIZATION_RETIREMENT_UNSAFE", "Stopped original payable hold must prove no external reservation before replacement"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_AUTHORIZATION_RETIREMENT, "Supplier authorization retirement requires a named decision and original operation revision"); }
+    private static DomainException unsafe() { return new DomainException(ErrorCode.SUPPLIER_AUTHORIZATION_RETIREMENT_UNSAFE, "Stopped original payable hold must prove no external reservation before replacement"); }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -38,12 +39,12 @@ public class AdvanceRequestSubmissionService {
         requests.find(actor.tenantId(), id).filter(advance -> advance.employeeId().equals(actor.userId())).orElseThrow(AdvanceRequestSubmissionService::notFound);
         requests.lock(actor.tenantId(), id); var advance = requests.find(actor.tenantId(), id).orElseThrow();
         var application = applications.requireApplicant(advance.applicationId()); application.requireEditable(input.applicationVersion());
-        if (advance.version() != input.requestVersion()) throw new DomainException("CONCURRENCY_CONFLICT", "Advance request version changed");
+        if (advance.version() != input.requestVersion()) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Advance request version changed");
         var checked = checks.find(actor.tenantId(), input.precheckId()).filter(check -> check.input().requestId().equals(id)).orElseThrow(AdvanceRequestSubmissionService::notFound);
         String failure = validation.readyFailure(checked, advance, Instant.now());
         if (failure != null) throw new DomainException(failure, "Refresh advance request facts before submission");
         var definition = definitions.lockPublished(actor.tenantId(), application.processKey(), application.definitionVersion())
-                .orElseThrow(() -> new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published advance request process not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.PROCESS_DEFINITION_NOT_FOUND, "Published advance request process not found"));
         definition.requireStartEnabled(); AdvanceRequestFormContract.requireReview(definition.graph(), application.formSchema());
         var evidence = checked.result().evidence(); Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         advance.freeze(input.requestVersion(), application.nextSubmissionRound(), evidence.catalog(), evidence.account(), checked.input().initiator(), now);
@@ -51,11 +52,11 @@ public class AdvanceRequestSubmissionService {
         application = applications.reviseBusiness(application.id(), application.version(), advance.content().title(),
                 AdvanceRequestFormContract.submittedPayload(advance.currentRound()), application.businessReference());
         application = applications.submitBusiness(application.id(), application.version(), checked.input().initiator().appointmentId(), application.businessReference());
-        if (!evidence.validUntil().isAfter(Instant.now())) throw new DomainException("FACTS_EXPIRED", "Advance request facts expired during submission");
+        if (!evidence.validUntil().isAfter(Instant.now())) throw new DomainException(ErrorCode.FACTS_EXPIRED, "Advance request facts expired during submission");
         return AdvanceRequestService.receipt(application, advance);
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Advance request or precheck not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Advance request or precheck not found"); }
 
     /**
      * 双版本和服务端预检标识，不允许客户端附带批准结论。

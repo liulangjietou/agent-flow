@@ -1,6 +1,7 @@
 package io.agentflow.finance;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.mapper.PaymentPersonnelMapper;
 import io.agentflow.mybatis.SqlRows;
@@ -48,7 +49,7 @@ public class PaymentPersonnel {
 
     /** 后台在领取和发送登记时重读当前组织，停用或结束任职后阻止新发送。 */
     public void requireEligible(String tenant, String user, UUID legalEntityId) {
-        if (!eligible(tenant, user, legalEntityId)) throw new DomainException("PAYMENT_ACTOR_UNAVAILABLE", "Payment actor must have an active appointment in the original legal entity");
+        if (!eligible(tenant, user, legalEntityId)) throw new DomainException(ErrorCode.PAYMENT_ACTOR_UNAVAILABLE, "Payment actor must have an active appointment in the original legal entity");
     }
 
     /**

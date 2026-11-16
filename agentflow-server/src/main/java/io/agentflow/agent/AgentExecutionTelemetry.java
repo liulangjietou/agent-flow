@@ -61,12 +61,31 @@ public class AgentExecutionTelemetry {
             current.promptVersion = promptVersion;
             current.providerId = providerId;
             current.modelVersion = modelVersion;
-            current.usage = usage;
+            current.usage = current.usage == null ? usage : combine(current.usage, usage);
         }
     }
 
     /**
-     * 当前调用只保留一次响应；最终业务结果由外层适配器的严格校验决定。
+     * 同一领取内的多次调用（如协议修复重试）合计用量：全部已报告才相加；任一次格式错误记为 INVALID，
+     * 任一次未报告记为 NOT_REPORTED，不把缺失部分当作零。
+     */
+    static OpenAiTextClient.Usage combine(OpenAiTextClient.Usage first, OpenAiTextClient.Usage second) {
+        if (first.status() == OpenAiTextClient.UsageStatus.INVALID || second.status() == OpenAiTextClient.UsageStatus.INVALID) {
+            return new OpenAiTextClient.Usage(OpenAiTextClient.UsageStatus.INVALID, null, null, null);
+        }
+        if (first.status() == OpenAiTextClient.UsageStatus.NOT_REPORTED || second.status() == OpenAiTextClient.UsageStatus.NOT_REPORTED) {
+            return new OpenAiTextClient.Usage(OpenAiTextClient.UsageStatus.NOT_REPORTED, null, null, null);
+        }
+        try {
+            return new OpenAiTextClient.Usage(OpenAiTextClient.UsageStatus.REPORTED, Math.addExact(first.inputTokens(), second.inputTokens()),
+                    Math.addExact(first.outputTokens(), second.outputTokens()), Math.addExact(first.totalTokens(), second.totalTokens()));
+        } catch (ArithmeticException overflow) {
+            return new OpenAiTextClient.Usage(OpenAiTextClient.UsageStatus.INVALID, null, null, null);
+        }
+    }
+
+    /**
+     * 当前领取内的响应观测；最终业务结果由外层适配器的严格校验决定。
      * @author owlzhangfq@gmail.com
      */
     private static final class Observation {

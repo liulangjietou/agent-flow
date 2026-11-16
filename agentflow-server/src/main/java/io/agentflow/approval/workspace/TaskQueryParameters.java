@@ -1,5 +1,6 @@
 package io.agentflow.approval.workspace;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
@@ -91,5 +92,5 @@ public record TaskQueryParameters(PendingTaskReadPort.Query query, String contex
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 is unavailable", impossible); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_TASK_QUERY", "Invalid pending task filter or cursor"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_TASK_QUERY, "Invalid pending task filter or cursor"); }
 }

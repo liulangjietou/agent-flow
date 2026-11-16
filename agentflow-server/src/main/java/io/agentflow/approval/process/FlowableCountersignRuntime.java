@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.CountersignMembership;
 import io.agentflow.common.DomainException;
 import org.flowable.bpmn.model.UserTask;
@@ -127,7 +128,7 @@ public class FlowableCountersignRuntime {
     }
 
     private static DomainException invalid() {
-        return new DomainException("COUNTERSIGN_STATE_INVALID", "The active countersign execution cannot be verified");
+        return new DomainException(ErrorCode.COUNTERSIGN_STATE_INVALID, "The active countersign execution cannot be verified");
     }
 
     /**

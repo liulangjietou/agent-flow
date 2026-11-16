@@ -14,7 +14,7 @@ import static org.assertj.core.api.Assertions.*;
  * @author owlzhangfq@gmail.com
  */
 class InvoicePdfInspectorTest {
-    private final Path directory = Path.of("/fyoung/tmp/agentflow-pdf-process-test-" + UUID.randomUUID());
+    private final Path directory = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-pdf-process-test-" + UUID.randomUUID());
 
     @AfterEach
     void removeEmptyFixtureRoot() throws Exception {

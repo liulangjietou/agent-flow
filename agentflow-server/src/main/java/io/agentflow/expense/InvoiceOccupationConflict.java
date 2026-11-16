@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.List;
 
@@ -18,7 +19,7 @@ public final class InvoiceOccupationConflict extends DomainException {
 
     /** 只有已确认的票号占用冲突可以附加当前授权来源。 */
     public static boolean matches(DomainException failure) {
-        return OCCUPIED.equals(failure.code()) || "RESOURCES_CHANGED".equals(failure.code())
+        return OCCUPIED.equals(failure.code()) || failure.is(ErrorCode.RESOURCES_CHANGED)
                 && failure.getCause() instanceof DomainException original && OCCUPIED.equals(original.code());
     }
 

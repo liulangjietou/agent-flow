@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.Objects;
@@ -33,14 +34,14 @@ public record ProcurementPayableReservation(UUID id, Source source, long version
 
     /** 应用服务核对原申请确已重提、拒绝或作废后，领域追加单次释放事实。 */
     public ProcurementPayableReservation release(ReleaseReason reason, String actor, Instant now) {
-        if (!held()) throw new DomainException("PROCUREMENT_RESERVATION_RELEASED", "Original payable reservation is already released");
+        if (!held()) throw new DomainException(ErrorCode.PROCUREMENT_RESERVATION_RELEASED, "Original payable reservation is already released");
         return new ProcurementPayableReservation(id, source, 2, heldAt, new Release(reason, actor, now), null);
     }
     /** 只有同一原占用对应的完整 ERP 结算才能完成；重复调用不能重新消耗或重开原申请。 */
     public ProcurementPayableReservation settle(SupplierPayableSettlementOperation operation, Instant now) {
         if (!held() || operation == null || !operation.settled() || now == null || now.isBefore(operation.updatedAt())
                 || !operation.command().payment().holdCommand().authorization().source().reservation().equals(this)) {
-            throw new DomainException("PROCUREMENT_SETTLEMENT_SOURCE_CHANGED", "Completed original ERP settlement must match the held local payable reservation");
+            throw new DomainException(ErrorCode.PROCUREMENT_SETTLEMENT_SOURCE_CHANGED, "Completed original ERP settlement must match the held local payable reservation");
         }
         var command = operation.command();
         return new ProcurementPayableReservation(id, source, 2, heldAt, null, new Settlement(command.id(), operation.version(), command.payment().id(), now));
@@ -49,7 +50,7 @@ public record ProcurementPayableReservation(UUID id, Source source, long version
     public ProcurementPayableReservation adjust(SupplierPayableAdjustmentOperation operation, Instant now) {
         if (!held() || operation == null || !operation.adjusted() || now == null || now.isBefore(operation.updatedAt())
                 || !operation.command().source().returns().request().command().holdCommand().authorization().source().reservation().equals(this)) {
-            throw new DomainException("PROCUREMENT_ADJUSTMENT_SOURCE_CHANGED", "Confirmed supplier adjustment must match the original held payable reservation");
+            throw new DomainException(ErrorCode.PROCUREMENT_ADJUSTMENT_SOURCE_CHANGED, "Confirmed supplier adjustment must match the original held payable reservation");
         }
         return new ProcurementPayableReservation(id, source, 2, heldAt, null, null,
                 new Adjustment(operation.command().id(), operation.version(), operation.command().source().returns().request().command().id(), now));
@@ -77,7 +78,7 @@ public record ProcurementPayableReservation(UUID id, Source source, long version
         }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_PROCUREMENT_RESERVATION", "Payable reservation must preserve a submitted request and a single explicit release, settlement or adjustment"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PROCUREMENT_RESERVATION, "Payable reservation must preserve a submitted request and a single explicit release, settlement or adjustment"); }
 
     /**
      * 关联真实申请版本和冻结轮次，原应付币种、金额和身份从轮次取得。

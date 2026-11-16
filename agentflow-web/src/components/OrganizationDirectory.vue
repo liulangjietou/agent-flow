@@ -4,7 +4,7 @@ import { api, type ApiError } from '../api'
 import OrganizationSynchronization from './OrganizationSynchronization.vue'
 import { organizationSyncDrafts } from '../organizationSync'
 import { emptyOrganizationDraft, organizationDirty, organizationDrafts, organizationForm, organizationLabels, organizationPath, organizationPayload,
-  type OrganizationSection, type OrganizationRecord, type OrganizationUnit, type OrganizationPerson, type OrganizationChange } from '../organization'
+  type OrganizationSection, type OrganizationRecord, type OrganizationUnit, type OrganizationChange } from '../organization'
 
 const READ_TIMEOUT_MS = 12_000
 const props = defineProps<{ scopeKey: string; refreshVersion: number; locked: boolean }>()

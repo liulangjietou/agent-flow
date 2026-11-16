@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AccountMappingPort;
 import io.agentflow.finance.BudgetCommand;
@@ -103,7 +104,7 @@ public record ExpenseResourceAdjustmentBasis(ExpenseSettlement settlement, Budge
         }
     }
     private static DomainException changed() {
-        return new DomainException("EXPENSE_ADJUSTMENT_BASIS_CHANGED", "Full expense cancellation requires original settled budget, accrual reversal and all actual payment returns");
+        return new DomainException(ErrorCode.EXPENSE_ADJUSTMENT_BASIS_CHANGED, "Full expense cancellation requires original settled budget, accrual reversal and all actual payment returns");
     }
     @Override public String toString() { return "ExpenseResourceAdjustmentBasis[reportId=" + reportId() + "]"; }
 }

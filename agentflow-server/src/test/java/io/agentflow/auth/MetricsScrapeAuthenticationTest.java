@@ -27,7 +27,7 @@ class MetricsScrapeAuthenticationTest {
     @Test
     void rejectsEmptyMissingOversizedAndMalformedFilesWithoutLeakingCause() throws Exception {
         assertInvalid("/missing/private-file");
-        Path file = Files.createTempFile(Path.of("/fyoung/tmp"), "metrics-invalid-", ".txt");
+        Path file = Files.createTempFile(Path.of(System.getProperty("java.io.tmpdir")), "metrics-invalid-", ".txt");
         try {
             for (String value : new String[]{"", "short", "x".repeat(257), TOKEN + "\n\n", TOKEN + " private-content"}) {
                 Files.writeString(file, value);
@@ -38,7 +38,7 @@ class MetricsScrapeAuthenticationTest {
 
     @Test
     void rejectsDuplicateOrOversizedHeadersAndLimitsPrivilegeToOnePath() throws Exception {
-        Path file = Files.createTempFile(Path.of("/fyoung/tmp"), "metrics-valid-", ".txt");
+        Path file = Files.createTempFile(Path.of(System.getProperty("java.io.tmpdir")), "metrics-valid-", ".txt");
         try {
             Files.writeString(file, TOKEN + "\r\n");
             var gate = new MetricsScrapeAuthentication(true, file.toString());

@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.HashSet;
@@ -28,7 +29,7 @@ public final class DraftAssistRun {
     /** 模型完成只产生待确认建议，不修改申请版本。 */
     public void complete(long version, DraftSuggestion suggestion, Instant at) {
         require(version, Status.RUNNING); time(at, state.startedAt());
-        if (suggestion == null || !PROMPT_VERSION.equals(suggestion.promptVersion())) throw new DomainException("INVALID_AGENT_OUTPUT", "Draft prompt changed");
+        if (suggestion == null || !PROMPT_VERSION.equals(suggestion.promptVersion())) throw new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Draft prompt changed");
         suggestion.requireMatches(context.input());
         state = new State(Status.COMPLETED, version + 1, state.startedAt(), at, suggestion, null, null);
     }
@@ -42,7 +43,7 @@ public final class DraftAssistRun {
     /** 只采纳原申请版本的明确勾选值；未选字段和模型原值均保留。 */
     public void adopt(long version, long applicationVersion, String actor, List<DraftSuggestion.Selection> selected, String comment, Instant at) {
         require(version, Status.COMPLETED);
-        if (applicationVersion != context.input().applicationVersion()) throw new DomainException("AGENT_INPUT_CHANGED", "Draft changed since generation");
+        if (applicationVersion != context.input().applicationVersion()) throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Draft changed since generation");
         if (selected == null || selected.isEmpty() || selected.size() > DraftSuggestion.MAX_PROPOSALS
                 || selected.stream().anyMatch(java.util.Objects::isNull)) throw invalidReview();
         var proposed = new HashSet<>(state.suggestion().proposals().stream().map(DraftSuggestion.Proposal::targetId).toList());
@@ -81,13 +82,13 @@ public final class DraftAssistRun {
         return run;
     }
     private void require(long version, Status status) {
-        if (state.version() != version) throw new DomainException("CONCURRENCY_CONFLICT", "Draft assist version changed");
-        if (state.status() != status) throw new DomainException("AGENT_RUN_STATE_CONFLICT", "Draft assist transition is unavailable");
+        if (state.version() != version) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Draft assist version changed");
+        if (state.status() != status) throw new DomainException(ErrorCode.AGENT_RUN_STATE_CONFLICT, "Draft assist transition is unavailable");
     }
     private static void time(Instant at, Instant previous) {
-        if (at == null || at.isBefore(previous)) throw new DomainException("INVALID_AGENT_TIME", "Draft assist event time moved backwards");
+        if (at == null || at.isBefore(previous)) throw new DomainException(ErrorCode.INVALID_AGENT_TIME, "Draft assist event time moved backwards");
     }
-    private static DomainException invalidReview() { return new DomainException("INVALID_AGENT_REVIEW", "Review only selected proposals as the original applicant"); }
+    private static DomainException invalidReview() { return new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Review only selected proposals as the original applicant"); }
     public Context context() { return context; }
     public State state() { return state; }
 
@@ -99,7 +100,7 @@ public final class DraftAssistRun {
         public Context {
             if (id == null || StringUtils.isBlank(tenantId) || tenantId.length() > 64 || StringUtils.isBlank(requestedBy)
                     || requestedBy.length() > 128 || createdAt == null || input == null || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}")) {
-                throw new DomainException("INVALID_AGENT_INPUT", "Invalid draft assist context");
+                throw new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Invalid draft assist context");
             }
         }
     }

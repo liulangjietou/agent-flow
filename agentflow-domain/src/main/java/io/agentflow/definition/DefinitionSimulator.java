@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseFormContract;
 import io.agentflow.expense.ExpenseSplitRiskPolicy;
@@ -72,10 +73,10 @@ public final class DefinitionSimulator {
 
     private EvaluationContext splitContext(EvaluationContext original, ExpenseSplitRiskPolicy.Configuration policy, Money synthetic) {
         if (policy.mode() != ExpenseSplitRiskPolicy.Mode.ENABLED) {
-            if (synthetic != null) throw new DomainException("EXPENSE_SPLIT_SIMULATION_UNEXPECTED", "Synthetic routing amount requires an enabled split rule");
+            if (synthetic != null) throw new DomainException(ErrorCode.EXPENSE_SPLIT_SIMULATION_UNEXPECTED, "Synthetic routing amount requires an enabled split rule");
             return original;
         }
-        if (synthetic == null) throw new DomainException("EXPENSE_SPLIT_SIMULATION_REQUIRED", "Enabled split simulation requires an explicit synthetic routing amount");
+        if (synthetic == null) throw new DomainException(ErrorCode.EXPENSE_SPLIT_SIMULATION_REQUIRED, "Enabled split simulation requires an explicit synthetic routing amount");
         Money ownAmount;
         try {
             ownAmount = new Money(new BigDecimal(String.valueOf(original.value(ExpenseFormContract.AMOUNT))),
@@ -89,7 +90,7 @@ public final class DefinitionSimulator {
     }
 
     private DomainException invalidSplitAmount() {
-        return new DomainException("EXPENSE_SPLIT_SIMULATION_INVALID", "Synthetic routing amount must match the rule currency and cannot reduce the original amount");
+        return new DomainException(ErrorCode.EXPENSE_SPLIT_SIMULATION_INVALID, "Synthetic routing amount must match the rule currency and cannot reduce the original amount");
     }
 
     private Decision select(String nodeId, List<Edge> outgoing, EvaluationContext context, int languageVersion) {
@@ -108,7 +109,7 @@ public final class DefinitionSimulator {
             branches.add(new Branch(edge.id(), edge.target(), edge.condition(), outcome));
         }
         if (selectedId == null) selectedId = defaultId;
-        if (selectedId == null) throw new DomainException("NO_BRANCH_MATCHED", "No outgoing branch matched at node: " + nodeId);
+        if (selectedId == null) throw new DomainException(ErrorCode.NO_BRANCH_MATCHED, "No outgoing branch matched at node: " + nodeId);
         if (defaultId != null) {
             String id = defaultId;
             Edge fallback = outgoing.stream().filter(edge -> edge.id().equals(id)).findFirst().orElseThrow();

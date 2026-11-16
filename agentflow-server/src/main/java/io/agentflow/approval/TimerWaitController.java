@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.approval.process.TimerWaitService;
 import io.agentflow.common.DomainException;
@@ -43,6 +44,6 @@ public class TimerWaitController {
         try {
             if (request.getQueryString() != null || !value.matches("[1-9][0-9]{0,9}")) throw new NumberFormatException();
             return Integer.parseInt(value);
-        } catch (NumberFormatException invalid) { throw new DomainException("INVALID_TIMER_QUERY", "A positive round number and no query parameters are required"); }
+        } catch (NumberFormatException invalid) { throw new DomainException(ErrorCode.INVALID_TIMER_QUERY, "A positive round number and no query parameters are required"); }
     }
 }

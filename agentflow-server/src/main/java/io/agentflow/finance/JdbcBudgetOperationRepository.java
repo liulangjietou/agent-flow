@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.mapper.BudgetOperationRepositoryMapper;
@@ -149,7 +150,7 @@ public class JdbcBudgetOperationRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Budget operation input or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Budget operation input or version changed"); }
 
     /**
      * 扫描不加载财务数据，取得单据锁后再读取完整操作。

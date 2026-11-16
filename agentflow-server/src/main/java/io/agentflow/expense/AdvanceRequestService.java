@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.ApplicationFieldViews;
 import io.agentflow.approval.model.Application;
@@ -62,7 +63,7 @@ public class AdvanceRequestService {
         var round = advance.rounds().stream().filter(value -> value.roundNo() == selected).findFirst().orElseThrow(AdvanceRequestService::notFound);
         var projection = fields.attachmentView(application, selected);
         if (!owner && !AdvanceRequestFormContract.detailsReadable(application.formSchema(), projection.schema())) {
-            throw new DomainException("FORBIDDEN", "Field permissions do not allow reading advance details");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Field permissions do not allow reading advance details");
         }
         return view(application, advance, round, false);
     }
@@ -71,7 +72,7 @@ public class AdvanceRequestService {
     @Transactional
     public Receipt change(UUID id, long applicationVersion, long requestVersion, String comment, boolean cancel) {
         owned(id); requests.lock(actors.actor().tenantId(), id); var advance = owned(id);
-        if (advance.version() != requestVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Advance request version changed");
+        if (advance.version() != requestVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Advance request version changed");
         var application = applications.requireApplicant(advance.applicationId());
         application = cancel ? applications.cancelBusiness(application.id(), applicationVersion, comment, application.businessReference())
                 : applications.withdrawBusiness(application.id(), applicationVersion, comment, application.businessReference());
@@ -91,7 +92,7 @@ public class AdvanceRequestService {
     public static Receipt receipt(Application application, AdvanceRequest advance) {
         return new Receipt(advance.id(), application.id(), application.version(), advance.version(), application.roundNo(), application.status());
     }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Advance request or round not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Advance request or round not found"); }
 
     /**
      * 草稿内容与某轮快照互斥，余额由独立的核销资源接口读取。

@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.util.Map;
@@ -20,7 +21,7 @@ public record TimerWaitPolicy(int delaySeconds) {
     /** 发布入口只接受明确、规范的十进制秒数。 */
     public static TimerWaitPolicy fromProperties(Map<String, String> properties) {
         String raw = properties.get(PROPERTY);
-        if (raw == null) throw new DomainException("TIMER_DELAY_REQUIRED", "An explicit timer wait duration is required");
+        if (raw == null) throw new DomainException(ErrorCode.TIMER_DELAY_REQUIRED, "An explicit timer wait duration is required");
         if (!raw.matches("[1-9][0-9]{0,7}")) throw invalid();
         return new TimerWaitPolicy(Integer.parseInt(raw));
     }
@@ -29,6 +30,6 @@ public record TimerWaitPolicy(int delaySeconds) {
     public Duration duration() { return Duration.ofSeconds(delaySeconds); }
 
     private static DomainException invalid() {
-        return new DomainException("TIMER_DELAY_INVALID", "Timer wait duration must be a whole number of seconds between 1 and 31536000");
+        return new DomainException(ErrorCode.TIMER_DELAY_INVALID, "Timer wait duration must be a whole number of seconds between 1 and 31536000");
     }
 }

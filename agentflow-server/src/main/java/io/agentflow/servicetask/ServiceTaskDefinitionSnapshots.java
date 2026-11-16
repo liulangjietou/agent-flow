@@ -1,6 +1,7 @@
 package io.agentflow.servicetask;
 
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -104,7 +105,7 @@ public class ServiceTaskDefinitionSnapshots {
         else throw invalid();
     }
 
-    private static DomainException invalid() { return new DomainException("SERVICE_TASK_DEFINITION_MISMATCH", "Service task execution must belong to the exact published tenant definition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.SERVICE_TASK_DEFINITION_MISMATCH, "Service task execution must belong to the exact published tenant definition"); }
 
     /**
      * @author owlzhangfq@gmail.com

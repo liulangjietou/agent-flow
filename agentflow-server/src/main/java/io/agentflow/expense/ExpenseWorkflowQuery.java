@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.process.FlowableTaskAuthorization;
@@ -58,7 +59,7 @@ public class ExpenseWorkflowQuery {
     public View get(UUID id, Map<String, String> parameters) {
         if (!Set.of("taskId").containsAll(parameters.keySet()) || parameters.containsKey("taskId")
                 && (parameters.get("taskId").isBlank() || parameters.get("taskId").length() > 128)) {
-            throw new DomainException("INVALID_EXPENSE_QUERY", "Only a current task identifier is accepted");
+            throw new DomainException(ErrorCode.INVALID_EXPENSE_QUERY, "Only a current task identifier is accepted");
         }
         var actor = actors.actor(); var detail = drafts.read(id, null);
         var report = reports.find(actor.tenantId(), id).orElseThrow(); var application = applications.get(detail.applicationId());
@@ -71,7 +72,7 @@ public class ExpenseWorkflowQuery {
             var task = tasks.requireReadable(parameters.get("taskId"), actor);
             if (!tasks.application(actor, task).id().equals(application.id()) || application.status() != ApplicationStatus.IN_APPROVAL
                     || control == null || !String.valueOf(application.roundNo()).equals(String.valueOf(task.getProcessVariables().get("roundNo")))) {
-                throw new DomainException("NOT_FOUND", "Current expense task not found");
+                throw new DomainException(ErrorCode.NOT_FOUND, "Current expense task not found");
             }
             var stage = control.stage(task.getTaskDefinitionKey()); boolean delegated = task.getDelegationState() == DelegationState.PENDING;
             boolean direct = tasks.canAct(actor, task);

@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.Set;
 import java.util.UUID;
@@ -41,7 +42,7 @@ public class SubprocessRelationsController {
             afterId = cursor == null ? null : UUID.fromString(cursor);
             if (afterId != null && !afterId.toString().equals(cursor)) throw new IllegalArgumentException();
         } catch (IllegalArgumentException exception) {
-            throw new DomainException("INVALID_SUBPROCESS_QUERY", "A positive round, bounded limit and original call cursor are required");
+            throw new DomainException(ErrorCode.INVALID_SUBPROCESS_QUERY, "A positive round, bounded limit and original call cursor are required");
         }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(relations.read(id, round, afterId, limit));
     }

@@ -1,5 +1,6 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import org.apache.commons.lang3.StringUtils;
@@ -125,6 +126,6 @@ public record ServiceTaskContract(String key, long version, String name, List<Pa
         }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_SERVICE_TASK_CONTRACT", "Service task contract must declare a bounded, versioned input schema"); }
-    private static DomainException invalidInputs() { return new DomainException("INVALID_SERVICE_TASK_INPUTS", "Service task inputs must match the declared scalar schema and limits"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SERVICE_TASK_CONTRACT, "Service task contract must declare a bounded, versioned input schema"); }
+    private static DomainException invalidInputs() { return new DomainException(ErrorCode.INVALID_SERVICE_TASK_INPUTS, "Service task inputs must match the declared scalar schema and limits"); }
 }

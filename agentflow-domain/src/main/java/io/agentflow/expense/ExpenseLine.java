@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import org.apache.commons.lang3.StringUtils;
@@ -51,13 +52,13 @@ public record ExpenseLine(int lineNo, String categoryCode, LocalDate incurredOn,
                     || !targets.add(List.of(allocation.costCenter(), allocation.projectCode() == null ? "" : allocation.projectCode()))) throw invalid();
             allocated = allocated.plus(allocation.amount());
         }
-        if (allocated.compareTo(claimedGross) != 0) throw new DomainException("ALLOCATION_UNBALANCED", "Cost allocations must equal the line amount");
+        if (allocated.compareTo(claimedGross) != 0) throw new DomainException(ErrorCode.ALLOCATION_UNBALANCED, "Cost allocations must equal the line amount");
         if (allowance != null) {
             var calculation = allowance.calculation();
             if (unit != Unit.DAY || !incurredOn.equals(calculation.startsOn()) || !java.util.Objects.equals(endedOn, calculation.endsOn())
                     || quantity.compareTo(BigDecimal.valueOf(calculation.days())) != 0 || !claimedGross.equals(calculation.gross())
                     || claimedTax.value().signum() != 0 || !invoiceIds.isEmpty()) {
-                throw new DomainException("ALLOWANCE_CALCULATION_MISMATCH", "Allowance line must retain its calculated dates, days and gross, zero deductible tax and no invoices");
+                throw new DomainException(ErrorCode.ALLOWANCE_CALCULATION_MISMATCH, "Allowance line must retain its calculated dates, days and gross, zero deductible tax and no invoices");
             }
         }
         quantity = quantity.stripTrailingZeros();
@@ -80,18 +81,18 @@ public record ExpenseLine(int lineNo, String categoryCode, LocalDate incurredOn,
         boolean fixed = rule != null && rule.constraints().fixedAllowance() != null;
         if (allowance == null && !fixed) return;
         if (allowance == null || !fixed || !managed.selection().equals(receipt.selection())) {
-            throw new DomainException("ALLOWANCE_RECALCULATION_REQUIRED", "Allowance must be recalculated against the current published rule");
+            throw new DomainException(ErrorCode.ALLOWANCE_RECALCULATION_REQUIRED, "Allowance must be recalculated against the current published rule");
         }
         var current = ExpenseAllowanceBasis.calculate(receipt, rule, legalEntityId, this);
         allowance.requireCurrent(current);
         if (!assessed.assessedGross().equals(rate.convert(current.calculation().gross()))
                 || !assessed.allowedGross().equals(assessed.assessedGross()) || deductibleTax.value().signum() != 0
                 || assessed.decision() != ExpensePolicySnapshot.Decision.WITHIN_LIMIT) {
-            throw new DomainException("ALLOWANCE_ASSESSMENT_MISMATCH", "Allowance assessment must preserve the calculated amount and zero deductible tax");
+            throw new DomainException(ErrorCode.ALLOWANCE_ASSESSMENT_MISMATCH, "Allowance assessment must preserve the calculated amount and zero deductible tax");
         }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_LINE", "Expense line fields or amounts are invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_LINE, "Expense line fields or amounts are invalid"); }
 
     /**
      * 费用计量单位，由匹配费用标准解释其上限，不能把单位数量当作核定金额。
@@ -106,7 +107,7 @@ public record ExpenseLine(int lineNo, String categoryCode, LocalDate incurredOn,
     public record PriorRequestLine(UUID requestId, int lineNo) {
         /** 引用必须明确到事前申请行。 */
         public PriorRequestLine {
-            if (requestId == null || lineNo < 1) throw new DomainException("INVALID_PRIOR_REQUEST", "A prior request line is required");
+            if (requestId == null || lineNo < 1) throw new DomainException(ErrorCode.INVALID_PRIOR_REQUEST, "A prior request line is required");
         }
     }
 }

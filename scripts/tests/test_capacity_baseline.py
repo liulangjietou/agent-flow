@@ -1,3 +1,4 @@
+import os
 """压测工具必须保护现有资源、保留失败样本，并拒绝失真的统计结果。"""
 import argparse
 import importlib.util
@@ -9,6 +10,9 @@ from unittest.mock import patch
 from urllib.error import HTTPError
 from io import BytesIO
 
+# 测试临时根目录：AGENTFLOW_TMP_DIR 优先，未设置时使用系统临时目录。
+TMP_ROOT = os.environ.get("AGENTFLOW_TMP_DIR") or tempfile.gettempdir()
+
 spec = importlib.util.spec_from_file_location("capacity_baseline", Path(__file__).resolve().parents[1] / "capacity_baseline.py")
 baseline = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(baseline)
@@ -18,7 +22,7 @@ class CapacityBaselineTest(unittest.TestCase):
     """覆盖资源身份、失败记录、输出防覆盖和权限边界。@author owlzhangfq@gmail.com"""
 
     def test_remote_docker_is_rejected_before_resource_creation(self):
-        sandbox = baseline.Sandbox(argparse.Namespace(), Path("/fyoung/tmp"))
+        sandbox = baseline.Sandbox(argparse.Namespace(), Path(TMP_ROOT))
         context = [{"Endpoints": {"docker": {"Host": "ssh://remote"}}}]
         with patch.dict(baseline.os.environ, {"DOCKER_HOST": ""}), patch.object(baseline, "docker", return_value=json.dumps(context)) as command:
             with self.assertRaisesRegex(baseline.BaselineError, "LOCAL_DOCKER_REQUIRED"):
@@ -26,7 +30,7 @@ class CapacityBaselineTest(unittest.TestCase):
             command.assert_called_once_with("context", "inspect")
 
     def test_cli_rejects_existing_services_unbounded_load_and_outside_output(self):
-        with tempfile.TemporaryDirectory(dir="/fyoung/tmp") as root:
+        with tempfile.TemporaryDirectory(dir=TMP_ROOT) as root:
             common = ["--server-image", "agentflow-demo-server", "--output", root + "/new"]
             for extra in (["--port", "8080"], ["--port", "8180"], ["--concurrency", "0"],
                           ["--concurrency", "1,1"], ["--applications", "10001"], ["--requests", "100000"],
@@ -35,7 +39,7 @@ class CapacityBaselineTest(unittest.TestCase):
                     baseline.arguments(common + extra)
 
     def test_output_is_private_and_cannot_replace_an_existing_report(self):
-        with tempfile.TemporaryDirectory(dir="/fyoung/tmp") as root:
+        with tempfile.TemporaryDirectory(dir=TMP_ROOT) as root:
             path = Path(root) / "report.json"
             baseline.write_json(path, {"result": "INCOMPLETE"})
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
@@ -44,7 +48,7 @@ class CapacityBaselineTest(unittest.TestCase):
             self.assertEqual(json.loads(path.read_text())["result"], "INCOMPLETE")
 
     def test_cleanup_never_stops_container_with_a_different_identity(self):
-        sandbox = baseline.Sandbox(argparse.Namespace(), Path("/fyoung/tmp"))
+        sandbox = baseline.Sandbox(argparse.Namespace(), Path(TMP_ROOT))
         sandbox.containers = {"server": "new-server", "database": "new-db"}
         def command(*args, **kwargs):
             if args[0] == "inspect":
@@ -56,7 +60,7 @@ class CapacityBaselineTest(unittest.TestCase):
         self.assertTrue(all(row["error"] == "RESOURCE_IDENTITY_MISMATCH" for row in errors))
 
     def test_cleanup_stops_owned_resources_without_removing_containers_or_volumes(self):
-        sandbox = baseline.Sandbox(argparse.Namespace(), Path("/fyoung/tmp"))
+        sandbox = baseline.Sandbox(argparse.Namespace(), Path(TMP_ROOT))
         sandbox.containers = {"server": "own-server", "database": "own-db"}
         stopped = []
         def command(*args, **kwargs):

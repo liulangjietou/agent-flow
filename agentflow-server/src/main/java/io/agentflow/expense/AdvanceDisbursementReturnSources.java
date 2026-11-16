@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AdvanceDisbursementReturnPort;
 import io.agentflow.finance.JdbcPaymentOperationRepository;
@@ -29,7 +30,7 @@ public class AdvanceDisbursementReturnSources {
         if (!original.input().equals(funding.payment().input()) || !original.observation().paymentReference().equals(funding.advance().paymentReference())) throw changed();
         return new Source(funding, original.version(), new AdvanceDisbursementReturnPort.Request(command, original.observation()));
     }
-    private static DomainException changed() { return new DomainException("DISBURSEMENT_RETURN_SOURCE_CHANGED", "Original successful disbursement revision is unavailable or inconsistent"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.DISBURSEMENT_RETURN_SOURCE_CHANGED, "Original successful disbursement revision is unavailable or inconsistent"); }
     /**
      * 当前借款、原付款和固定成功修订各自保留，外部读取只接收固定请求。
      * @author owlzhangfq@gmail.com

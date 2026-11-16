@@ -75,7 +75,7 @@ async function loadCatalog() {
     if (version !== epoch) return
     if (!(Date.parse(value.validUntil) > Date.now())) throw new Error('Expired catalog')
     catalog.value = value
-  } catch (cause) { if (version === epoch) error.value = '当前无法读取本人财务目录，请检查财务连接后重试。' }
+  } catch { if (version === epoch) error.value = '当前无法读取本人财务目录，请检查财务连接后重试。' }
   finally { clearTimeout(timeout); if (version === epoch) { loading.value = false; controller = null } }
 }
 async function selectDefinition(item: DefinitionCatalogItem) {

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.ApplicationFieldViews;
@@ -47,7 +48,7 @@ public class ExpenseSplitRoutingQueries {
                 var comparison = readable(actor, source.reportId(), source.roundNo());
                 if (!comparison.applicationId().equals(source.applicationId())) throw inconsistent();
             } catch (DomainException denied) {
-                if (!denied.code().equals("NOT_FOUND") && !denied.code().equals("FORBIDDEN")) throw denied;
+                if (!denied.is(ErrorCode.NOT_FOUND) && !denied.is(ErrorCode.FORBIDDEN)) throw denied;
                 return new View(reportId, primary.applicationId(), roundNo, Status.RESTRICTED, false, null);
             }
         }
@@ -66,12 +67,12 @@ public class ExpenseSplitRoutingQueries {
         var submitted = rounds.findByRound(actor.tenantId(), application.id(), roundNo).orElseThrow(ExpenseSplitRoutingQueries::notFound);
         var projection = fields.attachmentViewForActor(actor, application, roundNo);
         if (!ExpenseFormContract.detailsReadable(submitted.formSchema(), projection.schema())) {
-            throw new DomainException("FORBIDDEN", "Original expense details must remain fully readable");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Original expense details must remain fully readable");
         }
         return new Readable(application.id(), application.processKey(), submitted.definitionVersion());
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense submission round not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Expense submission round not found"); }
     private static IllegalStateException inconsistent() { return new IllegalStateException("Persisted split routing does not match the original submission"); }
 
     /**

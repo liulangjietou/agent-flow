@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.time.Instant;
@@ -48,7 +49,7 @@ public record SupplierPaymentReturns(SupplierPaymentReturnPort.Request request, 
         if (decision == null || !request.equals(decision.receipt().request())) throw invalid();
         requireTime(decision.registeredAt());
         var proofs = entries.stream().map(Entry::proof).toList();
-        if (!decision.receipt().returns().containsAll(proofs)) throw new DomainException("SUPPLIER_PAYMENT_RETURN_EVIDENCE_CHANGED", "Cumulative supplier returns cannot remove or replace a recorded bank receipt");
+        if (!decision.receipt().returns().containsAll(proofs)) throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_RETURN_EVIDENCE_CHANGED, "Cumulative supplier returns cannot remove or replace a recorded bank receipt");
         var next = new ArrayList<>(entries);
         for (var proof : decision.receipt().returns()) if (!proofs.contains(proof)) next.add(new Entry(decision.id(), proof));
         return new SupplierPaymentReturns(request, version + 1, next, next.size() > accountedEntryCount(), createdAt, decision.registeredAt(), accounting);
@@ -72,8 +73,8 @@ public record SupplierPaymentReturns(SupplierPaymentReturnPort.Request request, 
     /** 独立汇总累计回款，原指令金额保持不变。 */
     public Money totalReturned() { return entries.stream().map(entry -> entry.proof().amount()).reduce(Money.zero(request.command().amount().currency()), Money::plus); }
     private void requireTime(Instant at) { if (at == null || at.isBefore(updatedAt)) throw invalid(); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYMENT_RETURNS", "Supplier return ledger must preserve original payment and immutable cumulative received funds"); }
-    private static DomainException accountingChanged() { return new DomainException("SUPPLIER_PAYABLE_ADJUSTMENT_COMPLETION_CHANGED", "Confirmed supplier adjustment and fresh cumulative bank receipts must preserve the current return ledger"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYMENT_RETURNS, "Supplier return ledger must preserve original payment and immutable cumulative received funds"); }
+    private static DomainException accountingChanged() { return new DomainException(ErrorCode.SUPPLIER_PAYABLE_ADJUSTMENT_COMPLETION_CHANGED, "Confirmed supplier adjustment and fresh cumulative bank receipts must preserve the current return ledger"); }
     @Override public String toString() { return "SupplierPaymentReturns[paymentId=" + request.command().id() + ", version=" + version + "]"; }
 
     /**

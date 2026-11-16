@@ -1,5 +1,6 @@
 package io.agentflow.auth;
 
+import org.springframework.http.HttpMethod;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.callback.PaymentCallbackVerifier;
 import io.agentflow.event.EventIngressVerifier;
@@ -100,7 +101,7 @@ public class AuthenticationConfiguration {
                             if (session != null) session.invalidate();
                             response.sendRedirect(home + "?authError=oidc");
                         }))
-                .logout(logout -> logout.logoutRequestMatcher(request -> "POST".equals(request.getMethod())
+                .logout(logout -> logout.logoutRequestMatcher(request -> HttpMethod.POST.matches(request.getMethod())
                                 && ("/api/v1/auth/logout".equals(request.getRequestURI())
                                 || OidcProviderLogoutFilter.PATH.equals(request.getRequestURI())))
                         .deleteCookies(OidcClientConfiguration.SESSION_COOKIE)

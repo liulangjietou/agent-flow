@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceGatewayConfiguration;
@@ -51,7 +52,7 @@ public class ExpenseAllowancePreparation {
                 if (line.allowance() != null) throw recalculationRequired();
                 lines.add(line);
             } else {
-                if (view.allowance() == null) throw new DomainException("ALLOWANCE_ITINERARY_REQUIRED", "Allowance requires the itinerary end date");
+                if (view.allowance() == null) throw new DomainException(ErrorCode.ALLOWANCE_ITINERARY_REQUIRED, "Allowance requires the itinerary end date");
                 // 客户端可回显旧依据，但落库只能使用本次本人匹配得到的来源；金额和天数不一致直接拒绝。
                 lines.add(line.withAllowance(view.allowance()));
             }
@@ -64,24 +65,24 @@ public class ExpenseAllowancePreparation {
     public ExpenseContent requireCurrent(Prepared prepared) {
         var actor = actors.actor();
         if (!actor.tenantId().equals(prepared.tenantId()) || !actor.userId().equals(prepared.employeeId())) {
-            throw new DomainException("FORBIDDEN", "Allowance preparation belongs to another employee");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Allowance preparation belongs to another employee");
         }
         policies.lockForSubmission(actor.tenantId());
         if (!policies.current(actor.tenantId(), prepared.selection())) throw configurationChanged();
         if (prepared.targetDigest() != null && !prepared.targetDigest().equals(target(actor.tenantId()))) {
-            throw new DomainException("FINANCE_TARGET_CHANGED", "Finance destination changed while preparing the allowance");
+            throw new DomainException(ErrorCode.FINANCE_TARGET_CHANGED, "Finance destination changed while preparing the allowance");
         }
         if (prepared.validUntil() != null && !prepared.validUntil().isAfter(Instant.now())) {
-            throw new DomainException("FACTS_EXPIRED", "Allowance preparation facts expired before saving");
+            throw new DomainException(ErrorCode.FACTS_EXPIRED, "Allowance preparation facts expired before saving");
         }
         return prepared.content();
     }
 
     private String target(String tenant) {
-        return gateway.destination(tenant).orElseThrow(() -> new DomainException("FINANCE_GATEWAY_UNAVAILABLE", "NOT_CONFIGURED")).digest(tenant);
+        return gateway.destination(tenant).orElseThrow(() -> new DomainException(ErrorCode.FINANCE_GATEWAY_UNAVAILABLE, "NOT_CONFIGURED")).digest(tenant);
     }
-    private static DomainException configurationChanged() { return new DomainException("POLICY_CONFIGURATION_CHANGED", "Expense policy changed while preparing the draft"); }
-    private static DomainException recalculationRequired() { return new DomainException("ALLOWANCE_RECALCULATION_REQUIRED", "Allowance must be recalculated against the current published rule"); }
+    private static DomainException configurationChanged() { return new DomainException(ErrorCode.POLICY_CONFIGURATION_CHANGED, "Expense policy changed while preparing the draft"); }
+    private static DomainException recalculationRequired() { return new DomainException(ErrorCode.ALLOWANCE_RECALCULATION_REQUIRED, "Allowance must be recalculated against the current published rule"); }
 
     /**
      * 仅在同一次服务端调用中传递，持久化仍复用费用内容版本。

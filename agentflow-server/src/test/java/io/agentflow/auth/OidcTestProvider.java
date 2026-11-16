@@ -215,7 +215,7 @@ public final class OidcTestProvider implements AutoCloseable {
 
     /** 仅从测试 classpath 启动浏览器验收夹具，输出位置必须由调用方明确指定。 */
     public static void main(String[] args) throws Exception {
-        if ((args.length != 1 && args.length != 2) || !args[0].startsWith("/fyoung/tmp/")) throw new IllegalArgumentException("Expected a temporary evidence path");
+        if ((args.length != 1 && args.length != 2) || !java.nio.file.Path.of(args[0]).toAbsolutePath().normalize().startsWith(java.nio.file.Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize())) throw new IllegalArgumentException("Expected a temporary evidence path");
         var provider = new OidcTestProvider(System.getenv("AGENTFLOW_TEST_PROVIDER_ISSUER"));
         provider.supportsLogout = args.length == 2 && "--logout".equals(args[1]);
         Runtime.getRuntime().addShutdownHook(new Thread(provider::close));

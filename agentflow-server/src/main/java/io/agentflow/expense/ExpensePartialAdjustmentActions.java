@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import org.springframework.context.ApplicationEventPublisher;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
@@ -151,13 +152,13 @@ public class ExpensePartialAdjustmentActions {
     }
     private void requireOwner(String original) {
         if (original == null) throw conflict();
-        if (!actors.actor().userId().equals(original)) throw new DomainException("FORBIDDEN", "Only the original authorizer can resend this partial adjustment command");
+        if (!actors.actor().userId().equals(original)) throw new DomainException(ErrorCode.FORBIDDEN, "Only the original authorizer can resend this partial adjustment command");
     }
     private static ExpensePartialAdjustmentAudit.Receipt receipt(ExpenseReport report, ExpensePartialAdjustment value, UUID event) {
         return new ExpensePartialAdjustmentAudit.Receipt(report.id(), report.requireFrozenRound().roundNo(), value.id(), value.version(), null, null, event);
     }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed partial adjustment, original settlement or round changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed partial adjustment, original settlement or round changed"); }
 
     /**
      * 查询与重发按侧明确指定；确认当前来源不能选择或覆盖有争议的外部结果。

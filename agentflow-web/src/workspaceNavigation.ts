@@ -1,7 +1,13 @@
 import type { WorkspaceIconName } from './workspaceIcons'
 
-/** 工作空间已有页面标识；导航展示不授予业务权限。@author owlzhangfq@gmail.com */
-export type WorkspacePage = 'expense-reports' | 'account-mappings' | 'expense-configuration' | 'organization' | 'proxies' | 'webhooks' | 'audit' | 'transfer' | 'calendars' | 'guide' | 'examples' | 'operations' | 'api' | 'notifications' | 'started' | 'drafts' | 'handled' | 'workbench' | 'designer' | 'templates' | 'applications' | 'assist' | 'expense' | 'cashier' | 'system'
+/** 工作空间已有页面标识，同时是路由名称与路径段；导航展示不授予业务权限。@author owlzhangfq@gmail.com */
+export const workspacePages = ['expense-reports', 'account-mappings', 'expense-configuration', 'organization', 'proxies', 'webhooks', 'audit', 'transfer', 'calendars', 'guide', 'examples', 'operations', 'api', 'notifications', 'started', 'drafts', 'handled', 'workbench', 'designer', 'templates', 'applications', 'assist', 'expense', 'cashier', 'system'] as const
+export type WorkspacePage = typeof workspacePages[number]
+
+/** 判断任意值（如路由名称）是否为已知页面。 */
+export function isWorkspacePage(value: unknown): value is WorkspacePage {
+  return typeof value === 'string' && (workspacePages as readonly string[]).includes(value)
+}
 
 /** 同一份菜单供桌面侧栏与窄屏抽屉使用。@author owlzhangfq@gmail.com */
 export interface WorkspaceMenuItem { label: string; icon: WorkspaceIconName; page?: WorkspacePage; access?: 'manage' | 'inspect' | 'cashier' | 'finance-config' | 'finance' }

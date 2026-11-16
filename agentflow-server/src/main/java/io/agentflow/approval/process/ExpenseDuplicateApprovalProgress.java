@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.service.TaskAuditPort;
@@ -100,6 +101,6 @@ public class ExpenseDuplicateApprovalProgress {
     }
 
     private static DomainException invalid() {
-        return new DomainException("EXPENSE_DUPLICATE_SCOPE_INVALID", "Expense duplicate approval requires its original published round");
+        return new DomainException(ErrorCode.EXPENSE_DUPLICATE_SCOPE_INVALID, "Expense duplicate approval requires its original published round");
     }
 }

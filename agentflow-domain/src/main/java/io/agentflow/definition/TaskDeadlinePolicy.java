@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.calendar.BusinessDeadline;
 import io.agentflow.common.DomainException;
 import java.util.Map;
@@ -47,6 +48,6 @@ public record TaskDeadlinePolicy(UUID calendarId, long calendarRevision, int wor
     }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_TASK_DEADLINE", "Deadline requires a fixed calendar UUID, positive revision and supported working minutes");
+        return new DomainException(ErrorCode.INVALID_TASK_DEADLINE, "Deadline requires a fixed calendar UUID, positive revision and supported working minutes");
     }
 }

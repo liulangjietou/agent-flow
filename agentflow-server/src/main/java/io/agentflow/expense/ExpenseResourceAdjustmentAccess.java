@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.JdbcPaymentOperationRepository;
@@ -42,8 +43,8 @@ public class ExpenseResourceAdjustmentAccess {
     /** 所有人工动作核对实际申请与财务版本，不能把旧页面用于新的轮次。 */
     public void requireVersions(VoucherAccess.Context context, int round, long application, long business) {
         if (context.roundNo() != round || context.application().roundNo() != round || context.application().version() != application || context.businessVersion() != business) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Displayed expense round or financial version changed");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed expense round or financial version changed");
         }
     }
-    private static DomainException forbidden() { return new DomainException("FORBIDDEN", "Independent current finance and access to original financial fields are required"); }
+    private static DomainException forbidden() { return new DomainException(ErrorCode.FORBIDDEN, "Independent current finance and access to original financial fields are required"); }
 }

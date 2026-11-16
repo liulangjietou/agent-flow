@@ -1,0 +1,22 @@
+# 依赖与镜像更新：每周一次，分组合并小版本，避免 PR 淹没评审。
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      maven-minor: { update-types: [minor, patch] }
+  - package-ecosystem: npm
+    directory: /agentflow-web
+    schedule: { interval: weekly }
+    groups:
+      npm-minor: { update-types: [minor, patch] }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: docker
+    directory: /deploy
+    schedule: { interval: weekly }
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule: { interval: weekly }

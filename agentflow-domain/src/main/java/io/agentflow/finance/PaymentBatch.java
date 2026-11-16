@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -56,7 +57,7 @@ public record PaymentBatch(UUID id, String tenantId, UUID legalEntityId, String 
     /** 日志不展开账户选择、金额或人工说明。 */
     @Override public String toString() { return "PaymentBatch[id=" + id + ", items=" + items.size() + "]"; }
     private static boolean invalidText(String value) { return StringUtils.isBlank(value) || value.length() > 128; }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_BATCH", "Payment batch requires bounded distinct original requests in one payment scope"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_BATCH, "Payment batch requires bounded distinct original requests in one payment scope"); }
 
     /**
      * 记录已确认的授权修订、唯一执行请求和当时金额，不创建第二个资金编号。

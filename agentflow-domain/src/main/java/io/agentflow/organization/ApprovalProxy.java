@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 
@@ -40,7 +41,7 @@ public record ApprovalProxy(UUID id, UUID definitionId, UUID principalId, UUID s
     /** 撤销是终态；更换人员、范围或期限必须创建另一条有独立依据的记录。 */
     public ApprovalProxy revoke(long expectedRevision, String actor, String reason, Instant now) {
         OrganizationRevision.require(revision, expectedRevision);
-        if (revocation != null) throw new DomainException("APPROVAL_PROXY_REVOKED", "Approval proxy has already been revoked");
+        if (revocation != null) throw new DomainException(ErrorCode.APPROVAL_PROXY_REVOKED, "Approval proxy has already been revoked");
         return new ApprovalProxy(id, definitionId, principalId, substituteId, startsAt, endsAt,
                 this.reason, createdBy, createdAt, revision + 1, new Revocation(actor, reason, now));
     }
@@ -77,6 +78,6 @@ public record ApprovalProxy(UUID id, UUID definitionId, UUID principalId, UUID s
     }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_APPROVAL_PROXY", "Approval proxy requires distinct people, an explicit scope, a finite period and a reason");
+        return new DomainException(ErrorCode.INVALID_APPROVAL_PROXY, "Approval proxy requires distinct people, an explicit scope, a finite period and a reason");
     }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.Map;
 import static io.agentflow.definition.DefinitionModels.ApprovalMode;
@@ -15,12 +16,12 @@ public record ApprovalPolicy(ApprovalMode mode, Integer percentage) {
 
     /** 百分比仅适用于比例会签，不允许残留参数悄悄改变其他方式。 */
     public ApprovalPolicy {
-        if (mode == null) throw new DomainException("APPROVAL_MODE_INVALID", "Approval mode is required");
+        if (mode == null) throw new DomainException(ErrorCode.APPROVAL_MODE_INVALID, "Approval mode is required");
         if (mode == ApprovalMode.PERCENT) {
-            if (percentage == null) throw new DomainException("APPROVAL_PERCENTAGE_REQUIRED", "Approval percentage is required");
+            if (percentage == null) throw new DomainException(ErrorCode.APPROVAL_PERCENTAGE_REQUIRED, "Approval percentage is required");
             if (percentage < 1 || percentage > FULL_PERCENTAGE) throw invalidPercentage();
         } else if (percentage != null) {
-            throw new DomainException("APPROVAL_PERCENTAGE_UNEXPECTED", "Approval percentage only applies to percentage countersign");
+            throw new DomainException(ErrorCode.APPROVAL_PERCENTAGE_UNEXPECTED, "Approval percentage only applies to percentage countersign");
         }
     }
 
@@ -28,10 +29,10 @@ public record ApprovalPolicy(ApprovalMode mode, Integer percentage) {
     public static ApprovalPolicy fromProperties(Map<String, String> properties) {
         ApprovalMode mode;
         try { mode = ApprovalMode.valueOf(properties.getOrDefault(MODE_PROPERTY, ApprovalMode.SINGLE.name())); }
-        catch (IllegalArgumentException exception) { throw new DomainException("APPROVAL_MODE_INVALID", "Unsupported approval mode"); }
+        catch (IllegalArgumentException exception) { throw new DomainException(ErrorCode.APPROVAL_MODE_INVALID, "Unsupported approval mode"); }
         String raw = properties.get(PERCENTAGE_PROPERTY);
         if (raw != null && mode != ApprovalMode.PERCENT) {
-            throw new DomainException("APPROVAL_PERCENTAGE_UNEXPECTED", "Approval percentage only applies to percentage countersign");
+            throw new DomainException(ErrorCode.APPROVAL_PERCENTAGE_UNEXPECTED, "Approval percentage only applies to percentage countersign");
         }
         if (raw != null && !raw.matches("[1-9][0-9]?|100")) throw invalidPercentage();
         return new ApprovalPolicy(mode, raw == null ? null : Integer.valueOf(raw));
@@ -39,7 +40,7 @@ public record ApprovalPolicy(ApprovalMode mode, Integer percentage) {
 
     /** 整数运算向上取整，不用浮点近似或截断降低所需人数。 */
     public int requiredApprovals(int members) {
-        if (members < 1) throw new DomainException("COUNTERSIGN_NO_MEMBERS", "Approval requires at least one active member");
+        if (members < 1) throw new DomainException(ErrorCode.COUNTERSIGN_NO_MEMBERS, "Approval requires at least one active member");
         return switch (mode) {
             case SINGLE, ANY -> 1;
             case ALL -> members;
@@ -51,6 +52,6 @@ public record ApprovalPolicy(ApprovalMode mode, Integer percentage) {
     public boolean multiInstance() { return mode != ApprovalMode.SINGLE; }
 
     private static DomainException invalidPercentage() {
-        return new DomainException("APPROVAL_PERCENTAGE_INVALID", "Approval percentage must be an integer between 1 and 100");
+        return new DomainException(ErrorCode.APPROVAL_PERCENTAGE_INVALID, "Approval percentage must be an integer between 1 and 100");
     }
 }

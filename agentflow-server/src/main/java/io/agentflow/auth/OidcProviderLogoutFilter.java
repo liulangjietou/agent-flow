@@ -1,5 +1,6 @@
 package io.agentflow.auth;
 
+import org.springframework.http.HttpMethod;
 import io.agentflow.common.JsonUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -55,7 +56,7 @@ public final class OidcProviderLogoutFilter extends OncePerRequestFilter {
         if (!PATH.equals(request.getRequestURI())) { chain.doFilter(request, response); return; }
         response.setHeader("Cache-Control", "no-store");
         response.setHeader("Referrer-Policy", "no-referrer");
-        if (!"POST".equals(request.getMethod())) {
+        if (!HttpMethod.POST.matches(request.getMethod())) {
             response.setHeader("Allow", "POST");
             reject(response, 405, "请从工作台的退出窗口发起企业账号退出。"); return;
         }

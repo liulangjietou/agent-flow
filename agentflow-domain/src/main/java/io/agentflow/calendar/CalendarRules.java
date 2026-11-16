@@ -1,5 +1,6 @@
 package io.agentflow.calendar;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -52,8 +53,8 @@ public record CalendarRules(String zoneId, Map<DayOfWeek, List<Period>> weeklyHo
     /** 本地开始时刻不存在时拒绝；重复时刻必须由调用者明确选择第一次或第二次。 */
     public Instant resolveStart(LocalDateTime local, OverlapChoice overlapChoice) {
         var offsets = ZoneId.of(zoneId).getRules().getValidOffsets(local);
-        if (offsets.isEmpty()) throw new DomainException("CALENDAR_NONEXISTENT_START", "The local start time does not exist in this time zone");
-        if (offsets.size() > 1 && overlapChoice == null) throw new DomainException("CALENDAR_AMBIGUOUS_START", "Choose the earlier or later occurrence of the local start time");
+        if (offsets.isEmpty()) throw new DomainException(ErrorCode.CALENDAR_NONEXISTENT_START, "The local start time does not exist in this time zone");
+        if (offsets.size() > 1 && overlapChoice == null) throw new DomainException(ErrorCode.CALENDAR_AMBIGUOUS_START, "Choose the earlier or later occurrence of the local start time");
         var candidates = offsets.stream().map(local::toInstant).sorted().toList();
         return overlapChoice == OverlapChoice.LATER ? candidates.get(candidates.size() - 1) : candidates.get(0);
     }
@@ -100,7 +101,7 @@ public record CalendarRules(String zoneId, Map<DayOfWeek, List<Period>> weeklyHo
         return Integer.parseInt(value.substring(0, 2)) * 60 + Integer.parseInt(value.substring(3));
     }
 
-    private static DomainException invalid(String message) { return new DomainException("INVALID_CALENDAR_RULES", message); }
+    private static DomainException invalid(String message) { return new DomainException(ErrorCode.INVALID_CALENDAR_RULES, message); }
 
     /**
      * 同一天内的半开时间窗口；跨午夜须拆成两个日期或周日期配置。

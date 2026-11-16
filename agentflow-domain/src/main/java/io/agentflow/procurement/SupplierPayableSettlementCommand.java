@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AccountingPeriodPort;
 import io.agentflow.finance.PaymentObservation;
@@ -99,7 +100,7 @@ public record SupplierPayableSettlementCommand(UUID id, SupplierPaymentCommand p
             digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array()); digest.update(bytes);
         }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYABLE_SETTLEMENT_COMMAND", "Original paid bank evidence, an open accounting date and an independent finance actor are required"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYABLE_SETTLEMENT_COMMAND, "Original paid bank evidence, an open accounting date and an independent finance actor are required"); }
     /** 日志不展开原采购资料和银行回单。 */
     @Override public String toString() { return "SupplierPayableSettlementCommand[id=" + id() + "]"; }
 }

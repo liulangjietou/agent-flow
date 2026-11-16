@@ -1,5 +1,6 @@
 package io.agentflow.approval.comment;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.workspace.JdbcWorkspaceReadAdapter;
@@ -50,7 +51,7 @@ public class CommentMentionDirectory {
         if (requested.isEmpty()) return;
         if (organizations.initialized(actor.tenantId())) organizations.lock(actor.tenantId());
         if (!recipients(application, actor).containsAll(requested)) {
-            throw new DomainException("COMMENT_MENTION_UNAVAILABLE", "Mention recipients are no longer available for the current round");
+            throw new DomainException(ErrorCode.COMMENT_MENTION_UNAVAILABLE, "Mention recipients are no longer available for the current round");
         }
     }
 
@@ -82,7 +83,7 @@ public class CommentMentionDirectory {
                 return new Query(q.toLowerCase(Locale.ROOT), after, limit);
             } catch (IllegalArgumentException exception) { throw invalid(); }
         }
-        private static DomainException invalid() { return new DomainException("INVALID_COMMENT_QUERY", "Invalid comment mention query"); }
+        private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_COMMENT_QUERY, "Invalid comment mention query"); }
     }
 
     /** 名单只含已有账号标识，不输出组织资料或认证角色。

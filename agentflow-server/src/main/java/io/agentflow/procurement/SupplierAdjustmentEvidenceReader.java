@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AccountingPeriodPort;
 import io.agentflow.finance.FinanceResult;
@@ -51,7 +52,7 @@ public class SupplierAdjustmentEvidenceReader {
         SupplierPayableAdjustmentObservation previous = null;
         if (source.previous() != null) {
             var proof = completions.find(payment.tenantId(), source.previous().observation().operationId())
-                    .orElseThrow(() -> new DomainException("SUPPLIER_ADJUSTMENT_SOURCE_CHANGED", "Previous supplier adjustment completion is missing"));
+                    .orElseThrow(() -> new DomainException(ErrorCode.SUPPLIER_ADJUSTMENT_SOURCE_CHANGED, "Previous supplier adjustment completion is missing"));
             var result = adjustments.query(proof.operation().command());
             if (!(result instanceof FinanceResult.Success<SupplierPayableAdjustmentObservation> found)) return problem(result);
             previous = found.value();

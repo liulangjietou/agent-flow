@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Duration;
@@ -29,7 +30,7 @@ public record PaymentExecutionRequest(Input input, long version, Status status, 
         if (authorization == null || authorization.status() != PaymentAuthorization.Status.AUTHORIZED || now == null || now.isBefore(authorization.updatedAt())
                 || !now.isBefore(authorization.decision().expiresAt())) throw conflict();
         if (Objects.equals(cashier, authorization.decision().authorizedBy()) || Objects.equals(cashier, authorization.terms().payee().employeeId())) {
-            throw new DomainException("PAYMENT_SEPARATION_REQUIRED", "Applicant, payment authorizer and cashier must be different people");
+            throw new DomainException(ErrorCode.PAYMENT_SEPARATION_REQUIRED, "Applicant, payment authorizer and cashier must be different people");
         }
         var input = new Input(id, authorization.terms().tenantId(), authorization.terms().id(), authorization.version(), cashier, debitReference, debitVersion);
         return new PaymentExecutionRequest(input, 1, Status.QUEUED, 0, now, now, now, null, null);
@@ -68,7 +69,7 @@ public record PaymentExecutionRequest(Input input, long version, Status status, 
         requireTime(now); if (status != Status.RUNNING || leaseExpired(now) || authorization == null || authorization.status() != PaymentAuthorization.Status.AUTHORIZED
                 || !authorization.terms().tenantId().equals(input.tenantId()) || !authorization.terms().id().equals(input.authorizationId()) || authorization.version() != input.authorizationVersion()) throw conflict();
         if (directory == null || !directory.account(input.debitReference(), now).sourceVersion().equals(input.debitVersion())) {
-            throw new DomainException("PAYMENT_ACCOUNT_CHANGED", "Selected debit account version is no longer current");
+            throw new DomainException(ErrorCode.PAYMENT_ACCOUNT_CHANGED, "Selected debit account version is no longer current");
         }
         return authorization.registerExecution(input.cashier(), directory, input.debitReference(), account, voucher, now);
     }
@@ -88,8 +89,8 @@ public record PaymentExecutionRequest(Input input, long version, Status status, 
         return new PaymentExecutionRequest(input, Math.incrementExact(version), next, attempts, createdAt, now, retry, null, reason);
     }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_EXECUTION_REQUEST", "Payment execution request must preserve original cashier and account selection"); }
-    private static DomainException conflict() { return new DomainException("PAYMENT_EXECUTION_REQUEST_STATE_CONFLICT", "Payment execution request no longer permits this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_EXECUTION_REQUEST, "Payment execution request must preserve original cashier and account selection"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.PAYMENT_EXECUTION_REQUEST_STATE_CONFLICT, "Payment execution request no longer permits this transition"); }
 
     /** 日志不展开出纳或账户引用。 */
     @Override public String toString() { return "PaymentExecutionRequest[id=" + input.id() + ", version=" + version + ", status=" + status + "]"; }

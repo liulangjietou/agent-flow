@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.SubprocessExecutionLocks;
 import io.agentflow.approval.SubprocessStartService;
 import io.agentflow.approval.model.Application;
@@ -160,7 +161,7 @@ public class SubprocessStopService {
     }
 
     private static DomainException changed() {
-        return new DomainException("SUBPROCESS_STOP_MISMATCH", "Subprocess stop no longer matches the original application tree");
+        return new DomainException(ErrorCode.SUBPROCESS_STOP_MISMATCH, "Subprocess stop no longer matches the original application tree");
     }
 
     /** 当前事务内的原调用树，不能由客户端构造或用于另一个轮次。

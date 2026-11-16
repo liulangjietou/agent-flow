@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.procurement.SupplierPayableSettlementCommand;
 import io.agentflow.procurement.SupplierPayableSettlementEvidence;
@@ -22,7 +23,7 @@ public class GatewaySupplierPayableSettlement implements SupplierPayableSettleme
     /** 新鲜复查只作发送门槛，外发原文不随重试改变；ERP 在一次事务内去重、核销及记账。 */
     @Override public FinanceResult<SupplierPayableSettlementObservation> settle(SupplierPayableSettlementCommand command, SupplierPayableSettlementEvidence evidence) {
         if (evidence == null || !evidence.matches(command, Instant.now())) {
-            throw new DomainException("SUPPLIER_PAYABLE_SETTLEMENT_EVIDENCE_CHANGED", "Fresh original payable hold, bank receipt and accounting period are required before settlement");
+            throw new DomainException(ErrorCode.SUPPLIER_PAYABLE_SETTLEMENT_EVIDENCE_CHANGED, "Fresh original payable hold, bank receipt and accounting period are required before settlement");
         }
         return client.settleSupplierPayable(command.tenantId(), command.targetDigest(), command.id(), new Execute(command, command.digest()),
                 SupplierPayableSettlementObservation.class, value -> command.matches(value, false, Instant.now()));

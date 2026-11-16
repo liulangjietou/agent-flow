@@ -1,5 +1,6 @@
 package io.agentflow.approval.model;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.Comparator;
 import java.util.List;
@@ -60,5 +61,5 @@ public record SubmissionRisk(Level level, UUID definitionId, long definitionVers
         }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_SUBMISSION_RISK", "Submission risk source or classification is inconsistent"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUBMISSION_RISK, "Submission risk source or classification is inconsistent"); }
 }

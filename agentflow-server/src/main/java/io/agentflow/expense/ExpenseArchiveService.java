@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +37,7 @@ public class ExpenseArchiveService {
         var settlement = settlements.find(source.tenantId(), source.businessId()).orElseThrow();
         if (sealed(settlement)) return;
         var current = sources.capture(source.tenantId(), source.businessId());
-        if (!current.equals(expected)) throw new DomainException("ARCHIVE_SOURCE_CHANGED", "Archive evidence changed while checking original files");
+        if (!current.equals(expected)) throw new DomainException(ErrorCode.ARCHIVE_SOURCE_CHANGED, "Archive evidence changed while checking original files");
         archives.seal(ExpenseArchive.seal(current, now()));
     }
     /** 失败的候选只能留下原因，不能覆盖另一执行者已经完成的档案。 */

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseContent;
 import io.agentflow.expense.ExpenseLine;
@@ -140,7 +141,7 @@ public record ExpenseAccrualReductionCommand(UUID id, UUID adjustmentId, Voucher
 
     /** 新过账要求授权有效；过期后仍可读取同一指令的实际结果。 */
     public void requireSendAt(Instant now) {
-        if (now == null || now.isBefore(createdAt) || !now.isBefore(expiresAt)) throw new DomainException("EXPENSE_ACCRUAL_REDUCTION_EXPIRED", "Expense accrual reduction authorization or original evidence has expired");
+        if (now == null || now.isBefore(createdAt) || !now.isBefore(expiresAt)) throw new DomainException(ErrorCode.EXPENSE_ACCRUAL_REDUCTION_EXPIRED, "Expense accrual reduction authorization or original evidence has expired");
     }
 
     static String positionsDigest(List<VoucherReversalCommand.Line> positions) {
@@ -206,6 +207,6 @@ public record ExpenseAccrualReductionCommand(UUID id, UUID adjustmentId, Voucher
         }
     }
     static boolean text(String value, int max) { return StringUtils.isNotBlank(value) && value.length() <= max && value.equals(value.trim()) && value.chars().noneMatch(Character::isISOControl); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_ACCRUAL_REDUCTION_COMMAND", "Expense accrual reduction requires fresh original posting, exact remaining positions and independent finance authorization"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_ACCRUAL_REDUCTION_COMMAND, "Expense accrual reduction requires fresh original posting, exact remaining positions and independent finance authorization"); }
     @Override public String toString() { return "ExpenseAccrualReductionCommand[id=" + id + ", originalId=" + source.command().id() + "]"; }
 }

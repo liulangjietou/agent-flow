@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AccountingPeriodPort;
 import io.agentflow.finance.BudgetConsumptionReversalCommand;
@@ -74,8 +75,8 @@ public record ExpenseResourceAdjustmentPreparation(Input input, long version, St
         var age = period.observedAt().plus(BudgetConsumptionReversalCommand.MAX_AUTHORIZATION_AGE); return age.isBefore(period.validUntil()) ? age : period.validUntil();
     }
     private void requireTime(Instant at) { if (at == null || at.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_ADJUSTMENT_PREPARATION", "Adjustment preparation must preserve original finance facts and a fresh selected accounting period"); }
-    private static DomainException conflict() { return new DomainException("EXPENSE_ADJUSTMENT_PREPARATION_CONFLICT", "Adjustment preparation state or evidence has changed"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_ADJUSTMENT_PREPARATION, "Adjustment preparation must preserve original finance facts and a fresh selected accounting period"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.EXPENSE_ADJUSTMENT_PREPARATION_CONFLICT, "Adjustment preparation state or evidence has changed"); }
 
     /**
      * 人工只选择日期与说明，金额、分摊、身份和外部目标均固定到实际来源。

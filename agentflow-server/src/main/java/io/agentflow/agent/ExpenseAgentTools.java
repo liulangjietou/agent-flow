@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseDraftService;
 import io.agentflow.expense.ExpensePrecheckService;
@@ -57,20 +58,38 @@ public class ExpenseAgentTools {
     public Child child(ExpenseAgentRun run) {
         if (run.state().childAction() == ExpenseAgentRun.Action.EXTRACT_INVOICE) {
             var value = extraction.get(run.last().decision().referenceId(), run.state().childId());
-            return new Child(value.status().name(), value.review() == null ? null : Map.of("kind", "EMPLOYEE_CONFIRMED_INVOICE_FIELDS", "selected", value.review().selected()),
+            return new Child(ChildOutcome.of(value.status().name()), value.review() == null ? null : Map.of("kind", "EMPLOYEE_CONFIRMED_INVOICE_FIELDS", "selected", value.review().selected()),
                     value.failure() == null ? null : value.failure().name());
         }
         var value = draftAssists.get(run.context().reportId(), run.state().childId());
-        return new Child(value.status().name(), value.review(), value.failure() == null ? null : value.failure().name());
+        return new Child(ChildOutcome.of(value.status().name()), value.review(), value.failure() == null ? null : value.failure().name());
     }
     private static Object invoice(InvoiceWalletService.Item invoice) {
         var value = new LinkedHashMap<String, Object>(); value.put("id", invoice.id()); value.put("version", invoice.version());
         value.put("verification", invoice.verification()); value.put("verifiedFacts", invoice.facts()); return value;
     }
-    private static DomainException changed() { return new DomainException("AGENT_INPUT_CHANGED", "Agent scope does not match saved expense facts"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Agent scope does not match saved expense facts"); }
     /**
      * 子运行结果保留类型及人工确认状态。
      * @author owlzhangfq@gmail.com
      */
-    public record Child(String status, Object confirmed, String failure) { }
+    public record Child(ChildOutcome outcome, Object confirmed, String failure) { }
+
+    /**
+     * 票据抽取与费用草稿两类子任务状态的归一结果；只有本人确认、失败与放弃会推进 Agent。
+     * @author owlzhangfq@gmail.com
+     */
+    public enum ChildOutcome {
+        CONFIRMED, FAILED, DISMISSED, IN_PROGRESS;
+
+        /** 子任务枚举名与本枚举同名时直接对应，其余状态均视为仍在办理。 */
+        static ChildOutcome of(String status) {
+            return switch (status) {
+                case "CONFIRMED" -> CONFIRMED;
+                case "FAILED" -> FAILED;
+                case "DISMISSED" -> DISMISSED;
+                default -> IN_PROGRESS;
+            };
+        }
+    }
 }

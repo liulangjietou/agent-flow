@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.BudgetCommand;
 import io.agentflow.finance.BudgetExceptionApproval;
@@ -115,8 +116,8 @@ public record ExpenseBudgetReview(Input input, long version, Status status, Inst
     private ExpenseBudgetReview changed(Status next, Instant at, BudgetExceptionApproval proof, UUID operationId, AutomaticPass passed, Closure reason) {
         return new ExpenseBudgetReview(input, Math.incrementExact(version), next, submittedAt, at, proof, operationId, passed, reason);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_BUDGET_REVIEW", "Expense budget review and original sources are inconsistent"); }
-    private static DomainException conflict() { return new DomainException("EXPENSE_BUDGET_REVIEW_NOT_ALLOWED", "Budget review is not awaiting this decision"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_BUDGET_REVIEW, "Expense budget review and original sources are inconsistent"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.EXPENSE_BUDGET_REVIEW_NOT_ALLOWED, "Budget review is not awaiting this decision"); }
 
     /**
      * 只保存原提交与原操作身份，不复制金额台账。

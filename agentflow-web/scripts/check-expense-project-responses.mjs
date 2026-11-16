@@ -1,8 +1,9 @@
+import { tmpdir } from 'node:os'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
 import Ajv2020 from 'ajv/dist/2020.js'
 import addFormats from 'ajv-formats'
 import ts from 'typescript'
@@ -17,7 +18,7 @@ const operation = spec.paths['/api/v1/expense-reports/{id}/project-approval']?.g
 assert.ok(operation, 'Missing project approval read contract')
 const check = ajv.compile(JSON.parse(JSON.stringify(operation.responses['200'].content['application/json'].schema)
   .replaceAll('"#/components/', '"agentflow#/components/')))
-const root = fileURLToPath(new URL('../', import.meta.url)), output = mkdtempSync('/fyoung/tmp/agentflow-project-parser-')
+const root = fileURLToPath(new URL('../', import.meta.url)), output = mkdtempSync(join(process.env.AGENTFLOW_TMP_DIR ?? tmpdir(), 'agentflow-project-parser-'))
 const source = readFileSync(resolve(root, 'src/expenseProjectApproval.ts'), 'utf8')
 const membershipSource = readFileSync(resolve(root, 'src/countersignMembership.ts'), 'utf8')
 writeFileSync(resolve(output, 'package.json'), '{"type":"module"}')

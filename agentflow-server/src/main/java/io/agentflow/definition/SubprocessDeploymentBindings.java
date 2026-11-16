@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import java.util.HashMap;
@@ -75,7 +76,7 @@ public class SubprocessDeploymentBindings {
                 var policy = SubprocessPolicy.fromProperties(node.properties());
                 var reference = new Reference(policy.processKey(), policy.version());
                 if (!ancestors.add(reference)) {
-                    throw new DomainException("SUBPROCESS_RECURSION_FORBIDDEN", "A subprocess cannot recursively call an ancestor version");
+                    throw new DomainException(ErrorCode.SUBPROCESS_RECURSION_FORBIDDEN, "A subprocess cannot recursively call an ancestor version");
                 }
                 var target = targets.get(reference);
                 if (target == null) {
@@ -84,7 +85,7 @@ public class SubprocessDeploymentBindings {
                     var errors = references.inspect(tenant, target.graph(), target.formSchema());
                     if (!errors.isEmpty()) throw new DefinitionValidationException(errors);
                     if (!DefinitionApprovalPaths.endsWithoutApproval(target.graph()).isEmpty()) {
-                        throw new DomainException("SUBPROCESS_REQUIRES_APPROVAL_PATH", "Every subprocess completion path requires actual approval");
+                        throw new DomainException(ErrorCode.SUBPROCESS_REQUIRES_APPROVAL_PATH, "Every subprocess completion path requires actual approval");
                     }
                     targets.put(reference, target);
                 } else {
@@ -106,10 +107,10 @@ public class SubprocessDeploymentBindings {
     }
 
     private static DomainException depthExceeded() {
-        return new DomainException("SUBPROCESS_DEPTH_EXCEEDED", "Subprocess nesting exceeds the supported depth");
+        return new DomainException(ErrorCode.SUBPROCESS_DEPTH_EXCEEDED, "Subprocess nesting exceeds the supported depth");
     }
     private static DomainException limit() {
-        return new DomainException("SUBPROCESS_DEPENDENCY_LIMIT_EXCEEDED", "Subprocess dependency graph exceeds the supported size");
+        return new DomainException(ErrorCode.SUBPROCESS_DEPENDENCY_LIMIT_EXCEEDED, "Subprocess dependency graph exceeds the supported size");
     }
 
     /** @author owlzhangfq@gmail.com */

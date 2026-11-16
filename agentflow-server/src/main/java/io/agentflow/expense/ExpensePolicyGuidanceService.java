@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceGatewayConfiguration;
@@ -33,26 +34,26 @@ public class ExpensePolicyGuidanceService {
         if (catalog.legalEntities().stream().noneMatch(entity -> entity.id().equals(context.legalEntityId()))
                 || catalog.categories().stream().noneMatch(category -> category.code().equals(context.categoryCode()) && category.units().contains(context.unit()))
                 || catalog.cities().stream().noneMatch(city -> city.code().equals(context.cityCode()))) {
-            throw new DomainException("EXPENSE_GUIDANCE_CONTEXT_UNAVAILABLE", "Guidance dimensions must belong to the current employee catalog");
+            throw new DomainException(ErrorCode.EXPENSE_GUIDANCE_CONTEXT_UNAVAILABLE, "Guidance dimensions must belong to the current employee catalog");
         }
         var request = new ExpensePolicyGuidancePort.Request(actor.userId(), context, snapshot.forCategory(context.categoryCode(), context.unit()));
         var advice = policies.guidance(actor.tenantId(), request).requireValue();
-        if (!configuration.current(actor.tenantId(), snapshot.selection())) throw new DomainException("POLICY_CONFIGURATION_CHANGED", "Expense policy changed while reading guidance");
-        if (!target.equals(target(actor.tenantId()))) throw new DomainException("FINANCE_TARGET_CHANGED", "Finance destination changed while reading guidance");
+        if (!configuration.current(actor.tenantId(), snapshot.selection())) throw new DomainException(ErrorCode.POLICY_CONFIGURATION_CHANGED, "Expense policy changed while reading guidance");
+        if (!target.equals(target(actor.tenantId()))) throw new DomainException(ErrorCode.FINANCE_TARGET_CHANGED, "Finance destination changed while reading guidance");
         Instant until = Instant.now().plusSeconds(MAX_VALID_SECONDS);
         if (until.isAfter(advice.validUntil())) until = advice.validUntil();
         if (until.isAfter(catalog.validUntil())) until = catalog.validUntil();
-        if (!until.isAfter(Instant.now())) throw new DomainException("FACTS_EXPIRED", "Expense policy guidance facts expired");
+        if (!until.isAfter(Instant.now())) throw new DomainException(ErrorCode.FACTS_EXPIRED, "Expense policy guidance facts expired");
         ExpenseAllowanceBasis allowance = null;
         if (advice.constraints().fixedAllowance() != null) {
             if (snapshot.selection() == null || !snapshot.selection().equals(advice.selection())) {
-                throw new DomainException("ALLOWANCE_RULE_REQUIRED", "Fixed allowances require a managed published rule");
+                throw new DomainException(ErrorCode.ALLOWANCE_RULE_REQUIRED, "Fixed allowances require a managed published rule");
             }
             var rule = snapshot.current().activePolicy().definition().rules().stream()
                     .filter(candidate -> candidate.key().equals(advice.ruleKey())).findFirst()
-                    .orElseThrow(() -> new DomainException("ALLOWANCE_RULE_REQUIRED", "Allowance rule is absent from the published policy"));
+                    .orElseThrow(() -> new DomainException(ErrorCode.ALLOWANCE_RULE_REQUIRED, "Allowance rule is absent from the published policy"));
             if (!rule.constraints().equals(advice.constraints()) || context.unit() != ExpenseLine.Unit.DAY) {
-                throw new DomainException("ALLOWANCE_RULE_REQUIRED", "Allowance guidance must match the published rule and day unit");
+                throw new DomainException(ErrorCode.ALLOWANCE_RULE_REQUIRED, "Allowance guidance must match the published rule and day unit");
             }
             // 尚未填写结束日时仍显示制度，完整行程才产生可保存的计算依据。
             if (context.endedOn() != null) allowance = ExpenseAllowanceBasis.calculate(
@@ -63,7 +64,7 @@ public class ExpensePolicyGuidanceService {
     }
 
     private String target(String tenant) {
-        return gateway.destination(tenant).orElseThrow(() -> new DomainException("FINANCE_GATEWAY_UNAVAILABLE", "NOT_CONFIGURED")).digest(tenant);
+        return gateway.destination(tenant).orElseThrow(() -> new DomainException(ErrorCode.FINANCE_GATEWAY_UNAVAILABLE, "NOT_CONFIGURED")).digest(tenant);
     }
 
     /**

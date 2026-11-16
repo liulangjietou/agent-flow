@@ -1,5 +1,6 @@
 package io.agentflow.template;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import org.springframework.core.io.ResourceLoader;
@@ -54,7 +55,7 @@ public class ClasspathProcessTemplateCatalog {
     /** 按目录标识读取，不允许以任意路径访问 classpath。 */
     public ProcessTemplate get(String key) {
         ProcessTemplate template = templates.get(key);
-        if (template == null) throw new DomainException("NOT_FOUND", "Process template not found");
+        if (template == null) throw new DomainException(ErrorCode.NOT_FOUND, "Process template not found");
         return template;
     }
 
@@ -62,7 +63,7 @@ public class ClasspathProcessTemplateCatalog {
     public ProcessTemplate requireVersion(String key, long version) {
         ProcessTemplate template = get(key);
         if (template.templateVersion() != version) {
-            throw new DomainException("TEMPLATE_VERSION_CONFLICT", "Process template version changed");
+            throw new DomainException(ErrorCode.TEMPLATE_VERSION_CONFLICT, "Process template version changed");
         }
         return template;
     }

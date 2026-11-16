@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
@@ -21,7 +22,7 @@ public class SupplierAdjustmentNotificationController {
     /** 读取不重试调整、不完成占用，也不改变消息已读状态。 */
     @GetMapping("/api/v1/notifications/{id}/supplier-adjustment-target")
     public ResponseEntity<SupplierAdjustmentNotificationAccess.Target> target(@PathVariable UUID id, HttpServletRequest request) {
-        if (!request.getParameterMap().isEmpty()) throw new DomainException("INVALID_INBOX_QUERY", "Supplier adjustment notification target does not accept query parameters");
+        if (!request.getParameterMap().isEmpty()) throw new DomainException(ErrorCode.INVALID_INBOX_QUERY, "Supplier adjustment notification target does not accept query parameters");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(access.target(id));
     }
 }

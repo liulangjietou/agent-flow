@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.PaymentPersonnel;
@@ -28,7 +30,7 @@ public class SupplierPaymentAccess {
     public Context read(UUID requestId, Integer roundNo) {
         var view = payments.read(requestId, roundNo); var actor = actors.actor();
         var request = requests.find(actor.tenantId(), requestId).orElseThrow(SupplierPaymentAccess::notFound);
-        boolean finance = actor.hasRole("FINANCE") && !actor.userId().equals(request.employeeId())
+        boolean finance = actor.hasRole(SystemRole.FINANCE) && !actor.userId().equals(request.employeeId())
                 && personnel.eligible(actor.tenantId(), actor.userId(), view.content().legalEntityId());
         return new Context(view, finance);
     }
@@ -36,7 +38,7 @@ public class SupplierPaymentAccess {
     /** 每次新动作和幂等回放均核对当前权限，申请人即使兼任财务也不能自办。 */
     public Context requireFinance(UUID requestId, int roundNo) {
         var context = read(requestId, roundNo);
-        if (!context.finance()) throw new DomainException("FORBIDDEN", "Independent finance role and current appointment in the original legal entity are required");
+        if (!context.finance()) throw new DomainException(ErrorCode.FORBIDDEN, "Independent finance role and current appointment in the original legal entity are required");
         return context;
     }
 
@@ -46,7 +48,7 @@ public class SupplierPaymentAccess {
         var source = authorization.source().reservation().source(); requireFinance(source.requestId(), source.round().roundNo()); return authorization;
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Supplier payment is unavailable in the current scope"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Supplier payment is unavailable in the current scope"); }
 
     /**
      * 内部读取上下文不直接暴露实体或完整 ERP 材料。

@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import java.time.Duration;
@@ -102,9 +103,9 @@ public record BudgetAdjustmentReview(Input input, long version, Status status, I
     }
     private void requireRunning(Instant now) { requireTime(now); if (status != Status.RUNNING) throw conflict(); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_ADJUSTMENT_REVIEW", "Budget review must preserve original source, named finance actor and one evidence consumption"); }
-    private static DomainException conflict() { return new DomainException("BUDGET_ADJUSTMENT_REVIEW_CONFLICT", "Budget review no longer permits this transition"); }
-    private static DomainException unavailable() { return new DomainException("BUDGET_ADJUSTMENT_REVIEW_UNAVAILABLE", "A fresh original ledger review for the authorizing finance actor is required"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_ADJUSTMENT_REVIEW, "Budget review must preserve original source, named finance actor and one evidence consumption"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.BUDGET_ADJUSTMENT_REVIEW_CONFLICT, "Budget review no longer permits this transition"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.BUDGET_ADJUSTMENT_REVIEW_UNAVAILABLE, "A fresh original ledger review for the authorizing finance actor is required"); }
     /** 日志不打印完整台账或审批人员。 */
     @Override public String toString() { return "BudgetAdjustmentReview[id=" + input.id() + ", status=" + status + "]"; }
 

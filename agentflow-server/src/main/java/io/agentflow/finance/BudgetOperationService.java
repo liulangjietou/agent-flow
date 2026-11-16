@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseReportRepository;
 import io.agentflow.expense.ExpenseBudgetReview;
@@ -39,7 +40,7 @@ public class BudgetOperationService {
     public BudgetOperation reserve(String tenant, UUID reportId, long financialVersion, LocalDate date, String targetDigest, Instant now) {
         reports.lock(tenant, reportId);
         var report = reports.find(tenant, reportId).orElseThrow(BudgetOperationService::notFound);
-        if (report.version() != financialVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Financial version changed before budget registration");
+        if (report.version() != financialVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Financial version changed before budget registration");
         var occupation = occupations.find(tenant, reportId).orElse(null);
         var command = new BudgetCommand(UUID.randomUUID(), tenant,
                 occupation == null || occupation.confirmed() == null || occupation.status() == BudgetOccupation.Status.RELEASED
@@ -51,12 +52,12 @@ public class BudgetOperationService {
     /** 原任务同意与审计已经存在后，以固定编号登记同分摊的例外冻结或调整。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public BudgetOperation reserveException(ExpenseBudgetReview review, Instant now) {
-        if (review.status()!=ExpenseBudgetReview.Status.AUTHORIZED) throw new DomainException("EXPENSE_BUDGET_REVIEW_NOT_ALLOWED", "Budget exception requires an approved original review");
+        if (review.status()!=ExpenseBudgetReview.Status.AUTHORIZED) throw new DomainException(ErrorCode.EXPENSE_BUDGET_REVIEW_NOT_ALLOWED, "Budget exception requires an approved original review");
         var input = review.input(); reports.lock(input.tenantId(), input.reportId());
         var original = operations.find(input.tenantId(), input.originalOperationId()).orElseThrow(BudgetOperationService::notFound);
         var report = reports.find(input.tenantId(), input.reportId()).orElseThrow(BudgetOperationService::notFound);
         if (!original.input().command().position().equals(BudgetPrecheckPort.Request.fromCurrent(report, original.input().command().position().accountingDate()))) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Financial position changed before budget exception registration");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Financial position changed before budget exception registration");
         }
         var occupation = occupations.find(input.tenantId(), input.reportId()).orElseThrow(BudgetOperationService::notFound);
         return register(occupation, new BudgetOperation.Input(review.retryCommand(original), input.targetDigest()), now);
@@ -68,8 +69,8 @@ public class BudgetOperationService {
         if (action != BudgetCommand.Action.RELEASE && action != BudgetCommand.Action.CONSUME) throw new IllegalArgumentException("A final budget action is required");
         reports.lock(tenant, reportId);
         var occupation = occupations.find(tenant, reportId).orElseThrow(BudgetOperationService::notFound);
-        if (occupation.pendingOperationId() != null) throw new DomainException("BUDGET_OPERATION_PENDING", "Previous budget operation must be reconciled first");
-        if (occupation.status() != BudgetOccupation.Status.FROZEN) throw new DomainException("BUDGET_NOT_FROZEN", "Budget occupation is not frozen");
+        if (occupation.pendingOperationId() != null) throw new DomainException(ErrorCode.BUDGET_OPERATION_PENDING, "Previous budget operation must be reconciled first");
+        if (occupation.status() != BudgetOccupation.Status.FROZEN) throw new DomainException(ErrorCode.BUDGET_NOT_FROZEN, "Budget occupation is not frozen");
         var command = new BudgetCommand(UUID.randomUUID(), tenant, action, occupation.confirmed().position(), occupation.confirmed().expected());
         return register(occupation, new BudgetOperation.Input(command, occupation.targetDigest()), now);
     }
@@ -120,5 +121,5 @@ public class BudgetOperationService {
         events.publishEvent(new BudgetOperationChanged(previous, completed));
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Budget operation or financial report not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Budget operation or financial report not found"); }
 }

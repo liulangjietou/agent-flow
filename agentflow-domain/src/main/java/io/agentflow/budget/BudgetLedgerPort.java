@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import io.agentflow.finance.Money;
@@ -108,6 +109,6 @@ public interface BudgetLedgerPort {
     }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_BUDGET_LEDGER", "Budget ledger must preserve requested identities, periods and exact balances");
+        return new DomainException(ErrorCode.INVALID_BUDGET_LEDGER, "Budget ledger must preserve requested identities, periods and exact balances");
     }
 }

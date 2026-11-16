@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -17,7 +18,7 @@ public record InvoiceOriginal(UUID id, UUID invoiceId, String tenantId, String o
                 || StringUtils.isBlank(ownerId) || ownerId.length() > 128 || StringUtils.isBlank(filename) || filename.length() > 255
                 || !filename.matches("[^\\p{Cntrl}/\\\\]+") || size < 1 || size > InvoiceVerificationPort.Request.MAX_ORIGINAL_BYTES
                 || sha256 == null || !sha256.matches("[a-f0-9]{64}") || format == null || createdAt == null || status == null) {
-            throw new DomainException("INVALID_INVOICE_ORIGINAL", "Invoice original metadata is invalid");
+            throw new DomainException(ErrorCode.INVALID_INVOICE_ORIGINAL, "Invoice original metadata is invalid");
         }
     }
 
@@ -29,7 +30,7 @@ public record InvoiceOriginal(UUID id, UUID invoiceId, String tenantId, String o
 
     /** 完整原件才可发送查验或下载。 */
     public void requireReady() {
-        if (status != Status.READY) throw new DomainException("INVOICE_ORIGINAL_NOT_READY", "Invoice original upload is not complete");
+        if (status != Status.READY) throw new DomainException(ErrorCode.INVOICE_ORIGINAL_NOT_READY, "Invoice original upload is not complete");
     }
     private InvoiceOriginal withStatus(Status next) { return new InvoiceOriginal(id, invoiceId, tenantId, ownerId, filename, size, sha256, format, createdAt, next); }
 

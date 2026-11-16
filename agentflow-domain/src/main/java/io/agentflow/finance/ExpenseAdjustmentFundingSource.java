@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpensePaymentReturn;
 import io.agentflow.expense.ExpensePaymentReturns;
@@ -121,6 +122,6 @@ public record ExpenseAdjustmentFundingSource(ExpenseAdjustmentFinancialSource fi
                 || new HashSet<>(entries).size() != entries.size();
     }
     private static Money total(List<ExpensePaymentReturns.Entry> entries, String currency) { return entries.stream().map(value -> value.proof().funding().amount()).reduce(Money.zero(currency), Money::plus); }
-    private static DomainException changed() { return new DomainException("EXPENSE_ADJUSTMENT_FUNDING_CHANGED", "Partial adjustment requires exact original payment, registered unconsumed returns and matching payment accounting"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.EXPENSE_ADJUSTMENT_FUNDING_CHANGED, "Partial adjustment requires exact original payment, registered unconsumed returns and matching payment accounting"); }
     @Override public String toString() { return "ExpenseAdjustmentFundingSource[reportId=" + financial.change().before().original().id() + "]"; }
 }

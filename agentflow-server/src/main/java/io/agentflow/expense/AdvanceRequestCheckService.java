@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.Actor;
@@ -72,10 +73,10 @@ public class AdvanceRequestCheckService {
         application.requireEditable(request.applicationVersion());
         if (advance.version() != request.requestVersion() || advance.rounds().size() + 1 != application.nextSubmissionRound()) throw changed();
         var initiator = initiators.snapshot(actor, request.initiatorAppointmentId());
-        if (!initiator.legalEntityId().equals(advance.content().legalEntityId())) throw new DomainException("ADVANCE_INITIATOR_MISMATCH", "Selected appointment and advance legal entity must match");
-        var destination = configuration.destination(actor.tenantId()).orElseThrow(() -> new DomainException("FINANCE_GATEWAY_UNAVAILABLE", "Advance request check is not configured for this tenant"));
-        if (!destination.digest(actor.tenantId()).equals(request.targetDigest())) throw new DomainException("FINANCE_TARGET_CHANGED", "Refresh the finance destination before queuing");
-        if (jobs.active(actor.tenantId(), requestId)) throw new DomainException("ADVANCE_REQUEST_CHECK_ACTIVE", "Advance request already has an active precheck");
+        if (!initiator.legalEntityId().equals(advance.content().legalEntityId())) throw new DomainException(ErrorCode.ADVANCE_INITIATOR_MISMATCH, "Selected appointment and advance legal entity must match");
+        var destination = configuration.destination(actor.tenantId()).orElseThrow(() -> new DomainException(ErrorCode.FINANCE_GATEWAY_UNAVAILABLE, "Advance request check is not configured for this tenant"));
+        if (!destination.digest(actor.tenantId()).equals(request.targetDigest())) throw new DomainException(ErrorCode.FINANCE_TARGET_CHANGED, "Refresh the finance destination before queuing");
+        if (jobs.active(actor.tenantId(), requestId)) throw new DomainException(ErrorCode.ADVANCE_REQUEST_CHECK_ACTIVE, "Advance request already has an active precheck");
         var input = new Input(UUID.randomUUID(), actor.tenantId(), requestId, advance.applicationId(), actor.userId(), application.version(), advance.version(),
                 application.nextSubmissionRound(), jobs.nextAttempt(actor.tenantId(), requestId), initiator, request.targetDigest());
         jobs.create(AdvanceRequestCheck.queue(input, time(Instant.now()))); return new Receipt(input.id());
@@ -166,9 +167,9 @@ public class AdvanceRequestCheckService {
     private AdvanceRequest owned(UUID id) { return requests.find(actors.actor().tenantId(), id).filter(value -> value.employeeId().equals(actors.actor().userId())).orElseThrow(AdvanceRequestCheckService::notFound); }
     private static Summary summary(AdvanceRequestCheck job) { return new Summary(job.input().id(), job.version(), job.status(), job.input().applicationVersion(), job.input().requestVersion(), job.input().attempt(), job.createdAt(), job.startedAt(), job.completedAt()); }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MILLIS); }
-    private static DomainException changed() { return new DomainException("CONCURRENCY_CONFLICT", "Advance request or application version changed"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Advance request check context not found"); }
-    private static DomainException invalidQuery() { return new DomainException("INVALID_EXPENSE_QUERY", "Advance request check query is invalid"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Advance request or application version changed"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Advance request check context not found"); }
+    private static DomainException invalidQuery() { return new DomainException(ErrorCode.INVALID_EXPENSE_QUERY, "Advance request check query is invalid"); }
 
     /**
      * 申请人只能选择输入上下文，不能提交核算或预算结论。

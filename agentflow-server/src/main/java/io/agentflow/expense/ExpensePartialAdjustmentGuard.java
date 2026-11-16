@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.mapper.ExpensePartialAdjustmentGuardMapper;
 
@@ -31,8 +32,7 @@ public class ExpensePartialAdjustmentGuard {
     public void requireWholeAllowed(String tenant, UUID report) {
         reports.lock(tenant, report);
         if (!sqlMapper.requireWholeAllowed(tenant, report.toString()).isEmpty()) {
-            throw new DomainException(
-                    "EXPENSE_PARTIAL_ADJUSTMENT_PENDING",
+            throw new DomainException(ErrorCode.EXPENSE_PARTIAL_ADJUSTMENT_PENDING,
                     "Partial adjustment protects the original accrual and full resource"
                             + " cancellation");
         }
@@ -43,8 +43,7 @@ public class ExpensePartialAdjustmentGuard {
     public void requirePartialAllowed(String tenant, UUID report) {
         reports.lock(tenant, report);
         if (!sqlMapper.requirePartialAllowed(tenant, report.toString()).isEmpty()) {
-            throw new DomainException(
-                    "EXPENSE_ADJUSTMENT_PENDING",
+            throw new DomainException(ErrorCode.EXPENSE_ADJUSTMENT_PENDING,
                     "An existing full resource adjustment protects this expense");
         }
     }

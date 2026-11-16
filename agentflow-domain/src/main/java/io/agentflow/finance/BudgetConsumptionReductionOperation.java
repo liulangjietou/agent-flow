@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.time.Instant;
@@ -131,7 +132,7 @@ public record BudgetConsumptionReductionOperation(Input input, long version, Sta
     public BudgetConsumptionReductionOperation resolveDispute(BudgetConsumptionReductionObservation.Status outcome, ResolutionHistory history, Instant now) {
         requireTime(now);
         if (resolutionIssue(history, now) != null || conflictingObservation.status() != outcome)
-            throw new DomainException("BUDGET_REDUCTION_DISPUTE_UNRESOLVABLE", "Budget reduction resolution requires recent terminal evidence preserving all historical effects");
+            throw new DomainException(ErrorCode.BUDGET_REDUCTION_DISPUTE_UNRESOLVABLE, "Budget reduction resolution requires recent terminal evidence preserving all historical effects");
         return changed(Status.valueOf(outcome.name()), now, null, conflictingObservation, null, null);
     }
 
@@ -195,8 +196,8 @@ public record BudgetConsumptionReductionOperation(Input input, long version, Sta
     }
     private Instant retryAt(Instant now) { return now.plusSeconds(Math.min(MAX_BACKOFF_SECONDS, INITIAL_BACKOFF_SECONDS << Math.min(attempts - 1, 6))); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_REDUCTION_OPERATION", "Budget reduction state must preserve its immutable command and accepted evidence"); }
-    private static DomainException conflict() { return new DomainException("BUDGET_REDUCTION_OPERATION_CONFLICT", "Budget reduction cannot perform this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_REDUCTION_OPERATION, "Budget reduction state must preserve its immutable command and accepted evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.BUDGET_REDUCTION_OPERATION_CONFLICT, "Budget reduction cannot perform this transition"); }
     /**
      * 原消费修订由仓储外键固定，所有恢复都保留原财务目的地。
      * @author owlzhangfq@gmail.com

@@ -1,5 +1,6 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.springframework.util.MultiValueMap;
 
@@ -49,5 +50,5 @@ public record ServiceTaskCatalogQuery(String afterKey, Long beforeVersion, int l
         if (!allowed.containsAll(query.keySet()) || query.values().stream().anyMatch(values -> values.size() != 1)) throw invalid();
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_SERVICE_TASK_QUERY", "Invalid service task catalog query"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SERVICE_TASK_QUERY, "Invalid service task catalog query"); }
 }

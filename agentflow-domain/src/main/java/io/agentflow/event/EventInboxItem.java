@@ -1,5 +1,6 @@
 package io.agentflow.event;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.Set;
@@ -74,7 +75,7 @@ public record EventInboxItem(UUID id, ReceivedEvent input, long version, Status 
         if (!pending() || now.isBefore(updatedAt)) throw conflict();
         return new EventInboxItem(id, input, Math.incrementExact(version), next, receivedAt, now, due, count, issue, error, requestedBy, requestReason);
     }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Event processing state changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Event processing state changed"); }
     /** @author owlzhangfq@gmail.com */
     public enum Status { RECEIVED, WAITING, CONSUMED, IGNORED, REVIEW_REQUIRED }
     /** @author owlzhangfq@gmail.com */

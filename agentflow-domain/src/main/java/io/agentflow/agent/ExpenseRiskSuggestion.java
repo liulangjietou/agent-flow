@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.HashSet;
 import java.util.List;
@@ -60,5 +61,5 @@ public record ExpenseRiskSuggestion(String providerId, String modelVersion, Stri
     }
     private static boolean identifier(String value) { return text(value, AssistSuggestion.MAX_VERSION_LENGTH); }
     private static boolean text(String value, int limit) { return StringUtils.isNotBlank(value) && value.length() <= limit; }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_OUTPUT", "Risk explanations must match every selected observation and its evidence"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Risk explanations must match every selected observation and its evidence"); }
 }

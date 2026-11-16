@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.model.Application;
@@ -68,7 +69,7 @@ public class ExpenseDraftAssistService {
     public Receipt queue(UUID reportId, ExpenseDraftAssistPreparation.Prepared prepared, String targetDigest, String consentDigest) {
         var original = owned(reportId); reports.lock(original.report().tenantId(), reportId); var current = owned(reportId);
         requirePrepared(prepared, current);
-        if (!prepared.targetDigest().equals(targetDigest)) throw new DomainException("AGENT_TARGET_CHANGED", "Refresh the expense draft model destination");
+        if (!prepared.targetDigest().equals(targetDigest)) throw new DomainException(ErrorCode.AGENT_TARGET_CHANGED, "Refresh the expense draft model destination");
         if (!prepared.consentDigest().equals(consentDigest)) throw changed("CONSENT_CHANGED");
         Instant at = Instant.now();
         if (!prepared.input().currentAt(at)) throw changed("FACTS_EXPIRED");
@@ -99,7 +100,7 @@ public class ExpenseDraftAssistService {
     public ExpenseDraftAssistRun.Context reviewContext(UUID reportId, UUID runId, long runVersion, long applicationVersion, long financialVersion) {
         var snapshot = owned(reportId); var run = requireRun(snapshot.report(), runId);
         if (run.state().version() != runVersion) throw conflict();
-        if (run.state().status() != ExpenseDraftAssistRun.Status.COMPLETED) throw new DomainException("AGENT_RUN_STATE_CONFLICT", "Expense draft is not reviewable");
+        if (run.state().status() != ExpenseDraftAssistRun.Status.COMPLETED) throw new DomainException(ErrorCode.AGENT_RUN_STATE_CONFLICT, "Expense draft is not reviewable");
         requireCurrent(currentFailure(snapshot, run.context(), Instant.now()));
         if (applicationVersion != run.context().input().applicationVersion() || financialVersion != run.context().input().financialVersion()) throw changed("VERSION_CHANGED");
         return run.context();
@@ -212,9 +213,9 @@ public class ExpenseDraftAssistService {
     }
     private void fail(ExpenseDraftAssistRun run, AssistRun.Failure failure, Instant now) { run.fail(2, failure, now); save(run, 2); }
     private static void requireCurrent(String failure) { if (failure != null) throw changed(failure); }
-    private static DomainException changed(String reason) { return new DomainException("AGENT_INPUT_CHANGED", "Refresh expense draft sources: " + reason); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense draft run version changed"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense draft assistance not found"); }
+    private static DomainException changed(String reason) { return new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Refresh expense draft sources: " + reason); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense draft run version changed"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Expense draft assistance not found"); }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MILLIS); }
     private static Receipt receipt(ExpenseDraftAssistRun run) { return new Receipt(run.context().id(), run.state().status(), run.state().version()); }
 

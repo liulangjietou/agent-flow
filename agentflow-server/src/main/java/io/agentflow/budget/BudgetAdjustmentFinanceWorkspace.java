@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.common.CurrentActor;
@@ -96,8 +97,8 @@ public class BudgetAdjustmentFinanceWorkspace {
         try { var id = UUID.fromString(value); if (!id.toString().equals(value)) throw invalid(); return id; }
         catch (IllegalArgumentException failed) { throw invalid(); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_ADJUSTMENT_QUERY", "Budget execution accepts only a positive round, valid identity cursor and bounded page size"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Original budget adjustment operation was not found in the selected round"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_ADJUSTMENT_QUERY, "Budget execution accepts only a positive round, valid identity cursor and bounded page size"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Original budget adjustment operation was not found in the selected round"); }
     /**
      * 当前批准、本人待授权复核及原指令分别展示，不展开内部目的地或摘要。
      * @author owlzhangfq@gmail.com

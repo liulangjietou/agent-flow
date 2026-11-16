@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.ApplicationFieldViews;
 import io.agentflow.approval.model.Application;
@@ -72,11 +73,11 @@ public class ExpenseDraftService {
             return response(application, report, null, true);
         }
         int selected = roundNo == null ? application.roundNo() : roundNo;
-        if (selected < 1) throw new DomainException("INVALID_EXPENSE_QUERY", "Round number must be positive");
+        if (selected < 1) throw new DomainException(ErrorCode.INVALID_EXPENSE_QUERY, "Round number must be positive");
         var round = report.rounds().stream().filter(item -> item.roundNo() == selected).findFirst().orElseThrow(ExpenseDraftService::notFound);
         var projection = fields.attachmentView(application, selected);
         if (!applicant && !ExpenseFormContract.detailsReadable(application.formSchema(), projection.schema())) {
-            throw new DomainException("FORBIDDEN", "Field permissions do not allow reading expense details");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Field permissions do not allow reading expense details");
         }
         return response(application, report, round, false);
     }
@@ -93,5 +94,5 @@ public class ExpenseDraftService {
                 round == null ? null : ExpenseResponse.FinancialRound.from(round), retention);
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense report or round not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Expense report or round not found"); }
 }

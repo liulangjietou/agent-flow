@@ -1,5 +1,6 @@
 package io.agentflow.event;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.UUID;
 
@@ -15,7 +16,7 @@ public record EventSignal(int envelopeVersion, String tenantId, String sourceKey
                 || sourceKey == null || !sourceKey.matches("[a-z][a-z0-9._-]{0,63}") || eventType == null || !eventType.matches("[A-Za-z][A-Za-z0-9._-]{0,127}")
                 || applicationId == null || roundNo < 1 || waitId == null || !waitId.matches("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
                 || contractKey == null || !contractKey.matches("[a-z][a-z0-9._-]{0,63}") || contractVersion < 1) {
-            throw new DomainException("EVENT_INPUT_INVALID", "Event envelope is invalid");
+            throw new DomainException(ErrorCode.EVENT_INPUT_INVALID, "Event envelope is invalid");
         }
     }
 }

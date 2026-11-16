@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import static io.agentflow.definition.DefinitionModels.DefinitionDraft;
 import static io.agentflow.definition.DefinitionModels.DraftStatus;
 import static io.agentflow.definition.DefinitionModels.Graph;
@@ -61,16 +62,14 @@ public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository 
                             draft.id().toString(),
                             expectedRevision);
         } catch (DuplicateKeyException exception) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Definition version already exists");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Definition version already exists");
         }
         if (updated == 0) {
             if (SqlRows.single(sqlMapper.save2(draft.tenantId(), draft.id().toString())) > 0) {
-                throw new DomainException(
-                        "CONCURRENCY_CONFLICT", "Definition revision has changed");
+                throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Definition revision has changed");
             }
             if (draft.revision() != 0) {
-                throw new DomainException(
-                        "CONCURRENCY_CONFLICT",
+                throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT,
                         "Definition was deleted while it was being updated");
             }
             try {
@@ -87,8 +86,7 @@ public class JdbcDefinitionDraftRepository implements DefinitionDraftRepository 
                         textsJson,
                         draft.startEnabled());
             } catch (DuplicateKeyException exception) {
-                throw new DomainException(
-                        "CONCURRENCY_CONFLICT", "Definition version or id already exists");
+                throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Definition version or id already exists");
             }
         }
         return draft;

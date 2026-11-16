@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
@@ -22,7 +23,7 @@ public class SupplierPaymentNotificationController {
     /** 不接受外部指定付款号、租户或轮次，禁用缓存避免旧权限复用。 */
     @GetMapping("/api/v1/notifications/{id}/supplier-payment-target")
     public ResponseEntity<SupplierPaymentNotificationAccess.Target> target(@PathVariable UUID id, HttpServletRequest request) {
-        if (!request.getParameterMap().isEmpty()) throw new DomainException("INVALID_INBOX_QUERY", "Supplier payment notification target does not accept query parameters");
+        if (!request.getParameterMap().isEmpty()) throw new DomainException(ErrorCode.INVALID_INBOX_QUERY, "Supplier payment notification target does not accept query parameters");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(access.target(id));
     }
 }

@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -70,7 +72,7 @@ public class VoucherDisputeService {
     public VoucherAccess.Context requireFinance(UUID applicationId, UUID operationId, int roundNo) {
         var context = access.requireFinance(applicationId, roundNo); var command = original(context, operationId).input().command();
         var actor = actors.actor();
-        if (!VoucherDisputeResolution.independent(command, actor.userId())) throw new DomainException("FORBIDDEN", "Applicant and original cashier cannot resolve the voucher dispute");
+        if (!VoucherDisputeResolution.independent(command, actor.userId())) throw new DomainException(ErrorCode.FORBIDDEN, "Applicant and original cashier cannot resolve the voucher dispute");
         personnel.requireEligible(actor.tenantId(), actor.userId(), command.legalEntityId()); return context;
     }
 
@@ -85,8 +87,7 @@ public class VoucherDisputeService {
         if (application.version() != input.applicationVersion()
                 || context.businessVersion() != input.businessVersion()
                 || before.version() != input.operationVersion()) {
-            throw new DomainException(
-                    "CONCURRENCY_CONFLICT",
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT,
                     "Displayed approval, financial or voucher version changed");
         }
         var tenant = application.tenantId();
@@ -94,8 +95,7 @@ public class VoucherDisputeService {
         var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         if (input.outcome() == VoucherObservation.Status.POSTED
                 && reversals.forOperation(tenant, operationId).isPresent()) {
-            throw new DomainException(
-                    "VOUCHER_REVERSAL_ALREADY_RECORDED",
+            throw new DomainException(ErrorCode.VOUCHER_REVERSAL_ALREADY_RECORDED,
                     "An independently recorded reverse voucher prevents restoring the original"
                             + " posting");
         }
@@ -131,7 +131,7 @@ public class VoucherDisputeService {
                         "actor",
                         actor,
                         "authorizedRole",
-                        "FINANCE",
+                        SystemRole.FINANCE.name(),
                         "previousStatus",
                         before.status().name(),
                         "currentStatus",
@@ -184,7 +184,7 @@ public class VoucherDisputeService {
         return value;
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Voucher for the selected financial round not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Voucher for the selected financial round not found"); }
 
     /**
      * 请求只选择已展示终态与人工核对依据，不能提供新凭证号、金额或账户。

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpensePartialPreparationRepositoryMapper;
@@ -316,7 +317,7 @@ public class JdbcExpensePartialPreparationRepository {
 
     private static Timestamp timestamp(Instant at) { return at == null ? null : Timestamp.from(JdbcTimestampPrecision.roundedToMicros(at)); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Partial preparation or selected authorization changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Partial preparation or selected authorization changed"); }
 
     private static IllegalStateException inconsistent() { return new IllegalStateException("Persisted partial preparation identity or authorization proof is inconsistent"); }
 

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.ExpensePartialAdjustmentGuard;
@@ -151,7 +152,7 @@ public class JdbcVoucherReversalPreparationRepository {
 
     private static Instant instant(Timestamp at) { return at == null ? null : at.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Voucher reversal version or original input changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Voucher reversal version or original input changed"); }
 
     /**
      * 扫描只携带租户与任务标识。

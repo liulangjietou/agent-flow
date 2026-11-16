@@ -4,12 +4,26 @@ on:
   push:
   pull_request:
 
+env:
+  # 测试与脚本的临时根目录；本地未设置时回退到系统临时目录。
+  AGENTFLOW_TMP_DIR: /fyoung/tmp
+
 jobs:
+  dependency-review:
+    # 只在 PR 上比对新增依赖的已知漏洞，高危及以上阻断合并。
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
   postgres-schema:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17
+        image: postgres:17@sha256:0d938e975177bef9f1f61f3f9dbcf2e0aa0a139568f66d3415ed8892eb97f6ac
         env:
           POSTGRES_DB: agentflow_schema_test
           POSTGRES_USER: agentflow_test
@@ -127,6 +141,13 @@ jobs:
           # 与 PostgreSQL 矩阵和本地验证使用相同的上下文缓存上限，及时释放旧连接池。
           JAVA_TOOL_OPTIONS: -Dspring.test.context.cache.maxSize=4 -Djava.io.tmpdir=/fyoung/tmp
         run: mvn -B -ntp verify
+      - name: Upload backend coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: agentflow-server/target/site/jacoco
+          if-no-files-found: ignore
       - name: Verify maintenance and capacity tool guards
         run: |
           sudo install -d -o "$(id -u)" -g "$(id -g)" /fyoung/tmp
@@ -154,5 +175,7 @@ jobs:
         run: |
           sudo install -d -o "$(id -u)" -g "$(id -g)" /fyoung/tmp
           npm ci
+          npm audit --omit=dev --audit-level=high
+          npm run lint
           npm run test:requests
           npm run build

@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
@@ -42,7 +44,7 @@ public class PaymentDisputeService {
         var initial = access.requireFinanceAuthorization(paymentId); sources.lock(initial);
         var authorization = access.requireFinanceAuthorization(paymentId); var tenant = authorization.terms().tenantId(); var actor = actors.actor().userId();
         if (authorization.version() != input.authorizationVersion() || authorization.status() != PaymentAuthorization.Status.EXECUTION_REGISTERED) throw conflict();
-        if (!independent(authorization, actor)) throw new DomainException("FORBIDDEN", "Applicant and original cashier cannot resolve the payment dispute");
+        if (!independent(authorization, actor)) throw new DomainException(ErrorCode.FORBIDDEN, "Applicant and original cashier cannot resolve the payment dispute");
         var before = operations.find(tenant, paymentId).orElseThrow(PaymentDisputeService::conflict);
         if (before.version() != input.operationVersion()) throw conflict();
         var history = operations.disputeEvidence(tenant, paymentId); var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
@@ -51,7 +53,7 @@ public class PaymentDisputeService {
         operations.update(after); resolutions.create(decision);
         events.publishEvent(new PaymentOperationChanged(before, after));
         events.publishEvent(new PaymentDisputeResolved(after, decision));
-        var event = audit.record(authorization, decision.id(), after.version(), "FINANCE", "PAYMENT_DISPUTE_RESOLVE", before.status().name(), after.status().name(), input.comment(), now);
+        var event = audit.record(authorization, decision.id(), after.version(), SystemRole.FINANCE.name(), "PAYMENT_DISPUTE_RESOLVE", before.status().name(), after.status().name(), input.comment(), now);
         return new Receipt(authorization.terms().binding().applicationId(), paymentId, decision.id(), after.version(), after.status().name(), event);
     }
 
@@ -73,7 +75,7 @@ public class PaymentDisputeService {
     private static boolean independent(PaymentAuthorization authorization, String actor) {
         return authorization.execution() != null && !actor.equals(authorization.terms().payee().employeeId()) && !actor.equals(authorization.execution().command().authorization().executedBy());
     }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed original payment or authorization version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed original payment or authorization version changed"); }
     /**
      * 请求只能指定已展示的终态及人工核对凭据，金额、账户和银行回执均不从客户端接收。
      * @author owlzhangfq@gmail.com

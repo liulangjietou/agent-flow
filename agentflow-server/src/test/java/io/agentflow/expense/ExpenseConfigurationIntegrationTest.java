@@ -16,7 +16,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "spring.datasource.url=jdbc:h2:mem:expense-configuration;DB_CLOSE_DELAY=-1",
         "agentflow.advances.overdue.reminders-enabled=false", "agentflow.timers.enabled=false",
-        "agentflow.attachments.directory=/fyoung/tmp/agentflow-expense-configuration-test-files"})
+        "agentflow.attachments.directory=${java.io.tmpdir}/agentflow-expense-configuration-test-files"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class ExpenseConfigurationIntegrationTest {
     @Autowired MockMvc mvc;

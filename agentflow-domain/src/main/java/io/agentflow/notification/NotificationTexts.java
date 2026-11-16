@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 
 /**
@@ -31,7 +32,7 @@ public record NotificationTexts(String submitted, String returned, String approv
         if (text == null) return "";
         if (text.length() > MAX_LENGTH || text.chars().anyMatch(value -> Character.isISOControl(value)
                 && value != '\n' && value != '\r' && value != '\t')) {
-            throw new DomainException("INVALID_NOTIFICATION_TEXT", "Notification text must contain at most 500 characters without control codes");
+            throw new DomainException(ErrorCode.INVALID_NOTIFICATION_TEXT, "Notification text must contain at most 500 characters without control codes");
         }
         return text.strip();
     }

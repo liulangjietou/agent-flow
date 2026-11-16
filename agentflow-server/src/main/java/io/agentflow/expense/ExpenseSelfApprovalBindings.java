@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.service.ProcessRuntimePort.StartProcessCommand;
@@ -73,7 +74,7 @@ public class ExpenseSelfApprovalBindings {
                 // 财务节点只排除冲突人员，绝不能借自审批策略改派主管或自动通过。
                 candidates = original.stream().filter(subject -> !subject.equals(application.createdBy())).toList();
             }
-            if (candidates.isEmpty()) throw new DomainException("APPROVAL_RESPONSIBILITY_NO_MEMBERS", "No approvers remain after applying expense responsibilities");
+            if (candidates.isEmpty()) throw new DomainException(ErrorCode.APPROVAL_RESPONSIBILITY_NO_MEMBERS, "No approvers remain after applying expense responsibilities");
             selections.put(node.id(), new ExpenseSelfApprovalSnapshot.Selection(node.name(), stage, rule,
                     selected.directoryRevision(), original, candidates, replacement));
         }
@@ -97,12 +98,12 @@ public class ExpenseSelfApprovalBindings {
             return new ExpenseSelfApprovalSnapshot.Escalation(origin.supervisorAppointmentId(), command.initiatorContext().subject(),
                     selected.subjects().get(0), selected.directoryRevision());
         } catch (DomainException unavailable) {
-            if (!"ORGANIZATION_NO_APPROVERS".equals(unavailable.code())) throw unavailable;
-            throw new DomainException("APPROVER_NOT_FOUND", "The selected initiator appointment has no eligible direct supervisor");
+            if (!unavailable.is(ErrorCode.ORGANIZATION_NO_APPROVERS)) throw unavailable;
+            throw new DomainException(ErrorCode.APPROVER_NOT_FOUND, "The selected initiator appointment has no eligible direct supervisor");
         }
     }
 
     private static DomainException invalid() {
-        return new DomainException("EXPENSE_APPROVAL_CONTEXT_INVALID", "Expense approval selection requires its original applicant and selected appointment");
+        return new DomainException(ErrorCode.EXPENSE_APPROVAL_CONTEXT_INVALID, "Expense approval selection requires its original applicant and selected appointment");
     }
 }

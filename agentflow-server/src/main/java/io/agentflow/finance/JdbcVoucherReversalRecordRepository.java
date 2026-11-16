@@ -1,6 +1,7 @@
 package io.agentflow.finance;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.mapper.VoucherReversalRecordRepositoryMapper;
@@ -81,8 +82,7 @@ public class JdbcVoucherReversalRecordRepository {
                     Timestamp.from(value.recordedAt()),
                     json.write(value));
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "VOUCHER_REVERSAL_ALREADY_RECORDED",
+            throw new DomainException(ErrorCode.VOUCHER_REVERSAL_ALREADY_RECORDED,
                     "Original voucher or independent reverse posting already has a record");
         }
     }
@@ -133,8 +133,7 @@ public class JdbcVoucherReversalRecordRepository {
     }
 
     private static DomainException changed() {
-        return new DomainException(
-                "VOUCHER_REVERSAL_SOURCE_CHANGED",
+        return new DomainException(ErrorCode.VOUCHER_REVERSAL_SOURCE_CHANGED,
                 "Voucher reversal record must match its consumed check and current original"
                     + " revision");
     }

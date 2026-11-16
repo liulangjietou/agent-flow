@@ -1,5 +1,7 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
@@ -48,11 +50,11 @@ public class ApplicationFieldViews {
 
     /** 后台以重新认证的主体复用当轮字段规则，跨租户不能借申请人同名绕过投影。 */
     public FormFieldProjection attachmentViewForActor(Actor actor, Application application, Integer roundNo) {
-        if (!actor.tenantId().equals(application.tenantId())) throw new DomainException("NOT_FOUND", "Application not found");
+        if (!actor.tenantId().equals(application.tenantId())) throw new DomainException(ErrorCode.NOT_FOUND, "Application not found");
         if (roundNo != null) {
-            if (roundNo < 1) throw new DomainException("INVALID_ATTACHMENT_QUERY", "Round number must be positive");
+            if (roundNo < 1) throw new DomainException(ErrorCode.INVALID_ATTACHMENT_QUERY, "Round number must be positive");
             var round = rounds.findByRound(application.tenantId(), application.id(), roundNo)
-                    .orElseThrow(() -> new DomainException("NOT_FOUND", "Submission round not found"));
+                    .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Submission round not found"));
             return project(actor, application, round.formSchema(), round.payload(), round.processInstanceId());
         }
         String process = application.status() == ApplicationStatus.IN_APPROVAL
@@ -73,7 +75,7 @@ public class ApplicationFieldViews {
         var round = rounds.findByRound(application.tenantId(), application.id(), roundNo).orElse(null);
         var view = round == null ? project(application, application.formSchema(), application.payload(), null)
                 : project(application, round.formSchema(), round.payload(), round.processInstanceId());
-        if (view.restricted()) throw new DomainException("FORBIDDEN", "Field permissions do not allow reading the complete assist result");
+        if (view.restricted()) throw new DomainException(ErrorCode.FORBIDDEN, "Field permissions do not allow reading the complete assist result");
     }
 
     private FormFieldProjection project(Application application, FormSchema schema, Map<String, Object> payload, String process) {
@@ -82,7 +84,7 @@ public class ApplicationFieldViews {
 
     private FormFieldProjection project(Actor actor, Application application, FormSchema schema, Map<String, Object> payload, String process) {
         if (actor.userId().equals(application.createdBy()) || schema == null) return new FormFieldProjection(schema, payload, false);
-        Set<String> nodes = process != null && actor.hasRole("APPROVER") && recipients.eligible(actor.tenantId(), actor.userId())
+        Set<String> nodes = process != null && actor.hasRole(SystemRole.APPROVER) && recipients.eligible(actor.tenantId(), actor.userId())
                 ? participants.stream().flatMap(port -> port.readableNodes(application.tenantId(), process, actor).stream())
                     .collect(java.util.stream.Collectors.toUnmodifiableSet()) : Set.of();
         return FormFieldProjection.forNodes(schema, payload, nodes);

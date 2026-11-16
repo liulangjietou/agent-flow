@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -94,8 +95,7 @@ public class JdbcSupplierPayableSettlementRepository {
                     timestamp(value.nextAttemptAt()),
                     command.payment().id().toString());
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "SUPPLIER_SETTLEMENT_PENDING",
+            throw new DomainException(ErrorCode.SUPPLIER_SETTLEMENT_PENDING,
                     "Original bank payment already has an active settlement command");
         }
         append(value);
@@ -394,7 +394,7 @@ public class JdbcSupplierPayableSettlementRepository {
 
     private static IllegalStateException inconsistent() { return new IllegalStateException("Persisted supplier payable settlement is inconsistent"); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Original supplier settlement or persisted source changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Original supplier settlement or persisted source changed"); }
 
     /**
      * 后台扫描只返回结算身份。

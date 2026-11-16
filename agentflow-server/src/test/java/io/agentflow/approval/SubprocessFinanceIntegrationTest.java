@@ -94,7 +94,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 class SubprocessFinanceIntegrationTest {
     private static final Actor ADMIN = new Actor("demo", "admin", Set.of("ADMIN", "PROCESS_ADMIN"));
     private static final SubprocessFinanceGatewayFixture GATEWAY = new SubprocessFinanceGatewayFixture();
-    private static final Path FILES = Path.of("/fyoung/tmp/agentflow-subprocess-finance-" + UUID.randomUUID());
+    private static final Path FILES = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-subprocess-finance-" + UUID.randomUUID());
     private static final String SYSTEM_ACTOR = "system:subprocess";
     private UUID entity;
     private UUID appointment;

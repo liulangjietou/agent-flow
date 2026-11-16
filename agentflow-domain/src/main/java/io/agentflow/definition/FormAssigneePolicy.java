@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import java.util.List;
@@ -38,10 +39,10 @@ public record FormAssigneePolicy(String fieldKey, Relation relation) {
     public FormSchema.Field field(FormSchema schema) {
         var field = schema == null ? null : schema.fields().stream().filter(value -> value.key().equals(fieldKey)).findFirst().orElse(null);
         if (field == null || field.type() != FormSchema.FieldType.SELECT || !field.required()) {
-            throw new DomainException("FORM_ASSIGNEE_FIELD_REQUIRED", "Form assignee requires a required top-level select field");
+            throw new DomainException(ErrorCode.FORM_ASSIGNEE_FIELD_REQUIRED, "Form assignee requires a required top-level select field");
         }
         if (field.options().stream().anyMatch(option -> !UUID_VALUE.matcher(option.value()).matches())) {
-            throw new DomainException("FORM_ASSIGNEE_OPTION_INVALID", "Form assignee options must contain canonical organization identifiers");
+            throw new DomainException(ErrorCode.FORM_ASSIGNEE_OPTION_INVALID, "Form assignee options must contain canonical organization identifiers");
         }
         return field;
     }
@@ -49,7 +50,7 @@ public record FormAssigneePolicy(String fieldKey, Relation relation) {
     /** 返回已声明的对象标识，发布检查全部选项而非仅检查当前测试值。 */
     public List<UUID> references(FormSchema schema) { return field(schema).options().stream().map(option -> UUID.fromString(option.value())).toList(); }
 
-    private static DomainException invalidRule() { return new DomainException("FORM_ASSIGNEE_RULE_INVALID", "Form assignee rule must name a field and a supported organization relation"); }
+    private static DomainException invalidRule() { return new DomainException(ErrorCode.FORM_ASSIGNEE_RULE_INVALID, "Form assignee rule must name a field and a supported organization relation"); }
 
     /**
      * 同一种组织来源可用于不同业务关系，关系含义随流程版本保存。

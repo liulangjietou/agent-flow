@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -59,7 +60,7 @@ public class ExpensePartialAdjustmentDecisions {
                 || value.input().basis().funding().financial().settlement().input().source().roundNo() != report.requireFrozenRound().roundNo()) throw conflict();
         return value;
     }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed partial adjustment, original settlement or round changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed partial adjustment, original settlement or round changed"); }
 
     /**
      * 准备意图绑定当前调整和原财务修订，只允许一侧及明确日期。

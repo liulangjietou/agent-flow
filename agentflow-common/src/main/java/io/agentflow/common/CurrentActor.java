@@ -14,7 +14,7 @@ public class CurrentActor {
     public Actor actor() {
         Actor actor = HOLDER.get();
         if (actor == null) {
-            throw new DomainException("UNAUTHENTICATED", "Authentication is required");
+            throw new DomainException(ErrorCode.UNAUTHENTICATED, "Authentication is required");
         }
         return actor;
     }

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.SystemRole;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpenseResourceAdjustmentAuditMapper;
@@ -59,7 +60,7 @@ public class ExpenseResourceAdjustmentAudit {
                                 "roundNo",
                                 source.roundNo(),
                                 "authorizedRole",
-                                "FINANCE",
+                                SystemRole.FINANCE.name(),
                                 "comment",
                                 comment)),
                 Timestamp.from(at));

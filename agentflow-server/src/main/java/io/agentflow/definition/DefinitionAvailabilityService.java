@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
@@ -38,13 +39,13 @@ public class DefinitionAvailabilityService {
     public List<DefinitionAvailabilityChange> history(String tenantId, UUID id, long beforeRevision, int limit) {
         DefinitionDraft definition = get(tenantId, id);
         if (definition.status() != DefinitionModels.DraftStatus.PUBLISHED) {
-            throw new DomainException("DEFINITION_NOT_PUBLISHED", "Definition has not been published");
+            throw new DomainException(ErrorCode.DEFINITION_NOT_PUBLISHED, "Definition has not been published");
         }
         return changes.history(tenantId, id, beforeRevision, limit);
     }
 
     private DefinitionDraft get(String tenantId, UUID id) {
         return definitions.findById(tenantId, id)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Process definition not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Process definition not found"));
     }
 }

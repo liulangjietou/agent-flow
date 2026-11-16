@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -59,6 +60,6 @@ public record ExpenseAccrualReductionObservation(UUID operationId, UUID adjustme
     public enum Rejection { ACCOUNTING_PERIOD_CLOSED, ORIGINAL_NOT_POSTED, ORIGINAL_CHANGED, ADJUSTMENT_VERSION_CONFLICT,
         LEGAL_ENTITY_UNAVAILABLE, ACCOUNT_UNAVAILABLE, AUTHORIZATION_REJECTED }
 
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_ACCRUAL_REDUCTION_OBSERVATION", "Expense accrual reduction requires independent posting and exact original remaining positions"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_ACCRUAL_REDUCTION_OBSERVATION, "Expense accrual reduction requires independent posting and exact original remaining positions"); }
     @Override public String toString() { return "ExpenseAccrualReductionObservation[operationId=" + operationId + ", status=" + status + ", revision=" + revision + "]"; }
 }

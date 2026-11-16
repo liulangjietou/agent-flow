@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.UUID;
 import org.apache.commons.lang3.StringUtils;
@@ -17,7 +18,7 @@ public record SupplierAccountSnapshot(UUID legalEntityId, String supplierReferen
                 || !maskedAccount.matches(".*(?:\\*{2,}|•{2,}|[xX]{2,}).*") || maskedAccount.matches(".*[0-9]{5,}.*")
                 || maskedAccount.chars().filter(Character::isDigit).count() > 8
                 || accountDigest == null || !accountDigest.matches("[a-f0-9]{64}")) {
-            throw new DomainException("INVALID_SUPPLIER_ACCOUNT", "Supplier account requires an exact legal entity, supplier and masked versioned account");
+            throw new DomainException(ErrorCode.INVALID_SUPPLIER_ACCOUNT, "Supplier account requires an exact legal entity, supplier and masked versioned account");
         }
     }
 

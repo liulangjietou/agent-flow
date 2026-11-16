@@ -97,7 +97,7 @@ class DefinitionSecurityTest {
                 .andExpect(jsonPath("$[?(@.rule == 'user:bob')].memberCount").value(org.hamcrest.Matchers.contains(1)))
                 .andExpect(jsonPath("$[?(@.rule == 'role:FINANCE')].memberCount").value(org.hamcrest.Matchers.contains(2)));
         org.assertj.core.api.Assertions.assertThat(authService.options("foreign-tenant")).isEmpty();
-        org.assertj.core.api.Assertions.assertThat(new AuthService(false, "demo").options("demo")).isEmpty();
+        org.assertj.core.api.Assertions.assertThat(new AuthService(false, "demo", java.time.Duration.ofHours(12)).options("demo")).isEmpty();
     }
 
     @Test

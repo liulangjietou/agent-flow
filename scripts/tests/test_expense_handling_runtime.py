@@ -1,9 +1,13 @@
+import os
 """真实进程验收必须隔离数据库，不能继承项目或机器的默认库。"""
 import importlib.util
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
+
+# 测试临时根目录：AGENTFLOW_TMP_DIR 优先，未设置时使用系统临时目录。
+TMP_ROOT = os.environ.get("AGENTFLOW_TMP_DIR") or tempfile.gettempdir()
 
 spec = importlib.util.spec_from_file_location("expense_runtime", Path(__file__).parents[1] / "check-precheck-explanation.py")
 runtime_module = importlib.util.module_from_spec(spec)
@@ -22,7 +26,7 @@ class RuntimeIsolationTest(unittest.TestCase):
         self.assertIsNone(result["data"]["selection"])
 
     def test_runtime_explicitly_owns_database_and_syncs_commits_before_hard_stop(self):
-        with tempfile.TemporaryDirectory(dir="/fyoung/tmp") as directory:
+        with tempfile.TemporaryDirectory(dir=TMP_ROOT) as directory:
             runtime = runtime_module.Runtime("unused-java", Path(directory), SimpleNamespace(server=SimpleNamespace(server_port=12345)))
             self.assertEqual(runtime.settings.get("spring.datasource.url"), "jdbc:h2:file:" + str(Path(directory) / "data/agentflow") + ";WRITE_DELAY=0")
             self.assertEqual(runtime.settings.get("spring.datasource.driver-class-name"), "org.h2.Driver")

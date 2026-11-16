@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.FormAssigneePolicy;
 import org.springframework.stereotype.Service;
@@ -35,7 +36,7 @@ public class OrganizationAssigneeResolver {
         List<String> members = LocalOrganizationDirectory.isContextualRule(rule)
                 ? contextualMembers(tenantId, rule, context, true)
                 : directory.roleMembers(tenantId, rule.substring("role:".length()));
-        if (members.isEmpty()) throw new DomainException("ORGANIZATION_NO_APPROVERS", "No active approvers match the organization rule");
+        if (members.isEmpty()) throw new DomainException(ErrorCode.ORGANIZATION_NO_APPROVERS, "No active approvers match the organization rule");
         return new Selection(revision, rule, members);
     }
 
@@ -86,7 +87,7 @@ public class OrganizationAssigneeResolver {
     }
 
     private List<String> contextualMembers(String tenant, String rule, InitiatorContext context, boolean approvalRequired) {
-        if (context == null) throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");
+        if (context == null) throw new DomainException(ErrorCode.INITIATOR_APPOINTMENT_REQUIRED, "Select an initiator appointment for this process");
         var origin = appointment(tenant, context.appointmentId());
         if (!origin.personId().equals(context.personId()) || !origin.departmentId().equals(context.departmentId())) throw unavailable();
         var source = repository.person(tenant, origin.personId()).orElseThrow(OrganizationAssigneeResolver::unavailable);
@@ -100,8 +101,8 @@ public class OrganizationAssigneeResolver {
         } else {
             int level;
             try { level = Integer.parseInt(rule.substring(LocalOrganizationDirectory.SUPERVISOR_RULE.length())); }
-            catch (NumberFormatException exception) { throw new DomainException("INVALID_ORGANIZATION_RULE", "Supervisor level is invalid"); }
-            if (level < 1 || level > LocalOrganizationDirectory.MAX_SUPERVISOR_LEVEL) throw new DomainException("INVALID_ORGANIZATION_RULE", "Supervisor level is outside the supported range");
+            catch (NumberFormatException exception) { throw new DomainException(ErrorCode.INVALID_ORGANIZATION_RULE, "Supervisor level is invalid"); }
+            if (level < 1 || level > LocalOrganizationDirectory.MAX_SUPERVISOR_LEVEL) throw new DomainException(ErrorCode.INVALID_ORGANIZATION_RULE, "Supervisor level is outside the supported range");
             target = origin;
             var visited = new HashSet<UUID>(); visited.add(origin.personId());
             for (int index = 0; index < level; index++) {
@@ -129,7 +130,7 @@ public class OrganizationAssigneeResolver {
                 || repository.unit(tenant, department.legalEntityId()).filter(OrganizationUnit::active).isEmpty()) throw unavailable();
     }
 
-    private static DomainException unavailable() { return new DomainException("ORGANIZATION_NO_APPROVERS", "Dynamic organization relationship has no active approver"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.ORGANIZATION_NO_APPROVERS, "Dynamic organization relationship has no active approver"); }
 
     /**
      * 当时的目录修订、规则和实际成员均保留，不从当前目录补写历史。

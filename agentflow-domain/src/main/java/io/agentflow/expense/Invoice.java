@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import org.apache.commons.lang3.StringUtils;
@@ -48,7 +49,7 @@ public final class Invoice {
         requireCheckTime(result.verifiedAt());
         if (facts != null && (!facts.key().equals(result.key()) || !facts.legalEntityId().equals(result.legalEntityId())
                 || !facts.gross().equals(result.gross()) || !facts.tax().equals(result.tax()) || !facts.issueDate().equals(result.issueDate()))) {
-            throw new DomainException("INVOICE_FACTS_CHANGED", "Verified invoice identity or amounts changed for the same original file");
+            throw new DomainException(ErrorCode.INVOICE_FACTS_CHANGED, "Verified invoice identity or amounts changed for the same original file");
         }
         facts = result; verification = Verification.VERIFIED; failureCode = null; checkedAt = result.verifiedAt(); version++;
     }
@@ -64,9 +65,9 @@ public final class Invoice {
     public void occupy(long expectedVersion, ExpenseUse target, String employeeId, UUID legalEntityId, Instant at) {
         requireVersion(expectedVersion); requireVerified(at);
         if (target == null || target.lineNo() < 1) throw invalid();
-        if (!ownerId.equals(employeeId)) throw new DomainException("INVOICE_OWNER_MISMATCH", "Invoice belongs to another employee");
-        if (!facts.legalEntityId().equals(legalEntityId)) throw new DomainException("INVOICE_TITLE_MISMATCH", "Invoice buyer does not match the legal entity");
-        if (occupation != Occupation.AVAILABLE) throw new DomainException("INVOICE_OCCUPIED", "Invoice already has an active occupation");
+        if (!ownerId.equals(employeeId)) throw new DomainException(ErrorCode.INVOICE_OWNER_MISMATCH, "Invoice belongs to another employee");
+        if (!facts.legalEntityId().equals(legalEntityId)) throw new DomainException(ErrorCode.INVOICE_TITLE_MISMATCH, "Invoice buyer does not match the legal entity");
+        if (occupation != Occupation.AVAILABLE) throw new DomainException(ErrorCode.INVOICE_OCCUPIED, "Invoice already has an active occupation");
         if (reversals.stream().anyMatch(value -> value.use().equals(target))) throw reversalConflict();
         occupation = Occupation.OCCUPIED; use = target; version++;
     }
@@ -105,23 +106,23 @@ public final class Invoice {
     /** 返回当前有效查验事实，过期边界为右开区间。 */
     public VerifiedFacts requireVerified(Instant at) {
         if (verification != Verification.VERIFIED || facts == null || at == null || at.isBefore(facts.verifiedAt()) || !at.isBefore(facts.validUntil())) {
-            throw new DomainException("INVOICE_VERIFICATION_REQUIRED", "A current successful invoice verification is required");
+            throw new DomainException(ErrorCode.INVOICE_VERIFICATION_REQUIRED, "A current successful invoice verification is required");
         }
         return facts;
     }
 
     private void requireUse(ExpenseUse expectedUse) {
         if (occupation != Occupation.OCCUPIED || !Objects.equals(use, expectedUse)) {
-            throw new DomainException("INVOICE_OCCUPATION_CHANGED", "Invoice occupation no longer matches the expected report round");
+            throw new DomainException(ErrorCode.INVOICE_OCCUPATION_CHANGED, "Invoice occupation no longer matches the expected report round");
         }
     }
-    private void requireVersion(long expectedVersion) { if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Invoice version has changed"); }
+    private void requireVersion(long expectedVersion) { if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Invoice version has changed"); }
     private void requireCheckTime(Instant at) {
         if (at == null || checkedAt != null && at.isBefore(checkedAt)
-                || reversals.stream().anyMatch(value -> at.isBefore(value.reversedAt()))) throw new DomainException("INVALID_INVOICE_TIME", "Invoice verification time is out of order");
+                || reversals.stream().anyMatch(value -> at.isBefore(value.reversedAt()))) throw new DomainException(ErrorCode.INVALID_INVOICE_TIME, "Invoice verification time is out of order");
     }
-    private static DomainException reversalConflict() { return new DomainException("CONSUMPTION_REVERSAL_CONFLICT", "Invoice adjustment must retain the original consumed report round"); }
-    private static DomainException invalid() { return new DomainException("INVALID_INVOICE", "Invoice identity, original file or verified facts are invalid"); }
+    private static DomainException reversalConflict() { return new DomainException(ErrorCode.CONSUMPTION_REVERSAL_CONFLICT, "Invoice adjustment must retain the original consumed report round"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_INVOICE, "Invoice identity, original file or verified facts are invalid"); }
 
     /** 恢复时核对查验与占用维度的一致性，原件身份始终不可变。 */
     public static Invoice restore(State state) {

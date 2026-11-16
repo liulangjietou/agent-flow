@@ -1,5 +1,6 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.springframework.util.MultiValueMap;
 
@@ -36,6 +37,6 @@ public record ServiceTaskRuntimeQuery(int roundNo, UUID afterId, int limit) {
 
     /** 非本申请或本轮游标采用相同错误，不返回其他记录的信息。 */
     static DomainException invalid() {
-        return new DomainException("INVALID_SERVICE_TASK_QUERY", "Invalid service task runtime query");
+        return new DomainException(ErrorCode.INVALID_SERVICE_TASK_QUERY, "Invalid service task runtime query");
     }
 }

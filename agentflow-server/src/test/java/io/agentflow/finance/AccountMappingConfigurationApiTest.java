@@ -41,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "spring.datasource.url=jdbc:h2:mem:account-mapping-api;DB_CLOSE_DELAY=-1",
         "agentflow.advances.overdue.reminders-enabled=false", "agentflow.timers.enabled=false", "agentflow.finance-gateway.enabled=false",
-        "agentflow.attachments.directory=/fyoung/tmp/agentflow-account-mapping-api-test-files"})
+        "agentflow.attachments.directory=${java.io.tmpdir}/agentflow-account-mapping-api-test-files"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class AccountMappingConfigurationApiTest {
     private static final String API = "/api/v1/admin/account-mappings";

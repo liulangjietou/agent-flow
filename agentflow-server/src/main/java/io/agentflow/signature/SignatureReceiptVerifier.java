@@ -1,5 +1,6 @@
 package io.agentflow.signature;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
@@ -96,5 +97,5 @@ public class SignatureReceiptVerifier {
      * @author owlzhangfq@gmail.com
      */
     public record Verified(SignatureReceipt receipt, Evidence evidence) { }
-    private static DomainException invalid() { return new DomainException("SIGNATURE_RECEIPT_UNVERIFIED", "Signature receipt authentication or original request binding failed"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.SIGNATURE_RECEIPT_UNVERIFIED, "Signature receipt authentication or original request binding failed"); }
 }

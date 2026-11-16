@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseCategoryCatalog;
 import java.time.Instant;
@@ -17,7 +18,7 @@ public record AccountMappingDraft(UUID id, String tenantId, String key, long rev
         if (id == null || StringUtils.isBlank(tenantId) || tenantId.length() > 64 || !validKey(key) || revision < 1 || definition == null
                 || publishedVersion < 0 || publishedDraftRevision < 0 || publishedDraftRevision > revision || publishedVersion > publishedDraftRevision
                 || (publishedVersion == 0) != (publishedDraftRevision == 0)) {
-            throw new DomainException("INVALID_ACCOUNT_MAPPING_DRAFT", "Account mapping draft identity and revision are invalid");
+            throw new DomainException(ErrorCode.INVALID_ACCOUNT_MAPPING_DRAFT, "Account mapping draft identity and revision are invalid");
         }
     }
 
@@ -30,7 +31,7 @@ public record AccountMappingDraft(UUID id, String tenantId, String key, long rev
     public AccountMappingDraft revise(long expectedRevision, AccountMappingDefinition next) {
         requireRevision(expectedRevision);
         if (!definition.legalEntityId().equals(next.legalEntityId()) || !definition.currency().equals(next.currency())) {
-            throw new DomainException("ACCOUNT_MAPPING_SCOPE_IMMUTABLE", "An account mapping key cannot change its legal entity or currency");
+            throw new DomainException(ErrorCode.ACCOUNT_MAPPING_SCOPE_IMMUTABLE, "An account mapping key cannot change its legal entity or currency");
         }
         if (definition.equals(next)) throw unchanged();
         return new AccountMappingDraft(id, tenantId, key, Math.incrementExact(revision), next, publishedVersion, publishedDraftRevision);
@@ -40,7 +41,7 @@ public record AccountMappingDraft(UUID id, String tenantId, String key, long rev
     public Publication publish(long expectedRevision, ExpenseCategoryCatalog categories, String targetDigest, String actor, Instant now, String comment) {
         requireRevision(expectedRevision);
         if (publishedDraftRevision == revision) throw unchanged();
-        if (!tenantId.equals(categories.tenantId())) throw new DomainException("ACCOUNT_MAPPING_SCOPE_MISMATCH", "Account mapping and category catalog must belong to the same tenant");
+        if (!tenantId.equals(categories.tenantId())) throw new DomainException(ErrorCode.ACCOUNT_MAPPING_SCOPE_MISMATCH, "Account mapping and category catalog must belong to the same tenant");
         definition.requirePublishable(categories);
         var version = new PublishedAccountMapping(id, tenantId, key, Math.incrementExact(publishedVersion), revision, categories.version(),
                 definition, targetDigest, actor, now, comment);
@@ -49,12 +50,12 @@ public record AccountMappingDraft(UUID id, String tenantId, String key, long rev
 
     /** 期望修订由操作者读取后提交，拒绝覆盖并发修改。 */
     public void requireRevision(long expected) {
-        if (revision != expected) throw new DomainException("CONCURRENCY_CONFLICT", "Account mapping draft revision changed");
+        if (revision != expected) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Account mapping draft revision changed");
     }
 
     /** 管理路径只接受稳定的小写业务键。 */
     public static boolean validKey(String value) { return value != null && value.matches("[a-z][a-z0-9-]{0,63}"); }
-    private static DomainException unchanged() { return new DomainException("ACCOUNT_MAPPING_UNCHANGED", "Account mapping draft has no unpublished changes"); }
+    private static DomainException unchanged() { return new DomainException(ErrorCode.ACCOUNT_MAPPING_UNCHANGED, "Account mapping draft has no unpublished changes"); }
 
     /**
      * 发布游标与不可变发布物须在同一数据库事务保存。

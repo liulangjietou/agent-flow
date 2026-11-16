@@ -1,5 +1,7 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -34,8 +36,8 @@ public record DefinitionCatalogParameters(DefinitionCatalogPort.Query query, Str
             String text = text(raw, "q", 100), key = text(raw, "processKey", 128);
             String status = raw.getOrDefault("status", "");
             if (!STATUSES.contains(status)) throw invalid();
-            boolean manager = actor.hasRole("ADMIN") || actor.hasRole("PROCESS_ADMIN");
-            if (!manager && "DRAFT".equals(status)) throw new DomainException("FORBIDDEN", "Draft definitions are not visible to this role");
+            boolean manager = actor.hasRole(SystemRole.ADMIN) || actor.hasRole(SystemRole.PROCESS_ADMIN);
+            if (!manager && "DRAFT".equals(status)) throw new DomainException(ErrorCode.FORBIDDEN, "Draft definitions are not visible to this role");
             if (!manager) status = "PUBLISHED";
             String availability = raw.getOrDefault("startEnabled", "");
             if (!Set.of("", "true", "false").contains(availability)) throw invalid();
@@ -76,5 +78,5 @@ public record DefinitionCatalogParameters(DefinitionCatalogPort.Query query, Str
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
         catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 is unavailable", impossible); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_DEFINITION_QUERY", "Invalid definition filter or cursor"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_DEFINITION_QUERY, "Invalid definition filter or cursor"); }
 }

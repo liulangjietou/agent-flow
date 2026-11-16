@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.Actor;
@@ -77,12 +78,12 @@ public class ExpensePrecheckService {
         var report = owned(reportId); var application = applications.requireApplicant(report.applicationId());
         application.requireEditable(request.applicationVersion());
         if (report.version() != request.financialVersion() || report.rounds().size() + 1 != application.nextSubmissionRound()) throw changed();
-        if (report.content().lines().isEmpty()) throw new DomainException("EXPENSE_LINES_REQUIRED", "Expense precheck requires at least one line");
+        if (report.content().lines().isEmpty()) throw new DomainException(ErrorCode.EXPENSE_LINES_REQUIRED, "Expense precheck requires at least one line");
         var initiator = initiators.snapshot(actor, request.initiatorAppointmentId());
-        if (!initiator.legalEntityId().equals(report.content().legalEntityId())) throw new DomainException("EXPENSE_LEGAL_ENTITY_MISMATCH", "Selected appointment and expense legal entity must match");
-        var destination = configuration.destination(actor.tenantId()).orElseThrow(() -> new DomainException("FINANCE_GATEWAY_UNAVAILABLE", "Expense precheck is not configured for this tenant"));
-        if (!destination.digest(actor.tenantId()).equals(request.targetDigest())) throw new DomainException("FINANCE_TARGET_CHANGED", "Refresh the finance destination before queuing");
-        if (jobs.active(actor.tenantId(), reportId)) throw new DomainException("EXPENSE_PRECHECK_ACTIVE", "Expense report already has an active precheck");
+        if (!initiator.legalEntityId().equals(report.content().legalEntityId())) throw new DomainException(ErrorCode.EXPENSE_LEGAL_ENTITY_MISMATCH, "Selected appointment and expense legal entity must match");
+        var destination = configuration.destination(actor.tenantId()).orElseThrow(() -> new DomainException(ErrorCode.FINANCE_GATEWAY_UNAVAILABLE, "Expense precheck is not configured for this tenant"));
+        if (!destination.digest(actor.tenantId()).equals(request.targetDigest())) throw new DomainException(ErrorCode.FINANCE_TARGET_CHANGED, "Refresh the finance destination before queuing");
+        if (jobs.active(actor.tenantId(), reportId)) throw new DomainException(ErrorCode.EXPENSE_PRECHECK_ACTIVE, "Expense report already has an active precheck");
         var input = new Input(UUID.randomUUID(), actor.tenantId(), reportId, report.applicationId(), actor.userId(), application.version(), report.version(),
                 application.nextSubmissionRound(), jobs.nextAttempt(actor.tenantId(), reportId), initiator, request.accountingDate(), request.targetDigest());
         var job = ExpensePrecheckJob.queue(input, time(Instant.now())); jobs.create(job); record(job); return new Receipt(input.id());
@@ -209,9 +210,9 @@ public class ExpensePrecheckService {
 
     private static Summary summary(ExpensePrecheckJob job) { return new Summary(job.input().id(), job.version(), job.status(), job.input().applicationVersion(), job.input().financialVersion(), job.input().attempt(), job.createdAt(), job.startedAt(), job.completedAt()); }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MILLIS); }
-    private static DomainException changed() { return new DomainException("CONCURRENCY_CONFLICT", "Expense or application version changed"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense precheck context not found"); }
-    private static DomainException invalidQuery() { return new DomainException("INVALID_EXPENSE_QUERY", "Expense precheck query is invalid"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense or application version changed"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Expense precheck context not found"); }
+    private static DomainException invalidQuery() { return new DomainException(ErrorCode.INVALID_EXPENSE_QUERY, "Expense precheck query is invalid"); }
 
     /**
      * 申请人只能选择输入上下文，不能提交核算或预算结论。

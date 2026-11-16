@@ -1,5 +1,6 @@
 package io.agentflow.onboarding;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.history.JdbcSubmissionHistoryGapQuery;
 import io.agentflow.common.DomainException;
 import io.agentflow.mybatis.SqlRow;
@@ -46,7 +47,7 @@ public class JdbcFirstWorkflowReadAdapter implements FirstWorkflowReadPort {
                                 this::definition);
         if (definitions.isEmpty()) {
             if (definitionId != null)
-                throw new DomainException("NOT_FOUND", "Process definition was not found");
+                throw new DomainException(ErrorCode.NOT_FOUND, "Process definition was not found");
             return new Report(checkedAt, null, 0, 0, 0, null, null);
         }
         Definition definition = definitions.get(0);

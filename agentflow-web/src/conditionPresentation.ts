@@ -108,14 +108,14 @@ function insideQuotedLiteral(source: string, position: number, version: number):
       if (version === 2 && char === '\\') index++
       else if (char === quote) quote = ''
     } else if (version === 2) {
-      if (char === '\"' || char === "'") quote = char
+      if (char === '"' || char === "'") quote = char
     } else if (/[ \t\n\r\f\v]/.test(char)) inWord = false
     else {
       const connector = index > 0 && /[ \t\n\r\f\v]/.test(source[index - 1]!) ? /^(AND|OR)(?=[ \t\n\r\f\v])/i.exec(source.slice(index)) : null
       if (connector) { words = 0; inWord = false; index += connector[1]!.length - 1 }
       else if (!inWord) {
         words++; inWord = true
-        if (words === 3 && (char === '\"' || char === "'")) quote = char
+        if (words === 3 && (char === '"' || char === "'")) quote = char
       }
     }
   }

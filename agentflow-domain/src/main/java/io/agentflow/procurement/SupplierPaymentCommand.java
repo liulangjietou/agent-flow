@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.PaymentAccountsPort;
@@ -106,7 +107,7 @@ public record SupplierPaymentCommand(SupplierPayableHoldCommand holdCommand, Sup
             digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array()); digest.update(bytes);
         }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYMENT_COMMAND", "Supplier payment requires a fresh confirmed original hold and an independent cashier account selection"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYMENT_COMMAND, "Supplier payment requires a fresh confirmed original hold and an independent cashier account selection"); }
 
     /** 日志不展开供应商、出纳、金额或账户。 */
     @Override public String toString() { return "SupplierPaymentCommand[id=" + id() + "]"; }

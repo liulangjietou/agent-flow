@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.Comparator;
 import java.util.List;
@@ -28,5 +29,5 @@ public record ManagedAccountMapping(String tenantId, UUID legalEntityId, String 
         if (!legalEntityId.equals(entity) || !currency.equals(expectedCurrency) || !entries.stream().map(AccountMappingPort.Entry::key).toList().equals(keys)) throw invalid();
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_ACCOUNT_MAPPING_SELECTION", "Managed account mapping must bind the same tenant scope and required accounting keys"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ACCOUNT_MAPPING_SELECTION, "Managed account mapping must bind the same tenant scope and required accounting keys"); }
 }

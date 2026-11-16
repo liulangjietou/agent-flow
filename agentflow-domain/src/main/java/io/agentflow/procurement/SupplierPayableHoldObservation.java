@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.time.Instant;
@@ -36,7 +37,7 @@ public record SupplierPayableHoldObservation(UUID authorizationId, String comman
     private static boolean invalidReference(String value) {
         return StringUtils.isBlank(value) || value.length() > 128 || !value.equals(value.trim()) || value.chars().anyMatch(Character::isISOControl);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYABLE_HOLD_OBSERVATION", "Original payable hold evidence requires a consistent outcome for the exact command"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYABLE_HOLD_OBSERVATION, "Original payable hold evidence requires a consistent outcome for the exact command"); }
 
     /** 不在日志展开预留号或账户摘要。 */
     @Override public String toString() { return "SupplierPayableHoldObservation[authorizationId=" + authorizationId + ", status=" + status + ", revision=" + revision + "]"; }

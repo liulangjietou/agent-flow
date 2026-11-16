@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -25,13 +26,13 @@ public record VoucherReversalRetirement(UUID id, String tenantId, UUID operation
     /** 结束资格来自原执行状态与随后复核的同一有效原件，当前财务任职由应用入口核对。 */
     public static VoucherReversalOperation.RetirementBasis requireSource(VoucherReversalOperation reversal, VoucherOperation original, String actor, Instant now) {
         var command = reversal.input().command(); var basis = reversal.retirementBasis();
-        if (basis == null) throw new DomainException("VOUCHER_REVERSAL_RETIREMENT_UNSAFE", "Unknown, accepted, conflicting or posted reversal cannot be retired");
+        if (basis == null) throw new DomainException(ErrorCode.VOUCHER_REVERSAL_RETIREMENT_UNSAFE, "Unknown, accepted, conflicting or posted reversal cannot be retired");
         if (now.isBefore(reversal.updatedAt()) || !command.source().command().equals(original.input().command()) || !command.id().equals(original.reversalId())
                 || !VoucherDisputeResolution.independent(command.source().command(), actor)) throw invalid();
         var observation = original.observation();
         if (original.status() != VoucherOperation.Status.POSTED || observation == null || observation.observedAt().isBefore(reversal.updatedAt())
                 || observation.revision() < command.verifiedOriginal().revision() || !command.source().matchesOriginal(observation)) {
-            throw new DomainException("VOUCHER_REVERSAL_ORIGINAL_RECHECK_REQUIRED", "Original voucher must remain posted and be rechecked after the reversal stopped or failed");
+            throw new DomainException(ErrorCode.VOUCHER_REVERSAL_ORIGINAL_RECHECK_REQUIRED, "Original voucher must remain posted and be rechecked after the reversal stopped or failed");
         }
         original.releaseReversal(command.id(), now); return basis;
     }
@@ -41,5 +42,5 @@ public record VoucherReversalRetirement(UUID id, String tenantId, UUID operation
         return new VoucherReversalRetirement(UUID.randomUUID(), command.source().command().tenantId(), original.input().command().id(), command.id(),
                 original.version(), original.version() + 1, reversal.version(), reversal.stopForRetirement(now).version(), basis, original.observation(), actor, reference, comment, now);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_REVERSAL_RETIREMENT", "Reversal retirement must preserve its original identity, independent finance decision and fresh posted evidence"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_REVERSAL_RETIREMENT, "Reversal retirement must preserve its original identity, independent finance decision and fresh posted evidence"); }
 }

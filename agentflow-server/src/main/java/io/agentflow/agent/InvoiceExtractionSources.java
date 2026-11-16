@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.InvoiceOriginal;
 import io.agentflow.expense.InvoiceOriginalFiles;
@@ -53,7 +54,7 @@ public class InvoiceExtractionSources {
             throw new IllegalStateException("Invoice source preparation must run outside a transaction");
         }
         original.requireReady();
-        if (!SUPPORTED.contains(original.format())) throw new DomainException("INVOICE_EXTRACTION_FORMAT_UNSUPPORTED", "Invoice extraction format is not supported");
+        if (!SUPPORTED.contains(original.format())) throw new DomainException(ErrorCode.INVOICE_EXTRACTION_FORMAT_UNSUPPORTED, "Invoice extraction format is not supported");
         byte[] bytes = files.read(original);
         if (original.format() == InvoiceOriginal.Format.OFD) return ofd(original, bytes);
         int pages = original.format() == InvoiceOriginal.Format.PDF ? new InvoicePdfInspector().pageCount(bytes) : 1;
@@ -104,7 +105,7 @@ public class InvoiceExtractionSources {
     }
 
     private static DomainException invalidSource() {
-        return new DomainException("INVOICE_EXTRACTION_SOURCE_UNAVAILABLE", "Invoice original is unreadable or exceeds extraction limits");
+        return new DomainException(ErrorCode.INVOICE_EXTRACTION_SOURCE_UNAVAILABLE, "Invoice original is unreadable or exceeds extraction limits");
     }
 
     /**
@@ -129,7 +130,7 @@ public class InvoiceExtractionSources {
 
         /** XML 摘录还需存在于实际发送文本，图片摘录仍须本人对照原件。 */
         void requireQuote(String quote) {
-            if (text != null && !text.contains(quote)) throw new DomainException("INVALID_AGENT_OUTPUT", "Invoice quote is absent from the source text");
+            if (text != null && !text.contains(quote)) throw new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Invoice quote is absent from the source text");
         }
     }
 

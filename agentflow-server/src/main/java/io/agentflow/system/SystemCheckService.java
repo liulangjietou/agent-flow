@@ -1,5 +1,6 @@
 package io.agentflow.system;
 
+import io.agentflow.common.SystemRole;
 import io.agentflow.common.Actor;
 import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.notification.NotificationChannel;
@@ -71,7 +72,7 @@ public class SystemCheckService {
 
     /** 入口校验管理员权限后才调度依赖检查，结果不包含配置值或异常原文。 */
     public Report check(Actor actor) {
-        actor.requireRole("ADMIN");
+        actor.requireRole(SystemRole.ADMIN);
         // 自检没有审批单据；租户只取已授权主体，诊断线程不继承调用方的业务标识。
         var trace = new DiagnosticContext(DiagnosticContext.capture().traceId(), actor.tenantId());
         List<Check> checks = new ArrayList<>();

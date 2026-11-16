@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import java.util.List;
@@ -33,7 +34,7 @@ public class AgentUsageController {
                 subject = UUID.fromString(raw.getFirst("subjectId"));
                 if (!subject.toString().equals(raw.getFirst("subjectId"))) throw new IllegalArgumentException();
             }
-        } catch (IllegalArgumentException invalid) { throw new DomainException("INVALID_AGENT_QUERY", "Invalid agent usage query"); }
+        } catch (IllegalArgumentException invalid) { throw new DomainException(ErrorCode.INVALID_AGENT_QUERY, "Invalid agent usage query"); }
         var actor = actors.actor();
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(repository.list(actor.tenantId(), actor.userId(), subject));
     }

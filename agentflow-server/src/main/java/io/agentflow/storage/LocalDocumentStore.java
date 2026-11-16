@@ -1,5 +1,6 @@
 package io.agentflow.storage;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,8 +66,8 @@ public class LocalDocumentStore {
                 int count;
                 while ((count = input.read(buffer)) != -1) {
                     size += count;
-                    if (size > maxFileBytes) throw new DomainException("FILE_TOO_LARGE", "Document exceeds the configured file limit");
-                    if (size > file.size()) throw new DomainException("FILE_CONTENT_MISMATCH", "Document exceeds its registered size");
+                    if (size > maxFileBytes) throw new DomainException(ErrorCode.FILE_TOO_LARGE, "Document exceeds the configured file limit");
+                    if (size > file.size()) throw new DomainException(ErrorCode.FILE_CONTENT_MISMATCH, "Document exceeds its registered size");
                     digest.update(buffer, 0, count);
                     output.write(buffer, 0, count);
                 }
@@ -106,7 +107,7 @@ public class LocalDocumentStore {
             return bytes;
         } catch (IOException failure) { throw unavailable(); }
         catch (DomainException failure) {
-            throw new DomainException("FILE_INTEGRITY_FAILED", "Stored attachment is missing or differs from its fingerprint");
+            throw new DomainException(ErrorCode.FILE_INTEGRITY_FAILED, "Stored attachment is missing or differs from its fingerprint");
         }
     }
 
@@ -122,7 +123,7 @@ public class LocalDocumentStore {
         try { Files.deleteIfExists(staged); }
         catch (IOException failure) {
             // 清理失败不改写已发布文件的成功状态，也不遮蔽原传输错误。
-            log.warn("Document staging cleanup failed, errorCode={}, stagedFile={}", "FILE_STAGING_CLEANUP_FAILED", staged.getFileName(), failure);
+            log.error("Document staging cleanup failed, errorCode={}, stagedFile={}", "FILE_STAGING_CLEANUP_FAILED", staged.getFileName(), failure);
         }
     }
 
@@ -131,9 +132,9 @@ public class LocalDocumentStore {
 
     private Path path(Content file) { requireEnabled(); return directory.resolve(file.id() + ".bin"); }
     private void requireEnabled() {
-        if (!enabled()) throw new DomainException("FILE_STORAGE_UNAVAILABLE", "Document storage is not configured");
+        if (!enabled()) throw new DomainException(ErrorCode.FILE_STORAGE_UNAVAILABLE, "Document storage is not configured");
     }
-    private static DomainException unavailable() { return new DomainException("FILE_STORAGE_UNAVAILABLE", "Document storage is unavailable"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.FILE_STORAGE_UNAVAILABLE, "Document storage is unavailable"); }
     private static MessageDigest digest() {
         try { return MessageDigest.getInstance("SHA-256"); }
         catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 is unavailable", impossible); }
@@ -147,7 +148,7 @@ public class LocalDocumentStore {
         /** 基础存储只核对字节与预先登记的指纹，不决定业务可用性。 */
         public void verify(long actualSize, String actualDigest) {
             if (actualSize != size || !sha256.equals(actualDigest)) {
-                throw new DomainException("FILE_CONTENT_MISMATCH", "Document content differs from its registered fingerprint");
+                throw new DomainException(ErrorCode.FILE_CONTENT_MISMATCH, "Document content differs from its registered fingerprint");
             }
         }
     }

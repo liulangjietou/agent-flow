@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
@@ -128,6 +129,6 @@ public class OrganizationService {
     private void record(Actor actor, long revision, String kind, UUID id, Object value) {
         repository.recordChange(actor.tenantId(), revision, actor.userId(), kind, id, value, Instant.now());
     }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Organization record not found"); }
-    private static DomainException relation() { return new DomainException("ORGANIZATION_RELATION_INVALID", "Organization relation type or legal entity does not match"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Organization record not found"); }
+    private static DomainException relation() { return new DomainException(ErrorCode.ORGANIZATION_RELATION_INVALID, "Organization relation type or legal entity does not match"); }
 }

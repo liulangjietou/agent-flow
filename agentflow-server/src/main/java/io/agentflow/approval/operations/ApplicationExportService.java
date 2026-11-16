@@ -1,5 +1,6 @@
 package io.agentflow.approval.operations;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
@@ -22,16 +23,16 @@ public class ApplicationExportService {
 
     /** 超限整次拒绝，不截断文件；查询或生成失败也释放容量。 */
     public byte[] export(Actor actor, ApplicationSearchPort.Query filters) {
-        if (!capacity.tryAcquire()) throw new DomainException("APPLICATION_EXPORT_BUSY", "An application export is already running; retry later");
+        if (!capacity.tryAcquire()) throw new DomainException(ErrorCode.APPLICATION_EXPORT_BUSY, "An application export is already running; retry later");
         try {
             Instant startedAt = Instant.now();
             var query = new ApplicationSearchPort.Query(filters.text(), filters.status(), filters.processKey(), filters.definitionVersion(),
                     filters.applicant(), filters.createdFrom(), filters.createdBefore(), MAX_RECORDS, null, null);
             var rows = reader.search(actor, query);
-            if (rows.size() > MAX_RECORDS) throw new DomainException("APPLICATION_EXPORT_LIMIT_EXCEEDED", "Narrow the filters to at most 10000 records");
+            if (rows.size() > MAX_RECORDS) throw new DomainException(ErrorCode.APPLICATION_EXPORT_LIMIT_EXCEEDED, "Narrow the filters to at most 10000 records");
             return ApplicationWorkbook.write(rows, actor, query, startedAt);
         } catch (IOException exception) {
-            throw new DomainException("APPLICATION_EXPORT_FAILED", "Unable to generate the application workbook; retry later");
+            throw new DomainException(ErrorCode.APPLICATION_EXPORT_FAILED, "Unable to generate the application workbook; retry later");
         } finally { capacity.release(); }
     }
 }

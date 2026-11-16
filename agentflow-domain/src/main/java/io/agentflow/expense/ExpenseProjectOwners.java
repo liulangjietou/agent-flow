@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceCatalog;
 import java.util.Comparator;
@@ -33,7 +34,7 @@ public record ExpenseProjectOwners(String catalogVersion, UUID legalEntityId, Li
         var selected = catalog.projects().stream().filter(project -> project.legalEntityId().equals(content.legalEntityId())
                 && codes.contains(project.code())).toList();
         if (selected.size() != codes.size() || selected.stream().anyMatch(project -> project.ownerSubject() == null)) {
-            throw new DomainException("EXPENSE_PROJECT_OWNER_UNAVAILABLE", "Every allocated project requires an owner from the authorized finance catalog");
+            throw new DomainException(ErrorCode.EXPENSE_PROJECT_OWNER_UNAVAILABLE, "Every allocated project requires an owner from the authorized finance catalog");
         }
         return new ExpenseProjectOwners(catalog.sourceVersion(), content.legalEntityId(), selected);
     }
@@ -52,6 +53,6 @@ public record ExpenseProjectOwners(String catalogVersion, UUID legalEntityId, Li
                 .filter(Objects::nonNull).collect(Collectors.toSet());
     }
     private static DomainException invalid() {
-        return new DomainException("INVALID_EXPENSE_PROJECT_OWNERS", "Project owners must retain a unique complete project mapping within one legal entity and catalog version");
+        return new DomainException(ErrorCode.INVALID_EXPENSE_PROJECT_OWNERS, "Project owners must retain a unique complete project mapping within one legal entity and catalog version");
     }
 }

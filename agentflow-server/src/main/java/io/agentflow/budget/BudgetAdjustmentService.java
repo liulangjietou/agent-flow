@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.ApplicationFieldViews;
 import io.agentflow.approval.model.Application;
@@ -62,7 +63,7 @@ public class BudgetAdjustmentService {
         var round = adjustment.rounds().stream().filter(value -> value.roundNo() == selected).findFirst().orElseThrow(BudgetAdjustmentService::notFound);
         var projection = fields.attachmentView(application, selected);
         if (!owner && !BudgetAdjustmentFormContract.detailsReadable(application.formSchema(), projection.schema())) {
-            throw new DomainException("FORBIDDEN", "Field permissions do not allow reading adjustment details");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Field permissions do not allow reading adjustment details");
         }
         return view(application, adjustment, round, false);
     }
@@ -71,7 +72,7 @@ public class BudgetAdjustmentService {
     @Transactional
     public Receipt change(UUID id, long applicationVersion, long requestVersion, String comment, boolean cancel) {
         owned(id); requests.lock(actors.actor().tenantId(), id); var adjustment = owned(id);
-        if (adjustment.version() != requestVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Budget adjustment version changed");
+        if (adjustment.version() != requestVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Budget adjustment version changed");
         var application = applications.requireApplicant(adjustment.applicationId());
         application = cancel ? applications.cancelBusiness(application.id(), applicationVersion, comment, application.businessReference())
                 : applications.withdrawBusiness(application.id(), applicationVersion, comment, application.businessReference());
@@ -91,7 +92,7 @@ public class BudgetAdjustmentService {
     public static Receipt receipt(Application application, BudgetAdjustmentRequest adjustment) {
         return new Receipt(adjustment.id(), application.id(), application.version(), adjustment.version(), application.roundNo(), application.status());
     }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Budget adjustment or round not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Budget adjustment or round not found"); }
 
     /**
      * 草稿内容与某轮快照互斥，旧审批人只能读取其有权访问的原轮次。

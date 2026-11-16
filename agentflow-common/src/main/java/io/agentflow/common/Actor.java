@@ -11,7 +11,7 @@ public record Actor(String tenantId, String userId, Set<String> roles) {
     public Actor {
         if (org.apache.commons.lang3.StringUtils.isBlank(tenantId)
                 || org.apache.commons.lang3.StringUtils.isBlank(userId)) {
-            throw new DomainException("INVALID_ACTOR", "Tenant and user are required");
+            throw new DomainException(ErrorCode.INVALID_ACTOR, "Tenant and user are required");
         }
         roles = roles == null ? Set.of() : Set.copyOf(roles);
     }
@@ -21,10 +21,20 @@ public record Actor(String tenantId, String userId, Set<String> roles) {
         return roles.contains(role);
     }
 
+    /** 判断主体是否拥有系统角色。 */
+    public boolean hasRole(SystemRole role) {
+        return hasRole(role.name());
+    }
+
+    /** 要求主体拥有系统角色，否则拒绝当前用例。 */
+    public void requireRole(SystemRole role) {
+        requireRole(role.name());
+    }
+
     /** 要求主体拥有角色，否则拒绝当前用例。 */
     public void requireRole(String role) {
         if (!hasRole(role)) {
-            throw new DomainException("FORBIDDEN", "Required role is missing");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Required role is missing");
         }
     }
 }

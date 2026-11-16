@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -79,8 +80,7 @@ public class JdbcProcurementPayableReservationRepository {
                     json.write(value),
                     Timestamp.from(value.heldAt()));
         } catch (DuplicateKeyException occupied) {
-            throw new DomainException(
-                    "PROCUREMENT_PAYABLE_OCCUPIED",
+            throw new DomainException(ErrorCode.PROCUREMENT_PAYABLE_OCCUPIED,
                     "Original payable already has an active local payment request");
         }
         invoices.recognize(value);
@@ -332,5 +332,5 @@ public class JdbcProcurementPayableReservationRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Procurement payable reservation source or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Procurement payable reservation source or version changed"); }
 }

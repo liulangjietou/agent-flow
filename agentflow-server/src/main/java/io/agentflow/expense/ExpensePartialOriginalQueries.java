@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.*;
 import java.time.Instant;
@@ -53,7 +54,7 @@ public class ExpensePartialOriginalQueries {
         var paymentVoucher = payment == null ? null : vouchers.forRound(tenant, source.applicationId(), source.roundNo(), VoucherCommand.Kind.PAYMENT).orElseThrow(ExpensePartialOriginalQueries::conflict);
         return new Originals(accrual, payment, paymentVoucher);
     }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed original expense finance changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed original expense finance changed"); }
     /**
      * 同一原结算的最小内部查询组合，不作为公开响应输出。
      * @author owlzhangfq@gmail.com

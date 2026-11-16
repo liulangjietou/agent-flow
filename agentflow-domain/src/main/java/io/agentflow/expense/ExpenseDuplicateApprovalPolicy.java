@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionModels.Graph;
 import io.agentflow.definition.DefinitionModels.NodeType;
@@ -26,7 +27,7 @@ public final class ExpenseDuplicateApprovalPolicy {
         for (var node : graph.nodes()) {
             if (!node.properties().containsKey(PROPERTY)) continue;
             if (node.type() != NodeType.START || !AUTO_PASS_ADJACENT.equals(node.properties().get(PROPERTY))) {
-                throw new DomainException("EXPENSE_DUPLICATE_POLICY_INVALID", "Expense duplicate approval policy requires the supported start-node setting");
+                throw new DomainException(ErrorCode.EXPENSE_DUPLICATE_POLICY_INVALID, "Expense duplicate approval policy requires the supported start-node setting");
             }
             enabled = true;
         }
@@ -37,10 +38,10 @@ public final class ExpenseDuplicateApprovalPolicy {
     public static void validate(Graph graph, FormSchema schema) {
         if (!enabled(graph)) return;
         if (!ExpenseFormContract.structured(schema)) {
-            throw new DomainException("EXPENSE_DUPLICATE_REQUIRES_EXPENSE_FORM", "Expense duplicate approval policy requires an expense form");
+            throw new DomainException(ErrorCode.EXPENSE_DUPLICATE_REQUIRES_EXPENSE_FORM, "Expense duplicate approval policy requires an expense form");
         }
         if (!ExpenseSelfApprovalPolicy.enabled(graph)) {
-            throw new DomainException("EXPENSE_DUPLICATE_REQUIRES_FROZEN_DUTIES", "Expense duplicate approval policy requires frozen expense responsibilities");
+            throw new DomainException(ErrorCode.EXPENSE_DUPLICATE_REQUIRES_FROZEN_DUTIES, "Expense duplicate approval policy requires frozen expense responsibilities");
         }
     }
 

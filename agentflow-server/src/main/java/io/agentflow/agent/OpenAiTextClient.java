@@ -29,9 +29,15 @@ import org.slf4j.LoggerFactory;
 final class OpenAiTextClient {
     private static final int MAX_RESPONSE_BYTES = 256 * 1024;
     private static final Logger LOG = LoggerFactory.getLogger(OpenAiTextClient.class);
+    private static final int RATE_LIMITED = 429;
+    private static final int MAX_RATE_LIMIT_ATTEMPTS = 3;
+    private static final long DEFAULT_RETRY_AFTER_SECONDS = 1;
+    private static final long MAX_RETRY_AFTER_SECONDS = 10;
+    /** 全部适配器共享一个客户端：连接池与选择器线程按进程复用，不随每个适配器实例重复创建。 */
+    private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3))
+            .followRedirects(HttpClient.Redirect.NEVER).build();
     private final AssistConfiguration configuration;
     private final JsonUtil json;
-    private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).followRedirects(HttpClient.Redirect.NEVER).build();
 
     OpenAiTextClient(AssistConfiguration configuration, JsonUtil json) { this.configuration = configuration; this.json = json; }
 
@@ -51,22 +57,28 @@ final class OpenAiTextClient {
         catch (io.agentflow.common.DomainException unavailable) {
             throw new AssistModelPort.ModelFailure(AssistRun.Failure.MODEL_UNAVAILABLE);
         }
-        var endpoint = configuration.uri(); String provider = configuration.getProviderId(), model = configuration.getModel();
+        var endpoint = configuration.uri(); String provider = configuration.getProviderId(), model = configuration.modelFor(promptVersion);
         String apiKey = configuration.getApiKey(); int timeout = configuration.getTimeoutSeconds();
-        if (!AssistConfiguration.digest(endpoint + "\n" + provider + "\n" + model + "\n" + promptVersion).equals(expectedTarget)) {
+        if (!configuration.targetDigest(promptVersion).equals(expectedTarget)) {
             throw new AssistModelPort.ModelFailure(AssistRun.Failure.MODEL_UNAVAILABLE);
         }
         String body = json.write(Map.of("model", model, "stream", false, "store", false,
-                "max_completion_tokens", 4096, "response_format", Map.of("type", "json_object"),
+                "max_completion_tokens", configuration.maxCompletionTokensFor(promptVersion), "response_format", Map.of("type", "json_object"),
                 "messages", List.of(Map.of("role", "system", "content", instruction), Map.of("role", "user", "content", content))));
-        var request = HttpRequest.newBuilder(endpoint).timeout(Duration.ofSeconds(timeout))
-                .header("Content-Type", "application/json; charset=utf-8").POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
-        request.header(DiagnosticContext.HEADER, DiagnosticContext.capture().traceId());
-        if (!apiKey.isBlank()) request.header("Authorization", "Bearer " + apiKey);
         long started = System.nanoTime();
-        var future = client.sendAsync(request.build(), response -> new BoundedBody());
+        long deadline = started + TimeUnit.SECONDS.toNanos(timeout);
         try {
-            var response = future.get(timeout, TimeUnit.SECONDS);
+            HttpResponse<byte[]> response = null;
+            for (int attempt = 1; attempt <= MAX_RATE_LIMIT_ATTEMPTS; attempt++) {
+                response = send(endpoint, apiKey, body, deadline);
+                if (response.statusCode() != RATE_LIMITED) break;
+                // 429 表示请求未被处理，重试不会造成重复执行；等待时长受本次总超时约束，等不起就直接失败。
+                long wait = retryAfterNanos(response);
+                if (attempt == MAX_RATE_LIMIT_ATTEMPTS || System.nanoTime() + wait >= deadline) break;
+                LOG.info("Agent model rate limited, errorCode={}, promptVersion={}, attempt={}, retryAfterMs={}",
+                        AssistRun.Failure.MODEL_UNAVAILABLE, promptVersion, attempt, TimeUnit.NANOSECONDS.toMillis(wait));
+                TimeUnit.NANOSECONDS.sleep(wait);
+            }
             if (response.statusCode() != 200) throw new AssistModelPort.ModelFailure(AssistRun.Failure.MODEL_UNAVAILABLE);
             var reply = parse(provider, promptVersion, new String(response.body(), StandardCharsets.UTF_8));
             var usage = reply.usage();
@@ -87,7 +99,29 @@ final class OpenAiTextClient {
             var failure = cause instanceof AssistModelPort.ModelFailure modelFailure ? modelFailure.failure()
                     : cause instanceof java.net.http.HttpTimeoutException ? AssistRun.Failure.MODEL_TIMEOUT : AssistRun.Failure.MODEL_UNAVAILABLE;
             logFailure(promptVersion, started, failure); throw new AssistModelPort.ModelFailure(failure);
-        } finally { if (!future.isDone()) future.cancel(true); }
+        }
+    }
+
+    /** 单次发送只使用剩余预算；超时后取消读取，避免后台线程继续占用连接。 */
+    private HttpResponse<byte[]> send(java.net.URI endpoint, String apiKey, String body, long deadline)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        long remaining = deadline - System.nanoTime();
+        if (remaining <= 0) throw new TimeoutException("Model request budget exhausted");
+        var request = HttpRequest.newBuilder(endpoint).timeout(Duration.ofNanos(remaining))
+                .header("Content-Type", "application/json; charset=utf-8").POST(HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8));
+        request.header(DiagnosticContext.HEADER, DiagnosticContext.capture().traceId());
+        if (!apiKey.isBlank()) request.header("Authorization", "Bearer " + apiKey);
+        var future = CLIENT.sendAsync(request.build(), response -> new BoundedBody());
+        try { return future.get(remaining, TimeUnit.NANOSECONDS); }
+        finally { if (!future.isDone()) future.cancel(true); }
+    }
+
+    /** 只接受整数秒的 Retry-After；缺失、HTTP 日期或非法值都按默认退避处理，并封顶避免被提供者拖住。 */
+    static long retryAfterNanos(HttpResponse<?> response) {
+        long seconds = response.headers().firstValue("Retry-After").map(value -> {
+            try { return Long.parseLong(value.trim()); } catch (NumberFormatException notSeconds) { return DEFAULT_RETRY_AFTER_SECONDS; }
+        }).orElse(DEFAULT_RETRY_AFTER_SECONDS);
+        return TimeUnit.SECONDS.toNanos(Math.max(0, Math.min(seconds, MAX_RETRY_AFTER_SECONDS)));
     }
 
     private Reply parse(String provider, String promptVersion, String body) {
@@ -108,8 +142,9 @@ final class OpenAiTextClient {
     }
     private static AssistModelPort.ModelFailure invalid() { return new AssistModelPort.ModelFailure(AssistRun.Failure.INVALID_MODEL_OUTPUT); }
     private static long elapsed(long started) { return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started); }
+    /** 只记录失败分类与耗时，不输出异常对象：传输异常可能携带端点地址或提供者回显内容。 */
     private static void logFailure(String promptVersion, long started, AssistRun.Failure failure) {
-        LOG.warn("Agent model request failed, errorCode={}, promptVersion={}, elapsedMs={}", failure, promptVersion, elapsed(started));
+        LOG.error("Agent model request failed, errorCode={}, promptVersion={}, elapsedMs={}", failure, promptVersion, elapsed(started));
     }
 
     /** 不把未报告或异常用量补成零；用量异常不改变经过业务校验的模型内容。 */

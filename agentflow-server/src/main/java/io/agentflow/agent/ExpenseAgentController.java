@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -63,7 +64,7 @@ public class ExpenseAgentController {
         /** 防止静默忽略额外授权或任意工具参数。 */
         @com.fasterxml.jackson.annotation.JsonAnySetter public void unknown(String name, Object value) { throw new IllegalArgumentException("Unknown agent scope field"); }
     }
-    private static void noQuery(HttpServletRequest request) { if (request.getQueryString() != null) throw new DomainException("INVALID_AGENT_QUERY", "Agent does not accept query overrides"); }
+    private static void noQuery(HttpServletRequest request) { if (request.getQueryString() != null) throw new DomainException(ErrorCode.INVALID_AGENT_QUERY, "Agent does not accept query overrides"); }
     /**
      * 双摘要绑定已经展示的业务范围及模型目的地。
      * @author owlzhangfq@gmail.com

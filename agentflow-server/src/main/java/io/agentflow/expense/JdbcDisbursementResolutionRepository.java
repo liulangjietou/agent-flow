@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.DisbursementResolutionRepositoryMapper;
@@ -75,8 +76,7 @@ public class JdbcDisbursementResolutionRepository {
             for (var entry : after.disbursementReturns())
                 if (entry.resolutionId().equals(decision.id())) credits.record(decision, entry);
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "DISBURSEMENT_RETURN_ALREADY_RECORDED",
+            throw new DomainException(ErrorCode.DISBURSEMENT_RETURN_ALREADY_RECORDED,
                     "Received funds or credit already belongs to another repayment, disbursement"
                         + " adjustment or expense return");
         }
@@ -173,5 +173,5 @@ public class JdbcDisbursementResolutionRepository {
         };
     }
 
-    private static DomainException changed() { return new DomainException("DISBURSEMENT_RETURN_SOURCE_CHANGED", "Disbursement decision must match its consumed check and both advance revisions"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.DISBURSEMENT_RETURN_SOURCE_CHANGED, "Disbursement decision must match its consumed check and both advance revisions"); }
 }

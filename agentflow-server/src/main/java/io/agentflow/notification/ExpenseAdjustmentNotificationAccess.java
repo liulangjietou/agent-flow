@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.agentflow.approval.model.Application;
@@ -77,7 +78,7 @@ public class ExpenseAdjustmentNotificationAccess {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Target target(UUID id) {
         var actor = actors.actor(); var row = row(actor.tenantId(), actor.userId(), id); var source = allowed(actor.tenantId(), actor.userId(), row);
-        if (source == null) throw new DomainException("NOT_FOUND", "Original expense adjustment notification is unavailable in the current scope");
+        if (source == null) throw new DomainException(ErrorCode.NOT_FOUND, "Original expense adjustment notification is unavailable in the current scope");
         var input = source.preparation().input(); var original = input.basis().settlement().input().source();
         if (actor.userId().equals(original.employeeId())) readAccess.read(input.basis().reportId(), original.roundNo());
         else financeAccess.requireFinance(input.basis().reportId(), original.roundNo());

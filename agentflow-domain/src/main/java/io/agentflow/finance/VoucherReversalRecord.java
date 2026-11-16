@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -17,7 +18,7 @@ public record VoucherReversalRecord(UUID id, String tenantId, UUID checkId, long
                 || !tenantId.equals(receipt.request().command().tenantId()) || receipt.status() != VoucherReversalPort.Status.VERIFIED
                 || StringUtils.isBlank(recordedBy) || recordedBy.length() > 128 || !VoucherDisputeResolution.independent(receipt.request().command(), recordedBy)
                 || !receipt.matches(receipt.request(), recordedAt) || StringUtils.isBlank(evidenceReference) || evidenceReference.length() > 128
-                || StringUtils.isBlank(comment) || comment.length() > 2000) throw new DomainException("INVALID_VOUCHER_REVERSAL_RECORD", "Voucher reversal recording requires independent finance and complete fresh original evidence");
+                || StringUtils.isBlank(comment) || comment.length() > 2000) throw new DomainException(ErrorCode.INVALID_VOUCHER_REVERSAL_RECORD, "Voucher reversal recording requires independent finance and complete fresh original evidence");
     }
     public UUID operationId() { return receipt.request().command().id(); }
     public UUID legalEntityId() { return receipt.request().command().legalEntityId(); }

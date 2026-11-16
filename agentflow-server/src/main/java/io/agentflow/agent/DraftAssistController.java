@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.agent.DraftSuggestion.Selection;
 import io.agentflow.common.DomainException;
@@ -79,7 +80,7 @@ public class DraftAssistController {
         if (number < minimum || number > maximum) throw invalid();
         return number;
     }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_QUERY", "Invalid draft assist query"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_QUERY, "Invalid draft assist query"); }
     /**
      * 新说明与可发送来源由申请人明确提交，应用服务冻结原申请版本。
      * @author owlzhangfq@gmail.com

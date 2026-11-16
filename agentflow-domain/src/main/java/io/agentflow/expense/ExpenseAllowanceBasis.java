@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -12,7 +13,7 @@ public record ExpenseAllowanceBasis(ExpensePolicyReceipt policy, ExpenseAllowanc
     /** 发布版本与完整等式缺一不可，不能仅保存一个可被重新解释的金额。 */
     public ExpenseAllowanceBasis {
         if (policy == null || calculation == null) {
-            throw new DomainException("INVALID_ALLOWANCE_BASIS", "Allowance calculation requires a published policy receipt");
+            throw new DomainException(ErrorCode.INVALID_ALLOWANCE_BASIS, "Allowance calculation requires a published policy receipt");
         }
     }
 
@@ -27,12 +28,12 @@ public record ExpenseAllowanceBasis(ExpensePolicyReceipt policy, ExpenseAllowanc
             UUID legalEntityId, String categoryCode, String currency, LocalDate startsOn, LocalDate endsOn) {
         var allowance = rule.constraints().fixedAllowance();
         if (allowance == null || !receipt.ruleKey().equals(rule.key())) {
-            throw new DomainException("ALLOWANCE_RULE_REQUIRED", "The selected rule does not define a fixed allowance");
+            throw new DomainException(ErrorCode.ALLOWANCE_RULE_REQUIRED, "The selected rule does not define a fixed allowance");
         }
         var calculation = allowance.calculate(startsOn, endsOn);
         if (!rule.match().acceptsKnownFacts(legalEntityId, categoryCode, startsOn, currency)
                 || !rule.match().acceptsKnownFacts(legalEntityId, categoryCode, endsOn, currency)) {
-            throw new DomainException("ALLOWANCE_POLICY_PERIOD_MISMATCH", "The whole allowance itinerary must match one effective policy rule");
+            throw new DomainException(ErrorCode.ALLOWANCE_POLICY_PERIOD_MISMATCH, "The whole allowance itinerary must match one effective policy rule");
         }
         return new ExpenseAllowanceBasis(receipt, calculation);
     }
@@ -41,7 +42,7 @@ public record ExpenseAllowanceBasis(ExpensePolicyReceipt policy, ExpenseAllowanc
     public void requireCurrent(ExpenseAllowanceBasis current) {
         if (!policy.selection().equals(current.policy.selection()) || !policy.ruleKey().equals(current.policy.ruleKey())
                 || !calculation.equals(current.calculation)) {
-            throw new DomainException("ALLOWANCE_RECALCULATION_REQUIRED", "Allowance itinerary or published rule changed and must be recalculated");
+            throw new DomainException(ErrorCode.ALLOWANCE_RECALCULATION_REQUIRED, "Allowance itinerary or published rule changed and must be recalculated");
         }
     }
 }

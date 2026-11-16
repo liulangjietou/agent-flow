@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import org.apache.commons.lang3.StringUtils;
@@ -18,16 +19,16 @@ public record CostAllocation(String costCenter, String projectCode, Money amount
     public CostAllocation {
         if (StringUtils.isBlank(costCenter) || costCenter.length() > 128 || amount == null
                 || projectCode != null && (projectCode.isBlank() || projectCode.length() > 128)) {
-            throw new DomainException("INVALID_ALLOCATION", "A cost center and amount are required");
+            throw new DomainException(ErrorCode.INVALID_ALLOCATION, "A cost center and amount are required");
         }
     }
 
     /** 最大余数法分配整分；相同余数按原顺序确定，单次转换不积累分摊误差。 */
     public static List<CostAllocation> apportion(List<CostAllocation> weights, Money total) {
-        if (CollectionUtils.isEmpty(weights)) throw new DomainException("INVALID_ALLOCATION", "Allocation weights are required");
+        if (CollectionUtils.isEmpty(weights)) throw new DomainException(ErrorCode.INVALID_ALLOCATION, "Allocation weights are required");
         var sum = Money.zero(weights.get(0).amount.currency());
         for (var weight : weights) sum = sum.plus(weight.amount);
-        if (sum.value().signum() == 0) throw new DomainException("INVALID_ALLOCATION", "Allocation weight total must be positive");
+        if (sum.value().signum() == 0) throw new DomainException(ErrorCode.INVALID_ALLOCATION, "Allocation weight total must be positive");
         BigInteger cents = total.value().movePointRight(Money.SCALE).toBigIntegerExact();
         BigInteger denominator = sum.value().unscaledValue();
         var values = new ArrayList<BigInteger>(); var remainders = new ArrayList<BigInteger>();

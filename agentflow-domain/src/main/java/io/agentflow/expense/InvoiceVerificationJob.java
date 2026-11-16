@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -62,8 +63,8 @@ public record InvoiceVerificationJob(Input input, long version, Status status, I
     public boolean active() { return status == Status.QUEUED || status == Status.RUNNING; }
     public boolean expired(Instant now) { return status == Status.RUNNING && !leaseUntil.isAfter(now); }
     private void requireLive(Instant now) { if (status != Status.RUNNING || expired(now)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_INVOICE_VERIFICATION_JOB", "Invoice verification job state is invalid"); }
-    private static DomainException conflict() { return new DomainException("INVOICE_VERIFICATION_STATE_CONFLICT", "Invoice verification job is no longer executable"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_INVOICE_VERIFICATION_JOB, "Invoice verification job state is invalid"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.INVOICE_VERIFICATION_STATE_CONFLICT, "Invoice verification job is no longer executable"); }
 
     /**
      * 服务端冻结实际员工、原件、法人、版本及目标指纹，不保存外部凭据或原件字节。

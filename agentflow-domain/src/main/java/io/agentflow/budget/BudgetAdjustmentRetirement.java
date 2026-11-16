@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -28,7 +29,7 @@ public record BudgetAdjustmentRetirement(UUID operationId, long operationVersion
                 && !retiredBy.equals(value.command().source().employeeId()) && !retiredAt.isBefore(value.updatedAt());
     }
     private static Basis basis(BudgetAdjustmentOperation value) { return value.status() == BudgetAdjustmentOperation.Status.REJECTED ? Basis.REJECTED : Basis.NEVER_SENT; }
-    private static DomainException unsafe() { return new DomainException("BUDGET_ADJUSTMENT_RETIREMENT_UNSAFE", "Stopped original budget operation must prove no external adjustment before replacement"); }
+    private static DomainException unsafe() { return new DomainException(ErrorCode.BUDGET_ADJUSTMENT_RETIREMENT_UNSAFE, "Stopped original budget operation must prove no external adjustment before replacement"); }
     /** 默认日志只显示原指令标识。 */
     @Override public String toString() { return "BudgetAdjustmentRetirement[operationId=" + operationId + ", operationVersion=" + operationVersion + "]"; }
     /**

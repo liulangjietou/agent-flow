@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.Set;
 import java.util.UUID;
@@ -66,7 +67,7 @@ public final class AccountMappingConfigurationQuery {
     private static void require(MultiValueMap<String, String> parameters, Set<String> allowed) {
         if (!allowed.containsAll(parameters.keySet()) || parameters.values().stream().anyMatch(values -> values.size() != 1)) throw invalid();
     }
-    private static DomainException invalid() { return new DomainException("INVALID_ACCOUNT_MAPPING_QUERY", "Account mapping query, scope or identifier is invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ACCOUNT_MAPPING_QUERY, "Account mapping query, scope or identifier is invalid"); }
 
     /**
      * 目录筛选与稳定游标。

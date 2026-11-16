@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import java.time.Duration;
@@ -96,9 +97,9 @@ public class BudgetAdjustmentReviewService {
     private void requireSource(ApprovedBudgetAdjustment source, String finance) {
         execution.requireNewExecution(source, finance);
         if (operations.activeForRequest(source.tenantId(), source.requestId()).isPresent()) {
-            throw new DomainException("BUDGET_ADJUSTMENT_ALREADY_AUTHORIZED", "Original budget operation must be safely ended before a new review");
+            throw new DomainException(ErrorCode.BUDGET_ADJUSTMENT_ALREADY_AUTHORIZED, "Original budget operation must be safely ended before a new review");
         }
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException unavailable() { return new DomainException("BUDGET_ADJUSTMENT_REVIEW_UNAVAILABLE", "Fresh original budget ledger review for the current finance actor is required"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.BUDGET_ADJUSTMENT_REVIEW_UNAVAILABLE, "Fresh original budget ledger review for the current finance actor is required"); }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import java.util.List;
@@ -48,6 +49,6 @@ public class NotificationDeliveryQueries {
         return new HistoryPage(List.copyOf(rows.subList(0, count)), rows.size() > count ? query.cursor(rows.get(count - 1).version()) : null);
     }
     private NotificationDelivery own(Actor actor, UUID id) {
-        return store.get(actor, id).orElseThrow(() -> new DomainException("NOTIFICATION_DELIVERY_NOT_FOUND", "Notification delivery not found"));
+        return store.get(actor, id).orElseThrow(() -> new DomainException(ErrorCode.NOTIFICATION_DELIVERY_NOT_FOUND, "Notification delivery not found"));
     }
 }

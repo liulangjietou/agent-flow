@@ -1,5 +1,7 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
@@ -16,13 +18,13 @@ public record DefinitionPublication(String tenantId, UUID definitionId, String p
                                     String publishedBy, String authorizedRole, Instant publishedAt, String changeNote,
                                     ValidationSummary validation) {
     public static final int MAX_CHANGE_NOTE_LENGTH = 2000;
-    private static final String ADMIN_ROLE = "ADMIN";
-    private static final String PROCESS_ADMIN_ROLE = "PROCESS_ADMIN";
+    private static final String ADMIN_ROLE = SystemRole.ADMIN.name();
+    private static final String PROCESS_ADMIN_ROLE = SystemRole.PROCESS_ADMIN.name();
 
     /** 发布说明是发布事实的必填项，历史缺失记录不能用虚构说明补齐。 */
     public DefinitionPublication {
         if (StringUtils.isBlank(changeNote) || changeNote.length() > MAX_CHANGE_NOTE_LENGTH) {
-            throw new DomainException("INVALID_PUBLICATION_NOTE", "Publication change note must contain 1 to 2000 characters");
+            throw new DomainException(ErrorCode.INVALID_PUBLICATION_NOTE, "Publication change note must contain 1 to 2000 characters");
         }
         changeNote = changeNote.strip();
     }
@@ -39,7 +41,7 @@ public record DefinitionPublication(String tenantId, UUID definitionId, String p
         String role;
         if (publisher.hasRole(ADMIN_ROLE)) role = ADMIN_ROLE;
         else if (publisher.hasRole(PROCESS_ADMIN_ROLE)) role = PROCESS_ADMIN_ROLE;
-        else throw new DomainException("FORBIDDEN", "Process administrator role is required");
+        else throw new DomainException(ErrorCode.FORBIDDEN, "Process administrator role is required");
         var checks = draft.formSchema() == null
                 ? List.of(Check.GRAPH_STRUCTURE, Check.ASSIGNEE_SYNTAX, Check.RESTRICTED_CONDITIONS)
                 : List.of(Check.GRAPH_STRUCTURE, Check.ASSIGNEE_SYNTAX, Check.RESTRICTED_CONDITIONS, Check.FORM_FIELD_TYPES);

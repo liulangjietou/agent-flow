@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.time.Instant;
@@ -66,8 +67,8 @@ public record SupplierAdjustmentPreparation(Input input, long version, Status st
     private void requireRunning(Instant now) { requireTime(now); if (status != Status.RUNNING) throw conflict(); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
     private SupplierAdjustmentPreparation changed(Status next, Instant now, Instant retry, Issue reason) { return new SupplierAdjustmentPreparation(input, Math.incrementExact(version), next, attempts, now, retry, null, reason); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_ADJUSTMENT_PREPARATION", "Supplier adjustment preparation must preserve actual paid source, finance actor and accounting date"); }
-    private static DomainException conflict() { return new DomainException("SUPPLIER_ADJUSTMENT_PREPARATION_CONFLICT", "Supplier adjustment preparation no longer allows this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_ADJUSTMENT_PREPARATION, "Supplier adjustment preparation must preserve actual paid source, finance actor and accounting date"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.SUPPLIER_ADJUSTMENT_PREPARATION_CONFLICT, "Supplier adjustment preparation no longer allows this transition"); }
     /** 日志仅保存意图标识与准备状态。 */
     @Override public String toString() { return "SupplierAdjustmentPreparation[id=" + input.id() + ", status=" + status + "]"; }
 

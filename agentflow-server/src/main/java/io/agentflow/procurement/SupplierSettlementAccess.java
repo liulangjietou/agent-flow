@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import java.util.UUID;
@@ -33,7 +34,7 @@ public class SupplierSettlementAccess {
 
     /** 所有新决定及幂等回放都重新检查当前角色、法人任职和原轮次可读性。 */
     public Context requireFinance(UUID paymentId) {
-        var context = read(paymentId); if (!context.finance()) throw new DomainException("FORBIDDEN", "Settlement requires independent finance access to the original procurement round"); return context;
+        var context = read(paymentId); if (!context.finance()) throw new DomainException(ErrorCode.FORBIDDEN, "Settlement requires independent finance access to the original procurement round"); return context;
     }
 
     /** 结算号始终按租户定位，再回到其真实原银行所属轮次验证权限。 */
@@ -41,7 +42,7 @@ public class SupplierSettlementAccess {
         var value = settlements.find(actors.actor().tenantId(), id).orElseThrow(SupplierSettlementAccess::notFound);
         requireFinance(value.command().payment().id()); return value;
     }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Original supplier payment or settlement is unavailable in the current scope"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Original supplier payment or settlement is unavailable in the current scope"); }
 
     /**
      * 内部上下文不直接作为 HTTP 响应，原始资金命令必须留在服务端。

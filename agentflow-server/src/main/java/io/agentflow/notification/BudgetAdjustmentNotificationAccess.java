@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.agentflow.approval.model.Application;
@@ -62,7 +63,7 @@ public class BudgetAdjustmentNotificationAccess {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Target target(UUID id) {
         var actor = actors.actor(); var row = row(actor.tenantId(), actor.userId(), id); var source = allowed(actor.tenantId(), actor.userId(), row);
-        if (source == null) throw new DomainException("NOT_FOUND", "Original budget adjustment notification is unavailable in the current scope");
+        if (source == null) throw new DomainException(ErrorCode.NOT_FOUND, "Original budget adjustment notification is unavailable in the current scope");
         var original = source.approved(); var round = original.round().roundNo();
         if (actor.userId().equals(original.employeeId())) access.read(original.requestId(), round);
         else access.requireFinance(original.requestId(), round);

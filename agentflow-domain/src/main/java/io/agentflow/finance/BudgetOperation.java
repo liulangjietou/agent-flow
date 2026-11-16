@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.time.Instant;
@@ -86,8 +87,8 @@ public record BudgetOperation(Input input, long version, Status status, int atte
     private Instant retryAt(Instant now) {
         return now.plusSeconds(Math.min(MAX_BACKOFF_SECONDS, INITIAL_BACKOFF_SECONDS << Math.min(attempts - 1, 6)));
     }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_OPERATION", "Budget operation state or observation is inconsistent"); }
-    private static DomainException conflict() { return new DomainException("BUDGET_OPERATION_STATE_CONFLICT", "Budget operation is no longer executable"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_OPERATION, "Budget operation state or observation is inconsistent"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.BUDGET_OPERATION_STATE_CONFLICT, "Budget operation is no longer executable"); }
 
     /**
      * 目标和业务命令一起持久化；任何重试都不能更换它们。

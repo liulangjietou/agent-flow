@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.InvoiceOriginalRepositoryMapper;
@@ -53,16 +54,14 @@ public class JdbcInvoiceOriginalRepository {
         try {
             sqlMapper.reserveCapacity(tenant, owner, tenant, owner);
         } catch (DuplicateKeyException concurrentInitialization) {
-            throw new DomainException(
-                    "CONCURRENCY_CONFLICT",
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT,
                     "Invoice wallet was initialized concurrently; retry the same request");
         }
         int updated =
                 sqlMapper.reserveCapacity2(
                         bytes, tenant, owner, maximumBytes - bytes, maximumUploads);
         if (updated != 1)
-            throw new DomainException(
-                    "INVOICE_WALLET_QUOTA_EXCEEDED", "Invoice wallet upload capacity is exhausted");
+            throw new DomainException(ErrorCode.INVOICE_WALLET_QUOTA_EXCEEDED, "Invoice wallet upload capacity is exhausted");
     }
 
     /** 指纹、名称和归属只在登记时写入。 */
@@ -109,7 +108,7 @@ public class JdbcInvoiceOriginalRepository {
     public InvoiceOriginal lock(String tenant, UUID invoiceId) {
         return SqlRows.map(sqlMapper.lock(tenant, invoiceId.toString()), ROW).stream()
                 .findFirst()
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Invoice original not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Invoice original not found"));
     }
 
     /** READY 是原件完成态，不能被晚到失败覆盖。 */

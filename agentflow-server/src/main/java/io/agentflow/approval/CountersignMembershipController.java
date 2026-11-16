@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.approval.process.CountersignMembershipService;
 import io.agentflow.common.DomainException;
@@ -42,6 +43,6 @@ public class CountersignMembershipController {
     }
 
     private static void requireNoQuery(HttpServletRequest request) {
-        if (request.getQueryString() != null) throw new DomainException("INVALID_COUNTERSIGN_QUERY", "Countersign operations do not accept query parameters");
+        if (request.getQueryString() != null) throw new DomainException(ErrorCode.INVALID_COUNTERSIGN_QUERY, "Countersign operations do not accept query parameters");
     }
 }

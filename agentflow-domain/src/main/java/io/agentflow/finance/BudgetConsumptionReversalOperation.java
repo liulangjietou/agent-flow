@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.time.Instant;
@@ -124,8 +125,8 @@ public record BudgetConsumptionReversalOperation(Input input, long version, Stat
     }
     private Instant retryAt(Instant now) { return now.plusSeconds(Math.min(MAX_BACKOFF_SECONDS, INITIAL_BACKOFF_SECONDS << Math.min(attempts - 1, 6))); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_REVERSAL_OPERATION", "Budget reversal state must preserve its immutable command and accepted evidence"); }
-    private static DomainException conflict() { return new DomainException("BUDGET_REVERSAL_OPERATION_CONFLICT", "Budget reversal cannot perform this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_REVERSAL_OPERATION, "Budget reversal state must preserve its immutable command and accepted evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.BUDGET_REVERSAL_OPERATION_CONFLICT, "Budget reversal cannot perform this transition"); }
     /**
      * 原消费修订由仓储外键固定，所有恢复都保留原财务目的地。
      * @author owlzhangfq@gmail.com

@@ -1,5 +1,7 @@
 package io.agentflow.event;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.Actor;
@@ -73,7 +75,7 @@ public class EventContractController {
         var actor = administrator(); return noStore(service.history(actor.tenantId(), key, version, EventContractQuery.versions(query, true)));
     }
 
-    private Actor administrator() { var actor = actors.actor(); actor.requireRole("ADMIN"); return actor; }
+    private Actor administrator() { var actor = actors.actor(); actor.requireRole(SystemRole.ADMIN); return actor; }
     private static <T> ResponseEntity<T> noStore(T body) { return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body); }
 
     /**
@@ -82,7 +84,7 @@ public class EventContractController {
      */
     public record PublishInput(@NotNull @PositiveOrZero Long expectedVersion, String name, String sourceKey, String eventType, String reason) {
         /** 不允许忽略正文中的租户、作者或其他未声明字段。 */
-        @JsonAnySetter public void reject(String key, Object value) { throw new DomainException("INVALID_EVENT_CONTRACT", "Unsupported event contract field"); }
+        @JsonAnySetter public void reject(String key, Object value) { throw new DomainException(ErrorCode.INVALID_EVENT_CONTRACT, "Unsupported event contract field"); }
     }
 
     /**
@@ -91,6 +93,6 @@ public class EventContractController {
      */
     public record AvailabilityInput(@NotNull @Positive Long expectedRevision, @NotNull Boolean enabled, String reason) {
         /** 启停不能夹带契约修改或历史覆盖。 */
-        @JsonAnySetter public void reject(String key, Object value) { throw new DomainException("INVALID_EVENT_CONTRACT", "Unsupported event contract availability field"); }
+        @JsonAnySetter public void reject(String key, Object value) { throw new DomainException(ErrorCode.INVALID_EVENT_CONTRACT, "Unsupported event contract availability field"); }
     }
 }

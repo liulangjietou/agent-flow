@@ -34,4 +34,7 @@ public interface IdempotencyRepositoryMapper {
             @Param("body") String body,
             @Param("tenantId") String tenantId,
             @Param("key") String key);
+
+    /** 分批清空已过期回执正文，返回本批清理的记录数。 */
+    int purgeExpiredResponses(@Param("now") OffsetDateTime now, @Param("limit") int limit);
 }
