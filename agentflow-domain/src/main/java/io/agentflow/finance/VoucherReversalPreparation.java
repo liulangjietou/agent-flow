@@ -6,6 +6,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /**
@@ -38,6 +39,8 @@ public record VoucherReversalPreparation(Input input, long version, Status statu
         Instant expiry = now.plus(VoucherReversalPort.MAX_EVIDENCE_AGE);
         if (original.observedAt().plus(VoucherReversalPort.MAX_EVIDENCE_AGE).isBefore(expiry)) expiry = original.observedAt().plus(VoucherReversalPort.MAX_EVIDENCE_AGE);
         if (period.validUntil().isBefore(expiry)) expiry = period.validUntil();
+        // 外部回执可能带纳秒，而领取与授权都用截到微秒的时钟比较；向下截断只缩短窗口，保证到期那一刻不再允许首次发送。
+        expiry = expiry.truncatedTo(ChronoUnit.MICROS);
         var value = new VoucherReversalCommand(input.id(), input.source(), original, period, input.requestedBy(), input.evidenceReference(), input.reason(), now, expiry);
         return new VoucherReversalPreparation(input, version + 1, Status.READY, now, null, value, null);
     }
