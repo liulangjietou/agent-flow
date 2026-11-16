@@ -1,5 +1,6 @@
 package io.agentflow.approval.model;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.SubprocessPolicy;
 import java.time.Instant;
@@ -21,7 +22,7 @@ public record SubprocessCall(UUID id, String tenantId, UUID parentApplicationId,
     public SubprocessCall {
         if (parentRoundNo < 1 || parentApplicationId.equals(childApplicationId)
                 || parentProcessInstanceId.equals(childProcessInstanceId)) {
-            throw new DomainException("SUBPROCESS_IDENTITY_INVALID", "Subprocess parent and child identities must be distinct");
+            throw new DomainException(ErrorCode.SUBPROCESS_IDENTITY_INVALID, "Subprocess parent and child identities must be distinct");
         }
     }
 }

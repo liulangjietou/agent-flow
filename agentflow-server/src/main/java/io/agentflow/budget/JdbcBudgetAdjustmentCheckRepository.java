@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.budget.mapper.BudgetAdjustmentCheckRepositoryMapper;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -71,8 +72,7 @@ public class JdbcBudgetAdjustmentCheckRepository {
                     input.requestId().toString(),
                     Timestamp.from(job.createdAt()));
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "BUDGET_ADJUSTMENT_CHECK_ACTIVE",
+            throw new DomainException(ErrorCode.BUDGET_ADJUSTMENT_CHECK_ACTIVE,
                     "Budget adjustment already has an active precheck");
         }
         append(job);
@@ -209,7 +209,7 @@ public class JdbcBudgetAdjustmentCheckRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Budget adjustment check input or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Budget adjustment check input or version changed"); }
 
     /**
      * 扫描项不复制敏感快照，领取后在锁内重新读取。

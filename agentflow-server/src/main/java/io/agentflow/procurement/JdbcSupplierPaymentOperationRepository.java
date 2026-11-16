@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.PaymentObservation;
@@ -89,8 +90,7 @@ public class JdbcSupplierPaymentOperationRepository {
                     timestamp(value.updatedAt()),
                     timestamp(value.nextAttemptAt()));
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "SUPPLIER_PAYMENT_ALREADY_REGISTERED",
+            throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_ALREADY_REGISTERED,
                     "Original supplier authorization already has an immutable bank command");
         }
         append(value);
@@ -308,7 +308,7 @@ public class JdbcSupplierPaymentOperationRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Supplier bank command or persisted execution source changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Supplier bank command or persisted execution source changed"); }
 
     /**
      * 不带金额和账户的后台扫描标识。

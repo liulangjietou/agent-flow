@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.BudgetConsumptionReversalObservation;
 import io.agentflow.finance.BudgetConsumptionReversalOperation;
@@ -91,7 +92,7 @@ public class ExpenseResourceAdjustmentBudgetExecution {
         var command = operation.input().command(); var adjustment = adjustment(command.source().tenantId(), command.adjustmentId());
         if (!adjustment.input().budget().equals(operation.input()) || adjustment.budgetReversal() != null || adjustment.resourcesReversed()) throw conflict();
         if (gateway.destination(command.source().tenantId()).filter(value -> value.digest(command.source().tenantId()).equals(operation.input().targetDigest())).isEmpty()) {
-            throw new DomainException("FINANCE_TARGET_CHANGED", "Original budget destination is unavailable before sending");
+            throw new DomainException(ErrorCode.FINANCE_TARGET_CHANGED, "Original budget destination is unavailable before sending");
         }
         if (operation.attempts() == 0) sources.requireCurrent(adjustment.input().basis()); else sources.requireSupported(adjustment.input().basis());
         personnel.requireEligible(command.source().tenantId(), command.authorizedBy(), command.source().position().legalEntityId());
@@ -130,5 +131,5 @@ public class ExpenseResourceAdjustmentBudgetExecution {
     }
     private static void requireVersion(BudgetConsumptionReversalOperation value, long expected) { if (value.version() != expected) throw conflict(); }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense budget reversal or its original adjustment changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense budget reversal or its original adjustment changed"); }
 }

@@ -1,5 +1,7 @@
 package io.agentflow.onboarding;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.calendar.BusinessCalendarService;
 import io.agentflow.common.Actor;
@@ -86,12 +88,12 @@ public class TenantInitializationService {
         var person = directory.personBySubject(actor.tenantId(), actor.userId()).orElse(null);
         // 复用已有身份不能隐式更名、启用或赋予审批资格，状态变更必须回到组织管理用例。
         if (person != null && (!person.active() || !person.displayName().equals(input.administratorName().strip()))) {
-            throw new DomainException("INITIALIZATION_PERSON_CHANGED", "Review the existing administrator person before initialization");
+            throw new DomainException(ErrorCode.INITIALIZATION_PERSON_CHANGED, "Review the existing administrator person before initialization");
         }
         var legal = organizations.createUnit(actor, OrganizationUnit.Kind.LEGAL_ENTITY, input.legalEntityName(), null, null, true);
         var department = organizations.createUnit(actor, OrganizationUnit.Kind.DEPARTMENT, input.departmentName(), legal.id(), null, true);
         var position = organizations.createUnit(actor, OrganizationUnit.Kind.POSITION, input.positionName(), legal.id(), null, true);
-        if (person == null) person = organizations.createPerson(actor, actor.userId(), input.administratorName(), true, actor.hasRole("APPROVER"));
+        if (person == null) person = organizations.createPerson(actor, actor.userId(), input.administratorName(), true, actor.hasRole(SystemRole.APPROVER));
         var appointment = organizations.createAppointment(actor, person.id(), department.id(), position.id(), true);
         return initiators.snapshot(actor, appointment.id());
     }
@@ -105,16 +107,16 @@ public class TenantInitializationService {
         if (!enabled) return;
         var current = binding(actor, channel);
         if (!current.configured() || !expectedDigest.equals(current.digest())) {
-            throw new DomainException("INITIALIZATION_CHANNEL_CHANGED", "Review the current notification binding before enabling this channel");
+            throw new DomainException(ErrorCode.INITIALIZATION_CHANNEL_CHANGED, "Review the current notification binding before enabling this channel");
         }
     }
 
     private void requireUninitialized(Actor actor) {
-        if (initializations.find(actor.tenantId()).isPresent()) throw new DomainException("TENANT_ALREADY_INITIALIZED", "Tenant initialization is already complete");
+        if (initializations.find(actor.tenantId()).isPresent()) throw new DomainException(ErrorCode.TENANT_ALREADY_INITIALIZED, "Tenant initialization is already complete");
     }
 
     private static void requireRevision(long expected, long current) {
-        if (expected != current) throw new DomainException("CONCURRENCY_CONFLICT", "Organization directory changed; review initialization again");
+        if (expected != current) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Organization directory changed; review initialization again");
     }
 
     /** 初始化事实与当前设置分开返回；快照不会伪装成当前组织或订阅状态。

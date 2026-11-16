@@ -1,5 +1,6 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 
@@ -64,5 +65,5 @@ public record ServiceTaskCommand(UUID id, String tenantId, Binding binding, Serv
                 && !value.contains("${") && !value.contains("#{");
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_SERVICE_TASK_COMMAND", "Service task command requires its original tenant, round, definition and execution binding"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SERVICE_TASK_COMMAND, "Service task command requires its original tenant, round, definition and execution binding"); }
 }

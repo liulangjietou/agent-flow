@@ -1,6 +1,8 @@
 package io.agentflow.approval.process;
 
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 
 import io.agentflow.approval.ApprovalApplicationFacade;
@@ -154,7 +156,7 @@ public class TimerWaitService {
     }
 
     /** 成功回放仍要求当前管理员身份，历史回执不重新执行已结束的等待。 */
-    public Actor requireAdministrator() { var actor = actors.actor(); actor.requireRole("ADMIN"); return actor; }
+    public Actor requireAdministrator() { var actor = actors.actor(); actor.requireRole(SystemRole.ADMIN); return actor; }
 
     /** 管理员显式说明原因，只重试当前轮次的原失败任务，不接受新时长或新节点。 */
     @Transactional
@@ -167,7 +169,7 @@ public class TimerWaitService {
         if (binding == null || job == null || !binding.application().id().equals(applicationId)
                 || binding.application().roundNo() != roundNo || binding.suspended()) throw unavailable();
         if (job.getDuedate() == null || job.getDuedate().toInstant().isAfter(Instant.now())) {
-            throw new DomainException("TIMER_NOT_DUE", "The original timer wait is not due");
+            throw new DomainException(ErrorCode.TIMER_NOT_DUE, "The original timer wait is not due");
         }
         return advance(binding, job, true, input.expectedVersion(), actor.userId(), input.reason().strip());
     }
@@ -193,7 +195,7 @@ public class TimerWaitService {
             var node = definition.graph().nodes().stream().filter(n -> n.id().equals(job.getElementId()) && n.type() == DefinitionModels.NodeType.TIMER_WAIT).findFirst().orElse(null);
             if (node == null || job.getDuedate() == null || !application.tenantId().equals(job.getTenantId())
                     || !job.getProcessDefinitionId().equals(application.runtimeDefinitionId())) continue;
-            boolean canRetry = state == State.FAILED && actors.actor().hasRole("ADMIN") && application.status() == ApplicationStatus.IN_APPROVAL
+            boolean canRetry = state == State.FAILED && actors.actor().hasRole(SystemRole.ADMIN) && application.status() == ApplicationStatus.IN_APPROVAL
                     && application.roundNo() == round.roundNo() && round.status() == SubmissionRound.Status.IN_APPROVAL
                     && instance != null && !instance.isSuspended() && !job.getDuedate().toInstant().isAfter(Instant.now());
             entries.add(new Entry(job.getId(), node.id(), node.name(), job.getExecutionId(), job.getDuedate().toInstant(), state,
@@ -238,7 +240,7 @@ public class TimerWaitService {
         jobs.executeJob(executable.getId());
         boolean ended = runtime.createProcessInstanceQuery().processInstanceId(binding.round().processInstanceId()).singleResult() == null;
         if (ended && !subprocesses.hasApprovalEvidence(application, binding.round().processInstanceId())) {
-            throw new DomainException("TIMER_REQUIRES_APPROVAL", "A timer wait cannot substitute for human approval");
+            throw new DomainException(ErrorCode.TIMER_REQUIRES_APPROVAL, "A timer wait cannot substitute for human approval");
         }
         completion.persistProgress(application, expectedVersion, binding.round().processInstanceId(), ended, actor, reason);
         record(binding, actor, retry ? ApplicationAuditPort.Action.TIMER_RETRY : ApplicationAuditPort.Action.TIMER_ELAPSED, reason);
@@ -265,7 +267,7 @@ public class TimerWaitService {
 
     private static String safeCode(String code) { return code != null && code.matches("[A-Z][A-Z0-9_]{0,79}") ? code : EXECUTION_FAILED; }
 
-    private static DomainException unavailable() { return new DomainException("NOT_FOUND", "The bound timer wait is not available"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.NOT_FOUND, "The bound timer wait is not available"); }
 
     /**
      * @author owlzhangfq@gmail.com

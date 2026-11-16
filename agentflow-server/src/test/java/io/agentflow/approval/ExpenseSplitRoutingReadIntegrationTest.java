@@ -77,7 +77,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class ExpenseSplitRoutingReadIntegrationTest {
     private static final Actor ADMIN = new Actor("demo", "admin", Set.of("ADMIN", "PROCESS_ADMIN"));
-    private static final java.nio.file.Path RESPONSES = java.nio.file.Path.of("/fyoung/tmp/agentflow-remaining-20260928/f04-read-responses-" + UUID.randomUUID());
+    private static final java.nio.file.Path RESPONSES = java.nio.file.Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-remaining-20260928/f04-read-responses-" + UUID.randomUUID());
     private static final ExpenseSubprocessGatewayFixture GATEWAY = new ExpenseSubprocessGatewayFixture();
     private final Map<String, String> tokens = new ConcurrentHashMap<>();
     private UUID entity, appointment, manager, finance;
@@ -104,7 +104,7 @@ class ExpenseSplitRoutingReadIntegrationTest {
     @DynamicPropertySource static void endpoints(DynamicPropertyRegistry registry) {
         registry.add("agentflow.finance-gateway.tenants.demo.endpoint", GATEWAY::endpoint);
         registry.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> true);
-        registry.add("agentflow.attachments.directory", () -> "/fyoung/tmp/agentflow-split-read-http-fixtures");
+        registry.add("agentflow.attachments.directory", () -> System.getProperty("java.io.tmpdir") + "/agentflow-split-read-http-fixtures");
     }
     @BeforeEach void organization() {
         if (jdbc.queryForObject("SELECT COUNT(*) FROM organization_directory WHERE tenant_id='demo'", Integer.class) == 0) organization.initialize(ADMIN);

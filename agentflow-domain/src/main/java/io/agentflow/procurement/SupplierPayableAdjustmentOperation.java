@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import java.time.Duration;
@@ -65,7 +66,7 @@ public record SupplierPayableAdjustmentOperation(SupplierPayableAdjustmentComman
     public SupplierPayableAdjustmentOperation readyToSend(SupplierPayableAdjustmentEvidence checked, Instant now) {
         requireTime(now); if (status != Status.CHECKING) throw conflict(); if (leaseExpired(now)) return expireLease(now);
         if (checked == null || checked.checkedAt().isBefore(updatedAt) || !checked.matches(command, now)) {
-            throw new DomainException("SUPPLIER_PAYABLE_ADJUSTMENT_EVIDENCE_CHANGED", "Fresh registered bank returns, original ERP facts and accounting period are required before adjustment");
+            throw new DomainException(ErrorCode.SUPPLIER_PAYABLE_ADJUSTMENT_EVIDENCE_CHANGED, "Fresh registered bank returns, original ERP facts and accounting period are required before adjustment");
         }
         return new SupplierPayableAdjustmentOperation(command, Math.incrementExact(version), Status.ADJUSTING, attempts, Math.incrementExact(dispatches),
                 createdAt, now, null, leaseUntil, checked, observation, conflictingObservation, highestRevision, null);
@@ -127,7 +128,7 @@ public record SupplierPayableAdjustmentOperation(SupplierPayableAdjustmentComman
     /** 只读领取也可在原锁下停止；迟到复查必须由持久版本拒绝，不能再进入外发。 */
     public SupplierPayableAdjustmentOperation stopForRetirement(Instant now) {
         requireTime(now);
-        if (retirementBasis() == null) throw new DomainException("SUPPLIER_ADJUSTMENT_RETIREMENT_UNSAFE", "Original adjustment has not been proven free of external effects");
+        if (retirementBasis() == null) throw new DomainException(ErrorCode.SUPPLIER_ADJUSTMENT_RETIREMENT_UNSAFE, "Original adjustment has not been proven free of external effects");
         return status == Status.QUEUED || status == Status.CHECKING
                 ? changed(Status.VOIDED, now, null, null, null, null, null, 0, Failure.FINANCE_RETIRED) : this;
     }
@@ -174,7 +175,7 @@ public record SupplierPayableAdjustmentOperation(SupplierPayableAdjustmentComman
     public SupplierPayableAdjustmentOperation resolveDispute(SupplierPayableAdjustmentObservation.Status outcome, ResolutionHistory history, Instant now) {
         requireTime(now);
         if (resolutionIssue(history, now) != null || conflictingObservation.status() != outcome) {
-            throw new DomainException("SUPPLIER_ADJUSTMENT_DISPUTE_UNRESOLVABLE", "Recent terminal evidence must preserve the original supplier adjustment and historical postings");
+            throw new DomainException(ErrorCode.SUPPLIER_ADJUSTMENT_DISPUTE_UNRESOLVABLE, "Recent terminal evidence must preserve the original supplier adjustment and historical postings");
         }
         return changed(Status.valueOf(outcome.name()), now, null, null, evidence, conflictingObservation, null, highestRevision, null);
     }
@@ -225,8 +226,8 @@ public record SupplierPayableAdjustmentOperation(SupplierPayableAdjustmentComman
     }
     private Instant retryAt(Instant now) { return now.plusSeconds(Math.min(MAX_BACKOFF_SECONDS, INITIAL_BACKOFF_SECONDS << Math.min(attempts - 1, 6))); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_OPERATION", "Payable adjustment recovery must preserve the original command and posting facts"); }
-    private static DomainException conflict() { return new DomainException("SUPPLIER_PAYABLE_ADJUSTMENT_STATE_CONFLICT", "Payable adjustment no longer allows this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_OPERATION, "Payable adjustment recovery must preserve the original command and posting facts"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.SUPPLIER_PAYABLE_ADJUSTMENT_STATE_CONFLICT, "Payable adjustment no longer allows this transition"); }
     /** 日志只保留操作标识和状态，不展开金融资料。 */
     @Override public String toString() { return "SupplierPayableAdjustmentOperation[id=" + command.id() + ", version=" + version + ", status=" + status + "]"; }
 

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -29,7 +30,7 @@ public record VoucherReversalObservation(UUID operationId, String commandDigest,
                 && (posting == null || command.matchesPosting(posting, observedAt));
     }
     @Override public String toString() { return "VoucherReversalObservation[operationId=" + operationId + ", status=" + status + ", revision=" + revision + "]"; }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_REVERSAL_OBSERVATION", "Reversal observation must bind its original command and preserve complete posted evidence"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_REVERSAL_OBSERVATION, "Reversal observation must bind its original command and preserve complete posted evidence"); }
     /**
      * 单独的反向凭证目前只支持查询其原执行状态，不能由新命令覆盖旧结果。
      * @author owlzhangfq@gmail.com

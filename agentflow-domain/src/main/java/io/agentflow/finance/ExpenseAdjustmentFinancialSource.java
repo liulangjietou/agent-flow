@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.CostAllocation;
 import io.agentflow.expense.ExpenseAdjustmentAmounts;
@@ -111,7 +112,7 @@ public record ExpenseAdjustmentFinancialSource(ExpenseAdjustmentAmounts.Change c
     }
 
     private static void add(Map<PostingKey, Money> values, PostingKey key, Money amount) { if (amount.value().signum() > 0) values.put(key, amount); }
-    private static DomainException changed() { return new DomainException("EXPENSE_ADJUSTMENT_SOURCE_CHANGED", "Partial adjustment must retain the original settled expense, consumed budget and exact posted accrual positions"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.EXPENSE_ADJUSTMENT_SOURCE_CHANGED, "Partial adjustment must retain the original settled expense, consumed budget and exact posted accrual positions"); }
     @Override public String toString() { return "ExpenseAdjustmentFinancialSource[reportId=" + change.before().original().id() + "]"; }
 
     /**

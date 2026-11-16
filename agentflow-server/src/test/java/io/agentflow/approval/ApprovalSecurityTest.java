@@ -72,7 +72,7 @@ class ApprovalSecurityTest {
     @Test
     void rejectsUnsupportedTaskStatusInsteadOfReturningActiveTasks() throws Exception {
         mvc.perform(get("/api/v1/tasks?status=completed").header("Authorization", token("finance")))
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("code").value("INVALID_REQUEST"));
     }
 
@@ -105,7 +105,7 @@ class ApprovalSecurityTest {
     @Test
     void crossTenantTaskIsInvisibleEvenToMatchingAssignee() throws Exception {
         // 本用例验证跨租户资源隔离，显式提供另一租户已配置的审批身份目录。
-        org.mockito.Mockito.doReturn(new AuthService(true, "other-tenant").options("other-tenant"))
+        org.mockito.Mockito.doReturn(new AuthService(true, "other-tenant", java.time.Duration.ofHours(12)).options("other-tenant"))
                 .when(authService).options("other-tenant");
         Application application = submitted("other-tenant");
         String taskId = task(application);

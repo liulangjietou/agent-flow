@@ -1,5 +1,6 @@
 package io.agentflow.signature;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 
 import java.time.Instant;
@@ -90,5 +91,5 @@ public record SignatureReceipt(UUID operationId, String requestDigest, long revi
         }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_SIGNATURE_RECEIPT", "Signature receipt status, evidence and document fingerprints must be complete and consistent"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SIGNATURE_RECEIPT, "Signature receipt status, evidence and document fingerprints must be complete and consistent"); }
 }

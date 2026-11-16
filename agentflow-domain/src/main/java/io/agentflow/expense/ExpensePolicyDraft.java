@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -15,7 +16,7 @@ public record ExpensePolicyDraft(UUID id, String tenantId, String key, long revi
     public ExpensePolicyDraft {
         if (id == null || StringUtils.isBlank(tenantId) || tenantId.length() > 64 || !validKey(key) || revision < 1 || definition == null
                 || publishedVersion < 0 || publishedDraftRevision < 0 || publishedDraftRevision > revision || publishedVersion > publishedDraftRevision
-                || (publishedVersion == 0) != (publishedDraftRevision == 0)) throw new DomainException("INVALID_EXPENSE_POLICY_DRAFT", "Expense policy draft identity and revision are invalid");
+                || (publishedVersion == 0) != (publishedDraftRevision == 0)) throw new DomainException(ErrorCode.INVALID_EXPENSE_POLICY_DRAFT, "Expense policy draft identity and revision are invalid");
     }
 
     /** 明确创建首个草稿，不虚构已发布版本。 */
@@ -34,7 +35,7 @@ public record ExpensePolicyDraft(UUID id, String tenantId, String key, long revi
     public Publication publish(long expectedRevision, ExpenseCategoryCatalog categories, String actor, Instant now, String comment) {
         requireRevision(expectedRevision);
         if (publishedDraftRevision == revision) throw unchanged();
-        if (!tenantId.equals(categories.tenantId())) throw new DomainException("EXPENSE_POLICY_CATEGORY_UNAVAILABLE", "Expense policy and categories must belong to the same tenant");
+        if (!tenantId.equals(categories.tenantId())) throw new DomainException(ErrorCode.EXPENSE_POLICY_CATEGORY_UNAVAILABLE, "Expense policy and categories must belong to the same tenant");
         definition.requirePublishable(categories);
         var version = new PublishedExpensePolicy(id, tenantId, key, publishedVersion + 1, revision, categories.version(), definition, actor, now, comment);
         return new Publication(new ExpensePolicyDraft(id, tenantId, key, revision, definition, version.version(), revision), version);
@@ -42,12 +43,12 @@ public record ExpensePolicyDraft(UUID id, String tenantId, String key, long revi
 
     /** 并发校验属于草稿自身状态约束。 */
     public void requireRevision(long expected) {
-        if (revision != expected) throw new DomainException("CONCURRENCY_CONFLICT", "Expense policy draft revision changed");
+        if (revision != expected) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense policy draft revision changed");
     }
 
     /** 路径键使用稳定的小写业务标识，不解释路径或脚本片段。 */
     public static boolean validKey(String key) { return key != null && key.matches("[a-z][a-z0-9-]{0,63}"); }
-    private static DomainException unchanged() { return new DomainException("EXPENSE_CONFIGURATION_UNCHANGED", "Expense policy draft has no unpublished changes"); }
+    private static DomainException unchanged() { return new DomainException(ErrorCode.EXPENSE_CONFIGURATION_UNCHANGED, "Expense policy draft has no unpublished changes"); }
 
     /**
      * 应用层必须在同一事务中保存更新游标和新发布物。

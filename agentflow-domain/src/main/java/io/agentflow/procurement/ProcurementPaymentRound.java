@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceCatalog;
 import java.time.Instant;
@@ -18,13 +19,13 @@ public record ProcurementPaymentRound(int roundNo, long submittedRequestVersion,
                 || submittedAt == null || content == null || legalEntity == null || !legalEntity.id().equals(content.legalEntityId())
                 || StringUtils.isBlank(catalogVersion) || catalogVersion.length() > 128 || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}")
                 || payable == null || !payable.matches(content.payableRequest(submittedBy), submittedAt)) {
-            throw new DomainException("INVALID_PROCUREMENT_PAYMENT_ROUND", "Procurement round must preserve current matching evidence for the original applicant and payable");
+            throw new DomainException(ErrorCode.INVALID_PROCUREMENT_PAYMENT_ROUND, "Procurement round must preserve current matching evidence for the original applicant and payable");
         }
         if (!content.amount().currency().equals(legalEntity.baseCurrency()) || !payable.gross().currency().equals(legalEntity.baseCurrency())) {
-            throw new DomainException("PROCUREMENT_BASE_CURRENCY_REQUIRED", "Procurement payment must use the legal entity base currency");
+            throw new DomainException(ErrorCode.PROCUREMENT_BASE_CURRENCY_REQUIRED, "Procurement payment must use the legal entity base currency");
         }
         if (content.amount().compareTo(payable.outstanding()) > 0) {
-            throw new DomainException("PROCUREMENT_AMOUNT_EXCEEDS_PAYABLE", "Requested payment exceeds the verified outstanding payable");
+            throw new DomainException(ErrorCode.PROCUREMENT_AMOUNT_EXCEEDS_PAYABLE, "Requested payment exceeds the verified outstanding payable");
         }
     }
 

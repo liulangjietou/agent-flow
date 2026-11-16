@@ -1,6 +1,7 @@
 package io.agentflow.signature;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRows;
@@ -145,7 +146,7 @@ public class JdbcSignatureEvidenceRepository {
 
     private static Timestamp timestamp(Instant value) { return Timestamp.from(value.truncatedTo(ChronoUnit.MICROS)); }
 
-    private static DomainException conflict() { return new DomainException("SIGNATURE_EVIDENCE_CONFLICT", "Signature evidence must match the accepted operation revision"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.SIGNATURE_EVIDENCE_CONFLICT, "Signature evidence must match the accepted operation revision"); }
 
-    private static DomainException corrupt() { return new DomainException("SIGNATURE_EVIDENCE_CORRUPT", "Stored signature evidence failed verification"); }
+    private static DomainException corrupt() { return new DomainException(ErrorCode.SIGNATURE_EVIDENCE_CORRUPT, "Stored signature evidence failed verification"); }
 }

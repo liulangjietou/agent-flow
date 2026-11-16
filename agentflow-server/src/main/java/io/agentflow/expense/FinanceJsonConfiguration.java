@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
@@ -57,7 +58,7 @@ public class FinanceJsonConfiguration {
             return new Money(decimal(node.get("value")), node.get("currency").textValue());
         }
 
-        private static DomainException invalid() { return new DomainException("INVALID_MONEY", "Money requires a decimal string and currency"); }
+        private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_MONEY, "Money requires a decimal string and currency"); }
     }
 
     /**
@@ -73,7 +74,7 @@ public class FinanceJsonConfiguration {
 
     private static BigDecimal decimal(com.fasterxml.jackson.databind.JsonNode value) {
         if (!value.isTextual() || !value.textValue().matches("(?:0|[1-9][0-9]{0,14})(?:\\.[0-9]{1,2})?")) {
-            throw new DomainException("INVALID_MONEY", "A non-negative decimal string with at most two fractional digits is required");
+            throw new DomainException(ErrorCode.INVALID_MONEY, "A non-negative decimal string with at most two fractional digits is required");
         }
         return new BigDecimal(value.textValue());
     }

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.SubmissionRoundCompleted;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
@@ -90,5 +91,5 @@ public class ExpenseBudgetReviewService {
     }
 
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException unavailable() { return new DomainException("EXPENSE_BUDGET_REVIEW_UNAVAILABLE", "Budget review no longer matches the submitted round"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.EXPENSE_BUDGET_REVIEW_UNAVAILABLE, "Budget review no longer matches the submitted round"); }
 }

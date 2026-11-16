@@ -1,6 +1,7 @@
+import { tmpdir } from 'node:os'
 import assert from 'node:assert/strict'
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import ts from 'typescript'
@@ -8,7 +9,7 @@ import ts from 'typescript'
 // 只向明确指定的独立演示环境写入合成流程与申请，所有验收数据保留。
 const base = new URL(process.argv[2])
 assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(base.hostname) && base.pathname === '/' && process.argv[3] === '--exercise')
-const root = fileURLToPath(new URL('../', import.meta.url)), temporary = mkdtempSync('/fyoung/tmp/agentflow-quick-runtime-')
+const root = fileURLToPath(new URL('../', import.meta.url)), temporary = mkdtempSync(join(process.env.AGENTFLOW_TMP_DIR ?? tmpdir(), 'agentflow-quick-runtime-'))
 writeFileSync(resolve(temporary, 'package.json'), '{"type":"module"}')
 for (const name of ['quickDesigner','conditionBuilder','formSchema']) writeFileSync(resolve(temporary,name+'.js'), ts.transpileModule(readFileSync(resolve(root,'src/'+name+'.ts'),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText)
 const { editQuickGraph, projectQuickGraph } = await import(pathToFileURL(resolve(temporary,'quickDesigner.js')))

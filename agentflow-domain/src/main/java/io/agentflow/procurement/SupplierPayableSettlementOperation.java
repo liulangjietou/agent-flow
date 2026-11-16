@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import java.time.Duration;
@@ -65,7 +66,7 @@ public record SupplierPayableSettlementOperation(SupplierPayableSettlementComman
     public SupplierPayableSettlementOperation readyToSend(SupplierPayableSettlementEvidence checked, Instant now) {
         requireTime(now); if (status != Status.CHECKING) throw conflict(); if (leaseExpired(now)) return expireLease(now);
         if (checked == null || checked.checkedAt().isBefore(updatedAt) || !checked.matches(command, now)) {
-            throw new DomainException("SUPPLIER_PAYABLE_SETTLEMENT_EVIDENCE_CHANGED", "Fresh original held payable, bank receipt and accounting period are required before settlement");
+            throw new DomainException(ErrorCode.SUPPLIER_PAYABLE_SETTLEMENT_EVIDENCE_CHANGED, "Fresh original held payable, bank receipt and accounting period are required before settlement");
         }
         return new SupplierPayableSettlementOperation(command, Math.incrementExact(version), Status.SETTLING, attempts, Math.incrementExact(dispatches),
                 createdAt, now, null, leaseUntil, checked, observation, conflictingObservation, highestRevision, null);
@@ -127,7 +128,7 @@ public record SupplierPayableSettlementOperation(SupplierPayableSettlementComman
     /** 只读领取也可在原锁下停止；迟到复查必须由持久版本拒绝，不能再进入外发。 */
     public SupplierPayableSettlementOperation stopForRetirement(Instant now) {
         requireTime(now);
-        if (retirementBasis() == null) throw new DomainException("SUPPLIER_SETTLEMENT_RETIREMENT_UNSAFE", "Original settlement has not been proven free of external effects");
+        if (retirementBasis() == null) throw new DomainException(ErrorCode.SUPPLIER_SETTLEMENT_RETIREMENT_UNSAFE, "Original settlement has not been proven free of external effects");
         return status == Status.QUEUED || status == Status.CHECKING
                 ? changed(Status.VOIDED, now, null, null, null, null, null, 0, Failure.FINANCE_RETIRED) : this;
     }
@@ -174,7 +175,7 @@ public record SupplierPayableSettlementOperation(SupplierPayableSettlementComman
     public SupplierPayableSettlementOperation resolveDispute(SupplierPayableSettlementObservation.Status outcome, ResolutionHistory history, Instant now) {
         requireTime(now);
         if (resolutionIssue(history, now) != null || conflictingObservation.status() != outcome) {
-            throw new DomainException("SUPPLIER_SETTLEMENT_DISPUTE_UNRESOLVABLE", "Recent terminal evidence must preserve the original supplier settlement and historical postings");
+            throw new DomainException(ErrorCode.SUPPLIER_SETTLEMENT_DISPUTE_UNRESOLVABLE, "Recent terminal evidence must preserve the original supplier settlement and historical postings");
         }
         return changed(Status.valueOf(outcome.name()), now, null, null, evidence, conflictingObservation, null, highestRevision, null);
     }
@@ -225,8 +226,8 @@ public record SupplierPayableSettlementOperation(SupplierPayableSettlementComman
     }
     private Instant retryAt(Instant now) { return now.plusSeconds(Math.min(MAX_BACKOFF_SECONDS, INITIAL_BACKOFF_SECONDS << Math.min(attempts - 1, 6))); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYABLE_SETTLEMENT_OPERATION", "Payable settlement recovery must preserve the original command and posting facts"); }
-    private static DomainException conflict() { return new DomainException("SUPPLIER_PAYABLE_SETTLEMENT_STATE_CONFLICT", "Payable settlement no longer allows this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYABLE_SETTLEMENT_OPERATION, "Payable settlement recovery must preserve the original command and posting facts"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.SUPPLIER_PAYABLE_SETTLEMENT_STATE_CONFLICT, "Payable settlement no longer allows this transition"); }
     /** 日志只保留操作标识和状态，不展开金融资料。 */
     @Override public String toString() { return "SupplierPayableSettlementOperation[id=" + command.id() + ", version=" + version + ", status=" + status + "]"; }
 

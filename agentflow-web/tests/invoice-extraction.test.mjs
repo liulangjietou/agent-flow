@@ -151,7 +151,7 @@ test('未保存复核阻止翻页和切换，导航返回仍保留本人内存�
     assert.equal(next.state.detail.id, uuid(3)); assert.equal(next.state.values.INVOICE_NUMBER, '0000666'); assert.deepEqual(next.state.selected, ['INVOICE_NUMBER'])
     assert.equal(extraction.extractionDrafts.get('other', uuid(1)), null)
     next.state.discardEdits(); assert.equal(next.state.values.INVOICE_NUMBER, '0000123'); assert.equal(next.state.dirty, false)
-  } finally { next ? next.close() : p.close() }
+  } finally { if (next) next.close(); else p.close() }
 })
 
 test('刷新版本变化不覆盖本地修订，也不能用新版本提交旧修订', async () => {

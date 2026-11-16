@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.ApplicationFieldViews;
 import io.agentflow.approval.model.Application;
@@ -62,7 +63,7 @@ public class ExpensePlanService {
         var round = plan.rounds().stream().filter(value -> value.roundNo() == selected).findFirst().orElseThrow(ExpensePlanService::notFound);
         var projection = fields.attachmentView(application, selected);
         if (!owner && !ExpensePlanFormContract.detailsReadable(application.formSchema(), projection.schema())) {
-            throw new DomainException("FORBIDDEN", "Field permissions do not allow reading planned expense details");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Field permissions do not allow reading planned expense details");
         }
         return view(application, plan, round, false);
     }
@@ -71,7 +72,7 @@ public class ExpensePlanService {
     @Transactional
     public Receipt change(UUID id, long applicationVersion, long planVersion, String comment, boolean cancel) {
         owned(id); plans.lock(actors.actor().tenantId(), id); var plan = owned(id);
-        if (plan.version() != planVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Expense plan version changed");
+        if (plan.version() != planVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense plan version changed");
         var application = applications.requireApplicant(plan.applicationId());
         application = cancel ? applications.cancelBusiness(application.id(), applicationVersion, comment, application.businessReference())
                 : applications.withdrawBusiness(application.id(), applicationVersion, comment, application.businessReference());
@@ -89,7 +90,7 @@ public class ExpensePlanService {
     public static Receipt receipt(Application application, ExpensePlan plan) {
         return new Receipt(plan.id(), application.id(), application.version(), plan.version(), application.roundNo(), application.status());
     }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense plan or round not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Expense plan or round not found"); }
 
     /**
      * 草稿内容与某轮快照互斥，余额由独立的核销资源接口读取。

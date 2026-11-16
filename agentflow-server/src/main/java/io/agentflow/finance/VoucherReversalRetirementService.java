@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 
 import io.agentflow.common.CurrentActor;
@@ -138,10 +139,10 @@ public class VoucherReversalRetirementService {
     }
 
     private void requireUnrecorded(String tenant, UUID original) {
-        if (records.forOperation(tenant, original).isPresent()) throw new DomainException("VOUCHER_REVERSAL_ALREADY_RECORDED", "A registered independent reversal prevents restoring the original voucher");
+        if (records.forOperation(tenant, original).isPresent()) throw new DomainException(ErrorCode.VOUCHER_REVERSAL_ALREADY_RECORDED, "A registered independent reversal prevents restoring the original voucher");
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Original voucher or reversal retirement source changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Original voucher or reversal retirement source changed"); }
 
     /**
      * 客户端只传展示版本与财务说明，不能声明未执行或手工填入 ERP 结果。

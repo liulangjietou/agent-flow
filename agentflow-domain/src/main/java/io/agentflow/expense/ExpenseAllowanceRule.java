@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.math.BigDecimal;
@@ -16,7 +17,7 @@ public record ExpenseAllowanceRule(Money dailyRate, DayCountBasis dayCountBasis)
     /** 零金额、未说明天数口径及空日额都不能形成可发布补贴。 */
     public ExpenseAllowanceRule {
         if (dailyRate == null || dailyRate.value().signum() <= 0 || dayCountBasis == null) {
-            throw new DomainException("INVALID_ALLOWANCE_RULE", "Allowance rate and explicit day-count basis are required");
+            throw new DomainException(ErrorCode.INVALID_ALLOWANCE_RULE, "Allowance rate and explicit day-count basis are required");
         }
     }
 
@@ -32,10 +33,10 @@ public record ExpenseAllowanceRule(Money dailyRate, DayCountBasis dayCountBasis)
 
     private static long days(LocalDate startsOn, LocalDate endsOn) {
         if (startsOn == null || endsOn == null || endsOn.isBefore(startsOn)) {
-            throw new DomainException("ALLOWANCE_ITINERARY_REQUIRED", "Allowance requires an ordered itinerary date range");
+            throw new DomainException(ErrorCode.ALLOWANCE_ITINERARY_REQUIRED, "Allowance requires an ordered itinerary date range");
         }
         long value = ChronoUnit.DAYS.between(startsOn, endsOn) + 1;
-        if (value > MAX_DAYS) throw new DomainException("ALLOWANCE_ITINERARY_TOO_LONG", "Allowance itinerary exceeds the expense quantity limit");
+        if (value > MAX_DAYS) throw new DomainException(ErrorCode.ALLOWANCE_ITINERARY_TOO_LONG, "Allowance itinerary exceeds the expense quantity limit");
         return value;
     }
 
@@ -53,7 +54,7 @@ public record ExpenseAllowanceRule(Money dailyRate, DayCountBasis dayCountBasis)
         /** 反序列化同样验证日期、天数和金额，拒绝破坏历史计算等式。 */
         public Calculation {
             if (rule == null || days != ExpenseAllowanceRule.days(startsOn, endsOn) || !rule.total(days).equals(gross)) {
-                throw new DomainException("ALLOWANCE_CALCULATION_MISMATCH", "Allowance amount and days must match the recorded rule and itinerary");
+                throw new DomainException(ErrorCode.ALLOWANCE_CALCULATION_MISMATCH, "Allowance amount and days must match the recorded rule and itinerary");
             }
         }
     }

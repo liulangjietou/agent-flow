@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
@@ -87,5 +88,5 @@ public interface AccountMappingPort {
     /** 配置、请求与回执采用同一排序，规范摘要不依赖输入集合顺序。 */
     static Comparator<Key> keyOrder() { return Comparator.comparing((Key key) -> key.role().name()).thenComparing(Key::selector); }
     private static boolean invalidText(String value) { return StringUtils.isBlank(value) || value.length() > 128; }
-    private static DomainException invalid() { return new DomainException("INVALID_ACCOUNT_MAPPING", "Account mapping must cover exactly the requested legal entity, currency and accounting roles"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ACCOUNT_MAPPING, "Account mapping must cover exactly the requested legal entity, currency and accounting roles"); }
 }

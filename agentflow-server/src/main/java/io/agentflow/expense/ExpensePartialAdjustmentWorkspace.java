@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -140,8 +141,8 @@ public class ExpensePartialAdjustmentWorkspace {
                 value.beforeVersion(), value.afterVersion(), value.outcome(), value.observedAt(), value.resolvedBy(), value.resolvedAt(), value.evidenceReference(), value.reason())).orElse(null);
     }
     private static String name(Enum<?> value) { return value == null ? null : value.name(); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PARTIAL_ADJUSTMENT_QUERY", "Partial adjustment query only accepts a positive roundNo"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Consumed expense settlement is unavailable in this round"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PARTIAL_ADJUSTMENT_QUERY, "Partial adjustment query only accepts a positive roundNo"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Consumed expense settlement is unavailable in this round"); }
 
     /**
      * 未完成意图不改变 remaining，原件版本供后续明确写入核对。

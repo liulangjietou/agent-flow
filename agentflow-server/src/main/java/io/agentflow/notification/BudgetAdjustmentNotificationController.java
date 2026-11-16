@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
@@ -21,7 +22,7 @@ public class BudgetAdjustmentNotificationController {
     /** 读取不查询台账、不执行预算调整，也不改变消息已读状态。 */
     @GetMapping("/api/v1/notifications/{id}/budget-adjustment-target")
     public ResponseEntity<BudgetAdjustmentNotificationAccess.Target> target(@PathVariable UUID id, HttpServletRequest request) {
-        if (!request.getParameterMap().isEmpty()) throw new DomainException("INVALID_INBOX_QUERY", "Budget adjustment notification target does not accept query parameters");
+        if (!request.getParameterMap().isEmpty()) throw new DomainException(ErrorCode.INVALID_INBOX_QUERY, "Budget adjustment notification target does not accept query parameters");
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(access.target(id));
     }
 }

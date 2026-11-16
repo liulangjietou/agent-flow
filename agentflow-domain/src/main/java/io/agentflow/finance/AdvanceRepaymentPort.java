@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Duration;
@@ -89,5 +90,5 @@ public interface AdvanceRepaymentPort {
     enum Channel { BANK_TRANSFER, CASH, PAYROLL }
 
     private static boolean reference(String value) { return StringUtils.isNotBlank(value) && value.length() <= 128 && value.equals(value.trim()) && value.chars().noneMatch(Character::isISOControl); }
-    private static DomainException invalid() { return new DomainException("INVALID_ADVANCE_REPAYMENT_RECEIPT", "Repayment requires matching original loan, received funds and posted receivable entry"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ADVANCE_REPAYMENT_RECEIPT, "Repayment requires matching original loan, received funds and posted receivable entry"); }
 }

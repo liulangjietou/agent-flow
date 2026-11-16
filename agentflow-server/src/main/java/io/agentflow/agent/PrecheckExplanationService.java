@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.common.CurrentActor;
@@ -59,7 +60,7 @@ public class PrecheckExplanationService {
         return new InputOptions(job.input().id(), job.input().applicationVersion(), job.input().financialVersion(),
                 job.input().attempt(), job.status(), job.completedAt(), observation == null ? null : observation.validUntil(),
                 unavailable == null, unavailable, unavailable == null ? configuration.getProviderId() : null,
-                unavailable == null ? configuration.getModel() : null, unavailable == null ? configuration.uri().getAuthority() : null,
+                unavailable == null ? configuration.modelFor(PrecheckExplanationRun.PROMPT_VERSION) : null, unavailable == null ? configuration.uri().getAuthority() : null,
                 unavailable == null ? configuration.targetDigest(PrecheckExplanationRun.PROMPT_VERSION) : null,
                 unavailable == null ? sources.available(report, job) : List.of());
     }
@@ -74,7 +75,7 @@ public class PrecheckExplanationService {
         if (job.input().applicationVersion() != applicationVersion || job.input().financialVersion() != financialVersion) throw changed("VERSION_CHANGED");
         configuration.requireAvailable();
         if (!configuration.targetDigest(PrecheckExplanationRun.PROMPT_VERSION).equals(targetDigest)) {
-            throw new DomainException("AGENT_TARGET_CHANGED", "Refresh the explanation model destination");
+            throw new DomainException(ErrorCode.AGENT_TARGET_CHANGED, "Refresh the explanation model destination");
         }
         var run = new PrecheckExplanationRun(new PrecheckExplanationRun.Context(UUID.randomUUID(), report.tenantId(),
                 actors.actor().userId(), now, sources.select(report, job, sourceIds), targetDigest));
@@ -107,12 +108,12 @@ public class PrecheckExplanationService {
         requireRun(report, runId); runs.lock(report.tenantId(), runId); var run = requireRun(report, runId);
         Instant now = time(Instant.now());
         if (action == AssistExecutionService.ReviewAction.DISMISS) {
-            if (selectedIssueIds != null && !selectedIssueIds.isEmpty()) throw new DomainException("INVALID_AGENT_REVIEW", "Dismissal cannot adopt explanations");
+            if (selectedIssueIds != null && !selectedIssueIds.isEmpty()) throw new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Dismissal cannot adopt explanations");
             run.dismiss(expectedVersion, actors.actor().userId(), comment, now);
         } else if (action == AssistExecutionService.ReviewAction.ADOPT) {
             requireCurrent(currentFailure(report, run.context(), now));
             run.adopt(expectedVersion, actors.actor().userId(), selectedIssueIds, comment, now);
-        } else throw new DomainException("INVALID_AGENT_REVIEW", "Explanation review action is required");
+        } else throw new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Explanation review action is required");
         save(run, expectedVersion); return receipt(run);
     }
 
@@ -197,8 +198,8 @@ public class PrecheckExplanationService {
     }
     private void fail(PrecheckExplanationRun run, AssistRun.Failure failure, Instant now) { run.fail(2, failure, now); save(run, 2); }
     private static void requireCurrent(String failure) { if (failure != null) throw changed(failure); }
-    private static DomainException changed(String reason) { return new DomainException("AGENT_INPUT_CHANGED", "Refresh the current expense precheck: " + reason); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Precheck explanation not found"); }
+    private static DomainException changed(String reason) { return new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Refresh the current expense precheck: " + reason); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Precheck explanation not found"); }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MILLIS); }
     private static Receipt receipt(PrecheckExplanationRun run) { return new Receipt(run.context().id(), run.state().status(), run.state().version()); }
 

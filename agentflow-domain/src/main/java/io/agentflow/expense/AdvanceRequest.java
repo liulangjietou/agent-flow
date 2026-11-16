@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.EmployeeAccountPort;
 import io.agentflow.finance.EmployeeAccountSnapshot;
@@ -52,14 +53,14 @@ public final class AdvanceRequest {
         requireMutable(expectedVersion);
         if (roundNo != rounds.size() + 1 || now == null || !rounds.isEmpty() && now.isBefore(currentRound().submittedAt())) throw invalid();
         if (catalog == null || !employeeId.equals(catalog.employeeId()) || !catalog.validUntil().isAfter(now)) {
-            throw new DomainException("ADVANCE_CATALOG_CHANGED", "A current finance catalog for the applicant is required");
+            throw new DomainException(ErrorCode.ADVANCE_CATALOG_CHANGED, "A current finance catalog for the applicant is required");
         }
         if (account == null || !account.validUntil().isAfter(now)) {
-            throw new DomainException("ADVANCE_ACCOUNT_EXPIRED", "A current employee account is required");
+            throw new DomainException(ErrorCode.ADVANCE_ACCOUNT_EXPIRED, "A current employee account is required");
         }
         if (initiator == null || initiator.appointmentId() == null || !employeeId.equals(initiator.subject())
                 || !content.legalEntityId().equals(initiator.legalEntityId())) {
-            throw new DomainException("ADVANCE_INITIATOR_MISMATCH", "Selected appointment must match the advance applicant and legal entity");
+            throw new DomainException(ErrorCode.ADVANCE_INITIATOR_MISMATCH, "Selected appointment must match the advance applicant and legal entity");
         }
         var round = new AdvanceRequestRound(roundNo, version, employeeId, now, content, catalog.legalEntity(content.legalEntityId()),
                 catalog.sourceVersion(), account.snapshot());
@@ -76,7 +77,7 @@ public final class AdvanceRequest {
 
     /** 历史读取必须使用原轮次，不能由当前草稿倒推。 */
     public AdvanceRequestRound currentRound() {
-        if (rounds.isEmpty()) throw new DomainException("ADVANCE_NOT_SUBMITTED", "Advance request has not been submitted");
+        if (rounds.isEmpty()) throw new DomainException(ErrorCode.ADVANCE_NOT_SUBMITTED, "Advance request has not been submitted");
         return rounds.get(rounds.size() - 1);
     }
 
@@ -90,7 +91,7 @@ public final class AdvanceRequest {
                 || !command.payee().equals(authorizedAccount) || !currentRound().legalEntity().id().equals(command.payee().legalEntityId())
                 || !currentRound().content().amount().equals(command.amount())
                 || command.authorization().authorizedAt().isBefore(approval.approvedAt())) {
-            throw new DomainException("ADVANCE_PAYMENT_MISMATCH", "Successful payment must match original approved advance terms");
+            throw new DomainException(ErrorCode.ADVANCE_PAYMENT_MISMATCH, "Successful payment must match original approved advance terms");
         }
         var receipt = payment.observation();
         var paidOn = LocalDate.ofInstant(receipt.completedAt(), ZoneId.of(currentRound().legalEntity().timeZone()));
@@ -117,10 +118,10 @@ public final class AdvanceRequest {
     }
 
     private void requireMutable(long expectedVersion) {
-        if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Advance request version changed");
-        if (approval != null) throw new DomainException("ADVANCE_ALREADY_APPROVED", "Approved advance terms cannot be changed");
+        if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Advance request version changed");
+        if (approval != null) throw new DomainException(ErrorCode.ADVANCE_ALREADY_APPROVED, "Approved advance terms cannot be changed");
     }
-    private static DomainException invalid() { return new DomainException("INVALID_ADVANCE_REQUEST", "Advance request identity, version or approved round is inconsistent"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ADVANCE_REQUEST, "Advance request identity, version or approved round is inconsistent"); }
 
     /** 持久化申请依据，不保存派生余额。 */
     public State state() { return new State(id, tenantId, applicationId, employeeId, content, rounds, approval, version); }

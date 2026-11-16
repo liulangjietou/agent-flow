@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.PaymentAccountsPort;
 import java.time.Duration;
@@ -91,9 +92,9 @@ public record SupplierPaymentExecutionRequest(Input input, long version, Status 
         return new SupplierPaymentExecutionRequest(input, Math.incrementExact(version), next, attempts, createdAt, now, retry, null, reason);
     }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYMENT_EXECUTION_REQUEST", "Supplier cashier request must preserve the original hold and account selection"); }
-    private static DomainException conflict() { return new DomainException("SUPPLIER_PAYMENT_EXECUTION_STATE_CONFLICT", "Supplier cashier request no longer permits this transition"); }
-    private static DomainException evidenceChanged() { return new DomainException("SUPPLIER_PAYMENT_EVIDENCE_CHANGED", "Selected supplier payment debit account version changed"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYMENT_EXECUTION_REQUEST, "Supplier cashier request must preserve the original hold and account selection"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.SUPPLIER_PAYMENT_EXECUTION_STATE_CONFLICT, "Supplier cashier request no longer permits this transition"); }
+    private static DomainException evidenceChanged() { return new DomainException(ErrorCode.SUPPLIER_PAYMENT_EVIDENCE_CHANGED, "Selected supplier payment debit account version changed"); }
     /** 原选择只在受控存储中保存，不进入日志。 */
     @Override public String toString() { return "SupplierPaymentExecutionRequest[id=" + input.id() + ", version=" + version + ", status=" + status + "]"; }
 

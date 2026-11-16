@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.calendar.CalendarRules;
@@ -68,7 +69,7 @@ public class ExpenseRiskSources {
                 || sourceIds.stream().anyMatch(java.util.Objects::isNull) || new HashSet<>(sourceIds).size() != sourceIds.size()) throw invalid();
         Set<String> selectedIds = Set.copyOf(sourceIds);
         var selected = catalog.sources().stream().filter(source -> selectedIds.contains(source.reference().sourceId())).toList();
-        if (selected.size() != selectedIds.size()) throw new DomainException("FORBIDDEN", "Risk source is not in the authorized selection");
+        if (selected.size() != selectedIds.size()) throw new DomainException(ErrorCode.FORBIDDEN, "Risk source is not in the authorized selection");
         if (json.write(selected).getBytes(StandardCharsets.UTF_8).length > AssistInputService.MAX_INPUT_BYTES) throw invalid();
         return new ExpenseRiskInput(catalog.documents(), catalog.calendar(),
                 catalog.concerns().stream().filter(concern -> selectedIds.contains(concern.sourceId())).toList(), selected);
@@ -85,7 +86,7 @@ public class ExpenseRiskSources {
         return new AssistModelPort.Source(new AssistInput.Reference(id, AssistConfiguration.digest(content)), label, content);
     }
     private static List<Integer> documents(List<ExpenseRiskEvidence.LineId> lines) { return lines.stream().map(ExpenseRiskEvidence.LineId::document).distinct().sorted().toList(); }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_INPUT", "Explicitly select bounded expense scope and matching risk evidence"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Explicitly select bounded expense scope and matching risk evidence"); }
 
     /**
      * 原始文档绑定只供本地应用服务使用，公开目录应只返回 sources 和可选观察。

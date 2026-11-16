@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.servicetask.ServiceTaskActivationService;
 import org.flowable.bpmn.model.ReceiveTask;
@@ -39,5 +40,5 @@ public class FlowableServiceTaskArrival implements ExecutionListener {
                 execution.getCurrentActivityId(), (Map<String, Object>) values);
     }
 
-    private static DomainException invalid() { return new DomainException("SERVICE_TASK_CONTEXT_INVALID", "Native service task execution requires the original platform context"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.SERVICE_TASK_CONTEXT_INVALID, "Native service task execution requires the original platform context"); }
 }

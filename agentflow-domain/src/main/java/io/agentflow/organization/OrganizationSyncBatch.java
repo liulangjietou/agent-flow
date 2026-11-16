@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.Objects;
@@ -28,9 +29,9 @@ public final class OrganizationSyncBatch {
     /** 只接收原来源及连续游标的数据；人工预检和应用另行进行。 */
     public void receive(long expectedVersion, OrganizationSyncDelta delta, Instant at) {
         require(expectedVersion, Status.FETCHING); time(at, state.startedAt());
-        if (!state.leaseUntil().isAfter(at)) throw new DomainException("ORGANIZATION_SYNC_LEASE_EXPIRED", "Organization source read lease expired");
+        if (!state.leaseUntil().isAfter(at)) throw new DomainException(ErrorCode.ORGANIZATION_SYNC_LEASE_EXPIRED, "Organization source read lease expired");
         if (delta == null || !context.sourceKey().equals(delta.sourceKey()) || context.afterRevision() != delta.afterRevision()) {
-            throw new DomainException("ORGANIZATION_SYNC_SOURCE_CHANGED", "Organization source or revision does not match the requested batch");
+            throw new DomainException(ErrorCode.ORGANIZATION_SYNC_SOURCE_CHANGED, "Organization source or revision does not match the requested batch");
         }
         state = new State(Status.RECEIVED, 3, state.startedAt(), state.leaseUntil(), at, delta, null, null, null);
     }
@@ -45,7 +46,7 @@ public final class OrganizationSyncBatch {
     /** 只有已收到的数据能够应用，原来源游标必须仍然一致；持久化用例原子提交组织及游标。 */
     public void apply(long expectedVersion, long currentSourceRevision, Applied applied, String actor, String comment, Instant at) {
         require(expectedVersion, Status.RECEIVED); time(at, state.receivedAt());
-        if (currentSourceRevision != context.afterRevision()) throw new DomainException("ORGANIZATION_SYNC_SOURCE_CHANGED", "Organization source cursor changed before application");
+        if (currentSourceRevision != context.afterRevision()) throw new DomainException(ErrorCode.ORGANIZATION_SYNC_SOURCE_CHANGED, "Organization source cursor changed before application");
         if (applied == null) throw invalid();
         state = new State(Status.APPLIED, 4, state.startedAt(), state.leaseUntil(), state.receivedAt(), state.delta(), null, at,
                 new Decision(actor, comment, at, applied));
@@ -91,8 +92,8 @@ public final class OrganizationSyncBatch {
         if (state.status() != status) throw stateConflict();
     }
     private static void time(Instant at, Instant previous) { if (at == null || at.isBefore(previous)) throw invalid(); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Organization synchronization batch version changed"); }
-    private static DomainException stateConflict() { return new DomainException("ORGANIZATION_SYNC_STATE_CONFLICT", "Organization synchronization batch is not in the required state"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Organization synchronization batch version changed"); }
+    private static DomainException stateConflict() { return new DomainException(ErrorCode.ORGANIZATION_SYNC_STATE_CONFLICT, "Organization synchronization batch is not in the required state"); }
 
     /**
      * 原请求身份和部署目标摘要不可被客户端结果或重试覆盖。

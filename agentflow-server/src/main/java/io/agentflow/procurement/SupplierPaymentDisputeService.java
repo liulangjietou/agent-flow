@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -69,8 +71,7 @@ public class SupplierPaymentDisputeService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public View read(UUID paymentId, Map<String, String> parameters) {
         if (!parameters.isEmpty())
-            throw new DomainException(
-                    "INVALID_SUPPLIER_DISPUTE_QUERY",
+            throw new DomainException(ErrorCode.INVALID_SUPPLIER_DISPUTE_QUERY,
                     "Original supplier bank dispute does not accept alternate identities or query"
                             + " parameters");
         var context = access.read(paymentId);
@@ -123,7 +124,7 @@ public class SupplierPaymentDisputeService {
     @Transactional
     public Receipt resolve(UUID paymentId, ResolveInput input) {
         var context = locked(paymentId); var before = version(context, input.operationVersion()); var now = now(); var candidate = before.conflictingObservation();
-        if (candidate == null || candidate.status() != input.outcome()) throw new DomainException("SUPPLIER_PAYMENT_DISPUTE_UNRESOLVABLE", "Displayed supplier bank terminal evidence changed");
+        if (candidate == null || candidate.status() != input.outcome()) throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_DISPUTE_UNRESOLVABLE, "Displayed supplier bank terminal evidence changed");
         var decision = new SupplierPaymentDisputeResolution(UUID.randomUUID(), before.command().tenantId(), paymentId, before.version(), Math.incrementExact(before.version()),
                 candidate, actors.actor().userId(), now, input.evidenceReference().trim(), input.comment());
         var after = payments.resolve(decision); events.publishEvent(new SupplierPaymentChanged(before, after));
@@ -136,7 +137,7 @@ public class SupplierPaymentDisputeService {
 
     private static SupplierPaymentOperation version(SupplierSettlementAccess.Context context, long expected) {
         var payment = context.payment();
-        if (payment == null || payment.version() != expected) throw new DomainException("CONCURRENCY_CONFLICT", "Displayed original supplier bank revision changed");
+        if (payment == null || payment.version() != expected) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed original supplier bank revision changed");
         return payment;
     }
 
@@ -162,7 +163,7 @@ public class SupplierPaymentDisputeService {
                         "paymentId",
                         before.command().id(),
                         "authorizedRole",
-                        "FINANCE",
+                        SystemRole.FINANCE.name(),
                         "previousStatus",
                         before.status().name(),
                         "currentStatus",

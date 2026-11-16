@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AccountingPeriodPort;
 import io.agentflow.finance.PaymentObservation;
@@ -42,7 +43,7 @@ public record SupplierPayableSettlementEvidence(SupplierPayableHoldObservation h
         }
         return deadline;
     }
-    private static DomainException changed() { return new DomainException("SUPPLIER_PAYABLE_SETTLEMENT_EVIDENCE_CHANGED", "Original held payable, paid bank receipt and accounting period must remain fresh and consistent"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.SUPPLIER_PAYABLE_SETTLEMENT_EVIDENCE_CHANGED, "Original held payable, paid bank receipt and accounting period must remain fresh and consistent"); }
     /** 不在日志展开原交易资料。 */
     @Override public String toString() { return "SupplierPayableSettlementEvidence[checkedAt=" + checkedAt + "]"; }
 }

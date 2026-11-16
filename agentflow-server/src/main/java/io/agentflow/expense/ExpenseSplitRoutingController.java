@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.Set;
 import java.util.UUID;
@@ -36,5 +37,5 @@ public class ExpenseSplitRoutingController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(queries.read(id, roundNo));
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_QUERY", "Select exactly one canonical positive submission round"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_QUERY, "Select exactly one canonical positive submission round"); }
 }

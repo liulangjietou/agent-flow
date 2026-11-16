@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.InvoiceVerificationRepositoryMapper;
@@ -57,8 +58,7 @@ public class JdbcInvoiceVerificationRepository {
                     Timestamp.from(job.createdAt()),
                     DiagnosticContext.capture().traceId());
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "INVOICE_VERIFICATION_ACTIVE",
+            throw new DomainException(ErrorCode.INVOICE_VERIFICATION_ACTIVE,
                     "Invoice already has an active verification job");
         }
         append(job);
@@ -88,7 +88,7 @@ public class JdbcInvoiceVerificationRepository {
     @Transactional(propagation = Propagation.MANDATORY)
     public void lockInvoice(String tenant, UUID invoiceId) {
         if (sqlMapper.lockInvoice(tenant, invoiceId.toString()).isEmpty())
-            throw new DomainException("NOT_FOUND", "Invoice not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Invoice not found");
     }
 
     /** 读取仍以独立租户列定位，并验证状态 JSON 与检索列一致。 */
@@ -216,7 +216,7 @@ public class JdbcInvoiceVerificationRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Invoice verification version or input changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Invoice verification version or input changed"); }
 
     /**
      * 扫描结果仅含定位标识，不带原件或敏感票面。

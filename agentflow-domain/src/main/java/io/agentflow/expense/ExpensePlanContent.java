@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import org.apache.commons.lang3.StringUtils;
@@ -22,7 +23,7 @@ public record ExpensePlanContent(UUID legalEntityId, ExpenseContent.Type type, S
         title = title.trim(); lines = List.copyOf(lines);
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PLAN", "Expense plan fields and line numbers must be valid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PLAN, "Expense plan fields and line numbers must be valid"); }
 
     /**
      * 原币计划金额和成本归属整体审批，不能把其他批准行的余额挪来替代。
@@ -42,7 +43,7 @@ public record ExpensePlanContent(UUID legalEntityId, ExpenseContent.Type type, S
                         || !targets.add(List.of(allocation.costCenter(), allocation.projectCode() == null ? "" : allocation.projectCode()))) throw invalid();
                 allocated = allocated.plus(allocation.amount());
             }
-            if (allocated.compareTo(amount) != 0) throw new DomainException("ALLOCATION_UNBALANCED", "Expense plan allocations must equal the planned amount");
+            if (allocated.compareTo(amount) != 0) throw new DomainException(ErrorCode.ALLOCATION_UNBALANCED, "Expense plan allocations must equal the planned amount");
             allocations = List.copyOf(allocations); description = description.trim();
         }
     }

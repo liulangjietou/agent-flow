@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
@@ -50,7 +51,7 @@ public class AdvanceOffsetSuggestionService {
             if (page.size() < PAGE_SIZE) break;
             var last = page.get(page.size() - 1); cursor = new EmployeeAdvanceRepository.PaidCursor(last.paidOn(), last.id());
         }
-        if (!checked.validUntil().isAfter(Instant.now())) throw new DomainException("FACTS_EXPIRED", "Expense precheck expired while calculating offsets");
+        if (!checked.validUntil().isAfter(Instant.now())) throw new DomainException(ErrorCode.FACTS_EXPIRED, "Expense precheck expired while calculating offsets");
         return new Suggestion(report.id(), report.applicationId(), checked.job().applicationVersion(), checked.job().financialVersion(), precheckId,
                 checked.validUntil(), gross, gross.minus(remaining), remaining, items.size() == ExpenseContent.MAX_ADVANCES && remaining.value().signum() > 0, List.copyOf(items));
     }

@@ -1,5 +1,6 @@
 package io.agentflow.template;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -81,7 +82,7 @@ public class ClasspathFinancialTemplateExamples {
 
     /** 返回独立 JSON 副本，调用方不能修改共享目录；未知模板不能被当作资源路径。 */
     public JsonNode get(String templateKey) {
-        if (!TEMPLATE_KEYS.contains(templateKey)) throw new DomainException("NOT_FOUND", "Financial template examples not found");
+        if (!TEMPLATE_KEYS.contains(templateKey)) throw new DomainException(ErrorCode.NOT_FOUND, "Financial template examples not found");
         return document.deepCopy();
     }
 

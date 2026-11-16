@@ -68,6 +68,7 @@ class IdempotencyIntegrationTest {
     @Autowired TaskService tasks;
     @Autowired RepositoryService definitions;
     @MockitoSpyBean AuthService auth;
+    @Autowired io.agentflow.api.idempotency.IdempotencyRetention retention;
     @MockitoSpyBean JsonUtil json;
     @MockitoSpyBean JdbcIdempotencyRepository records;
     @MockitoSpyBean ApplicationAuditPort applicationAudit;
@@ -243,6 +244,27 @@ class IdempotencyIntegrationTest {
         jdbc.update("UPDATE request_idempotency SET expires_at=? WHERE tenant_id='demo' AND idempotency_key=?",
                 Instant.now().minusSeconds(1).atOffset(ZoneOffset.UTC), requestKey);
         MockHttpServletResponse response = send("POST", "/api/v1/applications", "alice", requestKey, body);
+        assertConflict(response, "IDEMPOTENCY_KEY_EXPIRED");
+        assertThat(response.getContentAsString()).doesNotContain(id);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=?", Integer.class, id)).isEqualTo(1);
+    }
+
+    @Test
+    void expiredResponsesArePurgedWhileTheKeyStillRefusesReexecution() throws Exception {
+        String expiredKey = key(), liveKey = key();
+        String body = createBody();
+        String id = tree(send("POST", "/api/v1/applications", "alice", expiredKey, body)).path("id").asText();
+        send("POST", "/api/v1/applications", "alice", liveKey, createBody());
+        jdbc.update("UPDATE request_idempotency SET expires_at=? WHERE tenant_id='demo' AND idempotency_key=?",
+                Instant.now().minusSeconds(1).atOffset(ZoneOffset.UTC), expiredKey);
+
+        assertThat(retention.purgeExpired(Instant.now())).isGreaterThanOrEqualTo(1);
+
+        assertThat(jdbc.queryForObject("SELECT response_body FROM request_idempotency WHERE tenant_id='demo' AND idempotency_key=?",
+                String.class, expiredKey)).isNull();
+        assertThat(jdbc.queryForObject("SELECT response_body FROM request_idempotency WHERE tenant_id='demo' AND idempotency_key=?",
+                String.class, liveKey)).isNotNull();
+        MockHttpServletResponse response = send("POST", "/api/v1/applications", "alice", expiredKey, body);
         assertConflict(response, "IDEMPOTENCY_KEY_EXPIRED");
         assertThat(response.getContentAsString()).doesNotContain(id);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM audit_event WHERE application_id=?", Integer.class, id)).isEqualTo(1);

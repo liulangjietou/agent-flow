@@ -8,7 +8,7 @@ const originals = { ...api }, originalFetch = global.fetch
 const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {}, parentNode: () => null, nextSibling: () => null })
 global.localStorage = { getItem: () => 'test-token', setItem() {}, removeItem() {} }
 const id = '00000000-0000-4000-8000-000000000001', bank = '00000000-0000-4000-8000-000000000002', older = '00000000-0000-4000-8000-000000000003'
-const clone = value => JSON.parse(JSON.stringify(value)), settle = () => new Promise(resolve => setImmediate(resolve))
+const settle = () => new Promise(resolve => setImmediate(resolve))
 const row = () => ({ id, eventId: 'evt_original', kind: 'SUPPLIER', authorizationId: bank, sourceRevision: 2, version: 2, status: 'REVIEW_REQUIRED', receivedAt: '2026-09-29T10:00:00Z', updatedAt: '2026-09-29T10:00:01Z', nextAttemptAt: null, failures: 0, queryVersion: null, reason: 'NEVER_DISPATCHED', requestedBy: null, requestReason: null })
 const detail = () => ({ callback: row(), history: [row(), { ...row(), version: 1, status: 'RECEIVED', reason: null, updatedAt: row().receivedAt, nextAttemptAt: row().receivedAt }] })
 const page = () => ({ items: [row()], nextBeforeId: null })

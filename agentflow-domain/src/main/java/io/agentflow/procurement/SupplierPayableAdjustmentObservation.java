@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.time.Instant;
@@ -71,5 +72,5 @@ public record SupplierPayableAdjustmentObservation(UUID operationId, String comm
         @Override public String toString() { return "SupplierPayableReturnEntry"; }
     }
     static boolean reference(String value) { return StringUtils.isNotBlank(value) && value.length() <= 128 && value.equals(value.trim()) && value.chars().noneMatch(Character::isISOControl); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_OBSERVATION", "Supplier adjustment requires exact independent bank receipt postings and original payable balances"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_OBSERVATION, "Supplier adjustment requires exact independent bank receipt postings and original payable balances"); }
 }

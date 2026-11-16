@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -30,8 +31,8 @@ public record SupplierAdjustmentRetirement(UUID operationId, UUID paymentId, lon
                 && basis == operation.retirementBasis() && !retiredAt.isBefore(operation.updatedAt())
                 && !retiredBy.equals(payment.cashier()) && !retiredBy.equals(payment.holdCommand().authorization().source().reservation().source().employeeId());
     }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_ADJUSTMENT_RETIREMENT", "Supplier adjustment retirement requires a named decision and exact original source revision"); }
-    private static DomainException unsafe() { return new DomainException("SUPPLIER_ADJUSTMENT_RETIREMENT_UNSAFE", "Stopped original settlement must prove no external settlement before replacement"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_ADJUSTMENT_RETIREMENT, "Supplier adjustment retirement requires a named decision and exact original source revision"); }
+    private static DomainException unsafe() { return new DomainException(ErrorCode.SUPPLIER_ADJUSTMENT_RETIREMENT_UNSAFE, "Stopped original settlement must prove no external settlement before replacement"); }
     /** 日志只保留操作标识和修订，不展开人员或资金资料。 */
     @Override public String toString() { return "SupplierAdjustmentRetirement[operationId=" + operationId + ", operationVersion=" + operationVersion + "]"; }
 }

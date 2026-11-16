@@ -4,7 +4,7 @@ import type { Definition } from './api'
 import type { InitiatorContext } from './initiatorContext'
 import type { InvoiceItem, InvoiceConflict } from './invoiceWallet'
 export type { InvoiceItem } from './invoiceWallet'
-import { amountMinor, type ExpenseContent, type ExpenseDetail, type ExpenseLine, type ExpenseVersions, type FinancialRound, type Money } from './expenses.js'
+import { amountMinor, type ExpenseContent, type ExpenseDetail, type ExpenseLine, type ExpenseVersions, type FinancialRound } from './expenses.js'
 import { extractionMatches, type ExtractionDetail } from './invoiceExtraction.js'
 
 export interface FinanceCatalog {

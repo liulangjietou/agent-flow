@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.Set;
 import org.springframework.util.MultiValueMap;
@@ -47,7 +48,7 @@ public final class ExpenseConfigurationQuery {
     private static void require(MultiValueMap<String, String> parameters, Set<String> allowed) {
         if (!allowed.containsAll(parameters.keySet()) || parameters.values().stream().anyMatch(values -> values.size() != 1)) throw invalid();
     }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_CONFIGURATION_QUERY", "Expense configuration query or identifier is invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_CONFIGURATION_QUERY, "Expense configuration query or identifier is invalid"); }
 
     /**
      * 制度目录分页参数。

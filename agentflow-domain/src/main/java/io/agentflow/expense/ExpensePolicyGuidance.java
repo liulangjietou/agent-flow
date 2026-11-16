@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import org.apache.commons.lang3.StringUtils;
@@ -19,7 +20,7 @@ public record ExpensePolicyGuidance(UUID policyId, long policyVersion, String po
         if (policyId == null || policyVersion < 1 || !text(policyName, 128) || !text(ruleKey, 64)
                 || !text(ruleName, 128) || constraints == null || !text(factSourceReference, 128) || validUntil == null
                 || selection != null && (!selection.policyId().equals(policyId) || selection.policyVersion() != policyVersion)) {
-            throw new DomainException("INVALID_EXPENSE_POLICY_GUIDANCE", "Expense policy guidance and its versioned source must be consistent");
+            throw new DomainException(ErrorCode.INVALID_EXPENSE_POLICY_GUIDANCE, "Expense policy guidance and its versioned source must be consistent");
         }
     }
 
@@ -53,7 +54,7 @@ public record ExpensePolicyGuidance(UUID policyId, long policyVersion, String po
         public Context {
             if (legalEntityId == null || reportType == null || !text(categoryCode, 64) || !text(cityCode, 128)
                     || incurredOn == null || endedOn != null && endedOn.isBefore(incurredOn) || !supportedCurrency(currency) || unit == null) {
-                throw new DomainException("INVALID_EXPENSE_GUIDANCE_QUERY", "Expense policy guidance dimensions are invalid");
+                throw new DomainException(ErrorCode.INVALID_EXPENSE_GUIDANCE_QUERY, "Expense policy guidance dimensions are invalid");
             }
         }
     }

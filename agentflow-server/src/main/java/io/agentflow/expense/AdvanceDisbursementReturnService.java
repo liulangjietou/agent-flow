@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
@@ -49,7 +51,7 @@ public class AdvanceDisbursementReturnService {
     public void authorize(UUID advanceId) {
         var actor = actors.actor(); var source = sources.find(actor.tenantId(), advanceId);
         access.requireFinanceAuthorization(source.funding().authorization().terms().id());
-        if (actor.userId().equals(source.request().command().authorization().executedBy())) throw new DomainException("FORBIDDEN", "Original payment executor cannot resolve its disbursement return");
+        if (actor.userId().equals(source.request().command().authorization().executedBy())) throw new DomainException(ErrorCode.FORBIDDEN, "Original payment executor cannot resolve its disbursement return");
     }
     /** 原放款与查询目标先持久化，出纳和页面不能替换查询身份。 */
     @Transactional
@@ -57,11 +59,11 @@ public class AdvanceDisbursementReturnService {
         var actor = actors.actor(); var source = sources.locked(actor.tenantId(), advanceId); authorize(advanceId); var funding = source.funding();
         if (funding.advance().version() != input.advanceVersion()) throw conflict();
         var latest = checks.latest(actor.tenantId(), advanceId, actor.userId()).orElse(null);
-        if (latest != null && latest.active()) throw new DomainException("DISBURSEMENT_RETURN_PENDING", "The current finance actor has a pending disbursement query");
+        if (latest != null && latest.active()) throw new DomainException(ErrorCode.DISBURSEMENT_RETURN_PENDING, "The current finance actor has a pending disbursement query");
         var now = time(Instant.now()); var check = AdvanceDisbursementReturnCheck.queue(new AdvanceDisbursementReturnCheck.Input(UUID.randomUUID(), actor.tenantId(),
                 funding.authorization().terms().targetDigest(), source.paymentVersion(), source.request(), actor.userId(), now));
         checks.create(check);
-        var event = audit.record(funding.authorization(), check.input().id(), check.version(), "FINANCE", "DISBURSEMENT_RETURN_QUERY", null, check.status().name(), input.comment(), now);
+        var event = audit.record(funding.authorization(), check.input().id(), check.version(), SystemRole.FINANCE.name(), "DISBURSEMENT_RETURN_QUERY", null, check.status().name(), input.comment(), now);
         return new ActionReceipt(advanceId, check.input().id(), check.version(), null, funding.advance().version(), event);
     }
     /** 借款、查询消费、决定、共用防重及审计同时提交，任一步失败全部回滚。 */
@@ -73,12 +75,12 @@ public class AdvanceDisbursementReturnService {
                 || !checks.latest(actor.tenantId(), advanceId, actor.userId()).map(value -> value.input().id().equals(check.input().id())).orElse(false)) throw conflict();
         requireCheck(check, source); var now = time(Instant.now()); var issue = confirmationIssue(source, check, now);
         if (issue != null) throw new DomainException(issue, "Disbursement return requires current original evidence, independent review and sufficient unallocated debt");
-        if (input.outcome() != check.receipt().status()) throw new DomainException("DISBURSEMENT_RETURN_OUTCOME_CHANGED", "Decision must match the displayed disbursement outcome");
+        if (input.outcome() != check.receipt().status()) throw new DomainException(ErrorCode.DISBURSEMENT_RETURN_OUTCOME_CHANGED, "Decision must match the displayed disbursement outcome");
         var decision = new AdvanceDisbursementReturn(UUID.randomUUID(), actor.tenantId(), check.input().id(), check.receipt(), actor.userId(), now, input.evidenceReference(), input.comment());
         var advance = funding.advance(); long version = advance.version(); advance.resolveDisbursementReview(version, decision);
         balances.update(advance, version, actor.userId(), "DISBURSEMENT_RETURN_RESOLVED"); var resolved = check.resolve(decision, now); checks.update(resolved); decisions.create(decision, advance);
         events.publishEvent(new AdvanceDisbursementReturnChanged(resolved));
-        var event = audit.record(funding.authorization(), decision.id(), advance.version(), "FINANCE", "DISBURSEMENT_RETURN_RESOLVE", check.status().name(), resolved.status().name(), input.comment(), now);
+        var event = audit.record(funding.authorization(), decision.id(), advance.version(), SystemRole.FINANCE.name(), "DISBURSEMENT_RETURN_RESOLVE", check.status().name(), resolved.status().name(), input.comment(), now);
         return new ActionReceipt(advanceId, check.input().id(), resolved.version(), decision.id(), advance.version(), event);
     }
     /** 展示与写入共享守卫，原付款未裁决或已有预留不能被本入口绕过。 */
@@ -145,7 +147,7 @@ public class AdvanceDisbursementReturnService {
     private void requireCheck(AdvanceDisbursementReturnCheck check, AdvanceDisbursementReturnSources.Source source) {
         if (!check.input().tenantId().equals(source.funding().advance().tenantId()) || check.input().paymentVersion() != source.paymentVersion()
                 || !check.input().targetDigest().equals(source.funding().authorization().terms().targetDigest()) || !check.input().request().equals(source.request())) {
-            throw new DomainException("DISBURSEMENT_RETURN_SOURCE_CHANGED", "Original disbursement and fixed query source changed");
+            throw new DomainException(ErrorCode.DISBURSEMENT_RETURN_SOURCE_CHANGED, "Original disbursement and fixed query source changed");
         }
     }
     private AdvanceDisbursementReturnCheck current(AdvanceDisbursementReturnCheck claimed) { return checks.find(claimed.input().tenantId(), claimed.input().id()).filter(value -> value.equals(claimed) && value.status() == AdvanceDisbursementReturnCheck.Status.RUNNING).orElse(null); }
@@ -153,7 +155,7 @@ public class AdvanceDisbursementReturnService {
         checks.update(value); events.publishEvent(new AdvanceDisbursementReturnChanged(value));
     }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed advance or disbursement query changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed advance or disbursement query changed"); }
     /**
      * 查询不接受外部目标、员工、账号或金额。
      * @author owlzhangfq@gmail.com

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -63,5 +64,5 @@ public class PaymentBatchController {
     public ResponseEntity<PaymentBatchService.Detail> get(@PathVariable UUID id) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.get(id));
     }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_BATCH", "Payment batch query accepts only a bounded limit and canonical beforeId"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_BATCH, "Payment batch query accepts only a bounded limit and canonical beforeId"); }
 }

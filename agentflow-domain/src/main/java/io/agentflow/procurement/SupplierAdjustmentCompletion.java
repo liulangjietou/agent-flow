@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 
@@ -24,6 +25,6 @@ public record SupplierAdjustmentCompletion(SupplierPayableAdjustmentOperation op
 
     /** 完成时间来自精确后继账本，数据库时间列只用于索引和约束。 */
     public Instant completedAt() { return after.updatedAt(); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_ADJUSTMENT_COMPLETION", "Supplier adjustment completion must preserve actual bank evidence and exact return ledger transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_ADJUSTMENT_COMPLETION, "Supplier adjustment completion must preserve actual bank evidence and exact return ledger transition"); }
     @Override public String toString() { return "SupplierAdjustmentCompletion[operationId=" + operation.command().id() + ", version=" + operation.version() + "]"; }
 }

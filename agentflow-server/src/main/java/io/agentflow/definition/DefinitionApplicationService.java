@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.event.EventContractBindings;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.Actor;
@@ -185,7 +186,7 @@ public class DefinitionApplicationService {
     public Optional<DefinitionPublication> publication(String tenantId, UUID id) {
         DefinitionDraft definition = get(tenantId, id);
         if (definition.status() == DefinitionModels.DraftStatus.DRAFT) {
-            throw new DomainException("DEFINITION_NOT_PUBLISHED", "Definition has not been published");
+            throw new DomainException(ErrorCode.DEFINITION_NOT_PUBLISHED, "Definition has not been published");
         }
         return publications.findByDefinition(tenantId, id);
     }
@@ -223,9 +224,9 @@ public class DefinitionApplicationService {
     public Comparison compare(String tenantId, UUID baselineId, String key, DefinitionDiffService.Snapshot current) {
         DefinitionDraft baseline = get(tenantId, baselineId);
         if (baseline.status() != DefinitionModels.DraftStatus.PUBLISHED) {
-            throw new DomainException("COMPARISON_BASELINE_REQUIRED", "Comparison baseline must be a published definition");
+            throw new DomainException(ErrorCode.COMPARISON_BASELINE_REQUIRED, "Comparison baseline must be a published definition");
         }
-        if (!baseline.key().equals(key)) throw new DomainException("COMPARISON_KEY_MISMATCH", "Comparison requires the same process key");
+        if (!baseline.key().equals(key)) throw new DomainException(ErrorCode.COMPARISON_KEY_MISMATCH, "Comparison requires the same process key");
         return new Comparison(new Baseline(baseline.id(), baseline.key(), baseline.name(), baseline.version()), differences.compare(
                 new DefinitionDiffService.Snapshot(baseline.name(), baseline.graph(), baseline.formSchema(), baseline.notificationTexts()), current));
     }
@@ -245,7 +246,7 @@ public class DefinitionApplicationService {
     /** 查询定义。 */
     public DefinitionDraft get(String tenantId, UUID id) {
         return repository.findById(tenantId, id)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Process definition not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Process definition not found"));
     }
 
     /** 查询定义列表。 */

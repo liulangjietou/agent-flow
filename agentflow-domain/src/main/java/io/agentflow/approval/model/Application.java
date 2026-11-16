@@ -1,5 +1,6 @@
 package io.agentflow.approval.model;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.NotificationTexts;
@@ -173,7 +174,7 @@ public final class Application {
     public void adjustBusinessPayload(long expectedVersion, BusinessReference reference, Map<String, Object> payload) {
         checkVersion(expectedVersion); requireInApproval();
         if (businessReference == null || !businessReference.equals(reference)) {
-            throw new DomainException("USE_BUSINESS_ENDPOINT", "A matching structured business reference is required");
+            throw new DomainException(ErrorCode.USE_BUSINESS_ENDPOINT, "A matching structured business reference is required");
         }
         if (formSchema != null) formSchema.validateSubmission(payload);
         this.payload = copyPayload(payload); version++;
@@ -183,7 +184,7 @@ public final class Application {
     public void requireEditable(long expectedVersion) {
         checkVersion(expectedVersion);
         if (!editable()) {
-            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be revised");
+            throw new DomainException(ErrorCode.DOMAIN_RULE_VIOLATION, "Only a draft, returned or withdrawn application can be revised");
         }
     }
 
@@ -192,7 +193,7 @@ public final class Application {
 
     /** 草稿已经预编号为第一轮；退回或撤回后才在下次提交时增加轮次。 */
     public int nextSubmissionRound() {
-        if (!editable()) throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be submitted");
+        if (!editable()) throw new DomainException(ErrorCode.DOMAIN_RULE_VIOLATION, "Only a draft, returned or withdrawn application can be submitted");
         return status == ApplicationStatus.DRAFT ? roundNo : roundNo + 1;
     }
 
@@ -240,7 +241,7 @@ public final class Application {
     public void withdraw(long expectedVersion) {
         checkVersion(expectedVersion);
         if (status != ApplicationStatus.IN_APPROVAL) {
-            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only an active application can be withdrawn");
+            throw new DomainException(ErrorCode.DOMAIN_RULE_VIOLATION, "Only an active application can be withdrawn");
         }
         status = ApplicationStatus.WITHDRAWN;
         version++;
@@ -250,7 +251,7 @@ public final class Application {
     public void revoke(long expectedVersion) {
         checkVersion(expectedVersion);
         if (status != ApplicationStatus.APPROVED) {
-            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only an approved application can be revoked");
+            throw new DomainException(ErrorCode.DOMAIN_RULE_VIOLATION, "Only an approved application can be revoked");
         }
         status = ApplicationStatus.REVOKED;
         version++;
@@ -261,7 +262,7 @@ public final class Application {
         checkVersion(expectedVersion);
         if (status != ApplicationStatus.DRAFT && status != ApplicationStatus.RETURNED
                 && status != ApplicationStatus.WITHDRAWN) {
-            throw new DomainException("DOMAIN_RULE_VIOLATION", "Only a draft, returned or withdrawn application can be cancelled");
+            throw new DomainException(ErrorCode.DOMAIN_RULE_VIOLATION, "Only a draft, returned or withdrawn application can be cancelled");
         }
         status = ApplicationStatus.CANCELLED;
         version++;
@@ -282,7 +283,7 @@ public final class Application {
 
     private void requireInApproval() {
         if (status != ApplicationStatus.IN_APPROVAL) {
-            throw new DomainException("DOMAIN_RULE_VIOLATION", "Application is not in approval");
+            throw new DomainException(ErrorCode.DOMAIN_RULE_VIOLATION, "Application is not in approval");
         }
     }
 
@@ -295,13 +296,13 @@ public final class Application {
     /** 取锁后先核对原操作版本，避免并发结束的任务被误报为从未存在。 */
     public void checkVersion(long expectedVersion) {
         if (version != expectedVersion) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Application version has changed");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Application version has changed");
         }
     }
 
     private static String require(String value, String field) {
         if (org.apache.commons.lang3.StringUtils.isBlank(value)) {
-            throw new DomainException("INVALID_APPLICATION", field + " is required");
+            throw new DomainException(ErrorCode.INVALID_APPLICATION, field + " is required");
         }
         return value.trim();
     }

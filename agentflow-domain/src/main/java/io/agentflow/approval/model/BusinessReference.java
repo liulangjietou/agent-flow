@@ -1,5 +1,6 @@
 package io.agentflow.approval.model;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.UUID;
 
@@ -10,7 +11,7 @@ import java.util.UUID;
 public record BusinessReference(Type type, UUID id) {
     /** 业务类型和业务标识必须同时存在。 */
     public BusinessReference {
-        if (type == null || id == null) throw new DomainException("INVALID_BUSINESS_REFERENCE", "Business type and identifier are required");
+        if (type == null || id == null) throw new DomainException(ErrorCode.INVALID_BUSINESS_REFERENCE, "Business type and identifier are required");
     }
 
     /**

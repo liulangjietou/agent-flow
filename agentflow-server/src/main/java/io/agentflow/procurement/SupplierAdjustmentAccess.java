@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import java.util.UUID;
@@ -29,7 +30,7 @@ public class SupplierAdjustmentAccess {
     /** 按当前租户找到真实调整，再验证它所属的原付款与审批轮次。 */
     public SupplierPayableAdjustmentOperation requireAdjustment(UUID adjustmentId) {
         var value = adjustments.find(actors.actor().tenantId(), adjustmentId)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Original supplier adjustment is unavailable in the current scope"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Original supplier adjustment is unavailable in the current scope"));
         requireFinance(value.command().source().returns().request().command().id()); return value;
     }
 }

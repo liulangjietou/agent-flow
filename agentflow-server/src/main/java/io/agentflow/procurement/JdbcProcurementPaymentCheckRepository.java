@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -74,8 +75,7 @@ public class JdbcProcurementPaymentCheckRepository {
                     input.requestId().toString(),
                     Timestamp.from(job.createdAt()));
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "PROCUREMENT_CHECK_ACTIVE",
+            throw new DomainException(ErrorCode.PROCUREMENT_CHECK_ACTIVE,
                     "Procurement payment already has an active precheck");
         }
         append(job);
@@ -214,7 +214,7 @@ public class JdbcProcurementPaymentCheckRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Procurement payment check input or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Procurement payment check input or version changed"); }
 
     /**
      * 扫描项不复制敏感快照，领取后在锁内重新读取。

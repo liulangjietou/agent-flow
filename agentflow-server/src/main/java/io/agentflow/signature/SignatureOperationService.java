@@ -1,5 +1,6 @@
 package io.agentflow.signature;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.auth.DeferredActorAuthentication;
 import io.agentflow.common.CurrentActor;
@@ -68,8 +69,8 @@ public class SignatureOperationService {
         var current = get(application, id); lockApplication(current);
         current = operations.lock(actors.actor().tenantId(), id).orElseThrow(SignatureOperationService::notFound);
         access.requireReadable(actors.actor(), current);
-        if (!current.input().request().authorization().actor().equals(actors.actor().userId())) throw new DomainException("FORBIDDEN", "Only the original signature authorizer may cancel");
-        if (current.version() != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Signature operation changed");
+        if (!current.input().request().authorization().actor().equals(actors.actor().userId())) throw new DomainException(ErrorCode.FORBIDDEN, "Only the original signature authorizer may cancel");
+        if (current.version() != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Signature operation changed");
         var cancelled = current.cancelUnsent(now); operations.update(cancelled);
         audit.record(cancelled, SignatureAudit.Action.SIGNATURE_CANCELLED, actors.actor().userId());
         return cancelled;
@@ -126,7 +127,7 @@ public class SignatureOperationService {
         var request = callback.input().request();
         var initial = operations.find(request.tenantId(), request.id()).orElseThrow(SignatureOperationService::notFound); lockApplication(initial);
         var current = operations.lock(request.tenantId(), request.id()).orElseThrow(SignatureOperationService::notFound);
-        if (!current.input().equals(callback.input())) throw new DomainException("SIGNATURE_RECEIPT_CONFLICT", "Signature callback original input changed");
+        if (!current.input().equals(callback.input())) throw new DomainException(ErrorCode.SIGNATURE_RECEIPT_CONFLICT, "Signature callback original input changed");
         // 接收时间可能早于等待锁期间已提交的状态；锁内生效时间不倒退，原验真时间仍保留在证据中。
         var appliedAt = now.isBefore(current.updatedAt()) ? current.updatedAt() : now;
         var accepted = current.receiveCallback(callback.verified().receipt(), appliedAt);
@@ -158,5 +159,5 @@ public class SignatureOperationService {
                 ? operation.status() == SignatureOperation.Status.UNKNOWN && operation.failure() == SignatureOperation.Failure.NOT_FOUND
                 : operation.receipt() != null && operation.receipt().equals(receipt);
     }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Signature operation or application not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Signature operation or application not found"); }
 }

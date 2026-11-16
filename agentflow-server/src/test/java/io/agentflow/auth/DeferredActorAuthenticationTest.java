@@ -41,7 +41,7 @@ import java.util.UUID;
  */
 class DeferredActorAuthenticationTest {
     private final Instant now = Instant.now();
-    private final AuthService demo = new AuthService(true, "demo");
+    private final AuthService demo = new AuthService(true, "demo", java.time.Duration.ofHours(12));
     private final DriverManagerDataSource source = new DriverManagerDataSource("jdbc:h2:mem:deferred-auth-" + UUID.randomUUID() + ";DB_CLOSE_DELAY=-1", "sa", "");
     private final JdbcTemplate jdbc = new JdbcTemplate(source);
     private final DataSourceTransactionManager manager = new DataSourceTransactionManager(source);
@@ -69,7 +69,7 @@ class DeferredActorAuthenticationTest {
         assertThatThrownBy(() -> demo.authenticate(reference.value())).isInstanceOf(DomainException.class);
         assertThat(service.resolve(reference, "demo", "bob", now)).isEmpty();
         assertThat(service.resolve(reference, "other", "alice", now)).isEmpty();
-        assertThat(service(properties(false, "EMPLOYEE"), sessions, logouts, new AuthService(true, "demo"))
+        assertThat(service(properties(false, "EMPLOYEE"), sessions, logouts, new AuthService(true, "demo", java.time.Duration.ofHours(12)))
                 .resolve(reference, "demo", "alice", now)).isEmpty();
         demo.logout(login.token());
         assertThat(service.resolve(reference, "demo", "alice", now)).isEmpty();

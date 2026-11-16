@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -37,7 +38,7 @@ public class JdbcProcurementPaymentRepository implements ProcurementPaymentRepos
     public void lock(String tenant, UUID requestId) {
         var application = sqlMapper.lock(tenant, requestId.toString());
         if (application.isEmpty())
-            throw new DomainException("NOT_FOUND", "Procurement payment not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Procurement payment not found");
         sqlMapper.lock2(tenant, application.get(0));
         sqlMapper.lock3(tenant, requestId.toString());
     }
@@ -109,9 +110,9 @@ public class JdbcProcurementPaymentRepository implements ProcurementPaymentRepos
 
     private static void requireAudit(String actor, String operation) {
         if (StringUtils.isBlank(actor) || actor.length() > 128 || operation == null || !operation.matches("[A-Z][A-Z0-9_]{0,63}")) {
-            throw new DomainException("INVALID_PROCUREMENT_PAYMENT_AUDIT", "Procurement payment changes require an actor and operation");
+            throw new DomainException(ErrorCode.INVALID_PROCUREMENT_PAYMENT_AUDIT, "Procurement payment changes require an actor and operation");
         }
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Procurement payment binding or version has changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Procurement payment binding or version has changed"); }
 }

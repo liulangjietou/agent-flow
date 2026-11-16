@@ -7,7 +7,7 @@ const { default: Rendered } = await import(process.env.AGENTFLOW_TEST_SERVICETAS
 const { api } = await import(process.env.AGENTFLOW_TEST_API)
 const originals = { ...api }, APP = '00000000-0000-0000-0000-000000000001'
 const id = number => '00000000-0000-0000-0000-' + String(number).padStart(12, '0')
-const copy = value => JSON.parse(JSON.stringify(value)), settle = () => new Promise(resolve => setImmediate(resolve))
+const settle = () => new Promise(resolve => setImmediate(resolve))
 const deferred = () => { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
 const entry = (number = 2, changes = {}) => ({ id: id(number), nodeId: 'service', nodeName: '登记申请', operationKey: 'receipt.register', operationVersion: '9223372036854775807', operationName: '登记服务', version: '1', status: 'QUEUED', progress: 'PENDING', attempts: 0, createdAt: '2026-10-03T12:00:00Z', updatedAt: '2026-10-03T12:00:00Z', configurationAvailable: true, ...changes })
 const page = (changes = {}) => ({ applicationId: APP, applicationVersion: 2, roundNo: 1, roundStatus: 'IN_APPROVAL', items: [entry()], ...changes })

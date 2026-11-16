@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -45,5 +46,5 @@ public interface AccountingPeriodPort {
     }
 
     private static boolean invalidText(String value) { return StringUtils.isBlank(value) || value.length() > 128; }
-    private static DomainException invalid() { return new DomainException("INVALID_ACCOUNTING_PERIOD", "An open accounting period must cover the original date with versioned evidence"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ACCOUNTING_PERIOD, "An open accounting period must cover the original date with versioned evidence"); }
 }

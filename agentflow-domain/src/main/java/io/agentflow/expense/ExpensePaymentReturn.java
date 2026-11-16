@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.ExpensePaymentReturnPort;
 import org.apache.commons.lang3.StringUtils;
@@ -44,5 +45,5 @@ public record ExpensePaymentReturn(UUID id, String tenantId, UUID checkId, Expen
     }
 
     @Override public String toString() { return "ExpensePaymentReturn[id=" + id + ", paymentId=" + receipt.request().command().id() + "]"; }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PAYMENT_RETURN", "Expense payment return requires fresh original evidence and an independent finance registration"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PAYMENT_RETURN, "Expense payment return requires fresh original evidence and an independent finance registration"); }
 }

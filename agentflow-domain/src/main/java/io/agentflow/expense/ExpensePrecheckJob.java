@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.organization.InitiatorContext;
 import org.apache.commons.lang3.StringUtils;
@@ -58,8 +59,8 @@ public record ExpensePrecheckJob(Input input, long version, Status status, Insta
                 || budget.financialVersion() != input.financialVersion() || !budget.employeeId().equals(input.employeeId())
                 || !budget.legalEntityId().equals(evidence.legalEntity().id()) || !budget.accountingDate().equals(input.accountingDate())) throw invalid();
     }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PRECHECK", "Expense precheck state or evidence is invalid"); }
-    private static DomainException conflict() { return new DomainException("EXPENSE_PRECHECK_STATE_CONFLICT", "Expense precheck is no longer executable"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PRECHECK, "Expense precheck state or evidence is invalid"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.EXPENSE_PRECHECK_STATE_CONFLICT, "Expense precheck is no longer executable"); }
 
     /**
      * 固定申请与财务版本、任职和记账日期，实际员工始终来自认证身份。

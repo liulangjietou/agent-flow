@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 
 import io.agentflow.common.CurrentActor;
@@ -122,7 +124,7 @@ public class SupplierFinanceActions {
         var payload = new LinkedHashMap<String, Object>();
         payload.put("requestId", source.requestId());
         payload.put("roundNo", source.round().roundNo());
-        payload.put("authorizedRole", "FINANCE");
+        payload.put("authorizedRole", SystemRole.FINANCE.name());
         payload.put("applicationVersion", approved.approval().applicationVersion());
         payload.put("requestVersion", approved.approvedRequestVersion());
         payload.put("previousStatus", previous);
@@ -144,9 +146,9 @@ public class SupplierFinanceActions {
 
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed approved procurement source or payable review changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed approved procurement source or payable review changed"); }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Original supplier payable review or hold not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Original supplier payable review or hold not found"); }
 
     /**
      * 三类人工恢复动作均只操作原授权号。

@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.event.EventContract;
 import java.util.Map;
@@ -24,11 +25,11 @@ public record EventWaitPolicy(String contractKey, long contractVersion) {
     /** 属性必须同时存在且版本使用规范十进制，不能在读取时补默认版本。 */
     public static EventWaitPolicy fromProperties(Map<String, String> properties) {
         String key = properties.get(KEY_PROPERTY), version = properties.get(VERSION_PROPERTY);
-        if (key == null || version == null) throw new DomainException("EVENT_CONTRACT_REFERENCE_REQUIRED", "An explicit published event contract version is required");
+        if (key == null || version == null) throw new DomainException(ErrorCode.EVENT_CONTRACT_REFERENCE_REQUIRED, "An explicit published event contract version is required");
         if (!version.matches("[1-9][0-9]{0,18}")) throw invalid();
         try { return new EventWaitPolicy(key, Long.parseLong(version)); }
         catch (NumberFormatException failure) { throw invalid(); }
     }
 
-    private static DomainException invalid() { return new DomainException("EVENT_CONTRACT_REFERENCE_INVALID", "Event contract reference is invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.EVENT_CONTRACT_REFERENCE_INVALID, "Event contract reference is invalid"); }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.AssistExecutionService;
 import io.agentflow.agent.PrecheckExplanationService;
 import io.agentflow.common.CurrentActor;
@@ -43,10 +44,10 @@ public class ExpenseCorrectionService {
         reports.lock(actor.tenantId(), reportId);
         var detail = explanations.get(reportId, runId);
         if (detail.result() == ExpensePrecheckJob.Status.READY) {
-            throw new DomainException("AGENT_CORRECTION_NOT_REQUIRED", "A successful precheck has no blocking findings to correct");
+            throw new DomainException(ErrorCode.AGENT_CORRECTION_NOT_REQUIRED, "A successful precheck has no blocking findings to correct");
         }
         if (detail.applicationVersion() != applicationVersion || detail.financialVersion() != financialVersion) {
-            throw new DomainException("AGENT_INPUT_CHANGED", "Expense correction versions do not match the explanation");
+            throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Expense correction versions do not match the explanation");
         }
         var original = jobs.find(actor.tenantId(), detail.precheckId()).orElseThrow().input();
         explanations.review(reportId, runId, runVersion, AssistExecutionService.ReviewAction.ADOPT, selectedIssueIds, comment);

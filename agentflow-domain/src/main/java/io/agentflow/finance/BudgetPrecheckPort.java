@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.CostAllocation;
@@ -99,5 +100,5 @@ public interface BudgetPrecheckPort {
         }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_PRECHECK", "Budget precheck context, allocations or evidence are invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_PRECHECK, "Budget precheck context, allocations or evidence are invalid"); }
 }

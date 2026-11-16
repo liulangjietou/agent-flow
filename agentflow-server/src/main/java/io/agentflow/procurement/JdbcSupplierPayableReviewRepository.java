@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -74,8 +75,7 @@ public class JdbcSupplierPayableReviewRepository {
                     timestamp(value.updatedAt()),
                     source.requestId().toString());
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "SUPPLIER_PAYABLE_REVIEW_PENDING",
+            throw new DomainException(ErrorCode.SUPPLIER_PAYABLE_REVIEW_PENDING,
                     "The current finance actor already has a pending payable review");
         }
         append(value);
@@ -181,7 +181,7 @@ public class JdbcSupplierPayableReviewRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Supplier payable review input, version or authorization consumption changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Supplier payable review input, version or authorization consumption changed"); }
 
     /**
      * 后台候选只包含租户与原读取标识。

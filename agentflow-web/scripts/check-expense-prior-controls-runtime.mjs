@@ -1,11 +1,12 @@
+import { tmpdir } from 'node:os'
 import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
 import ts from 'typescript'
 
 // 直接运行当前页面解析器，不另外实现一份验收用规则。
-const root = fileURLToPath(new URL('../', import.meta.url)), output = mkdtempSync('/fyoung/tmp/agentflow-prior-parser-')
+const root = fileURLToPath(new URL('../', import.meta.url)), output = mkdtempSync(join(process.env.AGENTFLOW_TMP_DIR ?? tmpdir(), 'agentflow-prior-parser-'))
 writeFileSync(resolve(output, 'package.json'), '{"type":"module"}')
 for (const name of ['expenses', 'expensePriorControl']) {
   const source = readFileSync(resolve(root, 'src', name + '.ts'), 'utf8')

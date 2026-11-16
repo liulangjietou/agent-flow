@@ -1,5 +1,6 @@
 package io.agentflow.signature;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
@@ -89,8 +90,8 @@ public class SignatureController {
         if (value == null || !value.matches("[1-9][0-9]{0,9}")) throw invalidQuery();
         int number = Integer.parseInt(value); if (number > maximum) throw invalidQuery(); return number;
     }
-    private static DomainException invalidQuery() { return new DomainException("INVALID_SIGNATURE_QUERY", "Signature query is invalid"); }
-    private static DomainException invalidInput() { return new DomainException("INVALID_SIGNATURE_REQUEST", "Signature version or input is invalid"); }
+    private static DomainException invalidQuery() { return new DomainException(ErrorCode.INVALID_SIGNATURE_QUERY, "Signature query is invalid"); }
+    private static DomainException invalidInput() { return new DomainException(ErrorCode.INVALID_SIGNATURE_REQUEST, "Signature version or input is invalid"); }
     /**
      * 版本采用十进制文本，避免浏览器截断长整数；实际签署人由服务器资料决定。
      * @author owlzhangfq@gmail.com

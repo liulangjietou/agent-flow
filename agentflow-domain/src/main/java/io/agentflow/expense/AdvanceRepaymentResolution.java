@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AdvanceRepaymentAdjustmentPort;
 import io.agentflow.finance.Money;
@@ -58,5 +59,5 @@ public record AdvanceRepaymentResolution(UUID id, String tenantId, UUID checkId,
             return repaymentId.equals(decision.receipt().request().repaymentId()) && decision.receipt().returns().contains(proof());
         }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_REPAYMENT_RESOLUTION", "Repayment decision requires recent original evidence and independent finance review"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_REPAYMENT_RESOLUTION, "Repayment decision requires recent original evidence and independent finance review"); }
 }

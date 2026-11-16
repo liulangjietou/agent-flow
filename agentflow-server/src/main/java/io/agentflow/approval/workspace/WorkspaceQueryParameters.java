@@ -1,5 +1,6 @@
 package io.agentflow.approval.workspace;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
@@ -64,5 +65,5 @@ public record WorkspaceQueryParameters(WorkspaceReadPort.Query query, String con
         catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 is unavailable", impossible); }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_WORKSPACE_QUERY", "Invalid workspace filter or cursor"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_WORKSPACE_QUERY, "Invalid workspace filter or cursor"); }
 }

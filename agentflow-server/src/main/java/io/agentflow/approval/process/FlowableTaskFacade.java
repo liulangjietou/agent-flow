@@ -1,5 +1,7 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.approval.model.ApplicationStatus;
@@ -88,10 +90,10 @@ public class FlowableTaskFacade {
         var query = taskService.createTaskQuery().processVariableValueEquals("tenantId", actor.tenantId()).includeProcessVariables().includeIdentityLinks();
         String normalizedStatus = status == null || status.isBlank() ? "PENDING" : status.toUpperCase(Locale.ROOT);
         if (!"PENDING".equals(normalizedStatus)) {
-            throw new DomainException("INVALID_REQUEST", "Only pending task status is supported");
+            throw new DomainException(ErrorCode.INVALID_REQUEST, "Only pending task status is supported");
         }
         query.active();
-        if (!actor.hasRole("APPROVER") || !recipients.eligible(actor.tenantId(), actor.userId())) return List.of();
+        if (!actor.hasRole(SystemRole.APPROVER) || !recipients.eligible(actor.tenantId(), actor.userId())) return List.of();
         var scope = proxies.forActor(actor, Instant.now());
         return query.list().stream().filter(task -> authorization.canAct(actor, task) || scope.canRead(task))
                 .map(task -> view(actor, task)).toList();
@@ -106,10 +108,10 @@ public class FlowableTaskFacade {
     /** 后台摘要复核已认证的发起主体，继续使用当前任务与组织事实，不修改线程认证上下文。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public TaskView get(String taskId, Actor actor) {
-        actor.requireRole("APPROVER");
+        actor.requireRole(SystemRole.APPROVER);
         Task task = authorization.requireReadable(taskId, actor);
         if (task.isSuspended() || authorization.application(actor, task).status() != ApplicationStatus.IN_APPROVAL) {
-            throw new DomainException("NOT_FOUND", "Active task not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Active task not found");
         }
         return view(actor, task);
     }
@@ -167,9 +169,9 @@ public class FlowableTaskFacade {
     @Transactional
     public ActionResult action(String taskId, String action, String comment, String targetUser, Long expectedVersion, UUID proxyId) {
         Actor actor = currentActor.actor();
-        actor.requireRole("APPROVER");
+        actor.requireRole(SystemRole.APPROVER);
         if (expectedVersion == null) {
-            throw new DomainException("INVALID_REQUEST", "expectedVersion is required");
+            throw new DomainException(ErrorCode.INVALID_REQUEST, "expectedVersion is required");
         }
         Task task = authorization.requireReadable(taskId, actor);
         Application application = authorization.application(actor, task);
@@ -269,7 +271,7 @@ public class FlowableTaskFacade {
                     expenses.taskApproved(application, task, actor.userId(), auditEventId);
                     subprocesses.afterAdvance(before, application);
                 }
-                default -> throw new DomainException("INVALID_REQUEST", "Unsupported task action");
+                default -> throw new DomainException(ErrorCode.INVALID_REQUEST, "Unsupported task action");
             }
             if (normalized == TaskAction.REJECT) {
                 expenseReleases.release(application, actor.userId(), Instant.now());
@@ -284,7 +286,7 @@ public class FlowableTaskFacade {
     /** 接收人选择只对当前可操作任务开放，执行时再次按同一权威目录复核。 */
     public List<String> recipients(String taskId) {
         Actor actor = currentActor.actor();
-        actor.requireRole("APPROVER");
+        actor.requireRole(SystemRole.APPROVER);
         Task task = authorization.require(taskId, actor);
         delegation(task).requireAction(TaskAction.TRANSFER);
         return authorization.allowedTargets(task, recipients.approvers(actor.tenantId())).stream()
@@ -313,20 +315,20 @@ public class FlowableTaskFacade {
 
     private void requireAssignee(Task task, Actor actor) {
         if (!actor.userId().equals(task.getAssignee())) {
-            throw new DomainException("FORBIDDEN", "Only the current assignee can release a task");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Only the current assignee can release a task");
         }
     }
 
     private void requireTarget(Actor actor, String targetUser) {
-        if (targetUser == null || targetUser.isBlank()) throw new DomainException("INVALID_REQUEST", "targetUser is required");
+        if (targetUser == null || targetUser.isBlank()) throw new DomainException(ErrorCode.INVALID_REQUEST, "targetUser is required");
         if (actor.userId().equals(targetUser) || !recipients.approvers(actor.tenantId()).contains(targetUser)) {
-            throw new DomainException("INVALID_TASK_RECIPIENT", "The recipient must be another active approver in this tenant");
+            throw new DomainException(ErrorCode.INVALID_TASK_RECIPIENT, "The recipient must be another active approver in this tenant");
         }
     }
 
     private void requireComment(String comment) {
         if (comment == null || comment.isBlank()) {
-            throw new DomainException("DOMAIN_RULE_VIOLATION", "A reason is required");
+            throw new DomainException(ErrorCode.DOMAIN_RULE_VIOLATION, "A reason is required");
         }
     }
 

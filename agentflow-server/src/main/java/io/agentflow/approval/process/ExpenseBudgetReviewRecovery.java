@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.SubprocessExecutionLocks;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
@@ -61,7 +62,7 @@ public class ExpenseBudgetReviewRecovery {
         if (instance==null || instance.isSuspended()) { defer(candidate); return; }
         if (round.status()!=SubmissionRound.Status.IN_APPROVAL || !application.tenantId().equals(instance.getTenantId())
                 || !application.runtimeDefinitionId().equals(instance.getProcessDefinitionId())) {
-            throw new DomainException("EXPENSE_BUDGET_TASK_CONTEXT_CHANGED", "Budget recovery no longer matches the original process instance");
+            throw new DomainException(ErrorCode.EXPENSE_BUDGET_TASK_CONTEXT_CHANGED, "Budget recovery no longer matches the original process instance");
         }
         var review = reviews.find(candidate.tenantId(), candidate.reportId(), candidate.roundNo()).orElseThrow();
         var operationId = review.authorizedOperationId()==null ? review.input().originalOperationId() : review.authorizedOperationId();

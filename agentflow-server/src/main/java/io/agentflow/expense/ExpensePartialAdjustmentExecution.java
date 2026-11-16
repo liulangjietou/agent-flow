@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import org.springframework.context.ApplicationEventPublisher;
 
 import io.agentflow.common.DomainException;
@@ -55,5 +56,5 @@ public class ExpensePartialAdjustmentExecution {
             events.publishEvent(new ExpensePartialAdjustmentChanged.Resources(blocked));
         }
     }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Partial adjustment source or execution candidate changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Partial adjustment source or execution candidate changed"); }
 }

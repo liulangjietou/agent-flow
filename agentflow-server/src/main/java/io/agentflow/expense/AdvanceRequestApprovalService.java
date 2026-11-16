@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
@@ -31,10 +32,10 @@ public class AdvanceRequestApprovalService {
     public void approved(Application application, String actor) {
         if (!bound(application) || application.status() != ApplicationStatus.APPROVED) return;
         var request = requests.find(application.tenantId(), application.businessReference().id()).orElseThrow(
-                () -> new DomainException("NOT_FOUND", "Approved advance request not found"));
+                () -> new DomainException(ErrorCode.NOT_FOUND, "Approved advance request not found"));
         if (!request.applicationId().equals(application.id()) || !request.employeeId().equals(application.createdBy())
                 || !AdvanceRequestFormContract.submittedPayload(request.currentRound()).equals(application.payload())) {
-            throw new DomainException("ADVANCE_APPROVAL_MISMATCH", "Approval must match the frozen advance terms and applicant");
+            throw new DomainException(ErrorCode.ADVANCE_APPROVAL_MISMATCH, "Approval must match the frozen advance terms and applicant");
         }
         long previous = request.version();
         request.approve(previous, application.roundNo(), application.version(), actor, Instant.now().truncatedTo(ChronoUnit.MICROS));

@@ -7,6 +7,9 @@ import subprocess
 import tempfile
 import unittest
 
+# 测试临时根目录：AGENTFLOW_TMP_DIR 优先，未设置时使用系统临时目录。
+TMP_ROOT = os.environ.get("AGENTFLOW_TMP_DIR") or tempfile.gettempdir()
+
 
 ENTRYPOINT = Path(__file__).resolve().parents[2] / "deploy/production/entrypoint.sh"
 
@@ -18,7 +21,7 @@ class ProductionEntrypointTest(unittest.TestCase):
     """
 
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix="production-entrypoint-", dir="/fyoung/tmp")
+        self.temporary = tempfile.TemporaryDirectory(prefix="production-entrypoint-", dir=TMP_ROOT)
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.java = self.root / "java"
@@ -41,7 +44,7 @@ sys.exit(int(os.environ.get('FIXTURE_EXIT_CODE','0')))
                               env={**self.environment, **environment}, capture_output=True, text=True, timeout=5)
 
     def test_passes_literal_secret_values_and_original_arguments(self):
-        database = "db-'$(touch /fyoung/tmp/never-created-by-secret)'-$VALUE"
+        database = "db-'$(touch " + TMP_ROOT + "/never-created-by-secret)'-$VALUE"
         oidc = "oidc-`uname`-special;&"
         result = self.invoke(AGENTFLOW_DATASOURCE_PASSWORD_FILE=self.secret("database", database + "\n"),
                              AGENTFLOW_OIDC_CLIENT_SECRET_FILE=self.secret("oidc", oidc + "\n"),

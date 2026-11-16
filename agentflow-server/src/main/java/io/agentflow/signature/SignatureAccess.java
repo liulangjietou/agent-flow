@@ -1,5 +1,6 @@
 package io.agentflow.signature;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
@@ -61,7 +62,7 @@ public class SignatureAccess {
     public void requireRound(Actor actor, UUID applicationId, int roundNo) {
         active(actor); applications.getForActor(actor, applicationId);
         rounds.findByRound(actor.tenantId(), applicationId, roundNo)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Submission round not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Submission round not found"));
     }
 
     /** 可选资料只来自当前具名授权，组织目录不补授签署身份。 */
@@ -76,7 +77,7 @@ public class SignatureAccess {
     public void requireReadable(Actor actor, SignatureOperation operation) {
         active(actor);
         var request = operation.input().request();
-        if (!actor.tenantId().equals(request.tenantId())) throw new DomainException("NOT_FOUND", "Signature operation not found");
+        if (!actor.tenantId().equals(request.tenantId())) throw new DomainException(ErrorCode.NOT_FOUND, "Signature operation not found");
         applications.getForActor(actor, request.source().applicationId());
         for (var original : request.documents()) {
             if (!original.equals(document(actor, request.source().applicationId(), request.source().roundNo(), original.attachmentId()))) throw sourceChanged();
@@ -86,7 +87,7 @@ public class SignatureAccess {
     /** 首次领取再次核对原登录对应主体、批准版本和资料；已发送恢复不调用此入口。 */
     public void requireInitialSend(Actor actor, SignatureOperation operation) {
         var request = operation.input().request(); var source = request.source(); var authorization = request.authorization();
-        if (!actor.userId().equals(authorization.actor())) throw new DomainException("FORBIDDEN", "Signature authorization belongs to another actor");
+        if (!actor.userId().equals(authorization.actor())) throw new DomainException(ErrorCode.FORBIDDEN, "Signature authorization belongs to another actor");
         requireReadable(actor, operation);
         var application = applications.getForActor(actor, source.applicationId());
         approved(application, source.roundNo(), source.applicationVersion());
@@ -103,7 +104,7 @@ public class SignatureAccess {
 
     private void active(Actor actor) {
         if (organization.initialized(actor.tenantId()) && organization.personBySubject(actor.tenantId(), actor.userId())
-                .filter(OrganizationPerson::active).isEmpty()) throw new DomainException("FORBIDDEN", "Signature actor is not active in the organization");
+                .filter(OrganizationPerson::active).isEmpty()) throw new DomainException(ErrorCode.FORBIDDEN, "Signature actor is not active in the organization");
     }
 
     private void approved(Application application, int roundNo, long expectedVersion) {
@@ -115,10 +116,10 @@ public class SignatureAccess {
     private SignatureGatewayConfiguration.Declaration enabled(Actor actor, String key, long version) {
         return configuration.find(actor.tenantId(), key, version).filter(SignatureGatewayConfiguration.Declaration::enabled)
                 .filter(value -> value.profile().actors().contains(actor.userId()))
-                .orElseThrow(() -> new DomainException("FORBIDDEN", "Signature profile is not enabled for this actor"));
+                .orElseThrow(() -> new DomainException(ErrorCode.FORBIDDEN, "Signature profile is not enabled for this actor"));
     }
 
-    private static DomainException sourceChanged() { return new DomainException("SIGNATURE_SOURCE_CHANGED", "Approved signature source or authorization changed"); }
+    private static DomainException sourceChanged() { return new DomainException(ErrorCode.SIGNATURE_SOURCE_CHANGED, "Approved signature source or authorization changed"); }
 
     /**
      * 业务入口一次校验选择范围；不接收租户、操作者、物理路径、服务地址或服务方账户。
@@ -130,7 +131,7 @@ public class SignatureAccess {
             if (roundNo < 1 || expectedVersion < 1 || profileVersion < 1 || !SignatureRequest.key(profileKey)
                     || documentIds == null || documentIds.isEmpty() || documentIds.size() > SignatureRequest.MAX_DOCUMENTS
                     || documentIds.stream().anyMatch(java.util.Objects::isNull) || documentIds.stream().distinct().count() != documentIds.size()
-                    || !SignatureRequest.literal(purpose, 1000) || validUntil == null) throw new DomainException("INVALID_SIGNATURE_REQUEST", "Signature selection and authorization are invalid");
+                    || !SignatureRequest.literal(purpose, 1000) || validUntil == null) throw new DomainException(ErrorCode.INVALID_SIGNATURE_REQUEST, "Signature selection and authorization are invalid");
             documentIds = List.copyOf(documentIds);
         }
         @Override public String toString() { return "SignatureCreateInput[round=" + roundNo + ", documents=" + documentIds.size() + "]"; }

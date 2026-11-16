@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,7 +34,7 @@ public final class DefinitionApprovalPaths {
                 remaining.remove(id);
                 if (node.type() == NodeType.END && bypass) ends.add(id);
             }
-            if (remaining.size() == before) throw new DomainException("INVALID_DEFINITION", "Approval path requires an acyclic connected graph");
+            if (remaining.size() == before) throw new DomainException(ErrorCode.INVALID_DEFINITION, "Approval path requires an acyclic connected graph");
         }
         return List.copyOf(ends);
     }

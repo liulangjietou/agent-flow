@@ -1,5 +1,6 @@
 package io.agentflow.expense.reporting;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.common.CurrentActor;
@@ -48,7 +49,7 @@ public class ExpenseReportScope {
     private static <T> Optional<T> readable(Supplier<T> read) {
         try { return Optional.of(read.get()); }
         catch (DomainException failure) {
-            if ("FORBIDDEN".equals(failure.code()) || "NOT_FOUND".equals(failure.code())) return Optional.empty();
+            if (failure.is(ErrorCode.FORBIDDEN) || failure.is(ErrorCode.NOT_FOUND)) return Optional.empty();
             throw failure;
         }
     }
@@ -59,7 +60,7 @@ public class ExpenseReportScope {
                 && (query.departmentId() == null || original != null && query.departmentId().equals(original.departmentId()));
     }
     /** 不同来源绑定不一致时拒绝整次报告，不能以零值掩盖来源损坏。 */
-    static DomainException unavailable() { return new DomainException("EXPENSE_REPORT_SOURCE_UNAVAILABLE", "Original financial report sources are missing or inconsistent"); }
+    static DomainException unavailable() { return new DomainException(ErrorCode.EXPENSE_REPORT_SOURCE_UNAVAILABLE, "Original financial report sources are missing or inconsistent"); }
     /**
      * 已授权报销与其独立审批原事实。
      * @author owlzhangfq@gmail.com

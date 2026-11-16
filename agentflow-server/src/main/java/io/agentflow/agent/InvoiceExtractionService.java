@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.InvoiceOriginal;
@@ -68,7 +69,7 @@ public class InvoiceExtractionService {
                     default -> Transmission.ORIGINAL_BYTES;
                 },
                 unavailable == null, unavailable, modelAvailable ? configuration.getProviderId() : null,
-                modelAvailable ? configuration.getModel() : null, modelAvailable ? configuration.uri().getAuthority() : null,
+                modelAvailable ? configuration.modelFor(InvoiceExtractionRun.CONTRACT_VERSION) : null, modelAvailable ? configuration.uri().getAuthority() : null,
                 modelAvailable ? configuration.targetDigest(InvoiceExtractionRun.CONTRACT_VERSION) : null, sources.supportedFormats());
     }
 
@@ -82,7 +83,7 @@ public class InvoiceExtractionService {
         requireOwner(original); requireInput(original, prepared.input);
         if (prepared.method != expectedMethod || prepared.method != MODEL && targetDigest != null) throw inputChanged();
         requireTarget(prepared.method, targetDigest);
-        if (runs.activeId(actor.tenantId(), original.invoiceId()).isPresent()) throw new DomainException("AGENT_RUN_ACTIVE", "Invoice extraction is already active");
+        if (runs.activeId(actor.tenantId(), original.invoiceId()).isPresent()) throw new DomainException(ErrorCode.AGENT_RUN_ACTIVE, "Invoice extraction is already active");
         var run = new InvoiceExtractionRun(new InvoiceExtractionRun.Context(UUID.randomUUID(), actor.tenantId(), actor.userId(),
                 Instant.now(), prepared.input, prepared.method, targetDigest));
         runs.create(run);
@@ -101,7 +102,7 @@ public class InvoiceExtractionService {
     /** 历史分页在入口限额，列表只返回运行元数据。 */
     @Transactional(readOnly = true)
     public JdbcInvoiceExtractionRunRepository.Page list(UUID invoiceId, int page, int pageSize) {
-        if (page < 0 || page > 1_000_000 || pageSize < 1 || pageSize > 50) throw new DomainException("INVALID_REQUEST", "Invoice extraction page is outside allowed bounds");
+        if (page < 0 || page > 1_000_000 || pageSize < 1 || pageSize > 50) throw new DomainException(ErrorCode.INVALID_REQUEST, "Invoice extraction page is outside allowed bounds");
         var original = owned(invoiceId);
         return runs.page(original.tenantId(), invoiceId, page, pageSize);
     }
@@ -119,9 +120,9 @@ public class InvoiceExtractionService {
             requireInput(original, run.context().input());
             run.confirm(expectedVersion, actor.userId(), run.context().input(), selected, comment, Instant.now());
         } else if (action == ReviewAction.DISMISS) {
-            if (selected != null && !selected.isEmpty()) throw new DomainException("INVALID_AGENT_REVIEW", "Dismissal cannot confirm invoice values");
+            if (selected != null && !selected.isEmpty()) throw new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Dismissal cannot confirm invoice values");
             run.dismiss(expectedVersion, actor.userId(), comment, Instant.now());
-        } else throw new DomainException("INVALID_AGENT_REVIEW", "Invoice extraction review action is required");
+        } else throw new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Invoice extraction review action is required");
         runs.update(run, expectedVersion, null);
         handling.invoice(run);
         return receipt(run);
@@ -191,7 +192,7 @@ public class InvoiceExtractionService {
     private void requireTarget(InvoiceExtractionSuggestion.Method method, String digest) {
         if (method != MODEL) return;
         configuration.requireAvailable();
-        if (!configuration.targetDigest(InvoiceExtractionRun.CONTRACT_VERSION).equals(digest)) throw new DomainException("AGENT_TARGET_CHANGED", "Refresh the invoice model destination");
+        if (!configuration.targetDigest(InvoiceExtractionRun.CONTRACT_VERSION).equals(digest)) throw new DomainException(ErrorCode.AGENT_TARGET_CHANGED, "Refresh the invoice model destination");
     }
     private void fail(InvoiceExtractionRun run, InvoiceExtractionRun.Failure failure, Instant at) {
         long previous = run.state().version(); run.fail(previous, failure, at); runs.update(run, previous, null); handling.invoice(run);
@@ -203,8 +204,8 @@ public class InvoiceExtractionService {
                 && original.format() == input.format() && original.size() == input.originalBytes();
     }
     private static Instant afterLocks(Instant observedAt) { var current = Instant.now(); return current.isAfter(observedAt) ? current : observedAt; }
-    private static DomainException inputChanged() { return new DomainException("AGENT_INPUT_CHANGED", "Invoice original or extraction method changed"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Invoice extraction not found"); }
+    private static DomainException inputChanged() { return new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Invoice original or extraction method changed"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Invoice extraction not found"); }
     private static Receipt receipt(InvoiceExtractionRun run) { return new Receipt(run.context().id(), run.state().status(), run.state().version()); }
 
     /**

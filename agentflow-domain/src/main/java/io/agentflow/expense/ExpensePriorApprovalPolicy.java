@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.ConditionParser;
 import io.agentflow.definition.DefinitionModels.*;
@@ -87,6 +88,6 @@ public final class ExpensePriorApprovalPolicy {
     }
 
     private static DomainException invalid() {
-        return new DomainException("EXPENSE_PRIOR_APPROVAL_REQUIRED", "Prior tolerance exceptions require an independent readable review before every financial path");
+        return new DomainException(ErrorCode.EXPENSE_PRIOR_APPROVAL_REQUIRED, "Prior tolerance exceptions require an independent readable review before every financial path");
     }
 }

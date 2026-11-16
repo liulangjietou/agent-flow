@@ -109,7 +109,7 @@ class ExpenseSubprocessIntegrationTest {
     private static final Actor ADMIN = new Actor("demo", "admin", Set.of("ADMIN", "PROCESS_ADMIN"));
     private static final Actor APPLICANT = new Actor("demo", "alice", Set.of("EMPLOYEE"));
     private static final ExpenseSubprocessGatewayFixture GATEWAY = new ExpenseSubprocessGatewayFixture();
-    private static final Path FILES = Path.of("/fyoung/tmp/agentflow-expense-subprocess-" + UUID.randomUUID());
+    private static final Path FILES = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-expense-subprocess-" + UUID.randomUUID());
     private static final AtomicInteger SERIAL = new AtomicInteger();
     private UUID entity;
     private UUID appointment;

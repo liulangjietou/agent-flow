@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.ApplicationFieldViews;
 import io.agentflow.common.DomainException;
@@ -48,7 +49,7 @@ public class ExpenseArchiveWorkspace {
     public JdbcExpenseArchiveRepository.Entry download(UUID reportId, Map<String, String> parameters) {
         var context = context(reportId, parameters);
         var entry = archives.find(context.application().tenantId(), reportId, context.roundNo()).filter(value -> value.archive() != null)
-                .orElseThrow(() -> new DomainException("ARCHIVE_NOT_READY", "Expense archive is not sealed"));
+                .orElseThrow(() -> new DomainException(ErrorCode.ARCHIVE_NOT_READY, "Expense archive is not sealed"));
         files.verify(entry.archive().manifest()); context(reportId, parameters); return entry;
     }
     private VoucherAccess.Context context(UUID reportId, Map<String, String> parameters) {
@@ -57,10 +58,10 @@ public class ExpenseArchiveWorkspace {
             String value = parameters.get("roundNo"); if (!value.matches("[1-9][0-9]{0,8}")) throw invalid(); round = Integer.valueOf(value);
         }
         var context = access.read(reportId, round);
-        if (fields.attachmentView(context.application(), context.roundNo()).restricted()) throw new DomainException("FORBIDDEN", "Complete original round field access is required for archive");
+        if (fields.attachmentView(context.application(), context.roundNo()).restricted()) throw new DomainException(ErrorCode.FORBIDDEN, "Complete original round field access is required for archive");
         return context;
     }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_QUERY", "Archive query only accepts a positive roundNo"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_QUERY, "Archive query only accepts a positive roundNo"); }
     /**
      * 当前争议独立于不可变归档状态。
      * @author owlzhangfq@gmail.com

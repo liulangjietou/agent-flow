@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -69,7 +70,7 @@ public class ExpenseHandlingController {
         return idempotency.executePrepared(request, HttpStatus.OK, () -> reads.resume(id, taskId, readId, body.expectedVersion()), prepared -> reads.record(id, prepared));
     }
     private static void noQuery(HttpServletRequest request) {
-        if (request.getQueryString() != null) throw new DomainException("INVALID_AGENT_QUERY", "Expense handling does not accept query parameters");
+        if (request.getQueryString() != null) throw new DomainException(ErrorCode.INVALID_AGENT_QUERY, "Expense handling does not accept query parameters");
     }
     /**
      * 目标说明只保存在办理记录，不默认成为模型外发材料。

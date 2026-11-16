@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.AdvanceRepaymentCheckRepositoryMapper;
@@ -148,7 +149,7 @@ public class JdbcAdvanceRepaymentCheckRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Repayment check input or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Repayment check input or version changed"); }
 
     /**
      * 扫描仅返回身份，原件按租约领取后再加载。

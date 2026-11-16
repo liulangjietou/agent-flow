@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import io.agentflow.finance.Money;
@@ -146,5 +147,5 @@ public interface SupplierPaymentReturnPort {
                 && original.receiptReference().equals(current.receiptReference());
     }
     private static boolean reference(String value) { return StringUtils.isNotBlank(value) && value.length() <= 128 && value.equals(value.trim()) && value.chars().noneMatch(Character::isISOControl); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYMENT_RETURN_RECEIPT", "Supplier payment return requires the original successful payment and independent funds received by the original company account"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYMENT_RETURN_RECEIPT, "Supplier payment return requires the original successful payment and independent funds received by the original company account"); }
 }

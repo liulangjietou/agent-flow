@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
@@ -82,5 +83,5 @@ public class ExpenseResourceAdjustmentSources {
                 || !new VoucherReversalPort.Request(voucherBefore.input().command(), voucherBefore.observation()).matchesOriginal(voucherNow.observation()))) throw changed();
         if (expected.paymentVoucherReversal() != null && !expected.paymentVoucherReversal().equals(current.paymentVoucherReversal())) throw changed();
     }
-    private static DomainException changed() { return new DomainException("EXPENSE_ADJUSTMENT_SOURCE_CHANGED", "Original expense, budget, accrual reversal or full payment return changed before resource adjustment"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.EXPENSE_ADJUSTMENT_SOURCE_CHANGED, "Original expense, budget, accrual reversal or full payment return changed before resource adjustment"); }
 }

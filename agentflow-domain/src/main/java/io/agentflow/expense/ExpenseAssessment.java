@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 
@@ -11,7 +12,7 @@ public record ExpenseAssessment(ExpenseExchangeRate exchangeRate, ExpensePolicyS
     /** 可抵扣税额必须具有显式本位币；与原币明细折算结果的一致性在冻结时校验。 */
     public ExpenseAssessment {
         if (exchangeRate == null || policy == null || deductibleTax == null) {
-            throw new DomainException("EXPENSE_PRECHECK_REQUIRED", "Exchange rate, policy and tax assessment are required");
+            throw new DomainException(ErrorCode.EXPENSE_PRECHECK_REQUIRED, "Exchange rate, policy and tax assessment are required");
         }
     }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.organization.InitiatorContext;
@@ -51,11 +52,11 @@ public final class BudgetAdjustmentRequest {
         requireMutable(expectedVersion);
         if (roundNo != rounds.size() + 1 || now == null || !rounds.isEmpty() && now.isBefore(currentRound().submittedAt())) throw invalid();
         if (catalog == null || !employeeId.equals(catalog.employeeId()) || !catalog.validUntil().isAfter(now)) {
-            throw new DomainException("BUDGET_CATALOG_CHANGED", "A current finance catalog for the budget adjustment applicant is required");
+            throw new DomainException(ErrorCode.BUDGET_CATALOG_CHANGED, "A current finance catalog for the budget adjustment applicant is required");
         }
         if (initiator == null || initiator.appointmentId() == null || !employeeId.equals(initiator.subject())
                 || !content.legalEntityId().equals(initiator.legalEntityId())) {
-            throw new DomainException("BUDGET_INITIATOR_MISMATCH", "Selected appointment must match the budget adjustment applicant and legal entity");
+            throw new DomainException(ErrorCode.BUDGET_INITIATOR_MISMATCH, "Selected appointment must match the budget adjustment applicant and legal entity");
         }
         var round = new BudgetAdjustmentRound(roundNo, version, employeeId, now, content, catalog.legalEntity(content.legalEntityId()),
                 catalog.sourceVersion(), targetDigest, ledger);
@@ -77,7 +78,7 @@ public final class BudgetAdjustmentRequest {
 
     /** 草稿不能伪装为已有审批依据。 */
     public BudgetAdjustmentRound currentRound() {
-        if (rounds.isEmpty()) throw new DomainException("BUDGET_ADJUSTMENT_NOT_SUBMITTED", "Budget adjustment has not been submitted");
+        if (rounds.isEmpty()) throw new DomainException(ErrorCode.BUDGET_ADJUSTMENT_NOT_SUBMITTED, "Budget adjustment has not been submitted");
         return rounds.get(rounds.size() - 1);
     }
 
@@ -106,8 +107,8 @@ public final class BudgetAdjustmentRequest {
     }
 
     private void requireMutable(long expectedVersion) {
-        if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Budget adjustment request version changed");
-        if (approval != null) throw new DomainException("BUDGET_ADJUSTMENT_ALREADY_APPROVED", "Approved budget adjustment terms cannot be changed");
+        if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Budget adjustment request version changed");
+        if (approval != null) throw new DomainException(ErrorCode.BUDGET_ADJUSTMENT_ALREADY_APPROVED, "Approved budget adjustment terms cannot be changed");
     }
 
     private static boolean invalidText(String value, int maximum) {
@@ -115,7 +116,7 @@ public final class BudgetAdjustmentRequest {
     }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_BUDGET_ADJUSTMENT", "Budget adjustment identity, history and approval must remain consistent");
+        return new DomainException(ErrorCode.INVALID_BUDGET_ADJUSTMENT, "Budget adjustment identity, history and approval must remain consistent");
     }
 
     /** 状态只保存申请和审批事实，不派生实际预算执行成功。 */

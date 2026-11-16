@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.InvoiceOriginal;
 import java.time.Instant;
@@ -32,7 +33,7 @@ public final class InvoiceExtractionRun {
     public void complete(long expectedVersion, InvoiceExtractionSuggestion suggestion, Instant at) {
         require(expectedVersion, Status.RUNNING); time(at, state.startedAt());
         if (suggestion == null || !CONTRACT_VERSION.equals(suggestion.contractVersion()) || context.method() != suggestion.method()) {
-            throw new DomainException("INVALID_AGENT_OUTPUT", "Invoice extraction method or contract changed");
+            throw new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Invoice extraction method or contract changed");
         }
         suggestion.requireMatches(context.input());
         state = new State(Status.COMPLETED, expectedVersion + 1, state.startedAt(), at, suggestion, null, null);
@@ -48,7 +49,7 @@ public final class InvoiceExtractionRun {
     public void confirm(long expectedVersion, String actor, InvoiceExtractionInput currentInput,
                         List<InvoiceExtractionSuggestion.Selection> selected, String comment, Instant at) {
         require(expectedVersion, Status.COMPLETED);
-        if (!context.input().equals(currentInput)) throw new DomainException("AGENT_INPUT_CHANGED", "Invoice original changed since extraction");
+        if (!context.input().equals(currentInput)) throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Invoice original changed since extraction");
         if (CollectionUtils.isEmpty(selected) || selected.size() > InvoiceExtractionSuggestion.MAX_PROPOSALS
                 || selected.stream().anyMatch(Objects::isNull)) throw invalidReview();
         var available = new HashSet<>(state.suggestion().proposals().stream().map(InvoiceExtractionSuggestion.Proposal::field).toList());
@@ -84,14 +85,14 @@ public final class InvoiceExtractionRun {
     }
 
     private void require(long version, Status status) {
-        if (state.version() != version) throw new DomainException("CONCURRENCY_CONFLICT", "Invoice extraction version changed");
-        if (state.status() != status) throw new DomainException("AGENT_RUN_STATE_CONFLICT", "Invoice extraction transition is unavailable");
+        if (state.version() != version) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Invoice extraction version changed");
+        if (state.status() != status) throw new DomainException(ErrorCode.AGENT_RUN_STATE_CONFLICT, "Invoice extraction transition is unavailable");
     }
     private static void time(Instant at, Instant previous) {
-        if (at == null || at.isBefore(previous)) throw new DomainException("INVALID_AGENT_TIME", "Invoice extraction time moved backwards");
+        if (at == null || at.isBefore(previous)) throw new DomainException(ErrorCode.INVALID_AGENT_TIME, "Invoice extraction time moved backwards");
     }
     private static DomainException invalidReview() {
-        return new DomainException("INVALID_AGENT_REVIEW", "Only the original owner may confirm selected invoice proposals");
+        return new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Only the original owner may confirm selected invoice proposals");
     }
     public Context context() { return context; }
     public State state() { return state; }
@@ -109,7 +110,7 @@ public final class InvoiceExtractionRun {
                     || StringUtils.isBlank(requestedBy) || requestedBy.length() > 128 || createdAt == null || input == null || method == null
                     || method == InvoiceExtractionSuggestion.Method.MODEL && (targetDigest == null || !targetDigest.matches("[a-f0-9]{64}"))
                     || method == InvoiceExtractionSuggestion.Method.STRUCTURED_XML && (input.format() != InvoiceOriginal.Format.XML || targetDigest != null)) {
-                throw new DomainException("INVALID_AGENT_INPUT", "Invoice extraction context is invalid");
+                throw new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Invoice extraction context is invalid");
             }
         }
     }

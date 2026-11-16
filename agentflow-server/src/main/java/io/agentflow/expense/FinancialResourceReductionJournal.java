@@ -1,6 +1,7 @@
 package io.agentflow.expense;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.FinancialResourceReductionJournalMapper;
@@ -135,8 +136,7 @@ public class FinancialResourceReductionJournal {
     }
 
     private static DomainException conflict() {
-        return new DomainException(
-                "EXPENSE_CONSUMPTION_REVERSAL_UNAUTHORIZED",
+        return new DomainException(ErrorCode.EXPENSE_CONSUMPTION_REVERSAL_UNAUTHORIZED,
                 "Partial resource effect requires actual accepted finance, original consumption and"
                     + " exact remaining amount");
     }

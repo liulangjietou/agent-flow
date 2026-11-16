@@ -1,5 +1,7 @@
 package io.agentflow.finance.callback;
 
+import org.springframework.http.HttpMethod;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
@@ -72,11 +74,11 @@ public class PaymentCallbackVerifier {
     }
 
     /** 只有精确 POST 路径交由签名认证，其他方法和子路径仍要求用户认证。 */
-    public static boolean matches(HttpServletRequest request) { return "POST".equals(request.getMethod()) && PATH.equals(request.getRequestURI()); }
+    public static boolean matches(HttpServletRequest request) { return HttpMethod.POST.matches(request.getMethod()) && PATH.equals(request.getRequestURI()); }
 
     /** 有界读取后验证标准签名字节，重复头、压缩体和非 UTF-8 JSON 均拒绝。 */
     public Verified verify(HttpServletRequest request, Instant now) throws IOException {
-        if (!enabled) throw new DomainException("PAYMENT_CALLBACK_DISABLED", "Payment callbacks are disabled");
+        if (!enabled) throw new DomainException(ErrorCode.PAYMENT_CALLBACK_DISABLED, "Payment callbacks are disabled");
         String tenant = header(request, "webhook-tenant"), event = header(request, "webhook-id");
         String timestamp = header(request, "webhook-timestamp"), signatures = header(request, "webhook-signature");
         if (tenant == null || !keys.containsKey(tenant) || event == null || !event.matches("[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}")
@@ -102,7 +104,7 @@ public class PaymentCallbackVerifier {
         if (signal == null || signal.contractVersion() != 1 || !"payment.changed".equals(signal.type()) || !tenant.equals(signal.tenantId())
                 || signal.kind() == null || signal.authorizationId() == null || signal.commandDigest() == null
                 || !signal.commandDigest().matches("[a-f0-9]{64}") || signal.sourceRevision() < 1) throw invalidPayload();
-        var target = gateway.destination(tenant).orElseThrow(() -> new DomainException("PAYMENT_CALLBACK_DISABLED", "Payment callback gateway is unavailable"));
+        var target = gateway.destination(tenant).orElseThrow(() -> new DomainException(ErrorCode.PAYMENT_CALLBACK_DISABLED, "Payment callback gateway is unavailable"));
         return new Verified(event, digest(body), target.digest(tenant), signal);
     }
 
@@ -141,9 +143,9 @@ public class PaymentCallbackVerifier {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)); }
         catch (GeneralSecurityException impossible) { throw new IllegalStateException("SHA-256 unavailable", impossible); }
     }
-    private static DomainException invalidPayload() { return new DomainException("PAYMENT_CALLBACK_INVALID", "Invalid payment callback payload"); }
-    private static DomainException unauthenticated() { return new DomainException("PAYMENT_CALLBACK_UNAUTHENTICATED", "Payment callback signature or delivery time is invalid"); }
-    private static DomainException tooLarge() { return new DomainException("PAYMENT_CALLBACK_TOO_LARGE", "Payment callback body exceeds the byte limit"); }
+    private static DomainException invalidPayload() { return new DomainException(ErrorCode.PAYMENT_CALLBACK_INVALID, "Invalid payment callback payload"); }
+    private static DomainException unauthenticated() { return new DomainException(ErrorCode.PAYMENT_CALLBACK_UNAUTHENTICATED, "Payment callback signature or delivery time is invalid"); }
+    private static DomainException tooLarge() { return new DomainException(ErrorCode.PAYMENT_CALLBACK_TOO_LARGE, "Payment callback body exceeds the byte limit"); }
     private static IllegalStateException invalidConfiguration() { return new IllegalStateException("Invalid payment callback configuration"); }
 
     /**

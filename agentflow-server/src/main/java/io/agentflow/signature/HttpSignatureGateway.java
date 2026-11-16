@@ -1,5 +1,6 @@
 package io.agentflow.signature;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.observability.DiagnosticContext;
 
 import io.agentflow.common.DomainException;
@@ -116,7 +117,7 @@ public class HttpSignatureGateway implements SignatureGateway {
             try {
                 if (documents.readIfPresent(content).isPresent()) { requireLease(claim); return new Stored(file); }
             } catch (DomainException unavailable) {
-                throw failed("FILE_INTEGRITY_FAILED".equals(unavailable.code()) ? Failure.ARTIFACT_MISMATCH : Failure.STORAGE_UNAVAILABLE);
+                throw failed(unavailable.is(ErrorCode.FILE_INTEGRITY_FAILED) ? Failure.ARTIFACT_MISMATCH : Failure.STORAGE_UNAVAILABLE);
             }
             if (file.size() > documents.maxFileBytes()) throw failed(Failure.STORAGE_UNAVAILABLE);
             var selected = configured(claim.input()); var timeout = timeout(claim, selected, false);
@@ -132,7 +133,7 @@ public class HttpSignatureGateway implements SignatureGateway {
                 staged = documents.stage(content, new ByteArrayInputStream(response.body()));
                 requireLease(claim); documents.publish(content, staged);
             } catch (DomainException failure) {
-                throw failed("FILE_CONTENT_MISMATCH".equals(failure.code()) || "FILE_INTEGRITY_FAILED".equals(failure.code()) ? Failure.ARTIFACT_MISMATCH : Failure.STORAGE_UNAVAILABLE);
+                throw failed(failure.is(ErrorCode.FILE_CONTENT_MISMATCH) || failure.is(ErrorCode.FILE_INTEGRITY_FAILED) ? Failure.ARTIFACT_MISMATCH : Failure.STORAGE_UNAVAILABLE);
             }
             return new Stored(file);
         } catch (GatewayFailure failure) { return new Unavailable(failure.reason); }

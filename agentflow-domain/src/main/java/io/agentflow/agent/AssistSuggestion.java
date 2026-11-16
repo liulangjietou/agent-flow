@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.CollectionUtils;
@@ -62,5 +63,5 @@ public record AssistSuggestion(String providerId, String modelVersion, String pr
         return value;
     }
 
-    private static DomainException invalid(String message) { return new DomainException("INVALID_AGENT_OUTPUT", message); }
+    private static DomainException invalid(String message) { return new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, message); }
 }

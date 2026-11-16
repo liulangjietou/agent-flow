@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -35,7 +36,7 @@ public record SupplierAdjustmentDisputeResolution(UUID id, String tenantId, UUID
         return StringUtils.isBlank(value) || value.length() > maximum || !value.equals(value.trim()) || value.chars().anyMatch(Character::isISOControl);
     }
     private static DomainException invalid() {
-        return new DomainException("INVALID_SUPPLIER_ADJUSTMENT_DISPUTE_RESOLUTION", "Supplier adjustment resolution requires original terminal evidence and an independent named finance reviewer");
+        return new DomainException(ErrorCode.INVALID_SUPPLIER_ADJUSTMENT_DISPUTE_RESOLUTION, "Supplier adjustment resolution requires original terminal evidence and an independent named finance reviewer");
     }
     /** 日志只显示决定及原调整编号，不展开对账原件或自由文本。 */
     @Override public String toString() { return "SupplierAdjustmentDisputeResolution[id=" + id + ", adjustmentId=" + adjustmentId + "]"; }

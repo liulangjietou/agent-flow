@@ -8,6 +8,9 @@ import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
+# 测试临时根目录：AGENTFLOW_TMP_DIR 优先，未设置时使用系统临时目录。
+TMP_ROOT = os.environ.get("AGENTFLOW_TMP_DIR") or tempfile.gettempdir()
+
 spec = importlib.util.spec_from_file_location('production_database', Path(__file__).resolve().parents[1] / 'production_database.py')
 db = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(db)
@@ -17,7 +20,7 @@ class ProductionDatabaseTest(unittest.TestCase):
     """恢复必须使用新数据库且只有完整成功后才能写回执。@author owlzhangfq@gmail.com"""
 
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(dir='/fyoung/tmp', prefix='agentflow-production-backup-test-')
+        self.temp = tempfile.TemporaryDirectory(dir=TMP_ROOT, prefix='agentflow-production-backup-test-')
         self.root = Path(self.temp.name)
         self.password = self.root / 'password'
         self.password.write_text('fixture:secret\\literal\n')

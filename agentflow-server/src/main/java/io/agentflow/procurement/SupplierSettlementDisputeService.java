@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -67,8 +69,7 @@ public class SupplierSettlementDisputeService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public View read(UUID id, Map<String, String> parameters) {
         if (!parameters.isEmpty())
-            throw new DomainException(
-                    "INVALID_SUPPLIER_SETTLEMENT_DISPUTE_QUERY",
+            throw new DomainException(ErrorCode.INVALID_SUPPLIER_SETTLEMENT_DISPUTE_QUERY,
                     "Original ERP dispute does not accept alternate identities or query"
                             + " parameters");
         var value =
@@ -119,10 +120,10 @@ public class SupplierSettlementDisputeService {
         var before = access.requireSettlement(id); var tenant = actors.actor().tenantId(); sources.lock(tenant, before.command().payment().id());
         before = access.requireSettlement(id);
         if (before.version() != input.settlementVersion() || settlements.retirement(tenant, id).isPresent()) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Displayed original supplier settlement changed or was safely retired");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed original supplier settlement changed or was safely retired");
         }
         var candidate = before.conflictingObservation();
-        if (candidate == null || candidate.status() != input.outcome()) throw new DomainException("SUPPLIER_SETTLEMENT_DISPUTE_UNRESOLVABLE", "Displayed original ERP terminal evidence changed");
+        if (candidate == null || candidate.status() != input.outcome()) throw new DomainException(ErrorCode.SUPPLIER_SETTLEMENT_DISPUTE_UNRESOLVABLE, "Displayed original ERP terminal evidence changed");
         var now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         var decision = new SupplierSettlementDisputeResolution(UUID.randomUUID(), tenant, id, before.version(), Math.incrementExact(before.version()), candidate,
                 actors.actor().userId(), now, input.evidenceReference().trim(), input.comment());
@@ -156,7 +157,7 @@ public class SupplierSettlementDisputeService {
                         "resolutionId",
                         decision.id(),
                         "authorizedRole",
-                        "FINANCE",
+                        SystemRole.FINANCE.name(),
                         "previousStatus",
                         before.status().name(),
                         "currentStatus",
@@ -184,7 +185,7 @@ public class SupplierSettlementDisputeService {
                         posting.periodReference(), posting.accountingDate(), posting.settledAt()));
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Original supplier ERP settlement is unavailable in the current scope"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Original supplier ERP settlement is unavailable in the current scope"); }
 
     /**
      * 输入只选择服务端候选终态，不接收金额、账务身份、回执或办理人。

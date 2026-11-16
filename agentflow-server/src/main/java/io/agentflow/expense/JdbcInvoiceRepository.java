@@ -1,6 +1,7 @@
 package io.agentflow.expense;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.InvoiceRepositoryMapper;
@@ -35,7 +36,7 @@ public class JdbcInvoiceRepository implements InvoiceRepository {
 
     @Override @Transactional
     public void create(Invoice invoice, String actor) {
-        if (invoice.verification() != Invoice.Verification.PENDING || invoice.occupation() != Invoice.Occupation.AVAILABLE) throw new DomainException("INVALID_INVOICE", "New invoice must begin with an unverified original");
+        if (invoice.verification() != Invoice.Verification.PENDING || invoice.occupation() != Invoice.Occupation.AVAILABLE) throw new DomainException(ErrorCode.INVALID_INVOICE, "New invoice must begin with an unverified original");
         store.create(KIND, stored(invoice), actor);
     }
 
@@ -91,8 +92,7 @@ public class JdbcInvoiceRepository implements InvoiceRepository {
                                             previous.use().roundNo(),
                                             previous.use().lineNo()))
                             != 1) {
-                throw new DomainException(
-                        "INVOICE_OCCUPATION_CHANGED",
+                throw new DomainException(ErrorCode.INVOICE_OCCUPATION_CHANGED,
                         "Consumed invoice occupation requires an authorized reversal before"
                             + " release");
             }
@@ -107,8 +107,7 @@ public class JdbcInvoiceRepository implements InvoiceRepository {
         var use = invoice.use();
         if (previous != null) {
             if (!key.equals(previous.key()))
-                throw new DomainException(
-                        "INVOICE_FACTS_CHANGED", "Occupied invoice canonical identity changed");
+                throw new DomainException(ErrorCode.INVOICE_FACTS_CHANGED, "Occupied invoice canonical identity changed");
             sqlMapper.syncClaim5(
                     use.reportId().toString(),
                     use.roundNo(),
@@ -127,8 +126,7 @@ public class JdbcInvoiceRepository implements InvoiceRepository {
                         use.lineNo(),
                         invoice.occupation().name());
             } catch (DuplicateKeyException occupied) {
-                throw new DomainException(
-                        "INVOICE_OCCUPIED",
+                throw new DomainException(ErrorCode.INVOICE_OCCUPIED,
                         "Invoice already has an active occupation in this tenant");
             }
         }

@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.calendar.BusinessDeadline;
 import io.agentflow.common.DomainException;
 import java.util.Map;
@@ -32,6 +33,6 @@ public record TaskEscalationPolicy(int workingMinutes, String recipientRule) {
     }
 
     private static DomainException invalid() {
-        return new DomainException("ESCALATION_RULE_INVALID", "Escalation requires supported working minutes and a literal recipient rule");
+        return new DomainException(ErrorCode.ESCALATION_RULE_INVALID, "Escalation requires supported working minutes and a literal recipient rule");
     }
 }

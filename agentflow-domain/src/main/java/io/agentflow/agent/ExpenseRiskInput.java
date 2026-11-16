@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseContent;
 import io.agentflow.expense.ExpenseRiskEvidence;
@@ -111,5 +112,5 @@ public record ExpenseRiskInput(List<Document> documents, CalendarReference calen
     }
 
     private static boolean digest(String value) { return value != null && value.matches("[a-f0-9]{64}"); }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_INPUT", "Risk evidence must bind bounded selected documents and observations"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Risk evidence must bind bounded selected documents and observations"); }
 }

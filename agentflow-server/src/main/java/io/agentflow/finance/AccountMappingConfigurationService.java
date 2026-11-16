@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
@@ -53,8 +54,8 @@ public class AccountMappingConfigurationService {
         var catalog = categories.categories(actor.tenantId(), categoryHead.categoryRevision()); catalog.requireVersion(expectedCategoryRevision);
         var draft = draft(actor.tenantId(), key);
         var head = repository.head(actor.tenantId(), draft.definition().legalEntityId(), draft.definition().currency());
-        if (head.activeRevision() != expectedActiveRevision) throw new DomainException("CONCURRENCY_CONFLICT", "Active account mapping changed before publishing");
-        var target = gateway.destination(actor.tenantId()).orElseThrow(() -> new DomainException("FINANCE_GATEWAY_UNAVAILABLE", "NOT_CONFIGURED"));
+        if (head.activeRevision() != expectedActiveRevision) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Active account mapping changed before publishing");
+        var target = gateway.destination(actor.tenantId()).orElseThrow(() -> new DomainException(ErrorCode.FINANCE_GATEWAY_UNAVAILABLE, "NOT_CONFIGURED"));
         var publication = draft.publish(expectedDraftRevision, catalog, target.digest(actor.tenantId()), actor.userId(), now(), comment);
         repository.publish(publication, head);
         return new Current(head.legalEntityId(), head.currency(), head.categoryRevision(), Math.incrementExact(head.activeRevision()), publication.version());
@@ -105,8 +106,8 @@ public class AccountMappingConfigurationService {
         return new Current(head.legalEntityId(), head.currency(), head.categoryRevision(), head.activeRevision(), active);
     }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MILLIS); }
-    private static DomainException missing() { return new DomainException("NOT_FOUND", "Account mapping configuration or version was not found"); }
-    private static DomainException inconsistent() { return new DomainException("ACCOUNT_MAPPING_CONFIGURATION_INCONSISTENT", "Active account mapping history or scope is inconsistent"); }
+    private static DomainException missing() { return new DomainException(ErrorCode.NOT_FOUND, "Account mapping configuration or version was not found"); }
+    private static DomainException inconsistent() { return new DomainException(ErrorCode.ACCOUNT_MAPPING_CONFIGURATION_INCONSISTENT, "Active account mapping history or scope is inconsistent"); }
 
     /**
      * 当前范围的发布版本与三个待确认的版本来源。

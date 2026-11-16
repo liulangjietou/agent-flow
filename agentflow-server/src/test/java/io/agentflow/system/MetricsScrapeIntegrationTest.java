@@ -34,7 +34,7 @@ class MetricsScrapeIntegrationTest {
 
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) throws Exception {
-        tokenFile = Files.createTempFile(Path.of("/fyoung/tmp"), "metrics-token-", ".txt");
+        tokenFile = Files.createTempFile(Path.of(System.getProperty("java.io.tmpdir")), "metrics-token-", ".txt");
         Files.writeString(tokenFile, TOKEN + "\n");
         registry.add("agentflow.monitoring.token-file", tokenFile::toString);
     }

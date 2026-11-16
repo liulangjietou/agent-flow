@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -43,5 +44,5 @@ public record ApprovedBudgetAdjustment(String tenantId, UUID requestId, UUID app
     private static boolean invalidText(String value, int maximum) {
         return StringUtils.isBlank(value) || value.length() > maximum || !value.equals(value.trim()) || value.chars().anyMatch(Character::isISOControl);
     }
-    private static DomainException changed() { return new DomainException("BUDGET_ADJUSTMENT_SOURCE_CHANGED", "Budget execution requires the original approved request and matching current ledger scope"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.BUDGET_ADJUSTMENT_SOURCE_CHANGED, "Budget execution requires the original approved request and matching current ledger scope"); }
 }

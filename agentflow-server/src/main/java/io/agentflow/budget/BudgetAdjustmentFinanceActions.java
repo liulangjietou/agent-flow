@@ -1,5 +1,7 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -116,7 +118,7 @@ public class BudgetAdjustmentFinanceActions {
         var payload = new LinkedHashMap<String, Object>();
         payload.put("requestId", source.requestId());
         payload.put("roundNo", source.round().roundNo());
-        payload.put("authorizedRole", "FINANCE");
+        payload.put("authorizedRole", SystemRole.FINANCE.name());
         payload.put("applicationVersion", source.approval().applicationVersion());
         payload.put("requestVersion", source.approvedRequestVersion());
         payload.put("previousStatus", previous);
@@ -138,9 +140,9 @@ public class BudgetAdjustmentFinanceActions {
 
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed budget approval or original ledger review changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed budget approval or original ledger review changed"); }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Original budget finance review was not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Original budget finance review was not found"); }
 
     /**
      * 恢复动作只操作原指令编号，查无不构成自动重发授权。

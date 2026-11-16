@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
@@ -118,7 +119,7 @@ public class ExpenseApprovalService {
         var authorized = authorize(reportId, taskId, applicationVersion, financialVersion);
         var application = authorized.application(); var task = authorized.task(); var context = authorized.context();
         if (!context.control().stage(task.getTaskDefinitionKey()).finance()) {
-            throw new DomainException("EXPENSE_FINANCE_TASK_REQUIRED", "Only a current financial review task may reduce expense amounts");
+            throw new DomainException(ErrorCode.EXPENSE_FINANCE_TASK_REQUIRED, "Only a current financial review task may reduce expense amounts");
         }
         requirePaper(context); var budget = requireBudget(context);
         // 先等齐核减会修改的资源锁，再观察代理有效期；旧的读取快照不能授权等待后的金额变更。
@@ -143,19 +144,19 @@ public class ExpenseApprovalService {
         task = authorization.requireReadable(taskId, actor); application = authorization.application(actor, task);
         var context = context(application, task);
         if (application.version() != applicationVersion || context.report().version() != financialVersion) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Application or financial version changed");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Application or financial version changed");
         }
         new TaskDelegation(task.getOwner(), task.getDelegationState() == DelegationState.PENDING).requireAction(TaskAction.APPROVE);
         return new AuthorizedTask(application, task, context);
     }
 
     private void requirePaper(Context context) {
-        if (!context.control().paperReady()) throw new DomainException("EXPENSE_PAPER_RECEIPT_REQUIRED", "Paper originals must be explicitly received for this round");
+        if (!context.control().paperReady()) throw new DomainException(ErrorCode.EXPENSE_PAPER_RECEIPT_REQUIRED, "Paper originals must be explicitly received for this round");
     }
     private io.agentflow.finance.BudgetOccupation requireBudget(Context context) {
         var position = BudgetPrecheckPort.Request.fromCurrent(context.report(), context.control().input().accountingDate());
         return budgets.find(context.report().tenantId(), context.report().id()).filter(value -> value.frozenFor(position)).orElseThrow(
-                () -> new DomainException("EXPENSE_BUDGET_NOT_CONFIRMED", "The current expense amount has no confirmed budget reservation"));
+                () -> new DomainException(ErrorCode.EXPENSE_BUDGET_NOT_CONFIRMED, "The current expense amount has no confirmed budget reservation"));
     }
 
     /**
@@ -170,19 +171,19 @@ public class ExpenseApprovalService {
         if (application.status() != ApplicationStatus.IN_APPROVAL || !report.applicationId().equals(application.id())
                 || !control.input().applicationId().equals(application.id()) || !control.input().employeeId().equals(report.employeeId())
                 || !String.valueOf(application.roundNo()).equals(String.valueOf(task.getProcessVariables().get("roundNo")))) {
-            throw new DomainException("EXPENSE_TASK_CONTEXT_CHANGED", "Expense task no longer belongs to the active round");
+            throw new DomainException(ErrorCode.EXPENSE_TASK_CONTEXT_CHANGED, "Expense task no longer belongs to the active round");
         }
         report.requireFrozenRound();
         if (report.currentRound().roundNo() != application.roundNo()
                 || report.currentRound().submittedFinancialVersion() + 1 != control.input().submittedFinancialVersion()) {
-            throw new DomainException("EXPENSE_TASK_CONTEXT_CHANGED", "Expense financial snapshot no longer matches its submission control");
+            throw new DomainException(ErrorCode.EXPENSE_TASK_CONTEXT_CHANGED, "Expense financial snapshot no longer matches its submission control");
         }
         return new Context(report, control);
     }
     private static boolean structured(Application application) {
         return application.businessReference() != null && application.businessReference().type() == BusinessReference.Type.EXPENSE;
     }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense task or submission control not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Expense task or submission control not found"); }
 
     /**
      * 同一次锁保护下的财务轮次和控制事实。

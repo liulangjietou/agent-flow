@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
@@ -45,7 +46,7 @@ public class ExpenseRevocationService {
         var actor = actors.actor(); reports.lock(actor.tenantId(), reportId);
         var report = reports.find(actor.tenantId(), reportId).orElseThrow();
         var context = access.requireFinance(reportId, report.currentRound().roundNo());
-        if (report.version() != input.financialVersion()) throw new DomainException("CONCURRENCY_CONFLICT", "Expense financial version changed");
+        if (report.version() != input.financialVersion()) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense financial version changed");
         var issue = issue(report, context.application());
         if (issue != null) throw new DomainException(issue.name(), "Original voucher, payment or settlement requires reconciliation before revocation");
         var application = applications.revokeBusiness(report.applicationId(), input.applicationVersion(), input.comment(), context.application().businessReference());

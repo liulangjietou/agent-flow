@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.Actor;
@@ -68,10 +69,10 @@ public class ProcurementPaymentCheckService {
         application.requireEditable(request.applicationVersion());
         if (payment.version() != request.requestVersion() || payment.rounds().size() + 1 != application.nextSubmissionRound()) throw changed();
         var initiator = initiators.snapshot(actor, request.initiatorAppointmentId());
-        if (!initiator.legalEntityId().equals(payment.content().legalEntityId())) throw new DomainException("PROCUREMENT_INITIATOR_MISMATCH", "Selected appointment and payment legal entity must match");
-        var destination = configuration.destination(actor.tenantId()).orElseThrow(() -> new DomainException("FINANCE_GATEWAY_UNAVAILABLE", "Procurement payment check is not configured for this tenant"));
-        if (!destination.digest(actor.tenantId()).equals(request.targetDigest())) throw new DomainException("FINANCE_TARGET_CHANGED", "Refresh the finance destination before queuing");
-        if (jobs.active(actor.tenantId(), requestId)) throw new DomainException("PROCUREMENT_CHECK_ACTIVE", "Procurement payment already has an active precheck");
+        if (!initiator.legalEntityId().equals(payment.content().legalEntityId())) throw new DomainException(ErrorCode.PROCUREMENT_INITIATOR_MISMATCH, "Selected appointment and payment legal entity must match");
+        var destination = configuration.destination(actor.tenantId()).orElseThrow(() -> new DomainException(ErrorCode.FINANCE_GATEWAY_UNAVAILABLE, "Procurement payment check is not configured for this tenant"));
+        if (!destination.digest(actor.tenantId()).equals(request.targetDigest())) throw new DomainException(ErrorCode.FINANCE_TARGET_CHANGED, "Refresh the finance destination before queuing");
+        if (jobs.active(actor.tenantId(), requestId)) throw new DomainException(ErrorCode.PROCUREMENT_CHECK_ACTIVE, "Procurement payment already has an active precheck");
         var input = new Input(UUID.randomUUID(), actor.tenantId(), requestId, payment.applicationId(), actor.userId(), application.version(), payment.version(),
                 application.nextSubmissionRound(), jobs.nextAttempt(actor.tenantId(), requestId), initiator, request.targetDigest(), payment.content());
         jobs.create(ProcurementPaymentCheck.queue(input, time(Instant.now()))); return new Receipt(input.id());
@@ -162,9 +163,9 @@ public class ProcurementPaymentCheckService {
     private ProcurementPaymentRequest owned(UUID id) { return requests.find(actors.actor().tenantId(), id).filter(value -> value.employeeId().equals(actors.actor().userId())).orElseThrow(ProcurementPaymentCheckService::notFound); }
     private static Summary summary(ProcurementPaymentCheck job) { return new Summary(job.input().id(), job.version(), job.status(), job.input().applicationVersion(), job.input().requestVersion(), job.input().attempt(), job.createdAt(), job.startedAt(), job.completedAt()); }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MILLIS); }
-    private static DomainException changed() { return new DomainException("CONCURRENCY_CONFLICT", "Procurement payment or application version changed"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Procurement payment check context not found"); }
-    private static DomainException invalidQuery() { return new DomainException("INVALID_PROCUREMENT_QUERY", "Procurement payment check query is invalid"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Procurement payment or application version changed"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Procurement payment check context not found"); }
+    private static DomainException invalidQuery() { return new DomainException(ErrorCode.INVALID_PROCUREMENT_QUERY, "Procurement payment check query is invalid"); }
 
     /**
      * 申请人只能选择输入上下文，不能提交核算或预算结论。

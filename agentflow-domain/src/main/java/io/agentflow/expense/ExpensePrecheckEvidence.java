@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.BudgetPrecheckPort;
@@ -62,7 +63,7 @@ public record ExpensePrecheckEvidence(String catalogVersion, FinanceCatalog.Lega
         }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PRECHECK", "Expense precheck evidence is inconsistent"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PRECHECK, "Expense precheck evidence is inconsistent"); }
 
     /**
      * 所有当前和上一轮资源都记录输入版本，包括本次准备释放的资源。

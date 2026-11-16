@@ -1,5 +1,6 @@
 package io.agentflow.event;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
@@ -22,7 +23,7 @@ public class EventContractService {
     public EventContractRepository.Version publish(Actor actor, String key, long expectedVersion, String name,
                                                     String sourceKey, String eventType, String reason) {
         if (expectedVersion < 0 || expectedVersion == Long.MAX_VALUE) {
-            throw new DomainException("INVALID_EVENT_CONTRACT", "Expected event contract version is invalid");
+            throw new DomainException(ErrorCode.INVALID_EVENT_CONTRACT, "Expected event contract version is invalid");
         }
         var value = EventContract.publish(actor.tenantId(), key, expectedVersion + 1, name, sourceKey, eventType, actor.userId(), reason, Instant.now());
         repository.publish(value, expectedVersion);
@@ -72,5 +73,5 @@ public class EventContractService {
         return new EventContractViews.History(items, found.size() > items.size() ? items.get(items.size() - 1).revision() : null);
     }
 
-    private static DomainException missing() { return new DomainException("NOT_FOUND", "Event contract version not found"); }
+    private static DomainException missing() { return new DomainException(ErrorCode.NOT_FOUND, "Event contract version not found"); }
 }

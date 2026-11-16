@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.util.UUID;
@@ -16,7 +17,7 @@ public record OrganizationPerson(UUID id, String subject, String displayName, bo
                 || subject.chars().anyMatch(Character::isISOControl)
                 || StringUtils.isBlank(displayName) || displayName.length() > 128
                 || displayName.chars().anyMatch(Character::isISOControl) || revision < 1) {
-            throw new DomainException("INVALID_ORGANIZATION_PERSON", "Organization person fields are invalid");
+            throw new DomainException(ErrorCode.INVALID_ORGANIZATION_PERSON, "Organization person fields are invalid");
         }
         displayName = displayName.strip();
     }

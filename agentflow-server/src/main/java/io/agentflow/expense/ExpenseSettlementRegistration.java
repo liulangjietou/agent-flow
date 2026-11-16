@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.*;
 import org.springframework.context.event.EventListener;
@@ -98,5 +99,5 @@ public class ExpenseSettlementRegistration {
     }
     private ExpenseReport report(String tenant, UUID id) { return reports.find(tenant, id).orElseThrow(ExpenseSettlementRegistration::notFound); }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense settlement source not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Expense settlement source not found"); }
 }

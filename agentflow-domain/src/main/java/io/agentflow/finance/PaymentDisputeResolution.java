@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -35,5 +36,5 @@ public record PaymentDisputeResolution(UUID id, String tenantId, UUID paymentId,
 
     /** 日志只定位裁决记录，不展开自由文本或回单。 */
     @Override public String toString() { return "PaymentDisputeResolution[id=" + id + ", paymentId=" + paymentId + ", resolvedVersion=" + resolvedVersion + "]"; }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_DISPUTE_RESOLUTION", "Payment dispute decision must retain recent original evidence and a named financial reviewer"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_DISPUTE_RESOLUTION, "Payment dispute decision must retain recent original evidence and a named financial reviewer"); }
 }

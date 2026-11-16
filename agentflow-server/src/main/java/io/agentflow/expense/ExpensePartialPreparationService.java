@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import org.springframework.context.ApplicationEventPublisher;
 
 import io.agentflow.common.DomainException;
@@ -47,7 +48,7 @@ public class ExpensePartialPreparationService {
         var value = ExpensePartialAdjustmentPreparation.queue(new ExpensePartialAdjustmentPreparation.Input(UUID.randomUUID(), current, side, date, actor, evidence, reason, now));
         requireAvailable(value, now);
         if (preparations.latest(tenant, id, side, actor).filter(ExpensePartialAdjustmentPreparation::active).isPresent()) {
-            throw new DomainException("PARTIAL_ADJUSTMENT_PREPARATION_PENDING", "Current finance actor already has a pending preparation for this side");
+            throw new DomainException(ErrorCode.PARTIAL_ADJUSTMENT_PREPARATION_PENDING, "Current finance actor already has a pending preparation for this side");
         }
         preparations.create(value); return value;
     }
@@ -122,7 +123,7 @@ public class ExpensePartialPreparationService {
         personnel.requireEligible(basis.tenantId(), input.requestedBy(), source.financial().accrual().input().command().legalEntityId());
         var target = input.side() == ExpensePartialAdjustmentPreparation.Side.BUDGET ? source.financial().consumption().input().targetDigest() : source.financial().accrual().input().targetDigest();
         if (gateway.destination(basis.tenantId()).filter(destination -> destination.digest(basis.tenantId()).equals(target)).isEmpty()) {
-            throw new DomainException("FINANCE_TARGET_CHANGED", "Original partial adjustment target is unavailable");
+            throw new DomainException(ErrorCode.FINANCE_TARGET_CHANGED, "Original partial adjustment target is unavailable");
         }
         return source;
     }
@@ -159,7 +160,7 @@ public class ExpensePartialPreparationService {
         if (result instanceof FinanceResult.Rejected<?> rejected) return rejected.reason().name(); return "INVALID_RESPONSE";
     }
     private static Instant time(Instant at) { var now = Instant.now(); return (at.isAfter(now) ? at : now).truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Partial adjustment preparation or its original source changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Partial adjustment preparation or its original source changed"); }
     private void save(ExpensePartialAdjustmentPreparation value) {
         preparations.update(value); events.publishEvent(new ExpensePartialAdjustmentChanged.Preparation(value));
     }

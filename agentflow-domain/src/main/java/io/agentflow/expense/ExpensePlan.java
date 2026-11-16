@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.organization.InitiatorContext;
@@ -60,18 +61,18 @@ public final class ExpensePlan {
                        Map<String, ExpensePriorControl.Snapshot> priorControls) {
         requireVersion(expectedVersion);
         if (roundNo != rounds.size() + 1 || now == null || !rounds.isEmpty() && now.isBefore(rounds.get(rounds.size() - 1).submittedAt())) throw invalid();
-        if (CollectionUtils.isEmpty(content.lines())) throw new DomainException("EXPENSE_PLAN_LINES_REQUIRED", "At least one planned expense line is required");
+        if (CollectionUtils.isEmpty(content.lines())) throw new DomainException(ErrorCode.EXPENSE_PLAN_LINES_REQUIRED, "At least one planned expense line is required");
         if (catalog == null || !employeeId.equals(catalog.employeeId()) || !catalog.validUntil().isAfter(now)) {
-            throw new DomainException("EXPENSE_PLAN_CATALOG_CHANGED", "A current catalog for the applicant is required");
+            throw new DomainException(ErrorCode.EXPENSE_PLAN_CATALOG_CHANGED, "A current catalog for the applicant is required");
         }
         if (initiator == null || !employeeId.equals(initiator.subject()) || !content.legalEntityId().equals(initiator.legalEntityId())) {
-            throw new DomainException("EXPENSE_PLAN_INITIATOR_MISMATCH", "The selected appointment must belong to the applicant and planned legal entity");
+            throw new DomainException(ErrorCode.EXPENSE_PLAN_INITIATOR_MISMATCH, "The selected appointment must belong to the applicant and planned legal entity");
         }
         var entity = catalog.legalEntity(content.legalEntityId()); var frozen = new ArrayList<ExpensePlanRound.FrozenLine>();
         for (var line : content.lines()) {
             requireCatalogLine(catalog, line);
             var rate = rates == null ? null : rates.get(line.amount().currency());
-            if (rate == null || !entity.baseCurrency().equals(rate.toCurrency())) throw new DomainException("EXPENSE_PLAN_RATE_REQUIRED", "Each planned currency requires a rate to the legal entity base currency");
+            if (rate == null || !entity.baseCurrency().equals(rate.toCurrency())) throw new DomainException(ErrorCode.EXPENSE_PLAN_RATE_REQUIRED, "Each planned currency requires a rate to the legal entity base currency");
             var amount = rate.convert(line.amount());
             frozen.add(new ExpensePlanRound.FrozenLine(line, rate, amount, CostAllocation.apportion(line.allocations(), amount), priorControls.get(line.categoryCode())));
         }
@@ -91,24 +92,24 @@ public final class ExpensePlan {
 
     /** 当前冻结轮次用于审批读模型，不能根据最新草稿重建历史。 */
     public ExpensePlanRound currentRound() {
-        if (rounds.isEmpty()) throw new DomainException("EXPENSE_PLAN_NOT_SUBMITTED", "Expense plan has not been submitted");
+        if (rounds.isEmpty()) throw new DomainException(ErrorCode.EXPENSE_PLAN_NOT_SUBMITTED, "Expense plan has not been submitted");
         return rounds.get(rounds.size() - 1);
     }
 
     private void requireCatalogLine(FinanceCatalog catalog, ExpensePlanContent.Line line) {
         if (catalog.categories().stream().noneMatch(value -> value.code().equals(line.categoryCode()))
                 || catalog.cities().stream().noneMatch(value -> value.code().equals(line.cityCode()))) {
-            throw new DomainException("EXPENSE_PLAN_CATEGORY_UNAVAILABLE", "Planned category or city is not available");
+            throw new DomainException(ErrorCode.EXPENSE_PLAN_CATEGORY_UNAVAILABLE, "Planned category or city is not available");
         }
         for (var allocation : line.allocations()) {
             if (catalog.costCenters().stream().noneMatch(value -> value.legalEntityId().equals(content.legalEntityId()) && value.code().equals(allocation.costCenter()))
                     || allocation.projectCode() != null && catalog.projects().stream().noneMatch(value -> value.legalEntityId().equals(content.legalEntityId()) && value.code().equals(allocation.projectCode()))) {
-                throw new DomainException("COST_OBJECT_UNAVAILABLE", "Planned cost objects are not available to the applicant");
+                throw new DomainException(ErrorCode.COST_OBJECT_UNAVAILABLE, "Planned cost objects are not available to the applicant");
             }
         }
     }
-    private void requireVersion(long expectedVersion) { if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Expense plan version changed"); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PLAN", "Expense plan identity or frozen round is invalid"); }
+    private void requireVersion(long expectedVersion) { if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense plan version changed"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PLAN, "Expense plan identity or frozen round is invalid"); }
 
     /** 恢复时核对连续轮次、递增财务版本与原申请人，不能混入另一份授权历史。 */
     public static ExpensePlan restore(State state) {

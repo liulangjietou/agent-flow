@@ -1,5 +1,6 @@
 package io.agentflow.expense.reporting;
 
+import io.agentflow.common.SystemRole;
 import io.agentflow.common.CurrentActor;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -22,7 +23,7 @@ public class ExpenseFinancialReportController {
     /** 认证角色与逐轮权限共同约束结果，浏览器和代理都不得缓存财务汇总。 */
     @GetMapping("/api/v1/reports/expense-finance")
     public ResponseEntity<ExpenseFinancialReport> report(@RequestParam MultiValueMap<String, String> raw) {
-        actors.actor().requireRole("FINANCE");
+        actors.actor().requireRole(SystemRole.FINANCE);
         Instant now = Instant.now();
         var query = ExpenseReportQueryParameters.parse(raw, now.atOffset(ZoneOffset.UTC).toLocalDate());
         return ResponseEntity.ok().header("Cache-Control", "no-store").body(reports.read(query, now));

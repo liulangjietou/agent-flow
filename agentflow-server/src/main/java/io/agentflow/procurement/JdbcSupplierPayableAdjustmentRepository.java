@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -78,8 +79,7 @@ public class JdbcSupplierPayableAdjustmentRepository {
                     timestamp(value.nextAttemptAt()),
                     command.source().returns().request().command().id().toString());
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "SUPPLIER_ADJUSTMENT_PENDING",
+            throw new DomainException(ErrorCode.SUPPLIER_ADJUSTMENT_PENDING,
                     "Original bank payment already has an active adjustment command");
         }
         append(value);
@@ -422,7 +422,7 @@ public class JdbcSupplierPayableAdjustmentRepository {
 
     private static IllegalStateException inconsistent() { return new IllegalStateException("Persisted supplier payable adjustment is inconsistent"); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Original supplier adjustment or persisted source changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Original supplier adjustment or persisted source changed"); }
 
     /**
      * 后台扫描只返回调整身份。

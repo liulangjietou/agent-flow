@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.SystemRole;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.agentflow.common.CurrentActor;
@@ -70,7 +71,7 @@ public class ExpensePartialAdjustmentAudit {
         var payload = new java.util.LinkedHashMap<String, Object>(details);
         payload.put("reportId", report.id());
         payload.put("roundNo", report.requireFrozenRound().roundNo());
-        payload.put("authorizedRole", "FINANCE");
+        payload.put("authorizedRole", SystemRole.FINANCE.name());
         payload.put("comment", comment);
         var event = UUID.randomUUID();
         sqlMapper.write(

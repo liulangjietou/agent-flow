@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -35,7 +36,7 @@ public class SupplierAdjustmentSources {
         facts.requireEvidence(source, evidence);
         var payment = source.returns().request().command();
         if (source.recognizesOriginalPayment() && !payment.matchesCurrentHold(payments.held(payment.holdCommand().authorization()), evidence.hold(), now)) {
-            throw new DomainException("SUPPLIER_ADJUSTMENT_SOURCE_CHANGED", "Current original supplier hold changed before adjustment");
+            throw new DomainException(ErrorCode.SUPPLIER_ADJUSTMENT_SOURCE_CHANGED, "Current original supplier hold changed before adjustment");
         }
     }
 }

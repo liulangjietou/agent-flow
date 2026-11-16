@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
@@ -55,5 +56,5 @@ public class ProcurementPayableReservations {
                 || application.businessReference() == null || application.businessReference().type() != BusinessReference.Type.PROCUREMENT_PAYMENT
                 || !application.businessReference().id().equals(request)) throw mismatch();
     }
-    private static DomainException mismatch() { return new DomainException("PROCUREMENT_RESERVATION_CONTEXT_CHANGED", "Payable reservation must match the actual procurement application lifecycle"); }
+    private static DomainException mismatch() { return new DomainException(ErrorCode.PROCUREMENT_RESERVATION_CONTEXT_CHANGED, "Payable reservation must match the actual procurement application lifecycle"); }
 }

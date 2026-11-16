@@ -473,7 +473,7 @@ class PrecheckExplanationIntegrationTest {
         properties.add("agentflow.assist.endpoint", () -> ENDPOINT);
         properties.add("agentflow.finance-gateway.tenants.demo.endpoint", () -> "http://127.0.0.1:" + MODEL.getAddress().getPort() + "/finance");
         properties.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> true);
-        properties.add("agentflow.attachments.directory", () -> "/fyoung/tmp/agentflow-precheck-explanation-fixtures");
+        properties.add("agentflow.attachments.directory", () -> System.getProperty("java.io.tmpdir") + "/agentflow-precheck-explanation-fixtures");
     }
     @BeforeEach void setup() {
         wire = json; modelDatabase = jdbc; MODE.set("success"); DURING_AGENT.set(null); PERSISTED_BEFORE_SEND.set(false); configuration.setEnabled(true); configuration.setEndpoint(ENDPOINT);

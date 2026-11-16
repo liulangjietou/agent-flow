@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.approval.process.InstanceControlService;
 import io.agentflow.common.DomainException;
@@ -61,6 +62,6 @@ public class InstanceControlController {
         try {
             if (request.getQueryString() != null || !value.matches("[1-9][0-9]{0,9}")) throw new NumberFormatException();
             return Integer.parseInt(value);
-        } catch (NumberFormatException invalid) { throw new DomainException("INVALID_INSTANCE_QUERY", "A positive round number and no query parameters are required"); }
+        } catch (NumberFormatException invalid) { throw new DomainException(ErrorCode.INVALID_INSTANCE_QUERY, "A positive round number and no query parameters are required"); }
     }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -48,7 +49,7 @@ public class SupplierSettlementWorkspace {
         var items = rows.stream().limit(query.limit()).map(value -> operation(value, context.finance(), now)).toList();
         var active = settlements.active(tenant, paymentId).orElse(null);
         var pending = preparations.active(tenant, paymentId).orElseGet(() -> preparations.latest(tenant, paymentId).orElse(null));
-        var reservation = reservations.find(tenant, original.id()).orElseThrow(() -> new DomainException("NOT_FOUND", "Original payable reservation is unavailable"));
+        var reservation = reservations.find(tenant, original.id()).orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Original payable reservation is unavailable"));
         var bank = context.payment(); var observation = bank == null ? null : bank.observation();
         var minimumDate = observation != null && observation.status() == PaymentObservation.Status.SUCCEEDED
                 ? observation.completedAt().atZone(ZoneId.of(source.round().legalEntity().timeZone())).toLocalDate() : null;
@@ -86,7 +87,7 @@ public class SupplierSettlementWorkspace {
             if (before != null && !before.toString().equals(parameters.get("beforeId"))) throw invalid(); return new Query(limit, before);
         } catch (IllegalArgumentException failure) { throw invalid(); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_SETTLEMENT_QUERY", "Settlement history requires a bounded limit and a canonical cursor from the same original payment"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_SETTLEMENT_QUERY, "Settlement history requires a bounded limit and a canonical cursor from the same original payment"); }
 
     /**
      * 排序固定，不接收客户端 SQL 字段。

@@ -1,6 +1,7 @@
 package io.agentflow.procurement;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRows;
@@ -285,5 +286,5 @@ public class JdbcSupplierAdjustmentSources {
                 .orElse(null);
     }
 
-    private static DomainException changed() { return new DomainException("SUPPLIER_ADJUSTMENT_SOURCE_CHANGED", "Registered supplier returns, original settlement or previous adjustment changed"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.SUPPLIER_ADJUSTMENT_SOURCE_CHANGED, "Registered supplier returns, original settlement or previous adjustment changed"); }
 }

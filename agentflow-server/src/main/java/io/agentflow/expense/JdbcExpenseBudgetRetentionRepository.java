@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpenseBudgetRetentionRepositoryMapper;
@@ -140,7 +141,7 @@ public class JdbcExpenseBudgetRetentionRepository {
 
     private static String text(UUID value) { return value == null ? null : value.toString(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Budget retention source or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Budget retention source or version changed"); }
 
     /**
      * 调度游标只携带定位键，执行时在单据锁内重新读取当前状态。

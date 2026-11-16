@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.BudgetConsumptionReversalOperation;
 import java.time.Instant;
@@ -20,5 +21,5 @@ public record ExpenseResourceAdjustmentRetirement(ExpenseResourceAdjustment befo
     /** 原子的后状态由同一份结束证据派生，不能额外编辑预算或资源。 */
     public ExpenseResourceAdjustment after() { return before.retire(stoppedBudget, retiredAt); }
     private static boolean text(String value, int max) { return StringUtils.isNotBlank(value) && value.equals(value.trim()) && value.length() <= max && value.chars().noneMatch(Character::isISOControl); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_ADJUSTMENT_RETIREMENT", "Adjustment retirement requires independent finance and a stopped, safely unexecuted budget operation"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_ADJUSTMENT_RETIREMENT, "Adjustment retirement requires independent finance and a stopped, safely unexecuted budget operation"); }
 }

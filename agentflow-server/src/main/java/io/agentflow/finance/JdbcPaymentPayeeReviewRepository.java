@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.mapper.PaymentPayeeReviewRepositoryMapper;
@@ -171,7 +172,7 @@ public class JdbcPaymentPayeeReviewRepository {
 
     private static String text(UUID value) { return value == null ? null : value.toString(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Original payee review input or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Original payee review input or version changed"); }
 
     /**
      * 后台候选仅包含标识，不提前加载或输出账户快照。

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.AdvanceRequestRepository;
 import io.agentflow.expense.ExpenseReportRepository;
@@ -48,5 +49,5 @@ public class ApprovedPaymentSources {
         payeeEvidence.requireAuthorizedAccount(authorization, approvedPayee);
         return voucher;
     }
-    private static DomainException changed() { return new DomainException("PAYMENT_SOURCE_CHANGED", "Original approved payment source, account or accounting voucher changed"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.PAYMENT_SOURCE_CHANGED, "Original approved payment source, account or accounting voucher changed"); }
 }

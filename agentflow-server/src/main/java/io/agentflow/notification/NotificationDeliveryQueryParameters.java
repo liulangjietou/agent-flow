@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -74,7 +75,7 @@ public final class NotificationDeliveryQueryParameters {
     }
     private static UUID uuid(String raw) { if (!raw.matches(UUID_PATTERN)) throw invalid(); return UUID.fromString(raw); }
     private static String encode(String value) { return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8)); }
-    private static DomainException invalid() { return new DomainException("INVALID_NOTIFICATION_DELIVERY_QUERY", "Invalid notification delivery filter or cursor"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_NOTIFICATION_DELIVERY_QUERY, "Invalid notification delivery filter or cursor"); }
 
     /** 已完成入口校验的投递筛选。
      * @author owlzhangfq@gmail.com

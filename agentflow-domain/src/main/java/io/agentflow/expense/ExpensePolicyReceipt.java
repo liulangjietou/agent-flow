@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 
@@ -11,6 +12,6 @@ public record ExpensePolicyReceipt(ExpensePolicySelection selection, String rule
     /** 来源引用用于追溯，不承载未经权限检查的远端原始正文。 */
     public ExpensePolicyReceipt {
         if (selection == null || StringUtils.isBlank(ruleKey) || ruleKey.length() > 64 || StringUtils.isBlank(factSourceReference)
-                || factSourceReference.length() > 128) throw new DomainException("INVALID_EXPENSE_POLICY_RECEIPT", "Managed expense policy receipt must identify the executed rule and fact source");
+                || factSourceReference.length() > 128) throw new DomainException(ErrorCode.INVALID_EXPENSE_POLICY_RECEIPT, "Managed expense policy receipt must identify the executed rule and fact source");
     }
 }

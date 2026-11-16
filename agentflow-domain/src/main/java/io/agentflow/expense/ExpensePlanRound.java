@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.Money;
@@ -49,7 +50,7 @@ public record ExpensePlanRound(int roundNo, long submittedPlanVersion, String su
     /** 路由和最终可核销额度使用相同的逐行本位币结果。 */
     public Money total() { return lines.stream().map(FrozenLine::amount).reduce(Money.zero(legalEntity.baseCurrency()), Money::plus); }
 
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PLAN_ROUND", "Expense plan round and conversion facts must match"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PLAN_ROUND, "Expense plan round and conversion facts must match"); }
 
     /**
      * 一行批准请求的候选金额；是否批准仍由实际审批结果决定。

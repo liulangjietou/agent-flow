@@ -1,5 +1,6 @@
 package io.agentflow.approval.workspace;
 
+import io.agentflow.common.SystemRole;
 import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.approval.process.FlowableApprovalProxyAccess;
 import io.agentflow.approval.process.FlowableTaskAuthorization;
@@ -50,7 +51,7 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
     @Override
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Result read(Actor actor, Query query) {
-        if (!actor.hasRole("APPROVER") || !recipients.eligible(actor.tenantId(), actor.userId()))
+        if (!actor.hasRole(SystemRole.APPROVER) || !recipients.eligible(actor.tenantId(), actor.userId()))
             return new Result(List.of(), 0);
         var proxyTaskIds = proxies.forActor(actor, query.deadlineAt()).taskIds();
         var conflictingTasks = authorization.conflictingExpenseTaskIds(actor);
@@ -81,9 +82,9 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
                                 java.util.Objects.equals(query.assignment(), "assigned"),
                                 java.util.Objects.equals(query.assignment(), "unclaimed"),
                                 java.util.Objects.equals(query.assignment(), "delegated"),
-                                query.deadline().name().equals("OVERDUE"),
-                                query.deadline().name().equals("PENDING"),
-                                query.deadline().name().equals("UNRECORDED"),
+                                query.deadline() == PendingTaskReadPort.DeadlineFilter.OVERDUE,
+                                query.deadline() == PendingTaskReadPort.DeadlineFilter.PENDING,
+                                query.deadline() == PendingTaskReadPort.DeadlineFilter.UNRECORDED,
                                 (query.risk() != null),
                                 (!query.text().isEmpty()),
                                 ((query.organization()).isEmpty()),
@@ -109,9 +110,9 @@ public class FlowablePendingTaskReadAdapter implements PendingTaskReadPort {
                                 java.util.Objects.equals(query.assignment(), "assigned"),
                                 java.util.Objects.equals(query.assignment(), "unclaimed"),
                                 java.util.Objects.equals(query.assignment(), "delegated"),
-                                query.deadline().name().equals("OVERDUE"),
-                                query.deadline().name().equals("PENDING"),
-                                query.deadline().name().equals("UNRECORDED"),
+                                query.deadline() == PendingTaskReadPort.DeadlineFilter.OVERDUE,
+                                query.deadline() == PendingTaskReadPort.DeadlineFilter.PENDING,
+                                query.deadline() == PendingTaskReadPort.DeadlineFilter.UNRECORDED,
                                 (query.risk() != null),
                                 (!query.text().isEmpty()),
                                 ((query.organization()).isEmpty()),

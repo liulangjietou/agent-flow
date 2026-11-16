@@ -8,18 +8,25 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "test:requests": "node scripts/test-requests.mjs && npm run test:openapi",
-    "test:openapi": "node scripts/check-openapi.mjs"
+    "test:openapi": "node scripts/check-openapi.mjs",
+    "lint": "eslint ."
   },
   "dependencies": {
-    "@vitejs/plugin-vue": "latest",
-    "typescript": "^5.8.3",
-    "vite": "latest",
-    "vue": "latest",
-    "vue-tsc": "^3.3.11"
+    "vue": "3.5.43",
+    "vue-router": "4.6.5"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "13.1.0",
+    "@eslint/js": "10.0.1",
+    "@vitejs/plugin-vue": "6.0.9",
     "ajv": "8.20.0",
-    "ajv-formats": "3.0.1"
+    "ajv-formats": "3.0.1",
+    "eslint": "10.15.0",
+    "eslint-plugin-vue": "10.12.1",
+    "globals": "17.14.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.2",
+    "vite": "8.3.0",
+    "vue-tsc": "3.3.11"
   }
 }

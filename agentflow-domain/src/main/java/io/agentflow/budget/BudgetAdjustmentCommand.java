@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -47,7 +48,7 @@ public record BudgetAdjustmentCommand(UUID id, ApprovedBudgetAdjustment source, 
     /** 到期只禁止新的写入；已经发送的未知结果始终保留原编号查询。 */
     public void requireSendAt(Instant now) {
         if (now == null || now.isBefore(authorizedAt) || !now.isBefore(expiresAt)) {
-            throw new DomainException("BUDGET_ADJUSTMENT_AUTHORIZATION_EXPIRED", "Budget adjustment authorization or ledger evidence has expired");
+            throw new DomainException(ErrorCode.BUDGET_ADJUSTMENT_AUTHORIZATION_EXPIRED, "Budget adjustment authorization or ledger evidence has expired");
         }
     }
 
@@ -90,7 +91,7 @@ public record BudgetAdjustmentCommand(UUID id, ApprovedBudgetAdjustment source, 
     private static boolean invalidText(String value, int maximum) {
         return StringUtils.isBlank(value) || value.length() > maximum || !value.equals(value.trim()) || value.chars().anyMatch(Character::isISOControl);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_ADJUSTMENT_COMMAND", "Budget adjustment requires exact approved intent, fresh ledger evidence and independent financial authorization"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_ADJUSTMENT_COMMAND, "Budget adjustment requires exact approved intent, fresh ledger evidence and independent financial authorization"); }
     /** 不向普通日志展开预算、金额或授权原因。 */
     @Override public String toString() { return "BudgetAdjustmentCommand[id=" + id + "]"; }
 }

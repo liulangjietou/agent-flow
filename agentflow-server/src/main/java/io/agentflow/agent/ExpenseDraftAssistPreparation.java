@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.FinanceGatewayConfiguration;
@@ -53,12 +54,12 @@ public class ExpenseDraftAssistPreparation {
     private Prepared prepare(ExpenseDraftAssistService.Snapshot snapshot, Request request, Instant originalExpiry) {
         String tenant = snapshot.report().tenantId(), employee = snapshot.report().employeeId();
         model.requireAvailable(); String modelTarget = model.targetDigest(ExpenseDraftAssistRun.PROMPT_VERSION);
-        String provider = model.getProviderId(), modelName = model.getModel(), destination = model.uri().getAuthority();
+        String provider = model.getProviderId(), modelName = model.modelFor(ExpenseDraftAssistRun.PROMPT_VERSION), destination = model.uri().getAuthority();
         String financeTarget = destination(tenant); var catalog = catalogs.catalog(tenant, employee).requireValue();
         Instant now = Instant.now(); Instant expiry = originalExpiry == null ? catalog.validUntil() : originalExpiry;
         if (!expiry.isAfter(now) || expiry.isAfter(catalog.validUntil()) || !financeTarget.equals(destination(tenant))) throw changed();
         model.requireAvailable();
-        if (!modelTarget.equals(model.targetDigest(ExpenseDraftAssistRun.PROMPT_VERSION))) throw new DomainException("AGENT_TARGET_CHANGED", "Expense draft model destination changed during preparation");
+        if (!modelTarget.equals(model.targetDigest(ExpenseDraftAssistRun.PROMPT_VERSION))) throw new DomainException(ErrorCode.AGENT_TARGET_CHANGED, "Expense draft model destination changed during preparation");
         var value = inputs.select(snapshot.application(), snapshot.report(), catalog, financeTarget, request.brief(), request.itinerary(), request.catalog());
         var frozen = new ExpenseDraftAssistInput(value.reportId(), value.applicationId(), value.applicationVersion(), value.financialVersion(),
                 value.legalEntityId(), value.reportType(), value.catalogVersion(), expiry, value.financeTargetDigest(), value.itinerary(), value.options(), value.sources());
@@ -66,9 +67,9 @@ public class ExpenseDraftAssistPreparation {
         return new Prepared(tenant, employee, frozen, modelTarget, consent, provider, modelName, destination);
     }
     private String destination(String tenant) {
-        return finance.destination(tenant).orElseThrow(() -> new DomainException("FINANCE_GATEWAY_UNAVAILABLE", "NOT_CONFIGURED")).digest(tenant);
+        return finance.destination(tenant).orElseThrow(() -> new DomainException(ErrorCode.FINANCE_GATEWAY_UNAVAILABLE, "NOT_CONFIGURED")).digest(tenant);
     }
-    private static DomainException changed() { return new DomainException("AGENT_INPUT_CHANGED", "Refresh the authorized expense draft catalog and sources"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Refresh the authorized expense draft catalog and sources"); }
 
     /**
      * 本人行程与所选代码，原始模型正文始终由服务端投影。

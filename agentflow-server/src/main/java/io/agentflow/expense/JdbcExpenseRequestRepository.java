@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpenseRequestRepositoryMapper;
@@ -41,8 +42,7 @@ public class JdbcExpenseRequestRepository implements ExpenseRequestRepository {
                                 balance ->
                                         !balance.reservations().isEmpty()
                                                 || !balance.consumptions().isEmpty())) {
-            throw new DomainException(
-                    "INVALID_PRIOR_REQUEST",
+            throw new DomainException(ErrorCode.INVALID_PRIOR_REQUEST,
                     "A new prior request must have unallocated approved lines");
         }
         var approved =
@@ -51,8 +51,7 @@ public class JdbcExpenseRequestRepository implements ExpenseRequestRepository {
                         request.applicationId().toString(),
                         request.employeeId());
         if (approved.isEmpty())
-            throw new DomainException(
-                    "PRIOR_REQUEST_NOT_APPROVED",
+            throw new DomainException(ErrorCode.PRIOR_REQUEST_NOT_APPROVED,
                     "Prior request credit requires the applicant's approved application");
         store.create(KIND, stored(request), actor);
     }
@@ -67,7 +66,7 @@ public class JdbcExpenseRequestRepository implements ExpenseRequestRepository {
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
     public void lock(String tenantId, UUID id) {
         if (sqlMapper.lock(tenantId, id.toString()).isEmpty()) {
-            throw new DomainException("NOT_FOUND", "Prior request credit not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Prior request credit not found");
         }
     }
 

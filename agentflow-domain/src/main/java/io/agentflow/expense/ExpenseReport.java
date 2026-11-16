@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.EmployeeAccountSnapshot;
 import io.agentflow.finance.Money;
@@ -30,7 +31,7 @@ public final class ExpenseReport {
         id = Objects.requireNonNull(state.id()); tenantId = actor(state.tenantId(), 64);
         applicationId = Objects.requireNonNull(state.applicationId()); employeeId = actor(state.employeeId(), 128);
         content = Objects.requireNonNull(state.content()); version = state.version(); rounds = List.copyOf(state.rounds());
-        if (version < 1) throw new DomainException("INVALID_EXPENSE_VERSION", "Financial version must be positive");
+        if (version < 1) throw new DomainException(ErrorCode.INVALID_EXPENSE_VERSION, "Financial version must be positive");
     }
 
     /** 应用服务先建立同租户、同申请人的一对一申请绑定。 */
@@ -55,12 +56,12 @@ public final class ExpenseReport {
         Money.zero(baseCurrency);
         if (!employeeId.equals(actor) || account == null || !employeeId.equals(account.employeeId())
                 || !content.legalEntityId().equals(account.legalEntityId())) {
-            throw new DomainException("EXPENSE_ACCOUNT_MISMATCH", "Only the applicant's verified legal-entity account may be used");
+            throw new DomainException(ErrorCode.EXPENSE_ACCOUNT_MISMATCH, "Only the applicant's verified legal-entity account may be used");
         }
         requireTime(at, rounds.isEmpty() ? null : latestEvent(currentRound()));
-        if (roundNo != rounds.size() + 1) throw new DomainException("EXPENSE_ROUND_CONFLICT", "Financial rounds must be consecutive");
+        if (roundNo != rounds.size() + 1) throw new DomainException(ErrorCode.EXPENSE_ROUND_CONFLICT, "Financial rounds must be consecutive");
         if (content.lines().isEmpty() || assessments == null || assessments.size() != content.lines().size()) {
-            throw new DomainException("EXPENSE_PRECHECK_REQUIRED", "Every expense line requires current submission facts");
+            throw new DomainException(ErrorCode.EXPENSE_PRECHECK_REQUIRED, "Every expense line requires current submission facts");
         }
         var original = new ArrayList<ExpenseRound.FrozenLine>();
         var approved = new ArrayList<ExpenseRound.ApprovedLine>();
@@ -76,7 +77,7 @@ public final class ExpenseReport {
         var frozen = new ExpenseRound(roundNo, version, actor, at, content, baseCurrency, account,
                 original, approved, content.advanceOffsets(), List.of());
         if (frozen.offsetTotal().compareTo(frozen.approvedGross()) > 0) {
-            throw new DomainException("ADVANCE_OFFSET_EXCEEDS_EXPENSE", "Advance offsets exceed approved expenses");
+            throw new DomainException(ErrorCode.ADVANCE_OFFSET_EXCEEDS_EXPENSE, "Advance offsets exceed approved expenses");
         }
         var updated = new ArrayList<>(rounds); updated.add(frozen);
         rounds = List.copyOf(updated); version++;
@@ -97,14 +98,14 @@ public final class ExpenseReport {
         requireTime(at, latestEvent(round));
         if (!validAdjustmentReason(reasonCode) || lineReasons == null || StringUtils.isBlank(comment) || comment.length() > 2000
                 || CollectionUtils.isEmpty(reductions) || reductions.size() > ExpenseContent.MAX_LINES) {
-            throw new DomainException("INVALID_EXPENSE_ADJUSTMENT", "A bounded reduction list, reason code and comment are required");
+            throw new DomainException(ErrorCode.INVALID_EXPENSE_ADJUSTMENT, "A bounded reduction list, reason code and comment are required");
         }
         var requested = new HashMap<Integer, Reduction>();
         for (var reduction : reductions) {
             if (reduction == null || requested.put(reduction.lineNo(), reduction) != null) throw invalidReduction();
         }
         if (!requested.keySet().containsAll(lineReasons.keySet()) || lineReasons.values().stream().anyMatch(reason -> !validAdjustmentReason(reason))) {
-            throw new DomainException("INVALID_EXPENSE_ADJUSTMENT", "Line reasons must belong to requested reductions and use valid reason codes");
+            throw new DomainException(ErrorCode.INVALID_EXPENSE_ADJUSTMENT, "Line reasons must belong to requested reductions and use valid reason codes");
         }
         var approved = new ArrayList<ExpenseRound.ApprovedLine>();
         var changes = new ArrayList<ExpenseAdjustment.LineChange>();
@@ -151,18 +152,18 @@ public final class ExpenseReport {
         if (fact == null || !baseCurrency.equals(fact.exchangeRate().toCurrency())
                 || !line.claimedGross().currency().equals(fact.exchangeRate().fromCurrency())
                 || !baseCurrency.equals(fact.deductibleTax().currency())) {
-            throw new DomainException("EXPENSE_PRECHECK_REQUIRED", "Submission facts do not match this expense line");
+            throw new DomainException(ErrorCode.EXPENSE_PRECHECK_REQUIRED, "Submission facts do not match this expense line");
         }
         Money gross = fact.exchangeRate().convert(line.claimedGross());
         if (!fact.policy().assessedGross().equals(gross)
                 || fact.deductibleTax().compareTo(fact.exchangeRate().convert(line.claimedTax())) > 0) {
-            throw new DomainException("EXPENSE_PRECHECK_REQUIRED", "Submission facts do not match this expense line");
+            throw new DomainException(ErrorCode.EXPENSE_PRECHECK_REQUIRED, "Submission facts do not match this expense line");
         }
         if (fact.policy().decision() == ExpensePolicySnapshot.Decision.DENIED) {
-            throw new DomainException("EXPENSE_POLICY_DENIED", "Expense policy denies this expense line");
+            throw new DomainException(ErrorCode.EXPENSE_POLICY_DENIED, "Expense policy denies this expense line");
         }
         if (fact.policy().decision() == ExpensePolicySnapshot.Decision.REQUIRES_EXCEPTION && StringUtils.isBlank(line.exceptionReason())) {
-            throw new DomainException("EXPENSE_EXCEPTION_REASON_REQUIRED", "An over-limit expense requires an explicit reason");
+            throw new DomainException(ErrorCode.EXPENSE_EXCEPTION_REASON_REQUIRED, "An over-limit expense requires an explicit reason");
         }
         // 制度与可抵扣额已经按本位币核定，不能再次乘汇率。
         return new ExpenseRound.FrozenLine(line, fact, gross, fact.deductibleTax());
@@ -190,16 +191,16 @@ public final class ExpenseReport {
     }
 
     private void requireVersion(long expectedVersion) {
-        if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Financial version has changed");
+        if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Financial version has changed");
     }
 
     private static String actor(String value, int maxLength) {
-        if (StringUtils.isBlank(value) || value.length() > maxLength) throw new DomainException("INVALID_EXPENSE_ACTOR", "A valid expense actor is required");
+        if (StringUtils.isBlank(value) || value.length() > maxLength) throw new DomainException(ErrorCode.INVALID_EXPENSE_ACTOR, "A valid expense actor is required");
         return value;
     }
 
     private static void requireTime(Instant at, Instant previous) {
-        if (at == null || previous != null && at.isBefore(previous)) throw new DomainException("INVALID_EXPENSE_TIME", "Financial event time precedes the previous event");
+        if (at == null || previous != null && at.isBefore(previous)) throw new DomainException(ErrorCode.INVALID_EXPENSE_TIME, "Financial event time precedes the previous event");
     }
 
     private static Instant latestEvent(ExpenseRound round) {
@@ -207,12 +208,12 @@ public final class ExpenseReport {
     }
 
     private static DomainException invalidReduction() {
-        return new DomainException("INVALID_EXPENSE_REDUCTION", "Each requested expense and tax amount must be a reduction of an existing line");
+        return new DomainException(ErrorCode.INVALID_EXPENSE_REDUCTION, "Each requested expense and tax amount must be a reduction of an existing line");
     }
 
     /** 读取最近一次提交的财务轮次；草稿没有可审核轮次。 */
     public ExpenseRound currentRound() {
-        if (rounds.isEmpty()) throw new DomainException("EXPENSE_NOT_SUBMITTED", "Expense report has no submitted financial round");
+        if (rounds.isEmpty()) throw new DomainException(ErrorCode.EXPENSE_NOT_SUBMITTED, "Expense report has no submitted financial round");
         return rounds.get(rounds.size() - 1);
     }
 
@@ -222,7 +223,7 @@ public final class ExpenseReport {
         long frozenVersion = round.adjustments().isEmpty() ? round.submittedFinancialVersion() + 1
                 : round.adjustments().get(round.adjustments().size() - 1).previousFinancialVersion() + 1;
         if (version != frozenVersion || !content.equals(round.content())) {
-            throw new DomainException("EXPENSE_NOT_FROZEN", "Current financial version has not been frozen");
+            throw new DomainException(ErrorCode.EXPENSE_NOT_FROZEN, "Current financial version has not been frozen");
         }
         return round;
     }

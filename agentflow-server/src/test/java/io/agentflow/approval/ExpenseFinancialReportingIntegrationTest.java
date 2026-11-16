@@ -82,7 +82,7 @@ class ExpenseFinancialReportingIntegrationTest {
     @DynamicPropertySource static void endpoints(DynamicPropertyRegistry registry) {
         registry.add("agentflow.finance-gateway.tenants.demo.endpoint", GATEWAY::endpoint);
         registry.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> true);
-        registry.add("agentflow.attachments.directory", () -> "/fyoung/tmp/agentflow-financial-reporting-http-fixtures");
+        registry.add("agentflow.attachments.directory", () -> System.getProperty("java.io.tmpdir") + "/agentflow-financial-reporting-http-fixtures");
     }
     @BeforeEach void source() {
         if (jdbc.queryForObject("SELECT COUNT(*) FROM organization_directory WHERE tenant_id='demo'", Integer.class) == 0) organization.initialize(ADMIN);
@@ -235,7 +235,7 @@ class ExpenseFinancialReportingIntegrationTest {
         String archive = System.getProperty("agentflow.test.financial-report-responses");
         if (archive != null) {
             var directory = java.nio.file.Path.of(archive).toAbsolutePath().normalize();
-            assertThat(directory.startsWith(java.nio.file.Path.of("/fyoung/tmp"))).isTrue();
+            assertThat(directory.startsWith(java.nio.file.Path.of(System.getProperty("java.io.tmpdir")))).isTrue();
             java.nio.file.Files.createDirectories(directory);
             java.nio.file.Files.writeString(directory.resolve(UUID.randomUUID()+".json"),
                     json.write(List.of(Map.of("method", "GET", "path", path, "actor", user, "status", expected, "response", body))));

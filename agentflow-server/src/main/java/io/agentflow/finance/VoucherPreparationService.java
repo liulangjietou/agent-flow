@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
@@ -63,7 +64,7 @@ public class VoucherPreparationService {
         sources.lock(original.input().source());
         var current = preparations.latest(tenant, applicationId, roundNo, VoucherCommand.Kind.PAYMENT).orElseThrow(VoucherPreparationService::notFound);
         if (operations.forRound(tenant, applicationId, roundNo, VoucherCommand.Kind.PAYMENT).isPresent()) {
-            throw new DomainException("VOUCHER_OPERATION_EXISTS", "Reconcile the original payment voucher before preparing another command");
+            throw new DomainException(ErrorCode.VOUCHER_OPERATION_EXISTS, "Reconcile the original payment voucher before preparing another command");
         }
         if (current.active()) return current;
         return enqueue(current.input().source(), Math.incrementExact(current.input().attempt()), actor, time(now));
@@ -74,10 +75,10 @@ public class VoucherPreparationService {
         var initial = applications.findById(tenant, applicationId).orElseThrow(VoucherPreparationService::notFound);
         var source = sources.reference(initial); sources.lock(source);
         var application = applications.findById(tenant, applicationId).orElseThrow(VoucherPreparationService::notFound);
-        if (application.version() != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Approval version changed");
+        if (application.version() != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Approval version changed");
         source = sources.reference(application);
         if (operations.forRound(tenant, applicationId, source.roundNo(), source.kind()).isPresent()) {
-            throw new DomainException("VOUCHER_OPERATION_EXISTS", "Reconcile the original voucher operation before preparing another command");
+            throw new DomainException(ErrorCode.VOUCHER_OPERATION_EXISTS, "Reconcile the original voucher operation before preparing another command");
         }
         var latest = preparations.latest(source).orElse(null);
         if (latest != null && (latest.active() || latest.status() == VoucherPreparation.Status.NOT_REQUIRED)) return latest;
@@ -110,7 +111,7 @@ public class VoucherPreparationService {
         if (current.expired(now)) { complete(current, current.finish(VoucherPreparation.Result.unavailable("LEASE_EXPIRED"), now)); return; }
         if (problem != null) { complete(current, current.finish(problem, now)); return; }
         if (command == null || !command.id().equals(current.input().id()) || !sources.derive(current.input().source()).matches(command)) {
-            throw new DomainException("VOUCHER_SOURCE_CHANGED", "Prepared command no longer matches original approval");
+            throw new DomainException(ErrorCode.VOUCHER_SOURCE_CHANGED, "Prepared command no longer matches original approval");
         }
         VoucherPreparation.Result mappingFailure = null;
         try { mappings.requireCurrent(current, command); }
@@ -142,7 +143,7 @@ public class VoucherPreparationService {
     private static Instant time(Instant now) { return now.truncatedTo(ChronoUnit.MICROS); }
     /** 锁后重新计时，保留调用方已观察到的更晚时刻，锁等待不能延长租约。 */
     private static Instant completionTime(Instant requested) { var observed = Instant.now(); return time(observed.isAfter(requested) ? observed : requested); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Voucher preparation or approved application not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Voucher preparation or approved application not found"); }
     /**
      * 实际源在领取事务内派生，执行器只持有不可变数据且不携带数据库锁。
      * @author owlzhangfq@gmail.com

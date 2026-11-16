@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
@@ -53,7 +54,7 @@ public class NotificationPreferencesController {
     }
 
     private static void requireNoQuery(Map<String,String> parameters) {
-        if (!parameters.isEmpty()) throw new DomainException("INVALID_NOTIFICATION_PREFERENCES", "Notification preferences do not accept query parameters");
+        if (!parameters.isEmpty()) throw new DomainException(ErrorCode.INVALID_NOTIFICATION_PREFERENCES, "Notification preferences do not accept query parameters");
     }
 
     /** 站内业务提醒始终开启；更新时间为 null 表示未保存过个人外部设置。

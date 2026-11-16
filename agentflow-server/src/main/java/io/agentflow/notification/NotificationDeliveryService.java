@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.auth.AuthService;
 import io.agentflow.approval.process.FlowableApprovalProxyNotifications;
 import io.agentflow.common.Actor;
@@ -92,13 +93,13 @@ public class NotificationDeliveryService {
     /** 人工恢复保持原编号及地址身份；已撤销同意、失去资格或改址的消息不能重试。 */
     @Transactional
     public NotificationDelivery retry(Actor actor, UUID id, long expectedVersion, boolean acknowledgePossibleDuplicate, String reason, Instant now) {
-        var identity = store.get(actor, id).orElseThrow(() -> new DomainException("NOTIFICATION_DELIVERY_NOT_FOUND", "Notification delivery not found"));
+        var identity = store.get(actor, id).orElseThrow(() -> new DomainException(ErrorCode.NOTIFICATION_DELIVERY_NOT_FOUND, "Notification delivery not found"));
         var currentPreferences = lockRecipient(identity);
         var value = store.lock(id).orElseThrow();
         var next = value.progress().retry(expectedVersion, acknowledgePossibleDuplicate, now);
-        if (revoked(value, currentPreferences) != null) throw new DomainException("NOTIFICATION_CONSENT_REVOKED", "Notification recipient or consent is no longer valid");
+        if (revoked(value, currentPreferences) != null) throw new DomainException(ErrorCode.NOTIFICATION_CONSENT_REVOKED, "Notification recipient or consent is no longer valid");
         var target = destinations.find(value.tenantId(), value.recipient(), value.channel()).orElse(null);
-        if (bindingFailure(value, target) != null) throw new DomainException("NOTIFICATION_BINDING_UNAVAILABLE", "Original notification binding is unavailable");
+        if (bindingFailure(value, target) != null) throw new DomainException(ErrorCode.NOTIFICATION_BINDING_UNAVAILABLE, "Original notification binding is unavailable");
         return store.save(value, next, actor.userId(), reason);
     }
 

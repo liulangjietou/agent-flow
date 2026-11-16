@@ -7,7 +7,7 @@ const { default: LineEditor } = await import(process.env.AGENTFLOW_TEST_EXPENSEL
 const { default: LineEditorPanel } = await import(process.env.AGENTFLOW_TEST_EXPENSELINEEDITORPANEL)
 const { default: Panel } = await import(process.env.AGENTFLOW_TEST_EXPENSEPOLICYGUIDANCEPANEL)
 const { default: Rendered } = await import(process.env.AGENTFLOW_TEST_EXPENSEPOLICYGUIDANCERENDERED)
-const { api, bindAuthenticationActor, writeRequests } = await import(process.env.AGENTFLOW_TEST_API)
+const { api, bindAuthenticationActor } = await import(process.env.AGENTFLOW_TEST_API)
 const originals = { ...api }, copy = value => JSON.parse(JSON.stringify(value)), settle = () => new Promise(resolve => setImmediate(resolve))
 const ENTITY = '00000000-0000-0000-0000-000000000001', POLICY = '00000000-0000-0000-0000-000000000002'
 const context = () => ({ legalEntityId: ENTITY, reportType: 'TRAVEL', categoryCode: 'TRAVEL', cityCode: 'SH', incurredOn: '2026-10-02', currency: 'CNY', unit: 'NIGHT' })

@@ -1,5 +1,7 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -52,7 +54,7 @@ public class DefinitionAvailabilityController {
             limit = Integer.parseInt(raw.getOrDefault("limit", Integer.toString(DEFAULT_LIMIT)));
             if (before < 1 || limit < 1 || limit > MAX_LIMIT) throw new IllegalArgumentException();
         } catch (IllegalArgumentException exception) {
-            throw new DomainException("INVALID_AVAILABILITY_QUERY", "Invalid availability history query");
+            throw new DomainException(ErrorCode.INVALID_AVAILABILITY_QUERY, "Invalid availability history query");
         }
         var rows = service.history(actors.actor().tenantId(), id, before, limit);
         int count = Math.min(rows.size(), limit);
@@ -63,8 +65,8 @@ public class DefinitionAvailabilityController {
 
     private void requireAdministrator() {
         var actor = actors.actor();
-        if (!actor.hasRole("ADMIN") && !actor.hasRole("PROCESS_ADMIN")) {
-            throw new DomainException("FORBIDDEN", "Process administrator role is required");
+        if (!actor.hasRole(SystemRole.ADMIN) && !actor.hasRole(SystemRole.PROCESS_ADMIN)) {
+            throw new DomainException(ErrorCode.FORBIDDEN, "Process administrator role is required");
         }
     }
 

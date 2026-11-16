@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.List;
@@ -19,7 +20,7 @@ public record ExpensePriorControlSnapshot(String tenantId, UUID reportId, UUID a
                 || roundNo < 1 || financialVersion < 2 || definitionId == null || definitionVersion < 1 || submittedAt == null || assessments == null
                 || assessments.size() > ExpenseContent.MAX_LINES || assessments.stream().anyMatch(java.util.Objects::isNull)
                 || assessments.stream().map(ExpensePriorControlAssessment::lineNo).distinct().count() != assessments.size()) {
-            throw new DomainException("INVALID_EXPENSE_PRIOR_SNAPSHOT", "Prior control snapshot requires the original submission identity and unique line assessments");
+            throw new DomainException(ErrorCode.INVALID_EXPENSE_PRIOR_SNAPSHOT, "Prior control snapshot requires the original submission identity and unique line assessments");
         }
         assessments = List.copyOf(assessments);
     }

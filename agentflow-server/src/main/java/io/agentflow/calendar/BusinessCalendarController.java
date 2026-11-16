@@ -1,5 +1,6 @@
 package io.agentflow.calendar;
 
+import io.agentflow.common.SystemRole;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
@@ -79,7 +80,7 @@ public class BusinessCalendarController {
         return noStore(service.calculate(actor.tenantId(), id, body.revision(), body.startLocal(), body.overlapChoice(), body.workingMinutes()));
     }
 
-    private Actor administrator() { var actor = currentActor.actor(); actor.requireRole("ADMIN"); return actor; }
+    private Actor administrator() { var actor = currentActor.actor(); actor.requireRole(SystemRole.ADMIN); return actor; }
     private static <T> ResponseEntity<T> noStore(T body) { return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body); }
     /**
      * 首版请求只包含管理员明确输入的业务设置。

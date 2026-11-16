@@ -1,5 +1,6 @@
 package io.agentflow.attachment;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.ApplicationFieldViews;
 import io.agentflow.common.CurrentActor;
@@ -52,15 +53,15 @@ public class AttachmentService {
     /** 登记时校验字段归属和容量，同一幂等请求返回原附件身份。 */
     @Transactional
     public Metadata reserve(UUID applicationId, UploadInput input) {
-        if (!store.available()) throw new DomainException("ATTACHMENT_STORAGE_UNAVAILABLE", "Attachment storage is unavailable");
+        if (!store.available()) throw new DomainException(ErrorCode.ATTACHMENT_STORAGE_UNAVAILABLE, "Attachment storage is unavailable");
         var actor = actors.actor();
         files.lockApplication(actor.tenantId(), applicationId);
         var application = applications.requireApplicant(applicationId);
         application.requireEditable(input.expectedVersion());
         if (!AttachmentReferences.containsField(application.formSchema(), input.fieldPath())) {
-            throw new DomainException("INVALID_ATTACHMENT_REFERENCE", "Field is not an attachment field");
+            throw new DomainException(ErrorCode.INVALID_ATTACHMENT_REFERENCE, "Field is not an attachment field");
         }
-        if (input.size() > store.maxFileBytes()) throw new DomainException("ATTACHMENT_TOO_LARGE", "Attachment exceeds the configured file limit");
+        if (input.size() > store.maxFileBytes()) throw new DomainException(ErrorCode.ATTACHMENT_TOO_LARGE, "Attachment exceeds the configured file limit");
         files.requireCapacity(actor.tenantId(), applicationId, input.size(), store.maxApplicationBytes(), store.maxApplicationUploads());
         var file = new Attachment(UUID.randomUUID(), actor.tenantId(), applicationId, input.fieldPath(), input.filename(),
                 input.size(), input.sha256(), actor.userId(), Instant.now(), Attachment.Status.UPLOADING);
@@ -114,10 +115,10 @@ public class AttachmentService {
         var view = copies.get(application, round);
         var file = files.get(actors.actor().tenantId(), application, id);
         if (!AttachmentReferences.containsField(view.formSchema(), file.fieldPath())) {
-            throw new DomainException("FORBIDDEN", "Field permissions do not allow reading this attachment");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Field permissions do not allow reading this attachment");
         }
         if (!AttachmentReferences.collect(view.formSchema(), view.payload()).contains(new AttachmentReferences.Reference(file.fieldPath(), id))
-                || !files.frozen(file, round)) throw new DomainException("NOT_FOUND", "Attachment is not referenced in this copied round");
+                || !files.frozen(file, round)) throw new DomainException(ErrorCode.NOT_FOUND, "Attachment is not referenced in this copied round");
         return file;
     }
 
@@ -131,13 +132,13 @@ public class AttachmentService {
         var view = fields.attachmentViewForActor(actor, application, round);
         var file = files.get(application.tenantId(), applicationId, id);
         if (!AttachmentReferences.containsField(view.schema(), file.fieldPath())) {
-            throw new DomainException("FORBIDDEN", "Field permissions do not allow reading this attachment");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Field permissions do not allow reading this attachment");
         }
         var reference = new AttachmentReferences.Reference(file.fieldPath(), id);
         boolean referenced = AttachmentReferences.collect(view.schema(), view.payload()).contains(reference);
         if (round != null ? !referenced || !files.frozen(file, round)
                 : !referenced && !(application.createdBy().equals(actor.userId()) && application.editable())) {
-            throw new DomainException("NOT_FOUND", "Attachment is not referenced in this view");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Attachment is not referenced in this view");
         }
         return file;
     }

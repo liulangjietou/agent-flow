@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.SystemRole;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -99,7 +100,7 @@ public class SupplierAdjustmentActions {
         payload.put("requestId", source.requestId());
         payload.put("roundNo", source.round().roundNo());
         payload.put("paymentId", authorization.id());
-        payload.put("authorizedRole", "FINANCE");
+        payload.put("authorizedRole", SystemRole.FINANCE.name());
         payload.put("previousStatus", before);
         payload.put("currentStatus", after);
         payload.put("comment", comment.trim());

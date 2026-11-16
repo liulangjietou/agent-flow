@@ -1,5 +1,6 @@
 package io.agentflow.expense.reporting;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.DomainException;
 import java.time.DateTimeException;
@@ -41,7 +42,7 @@ public final class ExpenseReportQueryParameters {
         if (!parsed.toString().equalsIgnoreCase(value)) throw invalid();
         return parsed;
     }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_REPORT_QUERY", "Invalid UTC date range or original organization/category filter"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_REPORT_QUERY, "Invalid UTC date range or original organization/category filter"); }
 
     /**
      * 已校验查询在整个只读事务内固定，所有来源复用同一日期边界。

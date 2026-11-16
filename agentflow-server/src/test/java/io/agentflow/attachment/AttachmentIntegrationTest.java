@@ -49,7 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.attachments.max-file-bytes=1024", "agentflow.attachments.max-application-bytes=2048", "agentflow.attachments.max-application-uploads=3"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class AttachmentIntegrationTest {
-    static final Path DIRECTORY = Path.of("/fyoung/tmp/agentflow-attachment-test-" + UUID.randomUUID());
+    static final Path DIRECTORY = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-attachment-test-" + UUID.randomUUID());
     @DynamicPropertySource
     static void properties(DynamicPropertyRegistry registry) {
         registry.add("agentflow.attachments.directory", DIRECTORY::toString);

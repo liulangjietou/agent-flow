@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -41,13 +42,13 @@ public class ExpensePlanSubmissionService {
         plans.find(actor.tenantId(), id).filter(plan -> plan.employeeId().equals(actor.userId())).orElseThrow(ExpensePlanSubmissionService::notFound);
         plans.lock(actor.tenantId(), id); var plan = plans.find(actor.tenantId(), id).orElseThrow();
         var application = applications.requireApplicant(plan.applicationId()); application.requireEditable(input.applicationVersion());
-        if (plan.version() != input.planVersion()) throw new DomainException("CONCURRENCY_CONFLICT", "Expense plan version changed");
+        if (plan.version() != input.planVersion()) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense plan version changed");
         var checked = checks.find(actor.tenantId(), input.precheckId()).filter(check -> check.input().planId().equals(id)).orElseThrow(ExpensePlanSubmissionService::notFound);
         policyConfiguration.lockForSubmission(actor.tenantId());
         String failure = validation.readyFailure(checked, plan, Instant.now());
         if (failure != null) throw new DomainException(failure, "Refresh expense plan facts before submission");
         var definition = definitions.lockPublished(actor.tenantId(), application.processKey(), application.definitionVersion())
-                .orElseThrow(() -> new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published expense plan process not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.PROCESS_DEFINITION_NOT_FOUND, "Published expense plan process not found"));
         definition.requireStartEnabled(); ExpensePlanFormContract.requireReview(definition.graph(), application.formSchema());
         var evidence = checked.result().evidence(); Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         var priorControls = evidence.preview().lines().stream().filter(line -> line.priorControl() != null)
@@ -59,11 +60,11 @@ public class ExpensePlanSubmissionService {
         application = applications.reviseBusiness(application.id(), application.version(), plan.content().title(),
                 ExpensePlanFormContract.submittedPayload(plan.currentRound()), application.businessReference());
         application = applications.submitBusiness(application.id(), application.version(), checked.input().initiator().appointmentId(), application.businessReference());
-        if (!evidence.validUntil().isAfter(Instant.now())) throw new DomainException("FACTS_EXPIRED", "Expense plan facts expired during submission");
+        if (!evidence.validUntil().isAfter(Instant.now())) throw new DomainException(ErrorCode.FACTS_EXPIRED, "Expense plan facts expired during submission");
         return ExpensePlanService.receipt(application, plan);
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense plan or precheck not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Expense plan or precheck not found"); }
 
     /**
      * 双版本和服务端预检标识，不允许客户端附带批准结论。

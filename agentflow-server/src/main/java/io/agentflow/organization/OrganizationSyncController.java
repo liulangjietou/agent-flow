@@ -1,5 +1,7 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
@@ -111,7 +113,7 @@ public class OrganizationSyncController {
         var actor = admin(); var page = page(query); return noStore(service.plans(actor, id, page[0], page[1]));
     }
 
-    private Actor admin() { var actor = actors.actor(); actor.requireRole("ADMIN"); return actor; }
+    private Actor admin() { var actor = actors.actor(); actor.requireRole(SystemRole.ADMIN); return actor; }
     private static <T> ResponseEntity<T> noStore(T body) { return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body); }
     private static void noQuery(HttpServletRequest request) { if (request.getQueryString() != null) throw query(); }
     private static void empty(MultiValueMap<String, String> values) { if (!values.isEmpty()) throw query(); }
@@ -123,7 +125,7 @@ public class OrganizationSyncController {
         if (value == null) return fallback; if (!value.matches("0|[1-9][0-9]{0,4}")) throw query();
         int result = Integer.parseInt(value); if (result < minimum || result > maximum) throw query(); return result;
     }
-    private static DomainException query() { return new DomainException("INVALID_ORGANIZATION_SYNC_QUERY", "Organization synchronization query is invalid"); }
+    private static DomainException query() { return new DomainException(ErrorCode.INVALID_ORGANIZATION_SYNC_QUERY, "Organization synchronization query is invalid"); }
 
     /**
      * 初次注册使用来源版本零，后续必须确认当前已注册来源版本和目标。

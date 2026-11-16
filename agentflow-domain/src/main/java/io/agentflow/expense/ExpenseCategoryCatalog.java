@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.util.HashSet;
@@ -27,15 +28,15 @@ public record ExpenseCategoryCatalog(String tenantId, long version, List<Categor
         var next = new ExpenseCategoryCatalog(tenantId, version + 1, replacement);
         var keys = new HashSet<>(next.categories.stream().map(Category::code).toList());
         if (categories.stream().anyMatch(category -> !keys.contains(category.code()))) {
-            throw new DomainException("EXPENSE_CATEGORY_REMOVAL_FORBIDDEN", "Expense categories can be disabled but their identities cannot be removed");
+            throw new DomainException(ErrorCode.EXPENSE_CATEGORY_REMOVAL_FORBIDDEN, "Expense categories can be disabled but their identities cannot be removed");
         }
-        if (version > 0 && categories.equals(next.categories)) throw new DomainException("EXPENSE_CONFIGURATION_UNCHANGED", "Expense category configuration has not changed");
+        if (version > 0 && categories.equals(next.categories)) throw new DomainException(ErrorCode.EXPENSE_CONFIGURATION_UNCHANGED, "Expense category configuration has not changed");
         return next;
     }
 
     /** 发布及写入只接受操作者已经核对过的类别版本。 */
     public void requireVersion(long expected) {
-        if (version != expected) throw new DomainException("CONCURRENCY_CONFLICT", "Expense category version changed");
+        if (version != expected) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense category version changed");
     }
 
     /** 当前可用字典不包含停用类别，历史快照仍完整保留。 */
@@ -44,7 +45,7 @@ public record ExpenseCategoryCatalog(String tenantId, long version, List<Categor
     private static void text(String value, int maximum) {
         if (StringUtils.isBlank(value) || value.length() > maximum || !value.equals(value.strip()) || value.chars().anyMatch(Character::isISOControl)) throw invalid();
     }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_CATEGORIES", "Expense category identities, names, units and revision must be valid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_CATEGORIES, "Expense category identities, names, units and revision must be valid"); }
 
     /**
      * 类别代码为稳定业务身份，名称用于展示，允许单位按配置顺序保留。

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -58,25 +59,25 @@ public class ExpenseSubmissionService {
     public Receipt submit(UUID id, Input input) {
         var actor = actors.actor(); reports.lock(actor.tenantId(), id);
         var report = reports.find(actor.tenantId(), id).filter(value -> value.employeeId().equals(actor.userId()))
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Expense report not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Expense report not found"));
         var application = applications.requireApplicant(report.applicationId());
         application.requireEditable(input.applicationVersion());
-        if (report.version() != input.financialVersion()) throw new DomainException("CONCURRENCY_CONFLICT", "Financial version changed");
+        if (report.version() != input.financialVersion()) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Financial version changed");
         var checked = prechecks.find(actor.tenantId(), input.precheckId()).filter(value -> value.input().reportId().equals(id))
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Expense precheck not found"));
-        if (checked.status() != ExpensePrecheckJob.Status.READY) throw new DomainException("PRECHECK_NOT_READY", "Expense precheck is not ready");
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Expense precheck not found"));
+        if (checked.status() != ExpensePrecheckJob.Status.READY) throw new DomainException(ErrorCode.PRECHECK_NOT_READY, "Expense precheck is not ready");
         var evidence = checked.result().evidence(); resources.lockReferences(actor.tenantId(), evidence.resources());
         policyConfiguration.lockForSubmission(actor.tenantId());
         validation.requireReady(checked, report, Instant.now());
         var definition = definitions.lockPublished(actor.tenantId(), application.processKey(), application.definitionVersion())
-                .orElseThrow(() -> new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published expense process not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.PROCESS_DEFINITION_NOT_FOUND, "Published expense process not found"));
         definition.requireStartEnabled();
         var stages = ExpenseProcessPolicy.requireSubmittable(definition.graph(), application.formSchema(), evidence.legalEntity().paperReceiptRequired());
         String budgetNode = ExpenseBudgetApprovalPolicy.require(definition.graph(), application.formSchema(), evidence.budget().exceptionPolicy()!=null);
         boolean hasProjects = report.content().lines().stream().flatMap(line -> line.allocations().stream()).anyMatch(allocation -> allocation.projectCode() != null);
         String projectNode = ExpenseProjectApprovalPolicy.require(definition.graph(), application.formSchema(), hasProjects);
         if (evidence.projectOwners() == null && (hasProjects || ExpenseFormContract.hasProjectControl(application.formSchema()))) {
-            throw new DomainException("EXPENSE_PROJECT_PRECHECK_REQUIRED", "Refresh the precheck to capture the original project owner evidence before submission");
+            throw new DomainException(ErrorCode.EXPENSE_PROJECT_PRECHECK_REQUIRED, "Refresh the precheck to capture the original project owner evidence before submission");
         }
         var loaded = resources.load(report); Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         var preview = evidence.preview();
@@ -85,7 +86,7 @@ public class ExpenseSubmissionService {
         var plan = new ExpenseSubmissionResources().plan(report, loaded, now);
         if (evidence.priorControls() == null ? plan.priorControls().stream().anyMatch(value -> value.source().control() != null)
                 : !evidence.priorControls().equals(plan.priorControls())) {
-            throw new DomainException("RESOURCES_CHANGED", "Prior control evidence changed after precheck");
+            throw new DomainException(ErrorCode.RESOURCES_CHANGED, "Prior control evidence changed after precheck");
         }
         boolean overTolerance = plan.priorControls().stream().anyMatch(ExpensePriorControlAssessment::requiresApproval);
         ExpensePriorApprovalPolicy.require(definition.graph(), application.formSchema(), overTolerance);
@@ -105,7 +106,7 @@ public class ExpenseSubmissionService {
         controls.create(control);
         var operation = budgets.reserve(actor.tenantId(), id, report.version(), checked.input().accountingDate(), checked.input().targetDigest(), now);
         budgetReviews.submitted(control, operation, evidence.budget().exceptionPolicy(), budgetNode);
-        if (!evidence.validUntil().isAfter(Instant.now())) throw new DomainException("FACTS_EXPIRED", "Expense precheck expired during submission");
+        if (!evidence.validUntil().isAfter(Instant.now())) throw new DomainException(ErrorCode.FACTS_EXPIRED, "Expense precheck expired during submission");
         journal.record(actor.tenantId(), id, io.agentflow.agent.ExpenseHandlingTask.Tool.SUBMISSION, application.id(), application.version(), "SUBMITTED",
                 application.version(), report.version(), input, java.time.Instant.now());
         return new Receipt(id, application.id(), application.version(), report.version(), application.roundNo(), operation.input().command().id());

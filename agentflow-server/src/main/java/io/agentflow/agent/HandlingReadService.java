@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.mapper.HandlingReadMapper;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -61,7 +62,7 @@ public class HandlingReadService {
             }
             var task = handling.requireReadable(reportId, taskId, input.expectedVersion());
             if (mapper.list(tenant, taskId.toString()).size() >= ExpenseHandlingTask.MAX_STEPS) {
-                throw new DomainException("AGENT_HANDLING_CLOSED", "Handling read budget exhausted");
+                throw new DomainException(ErrorCode.AGENT_HANDLING_CLOSED, "Handling read budget exhausted");
             }
             var created = HandlingReadExecution.start(id, digest, authorization, Instant.now());
             var original = new Original(taskId, input, task.state().applicationVersion(), task.state().financialVersion(), target(input.tool(), tenant));
@@ -91,7 +92,7 @@ public class HandlingReadService {
     public ExpenseHandlingService.ToolReceipt record(UUID reportId, Prepared prepared) {
         handling.authorize(reportId); var tenant = actors.actor().tenantId(); reports.lock(tenant, reportId);
         var execution = find(tenant, prepared.id());
-        if (execution == null) throw new DomainException("NOT_FOUND", "Handling read not found");
+        if (execution == null) throw new DomainException(ErrorCode.NOT_FOUND, "Handling read not found");
         if (execution.status() == HandlingReadExecution.Status.RECORDED) return json.read(execution.receiptJson(), ExpenseHandlingService.ToolReceipt.class);
         var receipt = handling.record(reportId, json.read(execution.preparedJson(), ExpenseHandlingService.Prepared.class));
         save(tenant, execution.recorded(json.write(receipt)), execution.version()); return receipt;
@@ -102,7 +103,7 @@ public class HandlingReadService {
         UUID id = identity(taskId, key);
         var original = transactions.execute(status -> input(actors.actor().tenantId(), id));
         if (original != null && (original.input().tool() != input.tool() || !java.util.Objects.equals(original.input().lineNo(), input.lineNo())
-                || !java.util.Objects.equals(original.input().referenceId(), input.referenceId()))) throw new DomainException("IDEMPOTENCY_CONFLICT", "Original agent tool changed");
+                || !java.util.Objects.equals(original.input().referenceId(), input.referenceId()))) throw new DomainException(ErrorCode.IDEMPOTENCY_CONFLICT, "Original agent tool changed");
         var prepared = prepareId(reportId, taskId, id, original == null ? input : original.input());
         return transactions.execute(status -> record(reportId, prepared));
     }
@@ -113,8 +114,8 @@ public class HandlingReadService {
         var original = transactions.execute(status -> {
             var state = find(actors.actor().tenantId(), readId);
             var value = input(actors.actor().tenantId(), readId);
-            if (state == null || value == null || !value.taskId().equals(taskId)) throw new DomainException("NOT_FOUND", "Handling read not found");
-            if (state.version() != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Handling read changed");
+            if (state == null || value == null || !value.taskId().equals(taskId)) throw new DomainException(ErrorCode.NOT_FOUND, "Handling read not found");
+            if (state.version() != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Handling read changed");
             return value;
         });
         return prepareId(reportId, taskId, readId, original.input());
@@ -139,7 +140,7 @@ public class HandlingReadService {
         var task = handling.requireReadable(reportId, taskId, null);
         if (!java.util.Objects.equals(original.targetDigest(), target(original.input().tool(), actors.actor().tenantId()))
                 || !taskId.equals(original.taskId()) || task.state().applicationVersion() != original.applicationVersion() || task.state().financialVersion() != original.financialVersion()) {
-            throw new DomainException("AGENT_INPUT_CHANGED", "Original read versions changed");
+            throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Original read versions changed");
         }
         return task;
     }
@@ -147,7 +148,7 @@ public class HandlingReadService {
         return tool == ExpenseHandlingService.ReadTool.POLICY ? finance.destination(tenant).map(value -> value.digest(tenant)).orElse(null) : null;
     }
     private void save(String tenant, HandlingReadExecution value, long previous) {
-        if (mapper.update(tenant, value.id().toString(), previous, value.version(), json.write(value)) != 1) throw new DomainException("CONCURRENCY_CONFLICT", "Handling read changed");
+        if (mapper.update(tenant, value.id().toString(), previous, value.version(), json.write(value)) != 1) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Handling read changed");
         append(tenant, value);
     }
     private void append(String tenant, HandlingReadExecution value) { mapper.append(tenant, value.id().toString(), value.version(), json.write(value)); }

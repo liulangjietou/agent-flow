@@ -52,7 +52,7 @@ import java.util.UUID;
         "agentflow.auth.demo-enabled=true", "agentflow.signatures.worker-enabled=false"})
 @AutoConfigureMockMvc
 class SignatureApiIntegrationTest {
-    private static final Path DIRECTORY = Path.of("/fyoung/tmp/agentflow-signature-api-" + UUID.randomUUID());
+    private static final Path DIRECTORY = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-signature-api-" + UUID.randomUUID());
     private static final java.security.KeyPair KEY = keyPair();
     private static final byte[] ORIGINAL = "合成原始合同".getBytes(StandardCharsets.UTF_8);
     private static final byte[] RESULT = "合成签署结果".getBytes(StandardCharsets.UTF_8);

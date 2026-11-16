@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Duration;
@@ -122,10 +123,10 @@ public record PaymentPayeeReview(Input input, long version, Status status, int a
     }
     private void requireRunning(Instant now) { requireTime(now); if (status != Status.RUNNING) throw conflict(); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_PAYEE_REVIEW", "Payee review must preserve original source and single-use account evidence"); }
-    private static DomainException conflict() { return new DomainException("PAYMENT_PAYEE_REVIEW_STATE_CONFLICT", "Payee review no longer allows this transition"); }
-    private static DomainException sourceChanged() { return new DomainException("PAYMENT_SOURCE_CHANGED", "A safely ended original authorization and current posted source are required"); }
-    private static DomainException unavailable() { return new DomainException("PAYMENT_PAYEE_REVIEW_UNAVAILABLE", "Fresh account review for the current finance actor is required"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_PAYEE_REVIEW, "Payee review must preserve original source and single-use account evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.PAYMENT_PAYEE_REVIEW_STATE_CONFLICT, "Payee review no longer allows this transition"); }
+    private static DomainException sourceChanged() { return new DomainException(ErrorCode.PAYMENT_SOURCE_CHANGED, "A safely ended original authorization and current posted source are required"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.PAYMENT_PAYEE_REVIEW_UNAVAILABLE, "Fresh account review for the current finance actor is required"); }
     /** 日志只保留复核标识和状态，不输出账户、金额或人员。 */
     @Override public String toString() { return "PaymentPayeeReview[id=" + input.id() + ", status=" + status + "]"; }
 

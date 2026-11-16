@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.AdvanceDisbursementReturn;
 import io.agentflow.expense.AdvanceRepayment;
@@ -101,8 +102,7 @@ public class JdbcFinanceReceiptCreditRepository {
                             funds.amount().value(),
                             funds.amount().currency());
             if (changed != 1)
-                throw new DomainException(
-                        "SUPPLIER_ADJUSTMENT_CREDIT_CHANGED",
+                throw new DomainException(ErrorCode.SUPPLIER_ADJUSTMENT_CREDIT_CHANGED,
                         "Supplier adjustment must account each original bank receipt once with its"
                                 + " first registration owner");
         }

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.common.DomainException;
@@ -46,7 +47,7 @@ public class ExpenseSettlementWorkspace {
         }
         return new View(reportId, app.id(), context.roundNo(), app.version(), context.businessVersion(), state, retry);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_QUERY", "Settlement query only accepts a positive roundNo"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_QUERY, "Settlement query only accepts a positive roundNo"); }
 
     /**
      * 零金额与全额冲销不是银行付款成功。

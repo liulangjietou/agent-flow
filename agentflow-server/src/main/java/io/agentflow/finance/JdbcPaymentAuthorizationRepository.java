@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -360,7 +361,7 @@ public class JdbcPaymentAuthorizationRepository {
                 json.write(value));
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Payment authorization terms or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Payment authorization terms or version changed"); }
 
     /**
      * 已由工作区入口解析的筛选值，不携带客户端 SQL 或当前账户目录。

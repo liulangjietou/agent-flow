@@ -1,7 +1,8 @@
+import { tmpdir } from 'node:os'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, resolve, relative } from 'node:path'
+import { dirname, resolve, relative, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import Ajv2020 from 'ajv/dist/2020.js'
 import addFormats from 'ajv-formats'
@@ -29,7 +30,7 @@ function validate(schema, value, context) {
   assert.ok(check(value), context + ': ' + JSON.stringify(check.errors))
 }
 
-const output = mkdtempSync('/fyoung/tmp/agentflow-split-contract-')
+const output = mkdtempSync(join(process.env.AGENTFLOW_TMP_DIR ?? tmpdir(), 'agentflow-split-contract-'))
 writeFileSync(resolve(output, 'package.json'), '{"type":"module"}\n')
 const compiled = new Map()
 function compile(name) {

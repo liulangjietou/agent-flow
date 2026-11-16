@@ -1,6 +1,7 @@
 package io.agentflow.agent;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.mapper.AssistExecutionServiceMapper;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.model.Application;
@@ -60,7 +61,7 @@ public class AssistExecutionService {
         String unavailable = null;
         try { configuration.requireAvailable(); } catch (DomainException failure) { unavailable = failure.code(); }
         return new InputOptions(application.version(), unavailable == null, unavailable,
-                unavailable == null ? configuration.getProviderId() : null, unavailable == null ? configuration.getModel() : null,
+                unavailable == null ? configuration.getProviderId() : null, unavailable == null ? configuration.modelFor(AssistConfiguration.PROMPT_VERSION) : null,
                 unavailable == null ? configuration.uri().getAuthority() : null,
                 unavailable == null ? configuration.targetDigest() : null, inputs.available(application, application.roundNo()));
     }
@@ -75,8 +76,7 @@ public class AssistExecutionService {
             List<String> sourceIds) {
         configuration.requireAvailable();
         if (!configuration.targetDigest().equals(targetDigest))
-            throw new DomainException(
-                    "AGENT_TARGET_CHANGED", "Refresh the model destination before selecting input");
+            throw new DomainException(ErrorCode.AGENT_TARGET_CHANGED, "Refresh the model destination before selecting input");
         lockApplication(actors.actor().tenantId(), applicationId);
         var application = applications.get(applicationId);
         requireVersion(application, expectedVersion);
@@ -85,8 +85,7 @@ public class AssistExecutionService {
         Integer active =
                 SqlRows.single(sqlMapper.queue(application.tenantId(), applicationId.toString()));
         if (active != null && active > 0)
-            throw new DomainException(
-                    "AGENT_RUN_ACTIVE", "An assist run is already active for this application");
+            throw new DomainException(ErrorCode.AGENT_RUN_ACTIVE, "An assist run is already active for this application");
         var run =
                 AssistRun.queue(
                         UUID.randomUUID(),
@@ -144,7 +143,7 @@ public class AssistExecutionService {
         run.start(run.version(), now); runs.update(run, run.version() - 1);
         try {
             configuration.requireAvailable();
-            if (!configuration.targetDigest().equals(job.targetDigest())) throw new DomainException("AGENT_TARGET_CHANGED", "Model target changed");
+            if (!configuration.targetDigest().equals(job.targetDigest())) throw new DomainException(ErrorCode.AGENT_TARGET_CHANGED, "Model target changed");
         } catch (DomainException unavailable) { finishFailure(run, AssistRun.Failure.MODEL_UNAVAILABLE, now); return null; }
         try {
             var application = applicationRepository.findById(tenant, run.input().applicationId()).orElseThrow(AssistExecutionService::notFound);
@@ -185,10 +184,10 @@ public class AssistExecutionService {
     private AssistRun requireRun(String tenant, UUID id) { return runs.find(tenant, id).orElseThrow(AssistExecutionService::notFound); }
 
     private static void requireVersion(Application application, long version) {
-        if (application.version() != version) throw new DomainException("AGENT_INPUT_CHANGED", "Application changed since the assist input was selected");
+        if (application.version() != version) throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Application changed since the assist input was selected");
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Assist context not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Assist context not found"); }
 
     private static Receipt receipt(AssistRun run) { return new Receipt(run.id(), run.status(), run.version()); }
 

@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpensePrecheckJob;
 import java.time.Instant;
@@ -48,5 +49,5 @@ public record PrecheckExplanationInput(UUID reportId, UUID applicationId, long a
 
     /** 解释的采纳截止时间由原检查决定，不能随生成或读取延长。 */
     public boolean currentAt(Instant at) { return !at.isBefore(checkedAt) && at.isBefore(validUntil); }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_INPUT", "Invalid precheck explanation input"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Invalid precheck explanation input"); }
 }

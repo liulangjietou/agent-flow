@@ -1,6 +1,7 @@
 package io.agentflow.auth;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.auth.mapper.DeferredActorAuthenticationMapper;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
@@ -54,8 +55,7 @@ public class DeferredActorAuthentication {
         LoginReference reference;
         if (oidc.enabled()) {
             if (sessions.getIfAvailable() == null)
-                throw new DomainException(
-                        "DEFERRED_AUTHENTICATION_UNAVAILABLE",
+                throw new DomainException(ErrorCode.DEFERRED_AUTHENTICATION_UNAVAILABLE,
                         "Deferred execution requires shared OIDC sessions");
             var session = request.getSession(false);
             if (session == null) throw unauthenticated();
@@ -118,7 +118,7 @@ public class DeferredActorAuthentication {
         }
     }
 
-    private static DomainException unauthenticated() { return new DomainException("UNAUTHENTICATED", "Original authenticated login is no longer available"); }
+    private static DomainException unauthenticated() { return new DomainException(ErrorCode.UNAUTHENTICATED, "Original authenticated login is no longer available"); }
 
     /**
      * 引用只能用于内部权限复核，不能恢复浏览器凭据，也不作为公开接口参数。

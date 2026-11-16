@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.PaymentObservation;
 import java.time.Instant;
@@ -35,7 +36,7 @@ public record SupplierPaymentDisputeResolution(UUID id, String tenantId, UUID pa
         return StringUtils.isBlank(value) || value.length() > maximum || !value.equals(value.trim()) || value.chars().anyMatch(Character::isISOControl);
     }
     private static DomainException invalid() {
-        return new DomainException("INVALID_SUPPLIER_PAYMENT_DISPUTE_RESOLUTION", "Supplier payment resolution requires original terminal evidence and an independent named finance reviewer");
+        return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYMENT_DISPUTE_RESOLUTION, "Supplier payment resolution requires original terminal evidence and an independent named finance reviewer");
     }
     /** 日志不展开对账凭据或自由文本。 */
     @Override public String toString() { return "SupplierPaymentDisputeResolution[id=" + id + ", paymentId=" + paymentId + "]"; }

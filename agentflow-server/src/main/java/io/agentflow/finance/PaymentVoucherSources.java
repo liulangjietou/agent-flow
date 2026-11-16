@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.AdvanceRequestRepository;
@@ -54,7 +55,7 @@ public class PaymentVoucherSources {
         if (authorization.execution() == null || !authorization.execution().command().equals(command)) throw changed();
         var voucher = vouchers.find(source.tenantId(), authorization.terms().voucherOperationId()).orElseThrow(PaymentVoucherSources::changed);
         if (!authorization.matchesVoucher(voucher, Instant.now())) {
-            throw new DomainException("PAYMENT_VOUCHER_ACCRUAL_UNCONFIRMED", "Original accrual voucher must remain confirmed before payment accounting");
+            throw new DomainException(ErrorCode.PAYMENT_VOUCHER_ACCRUAL_UNCONFIRMED, "Original accrual voucher must remain confirmed before payment accounting");
         }
         var application = applications.findById(source.tenantId(), source.applicationId()).orElseThrow(PaymentVoucherSources::changed);
         return VoucherSource.payment(application, command, original.observation(), legalTimeZone(source, authorization, voucher.input().command()));
@@ -94,6 +95,6 @@ public class PaymentVoucherSources {
                 && current.paidAmount().equals(original.paidAmount()) && current.accountDigest().equals(original.accountDigest())
                 && current.completedAt().equals(original.completedAt());
     }
-    private static DomainException changed() { return new DomainException("PAYMENT_VOUCHER_SOURCE_CHANGED", "Payment voucher must match its persisted original financial evidence"); }
-    private static DomainException unconfirmed() { return new DomainException("PAYMENT_VOUCHER_PAYMENT_UNCONFIRMED", "Original payment must have a current undisputed successful receipt"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.PAYMENT_VOUCHER_SOURCE_CHANGED, "Payment voucher must match its persisted original financial evidence"); }
+    private static DomainException unconfirmed() { return new DomainException(ErrorCode.PAYMENT_VOUCHER_PAYMENT_UNCONFIRMED, "Original payment must have a current undisputed successful receipt"); }
 }

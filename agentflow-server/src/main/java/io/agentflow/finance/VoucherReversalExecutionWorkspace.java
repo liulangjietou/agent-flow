@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -78,7 +79,7 @@ public class VoucherReversalExecutionWorkspace {
     private Observation observation(VoucherReversalObservation value) {
         return value == null ? null : new Observation(value.status(), value.revision(), value.observedAt(), value.acceptanceReference(), value.posting() == null ? null : value.posting().reversal(), value.rejection() == null ? null : value.rejection().name());
     }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_REVERSAL_QUERY", "Only a positive roundNo is accepted for reversal execution status"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_REVERSAL_QUERY, "Only a positive roundNo is accepted for reversal execution status"); }
     /**
      * 原件是否停用与 ERP 原状态分别展示，避免过账标签被误当成仍可继续付款。
      * @author owlzhangfq@gmail.com

@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionModels.Graph;
 import io.agentflow.definition.DefinitionModels.NodeType;
@@ -45,11 +46,11 @@ public class FormAssigneeBindings {
     public OrganizationAssigneeResolver.Selection requireActive(String tenantId, Snapshot snapshot, String nodeId, String rule) {
         var selected = snapshot.nodes().get(nodeId);
         if (selected == null || !selected.rule().equals(rule) || selected.subjects().isEmpty()) {
-            throw new DomainException("FORM_ASSIGNEE_SNAPSHOT_MISSING", "The current round has no matching frozen form assignee selection");
+            throw new DomainException(ErrorCode.FORM_ASSIGNEE_SNAPSHOT_MISSING, "The current round has no matching frozen form assignee selection");
         }
         repository.lock(tenantId);
         if (selected.subjects().stream().anyMatch(subject -> !directory.eligible(tenantId, subject))) {
-            throw new DomainException("FORM_ASSIGNEE_UNAVAILABLE", "A frozen form approver is no longer eligible");
+            throw new DomainException(ErrorCode.FORM_ASSIGNEE_UNAVAILABLE, "A frozen form approver is no longer eligible");
         }
         return selected;
     }
@@ -59,7 +60,7 @@ public class FormAssigneeBindings {
             try { return UUID.fromString(text); }
             catch (IllegalArgumentException invalid) { /* 统一返回字段来源缺失，不把非法值传给目录。 */ }
         }
-        throw new DomainException("FORM_ASSIGNEE_VALUE_REQUIRED", "Select the declared organization value before submitting");
+        throw new DomainException(ErrorCode.FORM_ASSIGNEE_VALUE_REQUIRED, "Select the declared organization value before submitting");
     }
 
     /**

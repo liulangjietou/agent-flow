@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
@@ -58,11 +60,11 @@ public class AdvanceRepaymentReviewService {
         var actor = actors.actor(); var source = sources.locked(actor.tenantId(), advanceId); authorize(advanceId, repaymentId);
         if (source.advance().version() != input.advanceVersion()) throw conflict();
         var latest = checks.latest(actor.tenantId(), repaymentId, actor.userId()).orElse(null);
-        if (latest != null && latest.active()) throw new DomainException("REPAYMENT_REVIEW_PENDING", "The current finance actor already has a pending repayment review");
+        if (latest != null && latest.active()) throw new DomainException(ErrorCode.REPAYMENT_REVIEW_PENDING, "The current finance actor already has a pending repayment review");
         var now = time(Instant.now()); var check = AdvanceRepaymentReviewCheck.queue(new AdvanceRepaymentReviewCheck.Input(UUID.randomUUID(), actor.tenantId(),
                 source.authorization().terms().targetDigest(), request(source, repaymentId), actor.userId(), now));
         checks.create(check);
-        var event = audit.record(source.authorization(), check.input().id(), check.version(), "FINANCE", "ADVANCE_REPAYMENT_REVIEW_QUERY", null, check.status().name(), input.comment(), now);
+        var event = audit.record(source.authorization(), check.input().id(), check.version(), SystemRole.FINANCE.name(), "ADVANCE_REPAYMENT_REVIEW_QUERY", null, check.status().name(), input.comment(), now);
         return new ActionReceipt(advanceId, repaymentId, check.input().id(), check.version(), null, source.advance().version(), event);
     }
     /** 精确展示版本、最新外部证据和独立财务决定同时成立才调整，任一步失败全部回滚。 */
@@ -75,12 +77,12 @@ public class AdvanceRepaymentReviewService {
                 || !checks.latest(actor.tenantId(), repaymentId, actor.userId()).map(value -> value.input().id().equals(check.input().id())).orElse(false)) throw conflict();
         requireCheck(check, source); var now = time(Instant.now()); var issue = confirmationIssue(source, check, now);
         if (issue != null) throw new DomainException(issue, "Repayment resolution requires fresh consistent original evidence and an independent decision");
-        if (input.outcome() != check.receipt().status()) throw new DomainException("REPAYMENT_REVIEW_OUTCOME_CHANGED", "Decision must match the displayed external outcome");
+        if (input.outcome() != check.receipt().status()) throw new DomainException(ErrorCode.REPAYMENT_REVIEW_OUTCOME_CHANGED, "Decision must match the displayed external outcome");
         var decision = new AdvanceRepaymentResolution(UUID.randomUUID(), actor.tenantId(), check.input().id(), check.receipt(), actor.userId(), now, input.evidenceReference(), input.comment());
         var advance = source.advance(); long version = advance.version(); advance.resolveRepaymentReview(version, decision);
         balances.update(advance, version, actor.userId(), "REPAYMENT_REVIEW_RESOLVED"); var resolved = check.resolve(decision, now); checks.update(resolved); decisions.create(decision, advance);
         events.publishEvent(new AdvanceRepaymentReviewChanged(resolved));
-        var event = audit.record(source.authorization(), decision.id(), advance.version(), "FINANCE", "ADVANCE_REPAYMENT_REVIEW_RESOLVE", check.status().name(), resolved.status().name(), input.comment(), now);
+        var event = audit.record(source.authorization(), decision.id(), advance.version(), SystemRole.FINANCE.name(), "ADVANCE_REPAYMENT_REVIEW_RESOLVE", check.status().name(), resolved.status().name(), input.comment(), now);
         return new ActionReceipt(advanceId, repaymentId, check.input().id(), resolved.version(), decision.id(), advance.version(), event);
     }
     /** 页面与写入共享守卫，其他财务的新观察会使旧决定失效。 */
@@ -152,8 +154,8 @@ public class AdvanceRepaymentReviewService {
     private void persistCheck(AdvanceRepaymentReviewCheck value) {
         checks.update(value); events.publishEvent(new AdvanceRepaymentReviewChanged(value));
     }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed advance balance or repayment review changed"); }
-    private static DomainException changed() { return new DomainException("ADVANCE_REPAYMENT_SOURCE_CHANGED", "Original repayment is unavailable in the current advance scope"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed advance balance or repayment review changed"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.ADVANCE_REPAYMENT_SOURCE_CHANGED, "Original repayment is unavailable in the current advance scope"); }
     /**
      * 页面只提交当前余额版本，原还款身份与金额来自已入账原件。
      * @author owlzhangfq@gmail.com

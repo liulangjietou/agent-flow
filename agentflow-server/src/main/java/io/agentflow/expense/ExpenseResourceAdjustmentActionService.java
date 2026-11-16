@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
@@ -50,7 +51,7 @@ public class ExpenseResourceAdjustmentActionService {
         switch (input.action()) {
             case QUERY -> budgetExecution.query(actor.tenantId(), before.id(), budget.version(), now);
             case RESEND_ORIGINAL -> {
-                if (!budget.input().command().authorizedBy().equals(actor.userId())) throw new DomainException("FORBIDDEN", "Only the original finance authorizer can resend the original budget command");
+                if (!budget.input().command().authorizedBy().equals(actor.userId())) throw new DomainException(ErrorCode.FORBIDDEN, "Only the original finance authorizer can resend the original budget command");
                 budgetExecution.resend(actor.tenantId(), before.id(), budget.version(), now);
             }
             case RETRY_RESOURCES -> {
@@ -118,7 +119,7 @@ public class ExpenseResourceAdjustmentActionService {
                 value.status(), budget.status(), value.resourcesReversed(), event);
     }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed expense adjustment or budget operation changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed expense adjustment or budget operation changed"); }
     /**
      * 查询、明确重发与本地恢复分别表达意图，不提供换编号自动重试。
      * @author owlzhangfq@gmail.com

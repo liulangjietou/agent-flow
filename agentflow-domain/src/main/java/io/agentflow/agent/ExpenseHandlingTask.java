@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -74,13 +75,13 @@ public final class ExpenseHandlingTask {
     /** 只结束办理记录，不取消已获授权的子任务，不产生批准或付款事实。 */
     public void close(long expectedVersion, Instant now) {
         requireVersion(expectedVersion);
-        if (!active()) throw new DomainException("AGENT_HANDLING_CLOSED", "Expense handling record is already closed");
+        if (!active()) throw new DomainException(ErrorCode.AGENT_HANDLING_CLOSED, "Expense handling record is already closed");
         state = new State(state.version() + 1, Status.CLOSED, state.applicationVersion(), state.financialVersion(), state.steps(), now);
     }
 
     /** 用户命令绑定当前办理版本，后台步骤推进后需要重新读取。 */
     public void requireVersion(long version) {
-        if (state.version() != version) throw new DomainException("CONCURRENCY_CONFLICT", "Expense handling record changed");
+        if (state.version() != version) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense handling record changed");
     }
     public boolean active() { return state.status() != Status.CLOSED && state.status() != Status.SUBMITTED && state.status() != Status.LIMIT_REACHED; }
     public Context context() { return context; }

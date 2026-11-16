@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpensePriorControlRepositoryMapper;
@@ -53,8 +54,7 @@ public class JdbcExpensePriorControlRepository {
                         snapshot.definitionId().toString(),
                         snapshot.definitionVersion());
         if (inserted != 1)
-            throw new DomainException(
-                    "CONCURRENCY_CONFLICT",
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT,
                     "Prior control preparation requires the original editable submission");
         var finalStates = new HashMap<UUID, ExpenseRequest.State>();
         plan.requests().forEach(change -> finalStates.put(change.after().id(), change.after()));
@@ -94,8 +94,7 @@ public class JdbcExpensePriorControlRepository {
         return find(report.tenantId(), report.id(), report.currentRound().roundNo())
                 .orElseThrow(
                         () ->
-                                new DomainException(
-                                        "EXPENSE_PRIOR_CONTROL_MISSING",
+                                new DomainException(ErrorCode.EXPENSE_PRIOR_CONTROL_MISSING,
                                         "Original prior control evidence is required for this"
                                             + " expense round"))
                 .requiresApproval();

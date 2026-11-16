@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.ArrayDeque;
 import java.util.HashSet;
@@ -61,6 +62,6 @@ public record ApprovalResponsibilityPolicy(boolean excludeApplicant, List<String
     }
 
     private static DomainException invalid() {
-        return new DomainException("APPROVAL_RESPONSIBILITY_INVALID", "Approval responsibility policy is invalid");
+        return new DomainException(ErrorCode.APPROVAL_RESPONSIBILITY_INVALID, "Approval responsibility policy is invalid");
     }
 }

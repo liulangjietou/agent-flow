@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import org.springframework.context.ApplicationEventPublisher;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
@@ -80,7 +81,7 @@ public class ExpensePartialAdjustmentDisputes {
             return null;
         } catch (DomainException unavailable) { return unavailable.code(); }
     }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed partial adjustment, original settlement or selected dispute outcome changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed partial adjustment, original settlement or selected dispute outcome changed"); }
 
     /**
      * 页面明确选择已显示的侧和终态，候选、身份与财务原件只能从实际记录恢复。

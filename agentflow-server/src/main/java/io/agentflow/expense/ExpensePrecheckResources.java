@@ -1,6 +1,7 @@
 package io.agentflow.expense;
 
 
+import io.agentflow.common.ErrorCode;
 import static io.agentflow.expense.ExpensePrecheckEvidence.ResourceKind;
 import static io.agentflow.expense.ExpensePrecheckEvidence.ResourceVersion;
 
@@ -90,7 +91,7 @@ public class ExpensePrecheckResources {
                 || invoiceValues.values().stream().anyMatch(value -> !value.ownerId().equals(report.employeeId()))
                 || requestValues.values().stream().anyMatch(value -> !value.employeeId().equals(report.employeeId()))
                 || advanceValues.values().stream().anyMatch(value -> !value.employeeId().equals(report.employeeId()))) {
-            throw new DomainException("EXPENSE_RESOURCE_UNAVAILABLE", "Referenced financial resources are unavailable to this employee");
+            throw new DomainException(ErrorCode.EXPENSE_RESOURCE_UNAVAILABLE, "Referenced financial resources are unavailable to this employee");
         }
         return new ExpenseSubmissionResources.Resources(invoiceValues.values().stream().collect(Collectors.toUnmodifiableMap(Invoice::id, Invoice::state)),
                 requestValues.values().stream().collect(Collectors.toUnmodifiableMap(ExpenseRequest::id, ExpenseRequest::state)),
@@ -134,8 +135,7 @@ public class ExpensePrecheckResources {
                                 value.invoiceId() == null
                                         || !wanted.get(value.key()).equals(value.invoiceId())
                                                 && !released.contains(value.invoiceId()))) {
-            throw new DomainException(
-                    "INVOICE_OCCUPIED",
+            throw new DomainException(ErrorCode.INVOICE_OCCUPIED,
                     "A canonical invoice has another active or consumed occupation");
         }
     }
@@ -180,7 +180,7 @@ public class ExpensePrecheckResources {
         } catch (DomainException changed) { return changed; }
     }
 
-    private static DomainException changed() { return new DomainException("RESOURCES_CHANGED", "Expense precheck must be refreshed before submission"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.RESOURCES_CHANGED, "Expense precheck must be refreshed before submission"); }
 
     private static void collect(ExpenseContent content, Set<UUID> invoices, Set<UUID> requests) {
         for (var line : content.lines()) {

@@ -1,5 +1,6 @@
 package io.agentflow.form;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
@@ -101,5 +102,5 @@ public class FormSchemaJsonDeserializer extends JsonDeserializer<FormSchema> {
         return value.textValue();
     }
 
-    private DomainException invalid() { return new DomainException("INVALID_FORM_SCHEMA", "Form schema JSON has an invalid structure or field type"); }
+    private DomainException invalid() { return new DomainException(ErrorCode.INVALID_FORM_SCHEMA, "Form schema JSON has an invalid structure or field type"); }
 }

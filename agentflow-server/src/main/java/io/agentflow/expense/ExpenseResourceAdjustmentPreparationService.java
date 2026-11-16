@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
@@ -54,7 +55,7 @@ public class ExpenseResourceAdjustmentPreparationService {
         var context = access.locked(report, input.roundNo()); access.requireVersions(context, input.roundNo(), input.applicationVersion(), input.businessVersion());
         var actor = actors.actor(); var basis = sources.find(actor.tenantId(), report); requireSettlement(basis, input.settlementVersion()); requireNoActive(basis);
         var latest = preparations.latest(actor.tenantId(), report, actor.userId()).orElse(null);
-        if (latest != null && latest.active()) throw new DomainException("EXPENSE_ADJUSTMENT_PREPARATION_PENDING", "Current finance actor already has a pending adjustment preparation");
+        if (latest != null && latest.active()) throw new DomainException(ErrorCode.EXPENSE_ADJUSTMENT_PREPARATION_PENDING, "Current finance actor already has a pending adjustment preparation");
         var now = time(Instant.now()); var value = ExpenseResourceAdjustmentPreparation.queue(new ExpenseResourceAdjustmentPreparation.Input(UUID.randomUUID(), basis,
                 input.accountingDate(), actor.userId(), input.evidenceReference(), input.reason(), now));
         preparations.create(value); var event = audit.record(basis, value.input().id(), value.version(), "EXPENSE_ADJUSTMENT_PREPARE", input.reason(), now);
@@ -117,7 +118,7 @@ public class ExpenseResourceAdjustmentPreparationService {
         try { requireAvailable(value); return true; } catch (DomainException changed) { persist(value.voidSource(at)); return false; }
     }
     private void requireNoActive(ExpenseResourceAdjustmentBasis basis) {
-        if (adjustments.active(basis.tenantId(), basis.reportId()).isPresent()) throw new DomainException("EXPENSE_ADJUSTMENT_EXISTS", "Original expense already has an active adjustment");
+        if (adjustments.active(basis.tenantId(), basis.reportId()).isPresent()) throw new DomainException(ErrorCode.EXPENSE_ADJUSTMENT_EXISTS, "Original expense already has an active adjustment");
     }
     private ExpenseResourceAdjustmentPreparation lockedCurrent(ExpenseResourceAdjustmentPreparation claimed) {
         var basis = claimed.input().basis(); reports.lock(basis.tenantId(), basis.reportId());
@@ -134,7 +135,7 @@ public class ExpenseResourceAdjustmentPreparationService {
                 adjustment == null ? null : adjustment.version(), budget == null ? null : budget.version(), event);
     }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed expense source or adjustment preparation changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed expense source or adjustment preparation changed"); }
 
     /**
      * 准备不接受金额或资源列表，服务端固定原报销事实。

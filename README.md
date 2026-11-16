@@ -472,14 +472,14 @@ sequenceDiagram
 | --- | --- | --- |
 | 业务事实 | MyBatis Mapper/XML，本地开发默认 PostgreSQL | 申请、财务聚合、轮次和修订以租户及来源约束关联 |
 | 工作流运行 | 同数据源 Flowable 表 | 与申请/轮次的本地事务共同提交，不将引擎状态等同于财务终态 |
-| 结构迁移 | Flyway，当前源码最高业务迁移 `V133` | 生产用维护命令迁移；服务启动校验已迁移结构 |
+| 结构迁移 | Flyway，当前源码最高业务迁移 `V134` | 生产用维护命令迁移；服务启动校验已迁移结构 |
 | 持久后台任务 | 数据库任务、租约、执行状态和回执修订，经 MyBatis 访问 | 副本竞争原任务；网络请求在事务外 |
 | 外发与事件 | 通知/Webhook outbox，可信事件 inbox | 持久去重、最小外发、签名、租约与结果恢复 |
 | 企业会话 | 可选 Spring Session JDBC | 多实例 OIDC 需要统一共享会话配置，支持跨实例回调及注销 |
 | 原件 | 可选单机私有持久目录与数据库元数据 | 同主机副本共用同一物理目录；跨主机独立目录不支持当前附件方案 |
 | 可观测性 | Actuator 健康，可选专用凭证 Prometheus 入口 | 不暴露表单正文；企业容量目标、阈值和告警接收链另行验收 |
 
-当前实现使用关系数据库队列和原件目录；部署图按已有 Compose 及维护命令组织。V129–V133 分别引入补正、模型用量、办理记录、持久查询和 Agent 自动编排。迁移包含 SQL 与 Java 两类，不能仅按 SQL 文件编号判断是否缺失。
+当前实现使用关系数据库队列和原件目录；部署图按已有 Compose 及维护命令组织。V129–V134 分别引入补正、模型用量、办理记录、持久查询、Agent 自动编排和幂等记录到期索引（过期记录保留键与摘要作墓碑，只分批清除响应正文）。迁移包含 SQL 与 Java 两类，不能仅按 SQL 文件编号判断是否缺失。
 
 ```mermaid
 flowchart TB
@@ -602,6 +602,8 @@ npm run dev -- --host 127.0.0.1
 
 打开 `http://127.0.0.1:5173`。Vite 将 `/api` 代理到 `http://127.0.0.1:8080` 并保持同源 Host。`npm run preview` 使用 `4173`，不替代开发服务器。访问主机或端口变更时，同步更新后端 `AGENTFLOW_WEB_ORIGIN`。直接调用另一后端时，`VITE_API_BASE` 必须包含完整 `/api/v1` 前缀，并在前端启动/构建前设置。
 
+工作区页面使用 History 路由，每个菜单页对应一个路径（如 `/workbench`、`/cashier`），支持深链接、刷新和浏览器前进后退；未登录访问深链接会在登录后回到原页面，未知路径回到 `/workbench`。Vite 开发/预览服务器与 `deploy/nginx.conf`、`deploy/production/nginx.conf` 都把非资源路径回退到 `index.html`，自定义反向代理时需保持同样回退。
+
 后端就绪与身份模式可直接核对：
 
 ```bash
@@ -646,8 +648,16 @@ curl --fail http://127.0.0.1:8080/api/v1/auth/options
 | `AGENTFLOW_ATTACHMENT_DIRECTORY` | 空，文件能力关闭 | 私有持久原件目录 |
 | `AGENTFLOW_FINANCE_GATEWAY_ENABLED` | `false` | 财务端口总开关；还需租户配置 |
 | `AGENTFLOW_JDBC_SESSIONS` | `false` | 企业共享会话，后台原登录恢复所需 |
+| `agentflow.web.max-request-body-bytes` | `8388608` | 非上传请求体上限，超出返回 `413 REQUEST_BODY_TOO_LARGE` |
+| `agentflow.auth.demo-token-ttl` | `PT12H` | 演示令牌有效期，过期令牌在认证时拒绝并清除 |
+| `agentflow.idempotency.purge-enabled` / `purge-delay-ms` | `true` / `3600000` | 过期幂等响应正文的分批清理开关与间隔 |
+| `agentflow.assist.max-completion-tokens` | `4096` | 单次模型输出上限（1–32768） |
+| `agentflow.assist.invalid-output-repair-attempts` | `1` | 输出不符合协议时的修复重试次数（0–3）；传输失败不重试 |
+| `agentflow.assist.purposes.<用途>.model` / `.max-completion-tokens` | 空 | 按用途覆盖模型与输出上限，用途为提示词版本去掉 `-vN` 后缀，覆盖值计入目标指纹 |
 
 启用模型前配置完整端点、模型和凭据，并在界面预览实际发送范围。生产使用 HTTPS；回环 HTTP 仅用于本地夹具。`compose.assist.yml` 与生产 Compose 合用，从密钥文件注入凭据；附件覆盖文件可与演示或生产 Compose 合用，挂载目录必须事先存在。详细示例见[受控模型配置](docs/agent-execution.md)、[原件配置](docs/field-attachments.md)和[生产环境示例](deploy/production/production.env.example)。
+
+模型返回 429 时在单次超时预算内按 `Retry-After`（仅整数秒，上限 10 秒）最多重试 3 次；同一次执行内多轮调用的用量合计记录，任一轮未上报则合计为未上报。
 
 后台调度有三组开关：`agentflow.assist.worker-enabled` 统一控制摘要、普通草稿、预检解释、费用草稿和风险提示的五个独立轮询；`agentflow.invoices.extraction-worker-enabled` 控制票据抽取；`agentflow.expense-agent.worker-enabled` 控制独立的报销自动循环。模型类调度还要求模型总开关开启。停止领取不会删除已有运行记录，详见 [AssistScheduling](agentflow-server/src/main/java/io/agentflow/agent/AssistScheduling.java) 和 [ExpenseAgentScheduling](agentflow-server/src/main/java/io/agentflow/agent/ExpenseAgentScheduling.java)。
 
@@ -666,22 +676,24 @@ curl --fail http://127.0.0.1:8080/api/v1/auth/options
 
 ### 构建与全量门禁
 
-在仓库根目录、JDK 17 环境下执行。测试临时文件统一放在 `/fyoung/tmp`：
+在仓库根目录、JDK 17 环境下执行。Java 测试临时文件跟随 `java.io.tmpdir`，前端与 Python 测试脚本读取 `AGENTFLOW_TMP_DIR`（未设置时用系统临时目录）；下面以 `/fyoung/tmp` 为例：
 
 ```bash
 mkdir -p /fyoung/tmp
 export JAVA_TOOL_OPTIONS="-Dspring.test.context.cache.maxSize=4 -Djava.io.tmpdir=/fyoung/tmp"
+export AGENTFLOW_TMP_DIR=/fyoung/tmp
 "$JAVA_HOME/bin/java" scripts/CheckAuthors.java .
 mvn -B -ntp verify
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
 
 cd agentflow-web
 npm ci
+npm run lint
 npm run test:requests
 npm run build
 ```
 
-`test:requests` 包含前端请求/状态测试及 OpenAPI 校验；`build` 先执行 Vue/TypeScript 类型检查，再生成生产资源。Java 作者检查覆盖全部命名类型与语法，包括内部类、record 和测试；Javadoc 必须包含 `@author owlzhangfq@gmail.com`。
+`mvn verify` 在 `validate` 阶段执行 Spotless 空白检查（行尾空白、文件末换行、Tab 缩进），不重排已有代码；违规时运行 `mvn spotless:apply` 修正。`verify` 同时生成 JaCoCo 覆盖率报告（`agentflow-server/target/site/jacoco`），不设阈值。`lint` 为 ESLint 检查；`test:requests` 包含前端请求/状态测试及 OpenAPI 校验；`build` 先执行 Vue/TypeScript 类型检查，再生成生产资源。Java 作者检查覆盖全部命名类型与语法，包括内部类、record 和测试；Javadoc 必须包含 `@author owlzhangfq@gmail.com`。
 
 GitHub Actions 还执行 PostgreSQL 迁移与共享会话、组织/字段/财务边界测试、维护脚本保护、四组生产 Compose 配置、监控规则及告警行为、代理故障与一次性认证回调检查。接口契约以实际路由和公开 DTO 对照，详见 [OpenAPI](docs/openapi-reference.md)。
 

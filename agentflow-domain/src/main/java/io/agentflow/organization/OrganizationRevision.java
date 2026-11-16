@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 
 /**
@@ -9,6 +10,6 @@ import io.agentflow.common.DomainException;
 final class OrganizationRevision {
     private OrganizationRevision() { }
     static void require(long actual, long expected) {
-        if (actual != expected) throw new DomainException("CONCURRENCY_CONFLICT", "Organization record revision has changed");
+        if (actual != expected) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Organization record revision has changed");
     }
 }

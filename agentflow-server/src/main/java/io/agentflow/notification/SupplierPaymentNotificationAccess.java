@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.PaymentPersonnel;
@@ -127,7 +128,7 @@ public class SupplierPaymentNotificationAccess {
         return new Context(authorization, request);
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Supplier payment notification is unavailable in the current scope"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Supplier payment notification is unavailable in the current scope"); }
 
     /**
      * 原事件定位只在服务内使用，完整采购、账户和指令留在受控存储。

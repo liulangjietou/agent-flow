@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 
@@ -33,7 +34,7 @@ public record OrganizationSyncKey(Kind kind, String externalId) {
         if (value == null ? !optional : value.kind() != kind) throw invalid();
     }
 
-    static DomainException invalid() { return new DomainException("INVALID_ORGANIZATION_SYNC_DATA", "Organization synchronization data is invalid"); }
+    static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ORGANIZATION_SYNC_DATA, "Organization synchronization data is invalid"); }
 
     /**
      * 引用类型必须来自固定目录，不接受认证角色、账号密码或任意业务对象。

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.observability.DiagnosticContext;
 
 import io.agentflow.common.DomainException;
@@ -101,7 +102,7 @@ public class ExpensePartialAdjustmentWorker {
                     resources.apply(candidate);
                 }
                 catch (DomainException changed) {
-                    try { if (!"CONCURRENCY_CONFLICT".equals(changed.code())) resources.block(candidate, changed.code()); }
+                    try { if (!changed.is(ErrorCode.CONCURRENCY_CONFLICT)) resources.block(candidate, changed.code()); }
                     catch (RuntimeException failed) { log("PARTIAL_RESOURCE_BLOCK_FAILURE", candidate.id(), failed); }
                 } catch (RuntimeException failed) { log("PARTIAL_RESOURCE_FAILURE", candidate.id(), failed); }
             }

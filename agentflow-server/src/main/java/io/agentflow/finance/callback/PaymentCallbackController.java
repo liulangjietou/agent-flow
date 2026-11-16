@@ -1,5 +1,7 @@
 package io.agentflow.finance.callback;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.CurrentActor;
@@ -49,7 +51,7 @@ public class PaymentCallbackController {
     /** 管理员只能查看最小运行元数据，读取权限不包含付款金额和账户快照。 */
     @GetMapping
     public ResponseEntity<Page> list(@RequestParam Map<String, String> raw) {
-        var actor = currentActor.actor(); actor.requireRole("ADMIN");
+        var actor = currentActor.actor(); actor.requireRole(SystemRole.ADMIN);
         if (!Set.of("limit", "beforeId").containsAll(raw.keySet())) throw invalidQuery();
         int limit = 25; UUID before = null;
         try {
@@ -67,19 +69,19 @@ public class PaymentCallbackController {
     /** 回调及最多五十次处理历史均按当前租户隔离。 */
     @GetMapping("/{id}")
     public ResponseEntity<Detail> detail(@PathVariable UUID id) {
-        var actor = currentActor.actor(); actor.requireRole("ADMIN");
+        var actor = currentActor.actor(); actor.requireRole(SystemRole.ADMIN);
         var current = callbacks.get(actor.tenantId(), id);
         return noStore(new Detail(View.of(current), callbacks.history(actor.tenantId(), id).stream().map(View::of).toList()));
     }
     /** 重试要求明确原因和期望版本，重复点击仍回放同一操作结果。 */
     @PostMapping("/{id}/retry")
     public ResponseEntity<String> retry(@PathVariable UUID id, @Valid @RequestBody RetryInput input, HttpServletRequest request) {
-        var actor = currentActor.actor(); actor.requireRole("ADMIN");
+        var actor = currentActor.actor(); actor.requireRole(SystemRole.ADMIN);
         var response = idempotency.execute(request, HttpStatus.OK,
                 () -> View.of(service.retry(actor, id, input.expectedVersion(), input.reason(), Instant.now())));
         return ResponseEntity.status(response.getStatusCode()).headers(response.getHeaders()).header("Cache-Control", "no-store").body(response.getBody());
     }
-    private static DomainException invalidQuery() { return new DomainException("PAYMENT_CALLBACK_INVALID", "Invalid payment callback query"); }
+    private static DomainException invalidQuery() { return new DomainException(ErrorCode.PAYMENT_CALLBACK_INVALID, "Invalid payment callback query"); }
     private static <T> ResponseEntity<T> noStore(T value) { return ResponseEntity.ok().header("Cache-Control", "no-store").body(value); }
 
     /**

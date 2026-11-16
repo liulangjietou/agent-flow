@@ -1,6 +1,7 @@
 package io.agentflow.attachment;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.attachment.mapper.AttachmentRepositoryMapper;
 import io.agentflow.common.DomainException;
 import io.agentflow.mybatis.SqlRows;
@@ -28,7 +29,7 @@ public class JdbcAttachmentRepository {
     /** 与申请状态写入共用行锁，避免上传完成和提交在不同状态下交叉通过。 */
     public void lockApplication(String tenant, UUID application) {
         if (SqlRows.maps(sqlMapper.lockApplication(tenant, application.toString())).isEmpty()) {
-            throw new DomainException("NOT_FOUND", "Application not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Application not found");
         }
     }
 
@@ -38,8 +39,7 @@ public class JdbcAttachmentRepository {
         var totals = SqlRows.single(sqlMapper.requireCapacity(tenant, application.toString()));
         if (((Number) totals.get("uploads")).longValue() >= maxUploads
                 || ((Number) totals.get("bytes")).longValue() > maxBytes - size) {
-            throw new DomainException(
-                    "ATTACHMENT_QUOTA_EXCEEDED", "Application attachment storage limit reached");
+            throw new DomainException(ErrorCode.ATTACHMENT_QUOTA_EXCEEDED, "Application attachment storage limit reached");
         }
     }
 
@@ -81,7 +81,7 @@ public class JdbcAttachmentRepository {
                                                 : UUID.fromString(row.getString("content_id"))))
                 .stream()
                 .findFirst()
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Attachment not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Attachment not found"));
     }
 
     /** 完成后不可降级；并发失败不能覆盖另一次成功上传。 */

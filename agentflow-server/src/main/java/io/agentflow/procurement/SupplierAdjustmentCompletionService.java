@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.JdbcFinanceReceiptCreditRepository;
 import java.time.Instant;
@@ -56,5 +57,5 @@ public class SupplierAdjustmentCompletionService {
         return proof;
     }
 
-    private static DomainException changed() { return new DomainException("SUPPLIER_ADJUSTMENT_COMPLETION_CHANGED", "Current supplier adjustment or previously known bank evidence changed before local accounting"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.SUPPLIER_ADJUSTMENT_COMPLETION_CHANGED, "Current supplier adjustment or previously known bank evidence changed before local accounting"); }
 }

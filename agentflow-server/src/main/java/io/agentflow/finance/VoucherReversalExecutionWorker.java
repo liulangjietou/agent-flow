@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.observability.DiagnosticContext;
 
 import io.agentflow.common.DomainException;
@@ -70,7 +71,7 @@ public class VoucherReversalExecutionWorker {
                         var input = claimed.input(); var result = claimed.status() == VoucherReversalOperation.Status.POSTING ? port.post(input.targetDigest(), input.command()) : port.query(input.targetDigest(), input.command());
                         execution.finish(claimed, result, Instant.now());
                     } catch (RuntimeException failed) {
-                        var reason = failed instanceof DomainException domain && "VOUCHER_REVERSAL_EVIDENCE_EXPIRED".equals(domain.code())
+                        var reason = failed instanceof DomainException domain && domain.is(ErrorCode.VOUCHER_REVERSAL_EVIDENCE_EXPIRED)
                                 ? VoucherReversalOperation.Failure.EVIDENCE_EXPIRED : VoucherReversalOperation.Failure.INTERNAL_ERROR;
                         execution.fail(claimed, reason, Instant.now()); LOG.error("Reversal dispatch failed, errorCode={}, reversalId={}", reason, candidate.id());
                     }

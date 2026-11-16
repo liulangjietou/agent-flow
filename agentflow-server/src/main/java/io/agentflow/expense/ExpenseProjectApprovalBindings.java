@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.service.ProcessRuntimePort.StartProcessCommand;
 import io.agentflow.approval.service.TaskRecipientDirectory;
 import io.agentflow.common.DomainException;
@@ -36,7 +37,7 @@ public class ExpenseProjectApprovalBindings {
                 || !nodeId.equals(ExpenseProjectApprovalPolicy.require(definition.graph(), command.formSchema(), source.hasProjects()))) throw missing();
         var subjects = source.owners().subjects();
         if (subjects.stream().anyMatch(subject -> !directory.eligible(command.tenantId(), subject))) {
-            throw new DomainException("EXPENSE_PROJECT_OWNER_UNAVAILABLE", "Every original project owner must be currently eligible to approve");
+            throw new DomainException(ErrorCode.EXPENSE_PROJECT_OWNER_UNAVAILABLE, "Every original project owner must be currently eligible to approve");
         }
         return new OrganizationAssigneeResolver.Selection(revision, ExpenseProjectApprovalPolicy.ASSIGNEE_RULE, subjects);
     }
@@ -48,6 +49,6 @@ public class ExpenseProjectApprovalBindings {
     }
 
     private static DomainException missing() {
-        return new DomainException("EXPENSE_PROJECT_SNAPSHOT_MISSING", "The expense round requires its original project owner and routing evidence");
+        return new DomainException(ErrorCode.EXPENSE_PROJECT_SNAPSHOT_MISSING, "The expense round requires its original project owner and routing evidence");
     }
 }

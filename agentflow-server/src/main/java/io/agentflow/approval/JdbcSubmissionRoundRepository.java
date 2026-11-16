@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.mapper.SubmissionRoundRepositoryMapper;
 import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.approval.model.SubmissionRound;
@@ -67,7 +68,7 @@ public class JdbcSubmissionRoundRepository implements SubmissionRoundRepository 
                     round.risk().level().name(),
                     jsonUtil.write(round.risk()));
         } catch (DuplicateKeyException exception) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Submission round already exists");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Submission round already exists");
         }
     }
 
@@ -112,8 +113,7 @@ public class JdbcSubmissionRoundRepository implements SubmissionRoundRepository 
                         SqlRows.single(
                                 sqlMapper.complete2(
                                         tenantId, applicationId.toString(), roundNo)))) {
-            throw new DomainException(
-                    "CONCURRENCY_CONFLICT",
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT,
                     "Submission round is already completed or belongs to another instance");
         }
         if (updated == 1)

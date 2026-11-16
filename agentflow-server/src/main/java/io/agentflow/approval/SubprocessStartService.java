@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
@@ -67,15 +68,15 @@ public class SubprocessStartService {
                 .orElseThrow(SubprocessStartService::invalidParent);
         var node = definition.graph().node(parent.nodeId());
         if (node == null || node.type() != DefinitionModels.NodeType.SUB_PROCESS) {
-            throw new DomainException("SUBPROCESS_NODE_REQUIRED", "The active node is not a platform subprocess call");
+            throw new DomainException(ErrorCode.SUBPROCESS_NODE_REQUIRED, "The active node is not a platform subprocess call");
         }
         if (calls.findByActivation(parent.tenantId(), parent.processInstanceId(), parent.activationId()).isPresent()) {
-            throw new DomainException("SUBPROCESS_CALL_EXISTS", "The native activation already has a child application");
+            throw new DomainException(ErrorCode.SUBPROCESS_CALL_EXISTS, "The native activation already has a child application");
         }
         var policy = SubprocessPolicy.fromProperties(node.properties());
         var bound = resolver.resolve(parent.tenantId(), policy, node.id(), application.formSchema());
         if (!bound.runtimeDefinitionId().equals(calledDefinitionId)) {
-            throw new DomainException("SUBPROCESS_DEFINITION_MISMATCH", "Native called definition differs from the bound subprocess version");
+            throw new DomainException(ErrorCode.SUBPROCESS_DEFINITION_MISMATCH, "Native called definition differs from the bound subprocess version");
         }
         requireAcyclic(parent, bound.runtimeDefinitionId());
         events.requireAvailable(parent.tenantId(), bound.graph());
@@ -83,7 +84,7 @@ public class SubprocessStartService {
                 LocalOrganizationDirectory.isContextualRule(childNode.properties().get("assigneeRule"))
                 || LocalOrganizationDirectory.isContextualRule(childNode.properties().get("recipientRule"))
                 || LocalOrganizationDirectory.isContextualRule(childNode.properties().get(io.agentflow.definition.TaskEscalationPolicy.RECIPIENT_RULE)))) {
-            throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "The subprocess requires the original initiator appointment");
+            throw new DomainException(ErrorCode.INITIATOR_APPOINTMENT_REQUIRED, "The subprocess requires the original initiator appointment");
         }
         var childId = UUID.randomUUID(); var at = Instant.now();
         var preparedFiles = attachments.prepare(application, childId, bound.formSchema(), bound.inputs().project(parent.payload()), SYSTEM_ACTOR, at);
@@ -136,9 +137,9 @@ public class SubprocessStartService {
         // 沿不可变调用来源检查实际发布版本，避免同一版本递归创建申请；名称相同不代表同一版本。
         while (true) {
             if (!ancestors.add(current) || definitionId.equals(childDefinitionId)) {
-                throw new DomainException("SUBPROCESS_RECURSION_FORBIDDEN", "A subprocess cannot recursively call an active ancestor version");
+                throw new DomainException(ErrorCode.SUBPROCESS_RECURSION_FORBIDDEN, "A subprocess cannot recursively call an active ancestor version");
             }
-            if (depth > SubprocessPolicy.MAX_CALL_DEPTH) throw new DomainException("SUBPROCESS_DEPTH_EXCEEDED", "Subprocess nesting exceeds the supported depth");
+            if (depth > SubprocessPolicy.MAX_CALL_DEPTH) throw new DomainException(ErrorCode.SUBPROCESS_DEPTH_EXCEEDED, "Subprocess nesting exceeds the supported depth");
             var origin = calls.findByChild(parent.tenantId(), current);
             if (origin.isEmpty()) return;
             current = origin.get().parentApplicationId(); definitionId = origin.get().parentRuntimeDefinitionId(); depth++;
@@ -151,7 +152,7 @@ public class SubprocessStartService {
     }
 
     private static DomainException invalidParent() {
-        return new DomainException("SUBPROCESS_PARENT_MISMATCH", "Native parent context differs from the active application round");
+        return new DomainException(ErrorCode.SUBPROCESS_PARENT_MISMATCH, "Native parent context differs from the active application round");
     }
 
     /**

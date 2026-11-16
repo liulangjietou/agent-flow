@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.util.HashSet;
@@ -19,18 +20,18 @@ public record ExpenseContent(UUID legalEntityId, Type type, String title, List<E
     public ExpenseContent {
         if (legalEntityId == null || type == null || StringUtils.isBlank(title) || title.length() > 256
                 || lines == null || lines.size() > MAX_LINES || advanceOffsets == null || advanceOffsets.size() > MAX_ADVANCES) {
-            throw new DomainException("INVALID_EXPENSE_CONTENT", "Expense report content is invalid");
+            throw new DomainException(ErrorCode.INVALID_EXPENSE_CONTENT, "Expense report content is invalid");
         }
         var numbers = new HashSet<Integer>(); var invoices = new HashSet<UUID>(); var advances = new HashSet<UUID>();
         for (var line : lines) {
-            if (line == null || !numbers.add(line.lineNo())) throw new DomainException("INVALID_EXPENSE_LINE", "Expense line numbers must be unique");
+            if (line == null || !numbers.add(line.lineNo())) throw new DomainException(ErrorCode.INVALID_EXPENSE_LINE, "Expense line numbers must be unique");
             for (var invoiceId : line.invoiceIds()) {
-                if (!invoices.add(invoiceId)) throw new DomainException("INVOICE_REUSED", "An invoice can only belong to one expense line");
+                if (!invoices.add(invoiceId)) throw new DomainException(ErrorCode.INVOICE_REUSED, "An invoice can only belong to one expense line");
             }
         }
         for (var offset : advanceOffsets) {
             if (offset == null || offset.amount().value().signum() <= 0 || !advances.add(offset.advanceId())) {
-                throw new DomainException("INVALID_ADVANCE_OFFSET", "Advance selections must be unique and positive");
+                throw new DomainException(ErrorCode.INVALID_ADVANCE_OFFSET, "Advance selections must be unique and positive");
             }
         }
         var allowances = lines.stream().filter(line -> line.allowance() != null).toList();
@@ -40,7 +41,7 @@ public record ExpenseContent(UUID legalEntityId, Type type, String title, List<E
                 var second = allowances.get(other);
                 if (first.categoryCode().equals(second.categoryCode()) && !first.endedOn().isBefore(second.incurredOn())
                         && !second.endedOn().isBefore(first.incurredOn())) {
-                    throw new DomainException("ALLOWANCE_ITINERARY_OVERLAP", "The same allowance category cannot claim overlapping itinerary days in one report");
+                    throw new DomainException(ErrorCode.ALLOWANCE_ITINERARY_OVERLAP, "The same allowance category cannot claim overlapping itinerary days in one report");
                 }
             }
         }

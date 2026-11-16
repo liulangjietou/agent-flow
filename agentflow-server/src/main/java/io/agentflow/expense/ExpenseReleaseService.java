@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
@@ -38,7 +39,7 @@ public class ExpenseReleaseService {
         if (application.businessReference() == null || application.businessReference().type() != BusinessReference.Type.EXPENSE) return;
         if (application.status() != ApplicationStatus.REJECTED && application.status() != ApplicationStatus.CANCELLED
                 && application.status() != ApplicationStatus.REVOKED) {
-            throw new DomainException("EXPENSE_RELEASE_NOT_ALLOWED", "Only rejected or cancelled expense reports release reservations");
+            throw new DomainException(ErrorCode.EXPENSE_RELEASE_NOT_ALLOWED, "Only rejected or cancelled expense reports release reservations");
         }
         UUID id = application.businessReference().id(); reports.lock(application.tenantId(), id);
         var report = reports.find(application.tenantId(), id).orElseThrow();

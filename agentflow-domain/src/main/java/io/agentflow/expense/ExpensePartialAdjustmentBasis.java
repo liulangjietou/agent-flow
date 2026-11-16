@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.*;
 import java.time.Instant;
@@ -91,6 +92,6 @@ public record ExpensePartialAdjustmentBasis(ExpenseAdjustmentFundingSource fundi
         }
         @Override public String toString() { return "PreviousExpensePartialAdjustment[id=" + id + ", version=" + version + "]"; }
     }
-    private static DomainException changed() { return new DomainException("EXPENSE_PARTIAL_ADJUSTMENT_SOURCE_CHANGED", "Partial adjustment must use the exact completed predecessor, original finance facts and registered bank entries"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.EXPENSE_PARTIAL_ADJUSTMENT_SOURCE_CHANGED, "Partial adjustment must use the exact completed predecessor, original finance facts and registered bank entries"); }
     @Override public String toString() { return "ExpensePartialAdjustmentBasis[reportId=" + reportId() + "]"; }
 }

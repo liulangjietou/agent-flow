@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import java.util.HashSet;
@@ -46,6 +47,6 @@ public record DraftAssistInput(UUID applicationId, long applicationVersion, Form
         catch (DomainException rejected) { throw invalidOutput(); }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_INPUT", "Invalid draft assist input"); }
-    private static DomainException invalidOutput() { return new DomainException("INVALID_AGENT_OUTPUT", "Draft value does not match an allowed target"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Invalid draft assist input"); }
+    private static DomainException invalidOutput() { return new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Draft value does not match an allowed target"); }
 }

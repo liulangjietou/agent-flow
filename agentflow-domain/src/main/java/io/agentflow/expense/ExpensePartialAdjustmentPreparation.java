@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.*;
 import java.time.Duration;
@@ -97,8 +98,8 @@ public record ExpensePartialAdjustmentPreparation(Input input, long version, Sta
     /** 到期边界排他，页面与授权使用相同结果。 */
     public boolean usable(Instant at) { return status == Status.READY && at != null && !at.isBefore(updatedAt) && at.isBefore(evidence.expiresAt()); }
     private void requireTime(Instant at) { if (at == null || at.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_PARTIAL_ADJUSTMENT_PREPARATION", "Partial preparation must preserve one eligible side and fresh actual finance evidence"); }
-    private static DomainException conflict() { return new DomainException("PARTIAL_ADJUSTMENT_PREPARATION_CONFLICT", "Partial preparation or the selected original operation changed"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PARTIAL_ADJUSTMENT_PREPARATION, "Partial preparation must preserve one eligible side and fresh actual finance evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.PARTIAL_ADJUSTMENT_PREPARATION_CONFLICT, "Partial preparation or the selected original operation changed"); }
 
     /**
      * 页面选择日期、侧别与说明，完整调整从当前持久修订恢复。

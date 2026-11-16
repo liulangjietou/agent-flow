@@ -70,7 +70,7 @@ class ExpensePolicyGuidanceIntegrationTest {
     @Autowired DefinitionApplicationService definitions;
 
     @DynamicPropertySource static void properties(DynamicPropertyRegistry registry) {
-        registry.add("agentflow.attachments.directory",()->"/fyoung/tmp/agentflow-policy-guidance-"+ENTITY);
+        registry.add("agentflow.attachments.directory",()->System.getProperty("java.io.tmpdir") + "/agentflow-policy-guidance-"+ENTITY);
         registry.add("agentflow.finance-gateway.tenants.demo.endpoint",()->"http://127.0.0.1:"+SERVER.getAddress().getPort()+"/finance");
         registry.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback",()->"true");
         registry.add("spring.datasource.url",()->System.getenv().getOrDefault("AGENTFLOW_GUIDANCE_TEST_URL","jdbc:h2:mem:policy-guidance;DB_CLOSE_DELAY=-1"));

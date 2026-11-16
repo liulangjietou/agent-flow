@@ -1,5 +1,7 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.PaymentPersonnel;
@@ -26,14 +28,14 @@ public class BudgetAdjustmentFinanceAccess {
     public Context read(UUID id, Integer roundNo) {
         var view = requests.read(id, roundNo); var actor = actors.actor();
         var request = repository.find(actor.tenantId(), id).orElseThrow(BudgetAdjustmentFinanceAccess::notFound);
-        boolean finance = actor.hasRole("FINANCE") && !actor.userId().equals(request.employeeId())
+        boolean finance = actor.hasRole(SystemRole.FINANCE) && !actor.userId().equals(request.employeeId())
                 && personnel.eligible(actor.tenantId(), actor.userId(), view.content().legalEntityId());
         return new Context(view, finance);
     }
     /** 每次新动作和幂等重放都检查当前权限，申请人兼任财务也不能自办。 */
     public Context requireFinance(UUID id, int roundNo) {
         var context = read(id, roundNo);
-        if (!context.finance()) throw new DomainException("FORBIDDEN", "Independent finance role and current appointment in the original legal entity are required");
+        if (!context.finance()) throw new DomainException(ErrorCode.FORBIDDEN, "Independent finance role and current appointment in the original legal entity are required");
         return context;
     }
     /** 原操作必须位于原租户并可读取原批准轮次，不能用外来编号绕过范围。 */
@@ -41,7 +43,7 @@ public class BudgetAdjustmentFinanceAccess {
         var operation = operations.find(actors.actor().tenantId(), id).orElseThrow(BudgetAdjustmentFinanceAccess::notFound);
         var source = operation.command().source(); requireFinance(source.requestId(), source.round().roundNo()); return operation;
     }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Budget adjustment execution is unavailable in the current scope"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Budget adjustment execution is unavailable in the current scope"); }
     /**
      * 内部权限上下文不包含完整财务指令。
      * @author owlzhangfq@gmail.com

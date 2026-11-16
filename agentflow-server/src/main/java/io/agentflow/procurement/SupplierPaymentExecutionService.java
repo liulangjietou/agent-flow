@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import java.time.Duration;
@@ -37,8 +38,8 @@ public class SupplierPaymentExecutionService {
             String debitReference, String debitVersion, Instant now) {
         var authorization = sources.lock(tenant, authorizationId); now = time(now); sources.requireCurrent(authorization, cashier, now);
         var hold = sources.held(authorization); if (hold.version() != holdVersion) throw conflict();
-        if (payments.find(tenant, authorizationId).isPresent()) throw new DomainException("SUPPLIER_PAYMENT_ALREADY_REGISTERED", "Original supplier authorization already has a bank command");
-        if (requests.owner(tenant, authorizationId).isPresent()) throw new DomainException("SUPPLIER_PAYMENT_EXECUTION_PENDING", "Original supplier authorization already has a cashier execution owner");
+        if (payments.find(tenant, authorizationId).isPresent()) throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_ALREADY_REGISTERED, "Original supplier authorization already has a bank command");
+        if (requests.owner(tenant, authorizationId).isPresent()) throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_EXECUTION_PENDING, "Original supplier authorization already has a cashier execution owner");
         var request = SupplierPaymentExecutionRequest.queue(UUID.randomUUID(), hold, cashier, debitReference, debitVersion, now);
         requests.create(request); return request;
     }
@@ -106,5 +107,5 @@ public class SupplierPaymentExecutionService {
         requests.update(current); events.publishEvent(new SupplierPaymentExecutionChanged(previous, current));
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Original supplier hold or cashier request changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Original supplier hold or cashier request changed"); }
 }

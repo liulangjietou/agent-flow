@@ -1,5 +1,6 @@
 package io.agentflow.signature;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.auth.DeferredActorAuthentication;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -46,8 +47,8 @@ public class SignaturePublicService {
 
     /** 新请求在幂等写事务外核对原件字节；成功重放不重新要求物理存储仍在线。 */
     public void requireOriginalsAvailable(List<SignatureRequest.Document> originals) {
-        if (!authentication.available()) throw new DomainException("DEFERRED_AUTHENTICATION_UNAVAILABLE", "Deferred execution authentication is unavailable");
-        if (!documents.available()) throw new DomainException("FILE_STORAGE_UNAVAILABLE", "Document storage is unavailable");
+        if (!authentication.available()) throw new DomainException(ErrorCode.DEFERRED_AUTHENTICATION_UNAVAILABLE, "Deferred execution authentication is unavailable");
+        if (!documents.available()) throw new DomainException(ErrorCode.FILE_STORAGE_UNAVAILABLE, "Document storage is unavailable");
         for (var original : originals) documents.read(new LocalDocumentStore.Content(original.contentId(), original.size(), original.sha256()));
     }
 
@@ -56,12 +57,12 @@ public class SignaturePublicService {
         var actor = actors.actor(); access.requireRound(actor, application, roundNo);
         SignatureOperation after = afterId == null ? null : operations.find(actor.tenantId(), afterId)
                 .filter(value -> value.input().request().source().applicationId().equals(application) && value.input().request().source().roundNo() == roundNo)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Signature cursor not found in this round"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Signature cursor not found in this round"));
         var rows = operations.forRound(actor.tenantId(), application, roundNo, after, limit + 1);
         var visible = new ArrayList<Receipt>(); int count = Math.min(rows.size(), limit);
         for (var operation : rows.subList(0, count)) {
             try { access.requireReadable(actor, operation); visible.add(Receipt.of(operation)); }
-            catch (DomainException denied) { if (!denied.code().equals("FORBIDDEN") && !denied.code().equals("NOT_FOUND")) throw denied; }
+            catch (DomainException denied) { if (!denied.is(ErrorCode.FORBIDDEN) && !denied.is(ErrorCode.NOT_FOUND)) throw denied; }
         }
         UUID cursor = rows.size() > limit ? rows.get(count - 1).input().request().id() : null;
         return new Page(List.copyOf(visible), cursor);
@@ -83,9 +84,9 @@ public class SignaturePublicService {
     /** 只下载已完整完成的结果；权限和字节指纹每次重查，预留或部分保存不能冒充交付。 */
     public Download download(UUID application, UUID id, UUID documentId) {
         var operation = service.get(application, id);
-        if (operation.status() != SignatureOperation.Status.SIGNED) throw new DomainException("SIGNATURE_RESULT_NOT_READY", "Signed results are not complete");
+        if (operation.status() != SignatureOperation.Status.SIGNED) throw new DomainException(ErrorCode.SIGNATURE_RESULT_NOT_READY, "Signed results are not complete");
         var original = operation.input().request().documents().stream().filter(value -> value.attachmentId().equals(documentId)).findFirst()
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Signed document not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Signed document not found"));
         var result = operation.artifacts().stream().filter(value -> value.documentId().equals(documentId)).findFirst().orElseThrow();
         return new Download("signed-" + original.filename(), documents.read(new LocalDocumentStore.Content(result.contentId(), result.size(), result.sha256())));
     }

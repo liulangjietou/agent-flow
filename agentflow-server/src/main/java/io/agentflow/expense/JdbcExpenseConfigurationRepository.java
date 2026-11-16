@@ -1,6 +1,7 @@
 package io.agentflow.expense;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -326,11 +327,11 @@ public class JdbcExpenseConfigurationRepository {
 
     private static UUID uuid(String value) { return value == null ? null : UUID.fromString(value); }
 
-    private static DomainException changed() { return new DomainException("CONCURRENCY_CONFLICT", "Expense configuration changed before saving"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense configuration changed before saving"); }
 
-    private static DomainException missing() { return new DomainException("NOT_FOUND", "Expense configuration version was not found"); }
+    private static DomainException missing() { return new DomainException(ErrorCode.NOT_FOUND, "Expense configuration version was not found"); }
 
-    private static DomainException inconsistent() { return new DomainException("EXPENSE_CONFIGURATION_INCONSISTENT", "Expense configuration history is inconsistent"); }
+    private static DomainException inconsistent() { return new DomainException(ErrorCode.EXPENSE_CONFIGURATION_INCONSISTENT, "Expense configuration history is inconsistent"); }
 
     /**
      * 一次读取得到当前类别与发布指针，再按不可变版本读正文。

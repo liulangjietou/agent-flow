@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import io.agentflow.finance.Money;
@@ -61,5 +62,5 @@ public interface ExpensePolicyPort {
         }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_POLICY_REQUEST", "Expense policy facts are incomplete or inconsistent"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_POLICY_REQUEST, "Expense policy facts are incomplete or inconsistent"); }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -51,7 +52,7 @@ public class VoucherReversalWorkspace {
                 receipt == null ? null : new Evidence(receipt.status(), receipt.revision(), receipt.observedAt(), receipt.validUntil(), receipt.current() == null ? null : receipt.current().revision(),
                         receipt.current() == null ? null : receipt.current().status(), receipt.reversal()), issue == null, issue);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_REVERSAL_QUERY", "Only a positive roundNo is accepted for voucher reversal status"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_REVERSAL_QUERY, "Only a positive roundNo is accepted for voucher reversal status"); }
     /**
      * 原件、候选和不可变登记分别展示，原凭证状态不等同于冲销已登记。
      * @author owlzhangfq@gmail.com

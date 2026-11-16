@@ -287,7 +287,7 @@ class VersionedFormsIntegrationTest {
         assertThat(send("POST", "/api/v1/applications", "alice", createBody(draft, "DRAFT-" + UUID.randomUUID(), Map.of())).getStatus()).isEqualTo(422);
         String foreignKey = "foreign-" + UUID.randomUUID();
         // 本用例验证跨租户资源隔离，显式提供另一租户已配置的审批身份目录。
-        org.mockito.Mockito.doReturn(new AuthService(true, "foreign-tenant").options("foreign-tenant"))
+        org.mockito.Mockito.doReturn(new AuthService(true, "foreign-tenant", java.time.Duration.ofHours(12)).options("foreign-tenant"))
                 .when(auth).options("foreign-tenant");
         var foreign = definitions.create("foreign-tenant", foreignKey, "其他租户流程", domainGraph());
         definitions.publish(new io.agentflow.common.Actor("foreign-tenant", "test-admin", java.util.Set.of("ADMIN")), foreign.id(), 0, "集成测试发布");

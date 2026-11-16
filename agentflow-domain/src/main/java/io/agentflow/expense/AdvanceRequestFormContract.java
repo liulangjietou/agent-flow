@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionModels.Graph;
 import io.agentflow.form.FormSchema;
@@ -28,7 +29,7 @@ public final class AdvanceRequestFormContract {
         if (schema == null || !schema.fieldTypes().keySet().equals(TYPES.keySet())
                 || schema.fields().stream().anyMatch(field -> field.type() != TYPES.get(field.key()) || !field.required()
                     || DETAILS.equals(field.key()) && !Boolean.TRUE.equals(field.sensitive()))) {
-            throw new DomainException("ADVANCE_REQUEST_FORM_REQUIRED", "An advance request requires sensitive details and derived amount and currency fields");
+            throw new DomainException(ErrorCode.ADVANCE_REQUEST_FORM_REQUIRED, "An advance request requires sensitive details and derived amount and currency fields");
         }
     }
 

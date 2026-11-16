@@ -1,8 +1,9 @@
+import { tmpdir } from 'node:os'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { resolve, join } from 'node:path'
 import Ajv2020 from 'ajv/dist/2020.js'
 import addFormats from 'ajv-formats'
 import ts from 'typescript'
@@ -11,7 +12,7 @@ import ts from 'typescript'
 const [contract, ...inputs] = process.argv.slice(2)
 assert.ok(contract && inputs.length, 'Pass the matching contract and captured response files or directories')
 const source = readFileSync(new URL('../src/expenseFinancialReporting.ts', import.meta.url), 'utf8')
-const output = mkdtempSync('/fyoung/tmp/agentflow-financial-parser-')
+const output = mkdtempSync(join(process.env.AGENTFLOW_TMP_DIR ?? tmpdir(), 'agentflow-financial-parser-'))
 writeFileSync(resolve(output, 'package.json'), '{"type":"module"}')
 writeFileSync(resolve(output, 'report.js'), ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)
 const ui = await import(pathToFileURL(resolve(output, 'report.js')).href)

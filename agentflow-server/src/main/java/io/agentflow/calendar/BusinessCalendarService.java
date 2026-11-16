@@ -1,5 +1,6 @@
 package io.agentflow.calendar;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
@@ -73,7 +74,7 @@ public class BusinessCalendarService {
         return new Calculation(id, revision, BusinessDeadline.calculate(calendar.rules(), startLocal, overlapChoice, workingMinutes));
     }
 
-    private static DomainException missing() { return new DomainException("NOT_FOUND", "Calendar or revision was not found"); }
+    private static DomainException missing() { return new DomainException(ErrorCode.NOT_FOUND, "Calendar or revision was not found"); }
 
     /**
      * 当前目录的稳定键分页。

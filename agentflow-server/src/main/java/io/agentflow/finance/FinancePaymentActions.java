@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.model.ApplicationStatus;
@@ -58,14 +60,14 @@ public class FinancePaymentActions {
         var current = authorizations.active(application.tenantId(), application.businessReference().type(), application.businessReference().id()).orElse(null);
         if (current != null) {
             if (current.status() == PaymentAuthorization.Status.AUTHORIZED && !now.isBefore(current.decision().expiresAt())) authorizations.update(current.expire(now));
-            else throw new DomainException("PAYMENT_AUTHORIZATION_EXISTS", "The financial business already has an active payment authorization or execution");
+            else throw new DomainException(ErrorCode.PAYMENT_AUTHORIZATION_EXISTS, "The financial business already has an active payment authorization or execution");
         }
         var review = input.payeeReviewId() == null ? null : reviews.requireReady(application.tenantId(), input.payeeReviewId(), input.payeeReviewVersion(), voucher, actors.actor().userId(), now);
         if (review != null) payee = review.account().snapshot();
         var authorization = PaymentAuthorization.issue(UUID.randomUUID(), voucher, payee, actors.actor().userId(), now, now.plusSeconds(input.validitySeconds()), dueDate);
         authorizations.create(authorization);
         if (review != null) reviews.consume(review, authorization, now);
-        var event = audit.record(authorization, authorization.terms().id(), authorization.version(), "FINANCE", "PAYMENT_AUTHORIZE", null, authorization.status().name(), input.comment(), now);
+        var event = audit.record(authorization, authorization.terms().id(), authorization.version(), SystemRole.FINANCE.name(), "PAYMENT_AUTHORIZE", null, authorization.status().name(), input.comment(), now);
         return receipt(authorization, "AUTHORIZE", null, event);
     }
     /** 原授权结束后只登记账户复核，外部读取成功也不会自动签发新授权。 */
@@ -74,7 +76,7 @@ public class FinancePaymentActions {
         var initial = access.requireFinanceAuthorization(authorizationId); paymentSources.lock(initial);
         var original = access.requireFinanceAuthorization(authorizationId); if (original.version() != input.authorizationVersion()) throw conflict();
         var now = now(); var review = reviews.register(original, input.voucherVersion(), actors.actor().userId(), now);
-        var event = audit.record(original, review.input().id(), review.version(), "FINANCE", "PAYMENT_PAYEE_REVIEW", null, review.status().name(), input.comment(), now);
+        var event = audit.record(original, review.input().id(), review.version(), SystemRole.FINANCE.name(), "PAYMENT_PAYEE_REVIEW", null, review.status().name(), input.comment(), now);
         return new ReviewReceipt(original.terms().binding().applicationId(), authorizationId, review.input().id(), review.version(), event);
     }
     /** 原轮次权限每次重读；查询不要求原批准仍有效，作废不能覆盖已经登记的出纳执行。 */
@@ -96,7 +98,7 @@ public class FinancePaymentActions {
             before = operation.status().name(); var queried = execution.query(authorization.terms().tenantId(), authorizationId, input.operationVersion(), now);
             after = queried.status().name(); version = queried.version(); operationVersion = queried.version();
         }
-        var event = audit.record(authorization, authorizationId, version, "FINANCE", "PAYMENT_" + input.action().name(), before, after, input.comment(), now);
+        var event = audit.record(authorization, authorizationId, version, SystemRole.FINANCE.name(), "PAYMENT_" + input.action().name(), before, after, input.comment(), now);
         return receipt(authorization, input.action().name(), operationVersion, event);
     }
     private static Receipt receipt(PaymentAuthorization value, String action, Long operationVersion, UUID event) {
@@ -111,11 +113,11 @@ public class FinancePaymentActions {
                 if (!date.isBefore(PaymentAuthorization.MIN_DUE_DATE)) return date;
             } catch (DateTimeParseException ignored) { /* 统一拒绝不存在的日期，不做宽松修正。 */ }
         }
-        throw new DomainException("INVALID_PAYMENT_DUE_DATE", "A valid explicit payment due date in YYYY-MM-DD format is required");
+        throw new DomainException(ErrorCode.INVALID_PAYMENT_DUE_DATE, "A valid explicit payment due date in YYYY-MM-DD format is required");
     }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed payment, voucher or financial version changed"); }
-    private static DomainException changedSource() { return new DomainException("PAYMENT_SOURCE_CHANGED", "Current approved financial source and posted voucher are required"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Original payment operation not found"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed payment, voucher or financial version changed"); }
+    private static DomainException changedSource() { return new DomainException(ErrorCode.PAYMENT_SOURCE_CHANGED, "Current approved financial source and posted voucher are required"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Original payment operation not found"); }
     /**
      * 安全结束只释放原业务占用，新授权和出纳执行分别再次确认。
      * @author owlzhangfq@gmail.com

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Duration;
@@ -58,8 +59,8 @@ public record VoucherReversalPreparation(Input input, long version, Status statu
     public boolean active() { return status == Status.QUEUED || status == Status.RUNNING; }
     public boolean expired(Instant now) { return status == Status.RUNNING && !leaseUntil.isAfter(now); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_REVERSAL_PREPARATION", "Reversal preparation must preserve original source, finance actor, date and authorization evidence"); }
-    private static DomainException conflict() { return new DomainException("VOUCHER_REVERSAL_PREPARATION_CONFLICT", "Reversal preparation can no longer perform this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_REVERSAL_PREPARATION, "Reversal preparation must preserve original source, finance actor, date and authorization evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.VOUCHER_REVERSAL_PREPARATION_CONFLICT, "Reversal preparation can no longer perform this transition"); }
     /**
      * 选择日期和说明来自财务，原件、目标及三种版本来自已授权服务器事实。
      * @author owlzhangfq@gmail.com

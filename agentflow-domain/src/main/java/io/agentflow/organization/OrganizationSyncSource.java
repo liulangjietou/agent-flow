@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.UUID;
@@ -21,11 +22,11 @@ public record OrganizationSyncSource(String tenantId, String sourceKey, long app
 
     /** 失败、取消或收到数据均不推进；组织应用与本次转换由同一事务持久化。 */
     public OrganizationSyncSource applied(OrganizationSyncBatch batch, long expectedVersion) {
-        if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Organization source revision changed");
+        if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Organization source revision changed");
         if (batch == null || batch.state().status() != OrganizationSyncBatch.Status.APPLIED
                 || !tenantId.equals(batch.context().tenantId()) || !sourceKey.equals(batch.context().sourceKey())
                 || appliedRevision != batch.context().afterRevision()) {
-            throw new DomainException("ORGANIZATION_SYNC_SOURCE_CHANGED", "Organization source cursor does not match the applied batch");
+            throw new DomainException(ErrorCode.ORGANIZATION_SYNC_SOURCE_CHANGED, "Organization source cursor does not match the applied batch");
         }
         return new OrganizationSyncSource(tenantId, sourceKey, batch.state().delta().revision(), version + 1,
                 batch.context().id(), registeredBy, registeredAt);

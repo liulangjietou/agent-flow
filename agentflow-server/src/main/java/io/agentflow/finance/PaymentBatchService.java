@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
@@ -92,7 +93,7 @@ public class PaymentBatchService {
         access.requireCashierRole(); var actor = actors.actor(); var value = batches.find(actor.tenantId(), id).orElseThrow(PaymentBatchService::notFound);
         if (!personnel.eligible(actor.tenantId(), actor.userId(), value.legalEntityId())) throw notFound(); return value;
     }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Payment batch is unavailable in the current cashier scope"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Payment batch is unavailable in the current cashier scope"); }
 
     /**
      * 客户端只能选择实际展示的原授权修订，不能传入收款人或金额。

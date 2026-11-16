@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.JdbcBudgetOperationRepository;
 import io.agentflow.finance.PaymentCommand;
@@ -71,12 +72,12 @@ public class ExpenseFinancialDisputeRecovery {
         reports.lock(tenant, id);
         var current = settlements.find(tenant, id).orElse(null);
         if (current == null || current.status() != ExpenseSettlement.Status.REVIEW_REQUIRED || !matches.test(current)) return;
-        var report = reports.find(tenant, id).orElseThrow(() -> new DomainException("NOT_FOUND", "Original expense report not found"));
+        var report = reports.find(tenant, id).orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Original expense report not found"));
         // 任一裁决不能替其他资金、凭证或批准争议作决定，完整原来源须重新成立。
         try { sources.requireCurrent(current, report); }
         catch (DomainException unavailable) { return; }
         var budget = current.budgetOperationId() == null ? null : budgets.find(tenant, current.budgetOperationId()).orElseThrow(
-                () -> new DomainException("EXPENSE_BUDGET_SOURCE_CHANGED", "Original consumption operation not found"));
+                () -> new DomainException(ErrorCode.EXPENSE_BUDGET_SOURCE_CHANGED, "Original consumption operation not found"));
         changes.persist(current, current.resolveFinancialReview(budget, at));
     }
 }

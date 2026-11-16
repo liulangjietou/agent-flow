@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
@@ -52,5 +53,5 @@ public record BudgetObservation(UUID operationId, String commandDigest, Status s
     public enum Rejection { BUDGET_INSUFFICIENT, BUDGET_POLICY_UNAVAILABLE, ACCOUNTING_PERIOD_CLOSED,
         COST_OBJECT_UNAVAILABLE, LEGAL_ENTITY_UNAVAILABLE, EMPLOYEE_UNAVAILABLE, LEDGER_VERSION_CONFLICT, RESERVATION_FINALIZED, BUDGET_EXCEPTION_REQUIRED }
 
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_OBSERVATION", "Budget observation must identify the original command and a consistent outcome"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_OBSERVATION, "Budget observation must identify the original command and a consistent outcome"); }
 }

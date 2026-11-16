@@ -1,5 +1,6 @@
 package io.agentflow.auth;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.signature.SignatureCallbackVerifier;
 
 import io.agentflow.common.CurrentActor;
@@ -23,6 +24,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingRequestWrapper;
@@ -48,10 +50,14 @@ public class BearerAuthFilter extends OncePerRequestFilter {
     private final OidcActorMapper oidcActors;
     private final ObjectProvider<OidcLogoutScopes> logoutScopes;
     private final MetricsScrapeAuthentication metrics;
+    private final int maxRequestBodyBytes;
 
-    /** 创建过滤器。 */
+    /** 创建过滤器；JSON 请求体上限可按部署调整，默认 8 MiB。 */
     public BearerAuthFilter(AuthService authService, CurrentActor currentActor, JsonUtil jsonUtil, OidcProperties oidc,
-                           ObjectProvider<OidcLogoutScopes> logoutScopes, MetricsScrapeAuthentication metrics) {
+                           ObjectProvider<OidcLogoutScopes> logoutScopes, MetricsScrapeAuthentication metrics,
+                           @Value("${agentflow.web.max-request-body-bytes:8388608}") int maxRequestBodyBytes) {
+        if (maxRequestBodyBytes <= 0) throw new IllegalArgumentException("agentflow.web.max-request-body-bytes must be positive");
+        this.maxRequestBodyBytes = maxRequestBodyBytes;
         this.authService = authService;
         this.currentActor = currentActor;
         this.jsonUtil = jsonUtil;
@@ -83,7 +89,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
                     if (binding == null || binding.length() > MAX_ACTOR_HEADER_LENGTH || !expected.equals(URLDecoder.decode(binding,
                             StandardCharsets.UTF_8))) throw new IllegalArgumentException();
                 } catch (IllegalArgumentException exception) {
-                    throw new DomainException("UNAUTHENTICATED", "Session identity changed; restore the original account before retrying");
+                    throw new DomainException(ErrorCode.UNAUTHENTICATED, "Session identity changed; restore the original account before retrying");
                 }
             }
         } catch (DomainException exception) {
@@ -110,9 +116,39 @@ public class BearerAuthFilter extends OncePerRequestFilter {
                     .matches("/api/v1/applications/[0-9a-f-]{36}/attachments/[0-9a-f-]{36}/content")
                     || request.getRequestURI().matches("/api/v1/invoices/[0-9a-f-]{36}/content"));
             // 二进制内容由附件服务流式限长并核对登记摘要，不复制整份文件到 JSON 幂等缓存。
-            chain.doFilter(fileUpload ? request : new ContentCachingRequestWrapper(request, Integer.MAX_VALUE), response);
+            if (fileUpload) {
+                chain.doFilter(request, response);
+            } else if (request.getContentLengthLong() > maxRequestBodyBytes) {
+                // 声明长度已超限时不读取正文，避免整份内容进入堆内缓存。
+                writeError(request, response, HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE,
+                        ErrorCode.REQUEST_BODY_TOO_LARGE.name(), "Request body exceeds the configured limit");
+            } else {
+                chain.doFilter(new BoundedCachingRequest(request, maxRequestBodyBytes), response);
+            }
         } finally {
             currentActor.clear();
+        }
+    }
+
+    private void writeError(HttpServletRequest request, HttpServletResponse response, int status, String code, String message)
+            throws IOException {
+        response.setStatus(status);
+        response.setContentType("application/json;charset=UTF-8");
+        response.setHeader("Cache-Control", "no-store");
+        response.getWriter().write(jsonUtil.write(Map.of("code", code, "message", message,
+                "traceId", RequestTrace.id(request), "path", request.getRequestURI())));
+    }
+
+    /**
+     * 未声明长度（分块传输）的正文在读取时限长；超限立即失败，不让幂等摘要基于被截断的正文计算。
+     * @author owlzhangfq@gmail.com
+     */
+    private static final class BoundedCachingRequest extends ContentCachingRequestWrapper {
+        private BoundedCachingRequest(HttpServletRequest request, int limit) { super(request, limit); }
+
+        @Override
+        protected void handleContentOverflow(int contentCacheLimit) {
+            throw new DomainException(ErrorCode.REQUEST_BODY_TOO_LARGE, "Request body exceeds the configured limit");
         }
     }
 
@@ -136,11 +172,11 @@ public class BearerAuthFilter extends OncePerRequestFilter {
                     SecurityContextHolder.clearContext();
                 }
             }
-            throw new DomainException("UNAUTHENTICATED", "Enterprise session is missing or expired");
+            throw new DomainException(ErrorCode.UNAUTHENTICATED, "Enterprise session is missing or expired");
         }
         String authorization = request.getHeader("Authorization");
         if (authorization == null || !authorization.startsWith("Bearer ")) {
-            throw new DomainException("UNAUTHENTICATED", "Authentication is required");
+            throw new DomainException(ErrorCode.UNAUTHENTICATED, "Authentication is required");
         }
         return authService.authenticate(authorization.substring(7));
     }

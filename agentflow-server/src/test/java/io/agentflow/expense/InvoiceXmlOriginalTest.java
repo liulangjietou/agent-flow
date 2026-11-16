@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.*;
  * @author owlzhangfq@gmail.com
  */
 class InvoiceXmlOriginalTest {
-    private final Path directory = Path.of("/fyoung/tmp/agentflow-invoice-xml-" + UUID.randomUUID());
+    private final Path directory = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-invoice-xml-" + UUID.randomUUID());
     private final InvoiceOriginalFiles files = new InvoiceOriginalFiles(new LocalDocumentStore(directory.toString(), InvoiceVerificationPort.Request.MAX_ORIGINAL_BYTES));
 
     @AfterEach void cleanOwnedFixture() throws Exception {

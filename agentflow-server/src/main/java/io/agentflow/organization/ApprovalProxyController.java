@@ -1,5 +1,7 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.Actor;
@@ -100,10 +102,10 @@ public class ApprovalProxyController {
         return new Person(person.id(), person.subject(), person.displayName(), person.canApprove());
     }
 
-    private Actor administrator() { var actor = actors.actor(); actor.requireRole("ADMIN"); return actor; }
+    private Actor administrator() { var actor = actors.actor(); actor.requireRole(SystemRole.ADMIN); return actor; }
     private static Receipt receipt(ApprovalProxy proxy) { return new Receipt(proxy.id(), proxy.revision()); }
     private static <T> ResponseEntity<T> noStore(T body) { return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Approval proxy or its tenant references were not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Approval proxy or its tenant references were not found"); }
 
     /**
      * 原授权及动态状态分开展示，人员当前资格不改写原记录。

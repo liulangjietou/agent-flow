@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.SystemRole;
 import io.agentflow.approval.service.ApplicationParticipantPort;
 import io.agentflow.common.Actor;
 import org.flowable.engine.HistoryService;
@@ -33,7 +34,7 @@ public class FlowableApplicationParticipantAdapter implements ApplicationPartici
     @Override
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public java.util.Set<String> readableNodes(String tenantId, String processInstanceId, Actor actor) {
-        if (!tenantId.equals(actor.tenantId()) || !actor.hasRole("APPROVER")) return java.util.Set.of();
+        if (!tenantId.equals(actor.tenantId()) || !actor.hasRole(SystemRole.APPROVER)) return java.util.Set.of();
         var scope = proxies.forActor(actor, java.time.Instant.now());
         // 暂停不会移除原任务参与事实；办理权限另由实时任务授权严格检查暂停状态。
         var active = taskService.createTaskQuery().processInstanceId(processInstanceId).taskTenantId(tenantId)

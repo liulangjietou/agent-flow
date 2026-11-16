@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -39,7 +40,7 @@ public class ExpensePaymentReturnWorkspace {
             var value = parameters.get("roundNo"); if (!value.matches("[1-9][0-9]{0,8}")) throw invalid(); round = Integer.valueOf(value);
         }
         var context = access.read(reportId, round); var actor = actors.actor(); var source = sources.find(actor.tenantId(), reportId);
-        if (context.roundNo() != source.request().command().binding().roundNo()) throw new DomainException("NOT_FOUND", "Original expense payment is unavailable in this round");
+        if (context.roundNo() != source.request().command().binding().roundNo()) throw new DomainException(ErrorCode.NOT_FOUND, "Original expense payment is unavailable in this round");
         var ledger = ledgers.find(actor.tenantId(), reportId).orElse(null); var original = source.request().original();
         boolean finance = access.canManage(context, reportId) && !actor.userId().equals(source.request().command().authorization().executedBy());
         var latest = finance ? checks.latest(actor.tenantId(), reportId, actor.userId()).orElse(null) : null;
@@ -58,7 +59,7 @@ public class ExpensePaymentReturnWorkspace {
                 receipt.returns().stream().filter(item -> !recorded.contains(item)).map(item -> item.funding().amount()).reduce(Money.zero(source.request().command().amount().currency()), Money::plus));
         return new Check(value.input().id(), value.version(), value.status(), value.input().requestedAt(), value.updatedAt(), value.issue() == null ? null : value.issue().name(), evidence, issue == null, issue);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PAYMENT_RETURN_QUERY", "Expense payment return query only accepts a positive roundNo"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PAYMENT_RETURN_QUERY, "Expense payment return query only accepts a positive roundNo"); }
 
     /**
      * 原净付款与累计实退分别显示，净额只表示原付款扣除登记退回，不代表重新付款授权。

@@ -1,5 +1,6 @@
 package io.agentflow.api.idempotency;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -83,7 +84,7 @@ public class IdempotencyExecutor {
         } catch (ClaimConflictException conflict) {
             return transaction.execute(status -> {
                 var winner = repository.find(actor.tenantId(), key)
-                        .orElseThrow(() -> new DomainException("CONCURRENCY_CONFLICT", "Concurrent idempotency result is unavailable"));
+                        .orElseThrow(() -> new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Concurrent idempotency result is unavailable"));
                 return replay(winner, actor, rolesHash, requestHash);
             });
         }
@@ -115,16 +116,16 @@ public class IdempotencyExecutor {
     private ResponseEntity<String> replay(JdbcIdempotencyRepository.StoredResponse stored, Actor actor,
                                            String rolesHash, String requestHash) {
         if (!stored.actorId().equals(actor.userId()) || !stored.requestHash().equals(requestHash)) {
-            throw new DomainException("IDEMPOTENCY_KEY_REUSED", "Idempotency key belongs to a different request or actor");
+            throw new DomainException(ErrorCode.IDEMPOTENCY_KEY_REUSED, "Idempotency key belongs to a different request or actor");
         }
         if (!stored.rolesHash().equals(rolesHash)) {
-            throw new DomainException("FORBIDDEN", "Authorization context changed since the original request");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Authorization context changed since the original request");
         }
         if (!stored.expiresAt().isAfter(Instant.now())) {
-            throw new DomainException("IDEMPOTENCY_KEY_EXPIRED", "Idempotency key has expired and cannot be executed again");
+            throw new DomainException(ErrorCode.IDEMPOTENCY_KEY_EXPIRED, "Idempotency key has expired and cannot be executed again");
         }
         if (stored.status() == null || stored.body() == null) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Idempotency result is not complete");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Idempotency result is not complete");
         }
         return response(stored.status(), stored.body(), true);
     }
@@ -136,9 +137,9 @@ public class IdempotencyExecutor {
 
     private String key(HttpServletRequest request) {
         List<String> keys = Collections.list(request.getHeaders(KEY_HEADER));
-        if (keys.isEmpty()) throw new DomainException("IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required");
+        if (keys.isEmpty()) throw new DomainException(ErrorCode.IDEMPOTENCY_KEY_REQUIRED, "Idempotency-Key is required");
         if (keys.size() != 1 || !KEY_PATTERN.matcher(keys.get(0)).matches()) {
-            throw new DomainException("INVALID_IDEMPOTENCY_KEY", "Idempotency-Key must contain 1 to 128 ASCII letters, digits, dots, underscores, colons or hyphens");
+            throw new DomainException(ErrorCode.INVALID_IDEMPOTENCY_KEY, "Idempotency-Key must contain 1 to 128 ASCII letters, digits, dots, underscores, colons or hyphens");
         }
         return keys.get(0);
     }
@@ -150,7 +151,7 @@ public class IdempotencyExecutor {
             // DTO 已消费部分由 wrapper 保留；可选正文的旧请求及剩余字节也必须纳入摘要。
             wrapped.getInputStream().transferTo(OutputStream.nullOutputStream());
         } catch (IOException exception) {
-            throw new DomainException("INVALID_IDEMPOTENCY_REQUEST", "Unable to read the complete request body");
+            throw new DomainException(ErrorCode.INVALID_IDEMPOTENCY_REQUEST, "Unable to read the complete request body");
         }
         List<byte[]> parts = new ArrayList<>();
         parts.add(request.getMethod().getBytes(StandardCharsets.UTF_8));

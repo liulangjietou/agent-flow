@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.ExpensePartialAdjustmentGuard;
@@ -95,8 +96,7 @@ public class JdbcVoucherReversalOperationRepository {
                     timestamp(value.nextAttemptAt()),
                     original.id().toString());
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "VOUCHER_REVERSAL_OPERATION_EXISTS",
+            throw new DomainException(ErrorCode.VOUCHER_REVERSAL_OPERATION_EXISTS,
                     "The original voucher already has an immutable reversal command");
         }
         append(value);
@@ -315,7 +315,7 @@ public class JdbcVoucherReversalOperationRepository {
 
     private static Instant instant(Timestamp at) { return at == null ? null : at.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Reversal command, consumed preparation or original voucher changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Reversal command, consumed preparation or original voucher changed"); }
 
     /**
      * 扫描不读取完整会计或支付内容。

@@ -1,14 +1,15 @@
+import { tmpdir } from 'node:os'
 import assert from 'node:assert/strict'
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import ts from 'typescript'
 
 // 仅向独立本机演示环境创建合成申请，保留退回、撤回和重提记录供浏览器验收。
 const origin = new URL(process.argv[2])
 assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(origin.hostname) && origin.pathname === '/' && process.argv[3] === '--exercise')
-const temporary = mkdtempSync('/fyoung/tmp/agentflow-round-comparison-runtime-')
+const temporary = mkdtempSync(join(process.env.AGENTFLOW_TMP_DIR ?? tmpdir(), 'agentflow-round-comparison-runtime-'))
 writeFileSync(resolve(temporary, 'package.json'), '{"type":"module"}')
 const source = readFileSync(fileURLToPath(new URL('../src/roundComparison.ts', import.meta.url)), 'utf8')
 writeFileSync(resolve(temporary, 'roundComparison.js'), ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)

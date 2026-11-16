@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
@@ -72,5 +73,5 @@ public class ExpensePartialAdjustmentSources {
     public static void requireContinuation(ExpenseAdjustmentFundingSource expected, ExpenseAdjustmentFundingSource value) {
         expected.requireContinuation(value);
     }
-    private static DomainException changed() { return new DomainException("EXPENSE_PARTIAL_ADJUSTMENT_SOURCE_CHANGED", "Current persisted expense, settlement, budget, accounting or registered bank evidence changed"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.EXPENSE_PARTIAL_ADJUSTMENT_SOURCE_CHANGED, "Current persisted expense, settlement, budget, accounting or registered bank evidence changed"); }
 }

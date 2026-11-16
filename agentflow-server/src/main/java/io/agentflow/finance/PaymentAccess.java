@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
@@ -11,7 +13,7 @@ import java.util.UUID;
  */
 @Service
 public class PaymentAccess {
-    public static final String CASHIER_ROLE = "CASHIER";
+    public static final String CASHIER_ROLE = SystemRole.CASHIER.name();
     private final CurrentActor actors;
     private final VoucherAccess financial;
     private final JdbcPaymentAuthorizationRepository authorizations;
@@ -37,7 +39,7 @@ public class PaymentAccess {
     }
     /** 出纳目录仅接受明确 CASHIER 角色，ADMIN 或 FINANCE 不能隐式兼任。 */
     public void requireCashierRole() {
-        if (!actors.actor().hasRole(CASHIER_ROLE)) throw new DomainException("FORBIDDEN", "Cashier role is required");
+        if (!actors.actor().hasRole(CASHIER_ROLE)) throw new DomainException(ErrorCode.FORBIDDEN, "Cashier role is required");
     }
     /** 出纳只获得已授权付款的专用最小投影，不因此成为审批参与者或取得完整表单访问。 */
     public PaymentAuthorization requireCashier(UUID id) {
@@ -49,10 +51,10 @@ public class PaymentAccess {
     public PaymentAuthorization requireExecution(UUID id) {
         var value = requireCashier(id); var actor = actors.actor();
         if (actor.userId().equals(value.terms().payee().employeeId()) || actor.userId().equals(value.decision().authorizedBy())) {
-            throw new DomainException("FORBIDDEN", "Applicant and payment authorizer cannot execute the payment");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Applicant and payment authorizer cannot execute the payment");
         }
         return value;
     }
     private PaymentAuthorization authorization(UUID id) { return authorizations.find(actors.actor().tenantId(), id).orElseThrow(PaymentAccess::notFound); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Payment authorization is unavailable in the current scope"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Payment authorization is unavailable in the current scope"); }
 }

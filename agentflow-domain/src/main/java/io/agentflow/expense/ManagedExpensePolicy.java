@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 
 /**
@@ -10,7 +11,7 @@ public record ManagedExpensePolicy(ExpensePolicySelection selection, ExpensePoli
     /** 只发送已启用类别和非空制度，不允许网关把不完整配置当成旧制度继续执行。 */
     public ManagedExpensePolicy {
         if (selection == null || definition == null || definition.rules().isEmpty() || category == null || !category.active()) {
-            throw new DomainException("INVALID_EXPENSE_POLICY_SELECTION", "Managed expense policy requires a published definition and active category");
+            throw new DomainException(ErrorCode.INVALID_EXPENSE_POLICY_SELECTION, "Managed expense policy requires a published definition and active category");
         }
     }
 }

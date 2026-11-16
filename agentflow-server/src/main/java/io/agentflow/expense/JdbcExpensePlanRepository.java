@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpensePlanRepositoryMapper;
@@ -35,7 +36,7 @@ public class JdbcExpensePlanRepository implements ExpensePlanRepository {
     @Transactional(propagation = Propagation.MANDATORY)
     public void lock(String tenant, UUID planId) {
         var application = sqlMapper.lock(tenant, planId.toString());
-        if (application.isEmpty()) throw new DomainException("NOT_FOUND", "Expense plan not found");
+        if (application.isEmpty()) throw new DomainException(ErrorCode.NOT_FOUND, "Expense plan not found");
         sqlMapper.lock2(tenant, application.get(0));
         sqlMapper.lock3(tenant, planId.toString());
     }
@@ -103,9 +104,9 @@ public class JdbcExpensePlanRepository implements ExpensePlanRepository {
 
     private static void requireAudit(String actor, String operation) {
         if (StringUtils.isBlank(actor) || actor.length() > 128 || operation == null || !operation.matches("[A-Z][A-Z0-9_]{0,63}")) {
-            throw new DomainException("INVALID_EXPENSE_PLAN_AUDIT", "Plan changes require an actor and operation");
+            throw new DomainException(ErrorCode.INVALID_EXPENSE_PLAN_AUDIT, "Plan changes require an actor and operation");
         }
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense plan binding or version has changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense plan binding or version has changed"); }
 }

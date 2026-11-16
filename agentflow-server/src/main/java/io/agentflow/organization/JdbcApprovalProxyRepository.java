@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.mybatis.SqlRow;
 import io.agentflow.mybatis.SqlRows;
@@ -68,8 +69,7 @@ public class JdbcApprovalProxyRepository implements ApprovalProxyRepository {
                         id.toString(),
                         expectedRevision);
         if (changed != 1)
-            throw new DomainException(
-                    "CONCURRENCY_CONFLICT", "Approval proxy revision has changed");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Approval proxy revision has changed");
     }
 
     @Override

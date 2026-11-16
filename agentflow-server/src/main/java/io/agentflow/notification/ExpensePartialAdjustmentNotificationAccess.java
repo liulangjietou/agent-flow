@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.agentflow.approval.model.Application;
@@ -72,8 +73,7 @@ public class ExpensePartialAdjustmentNotificationAccess {
         var row = row(actor.tenantId(), actor.userId(), id);
         var source = allowed(actor.tenantId(), actor.userId(), row);
         if (source == null)
-            throw new DomainException(
-                    "NOT_FOUND",
+            throw new DomainException(ErrorCode.NOT_FOUND,
                     "Original partial expense adjustment notification is unavailable in the current"
                         + " scope");
         var binding =

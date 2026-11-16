@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.history.HistoryEvent;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.common.DomainException;
@@ -24,7 +25,7 @@ public record ExpenseArchive(int formatVersion, Instant archivedAt, Manifest man
     }
     /** 文件已经逐个核对后，应用服务在锁内复核完整清单并封存。 */
     public static ExpenseArchive seal(Manifest manifest, Instant at) { return new ExpenseArchive(FORMAT_VERSION, at, manifest); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_ARCHIVE", "Archive must contain complete and matching original expense evidence"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_ARCHIVE, "Archive must contain complete and matching original expense evidence"); }
 
     /**
      * 只保存业务证据，不复制外部凭据、网关配置或原始付款命令。

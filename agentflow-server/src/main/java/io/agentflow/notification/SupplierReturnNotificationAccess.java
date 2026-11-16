@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.agentflow.approval.model.Application;
@@ -65,7 +66,7 @@ public class SupplierReturnNotificationAccess {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Target target(UUID messageId) {
         var actor = actors.actor(); var row = row(actor.tenantId(), actor.userId(), messageId); var source = allowed(actor.tenantId(), actor.userId(), row);
-        if (source == null) throw new DomainException("NOT_FOUND", "Original supplier return notification is unavailable in the current scope");
+        if (source == null) throw new DomainException(ErrorCode.NOT_FOUND, "Original supplier return notification is unavailable in the current scope");
         var check = source.check(); var input = check.input(); var payment = input.request().command(); var binding = payment.holdCommand().authorization().source().reservation().source();
         access.read(payment.id()); var observed = check.receipt(); var registration = source.registration();
         return new Target(messageId, input.id(), payment.id(), binding.requestId(), binding.applicationId(), binding.round().roundNo(),

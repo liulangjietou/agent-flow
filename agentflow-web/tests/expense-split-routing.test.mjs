@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 const { readSplitRouting, SplitRoutingQuery } = await import(process.env.AGENTFLOW_TEST_EXPENSESPLITROUTING)
-import { uuid, at, from, money, document, view } from './fixtures/expense-split-routing.mjs'
+import { uuid, from, money, document, view } from './fixtures/expense-split-routing.mjs'
 const read = v => readSplitRouting(v, uuid(1), 1, uuid(21))
 const unreadable = error => error.code === 'RESPONSE_UNREADABLE'
 

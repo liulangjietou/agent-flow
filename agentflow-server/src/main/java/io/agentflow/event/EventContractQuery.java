@@ -1,5 +1,6 @@
 package io.agentflow.event;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.Map;
 import java.util.Set;
@@ -43,5 +44,5 @@ public record EventContractQuery(String afterKey, Long before, int limit) {
     }
 
     private static void requireKeys(Map<String, String> query, Set<String> allowed) { if (!allowed.containsAll(query.keySet())) throw invalid(); }
-    private static DomainException invalid() { return new DomainException("INVALID_EVENT_CONTRACT_QUERY", "Invalid event contract query"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EVENT_CONTRACT_QUERY, "Invalid event contract query"); }
 }

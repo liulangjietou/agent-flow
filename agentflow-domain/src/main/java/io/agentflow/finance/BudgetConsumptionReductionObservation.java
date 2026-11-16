@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseContent;
 import io.agentflow.expense.ExpenseLine;
@@ -98,6 +99,6 @@ public record BudgetConsumptionReductionObservation(UUID operationId, UUID adjus
     }
     static boolean text(String value, int max) { return StringUtils.isNotBlank(value) && value.length() <= max && value.equals(value.trim()) && value.chars().noneMatch(Character::isISOControl); }
     private static boolean digest(String value) { return value != null && value.matches("[a-f0-9]{64}"); }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_REDUCTION_OBSERVATION", "Budget consumption reduction requires an exact original and consistent reduced positions"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_REDUCTION_OBSERVATION, "Budget consumption reduction requires an exact original and consistent reduced positions"); }
     @Override public String toString() { return "BudgetConsumptionReductionObservation[operationId=" + operationId + ", status=" + status + "]"; }
 }

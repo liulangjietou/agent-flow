@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -19,7 +20,7 @@ public record VoucherDisputeResolution(UUID id, String tenantId, UUID operationI
                 || StringUtils.isBlank(resolvedBy) || resolvedBy.length() > 128 || resolvedAt == null || resolvedAt.isBefore(observation.observedAt())
                 || !resolvedAt.isBefore(observation.observedAt().plus(VoucherOperation.DISPUTE_EVIDENCE_LIFETIME))
                 || StringUtils.isBlank(evidenceReference) || evidenceReference.length() > 128 || evidenceReference.chars().anyMatch(Character::isISOControl)
-                || StringUtils.isBlank(reason) || reason.length() > 2000) throw new DomainException("INVALID_VOUCHER_DISPUTE_RESOLUTION", "Voucher decision requires recent original evidence and a named reviewer");
+                || StringUtils.isBlank(reason) || reason.length() > 2000) throw new DomainException(ErrorCode.INVALID_VOUCHER_DISPUTE_RESOLUTION, "Voucher decision requires recent original evidence and a named reviewer");
         evidenceReference = evidenceReference.trim(); reason = reason.trim();
     }
     /** 申请人与原出纳不能裁决，结果只对应同一命令的精确连续修订。 */

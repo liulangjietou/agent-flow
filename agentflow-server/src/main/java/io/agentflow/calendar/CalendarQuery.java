@@ -1,5 +1,6 @@
 package io.agentflow.calendar;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.Map;
 import java.util.Set;
@@ -39,5 +40,5 @@ public record CalendarQuery(String afterKey, Long beforeRevision, int limit) {
         if (limit > MAX_LIMIT) throw invalid();
         return (int) limit;
     }
-    private static DomainException invalid() { return new DomainException("INVALID_CALENDAR_QUERY", "Invalid calendar pagination query"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_CALENDAR_QUERY, "Invalid calendar pagination query"); }
 }

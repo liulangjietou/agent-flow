@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -258,5 +259,5 @@ public class JdbcSupplierPaymentReturnsRepository {
 
     private static Timestamp timestamp(Instant value) { return Timestamp.from(time(value)); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Supplier return ledger or original bank source changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Supplier return ledger or original bank source changed"); }
 }

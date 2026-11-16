@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.model.BusinessReference;
@@ -59,8 +60,8 @@ public class VoucherReversalSources {
                 : expenses.find(tenant, binding.businessId()).orElseThrow(VoucherReversalSources::changed).version();
         if (version != input.businessVersion()) throw changed();
     }
-    private static DomainException changed() { return new DomainException("VOUCHER_REVERSAL_SOURCE_CHANGED", "Financial source changed after reversal review"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Original accepted voucher for this financial round not found"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.VOUCHER_REVERSAL_SOURCE_CHANGED, "Financial source changed after reversal review"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Original accepted voucher for this financial round not found"); }
     /**
      * 首次接受的原件与当前独立裁决状态各有用途，不能相互覆盖。
      * @author owlzhangfq@gmail.com

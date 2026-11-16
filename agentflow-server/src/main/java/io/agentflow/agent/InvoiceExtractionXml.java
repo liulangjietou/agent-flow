@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -75,7 +76,7 @@ final class InvoiceExtractionXml {
     }
 
     private static DomainException invalidSource() {
-        return new DomainException("INVOICE_EXTRACTION_SOURCE_UNAVAILABLE", "Invoice XML is unreadable, ambiguous or exceeds extraction limits");
+        return new DomainException(ErrorCode.INVOICE_EXTRACTION_SOURCE_UNAVAILABLE, "Invoice XML is unreadable, ambiguous or exceeds extraction limits");
     }
 
     /**

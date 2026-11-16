@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import java.nio.charset.StandardCharsets;
@@ -44,5 +45,5 @@ public record InboxQueryParameters(InboxRepository.Query query, String context) 
         return Base64.getUrlEncoder().withoutPadding().encodeToString((context + "\n" + message.createdAt() + "\n" + message.id()).getBytes(StandardCharsets.UTF_8));
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_INBOX_QUERY", "Invalid inbox filter or cursor"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_INBOX_QUERY, "Invalid inbox filter or cursor"); }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import java.time.Duration;
@@ -98,9 +99,9 @@ public record SupplierPayableReview(Input input, long version, Status status, in
     }
     private void requireRunning(Instant now) { requireTime(now); if (status != Status.RUNNING) throw conflict(); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYABLE_REVIEW", "Payable review must retain exact approved source, named finance actor and single-use evidence"); }
-    private static DomainException conflict() { return new DomainException("SUPPLIER_PAYABLE_REVIEW_STATE_CONFLICT", "Payable review no longer allows this transition"); }
-    private static DomainException unavailable() { return new DomainException("SUPPLIER_PAYABLE_REVIEW_UNAVAILABLE", "Fresh payable review for the current finance actor is required"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYABLE_REVIEW, "Payable review must retain exact approved source, named finance actor and single-use evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.SUPPLIER_PAYABLE_REVIEW_STATE_CONFLICT, "Payable review no longer allows this transition"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.SUPPLIER_PAYABLE_REVIEW_UNAVAILABLE, "Fresh payable review for the current finance actor is required"); }
 
     /** 日志不展开供应商、原应付、账户或人员。 */
     @Override public String toString() { return "SupplierPayableReview[id=" + input.id() + ", status=" + status + "]"; }

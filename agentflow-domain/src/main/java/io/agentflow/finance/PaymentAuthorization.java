@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Duration;
@@ -59,7 +60,7 @@ public record PaymentAuthorization(Terms terms, Decision decision, long version,
         var source = voucher.input().command(); var binding = source.binding();
         if (source.kind() == VoucherCommand.Kind.PAYMENT || payee == null || !payee.employeeId().equals(source.employeeId()) || !payee.legalEntityId().equals(source.legalEntityId())) throw changedVoucher();
         var amount = source.totals().payable();
-        if (amount.value().signum() == 0) throw new DomainException("PAYMENT_NOT_REQUIRED", "Zero payable settlements do not create payment authorizations");
+        if (amount.value().signum() == 0) throw new DomainException(ErrorCode.PAYMENT_NOT_REQUIRED, "Zero payable settlements do not create payment authorizations");
         var terms = new Terms(id, source.tenantId(), source.kind() == VoucherCommand.Kind.EMPLOYEE_ADVANCE ? PaymentCommand.Purpose.EMPLOYEE_ADVANCE : PaymentCommand.Purpose.EXPENSE_REIMBURSEMENT,
                 new PaymentCommand.Binding(binding.businessId(), binding.applicationId(), binding.roundNo(), binding.applicationVersion(), binding.businessVersion()),
                 amount, payee, source.id(), source.digest(), voucher.highestRevision(), voucher.observation().voucherReference(), voucher.input().targetDigest());
@@ -71,14 +72,14 @@ public record PaymentAuthorization(Terms terms, Decision decision, long version,
                                                    EmployeeAccountPort.Account currentPayee, VoucherOperation currentVoucher, Instant now) {
         requireAuthorized(now);
         if (invalidText(cashier) || cashier.equals(decision.authorizedBy()) || cashier.equals(terms.payee().employeeId())) {
-            throw new DomainException("PAYMENT_SEPARATION_REQUIRED", "Applicant, payment authorizer and cashier must be different people");
+            throw new DomainException(ErrorCode.PAYMENT_SEPARATION_REQUIRED, "Applicant, payment authorizer and cashier must be different people");
         }
         if (!matchesVoucher(currentVoucher, now)) throw changedVoucher();
         if (currentPayee == null || !currentPayee.snapshot().equals(terms.payee()) || !currentPayee.validUntil().isAfter(now)) {
-            throw new DomainException("PAYMENT_ACCOUNT_CHANGED", "Original payee account must remain current and valid");
+            throw new DomainException(ErrorCode.PAYMENT_ACCOUNT_CHANGED, "Original payee account must remain current and valid");
         }
         if (directory == null || !directory.matches(new PaymentAccountsPort.Request(terms.payee().legalEntityId(), terms.amount().currency(), cashier), now)) {
-            throw new DomainException("PAYMENT_DEBIT_ACCOUNT_UNAVAILABLE", "A current debit account directory for the original cashier and legal entity is required");
+            throw new DomainException(ErrorCode.PAYMENT_DEBIT_ACCOUNT_UNAVAILABLE, "A current debit account directory for the original cashier and legal entity is required");
         }
         var debit = directory.account(debitReference, now); var command = command(terms, decision, cashier, debit);
         Instant until = directory.validUntil().isBefore(currentPayee.validUntil()) ? directory.validUntil() : currentPayee.validUntil();
@@ -107,7 +108,7 @@ public record PaymentAuthorization(Terms terms, Decision decision, long version,
     public PaymentAuthorization retire(PaymentOperation operation, String actor, String reason, Instant now) {
         if (!canRetire(operation, actor) || operation.running() || operation.status() == PaymentOperation.Status.QUEUED
                 || now == null || now.isBefore(operation.updatedAt()) || now.isBefore(updatedAt)) {
-            throw new DomainException("PAYMENT_RETIREMENT_UNSAFE", "Original payment is not proven safely finished for this finance actor");
+            throw new DomainException(ErrorCode.PAYMENT_RETIREMENT_UNSAFE, "Original payment is not proven safely finished for this finance actor");
         }
         return new PaymentAuthorization(terms, decision, 3, Status.RETIRED, now, execution, null,
                 new Retirement(actor, reason, now, operation.version(), operation.retirementBasis()));
@@ -140,7 +141,7 @@ public record PaymentAuthorization(Terms terms, Decision decision, long version,
 
     private void requireAuthorized(Instant now) {
         if (status != Status.AUTHORIZED || now == null || now.isBefore(updatedAt)) throw conflict();
-        if (!now.isBefore(decision.expiresAt())) throw new DomainException("PAYMENT_AUTHORIZATION_EXPIRED", "Payment authorization is outside its execution window");
+        if (!now.isBefore(decision.expiresAt())) throw new DomainException(ErrorCode.PAYMENT_AUTHORIZATION_EXPIRED, "Payment authorization is outside its execution window");
     }
     private static PaymentCommand command(Terms terms, Decision decision, String cashier, PaymentAccountsPort.DebitAccount debit) {
         return new PaymentCommand(terms.id(), terms.tenantId(), terms.purpose(), terms.binding(), terms.amount(), debit.reference(), terms.payee(), terms.voucherReference(),
@@ -148,9 +149,9 @@ public record PaymentAuthorization(Terms terms, Decision decision, long version,
     }
     private static boolean invalidText(String value) { return StringUtils.isBlank(value) || value.length() > 128; }
     private static boolean digest(String value) { return value != null && value.matches("[a-f0-9]{64}"); }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_AUTHORIZATION", "Payment authorization must preserve original approved terms and separated execution"); }
-    private static DomainException conflict() { return new DomainException("PAYMENT_AUTHORIZATION_STATE_CONFLICT", "Payment authorization no longer allows this transition"); }
-    private static DomainException changedVoucher() { return new DomainException("PAYMENT_VOUCHER_CHANGED", "Original accounting voucher is not a current usable posted fact"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_AUTHORIZATION, "Payment authorization must preserve original approved terms and separated execution"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.PAYMENT_AUTHORIZATION_STATE_CONFLICT, "Payment authorization no longer allows this transition"); }
+    private static DomainException changedVoucher() { return new DomainException(ErrorCode.PAYMENT_VOUCHER_CHANGED, "Original accounting voucher is not a current usable posted fact"); }
 
     /** 日志只显示标识与状态，不泄露账户、金额或人员。 */
     @Override public String toString() { return "PaymentAuthorization[id=" + terms.id() + ", version=" + version + ", status=" + status + "]"; }

@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.time.Instant;
@@ -74,7 +75,7 @@ public record BudgetAdjustmentObservation(UUID operationId, String commandDigest
     private static boolean invalidText(String value, int maximum) {
         return StringUtils.isBlank(value) || value.length() > maximum || !value.equals(value.trim()) || value.chars().anyMatch(Character::isISOControl);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_ADJUSTMENT_OBSERVATION", "Budget adjustment receipt must preserve atomic identities, versions, periods and exact amounts"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_ADJUSTMENT_OBSERVATION, "Budget adjustment receipt must preserve atomic identities, versions, periods and exact amounts"); }
     /** 日志不打印额度与占用明细。 */
     @Override public String toString() { return "BudgetAdjustmentObservation[operationId=" + operationId + ", status=" + status + "]"; }
 }

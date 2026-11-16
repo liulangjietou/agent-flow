@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseUse;
 import java.time.Instant;
@@ -123,7 +124,7 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
         Money amount = consumedAmountFor(use);
         if (amount.value().signum() == 0 || reversals.stream().anyMatch(item -> item.use().equals(use))
                 || reductions.stream().anyMatch(item -> item.use().equals(use))) {
-            throw new DomainException("CONSUMPTION_REVERSAL_CONFLICT", "An unreversed original consumption is required");
+            throw new DomainException(ErrorCode.CONSUMPTION_REVERSAL_CONFLICT, "An unreversed original consumption is required");
         }
         var updated = new ArrayList<>(reversals); updated.add(new ConsumptionReversal(adjustmentId, use, amount, at));
         return new ReservedAmount(limit, consumptions, reservations, updated, reductions, ceiling);
@@ -134,7 +135,7 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
         limit.sameCurrency(amount);
         if (use == null) throw invalid();
         if (consumedFor(use)) {
-            throw new DomainException("RESERVATION_ALREADY_CONSUMED", "A consumed expense round cannot reserve the same resource again");
+            throw new DomainException(ErrorCode.RESERVATION_ALREADY_CONSUMED, "A consumed expense round cannot reserve the same resource again");
         }
         var updated = new ArrayList<>(reservations.stream().filter(item -> !item.use().equals(use)).toList());
         if (amount.value().signum() > 0) updated.add(new Reservation(use, amount));
@@ -152,7 +153,7 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
     /** 结算核销恰好消耗已经预留的金额，不能再次核销或扩大核销额。 */
     public ReservedAmount consume(ExpenseUse use) {
         Money amount = reservedFor(use);
-        if (amount.value().signum() == 0) throw new DomainException("RESERVATION_NOT_FOUND", "No active reservation exists for this expense round");
+        if (amount.value().signum() == 0) throw new DomainException(ErrorCode.RESERVATION_NOT_FOUND, "No active reservation exists for this expense round");
         var settled = new ArrayList<>(consumptions); settled.add(new Reservation(use, amount));
         return new ReservedAmount(limit, settled, reservations.stream().filter(item -> !item.use().equals(use)).toList(), reversals, reductions, ceiling);
     }
@@ -170,8 +171,8 @@ public record ReservedAmount(Money limit, List<Reservation> consumptions, List<R
         }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_RESERVATION", "Reservation identity or amount is invalid"); }
-    private static DomainException insufficient() { return new DomainException("INSUFFICIENT_FINANCIAL_BALANCE", "Reserved and consumed amounts exceed the available limit"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_RESERVATION, "Reservation identity or amount is invalid"); }
+    private static DomainException insufficient() { return new DomainException(ErrorCode.INSUFFICIENT_FINANCIAL_BALANCE, "Reserved and consumed amounts exceed the available limit"); }
 
     /**
      * HARD 与历史空值均限制余额；REFERENCE_ONLY 仅用于业务明确允许超额的事前计划。

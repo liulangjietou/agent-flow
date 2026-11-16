@@ -21,13 +21,34 @@ public class ExpenseAgentModel {
             不把抽取或本人确认值说成查验事实，不编造金额、制度阈值或人员资料。不要重复读取已有足够依据；目标完成后 FINISH。
             不输出 Markdown、工具调用、额外字段、HTTP 地址、脚本或费用赋值。
             """;
+    /** 修复重试时追加的提示；不改变输入，只提醒模型回到协议。 */
+    private static final String REPAIR_NOTE = "\n上一次回复不符合上述 JSON 协议或引用了范围外的资料，请严格按协议重新输出。";
     private final OpenAiTextClient client;
     private final JsonUtil json;
+    private final int repairAttempts;
     /** 保持原严格传输约束，决策 JSON 不会变成任意模型工具调用。 */
-    public ExpenseAgentModel(AssistConfiguration configuration, JsonUtil json) { this.client = new OpenAiTextClient(configuration, json); this.json = json; }
-    /** 解析必须保持参数类型，拒绝数值截断及未授权引用。 */
+    public ExpenseAgentModel(AssistConfiguration configuration, JsonUtil json) {
+        this.client = new OpenAiTextClient(configuration, json); this.json = json;
+        this.repairAttempts = configuration.getInvalidOutputRepairAttempts();
+    }
+
+    /**
+     * 输出不合协议时有界重试：回复已收到且被服务器拒绝，模型只提议动作、不产生副作用，重试不会重复执行业务。
+     * 网络失败或超时属于结果未知，不在这里重试，仍由本人确认后继续。
+     */
     public ExpenseAgentRun.Decision decide(ExpenseAgentRun.Context context, Object input) {
-        var reply = client.complete(ExpenseAgentRun.PROMPT_VERSION, context.targetDigest(), INSTRUCTION, input);
+        for (int attempt = 0; ; attempt++) {
+            try {
+                return decideOnce(context, input, attempt == 0 ? INSTRUCTION : INSTRUCTION + REPAIR_NOTE);
+            } catch (AssistModelPort.ModelFailure failure) {
+                if (failure.failure() != AssistRun.Failure.INVALID_MODEL_OUTPUT || attempt >= repairAttempts) throw failure;
+            }
+        }
+    }
+
+    /** 解析必须保持参数类型，拒绝数值截断及未授权引用。 */
+    private ExpenseAgentRun.Decision decideOnce(ExpenseAgentRun.Context context, Object input, String instruction) {
+        var reply = client.complete(ExpenseAgentRun.PROMPT_VERSION, context.targetDigest(), instruction, input);
         try {
             var value = reply.output();
             if (!value.isObject() || value.size() != 4 || !value.path("action").isTextual() || !value.path("message").isTextual()

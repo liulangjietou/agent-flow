@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Duration;
@@ -138,5 +139,5 @@ public interface ExpensePaymentReturnPort {
         return current.status() == PaymentObservation.Status.SUCCEEDED && original.completedAt().equals(current.completedAt()) && original.receiptReference().equals(current.receiptReference());
     }
     private static boolean reference(String value) { return StringUtils.isNotBlank(value) && value.length() <= 128 && value.equals(value.trim()) && value.chars().noneMatch(Character::isISOControl); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PAYMENT_RETURN_RECEIPT", "Expense payment return requires original payment, received bank funds and a matching payable credit"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PAYMENT_RETURN_RECEIPT, "Expense payment return requires original payment, received bank funds and a matching payable credit"); }
 }

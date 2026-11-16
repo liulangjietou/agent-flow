@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 
 /**
@@ -16,7 +17,7 @@ public record InvoiceKey(Type type, String code, String number) {
 
     /** 两类号码具有独立、无歧义的规范键。 */
     public String canonical() { return type == Type.DIGITAL ? "D:" + number : "T:" + code + ":" + number; }
-    private static DomainException invalid() { return new DomainException("INVALID_INVOICE_KEY", "A verified invoice type and canonical number are required"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_INVOICE_KEY, "A verified invoice type and canonical number are required"); }
 
     /**
      * 当前发票身份的两种去重口径。

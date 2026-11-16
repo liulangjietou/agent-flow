@@ -1,5 +1,7 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionDraftRepository;
@@ -30,16 +32,16 @@ public class ApprovalProxyService {
     @Transactional
     public ApprovalProxy create(Actor actor, UUID definitionId, UUID principalId, UUID substituteId,
                                 Instant startsAt, Instant endsAt, String reason) {
-        actor.requireRole("ADMIN");
+        actor.requireRole(SystemRole.ADMIN);
         var value = new ApprovalProxy(UUID.randomUUID(), definitionId, principalId, substituteId,
                 startsAt, endsAt, reason, actor.userId(), Instant.now(), 1, null);
         long directoryRevision = organization.lock(actor.tenantId());
         definitions.findById(actor.tenantId(), value.definitionId()).filter(definition -> definition.status() == DraftStatus.PUBLISHED)
-                .orElseThrow(() -> new DomainException("APPROVAL_PROXY_DEFINITION_REQUIRED", "Approval proxy requires a published definition in this tenant"));
+                .orElseThrow(() -> new DomainException(ErrorCode.APPROVAL_PROXY_DEFINITION_REQUIRED, "Approval proxy requires a published definition in this tenant"));
         requirePerson(actor.tenantId(), value.principalId());
         requirePerson(actor.tenantId(), value.substituteId());
         if (proxies.overlaps(actor.tenantId(), value.definitionId(), value.principalId(), value.startsAt(), value.endsAt())) {
-            throw new DomainException("APPROVAL_PROXY_OVERLAP", "The principal already has a proxy in this period and definition");
+            throw new DomainException(ErrorCode.APPROVAL_PROXY_OVERLAP, "The principal already has a proxy in this period and definition");
         }
         proxies.insert(actor.tenantId(), value);
         organization.recordChange(actor.tenantId(), directoryRevision, actor.userId(), CHANGE_KIND, value.id(), value, value.createdAt());
@@ -49,10 +51,10 @@ public class ApprovalProxyService {
     /** 撤销与正在使用原代理的事务共用行锁，保持明确先后顺序与具名原因。 */
     @Transactional
     public ApprovalProxy revoke(Actor actor, UUID id, long expectedRevision, String reason) {
-        actor.requireRole("ADMIN");
+        actor.requireRole(SystemRole.ADMIN);
         long directoryRevision = organization.lock(actor.tenantId());
         var original = proxies.lock(actor.tenantId(), id)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Approval proxy not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Approval proxy not found"));
         var value = original.revoke(expectedRevision, actor.userId(), reason, Instant.now());
         proxies.revoke(actor.tenantId(), id, expectedRevision, value.revocation());
         organization.recordChange(actor.tenantId(), directoryRevision, actor.userId(), CHANGE_KIND, value.id(), value, value.revocation().at());
@@ -61,6 +63,6 @@ public class ApprovalProxyService {
 
     private void requirePerson(String tenantId, UUID personId) {
         organization.person(tenantId, personId).filter(OrganizationPerson::canApprove)
-                .orElseThrow(() -> new DomainException("APPROVAL_PROXY_PERSON_REQUIRED", "Both proxy participants must be active local approvers in this tenant"));
+                .orElseThrow(() -> new DomainException(ErrorCode.APPROVAL_PROXY_PERSON_REQUIRED, "Both proxy participants must be active local approvers in this tenant"));
     }
 }

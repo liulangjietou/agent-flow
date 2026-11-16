@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.time.Instant;
@@ -20,7 +21,7 @@ public final class ExpenseSubmissionResources {
     public Plan plan(ExpenseReport prepared, Resources resources, Instant at) {
         var next = prepared.currentRound();
         if (prepared.version() != next.submittedFinancialVersion() + 1 || !next.adjustments().isEmpty()) {
-            throw new DomainException("EXPENSE_PRECHECK_REQUIRED", "Resource reservations require a fresh submission snapshot");
+            throw new DomainException(ErrorCode.EXPENSE_PRECHECK_REQUIRED, "Resource reservations require a fresh submission snapshot");
         }
         ExpenseRound previous = prepared.rounds().size() < 2 ? null : prepared.rounds().get(prepared.rounds().size() - 2);
         var desiredInvoices = new LinkedHashMap<UUID, ExpenseUse>();
@@ -67,15 +68,15 @@ public final class ExpenseSubmissionResources {
                 }
                 continue;
             }
-            if (!invoice.ownerId().equals(report.employeeId())) throw new DomainException("INVOICE_OWNER_MISMATCH", "Invoice belongs to another employee");
+            if (!invoice.ownerId().equals(report.employeeId())) throw new DomainException(ErrorCode.INVOICE_OWNER_MISMATCH, "Invoice belongs to another employee");
             var facts = invoice.requireVerified(at);
-            if (!canonical.add(facts.key())) throw new DomainException("INVOICE_OCCUPIED", "The same canonical invoice appears in multiple originals");
+            if (!canonical.add(facts.key())) throw new DomainException(ErrorCode.INVOICE_OCCUPIED, "The same canonical invoice appears in multiple originals");
             Operation operation;
             if (invoice.occupation() == Invoice.Occupation.AVAILABLE) {
                 invoice.occupy(invoice.version(), target, report.employeeId(), report.content().legalEntityId(), at); operation = Operation.RESERVE;
             } else if (invoice.occupation() == Invoice.Occupation.OCCUPIED && invoice.use().equals(previousUse)) {
                 invoice.move(invoice.version(), previousUse, target, report.content().legalEntityId(), at); operation = Operation.MOVE;
-            } else throw new DomainException("INVOICE_OCCUPIED", "Invoice has another active or consumed occupation");
+            } else throw new DomainException(ErrorCode.INVOICE_OCCUPIED, "Invoice has another active or consumed occupation");
             reservations.add(new InvoiceChange(invoice.state(), operation));
         }
         // 替换成同票号的另一原件时，先释放旧键，再建立新键；整个计划必须在一个事务内保存。
@@ -156,18 +157,18 @@ public final class ExpenseSubmissionResources {
     }
     private static <T> T require(Map<UUID, T> values, UUID id) {
         var found = values.get(id);
-        if (found == null) throw new DomainException("EXPENSE_RESOURCE_UNAVAILABLE", "A referenced financial resource is unavailable");
+        if (found == null) throw new DomainException(ErrorCode.EXPENSE_RESOURCE_UNAVAILABLE, "A referenced financial resource is unavailable");
         return found;
     }
     private static void tenant(ExpenseReport report, String tenant) {
-        if (!report.tenantId().equals(tenant)) throw new DomainException("EXPENSE_RESOURCE_UNAVAILABLE", "Financial resource tenant does not match");
+        if (!report.tenantId().equals(tenant)) throw new DomainException(ErrorCode.EXPENSE_RESOURCE_UNAVAILABLE, "Financial resource tenant does not match");
     }
     private static void resourceOwner(ExpenseReport report, String employee, UUID entity) {
         if (!report.employeeId().equals(employee) || !report.content().legalEntityId().equals(entity)) {
-            throw new DomainException("EXPENSE_RESOURCE_OWNER_MISMATCH", "Financial resource employee or legal entity does not match");
+            throw new DomainException(ErrorCode.EXPENSE_RESOURCE_OWNER_MISMATCH, "Financial resource employee or legal entity does not match");
         }
     }
-    private static DomainException consumed() { return new DomainException("RESERVATION_ALREADY_CONSUMED", "A settled previous expense round cannot reserve resources again"); }
+    private static DomainException consumed() { return new DomainException(ErrorCode.RESERVATION_ALREADY_CONSUMED, "A settled previous expense round cannot reserve resources again"); }
 
     /**
      * 只传不可变快照，计算过程不会修改仓储刚读到的共享实例。

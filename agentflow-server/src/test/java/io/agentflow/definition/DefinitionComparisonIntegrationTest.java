@@ -51,7 +51,7 @@ class DefinitionComparisonIntegrationTest {
     @Test
     void anonymousEmployeeAndForeignTenantCannotReadBaseline() throws Exception {
         // 本用例验证跨租户资源隔离，显式提供另一租户已配置的审批身份目录。
-        org.mockito.Mockito.doReturn(new AuthService(true, "foreign").options("foreign"))
+        org.mockito.Mockito.doReturn(new AuthService(true, "foreign", java.time.Duration.ofHours(12)).options("foreign"))
                 .when(auth).options("foreign");
         var baseline = published("foreign");
         String body = json.write(body(baseline));

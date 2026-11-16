@@ -1,5 +1,6 @@
 package io.agentflow.event;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.event.mapper.EventInboxRepositoryMapper;
@@ -198,7 +199,7 @@ public class JdbcEventInboxRepository implements EventInboxRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException missing() { return new DomainException("NOT_FOUND", "Event inbox item was not found"); }
+    private static DomainException missing() { return new DomainException(ErrorCode.NOT_FOUND, "Event inbox item was not found"); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Event inbox identity or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Event inbox identity or version changed"); }
 }

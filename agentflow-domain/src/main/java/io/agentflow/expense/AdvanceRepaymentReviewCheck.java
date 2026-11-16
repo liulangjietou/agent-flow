@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AdvanceRepaymentAdjustmentPort;
 import io.agentflow.finance.FinanceResult;
@@ -69,8 +70,8 @@ public record AdvanceRepaymentReviewCheck(Input input, long version, Status stat
     public boolean expired(Instant at) { return status == Status.RUNNING && !at.isBefore(leaseUntil); }
     private void requireTime(Instant at) { if (at == null || at.isBefore(updatedAt)) throw conflict(); }
     private void requireRunning(Instant at) { requireTime(at); if (status != Status.RUNNING) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_REPAYMENT_REVIEW_CHECK", "Repayment review must preserve original receipt, lease and evidence"); }
-    private static DomainException conflict() { return new DomainException("REPAYMENT_REVIEW_CHECK_CONFLICT", "Repayment review no longer permits this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_REPAYMENT_REVIEW_CHECK, "Repayment review must preserve original receipt, lease and evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.REPAYMENT_REVIEW_CHECK_CONFLICT, "Repayment review no longer permits this transition"); }
     @Override public String toString() { return "RepaymentReviewCheck[id=" + input.id() + ", status=" + status + "]"; }
 
     /**

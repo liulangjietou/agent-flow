@@ -1,5 +1,7 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
@@ -18,7 +20,7 @@ public record DefinitionAvailabilityChange(String tenantId, UUID definitionId, l
     /** 说明是治理事实的一部分，不能用空记录代替真实操作依据。 */
     public DefinitionAvailabilityChange {
         if (StringUtils.isBlank(reason) || reason.length() > MAX_REASON_LENGTH) {
-            throw new DomainException("INVALID_AVAILABILITY_REASON", "Availability reason must contain 1 to 2000 characters");
+            throw new DomainException(ErrorCode.INVALID_AVAILABILITY_REASON, "Availability reason must contain 1 to 2000 characters");
         }
         reason = reason.strip();
     }
@@ -27,9 +29,9 @@ public record DefinitionAvailabilityChange(String tenantId, UUID definitionId, l
     public static DefinitionAvailabilityChange prepare(DefinitionModels.DefinitionDraft definition, Actor actor,
                                                        boolean enabled, String reason, Instant changedAt) {
         String role;
-        if (actor.hasRole("ADMIN")) role = "ADMIN";
-        else if (actor.hasRole("PROCESS_ADMIN")) role = "PROCESS_ADMIN";
-        else throw new DomainException("FORBIDDEN", "Process administrator role is required");
+        if (actor.hasRole(SystemRole.ADMIN)) role = SystemRole.ADMIN.name();
+        else if (actor.hasRole(SystemRole.PROCESS_ADMIN)) role = SystemRole.PROCESS_ADMIN.name();
+        else throw new DomainException(ErrorCode.FORBIDDEN, "Process administrator role is required");
         return new DefinitionAvailabilityChange(definition.tenantId(), definition.id(), definition.revision() + 1,
                 definition.startEnabled(), enabled, actor.userId(), role, changedAt, reason);
     }

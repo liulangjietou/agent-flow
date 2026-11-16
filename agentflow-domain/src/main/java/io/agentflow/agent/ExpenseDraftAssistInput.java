@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseContent;
 import io.agentflow.finance.FinanceCatalog;
@@ -105,5 +106,5 @@ public record ExpenseDraftAssistInput(UUID reportId, UUID applicationId, long ap
         catch (NoSuchAlgorithmException impossible) { throw new IllegalStateException("SHA-256 unavailable", impossible); }
     }
     private static boolean text(String value, int maximum) { return StringUtils.isNotBlank(value) && value.length() <= maximum; }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_INPUT", "Expense draft input or evidence is invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Expense draft input or evidence is invalid"); }
 }

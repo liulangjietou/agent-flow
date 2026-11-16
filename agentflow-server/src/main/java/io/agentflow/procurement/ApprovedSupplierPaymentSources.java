@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
@@ -57,5 +58,5 @@ public class ApprovedSupplierPaymentSources {
         if (!authorization.source().equals(derive(original.tenantId(), original.requestId()))) throw changed();
     }
 
-    private static DomainException changed() { return new DomainException("PROCUREMENT_PAYMENT_SOURCE_CHANGED", "Actual approved procurement source or held payable changed"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.PROCUREMENT_PAYMENT_SOURCE_CHANGED, "Actual approved procurement source or held payable changed"); }
 }

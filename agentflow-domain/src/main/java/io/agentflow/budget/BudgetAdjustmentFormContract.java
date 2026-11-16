@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionModels.Graph;
 import io.agentflow.form.FormSchema;
@@ -26,7 +27,7 @@ public final class BudgetAdjustmentFormContract {
         if (schema == null || !schema.fieldTypes().keySet().equals(TYPES.keySet())
                 || schema.fields().stream().anyMatch(field -> field.type() != TYPES.get(field.key()) || !field.required()
                 || DETAILS.equals(field.key()) && !Boolean.TRUE.equals(field.sensitive()))) {
-            throw new DomainException("BUDGET_ADJUSTMENT_FORM_REQUIRED", "Budget adjustment requires sensitive details and derived amount and currency");
+            throw new DomainException(ErrorCode.BUDGET_ADJUSTMENT_FORM_REQUIRED, "Budget adjustment requires sensitive details and derived amount and currency");
         }
     }
 

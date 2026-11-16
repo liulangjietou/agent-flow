@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.NotificationTexts;
@@ -38,7 +39,7 @@ public final class DefinitionModels {
     public record Node(String id, String name, NodeType type, Map<String, String> properties) {
         public Node {
             if (id == null || id.isBlank() || name == null || name.isBlank() || type == null) {
-                throw new DomainException("INVALID_NODE", "Node id, name and type are required");
+                throw new DomainException(ErrorCode.INVALID_NODE, "Node id, name and type are required");
             }
             properties = properties == null ? Map.of() : Map.copyOf(properties);
         }
@@ -68,7 +69,7 @@ public final class DefinitionModels {
 
         public Edge {
             if (id == null || id.isBlank() || source == null || source.isBlank() || target == null || target.isBlank()) {
-                throw new DomainException("INVALID_EDGE", "Edge id, source and target are required");
+                throw new DomainException(ErrorCode.INVALID_EDGE, "Edge id, source and target are required");
             }
             condition = condition == null ? "" : condition.trim();
             waypoints = waypoints == null ? List.of() : List.copyOf(waypoints);
@@ -95,7 +96,7 @@ public final class DefinitionModels {
             edges = edges == null ? List.of() : List.copyOf(edges);
             conditionLanguageVersion = conditionLanguageVersion == null ? 1 : conditionLanguageVersion;
             if (conditionLanguageVersion != 1 && conditionLanguageVersion != 2) {
-                throw new DomainException("INVALID_CONDITION_VERSION", "Unsupported condition language version");
+                throw new DomainException(ErrorCode.INVALID_CONDITION_VERSION, "Unsupported condition language version");
             }
         }
         /** 按标识查找节点。 */
@@ -133,7 +134,7 @@ public final class DefinitionModels {
         public static DefinitionDraft create(UUID id, String tenantId, String key, String name, Graph graph,
                                              FormSchema formSchema, NotificationTexts notificationTexts) {
             if (id == null || tenantId == null || tenantId.isBlank() || key == null || key.isBlank()) {
-                throw new DomainException("INVALID_DEFINITION", "Definition id, tenant and key are required");
+                throw new DomainException(ErrorCode.INVALID_DEFINITION, "Definition id, tenant and key are required");
             }
             return new DefinitionDraft(id, tenantId, key, name, 0, 0, DraftStatus.DRAFT, graph, formSchema, notificationTexts);
         }
@@ -207,7 +208,7 @@ public final class DefinitionModels {
         public void publish(long expectedRevision, long nextVersion) {
             ensureDraft(); ensureRevision(expectedRevision);
             if (nextVersion <= version) {
-                throw new DomainException("INVALID_DEFINITION_VERSION", "Published version must increase");
+                throw new DomainException(ErrorCode.INVALID_DEFINITION_VERSION, "Published version must increase");
             }
             this.status = DraftStatus.PUBLISHED; this.version = nextVersion; this.revision++;
         }
@@ -215,11 +216,11 @@ public final class DefinitionModels {
         /** 停用和恢复只修改发起开关；已发布内容、版本号和现有实例保持原样。 */
         public void changeAvailability(long expectedRevision, boolean enabled) {
             if (status != DraftStatus.PUBLISHED) {
-                throw new DomainException("DEFINITION_NOT_PUBLISHED", "Only published definitions can change availability");
+                throw new DomainException(ErrorCode.DEFINITION_NOT_PUBLISHED, "Only published definitions can change availability");
             }
             ensureRevision(expectedRevision);
             if (startEnabled == enabled) {
-                throw new DomainException("DEFINITION_AVAILABILITY_UNCHANGED", "Definition already has the requested availability");
+                throw new DomainException(ErrorCode.DEFINITION_AVAILABILITY_UNCHANGED, "Definition already has the requested availability");
             }
             startEnabled = enabled;
             revision++;
@@ -227,11 +228,11 @@ public final class DefinitionModels {
 
         /** 新发起入口复核当前状态，历史读取不受此开关限制。 */
         public void requireStartEnabled() {
-            if (!startEnabled) throw new DomainException("DEFINITION_DISABLED", "This process version is disabled for new starts");
+            if (!startEnabled) throw new DomainException(ErrorCode.DEFINITION_DISABLED, "This process version is disabled for new starts");
         }
 
-        private void ensureDraft() { if (status != DraftStatus.DRAFT) throw new DomainException("DEFINITION_IMMUTABLE", "Published definition cannot be changed"); }
-        private void ensureRevision(long expected) { if (revision != expected) throw new DomainException("CONCURRENCY_CONFLICT", "Definition revision has changed"); }
+        private void ensureDraft() { if (status != DraftStatus.DRAFT) throw new DomainException(ErrorCode.DEFINITION_IMMUTABLE, "Published definition cannot be changed"); }
+        private void ensureRevision(long expected) { if (revision != expected) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Definition revision has changed"); }
 
         public UUID id() { return id; } public String tenantId() { return tenantId; } public String key() { return key; }
         public String name() { return name; } public long version() { return version; } public long revision() { return revision; }
@@ -270,11 +271,11 @@ public final class DefinitionModels {
      * @author owlzhangfq@gmail.com
      */
     public record Comparison(String field, Operator operator, String literal) implements ConditionAst {
-        public Comparison { if (field == null || !field.matches("[a-zA-Z][a-zA-Z0-9_.]{0,63}")) throw new DomainException("INVALID_CONDITION", "Field is not allowed"); }
+        public Comparison { if (field == null || !field.matches("[a-zA-Z][a-zA-Z0-9_.]{0,63}")) throw new DomainException(ErrorCode.INVALID_CONDITION, "Field is not allowed"); }
         public boolean evaluate(EvaluationContext c) {
             Object raw = c.value(field);
             String declaredType = c.fieldTypes() == null ? null : c.fieldTypes().get(field);
-            if (c.fieldTypes() != null && declaredType == null) throw new DomainException("INVALID_CONDITION", "Condition field is not declared");
+            if (c.fieldTypes() != null && declaredType == null) throw new DomainException(ErrorCode.INVALID_CONDITION, "Condition field is not declared");
             boolean absent = c.fieldTypes() == null ? raw == null : FormSchema.empty(raw, FormSchema.FieldType.valueOf(declaredType));
             if (absent) return operator == Operator.NOT_EXISTS;
             if (operator == Operator.EXISTS) return true;
@@ -285,7 +286,7 @@ public final class DefinitionModels {
                     case NUMBER -> FormSchema.decimal(raw.toString()).compareTo(FormSchema.decimal(literal));
                     case BOOLEAN -> Boolean.compare((Boolean) raw, Boolean.parseBoolean(literal));
                     case DATE, TEXT, TEXTAREA, SELECT -> raw.toString().compareTo(literal);
-                    case TABLE, ATTACHMENT -> throw new DomainException("INVALID_CONDITION", "Structured fields only support presence conditions");
+                    case TABLE, ATTACHMENT -> throw new DomainException(ErrorCode.INVALID_CONDITION, "Structured fields only support presence conditions");
                 };
             } else {
                 try { cmp = new BigDecimal(raw.toString()).compareTo(new BigDecimal(literal)); }
@@ -319,7 +320,7 @@ public final class DefinitionModels {
         /** 未填写不属于任何集合；值按枚举原文精确匹配。 */
         public boolean evaluate(EvaluationContext context) {
             if (context.fieldTypes() == null || !"SELECT".equals(context.fieldTypes().get(field))) {
-                throw new DomainException("INVALID_CONDITION", "Membership requires a declared select field");
+                throw new DomainException(ErrorCode.INVALID_CONDITION, "Membership requires a declared select field");
             }
             Object value = context.value(field);
             return !FormSchema.empty(value, FormSchema.FieldType.SELECT) && literals.contains(value.toString());

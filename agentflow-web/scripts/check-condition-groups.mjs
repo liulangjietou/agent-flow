@@ -1,6 +1,7 @@
+import { tmpdir } from 'node:os'
 import assert from 'node:assert/strict'
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import ts from 'typescript'
@@ -10,7 +11,7 @@ const base = new URL(process.argv[2])
 assert.ok(['127.0.0.1', 'localhost', '[::1]'].includes(base.hostname) && base.pathname === '/' && process.argv[3] === '--exercise')
 assert.ok(['8082', '8083'].includes(base.port), 'Use an isolated preview port')
 const root = fileURLToPath(new URL('../', import.meta.url))
-const temporary = mkdtempSync('/fyoung/tmp/agentflow-group-runtime-')
+const temporary = mkdtempSync(join(process.env.AGENTFLOW_TMP_DIR ?? tmpdir(), 'agentflow-group-runtime-'))
 writeFileSync(resolve(temporary, 'package.json'), '{"type":"module"}')
 for (const name of ['conditionGroups', 'conditionBuilder', 'conditionSyntax', 'formSchema']) {
   writeFileSync(resolve(temporary, name + '.js'), ts.transpileModule(readFileSync(resolve(root, 'src/' + name + '.ts'), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText)

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.repository.SubmissionRoundRepository;
 import io.agentflow.common.CurrentActor;
@@ -77,7 +78,7 @@ public class ExpenseProjectApprovalQuery {
     }
 
     private static DomainException unavailable() {
-        return new DomainException("EXPENSE_PROJECT_SNAPSHOT_MISSING", "Original project evidence and native responsibility must belong to the same published submission round");
+        return new DomainException(ErrorCode.EXPENSE_PROJECT_SNAPSHOT_MISSING, "Original project evidence and native responsibility must belong to the same published submission round");
     }
 
     /**

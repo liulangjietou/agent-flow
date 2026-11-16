@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -41,12 +42,12 @@ public class ProcurementPaymentSubmissionService {
         requests.find(actor.tenantId(), id).filter(payment -> payment.employeeId().equals(actor.userId())).orElseThrow(ProcurementPaymentSubmissionService::notFound);
         requests.lock(actor.tenantId(), id); var payment = requests.find(actor.tenantId(), id).orElseThrow();
         var application = applications.requireApplicant(payment.applicationId()); application.requireEditable(input.applicationVersion());
-        if (payment.version() != input.requestVersion()) throw new DomainException("CONCURRENCY_CONFLICT", "Procurement payment version changed");
+        if (payment.version() != input.requestVersion()) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Procurement payment version changed");
         var checked = checks.find(actor.tenantId(), input.precheckId()).filter(check -> check.input().requestId().equals(id)).orElseThrow(ProcurementPaymentSubmissionService::notFound);
         String failure = validation.readyFailure(checked, payment, Instant.now());
         if (failure != null) throw new DomainException(failure, "Refresh procurement payment facts before submission");
         var definition = definitions.lockPublished(actor.tenantId(), application.processKey(), application.definitionVersion())
-                .orElseThrow(() -> new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published procurement payment process not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.PROCESS_DEFINITION_NOT_FOUND, "Published procurement payment process not found"));
         definition.requireStartEnabled(); ProcurementPaymentFormContract.requireReview(definition.graph(), application.formSchema());
         var evidence = checked.result().evidence(); Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         payment.freeze(input.requestVersion(), application.nextSubmissionRound(), evidence.catalog(), checked.input().targetDigest(),
@@ -56,11 +57,11 @@ public class ProcurementPaymentSubmissionService {
         application = applications.reviseBusiness(application.id(), application.version(), payment.content().title(),
                 ProcurementPaymentFormContract.submittedPayload(payment.currentRound()), application.businessReference());
         application = applications.submitBusiness(application.id(), application.version(), checked.input().initiator().appointmentId(), application.businessReference());
-        if (!evidence.validUntil().isAfter(Instant.now())) throw new DomainException("FACTS_EXPIRED", "Procurement payment facts expired during submission");
+        if (!evidence.validUntil().isAfter(Instant.now())) throw new DomainException(ErrorCode.FACTS_EXPIRED, "Procurement payment facts expired during submission");
         return ProcurementPaymentService.receipt(application, payment);
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Procurement payment or precheck not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Procurement payment or precheck not found"); }
 
     /**
      * 双版本和服务端预检标识，不允许客户端附带批准结论。

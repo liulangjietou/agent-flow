@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Duration;
@@ -61,8 +62,8 @@ public record VoucherReversalCheck(Input input, long version, Status status, Ins
     public boolean expired(Instant at) { return status == Status.RUNNING && !at.isBefore(leaseUntil); }
     private void requireTime(Instant at) { if (at == null || at.isBefore(updatedAt)) throw conflict(); }
     private void requireRunning(Instant at) { requireTime(at); if (status != Status.RUNNING) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_REVERSAL_CHECK", "Voucher reversal check must preserve original receipt, lease and evidence"); }
-    private static DomainException conflict() { return new DomainException("VOUCHER_REVERSAL_CHECK_CONFLICT", "Voucher reversal check no longer permits this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_REVERSAL_CHECK, "Voucher reversal check must preserve original receipt, lease and evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.VOUCHER_REVERSAL_CHECK_CONFLICT, "Voucher reversal check no longer permits this transition"); }
     @Override public String toString() { return "VoucherReversalCheck[id=" + input.id() + ", status=" + status + "]"; }
 
     /**

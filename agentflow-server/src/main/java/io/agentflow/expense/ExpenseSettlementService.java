@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.BudgetCommand;
 import io.agentflow.finance.BudgetOperation;
@@ -49,7 +50,7 @@ public class ExpenseSettlementService {
             var plan = new ExpenseSettlementResources().plan(report, resources.loadReserved(report), now);
             var ids = plan.invoices().stream().map(change -> change.after().id()).toList();
             if (verifications.settlementReceipts(report.tenantId(), ids).size() != ids.size()) {
-                throw new DomainException("INVOICE_VERIFICATION_REQUIRED", "Every consumed invoice requires the latest successful verification");
+                throw new DomainException(ErrorCode.INVOICE_VERIFICATION_REQUIRED, "Every consumed invoice requires the latest successful verification");
             }
             changes.persist(plan, SYSTEM_ACTOR);
         } else now = now();
@@ -85,5 +86,5 @@ public class ExpenseSettlementService {
     }
     private ExpenseSettlement locked(String tenant, UUID id) { reports.lock(tenant, id); return settlements.find(tenant, id).orElseThrow(ExpenseSettlementService::conflict); }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense settlement version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense settlement version changed"); }
 }

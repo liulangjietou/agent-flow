@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
@@ -54,12 +56,12 @@ public class AdvanceRepaymentService {
         var actor = actors.actor(); var source = sources.locked(actor.tenantId(), advanceId); authorize(advanceId); source.requireConfirmedPayment();
         if (source.advance().version() != input.advanceVersion()) throw conflict();
         var latest = checks.latest(actor.tenantId(), advanceId, actor.userId()).orElse(null);
-        if (latest != null && latest.active()) throw new DomainException("ADVANCE_REPAYMENT_CHECK_PENDING", "The current finance actor already has a pending repayment check");
+        if (latest != null && latest.active()) throw new DomainException(ErrorCode.ADVANCE_REPAYMENT_CHECK_PENDING, "The current finance actor already has a pending repayment check");
         var now = now(); var payment = source.payment();
         var check = AdvanceRepaymentCheck.queue(new AdvanceRepaymentCheck.Input(UUID.randomUUID(), actor.tenantId(), source.authorization().terms().id(), payment.version(),
                 source.authorization().terms().targetDigest(), source.request(input.receiptReference().trim()), actor.userId(), now));
         checks.create(check);
-        var event = audit.record(source.authorization(), check.input().id(), check.version(), "FINANCE", "ADVANCE_REPAYMENT_QUERY", null, check.status().name(), input.comment(), now);
+        var event = audit.record(source.authorization(), check.input().id(), check.version(), SystemRole.FINANCE.name(), "ADVANCE_REPAYMENT_QUERY", null, check.status().name(), input.comment(), now);
         return new ActionReceipt(advanceId, check.input().id(), check.version(), null, source.advance().version(), event);
     }
     /** 当前展示余额与查询版本同时一致才确认；凭据、余额、任务消费和审计原子提交。 */
@@ -76,7 +78,7 @@ public class AdvanceRepaymentService {
         var advance = source.advance(); long version = advance.version(); advance.repay(version, repayment);
         balances.update(advance, version, actor.userId(), "REPAYMENT_RECORDED"); var recorded = check.record(repayment, now); checks.update(recorded); repayments.create(repayment, advance);
         events.publishEvent(new AdvanceRepaymentChanged(recorded));
-        var event = audit.record(source.authorization(), repayment.id(), advance.version(), "FINANCE", "ADVANCE_REPAYMENT_RECORD", check.status().name(), recorded.status().name(), input.comment(), now);
+        var event = audit.record(source.authorization(), repayment.id(), advance.version(), SystemRole.FINANCE.name(), "ADVANCE_REPAYMENT_RECORD", check.status().name(), recorded.status().name(), input.comment(), now);
         return new ActionReceipt(advanceId, check.input().id(), recorded.version(), repayment.id(), advance.version(), event);
     }
     /** 页面与确认共用守卫，另一位财务的新观测能使旧页面立即失效。 */
@@ -141,7 +143,7 @@ public class AdvanceRepaymentService {
     }
     private static Instant now() { return time(Instant.now()); }
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed advance balance or repayment check changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed advance balance or repayment check changed"); }
     /**
      * 请求不接收员工、金额、账号或收款结论。
      * @author owlzhangfq@gmail.com

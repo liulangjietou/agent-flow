@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.organization.InitiatorContext;
@@ -46,11 +47,11 @@ public final class ProcurementPaymentRequest {
         requireMutable(expectedVersion);
         if (roundNo != rounds.size() + 1 || now == null || !rounds.isEmpty() && now.isBefore(currentRound().submittedAt())) throw invalid();
         if (catalog == null || !employeeId.equals(catalog.employeeId()) || !catalog.validUntil().isAfter(now)) {
-            throw new DomainException("PROCUREMENT_CATALOG_CHANGED", "A current finance catalog for the procurement applicant is required");
+            throw new DomainException(ErrorCode.PROCUREMENT_CATALOG_CHANGED, "A current finance catalog for the procurement applicant is required");
         }
         if (initiator == null || initiator.appointmentId() == null || !employeeId.equals(initiator.subject())
                 || !content.legalEntityId().equals(initiator.legalEntityId())) {
-            throw new DomainException("PROCUREMENT_INITIATOR_MISMATCH", "Selected appointment must match the procurement applicant and legal entity");
+            throw new DomainException(ErrorCode.PROCUREMENT_INITIATOR_MISMATCH, "Selected appointment must match the procurement applicant and legal entity");
         }
         var round = new ProcurementPaymentRound(roundNo, version, employeeId, now, content, catalog.legalEntity(content.legalEntityId()),
                 catalog.sourceVersion(), targetDigest, payable);
@@ -67,7 +68,7 @@ public final class ProcurementPaymentRequest {
 
     /** 未提交草稿不允许被当作已有批准来源。 */
     public ProcurementPaymentRound currentRound() {
-        if (rounds.isEmpty()) throw new DomainException("PROCUREMENT_NOT_SUBMITTED", "Procurement payment has not been submitted");
+        if (rounds.isEmpty()) throw new DomainException(ErrorCode.PROCUREMENT_NOT_SUBMITTED, "Procurement payment has not been submitted");
         return rounds.get(rounds.size() - 1);
     }
 
@@ -91,10 +92,10 @@ public final class ProcurementPaymentRequest {
     }
 
     private void requireMutable(long expectedVersion) {
-        if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Procurement payment request version changed");
-        if (approval != null) throw new DomainException("PROCUREMENT_ALREADY_APPROVED", "Approved procurement payment terms cannot be changed");
+        if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Procurement payment request version changed");
+        if (approval != null) throw new DomainException(ErrorCode.PROCUREMENT_ALREADY_APPROVED, "Approved procurement payment terms cannot be changed");
     }
-    private static DomainException invalid() { return new DomainException("INVALID_PROCUREMENT_PAYMENT", "Procurement payment identity, history and approval must remain consistent"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PROCUREMENT_PAYMENT, "Procurement payment identity, history and approval must remain consistent"); }
 
     /** 持久化只记录本申请事实，不以审批状态推导付款成功。 */
     public State state() { return new State(id, tenantId, applicationId, employeeId, content, rounds, approval, version); }

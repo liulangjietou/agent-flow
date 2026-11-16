@@ -1,5 +1,6 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.servicetask.ServiceTaskContract;
 
@@ -62,5 +63,5 @@ public record ServiceTaskPolicy(String operationKey, long operationVersion, Stri
         return properties.keySet().stream().anyMatch(key -> REFERENCE_PROPERTIES.contains(key) || key.startsWith(INPUT_PREFIX));
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_SERVICE_TASK_POLICY", "Service task policy requires an exact contract reference and explicit field mappings"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SERVICE_TASK_POLICY, "Service task policy requires an exact contract reference and explicit field mappings"); }
 }

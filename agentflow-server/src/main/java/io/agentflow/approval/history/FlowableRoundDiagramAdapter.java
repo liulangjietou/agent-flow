@@ -1,5 +1,6 @@
 package io.agentflow.approval.history;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.common.DomainException;
@@ -157,5 +158,5 @@ public class FlowableRoundDiagramAdapter implements RoundDiagramPort {
     }
 
     private boolean matchesTenant(String owner, String tenant) { return owner == null || owner.isEmpty() || owner.equals(tenant); }
-    private DomainException unavailable() { return new DomainException("NOT_FOUND", "Bound process diagram is not available"); }
+    private DomainException unavailable() { return new DomainException(ErrorCode.NOT_FOUND, "Bound process diagram is not available"); }
 }

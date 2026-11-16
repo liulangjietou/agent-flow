@@ -1,5 +1,6 @@
 package io.agentflow.notification;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
@@ -33,7 +34,7 @@ public class InboxApplicationService {
     @Transactional
     public InboxMessage read(Actor actor, UUID id) {
         InboxMessage message = repository.find(actor, id)
-                .orElseThrow(() -> new DomainException("NOT_FOUND", "Notification not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Notification not found"));
         return repository.saveRead(message.markRead(Instant.now()));
     }
 

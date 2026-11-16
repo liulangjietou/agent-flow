@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.mapper.DraftAssistServiceMapper;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.SubprocessExecutionLocks;
@@ -61,7 +62,7 @@ public class DraftAssistService {
         String unavailable = null;
         try { configuration.requireAvailable(); } catch (DomainException failure) { unavailable = failure.code(); }
         return new InputOptions(application.version(), unavailable == null, unavailable,
-                unavailable == null ? configuration.getProviderId() : null, unavailable == null ? configuration.getModel() : null,
+                unavailable == null ? configuration.getProviderId() : null, unavailable == null ? configuration.modelFor(DraftAssistRun.PROMPT_VERSION) : null,
                 unavailable == null ? configuration.uri().getAuthority() : null,
                 unavailable == null ? configuration.targetDigest(DraftAssistRun.PROMPT_VERSION) : null, schema, inputs.available(application));
     }
@@ -91,9 +92,9 @@ public class DraftAssistService {
         var application = locks.lock(applications.requireApplicant(applicationId));
         application.requireEditable(expectedVersion);
         configuration.requireAvailable();
-        if (!configuration.targetDigest(DraftAssistRun.PROMPT_VERSION).equals(targetDigest)) throw new DomainException("AGENT_TARGET_CHANGED", "Refresh the draft model destination");
+        if (!configuration.targetDigest(DraftAssistRun.PROMPT_VERSION).equals(targetDigest)) throw new DomainException(ErrorCode.AGENT_TARGET_CHANGED, "Refresh the draft model destination");
         var selected = inputs.select(application, brief, sourceIds);
-        if (runs.active(application.tenantId(), applicationId)) throw new DomainException("AGENT_RUN_ACTIVE", "Draft generation is already active");
+        if (runs.active(application.tenantId(), applicationId)) throw new DomainException(ErrorCode.AGENT_RUN_ACTIVE, "Draft generation is already active");
         var run = new DraftAssistRun(new DraftAssistRun.Context(UUID.randomUUID(), application.tenantId(), actors.actor().userId(), Instant.now(), selected, targetDigest));
         runs.create(run); return receipt(run);
     }
@@ -107,10 +108,10 @@ public class DraftAssistService {
         runs.lock(application.tenantId(), runId);
         var run = requireRun(application, runId);
         if (action == AssistExecutionService.ReviewAction.DISMISS) {
-            if (selected != null && !selected.isEmpty()) throw new DomainException("INVALID_AGENT_REVIEW", "Dismissal cannot save draft values");
+            if (selected != null && !selected.isEmpty()) throw new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Dismissal cannot save draft values");
             run.dismiss(expectedRunVersion, actors.actor().userId(), comment, Instant.now());
         } else {
-            if (expectedApplicationVersion == null) throw new DomainException("INVALID_AGENT_REVIEW", "Draft version is required for adoption");
+            if (expectedApplicationVersion == null) throw new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Draft version is required for adoption");
             application.requireEditable(expectedApplicationVersion);
             run.adopt(expectedRunVersion, application.version(), actors.actor().userId(), selected, comment, Instant.now());
             var payload = new LinkedHashMap<>(application.payload()); String title = application.title();
@@ -146,7 +147,7 @@ public class DraftAssistService {
             if (!configuration
                     .targetDigest(DraftAssistRun.PROMPT_VERSION)
                     .equals(run.context().targetDigest()))
-                throw new DomainException("AGENT_TARGET_CHANGED", "Draft model target changed");
+                throw new DomainException(ErrorCode.AGENT_TARGET_CHANGED, "Draft model target changed");
         } catch (DomainException unavailable) {
             fail(run, AssistRun.Failure.MODEL_UNAVAILABLE, now);
             return null;
@@ -192,7 +193,7 @@ public class DraftAssistService {
         return run;
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Draft suggestion not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Draft suggestion not found"); }
 
     private static Receipt receipt(DraftAssistRun run) {
         return new Receipt(run.context().id(), run.state().status(), run.state().version(),

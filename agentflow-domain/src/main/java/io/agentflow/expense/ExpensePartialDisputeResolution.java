@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.BudgetConsumptionReductionObservation;
 import io.agentflow.finance.BudgetConsumptionReductionOperation;
@@ -54,7 +55,7 @@ public record ExpensePartialDisputeResolution(UUID id, String tenantId, UUID adj
     private static boolean text(String value, int max) {
         return StringUtils.isNotBlank(value) && value.length() <= max && value.equals(value.trim()) && value.chars().noneMatch(Character::isISOControl);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PARTIAL_DISPUTE_RESOLUTION", "Partial expense dispute resolution requires one exact terminal candidate, adjacent revisions and an independent named reviewer"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PARTIAL_DISPUTE_RESOLUTION, "Partial expense dispute resolution requires one exact terminal candidate, adjacent revisions and an independent named reviewer"); }
     /** 不将金融原件和人工说明写入对象日志。 */
     @Override public String toString() { return "ExpensePartialDisputeResolution[id=" + id + ", adjustmentId=" + adjustmentId + ", side=" + side + "]"; }
 

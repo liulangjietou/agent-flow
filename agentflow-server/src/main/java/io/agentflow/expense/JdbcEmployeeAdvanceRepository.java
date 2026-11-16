@@ -1,6 +1,7 @@
 package io.agentflow.expense;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.EmployeeAdvanceRepositoryMapper;
@@ -45,8 +46,7 @@ public class JdbcEmployeeAdvanceRepository implements EmployeeAdvanceRepository 
                 || !advance.balance().consumptions().isEmpty()
                 || !advance.repayments().isEmpty()
                 || !advance.disbursementReturns().isEmpty())
-            throw new DomainException(
-                    "INVALID_ADVANCE", "A new advance must be an unallocated actual payment");
+            throw new DomainException(ErrorCode.INVALID_ADVANCE, "A new advance must be an unallocated actual payment");
         store.create(KIND, stored(advance), actor);
         sqlMapper.create(
                 advance.tenantId(),

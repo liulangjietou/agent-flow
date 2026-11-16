@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.mapper.SubprocessCallRepositoryMapper;
 import io.agentflow.approval.model.SubprocessCall;
 import io.agentflow.approval.repository.SubprocessCallRepository;
@@ -60,8 +61,7 @@ public class JdbcSubprocessCallRepository implements SubprocessCallRepository {
                     json.write(call.policy()),
                     call.createdAt().atOffset(ZoneOffset.UTC));
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "SUBPROCESS_CALL_EXISTS",
+            throw new DomainException(ErrorCode.SUBPROCESS_CALL_EXISTS,
                     "This subprocess activation already has a child application");
         }
     }
@@ -112,8 +112,7 @@ public class JdbcSubprocessCallRepository implements SubprocessCallRepository {
                                 afterId.toString()),
                         row -> row.getObject("created_at", OffsetDateTime.class));
         if (position.isEmpty())
-            throw new DomainException(
-                    "INVALID_SUBPROCESS_QUERY", "Cursor does not belong to this application round");
+            throw new DomainException(ErrorCode.INVALID_SUBPROCESS_QUERY, "Cursor does not belong to this application round");
         var time = position.get(0);
         return SqlRows.map(
                 sqlMapper.pageByParentRoundQuery2(

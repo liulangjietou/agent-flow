@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -38,7 +39,7 @@ public final class AssistRun {
         this.id = Objects.requireNonNull(id);
         if (StringUtils.isBlank(tenantId) || tenantId.length() > 64 || StringUtils.isBlank(promptVersion)
                 || promptVersion.length() > AssistSuggestion.MAX_VERSION_LENGTH) {
-            throw new DomainException("INVALID_AGENT_INPUT", "Invalid tenant or prompt identifier");
+            throw new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Invalid tenant or prompt identifier");
         }
         this.tenantId = tenantId;
         this.requestedBy = actor(requestedBy);
@@ -62,7 +63,7 @@ public final class AssistRun {
         requireTime(at, startedAt);
         Objects.requireNonNull(result);
         if (!promptVersion.equals(result.promptVersion())) {
-            throw new DomainException("INVALID_AGENT_OUTPUT", "Prompt version changed during the run");
+            throw new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Prompt version changed during the run");
         }
         result.requireEvidenceFrom(input);
         suggestion = result;
@@ -86,10 +87,10 @@ public final class AssistRun {
                       String comment, Instant at) {
         require(expectedVersion, Status.COMPLETED);
         if (currentApplicationVersion != input.applicationVersion()) {
-            throw new DomainException("AGENT_INPUT_CHANGED", "Application changed since the summary was requested");
+            throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Application changed since the summary was requested");
         }
         if (StringUtils.isBlank(acceptedText) || acceptedText.length() > MAX_REVIEW_TEXT_LENGTH) {
-            throw new DomainException("INVALID_AGENT_REVIEW", "Invalid accepted summary text");
+            throw new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Invalid accepted summary text");
         }
         review(reviewer, acceptedText, comment, at, Status.ADOPTED);
     }
@@ -104,7 +105,7 @@ public final class AssistRun {
         String user = actor(reviewer);
         requireTime(at, completedAt);
         if (comment != null && comment.length() > MAX_REVIEW_COMMENT_LENGTH) {
-            throw new DomainException("INVALID_AGENT_REVIEW", "Review comment exceeds the limit");
+            throw new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Review comment exceeds the limit");
         }
         review = new Review(user, at, acceptedText, comment);
         status = target;
@@ -112,17 +113,17 @@ public final class AssistRun {
     }
 
     private void require(long expectedVersion, Status expectedStatus) {
-        if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Assist run version has changed");
-        if (status != expectedStatus) throw new DomainException("AGENT_RUN_STATE_CONFLICT", "Assist run cannot accept this transition");
+        if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Assist run version has changed");
+        if (status != expectedStatus) throw new DomainException(ErrorCode.AGENT_RUN_STATE_CONFLICT, "Assist run cannot accept this transition");
     }
 
     private static void requireTime(Instant at, Instant previous) {
-        if (at == null || at.isBefore(previous)) throw new DomainException("INVALID_AGENT_TIME", "Assist event time precedes the previous event");
+        if (at == null || at.isBefore(previous)) throw new DomainException(ErrorCode.INVALID_AGENT_TIME, "Assist event time precedes the previous event");
     }
 
     private static String actor(String value) {
         if (StringUtils.isBlank(value) || value.length() > MAX_ACTOR_LENGTH) {
-            throw new DomainException("INVALID_AGENT_ACTOR", "Invalid assist actor");
+            throw new DomainException(ErrorCode.INVALID_AGENT_ACTOR, "Invalid assist actor");
         }
         return value;
     }

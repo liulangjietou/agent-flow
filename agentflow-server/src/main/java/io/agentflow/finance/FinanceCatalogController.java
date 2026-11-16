@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +24,7 @@ public class FinanceCatalogController {
     /** 目录时效由端口核对，浏览器和代理不得缓存个人授权目录。 */
     @GetMapping("/api/v1/finance/catalog")
     public ResponseEntity<FinanceCatalog> catalog(@RequestParam Map<String, String> parameters) {
-        if (!parameters.isEmpty()) throw new DomainException("INVALID_FINANCE_QUERY", "Finance catalog does not accept query parameters");
+        if (!parameters.isEmpty()) throw new DomainException(ErrorCode.INVALID_FINANCE_QUERY, "Finance catalog does not accept query parameters");
         var actor = actors.actor();
         return ResponseEntity.ok().header("Cache-Control", "no-store")
                 .body(masterData.catalog(actor.tenantId(), actor.userId()).requireValue());

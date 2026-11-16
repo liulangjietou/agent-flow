@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceCatalog;
 import io.agentflow.finance.EmployeeAccountPort;
@@ -48,8 +49,8 @@ public record AdvanceRequestCheck(Input input, long version, Status status, Inst
     public boolean active() { return status == Status.QUEUED || status == Status.RUNNING; }
     public boolean expired(Instant now) { return status == Status.RUNNING && !leaseUntil.isAfter(now); }
 
-    private static DomainException invalid() { return new DomainException("INVALID_ADVANCE_REQUEST_CHECK", "Advance request check state and facts must match"); }
-    private static DomainException conflict() { return new DomainException("ADVANCE_REQUEST_CHECK_STATE_CONFLICT", "Advance request check is no longer executable"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ADVANCE_REQUEST_CHECK, "Advance request check state and facts must match"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.ADVANCE_REQUEST_CHECK_STATE_CONFLICT, "Advance request check is no longer executable"); }
 
     /**
      * 固定双版本、审批轮次、任职和外发目标，不接收客户端财务结论。

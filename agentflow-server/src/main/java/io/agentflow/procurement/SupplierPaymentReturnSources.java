@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.UUID;
 import java.util.Optional;
@@ -42,7 +43,7 @@ public class SupplierPaymentReturnSources {
     /** 已离职财务不能消费新原件，当前财务仍不得是原申请人或原出纳。 */
     public void requireFinance(Source source, String actor) { settlement.requireFinance(source.request().command(), actor); }
 
-    private static DomainException changed() { return new DomainException("SUPPLIER_PAYMENT_RETURN_SOURCE_CHANGED", "Supplier return requires the original successful bank transaction"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.SUPPLIER_PAYMENT_RETURN_SOURCE_CHANGED, "Supplier return requires the original successful bank transaction"); }
 
     /**
      * 仅用于内部编排，完整资金命令不直接返回浏览器。

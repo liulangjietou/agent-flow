@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import org.apache.commons.lang3.StringUtils;
@@ -22,7 +23,7 @@ public interface ExpensePolicyGuidancePort {
             if (StringUtils.isBlank(employeeId) || employeeId.length() > 128 || context == null
                     || managedPolicy != null && (!managedPolicy.category().code().equals(context.categoryCode())
                     || !managedPolicy.category().units().contains(context.unit()))) {
-                throw new DomainException("INVALID_EXPENSE_POLICY_GUIDANCE_REQUEST", "Expense policy guidance identity and category must match");
+                throw new DomainException(ErrorCode.INVALID_EXPENSE_POLICY_GUIDANCE_REQUEST, "Expense policy guidance identity and category must match");
             }
         }
     }

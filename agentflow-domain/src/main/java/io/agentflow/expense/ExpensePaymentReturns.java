@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.ExpensePaymentReturnPort;
 import io.agentflow.finance.Money;
@@ -45,7 +46,7 @@ public record ExpensePaymentReturns(ExpensePaymentReturnPort.Request request, lo
         if (decision == null || !request.equals(decision.receipt().request())) throw invalid();
         requireTime(decision.registeredAt());
         var proofs = entries.stream().map(Entry::proof).toList();
-        if (!decision.receipt().returns().containsAll(proofs)) throw new DomainException("EXPENSE_PAYMENT_RETURN_EVIDENCE_CHANGED", "Cumulative expense return cannot remove or replace a recorded bank receipt");
+        if (!decision.receipt().returns().containsAll(proofs)) throw new DomainException(ErrorCode.EXPENSE_PAYMENT_RETURN_EVIDENCE_CHANGED, "Cumulative expense return cannot remove or replace a recorded bank receipt");
         var next = new ArrayList<>(entries);
         for (var proof : decision.receipt().returns()) if (!proofs.contains(proof)) next.add(new Entry(decision.id(), proof));
         return new ExpensePaymentReturns(request, version + 1, next, !next.isEmpty(), createdAt, decision.registeredAt());
@@ -53,7 +54,7 @@ public record ExpensePaymentReturns(ExpensePaymentReturnPort.Request request, lo
     /** 已登记退回独立于原付款金额计算，不扣减费用或借款冲销。 */
     public Money totalReturned() { return entries.stream().map(entry -> entry.proof().funding().amount()).reduce(Money.zero(request.command().amount().currency()), Money::plus); }
     private void requireTime(Instant at) { if (at == null || at.isBefore(updatedAt)) throw invalid(); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_PAYMENT_RETURNS", "Expense return ledger must preserve original payment and immutable cumulative received funds"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_PAYMENT_RETURNS, "Expense return ledger must preserve original payment and immutable cumulative received funds"); }
     @Override public String toString() { return "ExpensePaymentReturns[paymentId=" + request.command().id() + ", version=" + version + "]"; }
 
     /**

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AdvanceDisbursementReturnPort;
 import io.agentflow.finance.Money;
@@ -44,5 +45,5 @@ public record AdvanceDisbursementReturn(UUID id, String tenantId, UUID checkId, 
         public Entry { if (resolutionId == null || proof == null) throw invalid(); }
         public Money amount() { return proof.funding().amount(); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_DISBURSEMENT_RETURN", "A disbursement adjustment requires fresh original evidence and an independent finance decision"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_DISBURSEMENT_RETURN, "A disbursement adjustment requires fresh original evidence and an independent finance decision"); }
 }

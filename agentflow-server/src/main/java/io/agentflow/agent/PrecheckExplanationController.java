@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -86,7 +87,7 @@ public class PrecheckExplanationController {
         if (!value.matches("0|[1-9][0-9]{0,4}")) throw invalid();
         int result = Integer.parseInt(value); if (result < minimum || result > maximum) throw invalid(); return result;
     }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_QUERY", "Invalid precheck explanation query"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_QUERY, "Invalid precheck explanation query"); }
 
     /**
      * 双版本和检查标识绑定已保存事实，来源正文由服务端读取。

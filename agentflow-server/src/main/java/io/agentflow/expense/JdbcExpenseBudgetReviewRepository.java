@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import io.agentflow.common.DomainException;
@@ -317,7 +318,7 @@ public class JdbcExpenseBudgetReviewRepository {
 
     private static String text(UUID value) { return value==null ? null : value.toString(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense budget review input or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense budget review input or version changed"); }
 
     private static IllegalStateException inconsistent() { return new IllegalStateException("Persisted expense budget review is inconsistent with original sources"); }
 

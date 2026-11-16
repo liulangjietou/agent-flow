@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.util.UUID;
@@ -15,7 +16,7 @@ public record EmployeeAccountSnapshot(UUID legalEntityId, String employeeId, Str
         if (legalEntityId == null || invalidText(employeeId) || invalidText(accountReference)
                 || invalidText(maskedAccount) || !isMask(maskedAccount) || invalidText(sourceVersion) || accountDigest == null
                 || !accountDigest.matches("[a-f0-9]{64}")) {
-            throw new DomainException("INVALID_EMPLOYEE_ACCOUNT", "A versioned employee account reference and digest are required");
+            throw new DomainException(ErrorCode.INVALID_EMPLOYEE_ACCOUNT, "A versioned employee account reference and digest are required");
         }
     }
 

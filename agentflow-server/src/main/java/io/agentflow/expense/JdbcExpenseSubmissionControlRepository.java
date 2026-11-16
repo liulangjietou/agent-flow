@@ -1,6 +1,7 @@
 package io.agentflow.expense;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpenseSubmissionControlRepositoryMapper;
@@ -123,5 +124,5 @@ public class JdbcExpenseSubmissionControlRepository {
                 json.write(value));
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense submission control or precheck changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense submission control or precheck changed"); }
 }

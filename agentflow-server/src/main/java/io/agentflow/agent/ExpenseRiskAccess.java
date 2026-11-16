@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.ApplicationFieldViews;
 import io.agentflow.approval.model.Application;
@@ -155,7 +156,7 @@ public class ExpenseRiskAccess {
         var submitted = rounds.findByRound(actor.tenantId(), application.id(), round.roundNo()).orElseThrow(ExpenseRiskAccess::notFound);
         var projection = fields.attachmentViewForActor(actor, application, round.roundNo());
         if (!ExpenseFormContract.detailsReadable(submitted.formSchema(), projection.schema())) {
-            throw new DomainException("FORBIDDEN", "All selected expense details must remain fully readable");
+            throw new DomainException(ErrorCode.FORBIDDEN, "All selected expense details must remain fully readable");
         }
         return new Readable(report, application, round, round.content().lines());
     }
@@ -166,14 +167,14 @@ public class ExpenseRiskAccess {
             var facts = invoice.requireVerified(at);
             return facts.legalEntityId().equals(source.round().content().legalEntityId()) ? facts : null;
         } catch (DomainException unavailable) {
-            if (!unavailable.code().equals("INVOICE_VERIFICATION_REQUIRED")) throw unavailable;
+            if (!unavailable.is(ErrorCode.INVOICE_VERIFICATION_REQUIRED)) throw unavailable;
             return null;
         }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_INPUT", "Select bounded existing expense lines for the same applicant and legal entity"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Expense risk source not found"); }
-    private static DomainException changed() { return new DomainException("AGENT_INPUT_CHANGED", "The primary expense submission round changed"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Select bounded existing expense lines for the same applicant and legal entity"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Expense risk source not found"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "The primary expense submission round changed"); }
 
     /**
      * 操作者明确指定对照范围，不执行全公司、管理员或财务角色的自动单据扫描。

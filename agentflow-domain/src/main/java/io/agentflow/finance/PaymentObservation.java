@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -34,7 +35,7 @@ public record PaymentObservation(UUID authorizationId, String commandDigest, Sta
 
     private static boolean validDigest(String value) { return value != null && value.matches("[a-f0-9]{64}"); }
     private static boolean invalidReference(String value) { return StringUtils.isBlank(value) || value.length() > 128; }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_OBSERVATION", "Payment evidence must identify the original authorization and a consistent outcome"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_OBSERVATION, "Payment evidence must identify the original authorization and a consistent outcome"); }
 
     /**
      * REVERSED 是新的对账事实，不允许据此静默删除已形成的借款或费用核销。

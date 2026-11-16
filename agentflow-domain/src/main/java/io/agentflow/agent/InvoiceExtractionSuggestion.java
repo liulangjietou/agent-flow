@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.InvoiceOriginal;
 import java.time.LocalDate;
@@ -131,5 +132,5 @@ public record InvoiceExtractionSuggestion(Method method, String providerId, Stri
     private static boolean identifier(String value) {
         return StringUtils.isNotBlank(value) && value.length() <= AssistSuggestion.MAX_VERSION_LENGTH;
     }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_OUTPUT", "Invoice extraction value or evidence is invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Invoice extraction value or evidence is invalid"); }
 }

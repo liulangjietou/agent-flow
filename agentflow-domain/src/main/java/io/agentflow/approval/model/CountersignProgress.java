@@ -1,5 +1,6 @@
 package io.agentflow.approval.model;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.ApprovalPolicy;
 import io.agentflow.definition.DefinitionModels.ApprovalMode;
@@ -20,7 +21,7 @@ public record CountersignProgress(int total, int completed, ApprovalMode mode, I
         var policy = new ApprovalPolicy(mode, percentage);
         if (!policy.multiInstance() || total < 1 || completed < 0 || completed > total
                 || required != policy.requiredApprovals(total)) {
-            throw new DomainException("COUNTERSIGN_STATE_INVALID", "Countersign progress does not match the published approval policy");
+            throw new DomainException(ErrorCode.COUNTERSIGN_STATE_INVALID, "Countersign progress does not match the published approval policy");
         }
     }
 
@@ -29,6 +30,6 @@ public record CountersignProgress(int total, int completed, ApprovalMode mode, I
 
     /** 由执行入口强制检查，不能仅隐藏界面按钮。 */
     public void requireAction(TaskAction action) {
-        if (!allows(action)) throw new DomainException("COUNTERSIGN_ASSIGNMENT_FIXED", "Countersign responsibility cannot be transferred or released");
+        if (!allows(action)) throw new DomainException(ErrorCode.COUNTERSIGN_ASSIGNMENT_FIXED, "Countersign responsibility cannot be transferred or released");
     }
 }

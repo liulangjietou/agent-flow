@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.observability.DiagnosticContext;
 
 import io.agentflow.common.DomainException;
@@ -83,7 +84,7 @@ public class ExpenseResourceAdjustmentWorker {
                     resourceExecution.apply(candidate);
                 }
                 catch (DomainException problem) {
-                    try { if (!"CONCURRENCY_CONFLICT".equals(problem.code())) resourceExecution.block(candidate, problem.code()); }
+                    try { if (!problem.is(ErrorCode.CONCURRENCY_CONFLICT)) resourceExecution.block(candidate, problem.code()); }
                     catch (RuntimeException failed) { log("ADJUSTMENT_RESOURCE_BLOCK_FAILURE", candidate.id(), failed); }
                 } catch (RuntimeException failed) { log("ADJUSTMENT_RESOURCE_FAILURE", candidate.id(), failed); }
             }

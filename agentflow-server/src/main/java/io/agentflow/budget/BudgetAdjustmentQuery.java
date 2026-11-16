@@ -1,6 +1,7 @@
 package io.agentflow.budget;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.budget.mapper.BudgetAdjustmentQueryMapper;
 import io.agentflow.common.CurrentActor;
@@ -97,7 +98,7 @@ public class BudgetAdjustmentQuery {
         } catch (IllegalArgumentException invalid) { throw invalid(); }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_ADJUSTMENT_QUERY", "Budget adjustment query or owned pagination boundary is invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_ADJUSTMENT_QUERY, "Budget adjustment query or owned pagination boundary is invalid"); }
 
     /**
      * 有界本人分页参数。

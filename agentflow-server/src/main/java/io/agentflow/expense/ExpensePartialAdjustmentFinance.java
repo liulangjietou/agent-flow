@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import org.springframework.context.ApplicationEventPublisher;
 
 import io.agentflow.common.DomainException;
@@ -138,7 +139,7 @@ public class ExpensePartialAdjustmentFinance {
         source.requireAuthorization(actor, now);
         personnel.requireEligible(basis.tenantId(), actor, source.financial().accrual().input().command().legalEntityId());
         if (gateway.destination(basis.tenantId()).filter(value -> value.digest(basis.tenantId()).equals(target)).isEmpty()) {
-            throw new DomainException("FINANCE_TARGET_CHANGED", "Original partial adjustment destination is unavailable before sending");
+            throw new DomainException(ErrorCode.FINANCE_TARGET_CHANGED, "Original partial adjustment destination is unavailable before sending");
         }
     }
     private ExpensePartialAdjustment budgetClaim(BudgetConsumptionReductionOperation claimed) {
@@ -161,7 +162,7 @@ public class ExpensePartialAdjustmentFinance {
         // 请求可能先等待另一侧释放原报销锁，领取和到期判断必须使用取得锁之后的时间。
         var now = Instant.now(); return (at.isAfter(now) ? at : now).truncatedTo(ChronoUnit.MICROS);
     }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Partial adjustment or its original authorized operation changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Partial adjustment or its original authorized operation changed"); }
     private void saveBudget(ExpensePartialAdjustment value) {
         adjustments.update(value); events.publishEvent(new ExpensePartialAdjustmentChanged.Budget(value));
     }

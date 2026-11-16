@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.agentflow.approval.model.Application;
@@ -81,7 +82,7 @@ public class ExpenseSettlementNotificationAccess {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Target target(UUID messageId) {
         var actor = actors.actor(); var source = allowed(actor.tenantId(), actor.userId(), row(actor.tenantId(), actor.userId(), messageId));
-        if (source == null) throw new DomainException("NOT_FOUND", "Expense settlement notification is unavailable in the current scope");
+        if (source == null) throw new DomainException(ErrorCode.NOT_FOUND, "Expense settlement notification is unavailable in the current scope");
         var input = source.historical().input(); var binding = input.source(); access.read(binding.businessId(), binding.roundNo());
         var funding = input.payment() != null ? ExpenseSettlementWorkspace.Funding.PAYMENT
                 : input.voucherOperationId() != null ? ExpenseSettlementWorkspace.Funding.FULL_OFFSET : ExpenseSettlementWorkspace.Funding.ZERO_AMOUNT;

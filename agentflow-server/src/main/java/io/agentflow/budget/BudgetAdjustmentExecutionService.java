@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceGatewayConfiguration;
 import io.agentflow.finance.FinanceResult;
@@ -40,7 +41,7 @@ public class BudgetAdjustmentExecutionService {
         sources.requireCurrent(source);
         personnel.requireEligible(source.tenantId(), finance, source.round().content().legalEntityId());
         if (!configuration.destination(source.tenantId()).map(target -> target.digest(source.tenantId()).equals(source.round().targetDigest())).orElse(false)) {
-            throw new DomainException("BUDGET_ADJUSTMENT_DESTINATION_UNAVAILABLE", "The original approved budget destination is no longer available");
+            throw new DomainException(ErrorCode.BUDGET_ADJUSTMENT_DESTINATION_UNAVAILABLE, "The original approved budget destination is no longer available");
         }
     }
 
@@ -79,7 +80,7 @@ public class BudgetAdjustmentExecutionService {
     @Transactional(propagation = Propagation.MANDATORY)
     public BudgetAdjustmentOperation resend(String tenant, UUID id, long version, String finance, Instant now) {
         var current = currentVersion(tenant, id, version);
-        if (!finance.equals(current.command().authorizedBy())) throw new DomainException("FORBIDDEN", "Only the original finance authorizer may resend this budget command");
+        if (!finance.equals(current.command().authorizedBy())) throw new DomainException(ErrorCode.FORBIDDEN, "Only the original finance authorizer may resend this budget command");
         requireNewExecution(current.command().source(), finance);
         var next = current.retryNotFound(time(now)); persist(next); return next;
     }
@@ -89,7 +90,7 @@ public class BudgetAdjustmentExecutionService {
     public BudgetAdjustmentRetirement retire(String tenant, UUID id, long version, String finance, Instant now) {
         var current = currentVersion(tenant, id, version); now = time(now);
         personnel.requireEligible(tenant, finance, current.command().source().round().content().legalEntityId());
-        if (!current.safelyUnexecuted()) throw new DomainException("BUDGET_ADJUSTMENT_RETIREMENT_UNSAFE", "Original budget operation must prove no external adjustment before replacement");
+        if (!current.safelyUnexecuted()) throw new DomainException(ErrorCode.BUDGET_ADJUSTMENT_RETIREMENT_UNSAFE, "Original budget operation must prove no external adjustment before replacement");
         if (current.status() == BudgetAdjustmentOperation.Status.QUEUED) { current = current.voidBeforeSend(now); operations.update(current); }
         var decision = BudgetAdjustmentRetirement.from(current, finance, now); operations.retire(tenant, decision); events.publishEvent(new BudgetAdjustmentOperationChanged(current, decision)); return decision;
     }
@@ -110,5 +111,5 @@ public class BudgetAdjustmentExecutionService {
         if (current == null || current.version() != version || operations.retirement(tenant, id).isPresent()) throw conflict(); return current;
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Original budget operation or retirement version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Original budget operation or retirement version changed"); }
 }

@@ -1,6 +1,7 @@
 package io.agentflow.expense;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpensePrecheckObservationsMapper;
@@ -67,7 +68,7 @@ public class ExpensePrecheckObservations {
         try {
             loaded = resources.load(report);
         } catch (DomainException unavailable) {
-            if (!"EXPENSE_RESOURCE_UNAVAILABLE".equals(unavailable.code())) throw unavailable;
+            if (!unavailable.is(ErrorCode.EXPENSE_RESOURCE_UNAVAILABLE)) throw unavailable;
             // 不读取或披露他人资源；引用重新可用后，依赖摘要自然变化。
             return digest(json.write(Map.of("resourceFailure", unavailable.code())));
         }

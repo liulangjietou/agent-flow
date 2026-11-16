@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import io.agentflow.finance.PaymentObservation;
@@ -70,7 +71,7 @@ public record SupplierPaymentOperation(SupplierPaymentCommand command, long vers
         requireTime(now); if (status != Status.CHECKING) throw conflict(); if (leaseExpired(now)) return expireLease(now);
         if (!now.isBefore(command.holdCommand().authorization().expiresAt())) return expireAuthorization(now);
         if (checked == null || checked.checkedAt().isBefore(updatedAt) || !checked.matches(command, now)) {
-            throw new DomainException("SUPPLIER_PAYMENT_EVIDENCE_CHANGED", "Fresh original payable, hold and cashier accounts are required before sending");
+            throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_EVIDENCE_CHANGED, "Fresh original payable, hold and cashier accounts are required before sending");
         }
         return new SupplierPaymentOperation(command, Math.incrementExact(version), Status.SENDING, attempts, Math.incrementExact(dispatches),
                 createdAt, now, null, leaseUntil, checked, observation, conflictingObservation, highestRevision, null);
@@ -174,7 +175,7 @@ public record SupplierPaymentOperation(SupplierPaymentCommand command, long vers
     public SupplierPaymentOperation resolveDispute(PaymentObservation.Status outcome, ResolutionHistory history, Instant now) {
         requireTime(now);
         if (resolutionIssue(history, now) != null || conflictingObservation.status() != outcome) {
-            throw new DomainException("SUPPLIER_PAYMENT_DISPUTE_UNRESOLVABLE", "Recent terminal evidence must preserve the original supplier payment and historical funding");
+            throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_DISPUTE_UNRESOLVABLE, "Recent terminal evidence must preserve the original supplier payment and historical funding");
         }
         return changed(Status.valueOf(outcome.name()), now, null, null, evidence, conflictingObservation, null, highestRevision, null);
     }
@@ -239,8 +240,8 @@ public record SupplierPaymentOperation(SupplierPaymentCommand command, long vers
     }
     private Instant retryAt(Instant now) { return now.plusSeconds(Math.min(MAX_BACKOFF_SECONDS, INITIAL_BACKOFF_SECONDS << Math.min(attempts - 1, 6))); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYMENT_OPERATION", "Supplier payment recovery must preserve the original command and bank facts"); }
-    private static DomainException conflict() { return new DomainException("SUPPLIER_PAYMENT_STATE_CONFLICT", "Supplier payment no longer allows this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYMENT_OPERATION, "Supplier payment recovery must preserve the original command and bank facts"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.SUPPLIER_PAYMENT_STATE_CONFLICT, "Supplier payment no longer allows this transition"); }
     /** 日志只保留操作标识和状态，不展开金融资料。 */
     @Override public String toString() { return "SupplierPaymentOperation[id=" + command.id() + ", version=" + version + ", status=" + status + "]"; }
 

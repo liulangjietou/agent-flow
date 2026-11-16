@@ -1,6 +1,7 @@
 package io.agentflow.finance;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.mapper.BudgetOccupationRepositoryMapper;
@@ -103,5 +104,5 @@ public class JdbcBudgetOccupationRepository {
                 value.tenantId(), value.reportId().toString(), value.version(), json.write(value));
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Budget occupation identity or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Budget occupation identity or version changed"); }
 }

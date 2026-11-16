@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceCatalog;
 import java.time.Instant;
@@ -19,10 +20,10 @@ public record BudgetAdjustmentRound(int roundNo, long submittedRequestVersion, S
                 || submittedAt == null || content == null || legalEntity == null || !legalEntity.id().equals(content.legalEntityId())
                 || StringUtils.isBlank(catalogVersion) || catalogVersion.length() > 128 || targetDigest == null
                 || !targetDigest.matches("[a-f0-9]{64}") || ledger == null || !ledger.matches(content.ledgerRequest(submittedBy), submittedAt)) {
-            throw new DomainException("INVALID_BUDGET_ADJUSTMENT_ROUND", "Budget adjustment round must preserve original applicant, destination and current ledger evidence");
+            throw new DomainException(ErrorCode.INVALID_BUDGET_ADJUSTMENT_ROUND, "Budget adjustment round must preserve original applicant, destination and current ledger evidence");
         }
         if (!content.amount().currency().equals(legalEntity.baseCurrency())) {
-            throw new DomainException("BUDGET_BASE_CURRENCY_REQUIRED", "Budget adjustment must use the legal entity base currency");
+            throw new DomainException(ErrorCode.BUDGET_BASE_CURRENCY_REQUIRED, "Budget adjustment must use the legal entity base currency");
         }
         content.changes(ledger);
     }

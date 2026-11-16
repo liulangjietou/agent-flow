@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.common.DomainException;
@@ -33,7 +34,7 @@ public class ExpenseDraftAssistInputs {
         if (!application.id().equals(report.applicationId()) || !application.tenantId().equals(report.tenantId())
                 || !application.createdBy().equals(report.employeeId()) || !catalog.employeeId().equals(report.employeeId())
                 || !new BusinessReference(BusinessReference.Type.EXPENSE, report.id()).equals(application.businessReference())) {
-            throw new DomainException("FORBIDDEN", "Expense draft sources belong to another application or employee");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Expense draft sources belong to another application or employee");
         }
         if (StringUtils.isBlank(brief) || brief.length() > DraftAssistInput.MAX_BRIEF_LENGTH || selection == null
                 || itinerary == null || itinerary.isEmpty() || itinerary.size() > ExpenseDraftAssistInput.MAX_LEGS
@@ -67,7 +68,7 @@ public class ExpenseDraftAssistInputs {
         var available = allowed.stream().collect(Collectors.toMap(key, Function.identity()));
         return selected.stream().map(id -> {
             var value = available.get(id);
-            if (value == null) throw new DomainException("FORBIDDEN", "Selected expense draft catalog entry is unavailable");
+            if (value == null) throw new DomainException(ErrorCode.FORBIDDEN, "Selected expense draft catalog entry is unavailable");
             return value;
         }).toList();
     }
@@ -77,7 +78,7 @@ public class ExpenseDraftAssistInputs {
                 || new HashSet<>(values).size() != values.size()) throw invalid();
         return List.copyOf(values);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_INPUT", "Expense draft sources exceed allowed bounds"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Expense draft sources exceed allowed bounds"); }
 
     /**
      * 用户只选择本人当前目录中的稳定代码，名称和权限始终由服务端取得。

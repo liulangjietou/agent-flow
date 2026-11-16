@@ -1,5 +1,7 @@
 package io.agentflow.event;
 
+import org.springframework.http.HttpMethod;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
@@ -77,7 +79,7 @@ public class EventIngressVerifier {
     }
 
     /** 只有精确的签名 POST 入口跳过用户会话；管理和子路径仍由原用户认证保护。 */
-    public static boolean matches(HttpServletRequest request) { return "POST".equals(request.getMethod()) && PATH.equals(request.getRequestURI()); }
+    public static boolean matches(HttpServletRequest request) { return HttpMethod.POST.matches(request.getMethod()) && PATH.equals(request.getRequestURI()); }
 
     /** 检查原收件的信任修订，不因当前密钥轮换而把已验签消息换成新身份。 */
     public Availability availability(ReceivedEvent event) {
@@ -89,7 +91,7 @@ public class EventIngressVerifier {
 
     /** 有界读取、验证投递时间与原始字节，再解析唯一且无附加字段的事件信封。 */
     public ReceivedEvent verify(HttpServletRequest request, Instant now) throws IOException {
-        if (!enabled) throw new DomainException("EVENT_INGRESS_DISABLED", "Event ingress is disabled");
+        if (!enabled) throw new DomainException(ErrorCode.EVENT_INGRESS_DISABLED, "Event ingress is disabled");
         if (request.getQueryString() != null) throw invalid();
         String tenant = header(request, "webhook-tenant"), sourceKey = header(request, "webhook-source"), eventId = header(request, "webhook-id");
         String timestamp = header(request, "webhook-timestamp"), signature = header(request, "webhook-signature");
@@ -150,9 +152,9 @@ public class EventIngressVerifier {
         try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(body)); }
         catch (GeneralSecurityException impossible) { throw new IllegalStateException("SHA-256 unavailable", impossible); }
     }
-    private static DomainException invalid() { return new DomainException("EVENT_INPUT_INVALID", "Event envelope is invalid"); }
-    private static DomainException unauthenticated() { return new DomainException("EVENT_UNAUTHENTICATED", "Event signature or delivery time is invalid"); }
-    private static DomainException tooLarge() { return new DomainException("EVENT_BODY_TOO_LARGE", "Event body exceeds the byte limit"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.EVENT_INPUT_INVALID, "Event envelope is invalid"); }
+    private static DomainException unauthenticated() { return new DomainException(ErrorCode.EVENT_UNAUTHENTICATED, "Event signature or delivery time is invalid"); }
+    private static DomainException tooLarge() { return new DomainException(ErrorCode.EVENT_BODY_TOO_LARGE, "Event body exceeds the byte limit"); }
     private static IllegalStateException invalidConfiguration() { return new IllegalStateException("Invalid event ingress configuration"); }
     /** @author owlzhangfq@gmail.com */
     public enum Availability { AVAILABLE, DISABLED, CHANGED }

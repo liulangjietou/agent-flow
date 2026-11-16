@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.time.Instant;
@@ -108,7 +109,7 @@ public record VoucherReversalOperation(Input input, long version, Status status,
     }
     /** 财务明确结束使原排队命令失效，既有终态失败回执和原命令字节保持。 */
     public VoucherReversalOperation stopForRetirement(Instant now) {
-        requireTime(now); if (retirementBasis() == null) throw new DomainException("VOUCHER_REVERSAL_RETIREMENT_UNSAFE", "Reversal is not proven safely finished");
+        requireTime(now); if (retirementBasis() == null) throw new DomainException(ErrorCode.VOUCHER_REVERSAL_RETIREMENT_UNSAFE, "Reversal is not proven safely finished");
         return status == Status.QUEUED ? changed(Status.VOIDED, now, null, null, null, 0, Failure.FINANCE_RETIRED) : this;
     }
     public boolean running() { return status == Status.POSTING || status == Status.QUERYING; }
@@ -139,8 +140,8 @@ public record VoucherReversalOperation(Input input, long version, Status status,
     }
     private Instant retryAt(Instant now) { return now.plusSeconds(Math.min(MAX_BACKOFF_SECONDS, INITIAL_BACKOFF_SECONDS << Math.min(attempts - 1, 6))); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_REVERSAL_OPERATION", "Reversal execution must preserve original command, accepted posting and highest external revision"); }
-    private static DomainException conflict() { return new DomainException("VOUCHER_REVERSAL_OPERATION_CONFLICT", "Reversal operation can no longer perform this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_REVERSAL_OPERATION, "Reversal execution must preserve original command, accepted posting and highest external revision"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.VOUCHER_REVERSAL_OPERATION_CONFLICT, "Reversal operation can no longer perform this transition"); }
     /**
      * 本地原修订、命令和目的地从登记开始不可替换。
      * @author owlzhangfq@gmail.com

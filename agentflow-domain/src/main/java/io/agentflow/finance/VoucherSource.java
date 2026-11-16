@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.BusinessReference;
@@ -46,7 +47,7 @@ public final class VoucherSource {
                 || !source.tenantId().equals(report.tenantId()) || !source.reportId().equals(report.id()) || !source.applicationId().equals(application.id())
                 || !source.employeeId().equals(report.employeeId()) || source.roundNo() != application.roundNo()
                 || source.submittedFinancialVersion() != round.submittedFinancialVersion() + 1 || !control.paperReady()) throw mismatch();
-        if (round.approvedGross().value().signum() == 0) throw new DomainException("VOUCHER_ZERO_AMOUNT", "A zero-value settlement does not create an accounting voucher");
+        if (round.approvedGross().value().signum() == 0) throw new DomainException(ErrorCode.VOUCHER_ZERO_AMOUNT, "A zero-value settlement does not create an accounting voucher");
         var lines = new ArrayList<VoucherCommand.Line>();
         for (var approved : round.approvedLines()) {
             if (approved.gross().value().signum() == 0) continue;
@@ -95,7 +96,7 @@ public final class VoucherSource {
                 || !application.createdBy().equals(employee) || application.businessReference() == null || application.businessReference().type() != type
                 || !application.businessReference().id().equals(businessId)) throw mismatch();
     }
-    private static DomainException mismatch() { return new DomainException("VOUCHER_SOURCE_MISMATCH", "Voucher source must match the actual approved financial round and applicant"); }
+    private static DomainException mismatch() { return new DomainException(ErrorCode.VOUCHER_SOURCE_MISMATCH, "Voucher source must match the actual approved financial round and applicant"); }
 
     /**
      * 本地不可变业务依据，外部 ERP 只补齐期间与科目，不能改变明细。

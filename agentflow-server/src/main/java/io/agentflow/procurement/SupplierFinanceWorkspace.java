@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.common.CurrentActor;
@@ -67,7 +68,7 @@ public class SupplierFinanceWorkspace {
         var observedLimit = review.payable().observedAt().plus(ProcurementPayablePort.MAX_EVIDENCE_AGE);
         return review.payable().validUntil().isBefore(observedLimit) ? review.payable().validUntil() : observedLimit;
     }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYMENT_QUERY", "Only a positive roundNo is accepted for supplier payment status"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYMENT_QUERY, "Only a positive roundNo is accepted for supplier payment status"); }
 
     /**
      * 待授权的 ERP 读取只向发起该复核且仍有权限的财务展示。

@@ -1,5 +1,7 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.approval.model.SubmissionRound;
@@ -64,7 +66,7 @@ public class FlowableApprovalProxyAccess {
 
     /** 单次读取共用观察时刻；调用方在只读事务内使用，不把此快照缓存为后续办理授权。 */
     public ReadScope forActor(Actor actor, Instant observedAt) {
-        return new ReadScope(actor, actor.hasRole("APPROVER") ? grants(actor.tenantId(), actor.userId(), observedAt) : List.of());
+        return new ReadScope(actor, actor.hasRole(SystemRole.APPROVER) ? grants(actor.tenantId(), actor.userId(), observedAt) : List.of());
     }
 
     /** 仅判断最小提醒的本地范围，不推断身份源角色，也不能用于读取表单或办理任务。 */
@@ -111,7 +113,7 @@ public class FlowableApprovalProxyAccess {
     }
 
     private static DomainException unavailable() {
-        return new DomainException("FORBIDDEN", "The selected approval proxy is no longer available for this task");
+        return new DomainException(ErrorCode.FORBIDDEN, "The selected approval proxy is no longer available for this task");
     }
 
     /**
@@ -145,7 +147,7 @@ public class FlowableApprovalProxyAccess {
             var matching = eligibleGrants(actor.tenantId(), actor.userId(), task, grants, false);
             if (matching.isEmpty()) return List.of();
             var node = matching.get(0).definition().graph().node(task.getTaskDefinitionKey());
-            return ExpenseProcessPolicy.stage(node).finance() && !actor.hasRole("FINANCE") ? List.of() : matching;
+            return ExpenseProcessPolicy.stage(node).finance() && !actor.hasRole(SystemRole.FINANCE) ? List.of() : matching;
         }
 
         /** 分页之前确定完整授权集合；按原审批人和精确原生版本查询，不扫描全租户任务。 */

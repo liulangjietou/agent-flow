@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.JdbcFinanceReceiptCreditRepository;
@@ -157,8 +158,7 @@ public class JdbcSupplierPaymentReturnRepository {
     private static Timestamp timestamp(Instant at) { return Timestamp.from(time(at)); }
 
     private static DomainException conflict() {
-        return new DomainException(
-                "CONCURRENCY_CONFLICT",
+        return new DomainException(ErrorCode.CONCURRENCY_CONFLICT,
                 "Supplier return decision requires current original bank and complete cumulative"
                     + " evidence");
     }

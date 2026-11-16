@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -39,6 +40,6 @@ public record BudgetExceptionApproval(UUID originalOperationId, String originalC
     }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_BUDGET_EXCEPTION_APPROVAL", "Budget exception approval requires the original refusal and matching policy");
+        return new DomainException(ErrorCode.INVALID_BUDGET_EXCEPTION_APPROVAL, "Budget exception approval requires the original refusal and matching policy");
     }
 }

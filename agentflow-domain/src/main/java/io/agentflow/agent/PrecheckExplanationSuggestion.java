@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.HashSet;
 import java.util.List;
@@ -68,5 +69,5 @@ public record PrecheckExplanationSuggestion(String providerId, String modelVersi
         }
     }
     private static boolean identifier(String value) { return StringUtils.isNotBlank(value) && value.length() <= AssistSuggestion.MAX_VERSION_LENGTH; }
-    private static DomainException invalid() { return new DomainException("INVALID_AGENT_OUTPUT", "Precheck explanation does not match the selected evidence"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Precheck explanation does not match the selected evidence"); }
 }

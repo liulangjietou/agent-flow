@@ -1,5 +1,6 @@
 package io.agentflow.signature;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 
@@ -123,5 +124,5 @@ public record SignatureRequest(UUID id, String tenantId, Source source, Authoriz
             digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array()); digest.update(bytes);
         }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_SIGNATURE_REQUEST", "Signature request requires a fixed source, explicit authorization, documents and configured signers"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SIGNATURE_REQUEST, "Signature request requires a fixed source, explicit authorization, documents and configured signers"); }
 }

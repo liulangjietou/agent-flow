@@ -1,5 +1,6 @@
 package io.agentflow.onboarding;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.calendar.CalendarRules;
 import io.agentflow.common.DomainException;
@@ -82,5 +83,5 @@ public record InitializationRequest(String workspaceName, Long expectedOrganizat
     }
 
     private static void require(boolean valid) { if (!valid) throw invalid(); }
-    private static DomainException invalid() { return new DomainException("INVALID_INITIALIZATION_REQUEST", "Invalid tenant initialization selection"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_INITIALIZATION_REQUEST, "Invalid tenant initialization selection"); }
 }

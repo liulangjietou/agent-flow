@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
@@ -16,7 +17,7 @@ public record ProcurementPaymentContent(UUID legalEntityId, String title, String
     public ProcurementPaymentContent {
         if (legalEntityId == null || invalid(title, 256) || invalid(purpose, 2000) || invalid(supplierReference, 128)
                 || invalid(payableReference, 128) || amount == null || amount.value().signum() <= 0) {
-            throw new DomainException("INVALID_PROCUREMENT_PAYMENT", "Procurement payment requires a legal entity, supplier, original payable and positive amount");
+            throw new DomainException(ErrorCode.INVALID_PROCUREMENT_PAYMENT, "Procurement payment requires a legal entity, supplier, original payable and positive amount");
         }
     }
 

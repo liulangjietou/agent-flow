@@ -1,5 +1,7 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.SubprocessExecutionLocks;
@@ -83,7 +85,7 @@ public class InstanceControlService {
     }
 
     /** 幂等回放仍检查当前管理员身份，不能借旧回执绕过角色撤销。 */
-    public Actor requireAdministrator() { var actor = actors.actor(); actor.requireRole("ADMIN"); return actor; }
+    public Actor requireAdministrator() { var actor = actors.actor(); actor.requireRole(SystemRole.ADMIN); return actor; }
 
     /** 读取继承申请权限；未绑定实例或旧轮次不提供运维操作。 */
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -95,7 +97,7 @@ public class InstanceControlService {
         if (!bound(application, round, instance)) return view(application, roundNo, State.UNAVAILABLE, null, false);
         Instant pausedAt = pauseTime(instance);
         return view(application, roundNo, instance.isSuspended() ? State.PAUSED : State.RUNNING, pausedAt,
-                application.status() == ApplicationStatus.IN_APPROVAL && roundNo == application.roundNo() && actors.actor().hasRole("ADMIN")
+                application.status() == ApplicationStatus.IN_APPROVAL && roundNo == application.roundNo() && actors.actor().hasRole(SystemRole.ADMIN)
                         && executionLocks.ancestry(application.tenantId(), id).isEmpty());
     }
 
@@ -228,7 +230,7 @@ public class InstanceControlService {
                     || !task.getDueDate().toInstant().equals(Instant.parse(original))) throw invalidDeadline();
             var calendar = calendars.findVersion(application.tenantId(), UUID.fromString((String) values.get(FlowableTaskDeadlineListener.CALENDAR_ID)),
                     ((Number) values.get(FlowableTaskDeadlineListener.CALENDAR_REVISION)).longValue())
-                    .orElseThrow(() -> new DomainException("DEADLINE_CALENDAR_UNAVAILABLE", "Bound deadline calendar is unavailable"));
+                    .orElseThrow(() -> new DomainException(ErrorCode.DEADLINE_CALENDAR_UNAVAILABLE, "Bound deadline calendar is unavailable"));
             Instant escalationDue = null;
             if (values.containsKey(TaskEscalationBindings.DUE_AT) && !values.containsKey(TaskEscalationBindings.ESCALATED_AT)) {
                 if (!(values.get(TaskEscalationBindings.PAUSED_DUE_AT) instanceof Date previous)
@@ -282,9 +284,9 @@ public class InstanceControlService {
         return operator;
     }
     private Instant now() { return engine.getProcessEngineConfiguration().getClock().getCurrentTime().toInstant(); }
-    private static DomainException unavailable() { return new DomainException("NOT_FOUND", "The bound approval instance is not available"); }
-    private static DomainException changed() { return new DomainException("CONCURRENCY_CONFLICT", "The instance is not in the required controlled runtime state"); }
-    private static DomainException invalidDeadline() { return new DomainException("DEADLINE_STATE_INVALID", "The original bound deadline cannot be recovered"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.NOT_FOUND, "The bound approval instance is not available"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "The instance is not in the required controlled runtime state"); }
+    private static DomainException invalidDeadline() { return new DomainException(ErrorCode.DEADLINE_STATE_INVALID, "The original bound deadline cannot be recovered"); }
 
     /** @author owlzhangfq@gmail.com */
     private record Binding(Application application, SubmissionRound round, ProcessInstance instance) { }

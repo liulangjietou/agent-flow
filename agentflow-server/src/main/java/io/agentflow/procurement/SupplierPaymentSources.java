@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.PaymentPersonnel;
 import java.time.Instant;
@@ -51,6 +52,6 @@ public class SupplierPaymentSources {
         if (hold.status() != SupplierPayableHoldOperation.Status.HELD || !hold.command().authorization().equals(original)) throw evidenceChanged();
         return hold;
     }
-    private static DomainException changed() { return new DomainException("SUPPLIER_PAYMENT_SOURCE_CHANGED", "Original supplier authorization or actual approved source changed"); }
-    private static DomainException evidenceChanged() { return new DomainException("SUPPLIER_PAYMENT_EVIDENCE_CHANGED", "Original supplier payable hold is not confirmed"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.SUPPLIER_PAYMENT_SOURCE_CHANGED, "Original supplier authorization or actual approved source changed"); }
+    private static DomainException evidenceChanged() { return new DomainException(ErrorCode.SUPPLIER_PAYMENT_EVIDENCE_CHANGED, "Original supplier payable hold is not confirmed"); }
 }

@@ -108,7 +108,7 @@ class ExpenseRiskIntegrationTest {
         registry.add("agentflow.assist.endpoint", () -> "http://127.0.0.1:" + MODEL.getAddress().getPort() + "/v1/chat/completions");
         registry.add("agentflow.finance-gateway.tenants.demo.endpoint", GATEWAY::endpoint);
         registry.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> true);
-        registry.add("agentflow.attachments.directory", () -> "/fyoung/tmp/agentflow-risk-http-fixtures");
+        registry.add("agentflow.attachments.directory", () -> System.getProperty("java.io.tmpdir") + "/agentflow-risk-http-fixtures");
     }
     @BeforeEach void organization() {
         wire = json;

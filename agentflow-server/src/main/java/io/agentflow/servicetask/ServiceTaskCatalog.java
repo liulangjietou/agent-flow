@@ -1,6 +1,7 @@
 package io.agentflow.servicetask;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.definition.ServiceTaskPolicy;
@@ -49,8 +50,7 @@ public class ServiceTaskCatalog {
             if (existing.isPresent()) {
                 if (!existing.get().contract().equals(value.contract())
                         || !existing.get().targetDigest().equals(value.targetDigest())) {
-                    throw new DomainException(
-                            "SERVICE_TASK_CONTRACT_REDEFINED",
+                    throw new DomainException(ErrorCode.SERVICE_TASK_CONTRACT_REDEFINED,
                             "An installed service task version cannot change its contract or"
                                 + " target");
                 }
@@ -147,13 +147,13 @@ public class ServiceTaskCatalog {
 
     /** 精确读取不会退回到其他版本或租户，投影不包含目标摘要、地址和凭据。 */
     public ServiceTaskCatalogViews.Option option(String tenant, String key, long version) {
-        var installed = find(tenant, key, version).orElseThrow(() -> new DomainException("NOT_FOUND", "Service task contract version not found"));
+        var installed = find(tenant, key, version).orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Service task contract version not found"));
         var contract = installed.contract();
         return new ServiceTaskCatalogViews.Option(contract.key(), Long.toString(contract.version()), contract.name(), contract.digest(),
                 contract.parameters(), available(tenant, installed));
     }
 
-    private static DomainException unavailable() { return new DomainException("SERVICE_TASK_CONTRACT_UNAVAILABLE", "The exact service task contract version is unavailable"); }
+    private static DomainException unavailable() { return new DomainException(ErrorCode.SERVICE_TASK_CONTRACT_UNAVAILABLE, "The exact service task contract version is unavailable"); }
 
     /**
      * @author owlzhangfq@gmail.com

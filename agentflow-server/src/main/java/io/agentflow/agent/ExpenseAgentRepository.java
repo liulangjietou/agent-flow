@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.mapper.ExpenseAgentMapper;
 import io.agentflow.auth.DeferredActorAuthentication;
 import io.agentflow.common.DomainException;
@@ -41,7 +42,7 @@ public class ExpenseAgentRepository {
     public void save(ExpenseAgentRun run, long previous) {
         var c = run.context(); var s = run.state();
         if (mapper.update(c.tenantId(), c.id().toString(), previous, s.version(), s.status().name(), s.leaseUntil(), json.write(s)) != 1) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Expense agent changed");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense agent changed");
         }
         append(run);
     }

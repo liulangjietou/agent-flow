@@ -1,5 +1,7 @@
 package io.agentflow.approval.operations;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -28,8 +30,8 @@ public class AuditExportController {
     /** 下载完整匹配结果；生成完成前不提交响应，错误仍返回标准 JSON。 */
     @GetMapping("/api/v1/operations/audit/export")
     public ResponseEntity<byte[]> export(@RequestParam Map<String, String> raw) {
-        var actor = currentActor.actor(); actor.requireRole("ADMIN");
-        if (raw.containsKey("cursor") || raw.containsKey("limit")) throw new DomainException("INVALID_AUDIT_QUERY", "Export does not accept pagination parameters");
+        var actor = currentActor.actor(); actor.requireRole(SystemRole.ADMIN);
+        if (raw.containsKey("cursor") || raw.containsKey("limit")) throw new DomainException(ErrorCode.INVALID_AUDIT_QUERY, "Export does not accept pagination parameters");
         var parameters = AuditSearchParameters.parse(actor, raw, json);
         byte[] workbook = exporter.export(actor, parameters.query());
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(TextWorkbook.MEDIA_TYPE))

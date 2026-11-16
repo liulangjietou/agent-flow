@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AdvanceRepaymentPort;
 import io.agentflow.finance.FinanceResult;
@@ -71,8 +72,8 @@ public record AdvanceRepaymentCheck(Input input, long version, Status status, In
     public boolean expired(Instant now) { return status == Status.RUNNING && !now.isBefore(leaseUntil); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
     private void requireRunning(Instant now) { requireTime(now); if (status != Status.RUNNING) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_ADVANCE_REPAYMENT_CHECK", "Repayment check must preserve original source, lease and evidence"); }
-    private static DomainException conflict() { return new DomainException("ADVANCE_REPAYMENT_CHECK_CONFLICT", "Repayment check no longer permits this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ADVANCE_REPAYMENT_CHECK, "Repayment check must preserve original source, lease and evidence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.ADVANCE_REPAYMENT_CHECK_CONFLICT, "Repayment check no longer permits this transition"); }
     @Override public String toString() { return "AdvanceRepaymentCheck[id=" + input.id() + ", status=" + status + "]"; }
 
     /**

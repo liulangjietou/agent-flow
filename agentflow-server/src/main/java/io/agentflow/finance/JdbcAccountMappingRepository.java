@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -296,9 +297,9 @@ public class JdbcAccountMappingRepository {
 
     private static UUID uuid(String value) { return value == null ? null : UUID.fromString(value); }
 
-    private static DomainException changed() { return new DomainException("CONCURRENCY_CONFLICT", "Account mapping configuration changed before saving"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Account mapping configuration changed before saving"); }
 
-    private static DomainException inconsistent() { return new DomainException("ACCOUNT_MAPPING_CONFIGURATION_INCONSISTENT", "Account mapping history or scope is inconsistent"); }
+    private static DomainException inconsistent() { return new DomainException(ErrorCode.ACCOUNT_MAPPING_CONFIGURATION_INCONSISTENT, "Account mapping history or scope is inconsistent"); }
 
     /**
      * 当前类别与法人币种范围的生效指针。

@@ -1,5 +1,7 @@
 package io.agentflow.servicetask;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -53,7 +55,7 @@ public class DefinitionServiceTaskController {
 
     private Actor designer() {
         var actor = actors.actor();
-        if (!actor.hasRole("ADMIN") && !actor.hasRole("PROCESS_ADMIN")) throw new DomainException("FORBIDDEN", "Process administrator role is required");
+        if (!actor.hasRole(SystemRole.ADMIN) && !actor.hasRole(SystemRole.PROCESS_ADMIN)) throw new DomainException(ErrorCode.FORBIDDEN, "Process administrator role is required");
         return actor;
     }
 

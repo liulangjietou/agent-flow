@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -63,14 +64,14 @@ public class SupplierCashierWorkspace {
         var directory = accounts.debitAccounts(actor.tenantId(), selected.command().targetDigest(), query).requireValue(); var current = selectable(id);
         if (!selected.equals(current)) throw conflict(); var now = Instant.now();
         var freshness = directory.observedAt().plus(ProcurementPayablePort.MAX_EVIDENCE_AGE);
-        if (!directory.matches(query, now) || !freshness.isAfter(now)) throw new DomainException("PAYMENT_ACCOUNT_EVIDENCE_EXPIRED", "Fresh cashier account directory is required");
+        if (!directory.matches(query, now) || !freshness.isAfter(now)) throw new DomainException(ErrorCode.PAYMENT_ACCOUNT_EVIDENCE_EXPIRED, "Fresh cashier account directory is required");
         return new Accounts(id, current.version(), directory.validUntil().isBefore(freshness) ? directory.validUntil() : freshness, directory.accounts());
     }
     private SupplierPayableHoldOperation selectable(UUID id) {
         var authorization = access.requireExecution(id); var actor = actors.actor();
         sources.requireCurrent(authorization, actor.userId(), Instant.now()); var hold = sources.held(authorization);
         if (payments.find(actor.tenantId(), id).isPresent() || requests.owner(actor.tenantId(), id).isPresent()) {
-            throw new DomainException("SUPPLIER_PAYMENT_EXECUTION_PENDING", "Supplier payment already has a saved cashier choice or bank command");
+            throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_EXECUTION_PENDING, "Supplier payment already has a saved cashier choice or bank command");
         }
         return hold;
     }
@@ -103,8 +104,8 @@ public class SupplierCashierWorkspace {
             if (before != null && !before.toString().equals(parameters.get("beforeId"))) throw invalid(); return new Query(limit, before);
         } catch (IllegalArgumentException failure) { throw invalid(); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_PAYMENT_QUERY", "Supplier cashier pagination accepts only a bounded limit and canonical beforeId"); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Original supplier authorization or confirmed hold changed"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PAYMENT_QUERY, "Supplier cashier pagination accepts only a bounded limit and canonical beforeId"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Original supplier authorization or confirmed hold changed"); }
 
     /**
      * 排序字段固定，查询参数不能注入 SQL。

@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import java.time.Duration;
@@ -117,5 +118,5 @@ public class SupplierAdjustmentService {
         var current = locked(tenant, id); if (current == null || current.version() != version) throw conflict(); return current;
     }
     private static Instant time(Instant value) { return value.truncatedTo(ChronoUnit.MICROS); }
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Original supplier adjustment changed or was safely retired"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Original supplier adjustment changed or was safely retired"); }
 }

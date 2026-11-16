@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.calendar.CalendarRules;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
@@ -254,5 +255,5 @@ public final class ExpenseRiskEvidence {
      */
     private record NumberGroup(InvoiceKey.Type type, String code, int width) { }
 
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_RISK_FACTS", "Select bounded expense lines and matching verified invoice references"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_RISK_FACTS, "Select bounded expense lines and matching verified invoice references"); }
 }

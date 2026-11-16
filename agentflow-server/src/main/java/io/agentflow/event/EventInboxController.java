@@ -1,5 +1,7 @@
 package io.agentflow.event;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.CurrentActor;
@@ -47,20 +49,20 @@ public class EventInboxController {
     /** 管理员按租户分页读取运行元数据，不扩大表单和附件权限。 */
     @GetMapping
     public ResponseEntity<Page> list(HttpServletRequest request) {
-        var actor = actors.actor(); actor.requireRole("ADMIN"); var query = query(request, false);
+        var actor = actors.actor(); actor.requireRole(SystemRole.ADMIN); var query = query(request, false);
         var rows = inbox.page(actor.tenantId(), query.limit(), query.beforeId()); int count = Math.min(rows.size(), query.limit());
         return noStore(new Page(rows.subList(0, count).stream().map(View::from).toList(), rows.size() > count ? rows.get(count - 1).id() : null));
     }
     /** 查看原事件当前处理状态，原始摘要和签名不进入响应。 */
     @GetMapping("/{id}")
     public ResponseEntity<View> detail(@PathVariable UUID id, HttpServletRequest request) {
-        var actor = actors.actor(); actor.requireRole("ADMIN"); requireNoQuery(request);
+        var actor = actors.actor(); actor.requireRole(SystemRole.ADMIN); requireNoQuery(request);
         return noStore(View.from(inbox.get(actor.tenantId(), id)));
     }
     /** 追加历史按真实修订翻页，不把最新五十条冒充完整历史。 */
     @GetMapping("/{id}/history")
     public ResponseEntity<History> history(@PathVariable UUID id, HttpServletRequest request) {
-        var actor = actors.actor(); actor.requireRole("ADMIN"); var query = query(request, true);
+        var actor = actors.actor(); actor.requireRole(SystemRole.ADMIN); var query = query(request, true);
         inbox.get(actor.tenantId(), id); var rows = inbox.history(actor.tenantId(), id, query.limit(), query.beforeVersion());
         int count = Math.min(rows.size(), query.limit());
         return noStore(new History(rows.subList(0, count).stream().map(View::from).toList(), rows.size() > count ? rows.get(count - 1).version() : null));
@@ -68,7 +70,7 @@ public class EventInboxController {
     /** 权限先于幂等回放检查；原事件恢复必须有明确原因及当前处理修订。 */
     @PostMapping("/{id}/retry")
     public ResponseEntity<String> retry(@PathVariable UUID id, @Valid @RequestBody RetryInput input, HttpServletRequest request) {
-        var actor = actors.actor(); actor.requireRole("ADMIN"); requireNoQuery(request);
+        var actor = actors.actor(); actor.requireRole(SystemRole.ADMIN); requireNoQuery(request);
         var response = idempotency.execute(request, HttpStatus.OK, () -> View.from(service.retry(actor, id, input.expectedVersion(), input.reason(), Instant.now())));
         return ResponseEntity.status(response.getStatusCode()).headers(response.getHeaders()).header("Cache-Control", "no-store").body(response.getBody());
     }
@@ -92,7 +94,7 @@ public class EventInboxController {
         } catch (IllegalArgumentException failure) { throw invalidQuery(); }
     }
     private static void requireNoQuery(HttpServletRequest request) { if (request.getQueryString() != null) throw invalidQuery(); }
-    private static DomainException invalidQuery() { return new DomainException("INVALID_EVENT_INBOX_QUERY", "Event inbox query is invalid"); }
+    private static DomainException invalidQuery() { return new DomainException(ErrorCode.INVALID_EVENT_INBOX_QUERY, "Event inbox query is invalid"); }
     private static <T> ResponseEntity<T> noStore(T value) { return ResponseEntity.ok().header("Cache-Control", "no-store").body(value); }
     /** @author owlzhangfq@gmail.com */
     private record Query(int limit, UUID beforeId, Long beforeVersion) { }

@@ -1,5 +1,6 @@
 package io.agentflow.approval.model;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.HashSet;
 import java.util.List;
@@ -37,10 +38,10 @@ public record CountersignMembership(int total, int completed, List<Member> pendi
     /** 当前责任人只能增加尚未承担本节点责任的有效人员，资格由调用方目录复核。 */
     public void requireAddition(String sourceTaskId, String targetUser) {
         requireOperator(sourceTaskId);
-        if (total >= MAX_MEMBERS) throw new DomainException("COUNTERSIGN_MEMBER_LIMIT", "Countersign member limit reached");
+        if (total >= MAX_MEMBERS) throw new DomainException(ErrorCode.COUNTERSIGN_MEMBER_LIMIT, "Countersign member limit reached");
         if (completedUsers.contains(targetUser) || completedResponsibilities.contains(targetUser)
                 || pending.stream().anyMatch(member -> member.user().equals(targetUser))) {
-            throw new DomainException("COUNTERSIGN_MEMBER_EXISTS", "The user already has responsibility for this countersign node");
+            throw new DomainException(ErrorCode.COUNTERSIGN_MEMBER_EXISTS, "The user already has responsibility for this countersign node");
         }
     }
 
@@ -48,23 +49,23 @@ public record CountersignMembership(int total, int completed, List<Member> pendi
     public Member requireRemoval(String sourceTaskId, String targetTaskId) {
         requireOperator(sourceTaskId);
         Member target = member(targetTaskId);
-        if (pending.size() <= 1) throw new DomainException("COUNTERSIGN_LAST_MEMBER", "The final pending countersign member cannot be removed");
-        if (sourceTaskId.equals(targetTaskId)) throw new DomainException("COUNTERSIGN_SELF_REMOVAL", "The acting member must retain their own approval responsibility");
-        if (target.delegated()) throw new DomainException("TASK_DELEGATION_PENDING", "Resolve the delegated task before removing its responsibility");
+        if (pending.size() <= 1) throw new DomainException(ErrorCode.COUNTERSIGN_LAST_MEMBER, "The final pending countersign member cannot be removed");
+        if (sourceTaskId.equals(targetTaskId)) throw new DomainException(ErrorCode.COUNTERSIGN_SELF_REMOVAL, "The acting member must retain their own approval responsibility");
+        if (target.delegated()) throw new DomainException(ErrorCode.TASK_DELEGATION_PENDING, "Resolve the delegated task before removing its responsibility");
         return target;
     }
 
     private void requireOperator(String sourceTaskId) {
-        if (member(sourceTaskId).delegated()) throw new DomainException("TASK_DELEGATION_PENDING", "Delegated assistance cannot change countersign responsibilities");
+        if (member(sourceTaskId).delegated()) throw new DomainException(ErrorCode.TASK_DELEGATION_PENDING, "Delegated assistance cannot change countersign responsibilities");
     }
 
     private Member member(String taskId) {
         return pending.stream().filter(member -> member.taskId().equals(taskId)).findFirst()
-                .orElseThrow(() -> new DomainException("COUNTERSIGN_MEMBER_UNAVAILABLE", "The selected pending countersign task is no longer available"));
+                .orElseThrow(() -> new DomainException(ErrorCode.COUNTERSIGN_MEMBER_UNAVAILABLE, "The selected pending countersign task is no longer available"));
     }
 
     private static DomainException invalid() {
-        return new DomainException("COUNTERSIGN_STATE_INVALID", "Countersign counts and responsibility facts do not agree");
+        return new DomainException(ErrorCode.COUNTERSIGN_STATE_INVALID, "Countersign counts and responsibility facts do not agree");
     }
 
     /**

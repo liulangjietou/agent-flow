@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.SystemRole;
 import io.agentflow.api.idempotency.IdempotencyExecutor;
 import io.agentflow.common.Actor;
 import io.agentflow.common.CurrentActor;
@@ -143,7 +144,7 @@ public class OrganizationController {
         return noStore(new ChangePage(List.copyOf(values.subList(0, Math.min(p.limit(), values.size()))), more ? values.get(p.limit() - 1).revision() : null));
     }
 
-    private Actor administrator() { var actor = actors.actor(); actor.requireRole("ADMIN"); return actor; }
+    private Actor administrator() { var actor = actors.actor(); actor.requireRole(SystemRole.ADMIN); return actor; }
     private static <T> ResponseEntity<T> noStore(T value) { return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(value); }
     private static <T> Page<T> page(List<T> values, int limit, Function<T, UUID> id) {
         return new Page<>(List.copyOf(values.subList(0, Math.min(limit, values.size()))), values.size() > limit ? id.apply(values.get(limit - 1)).toString() : null);

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionModels.*;
 import io.agentflow.form.FieldVisibility;
@@ -59,6 +60,6 @@ public final class ExpenseBudgetApprovalPolicy {
     }
 
     private static DomainException invalid() {
-        return new DomainException("EXPENSE_BUDGET_APPROVAL_REQUIRED", "Budget exceptions require one readable single-decision checkpoint before every financial path");
+        return new DomainException(ErrorCode.EXPENSE_BUDGET_APPROVAL_REQUIRED, "Budget exceptions require one readable single-decision checkpoint before every financial path");
     }
 }

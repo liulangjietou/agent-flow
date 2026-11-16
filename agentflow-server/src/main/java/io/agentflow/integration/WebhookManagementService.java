@@ -1,5 +1,6 @@
 package io.agentflow.integration;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,7 @@ public class WebhookManagementService {
         var delivery = store.get(actor.tenantId(), id);
         targets.find(actor.tenantId(), delivery.targetId()).filter(WebhookTargets.Destination::enabled)
                 .filter(value -> value.digest().equals(delivery.destinationDigest()))
-                .orElseThrow(() -> new DomainException("WEBHOOK_TARGET_UNAVAILABLE", "Webhook target is unavailable or has changed"));
+                .orElseThrow(() -> new DomainException(ErrorCode.WEBHOOK_TARGET_UNAVAILABLE, "Webhook target is unavailable or has changed"));
         return store.retry(delivery, expectedVersion, actor.userId(), Instant.now()).summary();
     }
 }

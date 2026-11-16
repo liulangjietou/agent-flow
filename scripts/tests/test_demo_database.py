@@ -1,3 +1,4 @@
+import os
 """覆盖备份完整性、目标保护及恢复失败时不启动应用的风险边界。"""
 import importlib.util
 import json
@@ -5,6 +6,9 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+
+# 测试临时根目录：AGENTFLOW_TMP_DIR 优先，未设置时使用系统临时目录。
+TMP_ROOT = os.environ.get("AGENTFLOW_TMP_DIR") or tempfile.gettempdir()
 
 spec = importlib.util.spec_from_file_location("demo_database", Path(__file__).resolve().parents[1] / "demo_database.py")
 db = importlib.util.module_from_spec(spec)
@@ -15,7 +19,7 @@ class DemoDatabaseTest(unittest.TestCase):
     """隔离恢复不得覆盖现有数据或把未完成归档声明为有效。@author owlzhangfq@gmail.com"""
 
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(dir="/fyoung/tmp", prefix="agentflow-backup-test-")
+        self.temp = tempfile.TemporaryDirectory(dir=TMP_ROOT, prefix="agentflow-backup-test-")
         self.root = Path(self.temp.name)
         self.bundle = db.private_directory(self.root / "bundle")
         self.archive = self.bundle / "database.dump"

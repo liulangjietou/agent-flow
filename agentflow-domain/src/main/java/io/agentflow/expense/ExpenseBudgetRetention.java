@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.BudgetCommand;
@@ -75,8 +76,8 @@ public record ExpenseBudgetRetention(String tenantId, UUID reportId, UUID applic
         return new ExpenseBudgetRetention(tenantId, reportId, applicationId, roundNo, stoppedStatus, retainedAt, policy, expiresAt,
                 next, operation, failure, Math.incrementExact(version), now);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_RETENTION", "Budget retention must preserve its source round, policy and deadline"); }
-    private static DomainException conflict() { return new DomainException("BUDGET_RETENTION_CONFLICT", "Budget retention no longer permits this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_RETENTION, "Budget retention must preserve its source round, policy and deadline"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.BUDGET_RETENTION_CONFLICT, "Budget retention no longer permits this transition"); }
 
     /**
      * 保留天数必须显式配置；每一天为连续 24 小时，不按编辑时间或工作日重新计算。

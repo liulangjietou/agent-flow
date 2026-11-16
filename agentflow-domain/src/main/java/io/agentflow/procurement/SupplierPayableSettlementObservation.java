@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.time.Instant;
@@ -53,5 +54,5 @@ public record SupplierPayableSettlementObservation(UUID operationId, String comm
         @Override public String toString() { return "SupplierPayableSettlementPosting[accountingDate=" + accountingDate + "]"; }
     }
     private static boolean invalidReference(String value) { return StringUtils.isBlank(value) || value.length() > 128 || !value.equals(value.trim()) || value.chars().anyMatch(Character::isISOControl); }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYABLE_SETTLEMENT_OBSERVATION", "Payable settlement requires exact balance changes and complete original posting evidence"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYABLE_SETTLEMENT_OBSERVATION, "Payable settlement requires exact balance changes and complete original posting evidence"); }
 }

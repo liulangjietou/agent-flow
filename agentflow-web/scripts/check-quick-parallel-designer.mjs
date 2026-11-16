@@ -1,6 +1,7 @@
+import { tmpdir } from 'node:os'
 import assert from 'node:assert/strict'
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import ts from 'typescript'
@@ -12,7 +13,7 @@ assert.ok(base.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].inclu
   && !base.username && !base.password && !base.search && !base.hash
   && process.argv.length === 4 && process.argv[3] === '--exercise', 'Use an isolated loopback demo port with --exercise')
 const source = fileURLToPath(new URL('../src/quickDesigner.ts', import.meta.url))
-const temporary = mkdtempSync('/fyoung/tmp/agentflow-quick-parallel-runtime-')
+const temporary = mkdtempSync(join(process.env.AGENTFLOW_TMP_DIR ?? tmpdir(), 'agentflow-quick-parallel-runtime-'))
 const modulePath = resolve(temporary, 'quickDesigner.mjs')
 writeFileSync(modulePath, ts.transpileModule(readFileSync(source, 'utf8'), {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext }

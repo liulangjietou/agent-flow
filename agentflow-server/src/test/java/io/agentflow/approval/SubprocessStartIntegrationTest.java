@@ -92,7 +92,7 @@ import static org.mockito.Mockito.doCallRealMethod;
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class SubprocessStartIntegrationTest {
     private static final Actor ADMIN = new Actor("demo", "admin", Set.of("ADMIN"));
-    private static final Path FILES = Path.of("/fyoung/tmp/agentflow-subprocess-start-" + UUID.randomUUID());
+    private static final Path FILES = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-subprocess-start-" + UUID.randomUUID());
     private String tenant = "demo";
     @Autowired ApprovalApplicationFacade applications;
     @MockitoSpyBean ApplicationRepository repository;

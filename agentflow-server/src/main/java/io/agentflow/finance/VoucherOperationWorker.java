@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.common.DomainException;
 import org.slf4j.Logger;
@@ -39,7 +40,7 @@ public class VoucherOperationWorker {
                         var result = claimed.status() == VoucherOperation.Status.POSTING ? accounting.post(input.targetDigest(), input.command()) : accounting.query(input.targetDigest(), input.command());
                         execution.finish(claimed, result, Instant.now());
                     } catch (RuntimeException failed) {
-                        var reason = failed instanceof DomainException domain && "VOUCHER_EVIDENCE_EXPIRED".equals(domain.code())
+                        var reason = failed instanceof DomainException domain && domain.is(ErrorCode.VOUCHER_EVIDENCE_EXPIRED)
                                 ? VoucherOperation.Failure.EVIDENCE_EXPIRED : VoucherOperation.Failure.INTERNAL_ERROR;
                         execution.fail(claimed, reason, Instant.now());
                         LOG.error("Voucher dispatch failed, errorCode={}, operationId={}", reason, candidate.id());

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpensePaymentReturnRepositoryMapper;
@@ -88,8 +89,7 @@ public class JdbcExpensePaymentReturnRepository {
             for (var entry : after.entries())
                 if (entry.registrationId().equals(decision.id())) credits.record(decision, entry);
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "EXPENSE_PAYMENT_RETURN_ALREADY_RECORDED",
+            throw new DomainException(ErrorCode.EXPENSE_PAYMENT_RETURN_ALREADY_RECORDED,
                     "Bank receipt or payable credit already belongs to another repayment or payment"
                         + " return");
         }
@@ -167,5 +167,5 @@ public class JdbcExpensePaymentReturnRepository {
      */
     public record Registered(long returnVersion, ExpensePaymentReturn decision) {}
 
-    private static DomainException changed() { return new DomainException("EXPENSE_PAYMENT_RETURN_SOURCE_CHANGED", "Expense return registration must match its consumed check and ledger revisions"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.EXPENSE_PAYMENT_RETURN_SOURCE_CHANGED, "Expense return registration must match its consumed check and ledger revisions"); }
 }

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.ExpenseCategoryCatalog;
 import java.nio.ByteBuffer;
@@ -36,18 +37,18 @@ public record AccountMappingDefinition(String name, UUID legalEntityId, String c
         var active = categories.activeCategories().stream().map(ExpenseCategoryCatalog.Category::code).collect(java.util.stream.Collectors.toSet());
         if (entries.isEmpty() || entries.stream().anyMatch(entry -> entry.key().role() == AccountMappingPort.Role.EXPENSE
                 && !active.contains(entry.key().selector()))) {
-            throw new DomainException("ACCOUNT_MAPPING_NOT_PUBLISHABLE", "Account mappings require entries and active expense categories");
+            throw new DomainException(ErrorCode.ACCOUNT_MAPPING_NOT_PUBLISHABLE, "Account mappings require entries and active expense categories");
         }
     }
 
     /** 只截取本次凭证需要的键，缺一项即阻断，不能补用旧版本或默认科目。 */
     public List<AccountMappingPort.Entry> select(AccountMappingPort.Request request) {
         if (!legalEntityId.equals(request.legalEntityId()) || !currency.equals(request.currency())) {
-            throw new DomainException("ACCOUNT_MAPPING_SCOPE_MISMATCH", "Account mapping legal entity and currency must match the voucher source");
+            throw new DomainException(ErrorCode.ACCOUNT_MAPPING_SCOPE_MISMATCH, "Account mapping legal entity and currency must match the voucher source");
         }
         var selected = entries.stream().filter(entry -> request.keys().contains(entry.key())).toList();
         if (selected.size() != request.keys().size()) {
-            throw new DomainException("ACCOUNT_MAPPING_UNAVAILABLE", "Published account mapping does not cover every required accounting key");
+            throw new DomainException(ErrorCode.ACCOUNT_MAPPING_UNAVAILABLE, "Published account mapping does not cover every required accounting key");
         }
         return selected;
     }
@@ -71,5 +72,5 @@ public record AccountMappingDefinition(String name, UUID legalEntityId, String c
     private static boolean invalidText(String value, int maximum) {
         return StringUtils.isBlank(value) || value.length() > maximum || !value.equals(value.strip()) || value.chars().anyMatch(Character::isISOControl);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_ACCOUNT_MAPPING_DEFINITION", "Account mapping definition requires a fixed scope and unique accounting keys"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ACCOUNT_MAPPING_DEFINITION, "Account mapping definition requires a fixed scope and unique accounting keys"); }
 }

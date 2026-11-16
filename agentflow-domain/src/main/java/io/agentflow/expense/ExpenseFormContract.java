@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.form.FormSchema;
 import java.util.Map;
@@ -73,6 +74,6 @@ public final class ExpenseFormContract {
     }
 
     private static DomainException invalid() {
-        return new DomainException("EXPENSE_FORM_CONTRACT_REQUIRED", "A structured expense definition with sensitive details and derived route fields is required");
+        return new DomainException(ErrorCode.EXPENSE_FORM_CONTRACT_REQUIRED, "A structured expense definition with sensitive details and derived route fields is required");
     }
 }

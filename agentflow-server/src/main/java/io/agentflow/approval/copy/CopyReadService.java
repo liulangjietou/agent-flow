@@ -1,5 +1,6 @@
 package io.agentflow.approval.copy;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.approval.model.SubmissionRound;
 import io.agentflow.approval.repository.ApplicationRepository;
@@ -36,7 +37,7 @@ public class CopyReadService {
     /** 管理员身份不绕过收件事实；停用人员立即不可读，历史事实继续保留。 */
     public Snapshot get(UUID applicationId, int roundNo) {
         var actor = actors.actor();
-        if (roundNo < 1) throw new DomainException("INVALID_COPY_QUERY", "Round number must be positive");
+        if (roundNo < 1) throw new DomainException(ErrorCode.INVALID_COPY_QUERY, "Round number must be positive");
         if (!directory.activeRecipient(actor.tenantId(), actor.userId())) throw notFound();
         var copies = recipients.find(actor.tenantId(), applicationId, roundNo, actor.userId());
         if (copies.isEmpty()) throw notFound();
@@ -51,7 +52,7 @@ public class CopyReadService {
                 round.status(), round.submittedAt(), matching.stream().map(CopyRecipient::nodeName).toList(), view.schema(), view.payload());
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Copied submission round not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Copied submission round not found"); }
 
     /**
      * 最小只读视图，不携带当前申请版本、其他轮次、审批意见或原始敏感字段。

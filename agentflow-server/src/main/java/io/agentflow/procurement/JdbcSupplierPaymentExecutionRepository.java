@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -73,8 +74,7 @@ public class JdbcSupplierPaymentExecutionRepository {
                     timestamp(value.nextAttemptAt()),
                     input.authorizationId().toString());
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "SUPPLIER_PAYMENT_EXECUTION_PENDING",
+            throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_EXECUTION_PENDING,
                     "Original supplier authorization already has a cashier execution owner");
         }
         append(value);
@@ -216,7 +216,7 @@ public class JdbcSupplierPaymentExecutionRepository {
 
     private static Instant instant(Timestamp value) { return value == null ? null : value.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Supplier cashier request or original registration changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Supplier cashier request or original registration changed"); }
 
     /**
      * 后台扫描不加载供应商或财务正文。

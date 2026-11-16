@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.mapper.InvoiceExtractionRunRepositoryMapper;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -68,10 +69,9 @@ public class JdbcInvoiceExtractionRunRepository {
                             input.format().name(),
                             input.originalBytes());
             if (changed != 1)
-                throw new DomainException(
-                        "AGENT_INPUT_CHANGED", "Invoice original changed before queue persistence");
+                throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Invoice original changed before queue persistence");
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException("AGENT_RUN_ACTIVE", "Invoice extraction is already active");
+            throw new DomainException(ErrorCode.AGENT_RUN_ACTIVE, "Invoice extraction is already active");
         }
         append(run);
     }
@@ -225,7 +225,7 @@ public class JdbcInvoiceExtractionRunRepository {
     // JDBC 索引时间统一截断到微秒，JSON 保留领域原时间，避免数据库舍入产生不一致。
     private static Timestamp timestamp(Instant value) { return value == null ? null : Timestamp.from(value.truncatedTo(ChronoUnit.MICROS)); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Invoice extraction changed before persistence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Invoice extraction changed before persistence"); }
 
     /**
      * 扫描结果仅携带不透明定位标识。

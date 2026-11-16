@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.UUID;
 
@@ -16,7 +17,7 @@ public record OrganizationAppointment(UUID id, UUID personId, UUID departmentId,
     /** 任职的身份和归属必须明确，不能把空字段解释为所有部门或所有岗位。 */
     public OrganizationAppointment {
         if (id == null || personId == null || departmentId == null || positionId == null || revision < 1) {
-            throw new DomainException("INVALID_ORGANIZATION_APPOINTMENT", "Organization appointment fields are invalid");
+            throw new DomainException(ErrorCode.INVALID_ORGANIZATION_APPOINTMENT, "Organization appointment fields are invalid");
         }
     }
 

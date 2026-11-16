@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
@@ -150,7 +151,7 @@ public final class ExpenseConfigurationInput {
     }
 
     private static IllegalArgumentException unknown() { return new IllegalArgumentException("Unknown expense configuration field"); }
-    private static DomainException malformed() { return new DomainException("INVALID_EXPENSE_CONFIGURATION_REQUEST", "Expense configuration contains an invalid date or enum value"); }
+    private static DomainException malformed() { return new DomainException(ErrorCode.INVALID_EXPENSE_CONFIGURATION_REQUEST, "Expense configuration contains an invalid date or enum value"); }
     private static <E extends Enum<E>> E enumeration(String value, Class<E> type) {
         if (value == null) return null;
         try { return Enum.valueOf(type, value); } catch (IllegalArgumentException invalid) { throw malformed(); }

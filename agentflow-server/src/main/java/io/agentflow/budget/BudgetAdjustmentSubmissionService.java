@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -38,12 +39,12 @@ public class BudgetAdjustmentSubmissionService {
         requests.find(actor.tenantId(), id).filter(adjustment -> adjustment.employeeId().equals(actor.userId())).orElseThrow(BudgetAdjustmentSubmissionService::notFound);
         requests.lock(actor.tenantId(), id); var adjustment = requests.find(actor.tenantId(), id).orElseThrow();
         var application = applications.requireApplicant(adjustment.applicationId()); application.requireEditable(input.applicationVersion());
-        if (adjustment.version() != input.requestVersion()) throw new DomainException("CONCURRENCY_CONFLICT", "Budget adjustment version changed");
+        if (adjustment.version() != input.requestVersion()) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Budget adjustment version changed");
         var checked = checks.find(actor.tenantId(), input.precheckId()).filter(check -> check.input().requestId().equals(id)).orElseThrow(BudgetAdjustmentSubmissionService::notFound);
         String failure = validation.readyFailure(checked, adjustment, Instant.now());
         if (failure != null) throw new DomainException(failure, "Refresh budget adjustment facts before submission");
         var definition = definitions.lockPublished(actor.tenantId(), application.processKey(), application.definitionVersion())
-                .orElseThrow(() -> new DomainException("PROCESS_DEFINITION_NOT_FOUND", "Published budget adjustment process not found"));
+                .orElseThrow(() -> new DomainException(ErrorCode.PROCESS_DEFINITION_NOT_FOUND, "Published budget adjustment process not found"));
         definition.requireStartEnabled(); BudgetAdjustmentFormContract.requireReview(definition.graph(), application.formSchema());
         var evidence = checked.result().evidence(); Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
         adjustment.freeze(input.requestVersion(), application.nextSubmissionRound(), evidence.catalog(), checked.input().targetDigest(),
@@ -52,11 +53,11 @@ public class BudgetAdjustmentSubmissionService {
         application = applications.reviseBusiness(application.id(), application.version(), adjustment.content().title(),
                 BudgetAdjustmentFormContract.submittedPayload(adjustment.currentRound()), application.businessReference());
         application = applications.submitBusiness(application.id(), application.version(), checked.input().initiator().appointmentId(), application.businessReference());
-        if (!evidence.validUntil().isAfter(Instant.now())) throw new DomainException("FACTS_EXPIRED", "Budget adjustment facts expired during submission");
+        if (!evidence.validUntil().isAfter(Instant.now())) throw new DomainException(ErrorCode.FACTS_EXPIRED, "Budget adjustment facts expired during submission");
         return BudgetAdjustmentService.receipt(application, adjustment);
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Budget adjustment or precheck not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Budget adjustment or precheck not found"); }
 
     /**
      * 双版本和服务端预检标识，不允许客户端附带批准结论。

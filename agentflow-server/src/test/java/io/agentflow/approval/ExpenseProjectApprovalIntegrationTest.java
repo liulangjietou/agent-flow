@@ -95,7 +95,7 @@ class ExpenseProjectApprovalIntegrationTest {
     @DynamicPropertySource static void endpoints(DynamicPropertyRegistry registry) {
         registry.add("agentflow.finance-gateway.tenants.demo.endpoint", GATEWAY::endpoint);
         registry.add("agentflow.finance-gateway.tenants.demo.allow-unauthenticated-loopback", () -> true);
-        registry.add("agentflow.attachments.directory", () -> "/fyoung/tmp/agentflow-project-approval-http-fixtures");
+        registry.add("agentflow.attachments.directory", () -> System.getProperty("java.io.tmpdir") + "/agentflow-project-approval-http-fixtures");
     }
     @BeforeEach void organizationAndSource() {
         if (jdbc.queryForObject("SELECT COUNT(*) FROM organization_directory WHERE tenant_id='demo'", Integer.class) == 0) organization.initialize(ADMIN);
@@ -527,7 +527,7 @@ class ExpenseProjectApprovalIntegrationTest {
         assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
         var view = json.read(response.getContentAsString(StandardCharsets.UTF_8), JsonNode.class);
         PROJECT_VIEWS.add(Map.of("path", path, "reportId", report.id(), "applicationId", report.applicationId(), "roundNo", round, "user", user, "response", view));
-        java.nio.file.Files.writeString(java.nio.file.Path.of("/fyoung/tmp/agentflow-remaining-20260928/f14-project-query-responses.json"), json.write(PROJECT_VIEWS));
+        java.nio.file.Files.writeString(java.nio.file.Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-remaining-20260928/f14-project-query-responses.json"), json.write(PROJECT_VIEWS));
         return view;
     }
     private String token(String user) { return "Bearer " + tokens.computeIfAbsent(user, value -> auth.login("demo", value, "demo").token()); }

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.BusinessReference;
 import io.agentflow.approval.repository.ApplicationRepository;
 import io.agentflow.approval.service.ProcessRuntimePort.StartProcessCommand;
@@ -84,6 +85,6 @@ public class ExpenseSplitRoutingBindings {
     }
 
     private static DomainException invalid() {
-        return new DomainException("EXPENSE_SPLIT_CONTEXT_INVALID", "Split routing requires the original prepared report, rule and runtime binding");
+        return new DomainException(ErrorCode.EXPENSE_SPLIT_CONTEXT_INVALID, "Split routing requires the original prepared report, rule and runtime binding");
     }
 }

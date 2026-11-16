@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.mapper.PrecheckExplanationRepositoryMapper;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -60,11 +61,9 @@ public class JdbcPrecheckExplanationRepository {
                             input.attempt(),
                             input.result().name());
             if (count != 1)
-                throw new DomainException(
-                        "AGENT_INPUT_CHANGED", "Precheck changed before explanation persistence");
+                throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Precheck changed before explanation persistence");
         } catch (DuplicateKeyException active) {
-            throw new DomainException(
-                    "AGENT_RUN_ACTIVE", "Expense report already has an active explanation");
+            throw new DomainException(ErrorCode.AGENT_RUN_ACTIVE, "Expense report already has an active explanation");
         }
         append(run);
     }
@@ -171,7 +170,7 @@ public class JdbcPrecheckExplanationRepository {
         return run;
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Precheck explanation changed before persistence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Precheck explanation changed before persistence"); }
 
     /**
      * 队列扫描仅提供定位键。

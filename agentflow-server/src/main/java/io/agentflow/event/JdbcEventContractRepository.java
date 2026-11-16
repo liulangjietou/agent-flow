@@ -1,5 +1,6 @@
 package io.agentflow.event;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.event.mapper.EventContractRepositoryMapper;
 import io.agentflow.mybatis.SqlRow;
@@ -179,5 +180,5 @@ public class JdbcEventContractRepository implements EventContractRepository {
                                 row.getString("change_reason")));
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Event contract or availability changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Event contract or availability changed"); }
 }

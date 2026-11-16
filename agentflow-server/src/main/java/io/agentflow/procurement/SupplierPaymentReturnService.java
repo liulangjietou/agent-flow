@@ -1,5 +1,7 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
@@ -78,7 +80,7 @@ public class SupplierPaymentReturnService {
         var ledger = ledgers.find(actor.tenantId(), paymentId).orElse(null);
         if (source.payment().version() != input.operationVersion() || (ledger == null ? 0 : ledger.version()) != input.returnVersion()) throw conflict();
         if (checks.latest(actor.tenantId(), paymentId, actor.userId()).filter(SupplierPaymentReturnCheck::active).isPresent())
-            throw new DomainException("SUPPLIER_PAYMENT_RETURN_PENDING", "Current finance actor already has an active supplier return query");
+            throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_RETURN_PENDING, "Current finance actor already has an active supplier return query");
         if (ledger == null) { ledger = SupplierPaymentReturns.open(source.request(), now); ledgers.create(ledger); }
         else if (!ledger.request().equals(source.request())) throw conflict();
         var check = SupplierPaymentReturnCheck.queue(new SupplierPaymentReturnCheck.Input(UUID.randomUUID(), actor.tenantId(), source.request().command().targetDigest(),
@@ -114,8 +116,7 @@ public class SupplierPaymentReturnService {
                     "Supplier return registration requires fresh complete evidence and the current"
                             + " independent finance decision");
         if (input.outcome() != check.receipt().status())
-            throw new DomainException(
-                    "SUPPLIER_PAYMENT_RETURN_OUTCOME_CHANGED",
+            throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_RETURN_OUTCOME_CHANGED,
                     "Registration must match the displayed supplier return outcome");
         var decision =
                 new SupplierPaymentReturn(
@@ -131,8 +132,7 @@ public class SupplierPaymentReturnService {
         try {
             next = registrations.register(decision, ledger.version(), check.version());
         } catch (DuplicateKeyException duplicate) {
-            throw new DomainException(
-                    "SUPPLIER_PAYMENT_RETURN_ALREADY_RECORDED",
+            throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_RETURN_ALREADY_RECORDED,
                     "Bank receipt is already registered to a financial source");
         }
         var resolved = check.resolve(decision, now);
@@ -237,7 +237,7 @@ public class SupplierPaymentReturnService {
                         "paymentId",
                         source.payment().command().id(),
                         "authorizedRole",
-                        "FINANCE",
+                        SystemRole.FINANCE.name(),
                         "comment",
                         comment.trim());
         sqlMapper.audit(
@@ -260,7 +260,7 @@ public class SupplierPaymentReturnService {
 
     private static Instant time(Instant at) { return at.truncatedTo(ChronoUnit.MICROS); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Displayed original supplier payment, return ledger or query changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed original supplier payment, return ledger or query changed"); }
 
     /**
      * 查询只确认展示的原银行和账本版本，不接受替代交易或账号。

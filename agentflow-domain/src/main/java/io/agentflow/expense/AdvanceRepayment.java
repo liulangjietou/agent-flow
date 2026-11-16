@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AdvanceRepaymentPort;
 import io.agentflow.finance.Money;
@@ -44,5 +45,5 @@ public record AdvanceRepayment(UUID id, String tenantId, UUID checkId, AdvanceRe
             if (id == null || StringUtils.isBlank(receiptReference) || receiptReference.length() > 128 || amount == null || amount.value().signum() <= 0) throw invalid();
         }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_ADVANCE_REPAYMENT", "A verified repayment must retain the original receipt and an independent finance actor"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ADVANCE_REPAYMENT, "A verified repayment must retain the original receipt and an independent finance actor"); }
 }

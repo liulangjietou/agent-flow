@@ -67,7 +67,7 @@ class BudgetAdjustmentFinanceWorkflowTest {
     private static final HttpServer SERVER = server();
     private static final String ENDPOINT = "http://127.0.0.1:" + SERVER.getAddress().getPort() + "/finance";
     private static final AtomicReference<BudgetAdjustmentFinanceWorkflowTest> ACTIVE = new AtomicReference<>();
-    private static final Path DIRECTORY = Path.of("/fyoung/tmp/agentflow-budget-adjustment-finance-workflow-" + UUID.randomUUID());
+    private static final Path DIRECTORY = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-budget-adjustment-finance-workflow-" + UUID.randomUUID());
     private final Actor admin = new Actor("demo", "admin", Set.of("ADMIN", "PROCESS_ADMIN"));
     private final Map<String, AtomicInteger> calls = new ConcurrentHashMap<>();
     private UUID entity;

@@ -1,6 +1,7 @@
 package io.agentflow.expense;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.ApplicationStatus;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -97,7 +98,7 @@ public class ExpensePlanQuery {
         } catch (IllegalArgumentException invalid) { throw invalid(); }
     }
 
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_QUERY", "Expense query or owned pagination boundary is invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_QUERY, "Expense query or owned pagination boundary is invalid"); }
 
     /**
      * 有界本人分页参数。

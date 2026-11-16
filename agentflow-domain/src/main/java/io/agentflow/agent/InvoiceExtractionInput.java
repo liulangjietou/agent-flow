@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.InvoiceOriginal;
 import io.agentflow.expense.InvoiceVerificationPort;
@@ -20,7 +21,7 @@ public record InvoiceExtractionInput(UUID invoiceId, UUID originalId, String ori
                 || pageCount < 1 || pageCount > MAX_PAGES
                 || (format == InvoiceOriginal.Format.PNG || format == InvoiceOriginal.Format.JPEG || format == InvoiceOriginal.Format.XML)
                 && pageCount != 1) {
-            throw new DomainException("INVALID_AGENT_INPUT", "Invoice extraction source is invalid or exceeds its limits");
+            throw new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Invoice extraction source is invalid or exceeds its limits");
         }
     }
 
@@ -28,7 +29,7 @@ public record InvoiceExtractionInput(UUID invoiceId, UUID originalId, String ori
     public void requireEvidence(InvoiceExtractionSuggestion.Evidence evidence) {
         if (!originalId.equals(evidence.originalId()) || !originalDigest.equals(evidence.originalDigest())
                 || evidence.page() > pageCount) {
-            throw new DomainException("INVALID_AGENT_OUTPUT", "Invoice evidence does not match the authorized original");
+            throw new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Invoice evidence does not match the authorized original");
         }
     }
 }

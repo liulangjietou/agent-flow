@@ -1,5 +1,6 @@
 package io.agentflow.approval;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.process.EventWaitService;
 import io.agentflow.common.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,7 +28,7 @@ public class EventWaitController {
         try {
             if (request.getQueryString() != null || !roundNo.matches("[1-9][0-9]{0,9}")) throw new NumberFormatException();
             round = Integer.parseInt(roundNo);
-        } catch (NumberFormatException failure) { throw new DomainException("INVALID_EVENT_WAIT_QUERY", "A positive round number and no query parameters are required"); }
+        } catch (NumberFormatException failure) { throw new DomainException(ErrorCode.INVALID_EVENT_WAIT_QUERY, "A positive round number and no query parameters are required"); }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.read(id, round));
     }
 }

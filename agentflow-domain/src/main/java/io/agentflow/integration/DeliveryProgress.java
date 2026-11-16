@@ -1,5 +1,6 @@
 package io.agentflow.integration;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.time.Instant;
@@ -58,7 +59,7 @@ public record DeliveryProgress(Status status, long version, int attempts, int cy
         return new DeliveryProgress(Status.PENDING, version + 1, attempts, 0, now, null, null, httpStatus, errorCode);
     }
 
-    private static DomainException conflict() { return new DomainException("WEBHOOK_DELIVERY_CONFLICT", "Webhook delivery state has changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.WEBHOOK_DELIVERY_CONFLICT, "Webhook delivery state has changed"); }
 
     /**
      * 外部确认、等待重试和永久失败分开表示。

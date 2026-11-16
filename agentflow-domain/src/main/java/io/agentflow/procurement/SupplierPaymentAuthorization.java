@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.time.Instant;
@@ -20,7 +21,7 @@ public record SupplierPaymentAuthorization(UUID id, ApprovedProcurementPayment s
                 || !authorizedBy.equals(authorizedBy.trim()) || authorizedBy.chars().anyMatch(Character::isISOControl)
                 || authorizedBy.equals(source.reservation().source().employeeId()) || authorizedAt == null || expiresAt == null
                 || !expiresAt.isAfter(authorizedAt) || Duration.between(authorizedAt, expiresAt).compareTo(MAX_VALIDITY) > 0) {
-            throw new DomainException("INVALID_SUPPLIER_PAYMENT_AUTHORIZATION", "Supplier payment requires a bounded independent financial authorization");
+            throw new DomainException(ErrorCode.INVALID_SUPPLIER_PAYMENT_AUTHORIZATION, "Supplier payment requires a bounded independent financial authorization");
         }
         source.requireCurrentPayable(payable, authorizedAt);
     }
@@ -33,7 +34,7 @@ public record SupplierPaymentAuthorization(UUID id, ApprovedProcurementPayment s
     /** 到期阻止新的资金执行，后续原命令查询和实际结算不依赖此新发送窗口。 */
     public void requireExecutionAt(Instant now) {
         if (now == null || now.isBefore(authorizedAt) || !now.isBefore(expiresAt)) {
-            throw new DomainException("SUPPLIER_PAYMENT_AUTHORIZATION_EXPIRED", "Supplier payment authorization is outside its execution window");
+            throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_AUTHORIZATION_EXPIRED, "Supplier payment authorization is outside its execution window");
         }
     }
 
@@ -42,7 +43,7 @@ public record SupplierPaymentAuthorization(UUID id, ApprovedProcurementPayment s
         requireExecutionAt(now);
         if (StringUtils.isBlank(cashier) || cashier.length() > 128 || !cashier.equals(cashier.trim()) || cashier.chars().anyMatch(Character::isISOControl)
                 || cashier.equals(authorizedBy) || cashier.equals(source.reservation().source().employeeId())) {
-            throw new DomainException("PAYMENT_SEPARATION_REQUIRED", "Procurement applicant, financial authorizer and cashier must be different people");
+            throw new DomainException(ErrorCode.PAYMENT_SEPARATION_REQUIRED, "Procurement applicant, financial authorizer and cashier must be different people");
         }
     }
 

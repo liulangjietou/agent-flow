@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.nio.ByteBuffer;
@@ -50,7 +51,7 @@ public record BudgetConsumptionReversalCommand(UUID id, UUID adjustmentId, Budge
     /** 授权失效后仍可查询原操作，但不能发送新的冲正写入。 */
     public void requireSendAt(Instant now) {
         if (now == null || now.isBefore(createdAt) || !now.isBefore(expiresAt)) {
-            throw new DomainException("BUDGET_REVERSAL_AUTHORIZATION_EXPIRED", "Budget reversal authorization and accounting evidence have expired");
+            throw new DomainException(ErrorCode.BUDGET_REVERSAL_AUTHORIZATION_EXPIRED, "Budget reversal authorization and accounting evidence have expired");
         }
     }
 
@@ -62,5 +63,5 @@ public record BudgetConsumptionReversalCommand(UUID id, UUID adjustmentId, Budge
         }
     }
     private static boolean text(String value, int length) { return StringUtils.isNotBlank(value) && value.equals(value.trim()) && value.length() <= length && value.chars().noneMatch(Character::isISOControl); }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_REVERSAL_COMMAND", "Budget reversal requires original consumed occupation, an open period and independent adjustment authorization"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_REVERSAL_COMMAND, "Budget reversal requires original consumed occupation, an open period and independent adjustment authorization"); }
 }

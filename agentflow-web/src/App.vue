@@ -13,7 +13,7 @@ import ApplicationRecord from './components/ApplicationRecord.vue'
 import type { RelatedRound } from './subprocessRelations'
 import WorkspaceNavigation from './components/WorkspaceNavigation.vue'
 import WorkspaceIcon from './components/WorkspaceIcon.vue'
-import { workspacePageLabel, type WorkspacePage as Page } from './workspaceNavigation'
+import { isWorkspacePage, workspacePageLabel, type WorkspacePage as Page } from './workspaceNavigation'
 import BranchDiagnostics from './components/BranchDiagnostics.vue'
 import { DesignerValidation } from './designerValidation'
 import ApplicationSearch from './components/ApplicationSearch.vue'
@@ -22,9 +22,9 @@ import AuditSearch from './components/AuditSearch.vue'
 import TaskActions from './components/TaskActions.vue'
 import type { CountersignInput, CountersignView } from './countersignMembership'
 import ExpenseWorkspace from './components/ExpenseWorkspace.vue'
-import CashierWorkspace from './components/CashierWorkspace.vue'
-import PaymentBatchWorkspace from './components/PaymentBatchWorkspace.vue'
-import SupplierCashierWorkspace from './components/SupplierCashierWorkspace.vue'
+import CashierView from './views/CashierView.vue'
+import LoginView from './views/LoginView.vue'
+import { useRoute, useRouter } from 'vue-router'
 import ExpenseDetail from './components/ExpenseDetail.vue'
 import ExpensePlanDetail from './components/ExpensePlanDetail.vue'
 import AdvanceRequestDetail from './components/AdvanceRequestDetail.vue'
@@ -129,6 +129,17 @@ import { acknowledgeExtraction, extractionDrafts, type ExtractionReceipt } from 
 
 type NodeType = 'START' | 'COPY' | 'TIMER_WAIT' | 'EVENT_WAIT' | 'SERVICE_TASK' | 'SUB_PROCESS' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
+// 页面与地址双向同步：首次进入时记下地址中的页面，登录后优先回到该页面（深链与刷新）。
+const route = useRoute(), router = useRouter()
+let requestedPage: Page | null = null
+router.isReady().then(() => { if (!loggedIn.value && isWorkspacePage(route.name)) requestedPage = route.name })
+watch(page, value => { if (route.name !== value) void router.push({ name: value }) })
+watch(() => route.name, name => { if (loggedIn.value && isWorkspacePage(name) && name !== page.value) page.value = name })
+/** 登录或恢复会话后的落地页：地址中带来的页面只使用一次，否则按角色选择开始页。 */
+function landingPage(): Page {
+  const requested = requestedPage; requestedPage = null
+  return requested && requested !== 'workbench' ? requested : canInspectSystem.value && !guideHidden(actorScope.value) ? 'guide' : 'workbench'
+}
 const comparisonOpen = ref(false)
 const comparisonInput = computed(() => ({ key: definitionKey.value.trim(), name: definitionName.value.trim(), graph: simulationGraph.value, formSchema: definitionFormSchema.value, notificationTexts: definitionNotificationTexts.value }))
 const simulationOpen = ref(false)
@@ -504,7 +515,7 @@ async function login() {
   if (busy.value || authOptions.value?.mode !== 'DEMO') return
   if (!username.value.trim() || !password.value) { notice.value = '请输入用户名和密码'; return }
   busy.value = true
-  try { const result = await api.login({ tenantId: tenantId.value.trim(), username: username.value.trim(), password: password.value }); localStorage.setItem('agentflow.token', result.token); actor.value = result.user; bindAuthenticationActor(result.user); loggedIn.value = true; password.value = ''; notice.value = '已进入工作空间'; page.value = canInspectSystem.value && !guideHidden(actorScope.value) ? 'guide' : 'workbench'; await refreshWorkspace(true) }
+  try { const result = await api.login({ tenantId: tenantId.value.trim(), username: username.value.trim(), password: password.value }); localStorage.setItem('agentflow.token', result.token); actor.value = result.user; bindAuthenticationActor(result.user); loggedIn.value = true; password.value = ''; notice.value = '已进入工作空间'; page.value = landingPage(); await refreshWorkspace(true) }
   catch (error) { notice.value = errorMessage(error) }
   finally { busy.value = false }
 }
@@ -1208,7 +1219,8 @@ function keyHandler(event: KeyboardEvent) {
   if (event.metaKey || event.ctrlKey) {
     if (event.key.toLowerCase() === 'z' || (!event.metaKey && event.key.toLowerCase() === 'y')) {
       event.preventDefault(); cancelCanvasInteraction()
-      event.key.toLowerCase() === 'y' || event.shiftKey ? redo() : undo()
+      if (event.key.toLowerCase() === 'y' || event.shiftKey) redo()
+      else undo()
     }
     return
   }
@@ -1586,7 +1598,7 @@ async function loadAuthentication(restore = true) {
     const result = await api.me()
     actor.value = result.actor; bindAuthenticationActor(result.actor)
     username.value = result.actor.userId; tenantId.value = result.actor.tenantId; loggedIn.value = true
-    page.value = canInspectSystem.value && !guideHidden(actorScope.value) ? 'guide' : 'workbench'
+    page.value = landingPage()
     await refreshWorkspace(true)
   } catch (error) {
     if ((error as ApiError).status === 401) localStorage.removeItem('agentflow.token')
@@ -1623,10 +1635,12 @@ async function restoreEnterpriseSession() {
 onMounted(async () => {
   window.addEventListener('beforeunload', warnBeforeUnload)
   window.addEventListener('agentflow:authentication-required', authenticationRequired)
-  const url = new URL(window.location.href)
-  if (url.searchParams.get('authError') === 'oidc') {
+  // 等首次路由（含根路径重定向）完成后再读取并清除回跳参数，避免重定向把参数带回地址栏。
+  await router.isReady()
+  if (route.query.authError === 'oidc') {
     notice.value = '企业登录未完成，可能是登录已过期或账号尚未分配平台权限。请重试或联系管理员。'
-    url.searchParams.delete('authError'); window.history.replaceState(null, '', url)
+    const query = { ...route.query }; delete query.authError
+    await router.replace({ query })
   }
   await loadAuthentication()
 })
@@ -1636,42 +1650,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
 
 <template>
   <div class="app" :inert="confirmationOpen || publicationOpen || logoutOpen" @keydown="keyHandler">
-    <section v-if="!loggedIn" class="login-screen">
-      <div class="login-layout">
-        <div class="login-story">
-          <div class="brand"><div class="brand-mark" aria-hidden="true">AF</div><div><strong>agentflow</strong><small>审批与业务协同</small></div></div>
-          <p class="eyebrow">AGENTFLOW / WORKSPACE</p>
-          <h1>让每一次审批<br /><em>都有依据。</em></h1>
-          <p class="login-copy">申请、审批与财务记录，在同一工作空间有序流转。</p>
-          <ol class="login-journey" aria-label="审批流程">
-            <li><WorkspaceIcon name="draft" /><strong>填写申请</strong><span>材料与业务事实</span></li>
-            <li><WorkspaceIcon name="flow" /><strong>审批流转</strong><span>明确每一步责任</span></li>
-            <li><WorkspaceIcon name="check" /><strong>记录归档</strong><span>结果有迹可循</span></li>
-          </ol>
-        </div>
-        <form class="login-card" aria-labelledby="login-title" @submit.prevent="login">
-          <h2 id="login-title">登录工作空间</h2>
-          <p class="login-intro">继续处理你的申请与审批。</p>
-          <p v-if="authLoading" role="status">正在读取登录配置…</p>
-          <template v-else-if="authOptions?.mode === 'DEMO'">
-            <label>租户空间<input v-model="tenantId" autocomplete="organization" placeholder="demo" /></label>
-            <label>用户名<input v-model="username" autocomplete="username" placeholder="admin" /></label>
-            <label>密码<input v-model="password" autocomplete="current-password" type="password" placeholder="请输入密码" /></label>
-            <button class="primary wide" :disabled="busy" :aria-busy="busy">{{ busy ? '正在登录…' : '进入工作台' }}<WorkspaceIcon v-if="!busy" name="arrow" /></button>
-            <details class="login-demo"><summary>查看演示账号</summary><p>租户 demo；账号 admin / manager / finance / cashier / alice，密码 demo。</p></details>
-          </template>
-          <template v-else-if="authOptions?.mode === 'OIDC'">
-            <p class="login-copy">使用企业账号登录，租户空间和权限由管理员分配。</p>
-            <button type="button" class="primary wide" :disabled="busy" @click="enterpriseLogin">使用企业账号登录 ↗</button>
-          </template>
-          <template v-else>
-            <p role="status">{{ authOptions?.mode === 'UNCONFIGURED' ? '尚未配置登录服务，请联系管理员。' : '无法读取登录配置，请检查服务连接后重试。' }}</p>
-            <button type="button" class="primary wide" @click="loadAuthentication()">重新检查</button>
-          </template>
-          <p v-if="notice" class="login-message" role="status">{{ notice }}</p>
-        </form>
-      </div>
-    </section>
+    <LoginView v-if="!loggedIn" v-model:tenant-id="tenantId" v-model:username="username" v-model:password="password" :auth-loading="authLoading" :auth-options="authOptions" :busy="busy" :notice="notice" @login="login" @enterprise-login="enterpriseLogin" @retry="loadAuthentication()" />
     <template v-else>
       <a class="skip-link" href="#workspace-content">跳至工作区</a>
       <main id="workspace-content" ref="workspace" class="main" tabindex="-1">
@@ -1817,12 +1796,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
             </template>
           </section>
         </section>
-        <section v-else-if="page === 'cashier' && canCashier" :key="actorScope">
-          <div class="cashier-kind" role="group" aria-label="付款业务"><button type="button" class="quiet" :aria-pressed="cashierKind === 'employee'" :disabled="busy || writesBlocked" @click="cashierKind = 'employee'">借款与报销</button><button type="button" class="quiet" :aria-pressed="cashierKind === 'supplier'" :disabled="busy || writesBlocked" @click="cashierKind = 'supplier'">供应商付款</button><button type="button" class="quiet" :aria-pressed="cashierKind === 'batches'" :disabled="busy || writesBlocked" @click="cashierKind = 'batches'">批量付款</button></div>
-          <CashierWorkspace v-if="cashierKind === 'employee'" :initial-payment-id="notificationPaymentId" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
-          <PaymentBatchWorkspace v-else-if="cashierKind === 'batches'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
-          <SupplierCashierWorkspace v-else :initial-payment-id="notificationPaymentId" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
-        </section>
+        <CashierView v-else-if="page === 'cashier' && canCashier" :key="actorScope" v-model:kind="cashierKind" :initial-payment-id="notificationPaymentId" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" />
         <ExpenseWorkspace v-else :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
       </main>
       <CopyRecord v-if="selectedCopy && actor" :key="actorScope + selectedCopy.applicationId + selectedCopy.roundNo" :application-id="selectedCopy.applicationId" :round-no="selectedCopy.roundNo" :scope-key="actorScope" @close="selectedCopy = null" />
@@ -1861,8 +1835,6 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
 </template>
 
 <style scoped>
-.cashier-kind{display:flex;flex-wrap:wrap;gap:10px;padding:24px 40px 0}.cashier-kind button[aria-pressed="true"]{background:#e3f2eb;border-color:#3c8a74;color:#145d4c}.cashier-kind button{min-height:40px}@media(max-width:600px){.cashier-kind{padding:16px 16px 0}}
-
 .session-notice{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:22px 30px;padding:18px 22px;border:1px solid #dfcfac;border-radius:12px;background:#fff8e9;color:var(--ink);font-size:13px;line-height:1.7}
 .session-notice>div{flex:1 1 340px;min-width:0;overflow-wrap:anywhere}.session-notice p{margin:6px 0 0}.session-notice button{flex-shrink:0}
 .application-session-notice{margin:16px 0;padding:16px}

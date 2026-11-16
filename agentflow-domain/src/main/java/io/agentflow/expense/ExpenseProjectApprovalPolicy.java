@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.ConditionParser;
 import io.agentflow.definition.DefinitionModels.*;
@@ -96,6 +97,6 @@ public final class ExpenseProjectApprovalPolicy {
         return condition.evaluate(new EvaluationContext(Map.of(field, allocated), Map.of(field, FormSchema.FieldType.BOOLEAN.name())));
     }
     private static DomainException invalid() {
-        return new DomainException("EXPENSE_PROJECT_APPROVAL_REQUIRED", "Project allocations require one readable fixed ALL review on every financial path; use a compatible published expense definition");
+        return new DomainException(ErrorCode.EXPENSE_PROJECT_APPROVAL_REQUIRED, "Project allocations require one readable fixed ALL review on every financial path; use a compatible published expense definition");
     }
 }

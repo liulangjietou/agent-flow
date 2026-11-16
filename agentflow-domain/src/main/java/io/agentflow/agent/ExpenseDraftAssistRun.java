@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.util.List;
@@ -24,14 +25,14 @@ public final class ExpenseDraftAssistRun {
     /** 租约固定到首次领取，进程崩溃后不自动重发原模型输入。 */
     public void start(long version, Instant at, Instant leaseUntil) {
         require(version, Status.QUEUED); time(at, context.createdAt());
-        if (leaseUntil == null || !leaseUntil.isAfter(at)) throw new DomainException("INVALID_AGENT_TIME", "Invalid expense draft lease");
+        if (leaseUntil == null || !leaseUntil.isAfter(at)) throw new DomainException(ErrorCode.INVALID_AGENT_TIME, "Invalid expense draft lease");
         state = new State(Status.RUNNING, version + 1, at, leaseUntil, null, null, null, null);
     }
 
     /** 完成时检查提示版本和冻结来源，尚不表示申请人接受了任何建议。 */
     public void complete(long version, ExpenseDraftSuggestion suggestion, Instant at) {
         require(version, Status.RUNNING); time(at, state.startedAt());
-        if (expired(at)) throw new DomainException("AGENT_RUN_STATE_CONFLICT", "Expense draft lease expired");
+        if (expired(at)) throw new DomainException(ErrorCode.AGENT_RUN_STATE_CONFLICT, "Expense draft lease expired");
         if (suggestion == null || !PROMPT_VERSION.equals(suggestion.promptVersion())) throw invalidOutput();
         suggestion.requireMatches(context.input());
         state = new State(Status.COMPLETED, version + 1, state.startedAt(), state.leaseUntil(), at, suggestion, null, null);
@@ -48,7 +49,7 @@ public final class ExpenseDraftAssistRun {
                         List<Selection> selected, String comment, Instant at) {
         require(version, Status.COMPLETED);
         if (applicationVersion != context.input().applicationVersion() || financialVersion != context.input().financialVersion()
-                || !context.input().currentAt(at)) throw new DomainException("AGENT_INPUT_CHANGED", "Expense draft or catalog changed before confirmation");
+                || !context.input().currentAt(at)) throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Expense draft or catalog changed before confirmation");
         if (CollectionUtils.isEmpty(selected) || selected.size() > ExpenseDraftSuggestion.MAX_LINES
                 || selected.stream().anyMatch(Objects::isNull)
                 || selected.stream().map(Selection::proposalId).distinct().count() != selected.size()) throw invalidReview();
@@ -89,14 +90,14 @@ public final class ExpenseDraftAssistRun {
     public boolean active() { return state.status() == Status.QUEUED || state.status() == Status.RUNNING; }
     public boolean expired(Instant at) { return state.status() == Status.RUNNING && !state.leaseUntil().isAfter(at); }
     private void require(long version, Status status) {
-        if (version != state.version()) throw new DomainException("CONCURRENCY_CONFLICT", "Expense draft run version changed");
-        if (state.status() != status) throw new DomainException("AGENT_RUN_STATE_CONFLICT", "Expense draft transition is unavailable");
+        if (version != state.version()) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense draft run version changed");
+        if (state.status() != status) throw new DomainException(ErrorCode.AGENT_RUN_STATE_CONFLICT, "Expense draft transition is unavailable");
     }
     private static void time(Instant at, Instant previous) {
-        if (at == null || at.isBefore(previous)) throw new DomainException("INVALID_AGENT_TIME", "Expense draft time moved backwards");
+        if (at == null || at.isBefore(previous)) throw new DomainException(ErrorCode.INVALID_AGENT_TIME, "Expense draft time moved backwards");
     }
-    private static DomainException invalidReview() { return new DomainException("INVALID_AGENT_REVIEW", "Only the original applicant may confirm selected expense draft parts"); }
-    private static DomainException invalidOutput() { return new DomainException("INVALID_AGENT_OUTPUT", "Expense draft prompt changed"); }
+    private static DomainException invalidReview() { return new DomainException(ErrorCode.INVALID_AGENT_REVIEW, "Only the original applicant may confirm selected expense draft parts"); }
+    private static DomainException invalidOutput() { return new DomainException(ErrorCode.INVALID_AGENT_OUTPUT, "Expense draft prompt changed"); }
 
     /**
      * 不可变运行身份和模型目标仅在本地使用，模型只收到已确认发送的来源。
@@ -106,7 +107,7 @@ public final class ExpenseDraftAssistRun {
         public Context {
             if (id == null || StringUtils.isBlank(tenantId) || tenantId.length() > 64 || StringUtils.isBlank(requestedBy)
                     || requestedBy.length() > 128 || createdAt == null || input == null || !input.currentAt(createdAt)
-                    || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}")) throw new DomainException("INVALID_AGENT_INPUT", "Invalid expense draft context");
+                    || targetDigest == null || !targetDigest.matches("[a-f0-9]{64}")) throw new DomainException(ErrorCode.INVALID_AGENT_INPUT, "Invalid expense draft context");
         }
     }
     /**

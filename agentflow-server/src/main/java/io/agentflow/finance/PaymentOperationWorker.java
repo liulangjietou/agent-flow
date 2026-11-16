@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.common.DomainException;
 import io.agentflow.expense.AdvanceDisbursementService;
@@ -48,7 +49,7 @@ public class PaymentOperationWorker {
                         } else result = payments.query(input.targetDigest(), input.command());
                         execution.finish(claimed, result, Instant.now());
                     } catch (RuntimeException failed) {
-                        var reason = failed instanceof DomainException domain && "PAYMENT_AUTHORIZATION_EXPIRED".equals(domain.code())
+                        var reason = failed instanceof DomainException domain && domain.is(ErrorCode.PAYMENT_AUTHORIZATION_EXPIRED)
                                 ? PaymentOperation.Failure.AUTHORIZATION_EXPIRED : PaymentOperation.Failure.INTERNAL_ERROR;
                         execution.fail(claimed, reason, Instant.now());
                         LOG.error("Payment dispatch failed, errorCode={}, authorizationId={}", reason, candidate.id());
@@ -78,7 +79,7 @@ public class PaymentOperationWorker {
             if (!(payeeResult instanceof FinanceResult.Success<EmployeeAccountPort.Account> current)) { accountFailure(checking, payeeResult); return null; }
             return execution.readyToSend(checking, debit.value(), current.value(), Instant.now());
         } catch (RuntimeException failed) {
-            boolean changed = failed instanceof DomainException domain && ("PAYMENT_ACCOUNT_CHANGED".equals(domain.code()) || "PAYMENT_DEBIT_ACCOUNT_UNAVAILABLE".equals(domain.code()));
+            boolean changed = failed instanceof DomainException domain && (domain.is(ErrorCode.PAYMENT_ACCOUNT_CHANGED) || domain.is(ErrorCode.PAYMENT_DEBIT_ACCOUNT_UNAVAILABLE));
             execution.checkFailed(checking, changed ? PaymentOperation.Failure.ACCOUNT_CHANGED : PaymentOperation.Failure.INTERNAL_ERROR, changed, Instant.now());
             LOG.error("Payment account check failed, errorCode={}, authorizationId={}", changed ? "ACCOUNT_CHANGED" : "CHECK_FAILURE", checking.input().command().id());
             return null;

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
@@ -41,7 +42,7 @@ public class CashierPaymentActions {
         var authorization = action == Action.QUERY ? access.requireCashier(id) : access.requireExecution(id);
         if (action == Action.RESEND_ORIGINAL && (authorization.execution() == null
                 || !authorization.execution().command().authorization().executedBy().equals(actors.actor().userId()))) {
-            throw new DomainException("FORBIDDEN", "Only the original cashier may resend the original payment");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Only the original cashier may resend the original payment");
         }
         return authorization;
     }
@@ -51,7 +52,7 @@ public class CashierPaymentActions {
     public Receipt act(UUID id, Input input) {
         var initial = requireAccess(id, input.action()); sources.lock(initial);
         var authorization = requireAccess(id, input.action());
-        if (authorization.version() != input.authorizationVersion()) throw new DomainException("CONCURRENCY_CONFLICT", "Displayed payment authorization changed");
+        if (authorization.version() != input.authorizationVersion()) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Displayed payment authorization changed");
         var now = Instant.now().truncatedTo(ChronoUnit.MICROS); UUID requestId = null; Long operationVersion = null;
         String previous = null, current; long version; UUID aggregate;
         if (input.action() == Action.EXECUTE) {
@@ -59,7 +60,7 @@ public class CashierPaymentActions {
             requestId = request.input().id(); aggregate = requestId; version = request.version(); current = request.status().name();
         } else {
             var operation = operations.find(authorization.terms().tenantId(), id)
-                    .orElseThrow(() -> new DomainException("NOT_FOUND", "Original payment operation not found"));
+                    .orElseThrow(() -> new DomainException(ErrorCode.NOT_FOUND, "Original payment operation not found"));
             previous = operation.status().name();
             var next = input.action() == Action.QUERY ? execution.query(authorization.terms().tenantId(), id, input.operationVersion(), now)
                     : execution.resend(authorization.terms().tenantId(), id, input.operationVersion(), now);

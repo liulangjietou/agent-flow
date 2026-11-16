@@ -1,5 +1,6 @@
 package io.agentflow.event;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.definition.DefinitionModels;
 import io.agentflow.definition.EventWaitPolicy;
@@ -41,7 +42,7 @@ public class EventContractBindings {
         for (var policy : policies) {
             var value = contracts.lockVersion(tenantId, policy.contractKey(), policy.contractVersion());
             if (value.isEmpty() || !value.get().availability().enabled()) {
-                throw new DomainException("EVENT_CONTRACT_UNAVAILABLE", "The referenced event contract version is unavailable");
+                throw new DomainException(ErrorCode.EVENT_CONTRACT_UNAVAILABLE, "The referenced event contract version is unavailable");
             }
         }
     }

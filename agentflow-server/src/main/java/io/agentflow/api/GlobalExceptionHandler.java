@@ -1,49 +1,64 @@
 package io.agentflow.api;
 
 import io.agentflow.common.DomainException;
-import io.agentflow.form.FormValidationException;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.definition.DefinitionValidationException;
-import org.springframework.http.converter.HttpMessageNotReadableException;
+import io.agentflow.expense.InvoiceOccupationConflict;
+import io.agentflow.form.FormValidationException;
+import io.agentflow.observability.RequestTrace;
 import jakarta.servlet.http.HttpServletRequest;
 import org.flowable.common.engine.api.FlowableOptimisticLockingException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.sql.SQLTransactionRollbackException;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import io.agentflow.observability.RequestTrace;
 
 /**
- * 将领域错误转换为稳定的 API 错误契约。
+ * 将领域错误转换为稳定的 API 错误契约；HTTP 状态统一取自 {@link ErrorCode}，此处不再维护平行映射。
  * @author owlzhangfq@gmail.com
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+    private static final Logger LOG = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
     /** 发票竞争在回滚后返回当前授权来源；禁止缓存包含业务单号的错误响应。 */
-    @ExceptionHandler(io.agentflow.expense.InvoiceOccupationConflict.class)
-    public org.springframework.http.ResponseEntity<Map<String, Object>> handleInvoiceOccupation(
-            io.agentflow.expense.InvoiceOccupationConflict exception, HttpServletRequest request) {
-        Map<String, Object> response = new java.util.LinkedHashMap<>(handleDomain(exception, request).getBody());
+    @ExceptionHandler(InvoiceOccupationConflict.class)
+    public ResponseEntity<Map<String, Object>> handleInvoiceOccupation(InvoiceOccupationConflict exception,
+                                                                       HttpServletRequest request) {
+        Map<String, Object> response = new LinkedHashMap<>(handleDomain(exception, request).getBody());
         response.put("details", Map.of("invoiceConflicts", exception.conflicts()));
-        return org.springframework.http.ResponseEntity.status(HttpStatus.CONFLICT)
-                .cacheControl(org.springframework.http.CacheControl.noStore()).body(response);
+        // 发票占用冲突固定返回 409：错误码可能是 RESOURCES_CHANGED 等业务码，但这里的语义始终是资源被他人占用。
+        return ResponseEntity.status(HttpStatus.CONFLICT).cacheControl(CacheControl.noStore()).body(response);
     }
 
-    /** 引擎乐观锁或数据库已回滚的并发事务统一返回冲突；无关数据库异常保留原错误。 */
-    @ExceptionHandler({FlowableOptimisticLockingException.class, SQLTransactionRollbackException.class})
-    public org.springframework.http.ResponseEntity<Map<String, Object>> handleConcurrency(
-            Exception exception, HttpServletRequest request) {
-        return handleDomain(new DomainException("CONCURRENCY_CONFLICT", "The process was changed by another request"), request);
+    /**
+     * 引擎乐观锁、数据库死锁、锁等待超时和序列化失败统一返回冲突。
+     * MyBatis-Spring 会把驱动异常翻译为 {@link ConcurrencyFailureException} 家族，原生 SQL 异常只在未经翻译的 JDBC 路径出现。
+     */
+    @ExceptionHandler({FlowableOptimisticLockingException.class, SQLTransactionRollbackException.class,
+            ConcurrencyFailureException.class})
+    public ResponseEntity<Map<String, Object>> handleConcurrency(Exception exception, HttpServletRequest request) {
+        LOG.info("Concurrent modification rejected, errorCode={}, path={}, exceptionType={}", ErrorCode.CONCURRENCY_CONFLICT,
+                request.getRequestURI(), exception.getClass().getSimpleName());
+        return handleDomain(new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "The process was changed by another request"), request);
     }
 
     /** 处理请求体字段校验错误，统一返回 400 契约。 */
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public org.springframework.http.ResponseEntity<Map<String, Object>> handleValidation(
-            MethodArgumentNotValidException exception, HttpServletRequest request) {
+    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException exception,
+                                                                HttpServletRequest request) {
         String message = exception.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getField() + ":" + error.getDefaultMessage())
                 .sorted().findFirst().orElse("Request validation failed");
@@ -52,40 +67,39 @@ public class GlobalExceptionHandler {
 
     /** 必填查询参数在进入控制器前缺失时仍返回统一错误契约。 */
     @ExceptionHandler(MissingServletRequestParameterException.class)
-    public org.springframework.http.ResponseEntity<Map<String, Object>> handleMissingParameter(
-            MissingServletRequestParameterException exception, HttpServletRequest request) {
+    public ResponseEntity<Map<String, Object>> handleMissingParameter(MissingServletRequestParameterException exception,
+                                                                      HttpServletRequest request) {
         return invalidRequest("Required request parameter is missing: " + exception.getParameterName(), request);
     }
 
     /** 查询或路径参数类型转换失败时只返回参数名，不回显提交值和底层异常。 */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public org.springframework.http.ResponseEntity<Map<String, Object>> handleParameterTypeMismatch(
-            MethodArgumentTypeMismatchException exception, HttpServletRequest request) {
+    public ResponseEntity<Map<String, Object>> handleParameterTypeMismatch(MethodArgumentTypeMismatchException exception,
+                                                                           HttpServletRequest request) {
         return invalidRequest("Request parameter is invalid: " + exception.getName(), request);
     }
 
     /** 表单错误包含稳定的字段规则码，不回显敏感填写值。 */
     @ExceptionHandler(FormValidationException.class)
-    public org.springframework.http.ResponseEntity<Map<String, Object>> handleForm(FormValidationException exception,
-                                                                                   HttpServletRequest request) {
-        Map<String, Object> response = new java.util.LinkedHashMap<>(handleDomain(exception, request).getBody());
+    public ResponseEntity<Map<String, Object>> handleForm(FormValidationException exception, HttpServletRequest request) {
+        Map<String, Object> response = new LinkedHashMap<>(handleDomain(exception, request).getBody());
         response.put("details", Map.of("fieldErrors", exception.fieldErrors()));
-        return org.springframework.http.ResponseEntity.unprocessableEntity().body(response);
+        return ResponseEntity.status(exception.status().httpStatus()).body(response);
     }
 
     /** 图校验返回规则码与对象标识，便于设计器定位错误。 */
     @ExceptionHandler(DefinitionValidationException.class)
-    public org.springframework.http.ResponseEntity<Map<String, Object>> handleDefinition(DefinitionValidationException exception,
-                                                                                        HttpServletRequest request) {
-        Map<String, Object> response = new java.util.LinkedHashMap<>(handleDomain(exception, request).getBody());
+    public ResponseEntity<Map<String, Object>> handleDefinition(DefinitionValidationException exception,
+                                                                HttpServletRequest request) {
+        Map<String, Object> response = new LinkedHashMap<>(handleDomain(exception, request).getBody());
         response.put("details", Map.of("definitionErrors", exception.errors()));
-        return org.springframework.http.ResponseEntity.unprocessableEntity().body(response);
+        return ResponseEntity.status(exception.status().httpStatus()).body(response);
     }
 
-    /** JSON 解码中的领域值对象结构错误仍保持稳定的业务错误码。 */
+    /** JSON 解码中的领域值对象结构错误（含请求体超限）仍保持稳定的业务错误码。 */
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public org.springframework.http.ResponseEntity<Map<String, Object>> handleUnreadable(HttpMessageNotReadableException exception,
-                                                                                        HttpServletRequest request) {
+    public ResponseEntity<Map<String, Object>> handleUnreadable(HttpMessageNotReadableException exception,
+                                                                HttpServletRequest request) {
         Throwable cause = exception;
         while (cause != null) {
             if (cause instanceof DomainException domain) return handleDomain(domain, request);
@@ -94,106 +108,19 @@ public class GlobalExceptionHandler {
         return invalidRequest("Request JSON is invalid", request);
     }
 
-    private org.springframework.http.ResponseEntity<Map<String, Object>> invalidRequest(
-            String message, HttpServletRequest request) {
-        return org.springframework.http.ResponseEntity.badRequest().body(Map.of(
-                "code", "INVALID_REQUEST", "message", message,
-                "traceId", RequestTrace.id(request), "path", request.getRequestURI()));
-    }
-
     /** 处理领域规则错误。 */
     @ExceptionHandler(DomainException.class)
-    public org.springframework.http.ResponseEntity<Map<String, Object>> handleDomain(DomainException exception,
-                                                                                       HttpServletRequest request) {
-        HttpStatus status = switch (exception.code()) {
-            case "INVALID_SIGNATURE_REQUEST", "INVALID_SIGNATURE_QUERY", "INVALID_SIGNATURE_CALLBACK" -> HttpStatus.BAD_REQUEST;
-            case "SIGNATURE_CALLBACK_UNAUTHENTICATED" -> HttpStatus.UNAUTHORIZED;
-            case "SIGNATURE_CALLBACK_TOO_LARGE" -> HttpStatus.PAYLOAD_TOO_LARGE;
-            case "SIGNATURE_SOURCE_CHANGED", "SIGNATURE_OPERATION_ACTIVE", "SIGNATURE_OPERATION_CONFLICT", "SIGNATURE_RECEIPT_CONFLICT", "SIGNATURE_RESULT_NOT_READY" -> HttpStatus.CONFLICT;
-            case "DEFERRED_AUTHENTICATION_UNAVAILABLE", "SIGNATURE_EVIDENCE_CORRUPT" -> HttpStatus.SERVICE_UNAVAILABLE;
-            case "INVALID_ACCOUNT_MAPPING_QUERY", "INVALID_ACCOUNT_MAPPING_DEFINITION", "INVALID_ACCOUNT_MAPPING" -> HttpStatus.BAD_REQUEST;
-            case "ACCOUNT_MAPPING_UNCHANGED", "ACCOUNT_MAPPING_SCOPE_IMMUTABLE", "ACCOUNT_MAPPING_NOT_PUBLISHABLE", "ACCOUNT_MAPPING_SCOPE_MISMATCH" -> HttpStatus.CONFLICT;
-            case "ACCOUNT_MAPPING_CONFIGURATION_INCONSISTENT" -> HttpStatus.SERVICE_UNAVAILABLE;
-            case "INVALID_EXPENSE_CONFIGURATION_REQUEST", "INVALID_EXPENSE_CONFIGURATION_QUERY", "INVALID_EXPENSE_GUIDANCE_QUERY" -> HttpStatus.BAD_REQUEST;
-            case "EXPENSE_CONFIGURATION_UNCHANGED", "EXPENSE_CATEGORY_REMOVAL_FORBIDDEN", "EXPENSE_POLICY_CATEGORY_UNAVAILABLE", "EXPENSE_POLICY_INCOMPLETE" -> HttpStatus.CONFLICT;
-            case "EXPENSE_CONFIGURATION_INCONSISTENT" -> HttpStatus.SERVICE_UNAVAILABLE;
-            case "ADVANCE_OVERDUE", "POLICY_CONFIGURATION_CHANGED", "EXPENSE_CATEGORY_CONFIGURATION_CHANGED", "ALLOWANCE_RECALCULATION_REQUIRED" -> HttpStatus.CONFLICT;
-            case "INVALID_INITIALIZATION_REQUEST", "INVALID_INITIALIZATION_QUERY" -> HttpStatus.BAD_REQUEST;
-            case "TENANT_ALREADY_INITIALIZED", "INITIALIZATION_PERSON_CHANGED", "INITIALIZATION_CHANNEL_CHANGED" -> HttpStatus.CONFLICT;
-            case "INVALID_NOTIFICATION_DELIVERY_QUERY", "NOTIFICATION_DUPLICATE_ACK_REQUIRED" -> HttpStatus.BAD_REQUEST;
-            case "NOTIFICATION_DELIVERY_NOT_FOUND" -> HttpStatus.NOT_FOUND;
-            case "NOTIFICATION_DELIVERY_STATE_INVALID", "NOTIFICATION_CONSENT_REVOKED", "NOTIFICATION_BINDING_UNAVAILABLE" -> HttpStatus.CONFLICT;
-            case "EVENT_INPUT_INVALID", "INVALID_EVENT_INBOX_QUERY" -> HttpStatus.BAD_REQUEST;
-            case "EVENT_UNAUTHENTICATED" -> HttpStatus.UNAUTHORIZED;
-            case "EVENT_INGRESS_DISABLED" -> HttpStatus.SERVICE_UNAVAILABLE;
-            case "EVENT_BODY_TOO_LARGE" -> HttpStatus.PAYLOAD_TOO_LARGE;
-            case "EVENT_SOURCE_CONFLICT", "EVENT_ID_CONFLICT" -> HttpStatus.CONFLICT;
-            case "INVALID_EVENT_CONTRACT", "INVALID_EVENT_CONTRACT_QUERY", "INVALID_EVENT_WAIT_QUERY" -> HttpStatus.BAD_REQUEST;
-            case "INVALID_SERVICE_TASK_QUERY" -> HttpStatus.BAD_REQUEST;
-            case "EVENT_CONTRACT_AVAILABILITY_UNCHANGED", "EVENT_CONTRACT_UNAVAILABLE" -> HttpStatus.CONFLICT;
-            case "INVALID_COUNTERSIGN_QUERY", "INVALID_TIMER_QUERY", "INVALID_INSTANCE_QUERY", "INVALID_SUBPROCESS_QUERY", "INVALID_NOTIFICATION_PREFERENCES" -> HttpStatus.BAD_REQUEST;
-            case "COUNTERSIGN_STATE_INVALID", "COUNTERSIGN_MEMBER_UNAVAILABLE", "COUNTERSIGN_MEMBER_LIMIT", "COUNTERSIGN_MEMBER_EXISTS",
-                    "COUNTERSIGN_LAST_MEMBER", "COUNTERSIGN_SELF_REMOVAL", "EXPENSE_PROJECT_MEMBERS_FIXED" -> HttpStatus.CONFLICT;
-            case "PAYMENT_CALLBACK_INVALID", "INVALID_PAYMENT_BATCH" -> HttpStatus.BAD_REQUEST;
-            case "PAYMENT_CALLBACK_UNAUTHENTICATED" -> HttpStatus.UNAUTHORIZED;
-            case "PAYMENT_CALLBACK_DISABLED" -> HttpStatus.SERVICE_UNAVAILABLE;
-            case "PAYMENT_CALLBACK_TOO_LARGE" -> HttpStatus.PAYLOAD_TOO_LARGE;
-            case "PAYMENT_CALLBACK_SOURCE_CONFLICT", "PAYMENT_CALLBACK_EVENT_CONFLICT" -> HttpStatus.CONFLICT;
-            case "INVALID_PROCUREMENT_QUERY", "INVALID_SUPPLIER_PAYMENT_QUERY", "INVALID_BUDGET_ADJUSTMENT_QUERY" -> HttpStatus.BAD_REQUEST;
-            case "SUPPLIER_PAYABLE_REVIEW_PENDING", "SUPPLIER_PAYABLE_REVIEW_STATE_CONFLICT", "SUPPLIER_PAYMENT_ALREADY_AUTHORIZED",
-                    "SUPPLIER_PAYABLE_HOLD_STATE_CONFLICT", "SUPPLIER_AUTHORIZATION_RETIREMENT_UNSAFE", "SUPPLIER_PAYMENT_EXECUTION_PENDING",
-                    "SUPPLIER_PAYMENT_ALREADY_REGISTERED", "SUPPLIER_PAYMENT_EXECUTION_STATE_CONFLICT", "SUPPLIER_PAYMENT_STATE_CONFLICT" -> HttpStatus.CONFLICT;
-            case "PROCUREMENT_CHECK_ACTIVE", "PROCUREMENT_CHECK_STATE_CONFLICT", "PROCUREMENT_PAYABLE_OCCUPIED",
-                    "BUDGET_ADJUSTMENT_CHECK_ACTIVE", "BUDGET_ADJUSTMENT_CHECK_STATE_CONFLICT",
-                    "BUDGET_ADJUSTMENT_REVIEW_ACTIVE", "BUDGET_ADJUSTMENT_REVIEW_CONFLICT", "BUDGET_ADJUSTMENT_ALREADY_AUTHORIZED",
-                    "BUDGET_ADJUSTMENT_OPERATION_CONFLICT", "BUDGET_ADJUSTMENT_RETIREMENT_UNSAFE",
-                    "PROCUREMENT_RESERVATION_CONTEXT_CHANGED" -> HttpStatus.CONFLICT;
-            case "INVALID_ATTACHMENT_QUERY", "INVALID_EXPENSE_QUERY", "INVALID_FINANCE_QUERY", "INVALID_INVOICE_QUERY", "INVALID_VOUCHER_QUERY", "INVALID_VOUCHER_REVERSAL_QUERY", "INVALID_PAYMENT_QUERY", "INVALID_ADVANCE_REPAYMENT_QUERY", "INVALID_EXPENSE_PAYMENT_RETURN_QUERY", "INVALID_EXPENSE_ADJUSTMENT_QUERY", "INVALID_SUPPLIER_PAYMENT_RETURN_QUERY" -> HttpStatus.BAD_REQUEST;
-            case "ATTACHMENT_TOO_LARGE", "FILE_TOO_LARGE" -> HttpStatus.PAYLOAD_TOO_LARGE;
-            case "ATTACHMENT_QUOTA_EXCEEDED", "AGENT_RUN_ACTIVE", "AGENT_HANDLING_ACTIVE", "AGENT_HANDLING_CLOSED", "AGENT_INPUT_CHANGED", "AGENT_TARGET_CHANGED", "AGENT_RUN_STATE_CONFLICT",
-                    "FINANCIAL_RESOURCE_EXISTS", "INVOICE_OCCUPIED", "INVOICE_OCCUPATION_CHANGED", "INVOICE_WALLET_QUOTA_EXCEEDED",
-                    "INVOICE_VERIFICATION_ACTIVE", "INVOICE_VERIFICATION_STATE_CONFLICT", "FINANCE_TARGET_CHANGED",
-                    "EXPENSE_PRECHECK_ACTIVE", "EXPENSE_PRECHECK_STATE_CONFLICT", "EXPENSE_PLAN_CHECK_ACTIVE", "EXPENSE_PLAN_CHECK_STATE_CONFLICT",
-                    "ADVANCE_REQUEST_CHECK_ACTIVE", "ADVANCE_REQUEST_CHECK_STATE_CONFLICT", "ADVANCE_REPAYMENT_CHECK_PENDING", "ADVANCE_REPAYMENT_CHECK_CONFLICT", "ADVANCE_REPAYMENT_ALREADY_RECORDED", "BUDGET_OPERATION_PENDING", "BUDGET_TARGET_CHANGED",
-                    "BUDGET_LEDGER_CONFLICT", "BUDGET_FINALIZED", "EXPENSE_RESERVATION_CHANGED",
-                    "PAYMENT_AUTHORIZATION_EXISTS", "PAYMENT_EXECUTION_ALREADY_REQUESTED", "PAYMENT_AUTHORIZATION_STATE_CONFLICT", "PAYMENT_OPERATION_STATE_CONFLICT",
-                    "VOUCHER_REVERSAL_PENDING", "VOUCHER_REVERSAL_ALREADY_RECORDED", "VOUCHER_REVERSAL_CHECK_CONFLICT",
-                    "VOUCHER_REVERSAL_OPERATION_EXISTS", "VOUCHER_REVERSAL_OPERATION_CONFLICT", "VOUCHER_REVERSAL_PREPARATION_CONFLICT",
-                    "VOUCHER_REVERSAL_RETIREMENT_UNSAFE", "VOUCHER_REVERSAL_ORIGINAL_RECHECK_REQUIRED",
-                    "EXPENSE_PAYMENT_RETURN_PENDING", "EXPENSE_PAYMENT_RETURN_CHECK_CONFLICT", "EXPENSE_PAYMENT_RETURN_ALREADY_RECORDED",
-                    "EXPENSE_PAYMENT_RETURN_EVIDENCE_CHANGED", "EXPENSE_PAYMENT_RETURN_OUTCOME_CHANGED",
-                    "EXPENSE_PARTIAL_ADJUSTMENT_PENDING", "EXPENSE_PARTIAL_ADJUSTMENT_SOURCE_CHANGED", "EXPENSE_PARTIAL_ADJUSTMENT_CONFLICT", "EXPENSE_ADJUSTMENT_PENDING",
-                    "EXPENSE_ADJUSTMENT_FUNDING_CHANGED", "EXPENSE_PARTIAL_ADJUSTMENT_PREPARATION_PENDING", "PARTIAL_ADJUSTMENT_PREPARATION_CONFLICT",
-                    "BUDGET_REDUCTION_OPERATION_CONFLICT", "BUDGET_REDUCTION_AUTHORIZATION_EXPIRED", "EXPENSE_ACCRUAL_REDUCTION_OPERATION_CONFLICT",
-                    "EXPENSE_ACCRUAL_REDUCTION_EXPIRED", "EXPENSE_ACCRUAL_REDUCTION_RETIREMENT_UNSAFE",
-                    "BUDGET_REDUCTION_DISPUTE_UNRESOLVABLE", "EXPENSE_ACCRUAL_REDUCTION_DISPUTE_UNRESOLVABLE",
-                    "SUPPLIER_SETTLEMENT_PENDING", "SUPPLIER_SETTLEMENT_PREPARATION_CONFLICT", "SUPPLIER_PAYABLE_SETTLEMENT_STATE_CONFLICT",
-                    "SUPPLIER_PAYMENT_RETURN_PENDING", "SUPPLIER_PAYMENT_RETURN_CHECK_CONFLICT", "SUPPLIER_PAYMENT_RETURN_ALREADY_RECORDED",
-                    "SUPPLIER_PAYMENT_RETURN_EVIDENCE_CHANGED", "SUPPLIER_PAYMENT_RETURN_OUTCOME_CHANGED", "SUPPLIER_PAYMENT_RETURN_REVIEW_REQUIRED",
-                    "SUPPLIER_PAYMENT_RETURN_NOT_REQUIRED", "SUPPLIER_PAYMENT_RETURN_EVIDENCE_UNAVAILABLE", "SUPPLIER_PAYMENT_RETURN_PAYMENT_UNRESOLVED",
-                    "SUPPLIER_PAYMENT_RETURN_SOURCE_CHANGED",
-                    "SUPPLIER_ADJUSTMENT_PENDING", "SUPPLIER_ADJUSTMENT_SOURCE_CHANGED", "SUPPLIER_ADJUSTMENT_COMPLETION_CHANGED",
-                    "SUPPLIER_ADJUSTMENT_PREPARATION_CONFLICT", "SUPPLIER_PAYABLE_ADJUSTMENT_STATE_CONFLICT", "SUPPLIER_PAYABLE_ADJUSTMENT_EVIDENCE_CHANGED", "SUPPLIER_ADJUSTMENT_RETIREMENT_UNSAFE",
-                    "SUPPLIER_SETTLEMENT_RETIREMENT_UNSAFE" -> HttpStatus.CONFLICT;
-            case "ORGANIZATION_SYNC_UNAVAILABLE", "AGENT_MODEL_DISABLED", "AGENT_MODEL_UNCONFIGURED", "FINANCE_GATEWAY_UNAVAILABLE" -> HttpStatus.SERVICE_UNAVAILABLE;
-            case "ATTACHMENT_STORAGE_UNAVAILABLE", "ATTACHMENT_INTEGRITY_FAILED", "FILE_STORAGE_UNAVAILABLE", "FILE_INTEGRITY_FAILED" -> HttpStatus.SERVICE_UNAVAILABLE;
-            case "INVALID_ORGANIZATION_SYNC_QUERY", "INVALID_ORGANIZATION_SYNC_SELECTION", "INVALID_ORGANIZATION_QUERY", "INVALID_AVAILABILITY_QUERY", "INVALID_AGENT_QUERY", "INVALID_DEFINITION_QUERY", "INVALID_WEBHOOK_QUERY", "INVALID_DIAGRAM_QUERY", "INVALID_AUDIT_QUERY", "INVALID_APPLICATION_QUERY", "INVALID_CALENDAR_QUERY", "INVALID_CALENDAR_CALCULATION", "INVALID_COMMENT_QUERY", "INVALID_FIRST_WORKFLOW_QUERY", "INVALID_OPERATIONS_QUERY", "INVALID_TASK_QUERY", "INVALID_INBOX_QUERY", "INVALID_WORKSPACE_QUERY", "INVALID_HISTORY_QUERY", "IDEMPOTENCY_KEY_REQUIRED", "INVALID_IDEMPOTENCY_KEY",
-                    "INVALID_IDEMPOTENCY_REQUEST", "INVALID_TEMPLATE_COPY_REQUEST", "INVALID_SUPPLIER_SETTLEMENT_QUERY", "INVALID_SUPPLIER_DISPUTE_QUERY",
-                    "INVALID_SUPPLIER_SETTLEMENT_DISPUTE_QUERY", "INVALID_SUPPLIER_ADJUSTMENT_DISPUTE_QUERY", "INVALID_SUPPLIER_ADJUSTMENT_QUERY",
-                    "INVALID_EXPENSE_PARTIAL_ADJUSTMENT_QUERY", "INVALID_EXPENSE_REPORT_QUERY" -> HttpStatus.BAD_REQUEST;
-            case "UNAUTHENTICATED" -> HttpStatus.UNAUTHORIZED;
-            case "FORBIDDEN", "PAYMENT_ACTOR_UNAVAILABLE" -> HttpStatus.FORBIDDEN;
-            case "NOT_FOUND" -> HttpStatus.NOT_FOUND;
-            case "ORGANIZATION_SYNC_SOURCE_CHANGED", "ORGANIZATION_SYNC_SOURCE_CONFLICT", "ORGANIZATION_SYNC_BATCH_ACTIVE",
-                    "ORGANIZATION_SYNC_STATE_CONFLICT", "ORGANIZATION_SYNC_PLAN_STALE", "ORGANIZATION_SYNC_BINDING_CONFLICT",
-                    "ORGANIZATION_ALREADY_INITIALIZED", "ORGANIZATION_IDENTITY_CONFLICT", "ORGANIZATION_APPOINTMENT_CONFLICT", "DEFINITION_DISABLED", "DEFINITION_AVAILABILITY_UNCHANGED", "WEBHOOK_DELIVERY_CONFLICT", "WEBHOOK_TARGET_UNAVAILABLE", "CALENDAR_KEY_CONFLICT", "COUNTERSIGN_ASSIGNMENT_FIXED", "TASK_DELEGATION_PENDING", "TASK_DELEGATION_OWNER_MISSING", "CONCURRENCY_CONFLICT", "IDEMPOTENCY_KEY_REUSED", "IDEMPOTENCY_KEY_EXPIRED", "DRAFT_VERSION_CONFLICT",
-                    "DEFINITION_DEPLOYMENT_CONFLICT", "DEFINITION_BINDING_AMBIGUOUS", "TEMPLATE_VERSION_CONFLICT", "COMMENT_MENTION_UNAVAILABLE" -> HttpStatus.CONFLICT;
-            case "APPLICATION_EXPORT_BUSY", "AUDIT_EXPORT_BUSY" -> HttpStatus.TOO_MANY_REQUESTS;
-            case "DEPENDENCY_UNAVAILABLE", "APPLICATION_EXPORT_FAILED", "AUDIT_EXPORT_FAILED" -> HttpStatus.SERVICE_UNAVAILABLE;
-            default -> HttpStatus.UNPROCESSABLE_ENTITY;
-        };
-        return org.springframework.http.ResponseEntity.status(status).body(Map.of(
-                "code", exception.code(), "message", exception.getMessage(),
-                "traceId", RequestTrace.id(request), "path", request.getRequestURI()));
+    public ResponseEntity<Map<String, Object>> handleDomain(DomainException exception, HttpServletRequest request) {
+        return ResponseEntity.status(exception.status().httpStatus()).body(body(exception.code(), exception.getMessage(), request));
+    }
+
+    private ResponseEntity<Map<String, Object>> invalidRequest(String message, HttpServletRequest request) {
+        return ResponseEntity.status(ErrorCode.INVALID_REQUEST.status().httpStatus())
+                .body(body(ErrorCode.INVALID_REQUEST.name(), message, request));
+    }
+
+    private static Map<String, Object> body(String code, String message, HttpServletRequest request) {
+        return Map.of("code", code, "message", message == null ? code : message,
+                "traceId", RequestTrace.id(request), "path", request.getRequestURI());
     }
 }

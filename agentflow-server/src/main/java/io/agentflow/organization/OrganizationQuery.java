@@ -1,5 +1,6 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.Map;
 import java.util.Set;
@@ -33,5 +34,5 @@ public record OrganizationQuery(String afterId, int limit, UUID personId, Organi
 
     /** 组织单元目录必须声明类型，不因字段缺失返回混合类型数据。 */
     public OrganizationUnit.Kind requiredKind() { if (kind == null) throw invalid(); return kind; }
-    private static DomainException invalid() { return new DomainException("INVALID_ORGANIZATION_QUERY", "Organization query filters or pagination are invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ORGANIZATION_QUERY, "Organization query filters or pagination are invalid"); }
 }

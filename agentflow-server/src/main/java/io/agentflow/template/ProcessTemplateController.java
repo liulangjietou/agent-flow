@@ -1,5 +1,7 @@
 package io.agentflow.template;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -81,8 +83,8 @@ public class ProcessTemplateController {
 
     private Actor requireProcessAdmin() {
         Actor actor = currentActor.actor();
-        if (!actor.hasRole("ADMIN") && !actor.hasRole("PROCESS_ADMIN")) {
-            throw new DomainException("FORBIDDEN", "Process administrator role is required");
+        if (!actor.hasRole(SystemRole.ADMIN) && !actor.hasRole(SystemRole.PROCESS_ADMIN)) {
+            throw new DomainException(ErrorCode.FORBIDDEN, "Process administrator role is required");
         }
         return actor;
     }
@@ -113,7 +115,7 @@ public class ProcessTemplateController {
         }
 
         private static DomainException invalid() {
-            return new DomainException("INVALID_TEMPLATE_COPY_REQUEST", "Template copy key, name or version is invalid");
+            return new DomainException(ErrorCode.INVALID_TEMPLATE_COPY_REQUEST, "Template copy key, name or version is invalid");
         }
     }
 }

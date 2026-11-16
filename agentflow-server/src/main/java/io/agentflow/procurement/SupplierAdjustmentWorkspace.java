@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -105,7 +106,7 @@ public class SupplierAdjustmentWorkspace {
             if (before != null && !before.toString().equals(parameters.get("beforeId"))) throw invalid(); return new Query(limit, before);
         } catch (IllegalArgumentException malformed) { throw invalid(); }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_ADJUSTMENT_QUERY", "Adjustment history requires a bounded limit and a canonical cursor from the same original payment"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_ADJUSTMENT_QUERY, "Adjustment history requires a bounded limit and a canonical cursor from the same original payment"); }
 
     /**
      * 固定原付款范围内的历史页参数。

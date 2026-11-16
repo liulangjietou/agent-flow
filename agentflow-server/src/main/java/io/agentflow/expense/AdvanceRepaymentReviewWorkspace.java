@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -41,7 +43,7 @@ public class AdvanceRepaymentReviewWorkspace {
         var detail = requests.read(advanceId, round); var actor = actors.actor(); var source = sources.find(actor.tenantId(), advanceId);
         var original = repayments.find(actor.tenantId(), repaymentId).orElseThrow(AdvanceRepaymentReviewWorkspace::notFound);
         if (!original.belongsTo(source.advance()) || source.authorization().terms().binding().roundNo() != detail.roundNo()) throw notFound();
-        boolean finance = actor.hasRole("FINANCE") && !actor.userId().equals(source.advance().employeeId()) && personnel.eligible(actor.tenantId(), actor.userId(), source.advance().legalEntityId());
+        boolean finance = actor.hasRole(SystemRole.FINANCE) && !actor.userId().equals(source.advance().employeeId()) && personnel.eligible(actor.tenantId(), actor.userId(), source.advance().legalEntityId());
         var latest = finance ? checks.latest(actor.tenantId(), repaymentId, actor.userId()).orElse(null) : null;
         var decision = decisions.latest(actor.tenantId(), repaymentId).orElse(null);
         return new View(detail.applicationId(), advanceId, detail.roundNo(), AdvanceRepaymentWorkspace.balance(source.advance()), AdvanceRepaymentWorkspace.recorded(original, source.advance()),
@@ -52,8 +54,8 @@ public class AdvanceRepaymentReviewWorkspace {
         return new Check(value.input().id(), value.version(), value.status(), value.input().requestedAt(), value.updatedAt(), value.issue() == null ? null : value.issue().name(),
                 receipt == null ? null : new Evidence(receipt.status(), receipt.revision(), receipt.observedAt(), receipt.validUntil(), receipt.current() == null ? null : receipt.current().revision(), receipt.fundsReturn(), receipt.posting(), receipt.additionalReturns()), issue == null, issue);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_REPAYMENT_REVIEW_QUERY", "Repayment review query is invalid"); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Original repayment is unavailable in the current scope"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_REPAYMENT_REVIEW_QUERY, "Repayment review query is invalid"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Original repayment is unavailable in the current scope"); }
     /**
      * 不公开外部地址、账户、目标摘要或自由文本材料。
      * @author owlzhangfq@gmail.com

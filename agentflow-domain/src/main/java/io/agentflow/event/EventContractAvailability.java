@@ -1,5 +1,6 @@
 package io.agentflow.event;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -19,9 +20,9 @@ public record EventContractAvailability(String tenantId, String key, long contra
     /** 只修改当前明确选择的版本；相同状态不制造新的审计修订。 */
     public EventContractAvailability change(long expectedRevision, boolean enabled, String actor, String reason, Instant now) {
         if (revision != expectedRevision || revision == Long.MAX_VALUE) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Event contract availability revision changed");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Event contract availability revision changed");
         }
-        if (this.enabled == enabled) throw new DomainException("EVENT_CONTRACT_AVAILABILITY_UNCHANGED", "Event contract availability is unchanged");
+        if (this.enabled == enabled) throw new DomainException(ErrorCode.EVENT_CONTRACT_AVAILABILITY_UNCHANGED, "Event contract availability is unchanged");
         return new EventContractAvailability(tenantId, key, contractVersion, revision + 1, enabled,
                 actor, now.truncatedTo(ChronoUnit.MICROS), EventContract.requireReason(reason));
     }

@@ -39,7 +39,7 @@
 
 ## 部署与运行
 
-默认 `agentflow.assist.enabled=false`。普通 Java 部署通过 `AGENTFLOW_ASSIST_ENABLED`、`AGENTFLOW_ASSIST_ENDPOINT`、`AGENTFLOW_ASSIST_PROVIDER`、`AGENTFLOW_ASSIST_MODEL`、`AGENTFLOW_ASSIST_API_KEY` 和 `AGENTFLOW_ASSIST_TIMEOUT_SECONDS` 配置；超时 1–120 秒，默认 45 秒。`AGENTFLOW_ASSIST_WORKER_ENABLED=false` 可停止新任务轮询，持久任务与历史仍保留。启用后摘要、普通草稿、预检解释、费用填报、费用风险五类任务分别按固定延时轮询，每类每批最多 10 项，共用专用的五线程有界调度池。一个慢模型请求不再阻塞其他类别；同类固定延时任务不会重叠，不同实例仍由数据库租约领取。普通调度和 Flowable 继续使用原自动配置。
+默认 `agentflow.assist.enabled=false`。普通 Java 部署通过 `AGENTFLOW_ASSIST_ENABLED`、`AGENTFLOW_ASSIST_ENDPOINT`、`AGENTFLOW_ASSIST_PROVIDER`、`AGENTFLOW_ASSIST_MODEL`、`AGENTFLOW_ASSIST_API_KEY` 和 `AGENTFLOW_ASSIST_TIMEOUT_SECONDS` 配置；超时 1–120 秒，默认 45 秒。`agentflow.assist.max-completion-tokens`（默认 4096，1–32768）限制单次输出；`agentflow.assist.purposes.<用途>.model` 与 `.max-completion-tokens` 可按用途覆盖（用途为提示词版本去掉 `-vN` 后缀，如 `expense-handling-agent`），覆盖值进入目标指纹，变更后需重新授权。模型返回 429 时在同一超时预算内按整数秒 `Retry-After`（上限 10 秒）最多尝试 3 次；输出不符合协议时按 `agentflow.assist.invalid-output-repair-attempts`（默认 1，0–3）附加修复说明重试，传输失败因结果未知不重试。多次调用的用量合计记录，任一次未上报则合计为未上报，不当作 0。`AGENTFLOW_ASSIST_WORKER_ENABLED=false` 可停止新任务轮询，持久任务与历史仍保留。启用后摘要、普通草稿、预检解释、费用填报、费用风险五类任务分别按固定延时轮询，每类每批最多 10 项，共用专用的五线程有界调度池。一个慢模型请求不再阻塞其他类别；同类固定延时任务不会重叠，不同实例仍由数据库租约领取。普通调度和 Flowable 继续使用原自动配置。
 
 生产 Compose 叠加 `compose.assist.yml`，模型 API key 放到受控文件，`AGENTFLOW_ASSIST_API_KEY_FILE` 只保存路径；入口拒绝空文件、不可读文件以及正文/文件双配置，不打印凭据。先用维护身份执行 V32 迁移，再滚动启动服务；历史 Agent 记录不会自动调用模型。端点必须是可信部署配置，前端只能确认指纹，不能改地址。示例 `model.example` 不是可调用服务。
 

@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -110,7 +111,7 @@ public record BudgetConsumptionReductionCommand(UUID id, UUID adjustmentId, Budg
 
     /** 授权过期只禁止发送，查询始终保留相同编号和摘要。 */
     public void requireSendAt(Instant now) {
-        if (now == null || now.isBefore(createdAt) || !now.isBefore(expiresAt)) throw new DomainException("BUDGET_REDUCTION_AUTHORIZATION_EXPIRED", "Budget reduction authorization and accounting evidence have expired");
+        if (now == null || now.isBefore(createdAt) || !now.isBefore(expiresAt)) throw new DomainException(ErrorCode.BUDGET_REDUCTION_AUTHORIZATION_EXPIRED, "Budget reduction authorization and accounting evidence have expired");
     }
 
     static String positionsDigest(List<BudgetPrecheckPort.Allocation> positions) {
@@ -134,6 +135,6 @@ public record BudgetConsumptionReductionCommand(UUID id, UUID adjustmentId, Budg
             if (bytes != null) digest.update(bytes);
         }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_REDUCTION_COMMAND", "Budget reduction requires original consumption, exact remaining positions and independent finance authorization"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_REDUCTION_COMMAND, "Budget reduction requires original consumption, exact remaining positions and independent finance authorization"); }
     @Override public String toString() { return "BudgetConsumptionReductionCommand[id=" + id + ", consumptionId=" + source.id() + "]"; }
 }

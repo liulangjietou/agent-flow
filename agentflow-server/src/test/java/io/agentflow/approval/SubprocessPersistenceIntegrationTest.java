@@ -49,7 +49,7 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=true", "agentflow.attachments.max-file-bytes=1024",
         "agentflow.attachments.max-application-bytes=4096", "agentflow.attachments.max-application-uploads=3"})
 class SubprocessPersistenceIntegrationTest {
-    static final Path DIRECTORY = Path.of("/fyoung/tmp/agentflow-subprocess-files-" + UUID.randomUUID());
+    static final Path DIRECTORY = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-subprocess-files-" + UUID.randomUUID());
     static final byte[] CONTENT = {1, 3, 5, 7};
     static final String SYSTEM = "system:subprocess";
     @Autowired ApplicationRepository applications;

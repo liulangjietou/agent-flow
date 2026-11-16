@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.PaymentAccountsPort;
 import java.time.Instant;
@@ -53,7 +54,7 @@ public record SupplierPaymentEvidence(SupplierPayableHoldObservation hold, Procu
         catch (DomainException changed) { return false; }
     }
 
-    private static DomainException changed() { return new DomainException("SUPPLIER_PAYMENT_EVIDENCE_CHANGED", "Original payable, hold and selected cashier accounts must remain fresh and unchanged"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.SUPPLIER_PAYMENT_EVIDENCE_CHANGED, "Original payable, hold and selected cashier accounts must remain fresh and unchanged"); }
     /** 证据含原供应商账户，仅在受控持久记录中保存。 */
     @Override public String toString() { return "SupplierPaymentEvidence[checkedAt=" + checkedAt + "]"; }
 }

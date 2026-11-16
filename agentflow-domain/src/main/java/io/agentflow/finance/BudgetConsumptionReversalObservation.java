@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -43,5 +44,5 @@ public record BudgetConsumptionReversalObservation(UUID operationId, String comm
     public enum Rejection { ACCOUNTING_PERIOD_CLOSED, BUDGET_POLICY_UNAVAILABLE, COST_OBJECT_UNAVAILABLE, LEGAL_ENTITY_UNAVAILABLE,
         EMPLOYEE_UNAVAILABLE, LEDGER_VERSION_CONFLICT, CONSUMPTION_NOT_FOUND, CONSUMPTION_ALREADY_REVERSED }
     private static boolean reference(String value) { return StringUtils.isNotBlank(value) && value.equals(value.trim()) && value.length() <= 128 && value.chars().noneMatch(Character::isISOControl); }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_REVERSAL_OBSERVATION", "Budget consumption reversal observation is inconsistent"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_REVERSAL_OBSERVATION, "Budget consumption reversal observation is inconsistent"); }
 }

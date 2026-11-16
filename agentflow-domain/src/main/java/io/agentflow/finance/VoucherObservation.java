@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -33,7 +34,7 @@ public record VoucherObservation(UUID operationId, String commandDigest, Status 
                 && command.accountingDate().equals(accountingDate) && !postedAt.isBefore(command.createdAt()));
     }
     private static boolean invalidText(String value) { return StringUtils.isBlank(value) || value.length() > 128; }
-    private static DomainException invalid() { return new DomainException("INVALID_VOUCHER_OBSERVATION", "Voucher observation must identify the original command and complete posting facts"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_VOUCHER_OBSERVATION, "Voucher observation must identify the original command and complete posting facts"); }
 
     /**
      * 已冲销须进入对账，不能当作仍有效过账或静默删除原记录。

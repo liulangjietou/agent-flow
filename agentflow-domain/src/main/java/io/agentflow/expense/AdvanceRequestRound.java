@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.EmployeeAccountSnapshot;
 import io.agentflow.finance.FinanceCatalog;
@@ -21,13 +22,13 @@ public record AdvanceRequestRound(int roundNo, long submittedRequestVersion, Str
                 || submittedAt == null || content == null || legalEntity == null || !legalEntity.id().equals(content.legalEntityId())
                 || StringUtils.isBlank(catalogVersion) || catalogVersion.length() > 128 || account == null
                 || !account.employeeId().equals(submittedBy) || !account.legalEntityId().equals(legalEntity.id())) {
-            throw new DomainException("INVALID_ADVANCE_REQUEST_ROUND", "Advance request round, applicant and account must match");
+            throw new DomainException(ErrorCode.INVALID_ADVANCE_REQUEST_ROUND, "Advance request round, applicant and account must match");
         }
         if (!content.amount().currency().equals(legalEntity.baseCurrency())) {
-            throw new DomainException("ADVANCE_BASE_CURRENCY_REQUIRED", "Employee advances must use the legal entity base currency");
+            throw new DomainException(ErrorCode.ADVANCE_BASE_CURRENCY_REQUIRED, "Employee advances must use the legal entity base currency");
         }
         if (content.dueOn().isBefore(LocalDate.ofInstant(submittedAt, ZoneId.of(legalEntity.timeZone())))) {
-            throw new DomainException("ADVANCE_REPAYMENT_DATE_PASSED", "Repayment date cannot precede the local submission date");
+            throw new DomainException(ErrorCode.ADVANCE_REPAYMENT_DATE_PASSED, "Repayment date cannot precede the local submission date");
         }
     }
 

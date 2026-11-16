@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.ReservedAmount;
@@ -19,7 +20,7 @@ public final class ExpenseSettlementResources {
     public Plan plan(ExpenseReport report, Resources resources, Instant at) {
         var round = report.requireFrozenRound();
         if (at == null || at.isBefore(round.submittedAt()) || round.adjustments().stream().anyMatch(value -> at.isBefore(value.adjustedAt()))) {
-            throw new DomainException("INVALID_EXPENSE_SETTLEMENT", "Settlement cannot precede the frozen financial facts");
+            throw new DomainException(ErrorCode.INVALID_EXPENSE_SETTLEMENT, "Settlement cannot precede the frozen financial facts");
         }
         var invoices = new ArrayList<InvoiceChange>(); var requests = new ArrayList<PriorChange>(); var advances = new ArrayList<AdvanceChange>();
         var priorValues = new HashMap<UUID, ExpenseRequest>();
@@ -63,5 +64,5 @@ public final class ExpenseSettlementResources {
     private static void owner(ExpenseReport report, String tenant, String employee) {
         if (!report.tenantId().equals(tenant) || !report.employeeId().equals(employee)) throw conflict();
     }
-    private static DomainException conflict() { return new DomainException("EXPENSE_RESERVATION_CHANGED", "Settlement resources must retain the original approved round and exact reservations"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.EXPENSE_RESERVATION_CHANGED, "Settlement resources must retain the original approved round and exact reservations"); }
 }

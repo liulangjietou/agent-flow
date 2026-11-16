@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.mybatis.SqlRows;
 import io.agentflow.notification.mapper.NotificationPreferencesRepositoryMapper;
@@ -87,11 +88,10 @@ public class JdbcNotificationPreferencesRepository implements NotificationPrefer
                                 previous.version());
         } catch (DuplicateKeyException conflict) {
             // PostgreSQL 竞争失败后退出原事务，由入口报告冲突，不能在已中止事务内继续查询。
-            throw new DomainException(
-                    "CONCURRENCY_CONFLICT", "Notification preferences were created concurrently");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Notification preferences were created concurrently");
         }
         if (changed != 1)
-            throw new DomainException("CONCURRENCY_CONFLICT", "Notification preferences changed");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Notification preferences changed");
         sqlMapper.save3(
                 current.tenantId(),
                 current.recipient(),

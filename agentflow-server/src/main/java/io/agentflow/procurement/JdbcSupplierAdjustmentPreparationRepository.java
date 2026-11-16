@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.mybatis.SqlRow;
@@ -211,9 +212,9 @@ public class JdbcSupplierAdjustmentPreparationRepository {
 
     private static IllegalStateException inconsistent() { return new IllegalStateException("Persisted supplier adjustment preparation is inconsistent"); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Supplier adjustment preparation or original paid source changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Supplier adjustment preparation or original paid source changed"); }
 
-    private static DomainException occupied() { return new DomainException("SUPPLIER_ADJUSTMENT_PENDING", "Original bank payment already has an active adjustment intent or command"); }
+    private static DomainException occupied() { return new DomainException(ErrorCode.SUPPLIER_ADJUSTMENT_PENDING, "Original bank payment already has an active adjustment intent or command"); }
 
     /**
      * 后台不在扫描结果展开原付款资料。

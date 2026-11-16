@@ -25,7 +25,7 @@ public class JsonUtil {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JsonProcessingException exception) {
-            throw new DomainException("JSON_SERIALIZATION_FAILED", "Unable to serialize JSON");
+            throw new DomainException(ErrorCode.JSON_SERIALIZATION_FAILED, "Unable to serialize JSON");
         }
     }
 
@@ -34,7 +34,7 @@ public class JsonUtil {
         try {
             return objectMapper.readValue(value, targetType);
         } catch (JsonProcessingException exception) {
-            throw new DomainException("JSON_DESERIALIZATION_FAILED", "Unable to deserialize JSON");
+            throw new DomainException(ErrorCode.JSON_DESERIALIZATION_FAILED, "Unable to deserialize JSON");
         }
     }
 
@@ -45,7 +45,7 @@ public class JsonUtil {
                     .with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
                     .with(com.fasterxml.jackson.core.JsonParser.Feature.STRICT_DUPLICATE_DETECTION).readValue(value);
         } catch (JsonProcessingException exception) {
-            throw new DomainException("JSON_DESERIALIZATION_FAILED", "Unable to deserialize complete JSON document");
+            throw new DomainException(ErrorCode.JSON_DESERIALIZATION_FAILED, "Unable to deserialize complete JSON document");
         }
     }
 
@@ -54,7 +54,7 @@ public class JsonUtil {
         try {
             return objectMapper.readValue(value, new TypeReference<>() { });
         } catch (JsonProcessingException exception) {
-            throw new DomainException("JSON_DESERIALIZATION_FAILED", "Unable to deserialize JSON map");
+            throw new DomainException(ErrorCode.JSON_DESERIALIZATION_FAILED, "Unable to deserialize JSON map");
         }
     }
 
@@ -63,7 +63,7 @@ public class JsonUtil {
         try {
             return objectMapper.readValue(value, targetType);
         } catch (JsonProcessingException exception) {
-            throw new DomainException("JSON_DESERIALIZATION_FAILED", "Unable to deserialize JSON");
+            throw new DomainException(ErrorCode.JSON_DESERIALIZATION_FAILED, "Unable to deserialize JSON");
         }
     }
 }

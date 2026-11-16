@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.JdbcPaymentAuthorizationRepository;
@@ -125,7 +126,7 @@ public class PaymentNotificationAccess {
         return payment;
     }
 
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Payment notification is unavailable in the current scope"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Payment notification is unavailable in the current scope"); }
 
     /**
      * 存储事实只在服务内使用，不把事件键公开给页面。

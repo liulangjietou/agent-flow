@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -16,7 +17,7 @@ import java.util.UUID;
 public record SupplierPayableHoldCommand(SupplierPaymentAuthorization authorization) {
     /** 金额、目标及原应付版本全部取自已保存授权。 */
     public SupplierPayableHoldCommand {
-        if (authorization == null) throw new DomainException("INVALID_SUPPLIER_PAYABLE_HOLD_COMMAND", "Payable hold requires an immutable supplier payment authorization");
+        if (authorization == null) throw new DomainException(ErrorCode.INVALID_SUPPLIER_PAYABLE_HOLD_COMMAND, "Payable hold requires an immutable supplier payment authorization");
     }
 
     public UUID id() { return authorization.id(); }

@@ -1,5 +1,6 @@
 package io.agentflow.budget;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.FinanceResult;
 import java.time.Duration;
@@ -129,8 +130,8 @@ public record BudgetAdjustmentOperation(BudgetAdjustmentCommand command, long ve
     }
     private Instant retryAt(Instant now) { return now.plusSeconds(Math.min(MAX_BACKOFF_SECONDS, INITIAL_BACKOFF_SECONDS << Math.min(attempts - 1, 6))); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_ADJUSTMENT_OPERATION", "Budget execution must preserve its command, attempts and accepted atomic observations"); }
-    private static DomainException conflict() { return new DomainException("BUDGET_ADJUSTMENT_OPERATION_CONFLICT", "Budget adjustment cannot perform this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_ADJUSTMENT_OPERATION, "Budget execution must preserve its command, attempts and accepted atomic observations"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.BUDGET_ADJUSTMENT_OPERATION_CONFLICT, "Budget adjustment cannot perform this transition"); }
 
     /**
      * 查无等待明确重发，未知只读恢复，矛盾独立核对。

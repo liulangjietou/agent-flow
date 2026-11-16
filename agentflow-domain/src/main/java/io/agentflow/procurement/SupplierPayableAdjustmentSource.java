@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.time.Instant;
@@ -66,8 +67,8 @@ public record SupplierPayableAdjustmentSource(SupplierPaymentReturns returns, Or
     private static Money total(List<SupplierPaymentReturns.Entry> entries, String currency) {
         return entries.stream().map(entry -> entry.proof().amount()).reduce(Money.zero(currency), Money::plus);
     }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_SOURCE", "Supplier adjustment must preserve the original payment, settlement and previously accounted bank receipts"); }
-    private static DomainException invalidIntent() { return new DomainException("INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND", "Independent finance and an accounting date preserving original payment and return facts are required"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_SOURCE, "Supplier adjustment must preserve the original payment, settlement and previously accounted bank receipts"); }
+    private static DomainException invalidIntent() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND, "Independent finance and an accounting date preserving original payment and return facts are required"); }
     @Override public String toString() { return "SupplierPayableAdjustmentSource[paymentId=" + returns.request().command().id() + "]"; }
 
     /**

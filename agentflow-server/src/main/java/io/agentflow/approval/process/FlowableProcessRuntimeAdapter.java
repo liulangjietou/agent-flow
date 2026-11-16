@@ -1,5 +1,6 @@
 package io.agentflow.approval.process;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.model.SubmissionRisk;
 import io.agentflow.observability.DiagnosticContext;
 import io.agentflow.event.EventContractBindings;
@@ -98,7 +99,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
                     serviceTasks.requireReady(command.tenantId(), published.graph(), published.formSchema(), command.payload() == null ? Map.of() : command.payload());
                     // 任职要求只取实际绑定的租户定义，同名新定义不能改变内置申请或旧轮次来源。
                     if (command.initiatorContext() == null && initiatorRequirements.required(command.tenantId(), published.graph())) {
-                        throw new DomainException("INITIATOR_APPOINTMENT_REQUIRED", "Select an initiator appointment for this process");
+                        throw new DomainException(ErrorCode.INITIATOR_APPOINTMENT_REQUIRED, "Select an initiator appointment for this process");
                     }
                     if (published.graph().riskPolicy() != null) {
                         risk = published.graph().riskPolicy().assess(published.id(), published.version(), published.formSchema(),
@@ -142,7 +143,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
                 .variableValueEquals("applicationId", command.applicationId().toString())
                 .variableValueEquals("roundNo", command.roundNo()).listPage(0, 2);
         if (instances.size() != 1 || !instances.get(0).getId().equals(command.processInstanceId())) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Business adjustment requires the exact active submission instance");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Business adjustment requires the exact active submission instance");
         }
         requireTenantBinding(instances.get(0), command.tenantId());
         runtimeService.setVariable(command.processInstanceId(), "formData", Collections.unmodifiableMap(new HashMap<>(command.payload())));
@@ -181,7 +182,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
             ProcessDefinition bundledDefinition = isBundled(binding.processKey(), binding.definitionVersion())
                     ? findDefinition(binding.tenantId(), binding.processKey(), binding.definitionVersion(), true) : null;
             if (tenantDefinition != null && bundledDefinition != null) {
-                throw new DomainException("DEFINITION_BINDING_AMBIGUOUS", "Legacy application has no saved definition source and multiple sources match");
+                throw new DomainException(ErrorCode.DEFINITION_BINDING_AMBIGUOUS, "Legacy application has no saved definition source and multiple sources match");
             }
             definition = tenantDefinition == null ? bundledDefinition : tenantDefinition;
         }
@@ -206,7 +207,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     private boolean isBundled(String key, long version) { return BUNDLED_PROCESS_KEY.equals(key) && version == BUNDLED_PROCESS_VERSION; }
 
     private DomainException definitionUnavailable() {
-        return new DomainException("PROCESS_DEFINITION_NOT_FOUND", "The bound process definition is not available");
+        return new DomainException(ErrorCode.PROCESS_DEFINITION_NOT_FOUND, "The bound process definition is not available");
     }
 
     @Override
@@ -214,7 +215,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
     public CompletedTask complete(CompleteTaskCommand command) {
         Task task = taskService.createTaskQuery().taskId(command.taskId()).includeProcessVariables().singleResult();
         if (task == null) {
-            throw new DomainException("NOT_FOUND", "Task not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Task not found");
         }
         Object businessNo = task.getProcessVariables().get("businessNo");
         try (var scope = DiagnosticContext.forBusiness(command.tenantId(), businessNo instanceof String value ? value : null,
@@ -249,13 +250,13 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
                 .variableValueEquals("applicationId", command.applicationId().toString())
                 .variableValueEquals("roundNo", command.roundNo()).listPage(0, 2);
         if (instances.size() != 1) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "The application round must have exactly one active process instance");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "The application round must have exactly one active process instance");
         }
         ProcessInstance instance = instances.get(0);
         requireTenantBinding(instance, command.tenantId());
         if (command.expectedProcessInstanceId() != null
                 && !command.expectedProcessInstanceId().equals(instance.getId())) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Submission round is bound to another process instance");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Submission round is bound to another process instance");
         }
         runtimeService.deleteProcessInstance(instance.getId(), command.reason());
         return instance.getId();
@@ -265,7 +266,7 @@ public class FlowableProcessRuntimeAdapter implements ProcessRuntimePort {
         // 内置全局定义启动的旧实例没有引擎租户列，租户变量仍必须精确匹配；有引擎租户时再核对一致性。
         if (instance.getTenantId() != null && !instance.getTenantId().isEmpty()
                 && !tenantId.equals(instance.getTenantId())) {
-            throw new DomainException("CONCURRENCY_CONFLICT", "Process instance tenant binding does not match the application");
+            throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Process instance tenant binding does not match the application");
         }
     }
 }

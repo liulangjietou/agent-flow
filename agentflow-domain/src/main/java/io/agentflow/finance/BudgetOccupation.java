@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import org.apache.commons.lang3.StringUtils;
 import java.time.Instant;
@@ -32,10 +33,10 @@ public record BudgetOccupation(String tenantId, UUID reportId, String employeeId
     /** 前一操作明确结束后才可登记下一操作，释放和占用必须使用已冻结的精确分摊。 */
     public BudgetOccupation enqueue(BudgetOperation.Input input) {
         var command = input.command();
-        if (pendingOperationId != null) throw new DomainException("BUDGET_OPERATION_PENDING", "Previous budget operation must be reconciled first");
+        if (pendingOperationId != null) throw new DomainException(ErrorCode.BUDGET_OPERATION_PENDING, "Previous budget operation must be reconciled first");
         requireCommand(command);
-        if (!targetDigest.equals(input.targetDigest())) throw new DomainException("BUDGET_TARGET_CHANGED", "Budget ledger belongs to a different gateway target");
-        if (status == Status.CONSUMED) throw new DomainException("BUDGET_FINALIZED", "Consumed budget cannot be reopened");
+        if (!targetDigest.equals(input.targetDigest())) throw new DomainException(ErrorCode.BUDGET_TARGET_CHANGED, "Budget ledger belongs to a different gateway target");
+        if (status == Status.CONSUMED) throw new DomainException(ErrorCode.BUDGET_FINALIZED, "Consumed budget cannot be reopened");
         if (status == Status.RELEASED) {
             var previous = confirmed.position(); var next = command.position();
             // 释放后只允许新的审批轮次重新冻结，旧轮次不得借重新冻结恢复已经结束的占用。
@@ -76,8 +77,8 @@ public record BudgetOccupation(String tenantId, UUID reportId, String employeeId
                 || !Objects.equals(command.expected(), confirmed == null ? null : confirmed.expected())
                 || (status == Status.UNFUNDED || status == Status.RELEASED) != (command.action() == BudgetCommand.Action.FREEZE)) throw conflict();
     }
-    private static DomainException invalid() { return new DomainException("INVALID_BUDGET_OCCUPATION", "Budget occupation identity or confirmed state is invalid"); }
-    private static DomainException conflict() { return new DomainException("BUDGET_LEDGER_CONFLICT", "Budget command does not match the current confirmed ledger"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_BUDGET_OCCUPATION, "Budget occupation identity or confirmed state is invalid"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.BUDGET_LEDGER_CONFLICT, "Budget command does not match the current confirmed ledger"); }
 
     /**
      * 已释放允许新轮次沿原凭据重新冻结；已核销保持终态，执行中由 pendingOperationId 表示。

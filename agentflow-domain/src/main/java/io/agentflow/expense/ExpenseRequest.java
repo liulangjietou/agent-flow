@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import io.agentflow.finance.ReservedAmount;
@@ -46,7 +47,7 @@ public final class ExpenseRequest {
     public void reserve(long expectedVersion, int requestLine, ExpenseUse use, Money amount) {
         requireVersion(expectedVersion); requireLineUse(use);
         var balance = balance(requestLine);
-        if (closed && amount.compareTo(balance.reservedFor(use)) > 0) throw new DomainException("EXPENSE_REQUEST_CLOSED", "Closed prior requests cannot accept new reservations");
+        if (closed && amount.compareTo(balance.reservedFor(use)) > 0) throw new DomainException(ErrorCode.EXPENSE_REQUEST_CLOSED, "Closed prior requests cannot accept new reservations");
         replace(requestLine, balance.reserve(use, amount));
     }
 
@@ -54,7 +55,7 @@ public final class ExpenseRequest {
     public void move(long expectedVersion, int requestLine, ExpenseUse previous, ExpenseUse next, Money amount) {
         requireVersion(expectedVersion); requireLineUse(previous); requireLineUse(next);
         var balance = balance(requestLine);
-        if (closed && amount.compareTo(balance.reservedFor(previous)) > 0) throw new DomainException("EXPENSE_REQUEST_CLOSED", "Closed prior requests cannot increase reservations");
+        if (closed && amount.compareTo(balance.reservedFor(previous)) > 0) throw new DomainException(ErrorCode.EXPENSE_REQUEST_CLOSED, "Closed prior requests cannot increase reservations");
         replace(requestLine, balance.move(previous, next, amount));
     }
 
@@ -78,21 +79,21 @@ public final class ExpenseRequest {
     /** 显式关闭停止新增核销计划，保留仍未结算的全部占用。 */
     public void close(long expectedVersion) {
         requireVersion(expectedVersion);
-        if (closed) throw new DomainException("EXPENSE_REQUEST_CLOSED", "Prior request is already closed");
+        if (closed) throw new DomainException(ErrorCode.EXPENSE_REQUEST_CLOSED, "Prior request is already closed");
         closed = true; version++;
     }
 
     /** 按原批准行读取，不能把其他行的余额挪来掩盖超支。 */
     public ReservedAmount balance(int lineNo) {
         var balance = balances.get(lineNo);
-        if (balance == null) throw new DomainException("PRIOR_REQUEST_LINE_NOT_FOUND", "Prior request line does not exist");
+        if (balance == null) throw new DomainException(ErrorCode.PRIOR_REQUEST_LINE_NOT_FOUND, "Prior request line does not exist");
         return balance;
     }
 
     private void replace(int lineNo, ReservedAmount balance) { var changed = new LinkedHashMap<>(balances); changed.put(lineNo, balance); balances = Map.copyOf(changed); version++; }
     private static void requireLineUse(ExpenseUse use) { if (use == null || use.lineNo() < 1) throw invalid(); }
-    private void requireVersion(long expectedVersion) { if (version != expectedVersion) throw new DomainException("CONCURRENCY_CONFLICT", "Prior request version has changed"); }
-    private static DomainException invalid() { return new DomainException("INVALID_PRIOR_REQUEST", "An approved prior request with unique positive line amounts is required"); }
+    private void requireVersion(long expectedVersion) { if (version != expectedVersion) throw new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Prior request version has changed"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_PRIOR_REQUEST, "An approved prior request with unique positive line amounts is required"); }
 
     /** 恢复时核对每行上限仍等于原批准及容差，不允许账本改写授权额度。 */
     public static ExpenseRequest restore(State state) {

@@ -77,7 +77,7 @@ class ExpenseSubmissionIntegrationTest {
     private static final String ENDPOINT = "http://127.0.0.1:" + SERVER.getAddress().getPort() + "/finance";
     private static final AtomicReference<ExpenseSubmissionIntegrationTest> ACTIVE = new AtomicReference<>();
     private static final java.util.concurrent.atomic.AtomicInteger SERIAL = new java.util.concurrent.atomic.AtomicInteger();
-    private static final Path DIRECTORY = Path.of("/fyoung/tmp/agentflow-expense-submission-" + UUID.randomUUID());
+    private static final Path DIRECTORY = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-expense-submission-" + UUID.randomUUID());
     private final Actor admin = new Actor("demo", "admin", Set.of("ADMIN", "PROCESS_ADMIN"));
     private final Map<UUID, BudgetCommand> commands = new ConcurrentHashMap<>();
     private final List<UUID> created = new ArrayList<>();

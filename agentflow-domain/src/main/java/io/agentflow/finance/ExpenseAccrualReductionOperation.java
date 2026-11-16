@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.time.Duration;
 import java.time.Instant;
@@ -110,7 +111,7 @@ public record ExpenseAccrualReductionOperation(Input input, long version, Status
     }
     /** 财务明确结束使原排队命令失效，既有终态失败回执和原命令字节保持。 */
     public ExpenseAccrualReductionOperation stopForRetirement(Instant now) {
-        requireTime(now); if (retirementBasis() == null) throw new DomainException("EXPENSE_ACCRUAL_REDUCTION_RETIREMENT_UNSAFE", "Accrual reduction is not proven safely finished");
+        requireTime(now); if (retirementBasis() == null) throw new DomainException(ErrorCode.EXPENSE_ACCRUAL_REDUCTION_RETIREMENT_UNSAFE, "Accrual reduction is not proven safely finished");
         return status == Status.QUEUED ? changed(Status.VOIDED, now, null, null, null, 0, Failure.FINANCE_RETIRED) : this;
     }
 
@@ -136,7 +137,7 @@ public record ExpenseAccrualReductionOperation(Input input, long version, Status
     public ExpenseAccrualReductionOperation resolveDispute(ExpenseAccrualReductionObservation.Status outcome, ResolutionHistory history, Instant now) {
         requireTime(now);
         if (resolutionIssue(history, now) != null || conflictingObservation.status() != outcome)
-            throw new DomainException("EXPENSE_ACCRUAL_REDUCTION_DISPUTE_UNRESOLVABLE", "Accrual reduction resolution requires recent terminal evidence preserving the original acceptance and postings");
+            throw new DomainException(ErrorCode.EXPENSE_ACCRUAL_REDUCTION_DISPUTE_UNRESOLVABLE, "Accrual reduction resolution requires recent terminal evidence preserving the original acceptance and postings");
         return changed(Status.valueOf(outcome.name()), now, null, conflictingObservation, null, highestRevision, null);
     }
 
@@ -211,8 +212,8 @@ public record ExpenseAccrualReductionOperation(Input input, long version, Status
     }
     private Instant retryAt(Instant now) { return now.plusSeconds(Math.min(MAX_BACKOFF_SECONDS, INITIAL_BACKOFF_SECONDS << Math.min(attempts - 1, 6))); }
     private void requireTime(Instant now) { if (now == null || now.isBefore(updatedAt)) throw conflict(); }
-    private static DomainException invalid() { return new DomainException("INVALID_EXPENSE_ACCRUAL_REDUCTION_OPERATION", "Accrual reduction execution must preserve original command, accepted posting and highest external revision"); }
-    private static DomainException conflict() { return new DomainException("EXPENSE_ACCRUAL_REDUCTION_OPERATION_CONFLICT", "Accrual reduction operation can no longer perform this transition"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_EXPENSE_ACCRUAL_REDUCTION_OPERATION, "Accrual reduction execution must preserve original command, accepted posting and highest external revision"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.EXPENSE_ACCRUAL_REDUCTION_OPERATION_CONFLICT, "Accrual reduction operation can no longer perform this transition"); }
     /**
      * 本地原修订、命令和目的地从登记开始不可替换。
      * @author owlzhangfq@gmail.com

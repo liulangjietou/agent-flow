@@ -6,7 +6,6 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
-import org.springframework.scheduling.TaskScheduler;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -26,7 +25,7 @@ class AssistSchedulingTest {
             release.await();
             return null;
         }).when(summaries).poll();
-        new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, AssistScheduling.class)
+        new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, io.agentflow.config.PollingSchedulingConfiguration.class, AssistScheduling.class)
                 .withConfiguration(AutoConfigurations.of(TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
                 .withBean(AssistWorker.class, () -> summaries)
                 .withBean(DraftAssistWorker.class, () -> org.mockito.Mockito.mock(DraftAssistWorker.class))
@@ -55,7 +54,7 @@ class AssistSchedulingTest {
         var explanations = org.mockito.Mockito.mock(PrecheckExplanationWorker.class);
         var expenseDrafts = org.mockito.Mockito.mock(ExpenseDraftAssistWorker.class);
         var expenseRisks = org.mockito.Mockito.mock(ExpenseRiskWorker.class);
-        new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, AssistScheduling.class)
+        new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, io.agentflow.config.PollingSchedulingConfiguration.class, AssistScheduling.class)
                 .withConfiguration(AutoConfigurations.of(TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
                 .withBean(AssistWorker.class, () -> summaries).withBean(DraftAssistWorker.class, () -> ordinaryDrafts)
                 .withBean(PrecheckExplanationWorker.class, () -> explanations).withBean(ExpenseDraftAssistWorker.class, () -> expenseDrafts)
@@ -75,14 +74,27 @@ class AssistSchedulingTest {
     }
 
     @Test
-    void enabledModelRetainsAnIndependentDefaultScheduler() {
-        new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, AssistScheduling.class)
+    void everyAssistPollerOwnsADedicatedSchedulerThread() {
+        new ApplicationContextRunner().withUserConfiguration(DatabaseConfig.class, io.agentflow.config.PollingSchedulingConfiguration.class, AssistScheduling.class)
                 .withConfiguration(AutoConfigurations.of(TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
-                .withPropertyValues("agentflow.assist.enabled=true", "agentflow.assist.worker-enabled=false")
+                .withBean(AssistWorker.class, () -> org.mockito.Mockito.mock(AssistWorker.class))
+                .withBean(DraftAssistWorker.class, () -> org.mockito.Mockito.mock(DraftAssistWorker.class))
+                .withBean(PrecheckExplanationWorker.class, () -> org.mockito.Mockito.mock(PrecheckExplanationWorker.class))
+                .withBean(ExpenseDraftAssistWorker.class, () -> org.mockito.Mockito.mock(ExpenseDraftAssistWorker.class))
+                .withBean(ExpenseRiskWorker.class, () -> org.mockito.Mockito.mock(ExpenseRiskWorker.class))
+                .withBean(org.springframework.transaction.PlatformTransactionManager.class, () ->
+                        new org.springframework.jdbc.datasource.DataSourceTransactionManager(
+                                new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:h2:mem:assist-pool", "sa", "")))
+                .withPropertyValues("agentflow.assist.enabled=true", "agentflow.assist.poll-delay-ms=60000")
                 .run(context -> {
-                    assertThat(context).hasBean("taskScheduler").hasBean("assistTaskScheduler").hasBean("applicationTaskExecutor");
-                    assertThat(context.getBean("taskScheduler", TaskScheduler.class))
-                            .isNotSameAs(context.getBean("assistTaskScheduler", TaskScheduler.class));
+                    var tasks = context.getBeansOfType(org.springframework.scheduling.config.ScheduledTaskHolder.class).values().stream()
+                            .mapToInt(holder -> holder.getScheduledTasks().size()).sum();
+                    assertThat(tasks).isEqualTo(5);
+                    var registrar = org.springframework.test.util.ReflectionTestUtils.getField(
+                            context.getBean(org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor.class), "registrar");
+                    var scheduler = ((org.springframework.scheduling.config.ScheduledTaskRegistrar) registrar).getScheduler();
+                    assertThat(scheduler).isInstanceOf(org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler.class);
+                    assertThat(((org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler) scheduler).getPoolSize()).isEqualTo(tasks);
                 });
     }
 }

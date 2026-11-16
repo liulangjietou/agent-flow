@@ -1,5 +1,6 @@
 package io.agentflow.agent;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.mapper.ExpenseDraftAssistRepositoryMapper;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
@@ -57,11 +58,9 @@ public class JdbcExpenseDraftAssistRepository {
                             input.applicationVersion(),
                             input.financialVersion());
             if (inserted != 1)
-                throw new DomainException(
-                        "AGENT_INPUT_CHANGED", "Expense draft changed before persistence");
+                throw new DomainException(ErrorCode.AGENT_INPUT_CHANGED, "Expense draft changed before persistence");
         } catch (DuplicateKeyException active) {
-            throw new DomainException(
-                    "AGENT_RUN_ACTIVE", "Expense report already has active draft assistance");
+            throw new DomainException(ErrorCode.AGENT_RUN_ACTIVE, "Expense report already has active draft assistance");
         }
         append(run);
     }
@@ -165,7 +164,7 @@ public class JdbcExpenseDraftAssistRepository {
         return run;
     }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense draft assistance changed before persistence"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense draft assistance changed before persistence"); }
 
     /**
      * 队列扫描不读取或暴露原模型内容。

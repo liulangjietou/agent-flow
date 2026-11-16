@@ -1,5 +1,6 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.util.UUID;
 
@@ -13,7 +14,7 @@ public record AccountMappingSelection(UUID mappingId, long mappingVersion, long 
     public AccountMappingSelection {
         if (mappingId == null || mappingVersion < 1 || categoryRevision < 0 || activeRevision < 1
                 || !validDigest(definitionDigest) || !validDigest(targetDigest)) {
-            throw new DomainException("INVALID_ACCOUNT_MAPPING_SELECTION", "Account mapping selection requires immutable versions and a bound finance target");
+            throw new DomainException(ErrorCode.INVALID_ACCOUNT_MAPPING_SELECTION, "Account mapping selection requires immutable versions and a bound finance target");
         }
     }
     private static boolean validDigest(String value) { return value != null && value.matches("[a-f0-9]{64}"); }

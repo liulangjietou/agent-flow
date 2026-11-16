@@ -1,6 +1,7 @@
 package io.agentflow.notification;
 
 
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import io.agentflow.approval.model.Application;
@@ -71,7 +72,7 @@ public class BudgetNotificationAccess {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Target target(UUID messageId) {
         var actor = actors.actor(); var source = allowed(actor.tenantId(), actor.userId(), row(actor.tenantId(), actor.userId(), messageId));
-        if (source == null) throw new DomainException("NOT_FOUND", "Budget notification is unavailable in the current scope");
+        if (source == null) throw new DomainException(ErrorCode.NOT_FOUND, "Budget notification is unavailable in the current scope");
         var operation = source.operation(); var position = operation.input().command().position();
         expenses.read(position.reportId(), position.roundNo());
         var observation = operation.observation();

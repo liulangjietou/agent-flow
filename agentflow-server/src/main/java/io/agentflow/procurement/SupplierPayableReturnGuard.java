@@ -1,6 +1,7 @@
 package io.agentflow.procurement;
 
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.mybatis.SqlRows;
 import io.agentflow.procurement.mapper.SupplierPayableReturnGuardMapper;
@@ -37,7 +38,7 @@ public class SupplierPayableReturnGuard {
 
     /** 新占用、财务授权及外部发送必须先处理同一应付已知的退回疑点。 */
     public void requireClear(String tenant, ProcurementPaymentContent content) {
-        if (blocked(tenant, content)) throw new DomainException("SUPPLIER_PAYMENT_RETURN_REVIEW_REQUIRED", "Original supplier payable has unresolved received-funds or bank evidence");
+        if (blocked(tenant, content)) throw new DomainException(ErrorCode.SUPPLIER_PAYMENT_RETURN_REVIEW_REQUIRED, "Original supplier payable has unresolved received-funds or bank evidence");
     }
 
     /** 只读投影与本地完成共用判定；原来已完成的凭据不会被回退。 */

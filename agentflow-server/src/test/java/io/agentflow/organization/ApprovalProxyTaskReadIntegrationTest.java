@@ -60,7 +60,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {"agentflow.auth.demo-enabled=false", "agentflow.sla.reminders-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class ApprovalProxyTaskReadIntegrationTest {
-    private static final Path FILES = Path.of("/fyoung/tmp/approval-proxy-read-files-" + UUID.randomUUID());
+    private static final Path FILES = Path.of(System.getProperty("java.io.tmpdir") + "/approval-proxy-read-files-" + UUID.randomUUID());
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry registry) {
         registry.add("agentflow.attachments.directory", FILES::toString);

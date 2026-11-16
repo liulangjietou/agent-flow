@@ -1,5 +1,7 @@
 package io.agentflow.organization;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import java.time.Instant;
@@ -33,7 +35,7 @@ public class OrganizationSyncApplicationService {
     /** 保存完整核对结果，即使存在冲突也保留该次具名预检，不改变组织事实。 */
     @Transactional
     public JdbcOrganizationSyncPlanRepository.Saved preflight(Actor actor, UUID batchId, long expectedVersion, List<Selection> selections) {
-        actor.requireRole("ADMIN"); long directoryRevision = organization.lock(actor.tenantId());
+        actor.requireRole(SystemRole.ADMIN); long directoryRevision = organization.lock(actor.tenantId());
         var source = source(actor); var batch = batch(actor, batchId, expectedVersion);
         configuration.requireCurrent(batch.context());
         return plans.create(planner.prepare(actor, batch, source.version(), directoryRevision, selections, now()));
@@ -42,19 +44,19 @@ public class OrganizationSyncApplicationService {
     /** 读取既有计划用于人工核对，不为旧计划拼接当前名称或来源事实。 */
     @Transactional(readOnly = true)
     public JdbcOrganizationSyncPlanRepository.Saved plan(Actor actor, UUID id) {
-        actor.requireRole("ADMIN"); return plans.find(actor.tenantId(), id).orElseThrow(OrganizationSyncApplicationService::notFound);
+        actor.requireRole(SystemRole.ADMIN); return plans.find(actor.tenantId(), id).orElseThrow(OrganizationSyncApplicationService::notFound);
     }
 
     /** 只应用服务端已保存且仍新鲜的无冲突计划，不接受客户端提供的实体目标值。 */
     @Transactional
     public OrganizationSyncBatch.State apply(Actor actor, UUID batchId, long expectedVersion, UUID planId, String comment) {
-        actor.requireRole("ADMIN"); long directoryRevision = organization.lock(actor.tenantId());
+        actor.requireRole(SystemRole.ADMIN); long directoryRevision = organization.lock(actor.tenantId());
         var source = source(actor); var batch = batch(actor, batchId, expectedVersion);
         configuration.requireCurrent(batch.context());
         var saved = plans.find(actor.tenantId(), planId).orElseThrow(OrganizationSyncApplicationService::notFound); var plan = saved.plan();
         if (!plan.batchId().equals(batchId) || plan.batchVersion() != expectedVersion || plan.directoryRevision() != directoryRevision
                 || plan.sourceVersion() != source.version() || batch.context().afterRevision() != source.appliedRevision()) throw stale();
-        if (!plan.ready()) throw new DomainException("ORGANIZATION_SYNC_PLAN_CONFLICT", "Resolve organization synchronization conflicts before application");
+        if (!plan.ready()) throw new DomainException(ErrorCode.ORGANIZATION_SYNC_PLAN_CONFLICT, "Resolve organization synchronization conflicts before application");
         Instant at = now();
         // 先构造所有新实体的无环基础引用，再保存部门负责人和主管，避免双向外键创建顺序问题。
         createBaseRecords(actor.tenantId(), plan);
@@ -113,6 +115,6 @@ public class OrganizationSyncApplicationService {
         if (value.state().status() != OrganizationSyncBatch.Status.RECEIVED || value.state().version() != version) throw stale(); return value;
     }
     private static Instant now() { return Instant.now().truncatedTo(ChronoUnit.MILLIS); }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Organization synchronization record not found"); }
-    private static DomainException stale() { return new DomainException("ORGANIZATION_SYNC_PLAN_STALE", "Organization synchronization plan no longer matches the current batch or directory"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Organization synchronization record not found"); }
+    private static DomainException stale() { return new DomainException(ErrorCode.ORGANIZATION_SYNC_PLAN_STALE, "Organization synchronization plan no longer matches the current batch or directory"); }
 }

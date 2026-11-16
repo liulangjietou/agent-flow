@@ -1,5 +1,7 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
@@ -30,8 +32,8 @@ import static io.agentflow.definition.DefinitionModels.Graph;
 @RestController
 @RequestMapping("/api/v1/process-definitions")
 public class DefinitionController {
-    private static final String PROCESS_ADMIN_ROLE = "PROCESS_ADMIN";
-    private static final String ADMIN_ROLE = "ADMIN";
+    private static final String PROCESS_ADMIN_ROLE = SystemRole.PROCESS_ADMIN.name();
+    private static final String ADMIN_ROLE = SystemRole.ADMIN.name();
     private final DefinitionApplicationService service;
     private final CurrentActor currentActor;
     private final IdempotencyExecutor idempotency;
@@ -120,7 +122,7 @@ public class DefinitionController {
         Actor actor = currentActor.actor();
         if (!canManageDefinitions(actor) && status != null && !status.isBlank()
                 && !"PUBLISHED".equalsIgnoreCase(status)) {
-            throw new DomainException("FORBIDDEN", "Only published definitions are visible to this role");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Only published definitions are visible to this role");
         }
         String visibleStatus = canManageDefinitions(actor) ? status : "PUBLISHED";
         return service.list(actor.tenantId(), visibleStatus).stream().map(DefinitionResponse::from).toList();
@@ -137,7 +139,7 @@ public class DefinitionController {
     public ResponseEntity<DefinitionInitiatorRequirements.View> initiatorRequirements(@PathVariable UUID id) {
         var definition = requireVisibleDefinition(id);
         if (definition.status() != DefinitionModels.DraftStatus.PUBLISHED) {
-            throw new DomainException("NOT_FOUND", "Published process definition not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Published process definition not found");
         }
         return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore())
                 .body(new DefinitionInitiatorRequirements.View(definition.key(), definition.version(),
@@ -268,7 +270,7 @@ public class DefinitionController {
         Actor actor = currentActor.actor();
         DefinitionDraft draft = service.get(actor.tenantId(), id);
         if (draft.status() != DefinitionModels.DraftStatus.PUBLISHED && !canManageDefinitions(actor)) {
-            throw new DomainException("NOT_FOUND", "Process definition not found");
+            throw new DomainException(ErrorCode.NOT_FOUND, "Process definition not found");
         }
         return draft;
     }
@@ -276,7 +278,7 @@ public class DefinitionController {
     private void requireProcessAdmin() {
         Actor actor = currentActor.actor();
         if (!canManageDefinitions(actor)) {
-            throw new DomainException("FORBIDDEN", "Process administrator role is required");
+            throw new DomainException(ErrorCode.FORBIDDEN, "Process administrator role is required");
         }
     }
 

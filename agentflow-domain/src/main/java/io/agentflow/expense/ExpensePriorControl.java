@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import java.math.BigDecimal;
 import org.apache.commons.lang3.StringUtils;
@@ -24,7 +25,7 @@ public record ExpensePriorControl(Mode mode, BigDecimal toleranceFraction) {
     public boolean hardLimit() { return mode == Mode.STRICT; }
 
     private static DomainException invalid() {
-        return new DomainException("INVALID_EXPENSE_PRIOR_CONTROL", "Prior request control mode, fraction and source must be valid");
+        return new DomainException(ErrorCode.INVALID_EXPENSE_PRIOR_CONTROL, "Prior request control mode, fraction and source must be valid");
     }
 
     /**

@@ -1,5 +1,7 @@
 package io.agentflow.finance;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import io.agentflow.approval.ApprovalApplicationFacade;
 import io.agentflow.approval.model.Application;
 import io.agentflow.approval.model.BusinessReference;
@@ -35,16 +37,16 @@ public class VoucherAccess {
         } else {
             var detail = advances.read(binding.id(), roundNo); round = detail.roundNo(); version = detail.requestVersion();
         }
-        var actor = actors.actor(); boolean finance = actor.hasRole("FINANCE") && !actor.userId().equals(application.createdBy());
+        var actor = actors.actor(); boolean finance = actor.hasRole(SystemRole.FINANCE) && !actor.userId().equals(application.createdBy());
         return new Context(application, round, version, finance);
     }
     /** 幂等回放之前也复核当前读取权限，职责分离禁止申请人操作自己的财务副作用。 */
     public Context requireFinance(UUID applicationId, int round) {
         var context = read(applicationId, round);
-        if (!context.finance()) throw new DomainException("FORBIDDEN", "Finance role and separation from applicant are required");
+        if (!context.finance()) throw new DomainException(ErrorCode.FORBIDDEN, "Finance role and separation from applicant are required");
         return context;
     }
-    private static DomainException notFound() { return new DomainException("NOT_FOUND", "Financial application not found"); }
+    private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Financial application not found"); }
     /**
      * 内部授权上下文，不作为 HTTP 响应返回原始申请。
      * @author owlzhangfq@gmail.com

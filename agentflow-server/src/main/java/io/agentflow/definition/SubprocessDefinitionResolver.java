@@ -1,14 +1,11 @@
 package io.agentflow.definition;
 
+import io.agentflow.common.ErrorCode;
+import io.agentflow.approval.BusinessFormBindings;
 import io.agentflow.approval.service.ProcessRuntimePort;
-import io.agentflow.budget.BudgetAdjustmentFormContract;
 import io.agentflow.common.DomainException;
-import io.agentflow.expense.AdvanceRequestFormContract;
-import io.agentflow.expense.ExpenseFormContract;
-import io.agentflow.expense.ExpensePlanFormContract;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.NotificationTexts;
-import io.agentflow.procurement.ProcurementPaymentFormContract;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,17 +19,18 @@ import java.util.UUID;
 public class SubprocessDefinitionResolver {
     private final DefinitionDraftRepository definitions;
     private final ProcessRuntimePort runtime;
+    private final BusinessFormBindings formBindings;
 
     /** 复用现有明确来源的运行端口，禁止退回到同名内置流程或其他租户。 */
-    public SubprocessDefinitionResolver(DefinitionDraftRepository definitions, ProcessRuntimePort runtime) {
-        this.definitions = definitions; this.runtime = runtime;
+    public SubprocessDefinitionResolver(DefinitionDraftRepository definitions, ProcessRuntimePort runtime, BusinessFormBindings formBindings) {
+        this.definitions = definitions; this.runtime = runtime; this.formBindings = formBindings;
     }
 
     /** 引用版本加锁至调用事务结束，与停用串行；返回自身不可变内容而非可修改定义聚合。 */
     @Transactional(propagation = Propagation.MANDATORY)
     public Bound resolve(String tenantId, SubprocessPolicy policy, String nodeId, FormSchema parentSchema) {
         var target = definitions.lockPublished(tenantId, policy.processKey(), policy.version()).orElseThrow(
-                () -> new DomainException("SUBPROCESS_DEFINITION_UNAVAILABLE", "The referenced published subprocess version is unavailable"));
+                () -> new DomainException(ErrorCode.SUBPROCESS_DEFINITION_UNAVAILABLE, "The referenced published subprocess version is unavailable"));
         return bind(tenantId, target, policy, nodeId, parentSchema);
     }
 
@@ -40,7 +38,7 @@ public class SubprocessDefinitionResolver {
     @Transactional(readOnly = true)
     public Bound inspect(String tenantId, SubprocessPolicy policy, String nodeId, FormSchema parentSchema) {
         var target = definitions.findPublished(tenantId, policy.processKey(), policy.version()).orElseThrow(
-                () -> new DomainException("SUBPROCESS_DEFINITION_UNAVAILABLE", "The referenced published subprocess version is unavailable"));
+                () -> new DomainException(ErrorCode.SUBPROCESS_DEFINITION_UNAVAILABLE, "The referenced published subprocess version is unavailable"));
         return bind(tenantId, target, policy, nodeId, parentSchema);
     }
 
@@ -49,10 +47,8 @@ public class SubprocessDefinitionResolver {
         target.requireStartEnabled();
         var schema = target.formSchema();
         // 与普通申请入口保持同一业务归属：映射表单不能伪造财务预检、资源占用或业务单据。
-        if (ExpenseFormContract.structured(schema) || ExpensePlanFormContract.structured(schema)
-                || AdvanceRequestFormContract.structured(schema) || ProcurementPaymentFormContract.structured(schema)
-                || BudgetAdjustmentFormContract.structured(schema)) {
-            throw new DomainException("BUSINESS_ENDPOINT_REQUIRED", "Structured financial applications require their business submission endpoint");
+        if (formBindings.anyStructured(schema)) {
+            throw new DomainException(ErrorCode.BUSINESS_ENDPOINT_REQUIRED, "Structured financial applications require their business submission endpoint");
         }
         var inputs = SubprocessInputs.bind(policy, nodeId, parentSchema, schema);
         String runtimeDefinitionId = runtime.resolveDefinition(tenantId, target.key(), target.version(), false);

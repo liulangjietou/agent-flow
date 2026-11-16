@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.Money;
 import java.time.Instant;
@@ -37,7 +38,7 @@ public record ApprovedProcurementPayment(ProcurementPayableReservation reservati
                 || !original.budgetRecognitionReference().equals(current.budgetRecognitionReference()) || !original.dueOn().equals(current.dueOn())
                 || !original.gross().equals(current.gross()) || !original.lines().equals(current.lines())
                 || amount().compareTo(current.outstanding()) > 0) {
-            throw new DomainException("PROCUREMENT_PAYABLE_CHANGED", "Current payable must retain the approved supplier, matching, account and accounting evidence with sufficient outstanding amount");
+            throw new DomainException(ErrorCode.PROCUREMENT_PAYABLE_CHANGED, "Current payable must retain the approved supplier, matching, account and accounting evidence with sufficient outstanding amount");
         }
     }
 
@@ -46,5 +47,5 @@ public record ApprovedProcurementPayment(ProcurementPayableReservation reservati
 
     /** 日志不展开供应商、票号、金额或账户信息。 */
     @Override public String toString() { return "ApprovedProcurementPayment[requestId=" + reservation.source().requestId() + "]"; }
-    private static DomainException changed() { return new DomainException("PROCUREMENT_PAYMENT_SOURCE_CHANGED", "Supplier payment requires the exact approved request and its held original payable"); }
+    private static DomainException changed() { return new DomainException(ErrorCode.PROCUREMENT_PAYMENT_SOURCE_CHANGED, "Supplier payment requires the exact approved request and its held original payable"); }
 }

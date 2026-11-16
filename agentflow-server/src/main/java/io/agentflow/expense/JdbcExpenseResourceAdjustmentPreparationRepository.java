@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.expense.mapper.ExpenseResourceAdjustmentPreparationRepositoryMapper;
@@ -207,7 +208,7 @@ public class JdbcExpenseResourceAdjustmentPreparationRepository {
 
     private static Instant instant(Timestamp at) { return at == null ? null : at.toInstant(); }
 
-    private static DomainException conflict() { return new DomainException("CONCURRENCY_CONFLICT", "Expense adjustment preparation input or version changed"); }
+    private static DomainException conflict() { return new DomainException(ErrorCode.CONCURRENCY_CONFLICT, "Expense adjustment preparation input or version changed"); }
 
     private static IllegalStateException inconsistent() { return new IllegalStateException("Persisted resource adjustment preparation identity is inconsistent"); }
 

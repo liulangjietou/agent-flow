@@ -1,5 +1,7 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.SystemRole;
+import io.agentflow.common.ErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.agentflow.common.CurrentActor;
 import io.agentflow.common.DomainException;
@@ -47,7 +49,7 @@ public class AdvanceRepaymentWorkspace {
         if (advance == null) { if (before != null) throw invalid(); return new View(detail.applicationId(), id, detail.roundNo(), null, false, null, List.of(), null); }
         var source = sources.find(actor.tenantId(), id);
         if (source.authorization().terms().binding().roundNo() != detail.roundNo()) return new View(detail.applicationId(), id, detail.roundNo(), null, false, null, List.of(), null);
-        boolean finance = actor.hasRole("FINANCE") && !actor.userId().equals(advance.employeeId()) && personnel.eligible(actor.tenantId(), actor.userId(), advance.legalEntityId());
+        boolean finance = actor.hasRole(SystemRole.FINANCE) && !actor.userId().equals(advance.employeeId()) && personnel.eligible(actor.tenantId(), actor.userId(), advance.legalEntityId());
         var latest = finance ? checks.latest(actor.tenantId(), id, actor.userId()).orElse(null) : null;
         var rows = repayments.list(actor.tenantId(), id, before, PAGE_SIZE + 1); var page = rows.stream().limit(PAGE_SIZE).map(value -> recorded(value, advance)).toList();
         boolean query = finance && source.payment().settleable() && !advance.paymentReviewRequired() && (latest == null || !latest.active());
@@ -69,7 +71,7 @@ public class AdvanceRepaymentWorkspace {
                 receipt.posting().voucherReference(), receipt.posting().entryReference(), receipt.posting().accountingDate(), receipt.posting().postedAt(), value.recordedBy(), value.recordedAt(),
                 advance.repaymentReviews().contains(value.id()), returns.isEmpty() ? null : returns.get(0), returns.stream().skip(1).toList());
     }
-    private static DomainException invalid() { return new DomainException("INVALID_ADVANCE_REPAYMENT_QUERY", "Repayment history query is invalid"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_ADVANCE_REPAYMENT_QUERY, "Repayment history query is invalid"); }
     /**
      * 轮次权限之下的最小工作区，不复制原账户、外部地址及理由自由文本。
      * @author owlzhangfq@gmail.com

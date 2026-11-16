@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.finance.FinanceCatalog;
@@ -98,7 +99,7 @@ public class ExpensePolicyConfiguration {
             if (selection == null) return null;
             var category = current.categories().activeCategories().stream()
                     .filter(value -> value.code().equals(categoryCode) && value.units().contains(unit)).findFirst()
-                    .orElseThrow(() -> new DomainException("EXPENSE_CATEGORY_UNAVAILABLE", "Expense category or unit is not available in the managed revision"));
+                    .orElseThrow(() -> new DomainException(ErrorCode.EXPENSE_CATEGORY_UNAVAILABLE, "Expense category or unit is not available in the managed revision"));
             return new ManagedExpensePolicy(selection, current.activePolicy().definition(), category);
         }
     }

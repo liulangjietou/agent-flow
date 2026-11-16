@@ -61,7 +61,7 @@ import java.util.function.Function;
         "agentflow.invoices.verification-worker-enabled=false"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 class InvoiceVerificationIntegrationTest {
-    private static final Path DIRECTORY = Path.of("/fyoung/tmp/agentflow-invoice-verification-" + UUID.randomUUID());
+    private static final Path DIRECTORY = Path.of(System.getProperty("java.io.tmpdir") + "/agentflow-invoice-verification-" + UUID.randomUUID());
     private static final byte[] PDF = "%PDF-1.7\nsynthetic-verification-original\n%%EOF".getBytes(StandardCharsets.UTF_8);
     private static final UUID ENTITY = UUID.randomUUID();
     private static final HttpServer SERVER = server();

@@ -1,5 +1,6 @@
 package io.agentflow.expense;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.agent.AssistRun;
 import io.agentflow.agent.PrecheckExplanationInput;
 import io.agentflow.agent.PrecheckExplanationService;
@@ -45,7 +46,7 @@ public class ExpenseCorrectionController {
     @PostMapping("/structured")
     public ResponseEntity<String> structured(@PathVariable UUID id, @PathVariable UUID runId,
             @Valid @RequestBody ExpenseStructuredCorrectionService.Input body, HttpServletRequest request) {
-        if (request.getQueryString() != null) throw new DomainException("INVALID_AGENT_QUERY", "Structured correction does not accept query parameters");
+        if (request.getQueryString() != null) throw new DomainException(ErrorCode.INVALID_AGENT_QUERY, "Structured correction does not accept query parameters");
         explanations.authorize(id);
         return idempotency.executePrepared(request, HttpStatus.OK, () -> structured.prepare(id, runId, body), prepared -> structured.apply(id, runId, prepared));
     }
@@ -54,7 +55,7 @@ public class ExpenseCorrectionController {
     @PostMapping
     public ResponseEntity<String> correct(@PathVariable UUID id, @PathVariable UUID runId,
             @Valid @RequestBody Input body, HttpServletRequest request) {
-        if (request.getQueryString() != null) throw new DomainException("INVALID_AGENT_QUERY", "Expense correction does not accept query parameters");
+        if (request.getQueryString() != null) throw new DomainException(ErrorCode.INVALID_AGENT_QUERY, "Expense correction does not accept query parameters");
         explanations.authorize(id);
         return idempotency.executePrepared(request, HttpStatus.OK, () -> allowances.prepare(body.content()),
                 prepared -> corrections.correct(id, runId, body.expectedRunVersion(), body.applicationVersion(),

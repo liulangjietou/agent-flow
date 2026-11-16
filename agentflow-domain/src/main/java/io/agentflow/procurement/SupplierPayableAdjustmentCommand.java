@@ -1,5 +1,6 @@
 package io.agentflow.procurement;
 
+import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
 import io.agentflow.finance.AccountingPeriodPort;
 import java.nio.ByteBuffer;
@@ -92,6 +93,6 @@ public record SupplierPayableAdjustmentCommand(UUID id, SupplierPayableAdjustmen
             byte[] bytes = text.getBytes(StandardCharsets.UTF_8); digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array()); digest.update(bytes);
         }
     }
-    private static DomainException invalid() { return new DomainException("INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND", "Independent finance, registered bank returns and a matching open accounting date are required"); }
+    private static DomainException invalid() { return new DomainException(ErrorCode.INVALID_SUPPLIER_PAYABLE_ADJUSTMENT_COMMAND, "Independent finance, registered bank returns and a matching open accounting date are required"); }
     @Override public String toString() { return "SupplierPayableAdjustmentCommand[id=" + id + "]"; }
 }
