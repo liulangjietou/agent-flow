@@ -5,6 +5,11 @@ services:
     image: ${AGENTFLOW_SERVER_IMAGE:?Set the verified server release image}
     deploy:
       replicas: ${AGENTFLOW_SERVER_REPLICAS:-1}
+      # 默认值即容量基线实测限额；JVM 堆按该内存限额的 66% 计算，调整内存即同步调整堆。
+      resources:
+        limits:
+          cpus: "${AGENTFLOW_SERVER_CPUS:-2}"
+          memory: ${AGENTFLOW_SERVER_MEMORY:-1536M}
     entrypoint: [/bin/sh, /opt/agentflow/production-entrypoint.sh]
     environment:
       SPRING_PROFILES_ACTIVE: prod

@@ -13,5 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 WORKDIR /app
 COPY --from=build --chown=agentflow:agentflow /workspace/agentflow-server/target/agentflow-server-0.1.0-SNAPSHOT.jar app.jar
 USER agentflow
+# 堆按容器内存限额取 66%（1536 MiB 时约 1 GiB，与容量基线一致），其余留给线程栈、元空间与直接内存；
+# 堆耗尽时立即退出交给 restart 策略重启，而不是半死不活地继续接请求。用 JDK_JAVA_OPTIONS 而非
+# JAVA_TOOL_OPTIONS，部署方为企业信任库设置后者时不会覆盖这里。
+ENV JDK_JAVA_OPTIONS="-XX:MaxRAMPercentage=66 -XX:+ExitOnOutOfMemoryError"
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

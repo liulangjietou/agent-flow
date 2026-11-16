@@ -26,6 +26,8 @@ docker build -f deploy/Dockerfile.web -t registry.example/agentflow-web:release 
 
 数据库默认示例使用 `sslmode=verify-full&sslrootcert=/run/secrets/database_ca`，同时校验证书链及 JDBC 地址中的主机名。`AGENTFLOW_DATABASE_CA_FILE` 指向部署宿主机上的数据库 CA 文件，它会只读挂载至运行和迁移容器。数据库地址必须能在容器网络中解析；不能把宿主机的 `localhost` 当作容器外部数据库地址。
 
+每个后端副本默认限制 2 CPU、1536 MiB 内存（`AGENTFLOW_SERVER_CPUS`、`AGENTFLOW_SERVER_MEMORY`），JVM 最大堆取内存上限的 66%，堆耗尽时进程退出并由 `restart: unless-stopped` 拉起。宿主机需为全部副本预留对应内存。
+
 数据库连接池为固定大小，默认每个后端副本 10 个连接（即[容量基线](capacity-baseline.md)实测配置），由 `AGENTFLOW_DATASOURCE_POOL_SIZE` 调整。规划时保证 `AGENTFLOW_SERVER_REPLICAS × AGENTFLOW_DATASOURCE_POOL_SIZE` 加上迁移和运维连接小于数据库 `max_connections`。若数据库前有防火墙或连接代理会回收空闲连接，把 `AGENTFLOW_DATASOURCE_MAX_LIFETIME_MS` 设得比该时限短。
 
 密码和 OIDC 客户端密钥分别写入独立文件；文件内容是一行原始值，可有结尾换行，不加 shell 引号、不做变量替换。容器入口只读文件，值不会出现在 Compose 环境清单或 Java 启动参数中。容器进程环境仍包含运行所需的值，Docker 管理权限需要按企业制度控制。
