@@ -148,7 +148,7 @@ jobs:
         run: mvn -B -ntp verify
       - name: Upload backend coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: jacoco-report
           path: agentflow-server/target/site/jacoco
