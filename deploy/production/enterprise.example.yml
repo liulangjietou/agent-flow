@@ -10,11 +10,27 @@ agentflow:
       roles-claim: roles
       tenant-mappings:
         replace-with-identity-tenant: replace-with-platform-tenant
+      # 平台角色共 8 个：EMPLOYEE、APPROVER、MANAGER、FINANCE、CASHIER、FINANCE_CONFIG_ADMIN、PROCESS_ADMIN、ADMIN。
+      # 值按原文比对，拼写错误不会报错，只会让该身份拿不到对应权限。FINANCE（核定、凭证、付款授权）与
+      # CASHIER（执行付款）是职责分离的两端，不要映射给同一个外部角色；用不到的财务角色整行删除。
       role-mappings:
         replace-with-employee-role: [EMPLOYEE]
         replace-with-approver-role: [EMPLOYEE, APPROVER]
+        replace-with-manager-role: [EMPLOYEE, APPROVER, MANAGER]
+        replace-with-finance-role: [EMPLOYEE, APPROVER, FINANCE]
+        replace-with-cashier-role: [EMPLOYEE, CASHIER]
+        replace-with-finance-config-role: [EMPLOYEE, FINANCE_CONFIG_ADMIN]
+        replace-with-process-admin-role: [EMPLOYEE, PROCESS_ADMIN]
         replace-with-administrator-role: [EMPLOYEE, APPROVER, PROCESS_ADMIN, ADMIN]
       allow-insecure-loopback: false
+
+  # 外部集成默认关闭，按需启用并逐项联调。凭据不写在本文件：在 Compose override 中声明文件密钥，
+  # 容器内出现 /run/secrets/<名称> 后，这里用 ${<名称>} 引用（见 docs/production-container-deployment.md）。
+  # 示例：租户 SMTP 服务器的密码文件挂载为 notification_smtp_password。
+  # notifications:
+  #   smtp-servers:
+  #     replace-with-server-id:
+  #       password: ${notification_smtp_password}
 server:
   servlet:
     session:
