@@ -38,7 +38,24 @@ docker build -f deploy/Dockerfile.web -t registry.example/agentflow-web:release 
 
 启用[表单附件](field-attachments.md#启用持久目录)时，先准备 UID/GID `10001` 所有、权限 `0700` 的持久目录，并设置 `AGENTFLOW_ATTACHMENT_HOST_DIRECTORY`。在本页 Compose 命令中一并使用 `-f compose.attachments.yml`，包括后续重建；目录必须支持 POSIX 权限和硬链接。未配置时附件保持关闭，不会保存到容器临时层。已有附件的备份和恢复必须同时包含数据库和原文件。
 
-租户与角色映射只授予明确声明所对应的平台身份，不会自动创建组织或审批人。请按 [OIDC 接入说明](enterprise-oidc.md)完成映射。`AGENTFLOW_OIDC_BACKCHANNEL_LOGOUT` 默认 false，身份源正确注册通知地址并完成联调后再启用。
+租户与角色映射只授予明确声明所对应的平台身份，不会自动创建组织或审批人。请按 [OIDC 接入说明](enterprise-oidc.md)完成映射。平台共 8 个角色，[企业映射模板](../deploy/production/enterprise.example.yml)给出了全部角色的示例行；角色值按原文比对，拼错不会报错，只会让该身份拿不到权限。财务（FINANCE）和出纳（CASHIER）是职责分离的两端，不要映射给同一个外部角色。
+
+### 外部集成的凭据
+
+财务网关、付款回调、SMTP/企业微信、Webhook、事件来源、电子签、组织同步和白名单服务任务都按租户配置，写在 `enterprise.yml` 里，默认全部关闭。它们的凭据不写进 `enterprise.yml` 或环境文件，而是作为文件密钥挂载：`prod` 配置会把容器内 `/run/secrets/` 目录按“文件名 = 配置项名”导入（Spring 配置树，自动去掉结尾换行），`enterprise.yml` 用 `${文件名}` 引用即可。
+
+在受控部署目录新建一个 override，例如 `/etc/agentflow/compose.integrations.yml`：
+
+```yaml
+services:
+  server:
+    secrets: [notification_smtp_password]
+secrets:
+  notification_smtp_password:
+    file: /etc/agentflow/secrets/notification-smtp-password
+```
+
+再在 `enterprise.yml` 中写 `password: ${notification_smtp_password}`。部署命令在已有 `-f` 之后追加 `-f /etc/agentflow/compose.integrations.yml`，后续重建也要带上。文件权限要求同上（UID 10001 可读）。文件名只用小写字母、数字和下划线，不要与平台已有配置项重名；已挂载的 `database_password`、`oidc_client_secret` 等也会以同名配置项出现，不要在集成里复用它们。各集成的字段和启用顺序见对应专题文档。`AGENTFLOW_OIDC_BACKCHANNEL_LOGOUT` 默认 false，身份源正确注册通知地址并完成联调后再启用。
 
 内部 CA 的身份源需要另外为服务器 JVM 配置可信证书库。可通过企业 Compose override 将信任库只读挂载，并设置 `JAVA_TOOL_OPTIONS` 的 `javax.net.ssl.trustStore` 等属性。不要关闭证书验证，也不要把验收用证书加入操作系统的全局信任。本阶段不提供企业 CA 自动分发。
 
@@ -80,6 +97,8 @@ docker compose --env-file /etc/agentflow/production.env -f compose.production.ym
 
 普通停止保留容器和外部数据库。本文件没有数据库卷；不要将 `down -v` 用于共享环境清理。
 
+容器日志使用 `json-file` 驱动并轮转：每个容器最多保留 `AGENTFLOW_LOG_MAX_FILES` 个（默认 5）、每个 `AGENTFLOW_LOG_MAX_SIZE`（默认 50m）的文件，宿主机按“容器数 × 两者乘积”预留磁盘。日志需要长期留存或集中检索时，用 override 改成企业日志平台的驱动，不要靠调大轮转上限保存审计证据；业务审计以平台审计记录为准。
+
 证书或文件密钥轮换后，需要重新创建使用它们的容器，使绑定挂载重新读取新文件。例如 TLS 文件替换后，先运行证书配置检查，再 `up -d --force-recreate --wait web`。单纯重启可能仍引用原文件的 inode。密码轮换需与数据库/IdP 按维护计划协调。
 
 ## 验收与边界
@@ -89,6 +108,8 @@ docker compose --env-file /etc/agentflow/production.env -f compose.production.ym
 - 代理覆盖或移除外来转发头，应用不依赖这些头生成回调；生产 Cookie 为 Secure、HttpOnly、SameSite=Lax。
 - 代理访问日志只记录无查询参数的路径与状态，不记录 Cookie、Authorization、请求体或 Referer。OIDC 路径的 Nginx 原始错误日志关闭，保留无参数的状态日志，具体失败通过后端受控日志和身份服务诊断。
 - 代理按客户端地址限流：`/api/v1/auth/oidc/` 每地址 10 次/秒（突发 50），其余接口 100 次/秒（突发 200），超限直接返回 429、不转发后端。企业出口 NAT 后多人共用一个地址时额度按整个出口计算；高峰仍触发 429 时调整 [nginx.conf](../deploy/production/nginx.conf) 中的 `limit_req_zone`。
+- 限流假设 Nginx 直接面对客户端。如果前面还有企业负载均衡、WAF 或 CDN，`$remote_addr` 会变成它们的地址，所有用户共用一份额度，同时后端审计里的来源地址也只剩负载均衡。这种部署要在 `server` 块里用 `set_real_ip_from <负载均衡网段>;` 和 `real_ip_header X-Forwarded-For;`（或 `proxy_protocol`）恢复真实地址，并且只信任负载均衡的网段；配置后重跑 `nginx -t` 和限流验收。不要信任任意来源的 `X-Forwarded-For`，否则客户端可以伪造地址绕过限流。
+- 前端静态资源（`/assets/`）按 gzip 压缩，接口响应不压缩：会话页面会同时返回 CSRF 令牌和用户可控内容，在 HTTPS 上压缩二者会给 BREACH 类长度推测留下条件。
 - 代理统一补齐 HSTS、CSP、X-Frame-Options、X-Content-Type-Options 和 Referrer-Policy；后端已自行设置的同名头（例如企业退出跳转页的 nonce CSP）原样保留，不叠加第二条。HSTS 生效后浏览器在一年内只用 HTTPS 访问该域名。
 - 只开放 readiness，其他 actuator 路径返回 404。可叠加[指标与告警规则](production-monitoring.md)；企业通知渠道、审计留存、证书自动续期、正式压测及灾备仍需完成。
 - 本阶段使用本地测试 CA 和签名身份夹具验证协议与部署；企业 IdP、企业 CA、域名及防火墙必须在目标环境重新验收。

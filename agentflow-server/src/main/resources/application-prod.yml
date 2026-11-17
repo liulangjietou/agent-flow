@@ -2,6 +2,9 @@ spring:
   config:
     activate:
       on-profile: prod
+    # 容器密钥目录按“文件名 = 属性名”导入（Spring 配置树，自动去掉结尾换行）。企业配置文件里按租户声明的
+    # 集成凭据写成 ${文件名}，正文不进入 Compose 环境清单、启动参数或配置文件；目录不存在时忽略。
+    import: optional:configtree:${AGENTFLOW_SECRETS_DIRECTORY:/run/secrets/}
   datasource:
     url: ${AGENTFLOW_DATASOURCE_URL}
     username: ${AGENTFLOW_DATASOURCE_USERNAME}

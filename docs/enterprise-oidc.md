@@ -36,6 +36,10 @@ agentflow:
       role-mappings:
         flow-employee: [EMPLOYEE]
         flow-approver: [EMPLOYEE, APPROVER]
+        flow-manager: [EMPLOYEE, APPROVER, MANAGER]
+        flow-finance: [EMPLOYEE, APPROVER, FINANCE]
+        flow-cashier: [EMPLOYEE, CASHIER]
+        flow-finance-config: [EMPLOYEE, FINANCE_CONFIG_ADMIN]
         flow-administrator: [EMPLOYEE, APPROVER, PROCESS_ADMIN, ADMIN]
       allow-insecure-loopback: false
 server:
@@ -50,6 +54,7 @@ server:
 - 租户声明必须是顶层字符串，角色声明必须是顶层字符串数组。仅读取经过协议验证的签名 ID Token，不调用 UserInfo，也不把用户名或邮箱作为身份替代值。
 - 平台用户标识使用稳定 `sub`；更换 issuer 或改变 sub 生成策略前必须规划既有申请/审计主体的身份迁移，本阶段不自动迁移身份。
 - 未映射租户、没有任何已映射角色、非法声明和过期 Token 均拒绝登录。外部 `ADMIN` 字符串不会自动授予平台管理员。
+- 平台角色共 8 个：`EMPLOYEE`、`APPROVER`、`MANAGER`、`FINANCE`、`CASHIER`、`FINANCE_CONFIG_ADMIN`、`PROCESS_ADMIN`、`ADMIN`。映射值按原文比对，启动时不校验拼写，写错只会让该身份缺少权限，上线前要用每类真实账号登录核对。只映射前述示例中的员工、审批、管理员三类时，费用核定、凭证、付款和出纳链路没有人能办理。`FINANCE` 与 `CASHIER` 是职责分离的两端，不要映射给同一个外部角色。
 
 ## 会话和浏览器操作
 

@@ -73,8 +73,13 @@ def main():
                 if probe.returncode == 0: break
                 time.sleep(.2)
             else: raise AssertionError("Fixture backend did not become ready")
+        # 静态资源夹具：入口页和一份超过压缩下限的脚本，用于核对静态压缩与接口不压缩的边界。
+        (directory / "html" / "assets").mkdir(parents=True)
+        (directory / "html" / "index.html").write_text("<!doctype html><title>fixture</title>")
+        (directory / "html" / "assets" / "app.js").write_text("export const fixture = 'agentflow';\n" * 400)
         web = docker("run", "-d", "--network", network, "-p", "127.0.0.1::8443",
                      "-v", str(ROOT / "deploy/production/nginx.conf") + ":/etc/nginx/conf.d/default.conf:ro",
+                     "-v", str(directory / "html") + ":/usr/share/nginx/html:ro",
                      "-v", str(directory / "cert.pem") + ":/run/secrets/tls_certificate:ro",
                      "-v", str(directory / "key.pem") + ":/run/secrets/tls_private_key:ro", NGINX_IMAGE)
         owned.append(web)
@@ -82,10 +87,10 @@ def main():
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}),
                     urllib.request.HTTPSHandler(context=ssl.create_default_context(cafile=str(directory / "cert.pem"))))
 
-        def exchange(path, method="GET"):
+        def exchange(path, method="GET", headers=None):
             try:
                 response = opener.open(urllib.request.Request("https://localhost:" + port + path,
-                        data=b"{}" if method == "POST" else None, method=method), timeout=12)
+                        data=b"{}" if method == "POST" else None, method=method, headers=headers or {}), timeout=12)
             except urllib.error.HTTPError as error:
                 response = error
             with response: return response.code, response.read().decode(), response.headers
@@ -144,6 +149,15 @@ def main():
         code, _, headers = exchange("/")
         assert code == 200 and headers["Cache-Control"] == "no-cache" and headers["Content-Security-Policy"], "Static entry lost headers"
 
+        # 静态脚本按客户端声明压缩且保留缓存与安全头；接口响应即使声明可压缩也原样返回。
+        gzip = {"Accept-Encoding": "gzip"}
+        code, _, headers = exchange("/assets/app.js", headers=gzip)
+        assert code == 200 and headers["Content-Encoding"] == "gzip", "Static assets must be compressed"
+        assert "Accept-Encoding" in (headers["Vary"] or "") and "immutable" in (headers["Cache-Control"] or "")
+        assert headers["Content-Security-Policy"], "Compressed static assets lost security headers"
+        _, _, headers = exchange("/api/probe", headers=gzip)
+        assert headers["Content-Encoding"] is None, "API responses must not be compressed"
+
         # 未登录可达的身份入口超出突发额度后由代理直接返回 429，被拒请求不到达后端。
         before = len((directory / "requests.jsonl").read_text().splitlines())
         codes = [request("/api/v1/auth/oidc/burst")[0] for _ in range(120)]
@@ -152,7 +166,7 @@ def main():
         assert forwarded == codes.count(200) and set(codes) <= {200, 429}, "Rejected requests must not reach the backend"
         report = {"bothNodesServed": True, "unsafeRequestsNotReplayed": True,
                   "readsSurviveNodeStop": True, "nodeRecoveryDiscovered": True,
-                  "securityHeadersWithoutStacking": True, "identityBurstRejected": codes.count(429),
+                  "securityHeadersWithoutStacking": True, "staticOnlyCompression": True, "identityBurstRejected": codes.count(429),
                   "nginxImage": NGINX_IMAGE, "evidenceDirectory": str(directory)}
         (directory / "report.json").write_text(json.dumps(report, indent=2))
         print(json.dumps(report))

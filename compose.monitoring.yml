@@ -35,6 +35,12 @@ services:
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     restart: unless-stopped
+    # 与 compose.production.yml 相同的轮转上限；叠加文件之间不能共享 YAML 锚点。
+    logging:
+      driver: json-file
+      options:
+        max-size: ${AGENTFLOW_LOG_MAX_SIZE:-50m}
+        max-file: "${AGENTFLOW_LOG_MAX_FILES:-5}"
 
 secrets:
   metrics_token:
