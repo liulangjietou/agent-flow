@@ -16,7 +16,7 @@ jobs:
     if: github.event_name == 'pull_request' && vars.DEPENDENCY_REVIEW_ENABLED == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
@@ -41,7 +41,7 @@ jobs:
       AGENTFLOW_SCHEMA_TEST_USERNAME: agentflow_test
       AGENTFLOW_SCHEMA_TEST_PASSWORD: isolated-ci-database-only
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Prepare isolated test artifacts
         run: sudo install -d -o "$(id -u)" -g "$(id -g)" /fyoung/tmp
       - uses: actions/setup-java@v4
@@ -131,7 +131,7 @@ jobs:
     # 正常全量约半小时；堆泄漏会让 GC 抖动拖到默认 6 小时上限，超时即失败以便尽早暴露。
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Prepare isolated test artifacts
         run: sudo install -d -o "$(id -u)" -g "$(id -g)" /fyoung/tmp
       - uses: actions/setup-java@v4
@@ -195,7 +195,7 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Resolve release version
         run: |
           version="${GITHUB_REF_NAME#v}"
