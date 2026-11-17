@@ -7,6 +7,15 @@ spring:
     username: ${AGENTFLOW_DATASOURCE_USERNAME}
     password: ${AGENTFLOW_DATASOURCE_PASSWORD}
     driver-class-name: ${AGENTFLOW_DATASOURCE_DRIVER:org.postgresql.Driver}
+    # 默认值即容量基线实测配置（docs/capacity-baseline.md）；副本数 × 连接数须小于数据库 max_connections 减去迁移与运维预留。
+    hikari:
+      pool-name: agentflow
+      maximum-pool-size: ${AGENTFLOW_DATASOURCE_POOL_SIZE:10}
+      # 固定大小连接池：空闲时不收缩，突发时无需临时建连。
+      minimum-idle: ${AGENTFLOW_DATASOURCE_POOL_SIZE:10}
+      connection-timeout: ${AGENTFLOW_DATASOURCE_CONNECTION_TIMEOUT_MS:30000}
+      # 须短于数据库、防火墙或连接代理回收空闲连接的时限，否则会取到已被对端关闭的连接。
+      max-lifetime: ${AGENTFLOW_DATASOURCE_MAX_LIFETIME_MS:1800000}
   flyway:
     # 保留 Flyway bean 与启动依赖顺序；ProductionSchemaConfiguration 将 migrate 替换为只校验。
     enabled: true

@@ -587,6 +587,8 @@ docker exec agentflow-postgres pg_isready -U root -d agentflow
 export JAVA_HOME=$(/usr/libexec/java_home -v 17)
 export PATH="$JAVA_HOME/bin:$PATH"
 export AGENTFLOW_WEB_ORIGIN=http://127.0.0.1:5173
+# 演示登录默认关闭，本机开发显式开启
+export AGENTFLOW_DEMO_AUTH=true
 
 mvn -pl agentflow-server -am package
 java -jar agentflow-server/target/agentflow-server-0.1.0-SNAPSHOT.jar
@@ -641,7 +643,7 @@ curl --fail http://127.0.0.1:8080/api/v1/auth/options
 | `AGENTFLOW_DATASOURCE_USERNAME` / `AGENTFLOW_DATASOURCE_PASSWORD` | `root` / `123456` | 本地开发默认凭据，生产必须显式配置 |
 | `AGENTFLOW_DATASOURCE_DRIVER` | `org.postgresql.Driver` | 数据源驱动 |
 | `AGENTFLOW_WEB_ORIGIN` | `http://localhost:5173` | 允许的浏览器来源；上面的启动命令改为 `127.0.0.1:5173` |
-| `AGENTFLOW_DEMO_AUTH` | `true`，`prod` 强制关闭 | 演示登录 |
+| `AGENTFLOW_DEMO_AUTH` | `false`；演示 Compose 显式开启；`prod` 下开启会拒绝启动 | 演示登录（公开固定口令） |
 | `AGENTFLOW_ASSIST_ENABLED` | `false` | 模型能力总开关 |
 | `AGENTFLOW_ASSIST_ENDPOINT` / `AGENTFLOW_ASSIST_MODEL` / `AGENTFLOW_ASSIST_API_KEY` | 空 | 受信任的完整 Chat Completions URL、模型标识和凭据 |
 | `AGENTFLOW_ASSIST_PROVIDER` / `AGENTFLOW_ASSIST_TIMEOUT_SECONDS` | `openai-compatible` / `45` | 提供者标识与单次超时 |

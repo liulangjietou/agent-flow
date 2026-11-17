@@ -102,6 +102,7 @@ class Runtime:
             self.port = available.getsockname()[1]
         self.config = directory / "runtime.json"
         save(self.config, {"server": {"address": "127.0.0.1", "port": self.port}, "agentflow": {
+            "auth": {"demo-enabled": True},
             "attachments": {"directory": str(directory / "attachments")},
             "service-tasks": {"lease-seconds": 15, "gateway": {"enabled": True, "tenants": {"demo": [{
                 "key": "receipt.register", "version": 1, "name": "重启验收合成操作", "enabled": True,

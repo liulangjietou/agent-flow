@@ -13,7 +13,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.oauth2.client.registration.ClientRegistrations;
@@ -40,7 +39,7 @@ public class OidcClientConfiguration {
     public ClientRegistrationRepository oidcClients(OidcProperties properties, Environment environment,
             @Value("${agentflow.auth.demo-enabled:false}") boolean demoEnabled,
             @Value("${agentflow.web.allowed-origin:http://localhost:5173}") String origin) {
-        properties.validate(demoEnabled, environment.acceptsProfiles(Profiles.of("prod", "production")), origin);
+        properties.validate(demoEnabled, environment.acceptsProfiles(AuthService.PRODUCTION), origin);
         var httpClient = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT)
                 .followRedirects(HttpClient.Redirect.NEVER).build();
         var factory = new JdkClientHttpRequestFactory(httpClient);

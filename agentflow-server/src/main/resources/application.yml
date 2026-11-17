@@ -84,7 +84,8 @@ agentflow:
     expected-instances: ${AGENTFLOW_EXPECTED_INSTANCES:1}
     token-file: ${AGENTFLOW_METRICS_TOKEN_FILE:}
   auth:
-    demo-enabled: ${AGENTFLOW_DEMO_AUTH:true}
+    # 演示账号口令公开固定，默认关闭；本机开发、演示 Compose 与验收脚本显式传 AGENTFLOW_DEMO_AUTH=true。
+    demo-enabled: ${AGENTFLOW_DEMO_AUTH:false}
     session:
       jdbc-enabled: ${AGENTFLOW_JDBC_SESSIONS:false}
     backchannel:

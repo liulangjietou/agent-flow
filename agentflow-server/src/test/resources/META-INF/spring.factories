@@ -1,0 +1,2 @@
+# 测试上下文关闭时释放其 Mockito mock，防止已关闭上下文被 Mockito 全局表钉住。
+org.springframework.context.ApplicationListener=io.agentflow.support.ClosedContextMocks

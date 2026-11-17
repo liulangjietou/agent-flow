@@ -35,6 +35,8 @@ class Handler(BaseHTTPRequestHandler):
             self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();return
         body=json.dumps({'node':os.environ['NODE'],'status':'UP'}).encode()
         self.send_response(200);self.send_header('Content-Type','application/json')
+        if path.endswith('/own-headers'):
+            self.send_header('Content-Security-Policy',"default-src 'none'");self.send_header('X-Frame-Options','SAMEORIGIN')
         self.send_header('Content-Length',str(len(body)));self.end_headers();self.wfile.write(body)
     do_GET=handle_request
     do_POST=handle_request
@@ -80,13 +82,16 @@ def main():
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}),
                     urllib.request.HTTPSHandler(context=ssl.create_default_context(cafile=str(directory / "cert.pem"))))
 
-        def request(path, method="GET"):
+        def exchange(path, method="GET"):
             try:
                 response = opener.open(urllib.request.Request("https://localhost:" + port + path,
                         data=b"{}" if method == "POST" else None, method=method), timeout=12)
             except urllib.error.HTTPError as error:
                 response = error
-            with response: return response.code, response.read().decode()
+            with response: return response.code, response.read().decode(), response.headers
+
+        def request(path, method="GET"):
+            return exchange(path, method)[:2]
 
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
@@ -126,8 +131,28 @@ def main():
             if code == 200: recovered.add(json.loads(body)["node"])
             time.sleep(.2)
         assert recovered == {"a", "b"}, "Recovered node must rejoin without restarting the proxy"
+
+        # 安全头：后端未设置时由代理补齐；后端自带的 CSP/X-Frame-Options（如企业退出跳转页）原样保留、不叠加第二条。
+        code, _, headers = exchange("/api/probe")
+        assert code == 200 and "frame-ancestors 'none'" in (headers["Content-Security-Policy"] or ""), "Proxy must add CSP"
+        assert headers.get_all("X-Frame-Options") == ["DENY"] and headers["X-Content-Type-Options"] == "nosniff"
+        assert headers["Referrer-Policy"] == "no-referrer" and "max-age=" in (headers["Strict-Transport-Security"] or "")
+        assert headers["Cache-Control"] is None, "API caching stays under backend control"
+        _, _, headers = exchange("/api/own-headers")
+        assert headers.get_all("Content-Security-Policy") == ["default-src 'none'"], "Backend CSP must not be stacked"
+        assert headers.get_all("X-Frame-Options") == ["SAMEORIGIN"], "Backend frame policy must not be stacked"
+        code, _, headers = exchange("/")
+        assert code == 200 and headers["Cache-Control"] == "no-cache" and headers["Content-Security-Policy"], "Static entry lost headers"
+
+        # 未登录可达的身份入口超出突发额度后由代理直接返回 429，被拒请求不到达后端。
+        before = len((directory / "requests.jsonl").read_text().splitlines())
+        codes = [request("/api/v1/auth/oidc/burst")[0] for _ in range(120)]
+        forwarded = len((directory / "requests.jsonl").read_text().splitlines()) - before
+        assert 429 in codes, "Identity endpoints must be rate limited"
+        assert forwarded == codes.count(200) and set(codes) <= {200, 429}, "Rejected requests must not reach the backend"
         report = {"bothNodesServed": True, "unsafeRequestsNotReplayed": True,
                   "readsSurviveNodeStop": True, "nodeRecoveryDiscovered": True,
+                  "securityHeadersWithoutStacking": True, "identityBurstRejected": codes.count(429),
                   "nginxImage": NGINX_IMAGE, "evidenceDirectory": str(directory)}
         (directory / "report.json").write_text(json.dumps(report, indent=2))
         print(json.dumps(report))

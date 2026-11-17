@@ -20,11 +20,17 @@ docker build -f deploy/Dockerfile.web -t registry.example/agentflow-web:release 
 
 镜像地址和 `release` 必须替换成自己的发布版本；是否推送由企业镜像发布流程决定。本仓库不附带镜像仓库凭证。
 
+也可以使用仓库自带的发布流水线：推送 `vMAJOR.MINOR.PATCH` 形式的标签（如 `v1.2.3`）后，CI 在全部检查通过后把工作区版本改写为 `1.2.3`，构建并推送 `ghcr.io/<owner>/<repo>-server:1.2.3` 与 `-web:1.2.3`，镜像带 OCI 版本、提交与来源标签。其他形式的标签会让发布作业失败，分支推送和 PR 只验证不发布。部署时用 `docker buildx imagetools inspect` 记录镜像摘要，并以 `镜像@sha256:...` 写入 `AGENTFLOW_SERVER_IMAGE` / `AGENTFLOW_WEB_IMAGE`。
+
 ## 配置文件与密钥
 
 将 [环境模板](../deploy/production/production.env.example) 和 [企业映射模板](../deploy/production/enterprise.example.yml) 复制到代码目录之外的受控部署目录，例如 `/etc/agentflow/production.env` 与 `/etc/agentflow/enterprise.yml`，逐项替换占位值。环境文件仅存地址、账号、开关和文件路径，不存密码或私钥。
 
 数据库默认示例使用 `sslmode=verify-full&sslrootcert=/run/secrets/database_ca`，同时校验证书链及 JDBC 地址中的主机名。`AGENTFLOW_DATABASE_CA_FILE` 指向部署宿主机上的数据库 CA 文件，它会只读挂载至运行和迁移容器。数据库地址必须能在容器网络中解析；不能把宿主机的 `localhost` 当作容器外部数据库地址。
+
+每个后端副本默认限制 2 CPU、1536 MiB 内存（`AGENTFLOW_SERVER_CPUS`、`AGENTFLOW_SERVER_MEMORY`），JVM 最大堆取内存上限的 66%，堆耗尽时进程退出并由 `restart: unless-stopped` 拉起。宿主机需为全部副本预留对应内存。
+
+数据库连接池为固定大小，默认每个后端副本 10 个连接（即[容量基线](capacity-baseline.md)实测配置），由 `AGENTFLOW_DATASOURCE_POOL_SIZE` 调整。规划时保证 `AGENTFLOW_SERVER_REPLICAS × AGENTFLOW_DATASOURCE_POOL_SIZE` 加上迁移和运维连接小于数据库 `max_connections`。若数据库前有防火墙或连接代理会回收空闲连接，把 `AGENTFLOW_DATASOURCE_MAX_LIFETIME_MS` 设得比该时限短。
 
 密码和 OIDC 客户端密钥分别写入独立文件；文件内容是一行原始值，可有结尾换行，不加 shell 引号、不做变量替换。容器入口只读文件，值不会出现在 Compose 环境清单或 Java 启动参数中。容器进程环境仍包含运行所需的值，Docker 管理权限需要按企业制度控制。
 
@@ -82,6 +88,8 @@ docker compose --env-file /etc/agentflow/production.env -f compose.production.ym
 - 会话使用 JDBC，容器重启后可恢复尚未过期且身份配置仍匹配的登录。共享会话不是多实例高可用验收。
 - 代理覆盖或移除外来转发头，应用不依赖这些头生成回调；生产 Cookie 为 Secure、HttpOnly、SameSite=Lax。
 - 代理访问日志只记录无查询参数的路径与状态，不记录 Cookie、Authorization、请求体或 Referer。OIDC 路径的 Nginx 原始错误日志关闭，保留无参数的状态日志，具体失败通过后端受控日志和身份服务诊断。
+- 代理按客户端地址限流：`/api/v1/auth/oidc/` 每地址 10 次/秒（突发 50），其余接口 100 次/秒（突发 200），超限直接返回 429、不转发后端。企业出口 NAT 后多人共用一个地址时额度按整个出口计算；高峰仍触发 429 时调整 [nginx.conf](../deploy/production/nginx.conf) 中的 `limit_req_zone`。
+- 代理统一补齐 HSTS、CSP、X-Frame-Options、X-Content-Type-Options 和 Referrer-Policy；后端已自行设置的同名头（例如企业退出跳转页的 nonce CSP）原样保留，不叠加第二条。HSTS 生效后浏览器在一年内只用 HTTPS 访问该域名。
 - 只开放 readiness，其他 actuator 路径返回 404。可叠加[指标与告警规则](production-monitoring.md)；企业通知渠道、审计留存、证书自动续期、正式压测及灾备仍需完成。
 - 本阶段使用本地测试 CA 和签名身份夹具验证协议与部署；企业 IdP、企业 CA、域名及防火墙必须在目标环境重新验收。
 

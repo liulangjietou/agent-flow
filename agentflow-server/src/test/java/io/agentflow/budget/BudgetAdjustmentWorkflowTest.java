@@ -117,7 +117,8 @@ class BudgetAdjustmentWorkflowTest {
             if (job != null) execution.finish(job, Result.unavailable("INTERNAL_ERROR"), Instant.now());
         }
     }
-    @AfterAll static void closeServer() { SERVER.stop(0); }
+    /** 关闭本类的回环服务，最后放下静态引用：它经测试实例或回调指向上下文 Bean，否则被缓存淘汰的 Spring 上下文无法回收；须在同一方法末尾执行，多个 @AfterAll 之间没有确定顺序。 */
+    @AfterAll static void closeServer() { SERVER.stop(0); ACTIVE.set(null); }
 
     @Test void creationReplaysOneBindingAndRejectsClientFinancialFacts() throws Exception {
         var body = createBody(published(false, false), content("70")); String key = UUID.randomUUID().toString();
