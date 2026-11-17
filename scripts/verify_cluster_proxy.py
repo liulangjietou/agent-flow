@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """用两个隔离后端核对生产代理的分流、故障恢复和请求重放边界。"""
+import gzip as gzip_codec
 import json
 import os
 from pathlib import Path
@@ -93,7 +94,11 @@ def main():
                         data=b"{}" if method == "POST" else None, method=method, headers=headers or {}), timeout=12)
             except urllib.error.HTTPError as error:
                 response = error
-            with response: return response.code, response.read().decode(), response.headers
+            with response:
+                # 压缩正文保留原始字节，由调用方解压核对；未压缩正文按文本返回。
+                body = response.read()
+                if response.headers["Content-Encoding"] is None: body = body.decode()
+                return response.code, body, response.headers
 
         def request(path, method="GET"):
             return exchange(path, method)[:2]
@@ -151,8 +156,9 @@ def main():
 
         # 静态脚本按客户端声明压缩且保留缓存与安全头；接口响应即使声明可压缩也原样返回。
         gzip = {"Accept-Encoding": "gzip"}
-        code, _, headers = exchange("/assets/app.js", headers=gzip)
+        code, body, headers = exchange("/assets/app.js", headers=gzip)
         assert code == 200 and headers["Content-Encoding"] == "gzip", "Static assets must be compressed"
+        assert gzip_codec.decompress(body) == (directory / "html" / "assets" / "app.js").read_bytes(), "Compressed asset corrupted"
         assert "Accept-Encoding" in (headers["Vary"] or "") and "immutable" in (headers["Cache-Control"] or "")
         assert headers["Content-Security-Policy"], "Compressed static assets lost security headers"
         _, _, headers = exchange("/api/probe", headers=gzip)
