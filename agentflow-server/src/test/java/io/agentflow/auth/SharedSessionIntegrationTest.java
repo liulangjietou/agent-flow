@@ -82,6 +82,8 @@ class SharedSessionIntegrationTest {
         if (second != null) second.close();
         if (first != null) first.close();
         PROVIDER.close();
+        // 已关闭的上下文及其 Bean 仍被静态字段引用就无法回收。
+        first = null; second = null; json = null;
     }
 
     @Test

@@ -83,7 +83,8 @@ class ExpensePolicyGuidanceIntegrationTest {
         jdbc.update("UPDATE expense_configuration SET active_revision=0,active_policy_id=NULL,active_policy_version=NULL WHERE tenant_id='demo'");
         for (String table:List.of("expense_policy_activation","expense_policy_version","expense_policy_draft_revision","expense_policy_draft","expense_category_revision","expense_configuration")) jdbc.update("DELETE FROM "+table+" WHERE tenant_id='demo'");
     }
-    @AfterAll static void close() { SERVER.stop(0); }
+    /** 关闭本类的回环服务，最后放下静态引用：它经测试实例或回调指向上下文 Bean，否则被缓存淘汰的 Spring 上下文无法回收；须在同一方法末尾执行，多个 @AfterAll 之间没有确定顺序。 */
+    @AfterAll static void close() { SERVER.stop(0); ACTIVE.set(null); }
 
     @Test void managedGuidanceUsesCallerAndPublishedRuleWithoutLeakingOtherRules() throws Exception {
         configured(); var response=read(QUERY,"alice"); var body=ok(response,200);

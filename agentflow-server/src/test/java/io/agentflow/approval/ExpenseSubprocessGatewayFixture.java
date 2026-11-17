@@ -148,8 +148,8 @@ final class ExpenseSubprocessGatewayFixture implements AutoCloseable {
     }
 
     private static Money money(String amount) { return new Money(new BigDecimal(amount), "CNY"); }
-    /** 只关闭本用例的合成端口，已有验收服务保持运行。 */
-    @Override public void close() { server.stop(0); }
+    /** 只关闭本用例的合成端口，已有验收服务保持运行；夹具随测试类常驻（static final），一并放下上下文 Bean，否则该类用过的 Spring 上下文无法回收。 */
+    @Override public void close() { server.stop(0); context = null; }
     /**
      * @author owlzhangfq@gmail.com
      */

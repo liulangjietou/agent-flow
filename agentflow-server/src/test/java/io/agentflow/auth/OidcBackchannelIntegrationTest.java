@@ -47,6 +47,8 @@ class OidcBackchannelIntegrationTest {
         if (second != null) second.close();
         if (first != null) first.close();
         PROVIDER.close();
+        // 已关闭的上下文仍被静态字段引用就无法回收。
+        first = null; second = null;
     }
 
     @BeforeEach

@@ -75,6 +75,8 @@ class OidcOrganizationJourneyIntegrationTest {
     static void close() {
         if (server != null) server.close();
         PROVIDER.close();
+        // 已关闭的上下文及其 Bean 仍被静态字段引用就无法回收。
+        server = null; json = null;
     }
 
     @Test

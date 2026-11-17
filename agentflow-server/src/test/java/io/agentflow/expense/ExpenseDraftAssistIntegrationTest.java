@@ -102,11 +102,13 @@ class ExpenseDraftAssistIntegrationTest {
             service.finish("demo", id, null, AssistRun.Failure.INPUT_UNAVAILABLE, Instant.now());
         }
     }
+    /** 关闭本类的回环服务，最后放下静态引用：它经测试实例或回调指向上下文 Bean，否则被缓存淘汰的 Spring 上下文无法回收；须在同一方法末尾执行，多个 @AfterAll 之间没有确定顺序。 */
     @AfterAll static void stop() throws Exception {
         SERVER.stop(0); HTTP_THREADS.shutdownNow();
         Files.writeString(OBSERVATION_DIRECTORY.resolve("manifest.json"), wire.write(Map.of("directory", OBSERVATION_DIRECTORY.toString(),
                 "observations", OBSERVATIONS.get(), "modelRequests", MODEL_CALLS.get(), "catalogRequests", CATALOG_CALLS.get())));
         System.out.println("Expense draft observations=" + OBSERVATION_DIRECTORY);
+        DURING_CATALOG.set(null); wire = null;
     }
 
     @Test
