@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Prepare isolated test artifacts
         run: sudo install -d -o "$(id -u)" -g "$(id -g)" /fyoung/tmp
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -134,7 +134,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Prepare isolated test artifacts
         run: sudo install -d -o "$(id -u)" -g "$(id -g)" /fyoung/tmp
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -206,7 +206,7 @@ jobs:
           echo "VERSION=$version" >> "$GITHUB_ENV"
           # GHCR 镜像名必须小写。
           echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
