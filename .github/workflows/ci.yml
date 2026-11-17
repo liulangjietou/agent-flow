@@ -170,7 +170,7 @@ jobs:
           docker run --rm --entrypoint /bin/promtool -v "$PWD/deploy/monitoring:/rules:ro" -w /rules prom/prometheus@sha256:508729e0e2d18e11fd742a5a5ca70e557b940a93948c3c95fd0123a6fd538b69 test rules alerts.test.yml
       - name: Verify proxy failover and one-time authorization callback handling
         run: python3 scripts/verify_cluster_proxy.py
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
