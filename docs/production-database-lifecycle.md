@@ -43,7 +43,7 @@ docker run --rm --network agentflow-production \
 
 ## 停机升级
 
-1. 在代表性数据库副本上执行新版本迁移，核对历史单据、待办继续办理及接口兼容；Flowable 依赖变更必须重新完成该演练。当前验证固定 7.2.0 引擎及 V22 → V29 业务结构，具体范围见[发布门禁](postgres-release-gate.md)；未经演练的引擎跨版本升级另行验收。
+1. 在代表性数据库副本上执行新版本迁移，核对历史单据、待办继续办理及接口兼容；Flowable 依赖变更必须重新完成该演练。CI 的 `postgres-schema` 作业固定 7.2.0 引擎，验证 V22 → 当前最高版本（2026-11-17 为 V134）的升级，具体范围见[发布门禁](postgres-release-gate.md)；未经演练的引擎跨版本升级另行验收。
 2. 进入维护窗口，停止所有应用节点、独立 worker 和其他数据库写入方。工具的 PostgreSQL advisory lock 只互斥本工具命令，不能代替停机，也不会自动终止在线服务。
 3. 使用[生产备份与隔离恢复工具](production-backup-recovery.md)保存整个 PostgreSQL 数据库，同时保留原配置与应用镜像。备份中包含业务和会话敏感数据，应按企业制度限制访问；原演示备份工具继续只适用于演示部署。
 4. 使用新版本发布包执行 `--schema=migrate`，再执行 `--schema=validate`。任何非零退出均停止后续发布。
@@ -83,7 +83,7 @@ mvn -B -ntp -pl agentflow-server -am \
   -Dtest=DatabaseSchemaPostgresIT -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-测试 URL 不带查询参数，测试会在该库中创建随机 `schema71_*` schema；仅用于隔离库，数据保留供排障。GitHub 工作流增加了对应 PostgreSQL 17 job；是否实际执行远程 CI 以仓库交付记录为准。
+测试 URL 不带查询参数，测试会在该库中创建随机 `schema71_*` schema；仅用于隔离库，数据保留供排障。GitHub 工作流的 `postgres-schema` 作业在 PostgreSQL 17 上运行该测试，PR 合入前必须通过。
 
 技术依据：[Flowable 数据库配置](https://www.flowable.com/open-source/docs/bpmn/ch03-Configuration)、[Flyway 校验语义](https://documentation.red-gate.com/flyway/reference/commands/validate)。具体行为以项目锁定的 Flowable 7.2.0、Flyway 11.7.2 及实际数据库验证为准。
 
@@ -91,6 +91,6 @@ mvn -B -ntp -pl agentflow-server -am \
 
 已补充当时发布包从 V24 直接升级到 V26 的隔离 PostgreSQL 验证：原业务字段与迁移历史保留，旧在途申请继续批准，旧包严格拒绝 V26，重复迁移无数据变化。环境、版本和边界见 [V26 升级兼容记录](v26-upgrade-compatibility.md)。
 
-## 当前 V29 发布门禁
+## 历史 V29 发布门禁
 
-2026-09-28 已在 PostgreSQL 17.11 完成 V22 → V29 结构生命周期 5 项验证，修复历史夹具对 V24 新增列的错误预期，实际发布 jar 的只读校验与重复迁移保持 73 张表数据。组织、字段权限、待办和运营查询另有 36 项 PostgreSQL 验证，并接入 CI 配置；远程 CI 尚未运行。详细边界及本地证据见 [PostgreSQL 发布门禁](postgres-release-gate.md)。
+2026-09-28 已在 PostgreSQL 17.11 完成 V22 → V29 结构生命周期 5 项验证，修复历史夹具对 V24 新增列的错误预期，实际发布 jar 的只读校验与重复迁移保持 73 张表数据。组织、字段权限、待办和运营查询另有 36 项 PostgreSQL 验证，并接入 CI 配置。该段为 V29 当时的记录；此后 CI 已在远端运行，当前覆盖范围见[发布门禁](postgres-release-gate.md)开头。详细边界及本地证据见 [PostgreSQL 发布门禁](postgres-release-gate.md)。

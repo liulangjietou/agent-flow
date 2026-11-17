@@ -520,7 +520,7 @@ flowchart TB
 | 外部组织同步 | `agentflow.organization-sync.enabled=false`，需可信源与映射 | [同步预检及人工采用](docs/organization-sync.md) |
 | 电子签 | `agentflow.signatures.gateway.enabled=false`，需签署配置与原登录授权 | [签署、回调及回执证据](docs/electronic-signatures.md) |
 | Prometheus | `AGENTFLOW_METRICS_ENABLED=false` | `compose.monitoring.yml`；[监控与告警](docs/production-monitoring.md) |
-| 企业 HTTPS | `compose.production.yml` 默认外部端口 `443`，后端副本默认 1 | [生产容器](docs/production-container-deployment.md)、[多实例](docs/multi-instance-deployment.md) |
+| 企业 HTTPS | `compose.production.yml` 默认外部端口 `443`，后端副本默认 1 | [上线检查清单](docs/production-go-live-checklist.md)、[生产容器](docs/production-container-deployment.md)、[多实例](docs/multi-instance-deployment.md) |
 
 生产数据库生命周期使用**同一个发布 jar**。以下以本地构建产物为例，生产部署替换为实际发布路径，并设置目标数据库及维护身份：
 
@@ -756,5 +756,5 @@ GitHub Actions 还执行 PostgreSQL 迁移与共享会话、组织/字段/财务
 | 消息、事件与集成 | [站内通知](docs/notification-inbox.md)、[偏好](docs/notification-preferences.md)、[外发投递](docs/notification-delivery.md)、[企业微信](docs/wecom-notifications.md)、[Webhook](docs/webhook-delivery.md)、[投递概况](docs/webhook-overview.md)、[事件契约](docs/event-contracts.md)、[开放 API](docs/openapi-reference.md) |
 | 企业身份与系统自检 | [OIDC 登录](docs/enterprise-oidc.md)、[共享会话](docs/shared-enterprise-sessions.md)、[后通道注销](docs/oidc-backchannel-logout.md)、[企业账号退出](docs/provider-initiated-logout.md)、[租户初始化](docs/tenant-initialization.md)、[自检边界](docs/system-adapter-checks.md) |
 | 企业集成扩展 | [组织同步](docs/organization-sync.md)、[电子签与回执](docs/electronic-signatures.md)、[财务模板配套](docs/financial-template-examples.md)、[业务追踪](docs/operation-tracing.md) |
-| 安装、恢复与运行维护 | [演示安装](docs/demo-installation.md)、[演示备份](docs/demo-backup-recovery.md)、[生产迁移](docs/production-database-lifecycle.md)、[生产容器](docs/production-container-deployment.md)、[多实例接续](docs/multi-instance-deployment.md)、[监控](docs/production-monitoring.md)、[生产恢复](docs/production-backup-recovery.md)、[容量](docs/capacity-baseline.md) |
+| 安装、恢复与运行维护 | [**上线检查清单**](docs/production-go-live-checklist.md)、[演示安装](docs/demo-installation.md)、[演示备份](docs/demo-backup-recovery.md)、[生产迁移](docs/production-database-lifecycle.md)、[生产容器](docs/production-container-deployment.md)、[多实例接续](docs/multi-instance-deployment.md)、[监控](docs/production-monitoring.md)、[生产恢复](docs/production-backup-recovery.md)、[容量](docs/capacity-baseline.md) |
 | 已知缺口与图稿维护 | [当前未完成台账](docs/remaining-task-ledger.md)、[原需求核对](docs/product-goal-gap-audit.md)、[图稿与源码索引维护](docs/architecture/README.md) |

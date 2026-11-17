@@ -1,5 +1,7 @@
 # PostgreSQL 发布门禁与 V29 验证
 
+**当前状态（2026-11-17）**：迁移已到 V134。`.github/workflows/ci.yml` 的 `postgres-schema` 作业在 GitHub 上运行，覆盖结构生命周期（V22 → 当前版本）、共享会话、MyBatis 映射，以及 31 个独立业务测试库；PR #34 的该作业通过。下文“远程 CI 尚未执行”“当前无 Git remote”等表述只描述 2026-09-28 当时的状态。
+
 本文下方记录 V29 发布包的历史验收。附件实施随后新增 V30，并在同一 CI 业务门禁追加 `AGENTFLOW_ATTACHMENT_TEST` 和 `AGENTFLOW_ATTACHMENT_MIGRATION` 两个独立数据库，分别运行附件生命周期及 V29→V30 迁移；当前配置共 9 个业务测试库。V30 的实际运行与配套恢复结果见[附件证据](evidence/field-attachments-20260928.json)，不复用下方 V29 jar 的摘要作为新发布包证明。两个 CI 作业都在 Java 测试之前准备 `/fyoung/tmp`。
 
 2026-09-28，在隔离工作树完成当前 V29 发布包的 PostgreSQL 17.11 验证，并将组织、字段权限、待办及运营查询的 PostgreSQL 回归接入现有 CI 配置。本次只修改测试、工作流和文档，没有新增业务规则或数据库迁移。远程 CI 尚未执行。
