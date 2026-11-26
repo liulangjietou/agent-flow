@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,12 +25,21 @@ public class ApplicationController {
     private final ApprovalApplicationFacade facade;
     private final IdempotencyExecutor idempotency;
     private final ApplicationFieldViews fields;
+    private final ApplicationUrgeService urges;
+
+    /** 兼容既有测试构造。 */
+    public ApplicationController(ApprovalApplicationFacade facade, IdempotencyExecutor idempotency, ApplicationFieldViews fields) {
+        this(facade, idempotency, fields, null);
+    }
 
     /** 创建控制器。 */
-    public ApplicationController(ApprovalApplicationFacade facade, IdempotencyExecutor idempotency, ApplicationFieldViews fields) {
+    @Autowired
+    public ApplicationController(ApprovalApplicationFacade facade, IdempotencyExecutor idempotency,
+                                 ApplicationFieldViews fields, ApplicationUrgeService urges) {
         this.facade = facade;
         this.idempotency = idempotency;
         this.fields = fields;
+        this.urges = urges;
     }
 
     /** 创建申请草稿。 */
@@ -95,6 +105,20 @@ public class ApplicationController {
         return idempotency.execute(httpRequest, HttpStatus.OK,
                 () -> ApplicationResponse.from(facade.cancel(id, request.expectedVersion(), request.comment())));
     }
+
+    /** 申请人对审批中的申请发起催办提醒，受冷却期约束。 */
+    @PostMapping("/{id}/urge")
+    public ResponseEntity<String> urge(@PathVariable UUID id, @Valid @RequestBody UrgeApplicationRequest request,
+                                       HttpServletRequest httpRequest) {
+        return idempotency.execute(httpRequest, HttpStatus.OK,
+                () -> urges.urge(id, request.expectedVersion(), request.note()));
+    }
+
+    /**
+     * 催办请求；版本号必填，附言可选且受长度限制。
+     * @author owlzhangfq@gmail.com
+     */
+    public record UrgeApplicationRequest(@NotNull Long expectedVersion, @Size(max = 500) String note) { }
 
     /**
      * 作废说明选填，版本必填；不能携带待保存的表单内容或其他租户。

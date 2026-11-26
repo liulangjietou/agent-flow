@@ -52,7 +52,8 @@ test('契约接纳实际返回的明细列权限，仍拒绝嵌套表格和任�
   const value = schema(), column = value.fields[3].columns[0]
   column.sensitive = true; column.nodeAccess = { review: 'MASKED' }
   assert.equal(validate(value), true, JSON.stringify(validate.errors))
-  column.nodeAccess.review = 'EDITABLE'; assert.equal(validate(value), false)
+  column.nodeAccess.review = 'EDITABLE'; assert.equal(validate(value), true)
+  column.nodeAccess.review = 'WRITABLE'; assert.equal(validate(value), false)
   column.nodeAccess.review = 'READ_ONLY'; column.type = 'TABLE'; assert.equal(validate(value), false)
 })
 

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.mapper.ApplicationUrgeMapper">
+    <select id="findLatest" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id, urged_at
+        FROM application_urge_record
+        WHERE tenant_id=#{tenantId} AND application_id=#{applicationId} AND round_no=#{roundNo}
+        ORDER BY urged_at DESC
+        LIMIT 1
+    </select>
+
+    <insert id="insert">
+        INSERT INTO application_urge_record
+        (id, tenant_id, application_id, round_no, urged_by, note, urged_at)
+        VALUES (#{id}, #{tenantId}, #{applicationId}, #{roundNo}, #{urgedBy}, #{note}, #{urgedAt})
+    </insert>
+</mapper>

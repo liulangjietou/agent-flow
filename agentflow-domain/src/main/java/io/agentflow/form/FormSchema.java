@@ -241,12 +241,12 @@ public record FormSchema(int schemaVersion, List<Field> fields) {
             if (nodeAccess == null || nodeAccess.isEmpty()) return fallback;
             if (nodes.isEmpty()) return nodeAccess.values().stream().reduce(fallback, FieldVisibility::stricter);
             return nodes.stream().map(node -> nodeAccess.getOrDefault(node, fallback))
-                    .reduce(FieldVisibility.READ_ONLY, FieldVisibility::stricter);
+                    .reduce(FieldVisibility.EDITABLE, FieldVisibility::stricter);
         }
 
         /** 公共摘要和索引不能间接暴露任一节点受限的字段。 */
         public boolean restricted() {
-            return Boolean.TRUE.equals(sensitive) || nodeAccess != null && nodeAccess.values().stream().anyMatch(value -> value != FieldVisibility.READ_ONLY)
+            return Boolean.TRUE.equals(sensitive) || nodeAccess != null && nodeAccess.values().stream().anyMatch(value -> !value.readable())
                     || columns != null && columns.stream().anyMatch(Field::restricted);
         }
 

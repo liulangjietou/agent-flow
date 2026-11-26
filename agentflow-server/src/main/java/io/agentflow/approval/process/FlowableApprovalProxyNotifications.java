@@ -345,6 +345,58 @@ public class FlowableApprovalProxyNotifications {
         }
     }
 
+    /** 申请人催办时同步向当前有效代理发送最小提醒，不复制催办附言也不新增读取授权。 */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public int urged(
+            Application application,
+            UUID urgeId,
+            List<TaskAudiencePort.Audience> current,
+            Set<String> nativeRecipients,
+            Instant now) {
+        var targets =
+                current.stream()
+                        .flatMap(
+                                task ->
+                                        task.proxies().stream()
+                                                .map(proxy -> new LifecycleTarget(task.taskId(), proxy)))
+                        .filter(target -> !nativeRecipients.contains(target.proxy().subject()))
+                        .sorted(
+                                Comparator.comparing(
+                                                (LifecycleTarget target) ->
+                                                        target.proxy().proxyId().toString())
+                                        .thenComparing(LifecycleTarget::taskId))
+                        .toList();
+        int sent = 0;
+        for (var target : targets) {
+            UUID proxyId = target.proxy().proxyId();
+            if (!originalGrantActive(application.tenantId(), target.proxy().subject(), proxyId, now)) continue;
+            String eventKey = "task-proxy-urge:" + urgeId + ":" + proxyId + ":" + target.taskId();
+            UUID id =
+                    UUID.nameUUIDFromBytes(
+                            (application.tenantId() + ":" + eventKey + ":" + target.proxy().subject())
+                                    .getBytes(StandardCharsets.UTF_8));
+            inbox.append(
+                    eventKey,
+                    new InboxMessage(
+                            id,
+                            application.tenantId(),
+                            target.proxy().subject(),
+                            application.id(),
+                            "代理审批催办提醒",
+                            "",
+                            InboxMessage.Kind.TASK_URGED,
+                            "system:approval-proxy",
+                            target.taskId(),
+                            null,
+                            application.roundNo(),
+                            now,
+                            null,
+                            "代理范围内有待办收到催办提醒，请登录核对当前资格和任务状态。"));
+            sent++;
+        }
+        return sent;
+    }
+
     /** 外发领取和人工恢复只复核原消息的那份代理，新授权不能复活旧的待发提醒。 */
     public boolean deliveryAllowed(NotificationDelivery delivery, Instant now) {
         var sources =

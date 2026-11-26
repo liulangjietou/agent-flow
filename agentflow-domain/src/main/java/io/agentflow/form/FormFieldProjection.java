@@ -50,7 +50,7 @@ public record FormFieldProjection(FormSchema schema, Map<String, Object> payload
             if (row instanceof Map<?, ?> cells) for (var column : field.columns()) {
                 var access = column.visibility(nodes);
                 if (access == FieldVisibility.MASKED) visible.put(column.key(), MASKED_VALUE);
-                else if (access == FieldVisibility.READ_ONLY && cells.containsKey(column.key())) visible.put(column.key(), cells.get(column.key()));
+                else if (access.readable() && cells.containsKey(column.key())) visible.put(column.key(), cells.get(column.key()));
             }
             return java.util.Collections.unmodifiableMap(visible);
         }).toList();

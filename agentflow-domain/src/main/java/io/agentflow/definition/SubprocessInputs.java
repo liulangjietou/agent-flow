@@ -54,11 +54,11 @@ public final class SubprocessInputs {
 
     private static Binding binding(FormSchema.Field source, FormSchema.Field target, String nodeId) {
         if (source.type() != target.type()) throw invalid("SUBPROCESS_INPUT_TYPE_MISMATCH", "Mapped field types must match");
-        if (source.visibility(Set.of(nodeId)) != FieldVisibility.READ_ONLY) {
+        if (!source.visibility(Set.of(nodeId)).readable()) {
             throw invalid("SUBPROCESS_INPUT_NOT_READABLE", "Hidden or masked input cannot be passed to a subprocess");
         }
         boolean restricted = Boolean.TRUE.equals(source.sensitive()) || source.nodeAccess() != null
-                && source.nodeAccess().values().stream().anyMatch(value -> value != FieldVisibility.READ_ONLY);
+                && source.nodeAccess().values().stream().anyMatch(value -> !value.readable());
         if (restricted && !Boolean.TRUE.equals(target.sensitive())) {
             throw invalid("SUBPROCESS_INPUT_SENSITIVITY_LOSS", "Subprocess fields must retain the source sensitivity");
         }
