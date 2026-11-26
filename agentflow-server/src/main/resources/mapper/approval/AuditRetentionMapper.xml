@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.approval.operations.mapper.AuditRetentionMapper">
+    <select id="findExpiredBatch" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id, tenant_id, event_id, aggregate_type, aggregate_id, aggregate_version,
+               application_id, action, actor_id, payload_json, occurred_at
+        FROM audit_event
+        WHERE occurred_at &lt; #{cutoff}
+        <if test="tenantId != null">
+            AND tenant_id = #{tenantId}
+        </if>
+          AND NOT EXISTS (
+              SELECT 1 FROM expense_budget_review r
+              WHERE r.tenant_id = audit_event.tenant_id
+                AND (r.decision_audit_id = audit_event.event_id OR r.automatic_audit_id = audit_event.event_id)
+          )
+        ORDER BY occurred_at ASC, id ASC
+        LIMIT #{limit}
+    </select>
+
+    <insert id="insertArchive">
+        INSERT INTO audit_event_archive
+        (id, tenant_id, event_id, aggregate_type, aggregate_id, aggregate_version,
+         application_id, action, actor_id, payload_json, occurred_at, archived_at)
+        VALUES (#{id}, #{tenantId}, #{eventId}, #{aggregateType}, #{aggregateId}, #{aggregateVersion},
+                #{applicationId}, #{action}, #{actorId}, #{payloadJson}, #{occurredAt}, #{archivedAt})
+    </insert>
+
+    <delete id="deleteFromHotTable">
+        DELETE FROM audit_event WHERE tenant_id = #{tenantId} AND id = #{id}
+    </delete>
+
+    <insert id="insertRun">
+        INSERT INTO audit_retention_run
+        (id, tenant_id, cutoff_at, archived_count, triggered_by, executed_at)
+        VALUES (#{id}, #{tenantId}, #{cutoffAt}, #{archivedCount}, #{triggeredBy}, #{executedAt})
+    </insert>
+
+    <select id="listRuns" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id, tenant_id, cutoff_at, archived_count, triggered_by, executed_at
+        FROM audit_retention_run
+        WHERE tenant_id = #{tenantId}
+        ORDER BY executed_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <select id="countArchived" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT COUNT(*) AS total_count
+        FROM audit_event_archive
+        WHERE tenant_id = #{tenantId}
+    </select>
+</mapper>

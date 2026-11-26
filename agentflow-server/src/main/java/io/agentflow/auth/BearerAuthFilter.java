@@ -24,6 +24,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -50,11 +51,21 @@ public class BearerAuthFilter extends OncePerRequestFilter {
     private final OidcActorMapper oidcActors;
     private final ObjectProvider<OidcLogoutScopes> logoutScopes;
     private final MetricsScrapeAuthentication metrics;
+    private final LocalIdentityService localIdentity;
     private final int maxRequestBodyBytes;
 
-    /** 创建过滤器；JSON 请求体上限可按部署调整，默认 8 MiB。 */
+    /** 兼容既有测试构造器。 */
     public BearerAuthFilter(AuthService authService, CurrentActor currentActor, JsonUtil jsonUtil, OidcProperties oidc,
                            ObjectProvider<OidcLogoutScopes> logoutScopes, MetricsScrapeAuthentication metrics,
+                           int maxRequestBodyBytes) {
+        this(authService, currentActor, jsonUtil, oidc, logoutScopes, metrics, null, maxRequestBodyBytes);
+    }
+
+    /** 创建过滤器；JSON 请求体上限可按部署调整，默认 8 MiB。 */
+    @Autowired
+    public BearerAuthFilter(AuthService authService, CurrentActor currentActor, JsonUtil jsonUtil, OidcProperties oidc,
+                           ObjectProvider<OidcLogoutScopes> logoutScopes, MetricsScrapeAuthentication metrics,
+                           ObjectProvider<LocalIdentityService> localIdentityProvider,
                            @Value("${agentflow.web.max-request-body-bytes:8388608}") int maxRequestBodyBytes) {
         if (maxRequestBodyBytes <= 0) throw new IllegalArgumentException("agentflow.web.max-request-body-bytes must be positive");
         this.maxRequestBodyBytes = maxRequestBodyBytes;
@@ -65,6 +76,7 @@ public class BearerAuthFilter extends OncePerRequestFilter {
         this.oidcActors = new OidcActorMapper(oidc);
         this.logoutScopes = logoutScopes;
         this.metrics = metrics;
+        this.localIdentity = localIdentityProvider == null ? null : localIdentityProvider.getIfAvailable();
     }
 
     @Override
@@ -178,12 +190,22 @@ public class BearerAuthFilter extends OncePerRequestFilter {
         if (authorization == null || !authorization.startsWith("Bearer ")) {
             throw new DomainException(ErrorCode.UNAUTHENTICATED, "Authentication is required");
         }
-        return authService.authenticate(authorization.substring(7));
+        String rawToken = authorization.substring(7);
+        try {
+            return authService.authenticate(rawToken);
+        } catch (DomainException unauthenticated) {
+            if (localIdentity != null) {
+                var local = localIdentity.authenticateSession(rawToken);
+                if (local.isPresent()) return local.get();
+            }
+            throw unauthenticated;
+        }
     }
 
     private boolean isPublic(HttpServletRequest request) {
         String path = request.getRequestURI();
-        return PaymentCallbackVerifier.matches(request) || EventIngressVerifier.matches(request) || SignatureCallbackVerifier.matches(request) || (HttpMethod.POST.matches(request.getMethod()) && path.equals("/api/v1/auth/login"))
+        return PaymentCallbackVerifier.matches(request) || EventIngressVerifier.matches(request) || SignatureCallbackVerifier.matches(request)
+                || (HttpMethod.POST.matches(request.getMethod()) && (path.equals("/api/v1/auth/login") || path.equals("/api/v1/auth/local/login")))
                 || (HttpMethod.GET.matches(request.getMethod()) && path.equals("/api/v1/auth/options"))
                 || ((HttpMethod.GET.matches(request.getMethod()) || HttpMethod.HEAD.matches(request.getMethod()))
                 && PUBLIC_HEALTH_PATHS.contains(path)) || path.equals("/error");

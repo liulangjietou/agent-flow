@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.auth.mapper.TenantOidcProviderMapper">
+    <select id="listByTenant" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id, tenant_id, provider_key, display_name, issuer_uri, client_id, client_secret,
+               scopes, enabled, version, updated_by, created_at, updated_at
+        FROM tenant_oidc_provider
+        WHERE tenant_id=#{tenantId}
+        ORDER BY provider_key ASC
+    </select>
+
+    <select id="findByKey" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id, tenant_id, provider_key, display_name, issuer_uri, client_id, client_secret,
+               scopes, enabled, version, updated_by, created_at, updated_at
+        FROM tenant_oidc_provider
+        WHERE tenant_id=#{tenantId} AND provider_key=#{providerKey}
+    </select>
+
+    <select id="findById" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id, tenant_id, provider_key, display_name, issuer_uri, client_id, client_secret,
+               scopes, enabled, version, updated_by, created_at, updated_at
+        FROM tenant_oidc_provider
+        WHERE tenant_id=#{tenantId} AND id=#{id}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO tenant_oidc_provider
+        (id, tenant_id, provider_key, display_name, issuer_uri, client_id, client_secret,
+         scopes, enabled, version, updated_by, created_at, updated_at)
+        VALUES (#{id}, #{tenantId}, #{providerKey}, #{displayName}, #{issuerUri}, #{clientId}, #{clientSecret},
+                #{scopes}, #{enabled}, 1, #{updatedBy}, #{createdAt}, #{createdAt})
+    </insert>
+
+    <update id="update">
+        UPDATE tenant_oidc_provider
+        SET display_name=#{displayName}, issuer_uri=#{issuerUri}, client_id=#{clientId},
+            client_secret=#{clientSecret}, scopes=#{scopes}, enabled=#{enabled},
+            updated_by=#{updatedBy}, version=version+1, updated_at=#{updatedAt}
+        WHERE tenant_id=#{tenantId} AND provider_key=#{providerKey} AND version=#{expectedVersion}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM tenant_oidc_provider
+        WHERE tenant_id=#{tenantId} AND id=#{id}
+    </delete>
+</mapper>
