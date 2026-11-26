@@ -56605,6 +56605,1957 @@
           }
         }
       }
+    },
+    "/api/v1/auth/local/login": {
+      "post": {
+        "operationId": "localLogin",
+        "tags": [
+          "认证"
+        ],
+        "summary": "本地账号口令与 TOTP 登录",
+        "description": "独立本地账号登录，支持可选 6 位 TOTP MFA 校验与连续失败锁定。",
+        "x-access": "匿名；受演示开关与租户限制",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "连续失败账号锁定",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalLoginRequest"
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/v1/auth/local-users": {
+      "get": {
+        "operationId": "listLocalUsers",
+        "tags": [
+          "认证"
+        ],
+        "summary": "管理员查看本租户本地账号",
+        "description": "返回本租户已部署的通知通道元信息与员工动态收件绑定，不暴露凭据。",
+        "x-access": "需要 ADMIN 角色",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LocalUserView"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要管理员角色",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createLocalUser",
+        "tags": [
+          "认证"
+        ],
+        "summary": "管理员创建本地账号",
+        "description": "管理员为本租户员工配置邮箱或企微收件绑定，立即生效且不修改已入队消息的冻结摘要。",
+        "x-access": "需要 ADMIN 角色",
+        "x-idempotency": true,
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "业务写请求幂等键",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLocalUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "400": {
+            "description": "请求格式或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要管理员角色",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalUserView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/local-users/{id}": {
+      "patch": {
+        "operationId": "updateLocalUser",
+        "tags": [
+          "认证"
+        ],
+        "summary": "管理员更新本地账号启停与角色",
+        "description": "管理员为本租户员工配置邮箱或企微收件绑定，立即生效且不修改已入队消息的冻结摘要。",
+        "x-access": "需要 ADMIN 角色",
+        "x-idempotency": true,
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "业务写请求幂等键",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLocalUserRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalUserView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要管理员角色",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/local-users/{id}/reset-password": {
+      "post": {
+        "operationId": "resetLocalUserPassword",
+        "tags": [
+          "认证"
+        ],
+        "summary": "管理员重置本地账号口令",
+        "description": "管理员为本租户员工配置邮箱或企微收件绑定，立即生效且不修改已入队消息的冻结摘要。",
+        "x-access": "需要 ADMIN 角色",
+        "x-idempotency": true,
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "业务写请求幂等键",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalUserView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要管理员角色",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/local/password": {
+      "post": {
+        "operationId": "changeLocalPassword",
+        "tags": [
+          "认证"
+        ],
+        "summary": "当前本地用户修改自身口令",
+        "description": "响应字段为 actor；不重新返回 token。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "修改成功"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/local/mfa/enroll": {
+      "post": {
+        "operationId": "enrollLocalMfa",
+        "tags": [
+          "认证"
+        ],
+        "summary": "初始化 TOTP MFA 密钥",
+        "description": "响应字段为 actor；不重新返回 token。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MfaEnrollment"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/local/mfa/enable": {
+      "post": {
+        "operationId": "enableLocalMfa",
+        "tags": [
+          "认证"
+        ],
+        "summary": "校验动态码并启用 MFA",
+        "description": "响应字段为 actor；不重新返回 token。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalUserView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnableMfaRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/local/mfa/disable": {
+      "post": {
+        "operationId": "disableLocalMfa",
+        "tags": [
+          "认证"
+        ],
+        "summary": "关闭 MFA",
+        "description": "响应字段为 actor；不重新返回 token。",
+        "x-access": "当前已登录账号",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalUserView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DisableMfaRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/oidc-providers": {
+      "get": {
+        "operationId": "listTenantOidcProviders",
+        "tags": [
+          "认证"
+        ],
+        "summary": "列出本租户动态 OIDC 提供方配置",
+        "description": "返回本租户已部署的通知通道元信息与员工动态收件绑定，不暴露凭据。",
+        "x-access": "需要 ADMIN 角色",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TenantOidcProviderView"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要管理员角色",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "upsertTenantOidcProvider",
+        "tags": [
+          "认证"
+        ],
+        "summary": "新增或更新租户 OIDC 提供方配置",
+        "description": "管理员为本租户员工配置邮箱或企微收件绑定，立即生效且不修改已入队消息的冻结摘要。",
+        "x-access": "需要 ADMIN 角色",
+        "x-idempotency": true,
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "业务写请求幂等键",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpsertOidcProviderRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TenantOidcProviderView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要管理员角色",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/oidc-providers/{id}": {
+      "delete": {
+        "operationId": "deleteTenantOidcProvider",
+        "tags": [
+          "认证"
+        ],
+        "summary": "删除租户 OIDC 提供方配置",
+        "description": "删除本租户内指定的动态收件绑定。",
+        "x-access": "需要 ADMIN 角色",
+        "x-idempotency": false,
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationBindingDeleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要管理员角色",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/audit/retention": {
+      "get": {
+        "operationId": "getAuditRetentionStatus",
+        "tags": [
+          "运维"
+        ],
+        "summary": "查看审计事件留存归档状态",
+        "description": "返回本租户已部署的通知通道元信息与员工动态收件绑定，不暴露凭据。",
+        "x-access": "需要 ADMIN 角色",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditRetentionStatus"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要管理员角色",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/audit/retention/run": {
+      "post": {
+        "operationId": "runAuditRetention",
+        "tags": [
+          "运维"
+        ],
+        "summary": "手动触发租户超期审计分批归档",
+        "description": "管理员为本租户员工配置邮箱或企微收件绑定，立即生效且不修改已入队消息的冻结摘要。",
+        "x-access": "需要 ADMIN 角色",
+        "x-idempotency": true,
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "业务写请求幂等键",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunRetentionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditRetentionRunRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要管理员角色",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operations/audit/export.csv": {
+      "get": {
+        "operationId": "exportAuditCsv",
+        "tags": [
+          "工作台"
+        ],
+        "summary": "流式导出审计摘要 CSV",
+        "description": "仅 ADMIN。按审计筛选一次导出全部匹配摘要，最多 10000 条，超限整次拒绝。缺失元数据留空，不包含表单正文、审批意见或完整审计 JSON；APPROVE 不代表整单批准。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "完整匹配结果工作簿，Cache-Control: no-store；Content-Disposition: attachment; filename=\"agentflow-audit.xlsx\"。空结果仍生成表头及导出说明。",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_AUDIT_QUERY：筛选、版本、日期或游标无效，包含未知参数及其他主体/条件的游标",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "AUDIT_EXPORT_LIMIT_EXCEEDED：超过 10000 份，请缩小筛选。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "AUDIT_EXPORT_BUSY：另一导出正在生成，请稍后重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "AUDIT_EXPORT_FAILED：文件生成失败，可重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "关联申请当前标题或业务单号的字面量包含文本",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "actor",
+            "in": "query",
+            "required": false,
+            "description": "已记录的精确操作人账号",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "required": false,
+            "description": "明确记录的动作，留空表示全部",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "CREATE",
+                "REVISE",
+                "SUBMIT",
+                "WITHDRAW",
+                "CANCEL",
+                "CLAIM",
+                "RELEASE",
+                "TRANSFER",
+                "DELEGATE",
+                "RESOLVE",
+                "RETURN",
+                "REJECT",
+                "APPROVE",
+                "EXPENSE_REDUCE",
+                "ADD_SIGNER",
+                "REMOVE_SIGNER",
+                "TIMER_ELAPSED",
+                "TIMER_FAILED",
+                "TIMER_RETRY",
+                "INSTANCE_PAUSE",
+                "INSTANCE_RESUME",
+                "INSTANCE_TERMINATE",
+                "EVENT_RECEIVED",
+                "SERVICE_TASK_COMPLETED",
+                "SUBPROCESS_COMPLETED",
+                "SUBPROCESS_STOPPED",
+                "TENANT_INITIALIZE",
+                "INVOICE_EXTRACTION_QUEUE",
+                "INVOICE_EXTRACTION_CONFIRM",
+                "INVOICE_EXTRACTION_DISMISS",
+                "EXPENSE_REQUEST_CLOSED",
+                "SELF_APPROVAL_ESCALATED",
+                "AUTO_PASSED_DUPLICATE",
+                "REVOKE"
+              ]
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "description": "事件聚合类型，留空表示全部",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "Application",
+                "Task",
+                "TenantInitialization",
+                "InvoiceExtractionRun",
+                "ExpenseRequest"
+              ]
+            }
+          },
+          {
+            "name": "applicationId",
+            "in": "query",
+            "required": false,
+            "description": "可关联的当前租户申请 UUID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "操作开始日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "操作结束日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/operations/applications/export.csv": {
+      "get": {
+        "operationId": "exportApplicationsCsv",
+        "tags": [
+          "工作台"
+        ],
+        "summary": "流式导出申请摘要 CSV",
+        "description": "仅 ADMIN。复用申请检索筛选，一次查询全部匹配摘要，最多 10000 条；超过上限整次拒绝，不生成截断文件。不接受 cursor 或 limit。响应包含申请记录和导出说明两个工作表；单号和标题均为文本，无表单正文或审批意见。每个服务实例同时只生成一份文件。",
+        "x-access": "ADMIN",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "完整匹配结果工作簿，Cache-Control: no-store；Content-Disposition: attachment; filename=\"agentflow-applications.xlsx\"。空结果仍生成表头及导出说明。",
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "角色或当前资源权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "INVALID_APPLICATION_QUERY：筛选、版本、日期或游标无效，包含未知参数及其他主体/条件的游标",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "APPLICATION_EXPORT_LIMIT_EXCEEDED：超过 10000 份，请缩小筛选。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "APPLICATION_EXPORT_BUSY：另一导出正在生成，请稍后重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "APPLICATION_EXPORT_FAILED：文件生成失败，可重试。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "标题或业务单号包含文本；大小写不敏感，百分号和下划线按字面量匹配",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "申请当前状态，留空表示全部",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "DRAFT",
+                "IN_APPROVAL",
+                "RETURNED",
+                "WITHDRAWN",
+                "APPROVED",
+                "REJECTED",
+                "CANCELLED",
+                "REVOKED"
+              ]
+            }
+          },
+          {
+            "name": "processKey",
+            "in": "query",
+            "required": false,
+            "description": "精确流程标识",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "definitionVersion",
+            "in": "query",
+            "required": false,
+            "description": "精确版本，必须同时指定流程标识",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "applicant",
+            "in": "query",
+            "required": false,
+            "description": "精确申请人账号",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "创建开始日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "创建结束日期 UTC，包含该日",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/procurement-payments/{id}/voucher-draft": {
+      "get": {
+        "operationId": "getProcurementVoucherDraft",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "获取已批准采购付款的 ERP 凭证草稿",
+        "description": "申请人读取草稿或原轮次；审批参与人须通过原轮次敏感明细权限。管理员不绕过字段限制。返回账户掩码，不返回账户引用、摘要或内部查验凭据。",
+        "x-access": "申请人或本轮明细可读的实际审批参与者",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcurementVoucherDraft"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "description": "选择历史轮次；省略时读取当前可见内容。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/procurement-payments/{id}/archive/content": {
+      "get": {
+        "operationId": "downloadProcurementArchive",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "下载已批准采购付款不可变电子归档 ZIP",
+        "description": "逐原件复核 SHA-256 后提供 ZIP；包含原存 manifest.json、manifest.sha256 和 originals/ 下原始字节。封存后的财务争议不改写历史档案；下载权限每次重新检查。",
+        "x-access": "本人或本轮所有字段原样可读的参与者；管理员不绕过敏感字段",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "headers": {
+              "Cache-Control": {
+                "description": "文件及元数据不缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "attachment; 服务端生成报销 UUID 和轮次文件名"
+              },
+              "X-Content-Type-Options": {
+                "schema": {
+                  "type": "string",
+                  "const": "nosniff"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "归档业务规则不满足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "持久目录不可用或已存内容完整性校验失败",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "roundNo",
+            "in": "query",
+            "required": false,
+            "description": "选择历史轮次；省略时读取当前可见内容。",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/procurement-payments/{id}/revoke": {
+      "post": {
+        "operationId": "revokeApprovedProcurementPayment",
+        "tags": [
+          "采购付款"
+        ],
+        "summary": "财务撤销尚未付款授权的已批准采购付款",
+        "description": "本人作废尚未批准且不在审批中的申请，原占用同事务释放；历史依据和修订保留。",
+        "x-access": "FINANCE",
+        "x-idempotency": true,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcurementPaymentReceipt"
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "true 为原成功响应回放；false 为本次执行。",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式、筛选参数或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "权限不足，或 OIDC 会话 CSRF 验证失败（CSRF_INVALID，保留原幂等键后恢复会话）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在或不可见",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "双版本、活动预检、外发目标或幂等冲突；结果未知时使用原请求恢复。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "领域规则、表单、流程图或状态校验不通过",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误；客户端不能把结果未知的写入当作失败后创建新请求。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "资源标识",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "每个新写入唯一。同一租户内绑定账号、角色、方法、路径、原始查询与正文；网络结果不明时使用原请求逐字节重试。成功响应保存 24 小时，过期拒绝重放，不重新执行。",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；由 GET /api/v1/auth/options 取得，演示 Bearer 模式不需要。",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-AgentFlow-Actor",
+            "in": "header",
+            "required": false,
+            "description": "OIDC 模式必填；URL 编码的 JSON 数组 [tenantId,userId]，对应本页面已确认的身份。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeProcurementRequest"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -101924,6 +103875,561 @@
               "null"
             ],
             "format": "uuid"
+          }
+        }
+      },
+      "LocalLoginRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tenantId",
+          "username",
+          "password"
+        ],
+        "properties": {
+          "tenantId": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "username": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "totpCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 16
+          }
+        }
+      },
+      "CreateLocalUserRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "username",
+          "displayName",
+          "password",
+          "roles"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "password": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 128
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          }
+        }
+      },
+      "UpdateLocalUserRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "roles",
+          "expectedVersion"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "newPassword",
+          "expectedVersion"
+        ],
+        "properties": {
+          "newPassword": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 128
+          },
+          "expectedVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 10,
+            "maxLength": 128
+          }
+        }
+      },
+      "EnableMfaRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "totpCode"
+        ],
+        "properties": {
+          "totpCode": {
+            "type": "string",
+            "maxLength": 16
+          }
+        }
+      },
+      "DisableMfaRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "currentPassword"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "totpCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 16
+          }
+        }
+      },
+      "LocalUserView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "tenantId",
+          "username",
+          "displayName",
+          "roles",
+          "enabled",
+          "mfaEnabled",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "mfaEnabled": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MfaEnrollment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "secret",
+          "otpauthUri",
+          "accountVersion"
+        ],
+        "properties": {
+          "secret": {
+            "type": "string"
+          },
+          "otpauthUri": {
+            "type": "string"
+          },
+          "accountVersion": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "UpsertOidcProviderRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "providerKey",
+          "displayName",
+          "issuerUri",
+          "clientId",
+          "enabled"
+        ],
+        "properties": {
+          "providerKey": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "displayName": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "issuerUri": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "clientId": {
+            "type": "string",
+            "maxLength": 256
+          },
+          "clientSecret": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1024
+          },
+          "scopes": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 512
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "expectedVersion": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          }
+        }
+      },
+      "TenantOidcProviderView": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "tenantId",
+          "providerKey",
+          "displayName",
+          "issuerUri",
+          "clientId",
+          "clientSecretConfigured",
+          "scopes",
+          "enabled",
+          "version",
+          "updatedBy",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tenantId": {
+            "type": "string"
+          },
+          "providerKey": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "issuerUri": {
+            "type": "string"
+          },
+          "clientId": {
+            "type": "string"
+          },
+          "clientSecretConfigured": {
+            "type": "boolean"
+          },
+          "scopes": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RunRetentionRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "retentionDays": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      },
+      "AuditRetentionRunRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "runId",
+          "cutoffAt",
+          "archivedCount",
+          "triggeredBy",
+          "executedAt"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cutoffAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "archivedCount": {
+            "type": "integer"
+          },
+          "triggeredBy": {
+            "type": "string"
+          },
+          "executedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AuditRetentionStatus": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scheduledEnabled",
+          "defaultRetentionDays",
+          "archivedTotal",
+          "recentRuns"
+        ],
+        "properties": {
+          "scheduledEnabled": {
+            "type": "boolean"
+          },
+          "defaultRetentionDays": {
+            "type": "integer"
+          },
+          "archivedTotal": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "recentRuns": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditRetentionRunRecord"
+            }
+          }
+        }
+      },
+      "ProcurementVoucherLine": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lineNo",
+          "role",
+          "side",
+          "amount",
+          "currency",
+          "supplierReference",
+          "payableReference"
+        ],
+        "properties": {
+          "lineNo": {
+            "type": "integer"
+          },
+          "role": {
+            "type": "string"
+          },
+          "side": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "supplierReference": {
+            "type": "string"
+          },
+          "payableReference": {
+            "type": "string"
+          },
+          "sourceReference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ProcurementVoucherDraft": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "procurementPaymentId",
+          "applicationId",
+          "businessNo",
+          "roundNo",
+          "legalEntityId",
+          "accountingDate",
+          "amount",
+          "currency",
+          "supplierReference",
+          "supplierName",
+          "payableReference",
+          "lines",
+          "basisDigest"
+        ],
+        "properties": {
+          "procurementPaymentId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "applicationId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "businessNo": {
+            "type": "string"
+          },
+          "roundNo": {
+            "type": "integer"
+          },
+          "legalEntityId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "accountingDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "amount": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "supplierReference": {
+            "type": "string"
+          },
+          "supplierName": {
+            "type": "string"
+          },
+          "payableReference": {
+            "type": "string"
+          },
+          "accrualVoucherReference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProcurementVoucherLine"
+            }
+          },
+          "basisDigest": {
+            "type": "string"
+          }
+        }
+      },
+      "RevokeProcurementRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "applicationVersion",
+          "requestVersion",
+          "comment"
+        ],
+        "properties": {
+          "applicationVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "requestVersion": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 2000
           }
         }
       }

@@ -11,9 +11,10 @@ import org.springframework.web.bind.annotation.RestController;
 import io.agentflow.common.CurrentActor;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.web.csrf.CsrfToken;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 
 /**
@@ -28,16 +29,27 @@ public class AuthController {
     private final OidcProperties oidc;
     private final boolean demoEnabled;
     private final ObjectProvider<ClientRegistrationRepository> clients;
+    private final LocalIdentityService localIdentity;
 
-    /** 创建控制器。 */
+    /** 兼容既有测试构造器。 */
     public AuthController(AuthService authService, CurrentActor currentActor, OidcProperties oidc,
                           ObjectProvider<ClientRegistrationRepository> clients,
+                          boolean demoEnabled) {
+        this(authService, currentActor, oidc, clients, null, demoEnabled);
+    }
+
+    /** 创建控制器。 */
+    @Autowired
+    public AuthController(AuthService authService, CurrentActor currentActor, OidcProperties oidc,
+                          ObjectProvider<ClientRegistrationRepository> clients,
+                          ObjectProvider<LocalIdentityService> localIdentityProvider,
                           @Value("${agentflow.auth.demo-enabled:false}") boolean demoEnabled) {
         this.authService = authService;
         this.currentActor = currentActor;
         this.oidc = oidc;
         this.demoEnabled = demoEnabled;
         this.clients = clients;
+        this.localIdentity = localIdentityProvider == null ? null : localIdentityProvider.getIfAvailable();
     }
 
     /** 前端按服务端实际配置展示登录入口；CSRF 令牌只供当前同源会话使用。 */
@@ -68,7 +80,9 @@ public class AuthController {
     /** 注销。 */
     @PostMapping("/logout")
     public void logout(@RequestHeader("Authorization") String authorization) {
-        authService.logout(token(authorization));
+        String rawToken = token(authorization);
+        authService.logout(rawToken);
+        if (localIdentity != null) localIdentity.revokeSession(rawToken);
     }
 
     private String token(String authorization) {

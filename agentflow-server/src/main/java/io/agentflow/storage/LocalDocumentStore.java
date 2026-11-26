@@ -6,6 +6,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.nio.channels.FileChannel;
 import java.nio.file.StandardOpenOption;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import java.io.IOException;
@@ -22,23 +24,48 @@ import java.util.Optional;
 
 /**
  * 审批附件与个人发票共用的不可变文件存储，只处理字节身份；业务归属与授权由各自用例负责。
+ * 支持 local（本地目录）与 s3（S3/MinIO 对象存储）两种后端，保持同一套指纹核验与不可变契约。
  * @author owlzhangfq@gmail.com
  */
 @Component
-public class LocalDocumentStore {
+public class LocalDocumentStore implements DocumentStoragePort {
     private static final Logger log = LoggerFactory.getLogger(LocalDocumentStore.class);
     public static final long MAX_SUPPORTED_BYTES = 100L * 1024 * 1024;
     private static final int COPY_BUFFER_BYTES = 64 * 1024;
     private final Path directory;
     private final long maxFileBytes;
+    private final S3ObjectStorageClient s3Client;
 
-    /** 显式目录未配置时保持关闭，不能默默写入容器临时层。 */
+    /** 兼容既有本地模式测试构造器。 */
+    public LocalDocumentStore(String directory, long maxFileBytes) {
+        this(directory, maxFileBytes, (S3ObjectStorageClient) null);
+    }
+
+    /** 显式目录未配置且未开启 S3 时保持关闭，不能默默写入容器临时层。 */
+    @Autowired
     public LocalDocumentStore(@Value("${agentflow.attachments.directory:}") String directory,
-            @Value("${agentflow.attachments.max-file-bytes:20971520}") long maxFileBytes) {
+            @Value("${agentflow.attachments.max-file-bytes:20971520}") long maxFileBytes,
+            ObjectProvider<S3StorageProperties> storageProperties) {
+        this(directory, maxFileBytes, resolveS3Client(storageProperties == null ? null : storageProperties.getIfAvailable()));
+    }
+
+    LocalDocumentStore(String directory, long maxFileBytes, S3ObjectStorageClient s3Client) {
         if (maxFileBytes < 1 || maxFileBytes > MAX_SUPPORTED_BYTES) throw new IllegalArgumentException("Invalid document file limit");
         this.maxFileBytes = maxFileBytes;
-        if (directory.isBlank()) this.directory = null;
-        else {
+        this.s3Client = s3Client;
+        if (s3Client != null) {
+            Path stagingRoot = directory == null || directory.isBlank()
+                    ? Path.of(System.getProperty("java.io.tmpdir"), "agentflow-s3-staging")
+                    : Path.of(directory);
+            if (!stagingRoot.isAbsolute()) throw new IllegalArgumentException("Document directory must be absolute");
+            try {
+                Files.createDirectories(stagingRoot);
+                this.directory = stagingRoot.toRealPath();
+                Files.setPosixFilePermissions(this.directory, PosixFilePermissions.fromString("rwx------"));
+            } catch (IOException failure) { throw unavailable(); }
+        } else if (directory == null || directory.isBlank()) {
+            this.directory = null;
+        } else {
             Path root = Path.of(directory);
             if (!root.isAbsolute()) throw new IllegalArgumentException("Document directory must be absolute");
             try {
@@ -49,8 +76,19 @@ public class LocalDocumentStore {
         }
     }
 
-    public boolean enabled() { return directory != null; }
+    private static S3ObjectStorageClient resolveS3Client(S3StorageProperties properties) {
+        if (properties == null || !properties.s3Enabled()) return null;
+        return new S3ObjectStorageClient(properties.getS3());
+    }
+
+    @Override
+    public boolean enabled() { return s3Client != null || directory != null; }
+
+    @Override
     public long maxFileBytes() { return maxFileBytes; }
+
+    @Override
+    public String backendType() { return s3Client != null ? "s3" : "local"; }
 
     /** 实际读取长度受限，不信任 HTTP Content-Length；指纹与登记值不符时不发布内容。 */
     public Path stage(Content file, InputStream input) {
@@ -84,8 +122,13 @@ public class LocalDocumentStore {
         }
     }
 
-    /** 同文件系统硬链接以排他方式发布；重复上传只能验证既有对象，不能覆盖它。 */
+    /** 同文件系统硬链接或对象存储条件上传以排他方式发布；重复上传只能验证既有对象，不能覆盖它。 */
+    @Override
     public void publish(Content file, Path staged) {
+        if (s3Client != null) {
+            s3Client.putObject(file, staged);
+            return;
+        }
         try {
             Files.createLink(path(file), staged);
         } catch (FileAlreadyExistsException existing) {
@@ -94,7 +137,11 @@ public class LocalDocumentStore {
     }
 
     /** 返回完整性已核对的字节，避免在向客户端写出一部分后才发现文件损坏。 */
+    @Override
     public byte[] read(Content file) {
+        if (s3Client != null) {
+            return s3Client.getObject(file);
+        }
         Path path = path(file);
         if (file.size() < 0 || file.size() > MAX_SUPPORTED_BYTES) throw unavailable();
         try {
@@ -112,12 +159,17 @@ public class LocalDocumentStore {
     }
 
     /** 恢复收集只在明确不存在时补取；无法判断、损坏或软链接仍按既有完整性契约拒绝读取。 */
+    @Override
     public Optional<byte[]> readIfPresent(Content file) {
+        if (s3Client != null) {
+            return s3Client.getObjectIfPresent(file);
+        }
         if (Files.notExists(path(file), LinkOption.NOFOLLOW_LINKS)) return Optional.empty();
         return Optional.of(read(file));
     }
 
     /** 只清理本次未发布的临时文件，已发布内容没有删除入口。 */
+    @Override
     public void discard(Path staged) {
         if (staged == null) return;
         try { Files.deleteIfExists(staged); }
@@ -127,8 +179,14 @@ public class LocalDocumentStore {
         }
     }
 
-    /** 配置检查不暴露主机路径；实际上传和下载仍分别检查 I/O 结果。 */
-    public boolean available() { return enabled() && Files.isDirectory(directory) && Files.isReadable(directory) && Files.isWritable(directory); }
+    /** 配置检查不暴露主机路径或对象存储凭据；实际上传和下载仍分别检查 I/O 结果。 */
+    @Override
+    public boolean available() {
+        if (s3Client != null) {
+            return directory != null && Files.isWritable(directory) && s3Client.headBucket();
+        }
+        return enabled() && Files.isDirectory(directory) && Files.isReadable(directory) && Files.isWritable(directory);
+    }
 
     private Path path(Content file) { requireEnabled(); return directory.resolve(file.id() + ".bin"); }
     private void requireEnabled() {
