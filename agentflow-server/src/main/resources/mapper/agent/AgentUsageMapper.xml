@@ -23,4 +23,7 @@
         <if test="subject != null">AND subject_id=#{subject}</if>
         ORDER BY recorded_at DESC,run_id DESC LIMIT 100
     </select>
+    <select id="listTenantSince" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT state_json FROM agent_execution_usage WHERE tenant_id=#{tenant} AND recorded_at &gt;= #{since}
+    </select>
 </mapper>

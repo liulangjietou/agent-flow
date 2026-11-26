@@ -22,12 +22,14 @@ public class PollingSchedulingConfiguration implements SchedulingConfigurer, Dis
     private static final Logger LOG = LoggerFactory.getLogger(PollingSchedulingConfiguration.class);
     private static final String THREAD_PREFIX = "agentflow-poller-";
     private ThreadPoolTaskScheduler scheduler;
+    private volatile int scheduledTaskCount;
 
     /** Spring 在全部 @Scheduled 方法登记完成、尚未开始调度时回调，此时任务数已确定。 */
     @Override
     public void configureTasks(ScheduledTaskRegistrar registrar) {
         int tasks = registrar.getFixedDelayTaskList().size() + registrar.getFixedRateTaskList().size()
                 + registrar.getCronTaskList().size() + registrar.getTriggerTaskList().size();
+        scheduledTaskCount = tasks;
         scheduler = new ThreadPoolTaskScheduler();
         scheduler.setPoolSize(Math.max(1, tasks));
         scheduler.setThreadNamePrefix(THREAD_PREFIX);
@@ -40,6 +42,9 @@ public class PollingSchedulingConfiguration implements SchedulingConfigurer, Dis
         registrar.setTaskScheduler(scheduler);
         LOG.info("Polling scheduler initialized, errorCode={}, scheduledTasks={}", "NONE", tasks);
     }
+
+    /** 暴露当前实例已登记的后台轮询任务数，供运行监控采集。 */
+    public int scheduledTaskCount() { return scheduledTaskCount; }
 
     /** 调度器由本配置创建，必须由本配置关闭。 */
     @Override

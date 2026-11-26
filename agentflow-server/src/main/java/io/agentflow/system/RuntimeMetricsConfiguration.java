@@ -1,14 +1,16 @@
 package io.agentflow.system;
 
+import io.agentflow.config.PollingSchedulingConfiguration;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.binder.MeterBinder;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * 部署期望副本数属于运行观测，不从审批或租户业务表推算。
+ * 部署期望副本数与后台调度容量属于运行观测，不携带租户或业务标识。
  * @author owlzhangfq@gmail.com
  */
 @Configuration(proxyBeanMethods = false)
@@ -21,5 +23,14 @@ public class RuntimeMetricsConfiguration {
         return registry -> Gauge.builder("agentflow.runtime.expected.instances", () -> expected)
                 .description("Configured number of application instances expected by the deployment")
                 .register(registry);
+    }
+
+    /** 暴露当前实例已登记的后台轮询任务数，辅助排查空闲连接池占用与调度线程规模。 */
+    @Bean
+    public MeterBinder scheduledTasks(ObjectProvider<PollingSchedulingConfiguration> schedulingProvider) {
+        return registry -> Gauge.builder("agentflow.runtime.scheduled.tasks", () -> {
+            var scheduling = schedulingProvider.getIfAvailable();
+            return scheduling == null ? 0 : scheduling.scheduledTaskCount();
+        }).description("Number of registered background polling tasks on this instance").register(registry);
     }
 }

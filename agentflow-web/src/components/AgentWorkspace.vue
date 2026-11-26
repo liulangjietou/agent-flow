@@ -485,4 +485,61 @@ onUnmounted(() => query.clear())
     font-size:21px;
   }
 }
+
+@media(max-width:900px) {
+  .assistant-layout {
+    grid-template-columns:minmax(0,1fr);
+    gap:20px;
+  }
+  .review-path {
+    grid-template-columns:minmax(0,1fr);
+    padding:16px;
+    gap:12px;
+  }
+  .review-path li+li {
+    border-left:0;
+    border-top:1px solid var(--line);
+    padding-left:0;
+    padding-top:12px;
+  }
+  .inbox-heading {
+    flex-direction:column;
+    align-items:flex-start;
+    padding:18px;
+  }
+  .assistant-search {
+    padding:0 18px 16px;
+  }
+  .assistant-search fieldset {
+    flex-wrap:wrap;
+  }
+  .search-field {
+    flex-basis:100%;
+  }
+  .assignment-field {
+    flex:1 1 120px;
+  }
+  .assistant-task {
+    padding:18px;
+  }
+  .task-open {
+    position:static;
+    transform:none;
+    margin-top:14px;
+    width:100%;
+  }
+  .task-open:active {
+    transform:none;
+  }
+  .assistant-pagination {
+    flex-wrap:wrap;
+    padding:14px 18px;
+  }
+  .expense-entry {
+    padding:20px 18px;
+  }
+  .expense-entry h3 {
+    font-size:20px;
+  }
+}
 </style>

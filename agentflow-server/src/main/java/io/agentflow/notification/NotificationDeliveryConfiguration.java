@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
 public class NotificationDeliveryConfiguration {
     private Map<String, SmtpServer> smtpServers = new LinkedHashMap<>();
     private Map<String, WeComApp> wecomApps = new LinkedHashMap<>();
+    private Map<String, FeishuApp> feishuApps = new LinkedHashMap<>();
+    private Map<String, DingTalkApp> dingtalkApps = new LinkedHashMap<>();
     private Map<String, Binding> bindings = new LinkedHashMap<>();
     private String publicUrl;
     private boolean allowInsecureInDemo;
@@ -21,6 +23,10 @@ public class NotificationDeliveryConfiguration {
     public void setSmtpServers(Map<String, SmtpServer> values) { smtpServers = values; }
     public Map<String, WeComApp> getWecomApps() { return wecomApps; }
     public void setWecomApps(Map<String, WeComApp> values) { wecomApps = values; }
+    public Map<String, FeishuApp> getFeishuApps() { return feishuApps; }
+    public void setFeishuApps(Map<String, FeishuApp> values) { feishuApps = values; }
+    public Map<String, DingTalkApp> getDingtalkApps() { return dingtalkApps; }
+    public void setDingtalkApps(Map<String, DingTalkApp> values) { dingtalkApps = values; }
     public Map<String, Binding> getBindings() { return bindings; }
     public void setBindings(Map<String, Binding> values) { bindings = values; }
     public String getPublicUrl() { return publicUrl; }
@@ -40,6 +46,24 @@ public class NotificationDeliveryConfiguration {
         public static final String OFFICIAL_BASE_URL = "https://qyapi.weixin.qq.com";
         public WeComApp { if (baseUrl == null) baseUrl = OFFICIAL_BASE_URL; }
         @Override public String toString() { return "NotificationWeComApp[redacted]"; }
+    }
+
+    /** 飞书自建应用配置，官方入口为 https://open.feishu.cn。
+     * @author owlzhangfq@gmail.com
+     */
+    public record FeishuApp(String tenantId, String appId, String appSecret, String baseUrl, boolean enabled) {
+        public static final String OFFICIAL_BASE_URL = "https://open.feishu.cn";
+        public FeishuApp { if (baseUrl == null) baseUrl = OFFICIAL_BASE_URL; }
+        @Override public String toString() { return "NotificationFeishuApp[redacted]"; }
+    }
+
+    /** 钉钉自建应用配置，官方入口为 https://oapi.dingtalk.com。
+     * @author owlzhangfq@gmail.com
+     */
+    public record DingTalkApp(String tenantId, String appKey, String appSecret, long agentId, String baseUrl, boolean enabled) {
+        public static final String OFFICIAL_BASE_URL = "https://oapi.dingtalk.com";
+        public DingTalkApp { if (baseUrl == null) baseUrl = OFFICIAL_BASE_URL; }
+        @Override public String toString() { return "NotificationDingTalkApp[redacted]"; }
     }
 
     /** 禁止把账号、密码、地址通过配置对象的字符串表示写入日志。

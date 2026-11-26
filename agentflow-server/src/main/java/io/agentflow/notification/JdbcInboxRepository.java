@@ -5,6 +5,8 @@ import io.agentflow.mybatis.SqlRow;
 import io.agentflow.mybatis.SqlRows;
 import io.agentflow.notification.mapper.InboxRepositoryMapper;
 
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,7 @@ import java.util.function.Function;
 public class JdbcInboxRepository implements InboxRepository {
     private final InboxRepositoryMapper sqlMapper;
     private final NotificationDispatchPlanner dispatches;
+    private final WorkspaceEventPublisher events;
     private static final Function<SqlRow, InboxMessage> MAPPER =
             row ->
                     new InboxMessage(
@@ -47,8 +50,17 @@ public class JdbcInboxRepository implements InboxRepository {
     /** 复用审批事务所用数据源。 */
     public JdbcInboxRepository(
             InboxRepositoryMapper sqlMapper, NotificationDispatchPlanner dispatches) {
+        this(sqlMapper, dispatches, null);
+    }
+
+    /** 落库提交后向在线接收人推送轻量刷新信号。 */
+    @Autowired
+    public JdbcInboxRepository(
+            InboxRepositoryMapper sqlMapper, NotificationDispatchPlanner dispatches,
+            ObjectProvider<WorkspaceEventPublisher> eventsProvider) {
         this.sqlMapper = sqlMapper;
         this.dispatches = dispatches;
+        this.events = eventsProvider == null ? null : eventsProvider.getIfAvailable();
     }
 
     @Override
@@ -73,7 +85,15 @@ public class JdbcInboxRepository implements InboxRepository {
                         message.tenantId(),
                         message.recipient(),
                         eventKey);
-        if (inserted == 1) dispatches.append(message);
+        if (inserted == 1) {
+            dispatches.append(message);
+            if (events != null) {
+                events.publishAfterCommit(message.tenantId(), message.recipient(), WorkspaceEventPublisher.EventType.INBOX_UPDATED);
+                if (message.taskId() != null) {
+                    events.publishAfterCommit(message.tenantId(), message.recipient(), WorkspaceEventPublisher.EventType.TASK_UPDATED);
+                }
+            }
+        }
     }
 
     @Override

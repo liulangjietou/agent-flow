@@ -2,11 +2,14 @@ package io.agentflow.approval.model;
 
 import io.agentflow.common.ErrorCode;
 import io.agentflow.common.DomainException;
+import io.agentflow.form.FieldVisibility;
 import io.agentflow.form.FormSchema;
 import io.agentflow.notification.NotificationTexts;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -178,6 +181,35 @@ public final class Application {
         }
         if (formSchema != null) formSchema.validateSubmission(payload);
         this.payload = copyPayload(payload); version++;
+    }
+
+    /** 审批节点仅可回填当前节点声明为 EDITABLE 的普通表单字段，合并后仍执行完整提交校验。 */
+    public void updateTaskEditableFields(long expectedVersion, String nodeId, Map<String, Object> updates) {
+        checkVersion(expectedVersion);
+        requireInApproval();
+        if (businessReference != null) {
+            throw new DomainException(ErrorCode.USE_BUSINESS_ENDPOINT, "Structured business applications do not allow generic approval field edits");
+        }
+        if (formSchema == null) {
+            throw new DomainException(ErrorCode.DOMAIN_RULE_VIOLATION, "Application has no form schema for editable approval fields");
+        }
+        if (org.apache.commons.lang3.StringUtils.isBlank(nodeId) || updates == null || updates.isEmpty()) {
+            throw new DomainException(ErrorCode.INVALID_REQUEST, "At least one editable field update is required");
+        }
+        Map<String, FormSchema.Field> declared = new LinkedHashMap<>();
+        formSchema.fields().forEach(field -> declared.put(field.key(), field));
+        Set<String> activeNode = Set.of(nodeId.trim());
+        for (String key : updates.keySet()) {
+            FormSchema.Field field = declared.get(key);
+            if (field == null || field.visibility(activeNode) != FieldVisibility.EDITABLE) {
+                throw new DomainException(ErrorCode.TASK_FIELD_NOT_EDITABLE, "Field is not editable at the current approval node: " + key);
+            }
+        }
+        Map<String, Object> merged = new LinkedHashMap<>(this.payload);
+        merged.putAll(updates);
+        formSchema.validateSubmission(merged);
+        this.payload = copyPayload(merged);
+        version++;
     }
 
     /** 正文与附件共用可编辑状态，上传不能借草稿入口修改审批中的证据。 */

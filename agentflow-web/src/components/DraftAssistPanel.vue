@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
+import { workspaceEvents } from '../workspaceEvents'
 import FormFields from './FormFields.vue'
 import { rawValueLabel, ownValue } from '../formSchema'
 import { draftError, draftSelections, draftStatuses, proposalField, proposalLabel, rememberDraftRun, focusedDraftRun,
@@ -146,7 +147,13 @@ watch(context, () => {
 watch([() => props.version, () => props.editable], () => { void loadInput() }, { flush: 'sync' })
 watch(sending, value => emit('busy', value), { flush: 'sync' })
 watch(dirty, value => emit('dirty', value), { immediate: true, flush: 'sync' })
-onUnmounted(() => { active = false; abortReads(); emit('busy', false); emit('dirty', false) })
+const unsubscribeEvents = workspaceEvents.subscribe(event => {
+  const inProgress = page.value?.items.some(item => item.status === 'QUEUED' || item.status === 'RUNNING')
+    || detail.value?.status === 'QUEUED' || detail.value?.status === 'RUNNING'
+  if (event.type !== 'AGENT_UPDATED' || !active || !inProgress || dirty.value) return
+  void loadPage(page.value?.page ?? 0, true).then(() => { if (selectedId.value) void loadDetail(selectedId.value, true) })
+})
+onUnmounted(() => { active = false; unsubscribeEvents(); abortReads(); emit('busy', false); emit('dirty', false) })
 </script>
 
 <template>

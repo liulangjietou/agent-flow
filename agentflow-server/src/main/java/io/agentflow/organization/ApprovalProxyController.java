@@ -91,6 +91,39 @@ public class ApprovalProxyController {
         return idempotency.execute(request, HttpStatus.OK, () -> receipt(service.revoke(actor, id, body.expectedRevision(), body.reason())));
     }
 
+    /** 审批人自助查看本人参与的审批代理记录（作为被代理人或代理人）。 */
+    @GetMapping("/self")
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public ResponseEntity<Page> listSelf(@RequestParam Map<String, String> raw) {
+        Actor actor = approver();
+        var query = OrganizationQuery.parse(raw, Set.of("afterId", "limit"));
+        Instant observedAt = Instant.now();
+        var person = organization.personBySubject(actor.tenantId(), actor.userId()).orElse(null);
+        if (person == null) {
+            return noStore(new Page(List.of(), null, observedAt));
+        }
+        var values = proxies.list(actor.tenantId(), person.id(), query.afterId(), query.limit());
+        int count = Math.min(values.size(), query.limit());
+        var items = values.subList(0, count).stream().map(proxy -> view(actor.tenantId(), proxy, observedAt)).toList();
+        String next = values.size() > count ? values.get(count - 1).id().toString() : null;
+        return noStore(new Page(items, next, observedAt));
+    }
+
+    /** 审批人自助创建本人名下的临时代理授权。 */
+    @PostMapping("/self")
+    public ResponseEntity<String> createSelf(@RequestBody SelfCreateInput body, HttpServletRequest request) {
+        var actor = approver();
+        return idempotency.execute(request, HttpStatus.CREATED, () -> receipt(service.createSelf(actor,
+                body.definitionId(), body.substituteId(), body.startsAt(), body.endsAt(), body.reason())));
+    }
+
+    /** 审批人自助撤销本人名下的代理授权。 */
+    @PostMapping("/self/{id}/revoke")
+    public ResponseEntity<String> revokeSelf(@PathVariable UUID id, @Valid @RequestBody RevokeInput body, HttpServletRequest request) {
+        var actor = approver();
+        return idempotency.execute(request, HttpStatus.OK, () -> receipt(service.revokeSelf(actor, id, body.expectedRevision(), body.reason())));
+    }
+
     private View view(String tenantId, ApprovalProxy proxy, Instant observedAt) {
         var definition = definitions.findById(tenantId, proxy.definitionId()).orElseThrow(ApprovalProxyController::notFound);
         return new View(proxy, proxy.statusAt(observedAt), observedAt, definition.key(), definition.version(), definition.name(),
@@ -103,6 +136,7 @@ public class ApprovalProxyController {
     }
 
     private Actor administrator() { var actor = actors.actor(); actor.requireRole(SystemRole.ADMIN); return actor; }
+    private Actor approver() { var actor = actors.actor(); actor.requireRole(SystemRole.APPROVER); return actor; }
     private static Receipt receipt(ApprovalProxy proxy) { return new Receipt(proxy.id(), proxy.revision()); }
     private static <T> ResponseEntity<T> noStore(T body) { return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body); }
     private static DomainException notFound() { return new DomainException(ErrorCode.NOT_FOUND, "Approval proxy or its tenant references were not found"); }
@@ -133,6 +167,15 @@ public class ApprovalProxyController {
     public record CreateInput(UUID definitionId, UUID principalId, UUID substituteId, Instant startsAt, Instant endsAt, String reason) {
         /** 未知字段显式失败，不能夹带认证身份、角色或伪造撤销状态。 */
         @JsonAnySetter public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown approval proxy creation field"); }
+    }
+
+    /**
+     * 审批人自助创建代理请求；被代理人固定为当前认证主体，不允许客户端传入 principalId。
+     * @author owlzhangfq@gmail.com
+     */
+    public record SelfCreateInput(UUID definitionId, UUID substituteId, Instant startsAt, Instant endsAt, String reason) {
+        /** 未知字段显式失败，避免客户端尝试伪造被代理人或角色。 */
+        @JsonAnySetter public void rejectUnknown(String name, Object value) { throw new IllegalArgumentException("Unknown self approval proxy creation field"); }
     }
 
     /**

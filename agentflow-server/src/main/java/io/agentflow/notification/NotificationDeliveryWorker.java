@@ -5,6 +5,7 @@ import io.agentflow.observability.DiagnosticContext;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,19 +21,35 @@ public class NotificationDeliveryWorker {
     private final JdbcNotificationDeliveryStore store;
     private final SmtpNotificationTransport smtp;
     private final WeComNotificationTransport wecom;
+    private final FeishuNotificationTransport feishu;
+    private final DingTalkNotificationTransport dingtalk;
     private final NotificationDeliveryService deliveries;
 
-    /** 通过独立 bean 的事务代理执行领取和确认。 */
+    /** 兼容既有测试构造器。 */
     public NotificationDeliveryWorker(JdbcNotificationDeliveryStore store, SmtpNotificationTransport smtp,
                                       WeComNotificationTransport wecom, NotificationDeliveryService deliveries) {
-        this.store = store; this.smtp = smtp; this.wecom = wecom; this.deliveries = deliveries;
+        this(store, smtp, wecom, null, null, deliveries);
+    }
+
+    /** 通过独立 bean 的事务代理执行领取和确认，支持企微、飞书与钉钉企业 IM 发送器。 */
+    @Autowired
+    public NotificationDeliveryWorker(JdbcNotificationDeliveryStore store, SmtpNotificationTransport smtp,
+                                      WeComNotificationTransport wecom, FeishuNotificationTransport feishu,
+                                      DingTalkNotificationTransport dingtalk, NotificationDeliveryService deliveries) {
+        this.store = store; this.smtp = smtp; this.wecom = wecom;
+        this.feishu = feishu; this.dingtalk = dingtalk; this.deliveries = deliveries;
     }
 
     /** 一批最多十条；崩溃后租约变为未知，不能因为未保存回执而自动重复发送。 */
     @Transactional(propagation = Propagation.NEVER)
-    public void runOnce() {
-        for (var candidate : store.due(Instant.now())) {
-            if (Thread.currentThread().isInterrupted()) return;
+    public void runOnce() { runBatch(); }
+
+    /** 执行单批投递并返回扫描到的到期任务数，供调度器判断是否进入空转退避。 */
+    @Transactional(propagation = Propagation.NEVER)
+    public int runBatch() {
+        var candidates = store.due(Instant.now());
+        for (var candidate : candidates) {
+            if (Thread.currentThread().isInterrupted()) return candidates.size();
             try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString())
                     .withBusiness(candidate.businessNo(), candidate.processInstanceId(), candidate.taskId()).open()) {
                 try {
@@ -41,7 +58,7 @@ public class NotificationDeliveryWorker {
                     LOG.info("Integration execution started, errorCode={}, source={}, operationId={}", "NONE", TRACE_SOURCE, candidate.id());
                     var outcome = switch (claimed.delivery().channel()) {
                         case EMAIL -> smtp.send(claimed.destination(), claimed.delivery());
-                        case ENTERPRISE_IM -> wecom.send(claimed.destination());
+                        case ENTERPRISE_IM -> sendEnterpriseIm(claimed.destination());
                     };
                     deliveries.finish(claimed.delivery(), outcome, Instant.now());
                 } catch (RuntimeException failure) {
@@ -50,5 +67,12 @@ public class NotificationDeliveryWorker {
                 }
             }
         }
+        return candidates.size();
+    }
+
+    private Outcome sendEnterpriseIm(NotificationDestinations.Destination destination) {
+        if (destination.feishuApp() != null && feishu != null) return feishu.send(destination);
+        if (destination.dingtalkApp() != null && dingtalk != null) return dingtalk.send(destination);
+        return wecom.send(destination);
     }
 }

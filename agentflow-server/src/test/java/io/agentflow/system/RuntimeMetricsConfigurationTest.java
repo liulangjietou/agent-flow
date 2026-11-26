@@ -21,4 +21,15 @@ class RuntimeMetricsConfigurationTest {
         assertThatThrownBy(() -> configuration.expectedInstances(0)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> configuration.expectedInstances(-1)).isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void exposesScheduledTaskGaugeWhenSchedulerIsAvailable() {
+        var configuration = new RuntimeMetricsConfiguration();
+        var registry = new SimpleMeterRegistry();
+        try {
+            configuration.scheduledTasks(new org.springframework.beans.factory.support.StaticListableBeanFactory()
+                    .getBeanProvider(io.agentflow.config.PollingSchedulingConfiguration.class)).bindTo(registry);
+            assertThat(registry.get("agentflow.runtime.scheduled.tasks").gauge().value()).isEqualTo(0.0);
+        } finally { registry.close(); }
+    }
 }

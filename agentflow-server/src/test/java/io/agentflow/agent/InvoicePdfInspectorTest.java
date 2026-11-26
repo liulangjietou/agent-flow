@@ -59,4 +59,17 @@ class InvoicePdfInspectorTest {
         } finally { Thread.interrupted(); }
         try (var paths = Files.list(directory)) { assertThat(paths.toList()).isEmpty(); }
     }
+
+    @Test
+    void rendersPdfPagesAndAllowsConcurrentWorkersWithinBoundedPool() throws Exception {
+        Files.createDirectory(directory);
+        var inspector = new InvoicePdfInspector(directory, Duration.ofSeconds(15), Duration.ofSeconds(30));
+        byte[] first = InvoicePdfSourceTest.pdf(2, doc -> { });
+        byte[] second = InvoicePdfSourceTest.pdf(1, doc -> { });
+        var futureFirst = java.util.concurrent.CompletableFuture.supplyAsync(() -> inspector.render(first));
+        var futureSecond = java.util.concurrent.CompletableFuture.supplyAsync(() -> inspector.pageCount(second));
+        assertThat(futureFirst.join()).hasSize(2);
+        assertThat(futureSecond.join()).isEqualTo(1);
+        try (var paths = Files.list(directory)) { assertThat(paths.toList()).isEmpty(); }
+    }
 }

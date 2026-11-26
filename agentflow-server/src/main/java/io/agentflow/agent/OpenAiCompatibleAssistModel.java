@@ -28,9 +28,29 @@ public class OpenAiCompatibleAssistModel implements AssistModelPort {
         this.configuration = configuration; this.json = json; this.client = new OpenAiTextClient(configuration, json);
     }
 
+    private static final Map<String, Object> JSON_SCHEMA = Map.of(
+            "type", "object",
+            "additionalProperties", false,
+            "required", List.of("claims", "confidence"),
+            "properties", Map.of(
+                    "confidence", Map.of("type", "number", "minimum", 0, "maximum", 1),
+                    "claims", Map.of("type", "array", "minItems", 1, "maxItems", 20, "items", Map.of(
+                            "type", "object",
+                            "additionalProperties", false,
+                            "required", List.of("text", "evidence"),
+                            "properties", Map.of(
+                                    "text", Map.of("type", "string", "maxLength", 1000),
+                                    "evidence", Map.of("type", "array", "minItems", 1, "items", Map.of(
+                                            "type", "object",
+                                            "additionalProperties", false,
+                                            "required", List.of("sourceId", "contentDigest"),
+                                            "properties", Map.of(
+                                                    "sourceId", Map.of("type", "string"),
+                                                    "contentDigest", Map.of("type", "string")))))))));
+
     @Override
     public AssistSuggestion generate(String promptVersion, List<Source> sources) {
-        var reply = client.complete(promptVersion, configuration.targetDigest(promptVersion), INSTRUCTION, Map.of("sources", sources));
+        var reply = client.complete(promptVersion, configuration.targetDigest(promptVersion), INSTRUCTION, Map.of("sources", sources), JSON_SCHEMA);
         return parse(reply, promptVersion);
     }
 

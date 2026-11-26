@@ -5,49 +5,82 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import static io.agentflow.notification.NotificationDeliveryConfiguration.*;
 
-/** 启动时校验并冻结部署绑定；旧消息不能随配置变更转投新账号。
+/** 启动时校验部署通道与静态绑定，并支持运行时读取租户动态员工绑定；旧消息仍受冻结摘要约束，不能随改址转投新账号。
  * @author owlzhangfq@gmail.com
  */
 @Component
 public class NotificationDestinations {
     private static final Set<String> LOOPBACK = Set.of("127.0.0.1", "::1");
     private static final int MAX_WECOM_TEXT_BYTES = 2048;
+    private final NotificationDeliveryConfiguration configuration;
+    private final String validatedPublicUrl;
     private final Map<Key, Destination> destinations;
+    private final JdbcNotificationBindingRepository dynamicBindings;
 
-    /** 生产连接要求 TLS；演示明文仅允许显式启用的回环地址。 */
+    /** 兼容单测和纯静态配置的构造入口。 */
     public NotificationDestinations(NotificationDeliveryConfiguration configuration,
-                                   @Value("${agentflow.auth.demo-enabled:false}") boolean demo) {
+                                    @Value("${agentflow.auth.demo-enabled:false}") boolean demo) {
+        this(configuration, demo, null);
+    }
+
+    /** 生产连接要求 TLS；演示明文仅允许显式启用的回环地址，动态绑定仓储可选注入。 */
+    @Autowired
+    public NotificationDestinations(NotificationDeliveryConfiguration configuration,
+                                    @Value("${agentflow.auth.demo-enabled:false}") boolean demo,
+                                    ObjectProvider<JdbcNotificationBindingRepository> dynamicBindingsProvider) {
+        this.configuration = configuration;
+        this.dynamicBindings = dynamicBindingsProvider == null ? null : dynamicBindingsProvider.getIfAvailable();
         try {
-            if (configuration.getSmtpServers() == null || configuration.getWecomApps() == null || configuration.getBindings() == null
-                    || configuration.getSmtpServers().size() + configuration.getWecomApps().size() > 20
+            if (configuration.getSmtpServers() == null || configuration.getWecomApps() == null
+                    || configuration.getFeishuApps() == null || configuration.getDingtalkApps() == null
+                    || configuration.getBindings() == null
+                    || configuration.getSmtpServers().size() + configuration.getWecomApps().size()
+                        + configuration.getFeishuApps().size() + configuration.getDingtalkApps().size() > 40
                     || configuration.getBindings().size() > 10000) throw invalid();
             boolean insecureDemo = demo && configuration.isAllowInsecureInDemo();
             configuration.getSmtpServers().forEach((id, server) -> validateServer(id, server, insecureDemo));
-            configuration.getWecomApps().forEach((id, app) -> validateWeCom(id, app, insecureDemo));
-            Map<Key, Destination> values = new HashMap<>();
-            if (!configuration.getBindings().isEmpty()) {
+            var imServerIds = new HashSet<String>();
+            configuration.getWecomApps().forEach((id, app) -> {
+                if (!imServerIds.add(id)) throw invalid();
+                validateWeCom(id, app, insecureDemo);
+            });
+            configuration.getFeishuApps().forEach((id, app) -> {
+                if (!imServerIds.add(id)) throw invalid();
+                validateFeishu(id, app, insecureDemo);
+            });
+            configuration.getDingtalkApps().forEach((id, app) -> {
+                if (!imServerIds.add(id)) throw invalid();
+                validateDingTalk(id, app, insecureDemo);
+            });
+            String resolvedPublicUrl = null;
+            if (StringUtils.isNotBlank(configuration.getPublicUrl()) || !configuration.getBindings().isEmpty()) {
                 URI publicUri = URI.create(configuration.getPublicUrl());
                 boolean secure = "https".equals(publicUri.getScheme());
                 boolean loopbackDemo = insecureDemo && "http".equals(publicUri.getScheme()) && LOOPBACK.contains(publicUri.getHost());
                 if ((!secure && !loopbackDemo) || publicUri.getHost() == null || publicUri.getRawUserInfo() != null
                         || publicUri.getRawQuery() != null || publicUri.getRawFragment() != null
                         || publicUri.getPort() == 0 || publicUri.getPort() > 65535 || publicUri.toString().length() > 2000) throw invalid();
+                resolvedPublicUrl = publicUri.toASCIIString();
+            }
+            this.validatedPublicUrl = resolvedPublicUrl;
+            Map<Key, Destination> values = new HashMap<>();
+            if (!configuration.getBindings().isEmpty()) {
+                final String publicUrl = resolvedPublicUrl;
                 configuration.getBindings().forEach((id, binding) -> {
-                    if (!identifier(id) || binding == null || !text(binding.tenantId(), 64) || !text(binding.recipient(), 128)
-                            || binding.channel() == null) throw invalid();
-                    var destination = switch (binding.channel()) {
-                        case EMAIL -> email(id, binding, configuration, publicUri.toASCIIString());
-                        case ENTERPRISE_IM -> wecom(id, binding, configuration, publicUri.toASCIIString());
-                    };
+                    var destination = buildDestination(id, binding, configuration, publicUrl);
                     if (values.put(new Key(binding.tenantId(), binding.recipient(), binding.channel()), destination) != null) throw invalid();
                 });
             }
@@ -58,16 +91,86 @@ public class NotificationDestinations {
         }
     }
 
-    /** 返回当前身份的原渠道绑定，调用方必须同时核对启用状态和已冻结摘要。 */
+    /** 优先解析本租户数据库动态绑定，未命中时回退启动期静态绑定；调用方继续核对启用状态与冻结摘要。 */
     public Optional<Destination> find(String tenant, String recipient, NotificationChannel channel) {
+        if (dynamicBindings != null && validatedPublicUrl != null) {
+            var dynamic = dynamicBindings.find(tenant, recipient, channel);
+            if (dynamic.isPresent()) {
+                var record = dynamic.get();
+                try {
+                    return Optional.of(buildDestination(record.id(),
+                            new Binding(record.tenantId(), record.recipientId(), record.channel(), record.serverId(), record.address(), record.enabled()),
+                            configuration, validatedPublicUrl));
+                } catch (RuntimeException invalidDynamic) {
+                    return Optional.empty();
+                }
+            }
+        }
         return Optional.ofNullable(destinations.get(new Key(tenant, recipient, channel)));
     }
 
-    /** 只返回本租户已启用绑定的渠道，用于配置诊断，不暴露收件人或证明渠道可用。 */
+    /** 校验并构造动态绑定目标；复用与静态配置完全一致的地址、通道归属与摘要规则。 */
+    public Destination validateDynamicBinding(String id, Binding binding) {
+        if (validatedPublicUrl == null) throw invalid();
+        return buildDestination(id, binding, configuration, validatedPublicUrl);
+    }
+
+    /** 返回本租户已部署的通知通道标识（不含任何密钥或服务器地址细节），供管理界面选择。 */
+    public List<ChannelServer> configuredServers(String tenant) {
+        var result = new java.util.ArrayList<ChannelServer>();
+        configuration.getSmtpServers().forEach((id, server) -> {
+            if (server.tenantId().equals(tenant)) result.add(new ChannelServer(id, NotificationChannel.EMAIL, server.enabled()));
+        });
+        configuration.getWecomApps().forEach((id, app) -> {
+            if (app.tenantId().equals(tenant)) result.add(new ChannelServer(id, NotificationChannel.ENTERPRISE_IM, app.enabled()));
+        });
+        configuration.getFeishuApps().forEach((id, app) -> {
+            if (app.tenantId().equals(tenant)) result.add(new ChannelServer(id, NotificationChannel.ENTERPRISE_IM, app.enabled()));
+        });
+        configuration.getDingtalkApps().forEach((id, app) -> {
+            if (app.tenantId().equals(tenant)) result.add(new ChannelServer(id, NotificationChannel.ENTERPRISE_IM, app.enabled()));
+        });
+        result.sort(java.util.Comparator.comparing(ChannelServer::channel).thenComparing(ChannelServer::id));
+        return List.copyOf(result);
+    }
+
+    /** 只返回本租户已启用绑定的渠道，合并动态库表与静态部署绑定，不暴露收件人或证明渠道可用。 */
     public Set<NotificationChannel> enabledChannels(String tenant) {
-        return destinations.values().stream()
+        var result = new HashSet<NotificationChannel>();
+        destinations.values().stream()
                 .filter(destination -> destination.enabled() && destination.tenantId().equals(tenant))
-                .map(Destination::channel).collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .map(Destination::channel).forEach(result::add);
+        if (dynamicBindings != null && validatedPublicUrl != null) {
+            for (var enabled : dynamicBindings.enabledChannels(tenant)) {
+                if (enabled.channel() == NotificationChannel.EMAIL) {
+                    var server = configuration.getSmtpServers().get(enabled.serverId());
+                    if (server != null && server.tenantId().equals(tenant) && server.enabled()) result.add(NotificationChannel.EMAIL);
+                } else if (enabled.channel() == NotificationChannel.ENTERPRISE_IM) {
+                    if (isEnterpriseImServerEnabled(configuration, tenant, enabled.serverId())) {
+                        result.add(NotificationChannel.ENTERPRISE_IM);
+                    }
+                }
+            }
+        }
+        return Set.copyOf(result);
+    }
+
+    private static boolean isEnterpriseImServerEnabled(NotificationDeliveryConfiguration config, String tenant, String serverId) {
+        var wecom = config.getWecomApps().get(serverId);
+        if (wecom != null && wecom.tenantId().equals(tenant) && wecom.enabled()) return true;
+        var feishu = config.getFeishuApps().get(serverId);
+        if (feishu != null && feishu.tenantId().equals(tenant) && feishu.enabled()) return true;
+        var dingtalk = config.getDingtalkApps().get(serverId);
+        return dingtalk != null && dingtalk.tenantId().equals(tenant) && dingtalk.enabled();
+    }
+
+    private static Destination buildDestination(String id, Binding binding, NotificationDeliveryConfiguration configuration, String publicUrl) {
+        if (!identifier(id) || binding == null || !text(binding.tenantId(), 64) || !text(binding.recipient(), 128)
+                || binding.channel() == null || publicUrl == null) throw invalid();
+        return switch (binding.channel()) {
+            case EMAIL -> email(id, binding, configuration, publicUrl);
+            case ENTERPRISE_IM -> enterpriseIm(id, binding, configuration, publicUrl);
+        };
     }
 
     private static Destination email(String id, Binding binding, NotificationDeliveryConfiguration configuration, String publicUrl) {
@@ -82,26 +185,64 @@ public class NotificationDestinations {
                 server, publicUrl, binding.enabled() && server.enabled(), digest(fingerprint), null);
     }
 
-    private static Destination wecom(String id, Binding binding, NotificationDeliveryConfiguration configuration, String publicUrl) {
-        var app = configuration.getWecomApps().get(binding.serverId());
-        if (app == null || !app.tenantId().equals(binding.tenantId()) || binding.address() == null
-                || !binding.address().matches("[A-Za-z0-9][A-Za-z0-9_@.-]{0,63}")
-                || NotificationMessageText.text(publicUrl).getBytes(StandardCharsets.UTF_8).length > MAX_WECOM_TEXT_BYTES) throw invalid();
-        String fingerprint = String.join("\n", binding.tenantId(), binding.recipient(), binding.channel().name(), id,
-                binding.address(), binding.serverId(), app.corpId(), Long.toString(app.agentId()), app.baseUrl(), publicUrl);
-        return new Destination(id, binding.tenantId(), binding.recipient(), binding.channel(), binding.address(),
-                null, publicUrl, binding.enabled() && app.enabled(), digest(fingerprint), app);
+    private static Destination enterpriseIm(String id, Binding binding, NotificationDeliveryConfiguration configuration, String publicUrl) {
+        if (binding.address() == null || !binding.address().matches("[A-Za-z0-9][A-Za-z0-9_@.-]{0,63}")
+                || NotificationMessageText.text(publicUrl).getBytes(StandardCharsets.UTF_8).length > MAX_WECOM_TEXT_BYTES) {
+            throw invalid();
+        }
+        var wecom = configuration.getWecomApps().get(binding.serverId());
+        if (wecom != null) {
+            if (!wecom.tenantId().equals(binding.tenantId())) throw invalid();
+            String fingerprint = String.join("\n", binding.tenantId(), binding.recipient(), binding.channel().name(), id,
+                    binding.address(), binding.serverId(), wecom.corpId(), Long.toString(wecom.agentId()), wecom.baseUrl(), publicUrl);
+            return new Destination(id, binding.tenantId(), binding.recipient(), binding.channel(), binding.address(),
+                    null, publicUrl, binding.enabled() && wecom.enabled(), digest(fingerprint), wecom, null, null);
+        }
+        var feishu = configuration.getFeishuApps().get(binding.serverId());
+        if (feishu != null) {
+            if (!feishu.tenantId().equals(binding.tenantId())) throw invalid();
+            String fingerprint = String.join("\n", "feishu", binding.tenantId(), binding.recipient(), binding.channel().name(), id,
+                    binding.address(), binding.serverId(), feishu.appId(), feishu.baseUrl(), publicUrl);
+            return new Destination(id, binding.tenantId(), binding.recipient(), binding.channel(), binding.address(),
+                    null, publicUrl, binding.enabled() && feishu.enabled(), digest(fingerprint), null, feishu, null);
+        }
+        var dingtalk = configuration.getDingtalkApps().get(binding.serverId());
+        if (dingtalk != null) {
+            if (!dingtalk.tenantId().equals(binding.tenantId())) throw invalid();
+            String fingerprint = String.join("\n", "dingtalk", binding.tenantId(), binding.recipient(), binding.channel().name(), id,
+                    binding.address(), binding.serverId(), dingtalk.appKey(), Long.toString(dingtalk.agentId()), dingtalk.baseUrl(), publicUrl);
+            return new Destination(id, binding.tenantId(), binding.recipient(), binding.channel(), binding.address(),
+                    null, publicUrl, binding.enabled() && dingtalk.enabled(), digest(fingerprint), null, null, dingtalk);
+        }
+        throw invalid();
     }
 
     private static void validateWeCom(String id, WeComApp app, boolean insecureDemo) {
         if (!identifier(id) || app == null || !text(app.tenantId(), 64) || !text(app.corpId(), 128)
                 || !app.corpId().matches("[A-Za-z0-9_-]+") || app.agentId() < 1 || app.agentId() > Integer.MAX_VALUE
                 || !text(app.secret(), 4096)) throw invalid();
-        URI base = URI.create(app.baseUrl());
+        validateOfficialOrLoopbackUrl(app.baseUrl(), WeComApp.OFFICIAL_BASE_URL, insecureDemo);
+    }
+
+    private static void validateFeishu(String id, FeishuApp app, boolean insecureDemo) {
+        if (!identifier(id) || app == null || !text(app.tenantId(), 64) || !text(app.appId(), 128)
+                || !app.appId().matches("[A-Za-z0-9_-]+") || !text(app.appSecret(), 4096)) throw invalid();
+        validateOfficialOrLoopbackUrl(app.baseUrl(), FeishuApp.OFFICIAL_BASE_URL, insecureDemo);
+    }
+
+    private static void validateDingTalk(String id, DingTalkApp app, boolean insecureDemo) {
+        if (!identifier(id) || app == null || !text(app.tenantId(), 64) || !text(app.appKey(), 128)
+                || !app.appKey().matches("[A-Za-z0-9_-]+") || app.agentId() < 1
+                || !text(app.appSecret(), 4096)) throw invalid();
+        validateOfficialOrLoopbackUrl(app.baseUrl(), DingTalkApp.OFFICIAL_BASE_URL, insecureDemo);
+    }
+
+    private static void validateOfficialOrLoopbackUrl(String baseUrl, String officialUrl, boolean insecureDemo) {
+        URI base = URI.create(baseUrl);
         boolean local = insecureDemo && "http".equals(base.getScheme()) && LOOPBACK.contains(base.getHost())
                 && base.getPort() > 0 && base.getPort() <= 65535 && StringUtils.isEmpty(base.getRawPath())
                 && base.getRawQuery() == null && base.getRawFragment() == null && base.getRawUserInfo() == null;
-        if (!WeComApp.OFFICIAL_BASE_URL.equals(app.baseUrl()) && !local) throw invalid();
+        if (!officialUrl.equals(baseUrl) && !local) throw invalid();
     }
 
     private static void validateServer(String id, SmtpServer server, boolean insecureDemo) {
@@ -135,11 +276,23 @@ public class NotificationDestinations {
      */
     private record Key(String tenant, String recipient, NotificationChannel channel) { }
 
+    /** 租户内可选择的已部署通知通道元信息，不包含主机或密钥。
+     * @author owlzhangfq@gmail.com
+     */
+    public record ChannelServer(String id, NotificationChannel channel, boolean enabled) { }
+
     /** 只供发送适配器使用，不作为 HTTP 响应或日志内容。
      * @author owlzhangfq@gmail.com
      */
     public record Destination(String id, String tenantId, String recipient, NotificationChannel channel, String address,
-                              SmtpServer server, String publicUrl, boolean enabled, String digest, WeComApp wecomApp) {
+                              SmtpServer server, String publicUrl, boolean enabled, String digest,
+                              WeComApp wecomApp, FeishuApp feishuApp, DingTalkApp dingtalkApp) {
+        /** 兼容既有邮件与企微构造调用。 */
+        public Destination(String id, String tenantId, String recipient, NotificationChannel channel, String address,
+                           SmtpServer server, String publicUrl, boolean enabled, String digest, WeComApp wecomApp) {
+            this(id, tenantId, recipient, channel, address, server, publicUrl, enabled, digest, wecomApp, null, null);
+        }
+
         @Override public String toString() { return "NotificationDestination[redacted]"; }
     }
 }

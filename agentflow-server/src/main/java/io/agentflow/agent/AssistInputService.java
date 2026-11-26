@@ -9,6 +9,8 @@ import io.agentflow.common.Actor;
 import io.agentflow.common.DomainException;
 import io.agentflow.common.JsonUtil;
 import io.agentflow.form.FormSchema;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -19,7 +21,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 显式来源选择边界：正文由服务端构造，只使用当前身份在该轮可读的非敏感字段。
+ * 显式来源选择边界：正文由服务端构造，只使用当前身份在该轮可读的非敏感字段与受控脱敏业务投影。
  * @author owlzhangfq@gmail.com
  */
 @Service
@@ -29,10 +31,20 @@ public class AssistInputService {
     private final ApplicationFieldViews fields;
     private final SubmissionRoundRepository rounds;
     private final JsonUtil json;
+    private final List<AssistBusinessSourceProvider> businessSources;
 
-    /** 待办授权和字段投影复用原审批边界，模型输入不直接读取客户端正文。 */
+    /** 兼容原有单测构造入口。 */
     public AssistInputService(FlowableTaskFacade tasks, ApplicationFieldViews fields, SubmissionRoundRepository rounds, JsonUtil json) {
+        this(tasks, fields, rounds, json, null);
+    }
+
+    /** 待办授权和字段投影复用原审批边界，同时为结构化财务单据追加受控只读业务摘要源。 */
+    @Autowired
+    public AssistInputService(FlowableTaskFacade tasks, ApplicationFieldViews fields, SubmissionRoundRepository rounds, JsonUtil json,
+                              ObjectProvider<List<AssistBusinessSourceProvider>> businessSourcesProvider) {
         this.tasks = tasks; this.fields = fields; this.rounds = rounds; this.json = json;
+        List<AssistBusinessSourceProvider> providers = businessSourcesProvider == null ? null : businessSourcesProvider.getIfAvailable();
+        this.businessSources = providers == null ? List.of() : List.copyOf(providers);
     }
 
     /** 只允许当轮可作出批准决定的人使用摘要，不因管理员或历史参与身份放宽。 */
@@ -67,6 +79,13 @@ public class AssistInputService {
                 }
             } else if (sendable(field, projected) && round.payload().containsKey(field.key())) {
                 result.add(source("form:" + field.key(), field.label(), round.payload().get(field.key())));
+            }
+        }
+        if (application.businessReference() != null) {
+            for (var provider : businessSources) {
+                for (var projection : provider.sources(application, roundNo)) {
+                    result.add(source(projection.sourceId(), projection.label(), projection.value()));
+                }
             }
         }
         return List.copyOf(result);

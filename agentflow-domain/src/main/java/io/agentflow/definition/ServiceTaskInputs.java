@@ -39,7 +39,7 @@ public final class ServiceTaskInputs {
             var field = fields.get(fieldKey); var parameter = parameters.get(parameterName);
             if (field == null || parameter == null) throw invalid("SERVICE_TASK_INPUT_UNKNOWN", "Service task mapping must name a declared parameter and form field");
             if (!compatible(field.type(), parameter.type())) throw invalid("SERVICE_TASK_INPUT_TYPE_MISMATCH", "Service task parameter and source field types must match");
-            if (field.visibility(Set.of(nodeId)) != FieldVisibility.READ_ONLY) {
+            if (!field.visibility(Set.of(nodeId)).readable()) {
                 throw invalid("SERVICE_TASK_INPUT_NOT_READABLE", "Hidden or masked fields cannot be passed to a service task");
             }
             if (field.restricted() && !parameter.sensitive()) {

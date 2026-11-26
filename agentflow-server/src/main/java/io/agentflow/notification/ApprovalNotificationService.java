@@ -201,6 +201,32 @@ public class ApprovalNotificationService {
         return true;
     }
 
+    /** 申请人手动催办当前活跃待办及有效代理，不在消息中复制未脱敏正文。 */
+    public int urged(Application application, String actor, UUID urgeId, Instant urgedAt) {
+        var active = proxies.capture(application, audience.pending(application.tenantId(), application.id()));
+        if (active.isEmpty()) {
+            throw new io.agentflow.common.DomainException(io.agentflow.common.ErrorCode.DOMAIN_RULE_VIOLATION,
+                    "No active approval task is available to urge");
+        }
+        var notifiedNative = new java.util.HashSet<String>();
+        notifiedNative.add(actor);
+        int sent = 0;
+        for (var task : active) {
+            String eventKey = "application-urge:" + urgeId + ":" + task.taskId();
+            for (String recipient : task.recipients()) {
+                if (actor.equals(recipient)) continue;
+                UUID id = UUID.nameUUIDFromBytes((application.tenantId() + ":" + eventKey + ":" + recipient).getBytes(StandardCharsets.UTF_8));
+                inbox.append(eventKey, new InboxMessage(id, application.tenantId(), recipient, application.id(), application.title(),
+                        application.businessNo(), Kind.TASK_URGED, actor, task.taskId(), task.nodeName(),
+                        application.roundNo(), urgedAt, null, "申请人发起催办提醒，请尽快处理当前待办。"));
+                notifiedNative.add(recipient);
+                sent++;
+            }
+        }
+        sent += proxies.urged(application, urgeId, active, notifiedNative, urgedAt);
+        return sent;
+    }
+
     /** 升级对象只收到协调提醒；不新增任务参与、抄送或表单授权事实。 */
     public void escalated(Application application, String taskId, String nodeName, java.util.List<String> recipients, Instant occurredAt) {
         String eventKey = "task-escalated:" + taskId;

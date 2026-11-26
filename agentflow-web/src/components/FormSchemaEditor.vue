@@ -128,7 +128,7 @@ function checkPreview() { previewErrors.value = validatePayload(props.modelValue
           <div class="field-permissions">
             <label class="required-toggle"><input v-model="row.field.sensitive" type="checkbox" :aria-label="`字段 ${index + 1} 敏感`" @focus="emit('beforeChange')" @change="publish" /> 敏感字段：默认向非申请人脱敏</label>
             <details><summary>审批节点字段权限</summary><p>申请人仅在草稿、退回、撤回时编辑。审批节点始终只读；未处于相应节点的管理员同样受字段限制。同时处于多个节点时，按更严格的权限显示。</p>
-              <label v-for="node in permissionNodes(row.field)" :key="node.id">{{ node.name }}<select :value="row.field.nodeAccess?.[node.id] ?? ''" @change="permission(row.field, node.id, $event)"><option value="">默认（敏感字段脱敏，其余只读）</option><option value="READ_ONLY">可见原值 · 只读</option><option value="MASKED">脱敏</option><option value="HIDDEN">隐藏</option></select></label>
+              <label v-for="node in permissionNodes(row.field)" :key="node.id">{{ node.name }}<select :value="row.field.nodeAccess?.[node.id] ?? ''" @change="permission(row.field, node.id, $event)"><option value="">默认（敏感字段脱敏，其余只读）</option><option value="EDITABLE">审批可编辑回填</option><option value="READ_ONLY">可见原值 · 只读</option><option value="MASKED">脱敏</option><option value="HIDDEN">隐藏</option></select></label>
               <p v-if="!permissionNodes(row.field).length">添加审批节点后即可配置。</p>
               <p v-if="configError(index, 'nodeAccess')" class="config-error">{{ configError(index, 'nodeAccess') }}</p>
             </details>

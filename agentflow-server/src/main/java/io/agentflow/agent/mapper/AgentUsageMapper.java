@@ -20,4 +20,6 @@ public interface AgentUsageMapper {
     int finish(@Param("tenant") String tenant, @Param("runId") String runId, @Param("kind") String kind, @Param("state") String state);
     /** 本人索引限定最近一百项。 */
     List<SqlRow> list(@Param("tenant") String tenant, @Param("owner") String owner, @Param("subject") String subject);
+    /** 按租户统计指定起始时刻以来的用量明细，用于日度 Token 配额管控。 */
+    List<SqlRow> listTenantSince(@Param("tenant") String tenant, @Param("since") java.time.OffsetDateTime since);
 }
