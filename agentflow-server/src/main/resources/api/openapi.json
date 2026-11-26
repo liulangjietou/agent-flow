@@ -55280,6 +55280,300 @@
           }
         }
       }
+    },
+    "/api/v1/notifications/bindings": {
+      "get": {
+        "operationId": "listNotificationBindings",
+        "tags": [
+          "消息"
+        ],
+        "summary": "查询本租户动态通知收件绑定",
+        "description": "返回本租户已部署的通知通道元信息与员工动态收件绑定，不暴露凭据。",
+        "x-access": "需要 ADMIN 角色",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationBindingCatalog"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要管理员角色",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "upsertNotificationBinding",
+        "tags": [
+          "消息"
+        ],
+        "summary": "新增或更新员工动态通知收件绑定",
+        "description": "管理员为本租户员工配置邮箱或企微收件绑定，立即生效且不修改已入队消息的冻结摘要。",
+        "x-access": "需要 ADMIN 角色",
+        "x-idempotency": true,
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "业务写请求幂等键",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotificationBindingUpsert"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationBindingView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要管理员角色",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications/bindings/{id}": {
+      "delete": {
+        "operationId": "deleteNotificationBinding",
+        "tags": [
+          "消息"
+        ],
+        "summary": "删除员工动态通知收件绑定",
+        "description": "删除本租户内指定的动态收件绑定。",
+        "x-access": "需要 ADMIN 角色",
+        "x-idempotency": true,
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "绑定标识",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "业务写请求幂等键",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationBindingDeleted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求格式或幂等键无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要管理员角色",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "资源不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "版本冲突或幂等冲突",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -100261,6 +100555,174 @@
           "applicationVersion",
           "financialVersion",
           "selectedPatchIds"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationChannelServer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "ENTERPRISE_IM"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationBindingView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "recipientId": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "ENTERPRISE_IM"
+            ]
+          },
+          "serverId": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "updatedBy": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "recipientId",
+          "channel",
+          "serverId",
+          "address",
+          "enabled",
+          "version",
+          "updatedBy",
+          "updatedAt"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationBindingCatalog": {
+        "type": "object",
+        "properties": {
+          "servers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationChannelServer"
+            }
+          },
+          "bindings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NotificationBindingView"
+            }
+          }
+        },
+        "required": [
+          "servers",
+          "bindings"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationBindingUpsert": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "recipientId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "EMAIL",
+              "ENTERPRISE_IM"
+            ]
+          },
+          "serverId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "address": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 254
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "expectedVersion": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "format": "int64",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "recipientId",
+          "channel",
+          "serverId",
+          "address",
+          "enabled"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationBindingDeleted": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "deleted": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "deleted"
         ],
         "additionalProperties": false
       }

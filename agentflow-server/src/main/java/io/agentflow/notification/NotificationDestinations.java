@@ -5,27 +5,44 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import static io.agentflow.notification.NotificationDeliveryConfiguration.*;
 
-/** 启动时校验并冻结部署绑定；旧消息不能随配置变更转投新账号。
+/** 启动时校验部署通道与静态绑定，并支持运行时读取租户动态员工绑定；旧消息仍受冻结摘要约束，不能随改址转投新账号。
  * @author owlzhangfq@gmail.com
  */
 @Component
 public class NotificationDestinations {
     private static final Set<String> LOOPBACK = Set.of("127.0.0.1", "::1");
     private static final int MAX_WECOM_TEXT_BYTES = 2048;
+    private final NotificationDeliveryConfiguration configuration;
+    private final String validatedPublicUrl;
     private final Map<Key, Destination> destinations;
+    private final JdbcNotificationBindingRepository dynamicBindings;
 
-    /** 生产连接要求 TLS；演示明文仅允许显式启用的回环地址。 */
+    /** 兼容单测和纯静态配置的构造入口。 */
     public NotificationDestinations(NotificationDeliveryConfiguration configuration,
-                                   @Value("${agentflow.auth.demo-enabled:false}") boolean demo) {
+                                    @Value("${agentflow.auth.demo-enabled:false}") boolean demo) {
+        this(configuration, demo, null);
+    }
+
+    /** 生产连接要求 TLS；演示明文仅允许显式启用的回环地址，动态绑定仓储可选注入。 */
+    @Autowired
+    public NotificationDestinations(NotificationDeliveryConfiguration configuration,
+                                    @Value("${agentflow.auth.demo-enabled:false}") boolean demo,
+                                    ObjectProvider<JdbcNotificationBindingRepository> dynamicBindingsProvider) {
+        this.configuration = configuration;
+        this.dynamicBindings = dynamicBindingsProvider == null ? null : dynamicBindingsProvider.getIfAvailable();
         try {
             if (configuration.getSmtpServers() == null || configuration.getWecomApps() == null || configuration.getBindings() == null
                     || configuration.getSmtpServers().size() + configuration.getWecomApps().size() > 20
@@ -33,21 +50,22 @@ public class NotificationDestinations {
             boolean insecureDemo = demo && configuration.isAllowInsecureInDemo();
             configuration.getSmtpServers().forEach((id, server) -> validateServer(id, server, insecureDemo));
             configuration.getWecomApps().forEach((id, app) -> validateWeCom(id, app, insecureDemo));
-            Map<Key, Destination> values = new HashMap<>();
-            if (!configuration.getBindings().isEmpty()) {
+            String resolvedPublicUrl = null;
+            if (StringUtils.isNotBlank(configuration.getPublicUrl()) || !configuration.getBindings().isEmpty()) {
                 URI publicUri = URI.create(configuration.getPublicUrl());
                 boolean secure = "https".equals(publicUri.getScheme());
                 boolean loopbackDemo = insecureDemo && "http".equals(publicUri.getScheme()) && LOOPBACK.contains(publicUri.getHost());
                 if ((!secure && !loopbackDemo) || publicUri.getHost() == null || publicUri.getRawUserInfo() != null
                         || publicUri.getRawQuery() != null || publicUri.getRawFragment() != null
                         || publicUri.getPort() == 0 || publicUri.getPort() > 65535 || publicUri.toString().length() > 2000) throw invalid();
+                resolvedPublicUrl = publicUri.toASCIIString();
+            }
+            this.validatedPublicUrl = resolvedPublicUrl;
+            Map<Key, Destination> values = new HashMap<>();
+            if (!configuration.getBindings().isEmpty()) {
+                final String publicUrl = resolvedPublicUrl;
                 configuration.getBindings().forEach((id, binding) -> {
-                    if (!identifier(id) || binding == null || !text(binding.tenantId(), 64) || !text(binding.recipient(), 128)
-                            || binding.channel() == null) throw invalid();
-                    var destination = switch (binding.channel()) {
-                        case EMAIL -> email(id, binding, configuration, publicUri.toASCIIString());
-                        case ENTERPRISE_IM -> wecom(id, binding, configuration, publicUri.toASCIIString());
-                    };
+                    var destination = buildDestination(id, binding, configuration, publicUrl);
                     if (values.put(new Key(binding.tenantId(), binding.recipient(), binding.channel()), destination) != null) throw invalid();
                 });
             }
@@ -58,16 +76,70 @@ public class NotificationDestinations {
         }
     }
 
-    /** 返回当前身份的原渠道绑定，调用方必须同时核对启用状态和已冻结摘要。 */
+    /** 优先解析本租户数据库动态绑定，未命中时回退启动期静态绑定；调用方继续核对启用状态与冻结摘要。 */
     public Optional<Destination> find(String tenant, String recipient, NotificationChannel channel) {
+        if (dynamicBindings != null && validatedPublicUrl != null) {
+            var dynamic = dynamicBindings.find(tenant, recipient, channel);
+            if (dynamic.isPresent()) {
+                var record = dynamic.get();
+                try {
+                    return Optional.of(buildDestination(record.id(),
+                            new Binding(record.tenantId(), record.recipientId(), record.channel(), record.serverId(), record.address(), record.enabled()),
+                            configuration, validatedPublicUrl));
+                } catch (RuntimeException invalidDynamic) {
+                    return Optional.empty();
+                }
+            }
+        }
         return Optional.ofNullable(destinations.get(new Key(tenant, recipient, channel)));
     }
 
-    /** 只返回本租户已启用绑定的渠道，用于配置诊断，不暴露收件人或证明渠道可用。 */
+    /** 校验并构造动态绑定目标；复用与静态配置完全一致的地址、通道归属与摘要规则。 */
+    public Destination validateDynamicBinding(String id, Binding binding) {
+        if (validatedPublicUrl == null) throw invalid();
+        return buildDestination(id, binding, configuration, validatedPublicUrl);
+    }
+
+    /** 返回本租户已部署的通知通道标识（不含任何密钥或服务器地址细节），供管理界面选择。 */
+    public List<ChannelServer> configuredServers(String tenant) {
+        var result = new java.util.ArrayList<ChannelServer>();
+        configuration.getSmtpServers().forEach((id, server) -> {
+            if (server.tenantId().equals(tenant)) result.add(new ChannelServer(id, NotificationChannel.EMAIL, server.enabled()));
+        });
+        configuration.getWecomApps().forEach((id, app) -> {
+            if (app.tenantId().equals(tenant)) result.add(new ChannelServer(id, NotificationChannel.ENTERPRISE_IM, app.enabled()));
+        });
+        result.sort(java.util.Comparator.comparing(ChannelServer::channel).thenComparing(ChannelServer::id));
+        return List.copyOf(result);
+    }
+
+    /** 只返回本租户已启用绑定的渠道，合并动态库表与静态部署绑定，不暴露收件人或证明渠道可用。 */
     public Set<NotificationChannel> enabledChannels(String tenant) {
-        return destinations.values().stream()
+        var result = new HashSet<NotificationChannel>();
+        destinations.values().stream()
                 .filter(destination -> destination.enabled() && destination.tenantId().equals(tenant))
-                .map(Destination::channel).collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .map(Destination::channel).forEach(result::add);
+        if (dynamicBindings != null && validatedPublicUrl != null) {
+            for (var enabled : dynamicBindings.enabledChannels(tenant)) {
+                if (enabled.channel() == NotificationChannel.EMAIL) {
+                    var server = configuration.getSmtpServers().get(enabled.serverId());
+                    if (server != null && server.tenantId().equals(tenant) && server.enabled()) result.add(NotificationChannel.EMAIL);
+                } else if (enabled.channel() == NotificationChannel.ENTERPRISE_IM) {
+                    var app = configuration.getWecomApps().get(enabled.serverId());
+                    if (app != null && app.tenantId().equals(tenant) && app.enabled()) result.add(NotificationChannel.ENTERPRISE_IM);
+                }
+            }
+        }
+        return Set.copyOf(result);
+    }
+
+    private static Destination buildDestination(String id, Binding binding, NotificationDeliveryConfiguration configuration, String publicUrl) {
+        if (!identifier(id) || binding == null || !text(binding.tenantId(), 64) || !text(binding.recipient(), 128)
+                || binding.channel() == null || publicUrl == null) throw invalid();
+        return switch (binding.channel()) {
+            case EMAIL -> email(id, binding, configuration, publicUrl);
+            case ENTERPRISE_IM -> wecom(id, binding, configuration, publicUrl);
+        };
     }
 
     private static Destination email(String id, Binding binding, NotificationDeliveryConfiguration configuration, String publicUrl) {
@@ -134,6 +206,11 @@ public class NotificationDestinations {
      * @author owlzhangfq@gmail.com
      */
     private record Key(String tenant, String recipient, NotificationChannel channel) { }
+
+    /** 租户内可选择的已部署通知通道元信息，不包含主机或密钥。
+     * @author owlzhangfq@gmail.com
+     */
+    public record ChannelServer(String id, NotificationChannel channel, boolean enabled) { }
 
     /** 只供发送适配器使用，不作为 HTTP 响应或日志内容。
      * @author owlzhangfq@gmail.com

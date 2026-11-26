@@ -30,9 +30,14 @@ public class NotificationDeliveryWorker {
 
     /** 一批最多十条；崩溃后租约变为未知，不能因为未保存回执而自动重复发送。 */
     @Transactional(propagation = Propagation.NEVER)
-    public void runOnce() {
-        for (var candidate : store.due(Instant.now())) {
-            if (Thread.currentThread().isInterrupted()) return;
+    public void runOnce() { runBatch(); }
+
+    /** 执行单批投递并返回扫描到的到期任务数，供调度器判断是否进入空转退避。 */
+    @Transactional(propagation = Propagation.NEVER)
+    public int runBatch() {
+        var candidates = store.due(Instant.now());
+        for (var candidate : candidates) {
+            if (Thread.currentThread().isInterrupted()) return candidates.size();
             try (var trace = DiagnosticContext.restored(candidate.traceId(), candidate.tenantId(), TRACE_SOURCE, candidate.id().toString())
                     .withBusiness(candidate.businessNo(), candidate.processInstanceId(), candidate.taskId()).open()) {
                 try {
@@ -50,5 +55,6 @@ public class NotificationDeliveryWorker {
                 }
             }
         }
+        return candidates.size();
     }
 }

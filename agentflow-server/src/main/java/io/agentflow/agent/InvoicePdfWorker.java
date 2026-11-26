@@ -1,14 +1,20 @@
 package io.agentflow.agent;
 
 import io.agentflow.expense.InvoiceVerificationPort;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.stream.MemoryCacheImageOutputStream;
 import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSDictionary;
 import org.apache.pdfbox.cos.COSInteger;
@@ -16,46 +22,93 @@ import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.cos.COSNumber;
 import org.apache.pdfbox.io.RandomAccessReadBufferedFile;
 import org.apache.pdfbox.pdfparser.PDFParser;
+import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPageTree;
+import org.apache.pdfbox.rendering.ImageType;
+import org.apache.pdfbox.rendering.PDFRenderer;
 
 /**
- * 独立 JVM 内的 PDF 页树检查入口，不启动 Spring、不渲染、不读取外部附件或执行文档动作。
+ * 独立 JVM 内的 PDF 页树检查与可选页面光栅化入口，不启动 Spring、不读取外部附件或执行文档动作。
  * @author owlzhangfq@gmail.com
  */
 public final class InvoicePdfWorker {
     static final String INPUT_FILE = "original.pdf";
     static final String RESULT_FILE = "pages.bin";
+    static final String RENDER_FLAG = "--render";
     static final int RESULT_MAGIC = 0x41465049;
     static final int RESULT_BYTES = 2 * Integer.BYTES;
+    private static final float RENDER_DPI = 144f;
     private static final int MAX_TREE_DEPTH = 16;
     private static final int MAX_TREE_NODES = 128;
     private static final int MAX_PAGE_POINTS = 3000;
 
     private InvoicePdfWorker() { }
 
-    /** 固定文件名只位于调用方创建的私有工作目录；成功才写出八字节结果。 */
+    /** 固定文件名只位于调用方创建的私有工作目录；无参写出八字节页数，传 --render 按有界协议写出全部页面 PNG。 */
     public static void main(String[] args) {
         try {
-            if (args.length != 0) throw invalid();
+            boolean render = args.length == 1 && RENDER_FLAG.equals(args[0]);
+            if (args.length != 0 && !render) throw invalid();
             Path input = Path.of(INPUT_FILE);
             long length = Files.size(input);
             if (length < 1 || length > InvoiceVerificationPort.Request.MAX_ORIGINAL_BYTES || Files.isSymbolicLink(input)) throw invalid();
-            int count;
             try (var source = new RandomAccessReadBufferedFile(input);
                  var document = new PDFParser(source).parse(false)) {
                 if (document.isEncrypted()) throw invalid();
                 var root = document.getDocumentCatalog().getCOSObject().getDictionaryObject(COSName.PAGES);
                 if (!(root instanceof COSDictionary pages) || !COSName.PAGES.equals(pages.getCOSName(COSName.TYPE))) throw invalid();
-                count = countPages(pages, null, 1, Collections.newSetFromMap(new IdentityHashMap<>()));
+                int count = countPages(pages, null, 1, Collections.newSetFromMap(new IdentityHashMap<>()));
                 if (count < 1 || count > InvoiceExtractionInput.MAX_PAGES) throw invalid();
-            }
-            try (var output = new DataOutputStream(Files.newOutputStream(Path.of(RESULT_FILE), StandardOpenOption.CREATE_NEW))) {
-                output.writeInt(RESULT_MAGIC); output.writeInt(count);
+                if (render) {
+                    InvoiceOfdResult.write(Path.of(InvoiceOfdResult.FILE), renderPages(document, count));
+                } else {
+                    try (var output = new DataOutputStream(Files.newOutputStream(Path.of(RESULT_FILE), StandardOpenOption.CREATE_NEW))) {
+                        output.writeInt(RESULT_MAGIC); output.writeInt(count);
+                    }
+                }
             }
         } catch (Exception | LinkageError | StackOverflowError rejected) {
             // 不把解析器异常、原件正文或路径输出给父进程；OOM 由 JVM 退出策略处理。
             System.exit(1);
         }
+    }
+
+    /** 逐页渲染为 8 位 RGB 标准 PNG，严格校验单页像素、总像素与总字节上限。 */
+    private static java.util.List<byte[]> renderPages(PDDocument document, int count) throws IOException {
+        var renderer = new PDFRenderer(document);
+        renderer.setSubsamplingAllowed(true);
+        var rendered = new ArrayList<byte[]>(count);
+        long totalPixels = 0;
+        int totalBytes = 0;
+        for (int i = 0; i < count; i++) {
+            BufferedImage image = renderer.renderImageWithDPI(i, RENDER_DPI, ImageType.RGB);
+            try {
+                long pagePixels = (long) image.getWidth() * image.getHeight();
+                totalPixels += pagePixels;
+                if (pagePixels < 1 || pagePixels > InvoiceOfdResult.MAX_PAGE_PIXELS || totalPixels > InvoiceOfdResult.MAX_TOTAL_PIXELS) {
+                    throw invalid();
+                }
+                byte[] png = encodePng(image, InvoiceOfdResult.MAX_PNG_BYTES - totalBytes);
+                totalBytes += png.length;
+                rendered.add(png);
+            } finally { image.flush(); }
+        }
+        return rendered;
+    }
+
+    private static byte[] encodePng(BufferedImage image, int remainingBytes) throws IOException {
+        if (remainingBytes < 1) throw invalid();
+        var bytes = new ByteArrayOutputStream();
+        var writers = ImageIO.getImageWritersByFormatName("PNG");
+        if (!writers.hasNext()) throw invalid();
+        var writer = writers.next();
+        try (var output = new MemoryCacheImageOutputStream(bytes)) {
+            writer.setOutput(output);
+            writer.write(null, new IIOImage(image, null, null), writer.getDefaultWriteParam());
+            output.flush();
+            if (bytes.size() > remainingBytes) throw invalid();
+            return bytes.toByteArray();
+        } finally { writer.dispose(); }
     }
 
     private static int countPages(COSDictionary node, COSDictionary parent, int depth, Set<COSDictionary> seen) throws IOException {

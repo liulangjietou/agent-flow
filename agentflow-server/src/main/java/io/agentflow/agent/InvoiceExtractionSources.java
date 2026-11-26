@@ -30,19 +30,31 @@ public class InvoiceExtractionSources {
             InvoiceOriginal.Format.PNG, InvoiceOriginal.Format.JPEG, InvoiceOriginal.Format.XML, InvoiceOriginal.Format.PDF, InvoiceOriginal.Format.OFD);
     private final InvoiceOriginalFiles files;
     private final Path ofdFontCatalog;
+    private final PdfMode pdfMode;
 
     /** 保留原有不可变文件读取和摘要校验，不额外复制文件到业务记录。 */
-    public InvoiceExtractionSources(InvoiceOriginalFiles files) { this(files, ""); }
+    public InvoiceExtractionSources(InvoiceOriginalFiles files) { this(files, "", PdfMode.FILE); }
 
-    /** 字体清单只取自部署配置；空配置仅接受内嵌字体，文件与 face 摘要由隔离进程校验。 */
+    /** 字体清单只取自部署配置；默认 PDF 采用原始 file 块发送，保持历史兼容性。 */
+    public InvoiceExtractionSources(InvoiceOriginalFiles files, String ofdFontCatalog) {
+        this(files, ofdFontCatalog, PdfMode.FILE);
+    }
+
+    /** 支持通过配置切换 PDF 为页图（images）模式，以兼容仅接受 image_url 的多模态视觉模型。 */
     @Autowired
     public InvoiceExtractionSources(InvoiceOriginalFiles files,
-            @Value("${agentflow.invoices.ofd-font-catalog:}") String ofdFontCatalog) {
+            @Value("${agentflow.invoices.ofd-font-catalog:}") String ofdFontCatalog,
+            @Value("${agentflow.invoices.pdf-mode:file}") String pdfMode) {
+        this(files, ofdFontCatalog, PdfMode.parse(pdfMode));
+    }
+
+    InvoiceExtractionSources(InvoiceOriginalFiles files, String ofdFontCatalog, PdfMode pdfMode) {
         this.files = files;
         this.ofdFontCatalog = org.springframework.util.StringUtils.hasText(ofdFontCatalog) ? Path.of(ofdFontCatalog) : null;
         if (this.ofdFontCatalog != null && !this.ofdFontCatalog.isAbsolute()) {
             throw new IllegalArgumentException("OFD font catalog must use an absolute deployment path");
         }
+        this.pdfMode = pdfMode == null ? PdfMode.FILE : pdfMode;
     }
 
     /** 只公布已经实现的内容适配器；具体原件仍须完整解析且不超过处理上限。 */
@@ -57,6 +69,7 @@ public class InvoiceExtractionSources {
         if (!SUPPORTED.contains(original.format())) throw new DomainException(ErrorCode.INVOICE_EXTRACTION_FORMAT_UNSUPPORTED, "Invoice extraction format is not supported");
         byte[] bytes = files.read(original);
         if (original.format() == InvoiceOriginal.Format.OFD) return ofd(original, bytes);
+        if (original.format() == InvoiceOriginal.Format.PDF && pdfMode == PdfMode.IMAGES) return pdfImages(original, bytes);
         int pages = original.format() == InvoiceOriginal.Format.PDF ? new InvoicePdfInspector().pageCount(bytes) : 1;
         var input = new InvoiceExtractionInput(original.invoiceId(), original.id(), original.sha256(), original.format(), original.size(), pages);
         if (original.format() == InvoiceOriginal.Format.PDF) {
@@ -76,14 +89,36 @@ public class InvoiceExtractionSources {
     private Prepared ofd(InvoiceOriginal original, byte[] bytes) {
         // 先完成所有页面；任何后页或后章失败均不能留下可外发的部分来源。
         var pages = new InvoiceOfdInspector().render(bytes, ofdFontCatalog);
+        return pagedImages(original, pages, "OFD");
+    }
+
+    private Prepared pdfImages(InvoiceOriginal original, byte[] bytes) {
+        var pages = new InvoicePdfInspector().render(bytes);
+        return pagedImages(original, pages, "PDF");
+    }
+
+    private Prepared pagedImages(InvoiceOriginal original, List<byte[]> pages, String label) {
         var input = new InvoiceExtractionInput(original.invoiceId(), original.id(), original.sha256(), original.format(), original.size(), pages.size());
         var parts = new ArrayList<Map<String, Object>>(pages.size() * 2);
         for (int i = 0; i < pages.size(); i++) {
-            parts.add(Map.of("type", "text", "text", "OFD page " + (i + 1) + " of " + pages.size()));
+            parts.add(Map.of("type", "text", "text", label + " page " + (i + 1) + " of " + pages.size()));
             String url = "data:image/png;base64," + Base64.getEncoder().encodeToString(pages.get(i));
             parts.add(Map.of("type", "image_url", "image_url", Map.of("url", url, "detail", "high")));
         }
         return new Prepared(input, parts, null, null);
+    }
+
+    /**
+     * PDF 模型输入形态：默认按原字节 file 块发送，兼容网关时可切换为逐页 PNG 图像块。
+     * @author owlzhangfq@gmail.com
+     */
+    enum PdfMode {
+        FILE, IMAGES;
+        static PdfMode parse(String value) {
+            if (value == null || value.isBlank()) return FILE;
+            try { return valueOf(value.trim().toUpperCase(java.util.Locale.ROOT)); }
+            catch (IllegalArgumentException invalid) { throw new IllegalArgumentException("Unsupported PDF extraction mode: " + value); }
+        }
     }
 
     private static void requireImage(InvoiceOriginal.Format format, byte[] bytes) {

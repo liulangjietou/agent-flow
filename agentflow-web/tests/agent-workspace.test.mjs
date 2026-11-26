@@ -73,3 +73,15 @@ test('读取失败保留错误，重试成功才形成可用空态，卸载取�
     finish(page([task('late')])); await pending; assert.deepEqual(view.state.query.items, [])
   } finally { view.close() }
 })
+
+test('移动端样式覆盖 900px 以下窄屏，避免双列挤压与按钮重叠', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { resolve } = await import('node:path')
+  const source = readFileSync(resolve(process.cwd(), 'src/components/AgentWorkspace.vue'), 'utf8')
+  const nav = readFileSync(resolve(process.cwd(), 'src/components/WorkspaceNavigation.vue'), 'utf8')
+  assert.match(source, /@media\(max-width:900px\)/)
+  assert.match(source, /@media\(max-width:900px\)[\s\S]*\.assistant-layout\s*\{[\s\S]*grid-template-columns:minmax\(0,1fr\)/)
+  assert.match(source, /@media\(max-width:900px\)[\s\S]*\.task-open\s*\{[\s\S]*position:static/)
+  assert.match(nav, /unreadCount\?: number \| null/)
+  assert.match(nav, /item\.page === 'notifications' && \(unreadCount \?\? 0\) > 0/)
+})

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.agentflow.notification.mapper.NotificationBindingMapper">
+    <select id="find" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,tenant_id,recipient_id,channel,server_id,address,enabled,version,updated_by,created_at,updated_at
+        FROM notification_recipient_binding
+        WHERE tenant_id=#{tenantId} AND recipient_id=#{recipientId} AND channel=#{channel}
+    </select>
+
+    <select id="findById" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,tenant_id,recipient_id,channel,server_id,address,enabled,version,updated_by,created_at,updated_at
+        FROM notification_recipient_binding
+        WHERE tenant_id=#{tenantId} AND id=#{id}
+    </select>
+
+    <select id="listByTenant" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT id,tenant_id,recipient_id,channel,server_id,address,enabled,version,updated_by,created_at,updated_at
+        FROM notification_recipient_binding
+        WHERE tenant_id=#{tenantId}
+        ORDER BY recipient_id ASC, channel ASC
+    </select>
+
+    <select id="enabledChannels" resultType="io.agentflow.mybatis.SqlRow">
+        SELECT DISTINCT channel, server_id
+        FROM notification_recipient_binding
+        WHERE tenant_id=#{tenantId} AND enabled=TRUE
+    </select>
+
+    <insert id="insert">
+        INSERT INTO notification_recipient_binding
+        (id,tenant_id,recipient_id,channel,server_id,address,enabled,version,updated_by,created_at,updated_at)
+        VALUES (#{id},#{tenantId},#{recipientId},#{channel},#{serverId},#{address},#{enabled},#{version},#{updatedBy},#{createdAt},#{updatedAt})
+    </insert>
+
+    <update id="update">
+        UPDATE notification_recipient_binding
+        SET id=#{id},server_id=#{serverId},address=#{address},enabled=#{enabled},version=#{nextVersion},updated_by=#{updatedBy},updated_at=#{updatedAt}
+        WHERE tenant_id=#{tenantId} AND recipient_id=#{recipientId} AND channel=#{channel} AND version=#{expectedVersion}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM notification_recipient_binding WHERE tenant_id=#{tenantId} AND id=#{id}
+    </delete>
+</mapper>

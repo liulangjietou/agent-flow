@@ -43,6 +43,23 @@ class InvoicePdfSourceTest {
     }
 
     @Test
+    void imagesModeRendersPdfPagesAsOrderedPngImagePartsForMultimodalModels() throws Exception {
+        byte[] bytes = pdf(2, doc -> { });
+        var imageSources = new InvoiceExtractionSources(files, "", "images");
+        var original = new InvoiceOriginal(UUID.randomUUID(), UUID.randomUUID(), "demo", "alice", "multi-page.pdf", bytes.length,
+                HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)), InvoiceOriginal.Format.PDF, Instant.now(), InvoiceOriginal.Status.READY);
+        when(files.read(original)).thenReturn(bytes);
+        var prepared = imageSources.prepare(original);
+        assertThat(prepared.input().pageCount()).isEqualTo(2);
+        assertThat(prepared.method()).isEqualTo(InvoiceExtractionSuggestion.Method.MODEL);
+        assertThat(prepared.parts()).hasSize(4);
+        assertThat(prepared.parts().get(0)).containsEntry("type", "text").containsEntry("text", "PDF page 1 of 2");
+        assertThat(prepared.parts().get(1)).containsEntry("type", "image_url");
+        assertThat(prepared.parts().get(2)).containsEntry("type", "text").containsEntry("text", "PDF page 2 of 2");
+        assertThat(prepared.parts().get(3)).containsEntry("type", "image_url");
+    }
+
+    @Test
     void zeroOrMoreThanTenPagesAreRejectedInsteadOfSendingAPartialDocument() throws Exception {
         assertUnavailable(pdf(0, doc -> { }));
         assertUnavailable(pdf(InvoiceExtractionInput.MAX_PAGES + 1, doc -> { }));

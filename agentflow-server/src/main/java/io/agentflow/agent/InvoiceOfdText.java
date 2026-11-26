@@ -22,12 +22,18 @@ final class InvoiceOfdText {
     private static final int MAX_GLYPHS = 25_000;
     private static final int MAX_OUTLINE_SEGMENTS = 100_000;
     private static final Pattern HEX_ESCAPE = Pattern.compile("[0-9a-fA-F]{4}");
+    private static final double ITALIC_SHEAR = 0.25;
+    private static final double BOLD_OFFSET_RATIO = 0.04;
+    private static final int BOLD_WEIGHT_THRESHOLD = 600;
     private InvoiceOfdText() { }
 
-    /** 字体已明确选定；缺字、越界变换和不完整位置都必须让整个文字对象失败。 */
+    /** 字体已明确选定；支持标准斜体与合法整百字重，缺字、越界变换和不完整位置仍让整个文字对象失败。 */
     static Path2D.Double outline(Element object, InvoiceOfdFont font) throws IOException {
         double size = number(required(object, "Size")), scale = number(object, "HScale", 1);
-        if (size <= 0 || scale <= 0 || bool(object, "Italic", false) || number(object, "Weight", 400) != 400) throw invalid();
+        boolean italic = bool(object, "Italic", false);
+        int weight = weight(object);
+        if (size <= 0 || scale <= 0) throw invalid();
+        boolean bold = weight >= BOLD_WEIGHT_THRESHOLD;
         int direction = direction(object, "CharDirection"); direction(object, "ReadDirection");
         var result = new Path2D.Double(); var pending = new ArrayList<Element>();
         Double previousX = null, previousY = null;
@@ -58,14 +64,27 @@ final class InvoiceOfdText {
                 if (i > 0) { x += deltaX[i - 1]; y += deltaY[i - 1]; bounded(x); bounded(y); }
                 var placement = AffineTransform.getTranslateInstance(x, y);
                 placement.rotate(Math.toRadians(direction)); placement.scale(size * scale, -size);
+                if (italic) placement.shear(ITALIC_SHEAR, 0);
                 // Delta 已给出对象坐标中的实际偏移；ReadDirection 不重新排版或覆盖这些坐标。
                 Glyph glyph = glyphs.get(i);
                 GeneralPath outline = glyph.explicit() ? font.glyph(glyph.value()) : font.unicode(glyph.value());
                 segments = append(result, outline, placement, segments);
+                if (bold) {
+                    var boldPlacement = new AffineTransform(placement);
+                    boldPlacement.translate(BOLD_OFFSET_RATIO, 0);
+                    segments = append(result, outline, boldPlacement, segments);
+                }
             }
         }
         if (codes == 0 || !pending.isEmpty()) throw invalid();
         return result;
+    }
+
+    /** GB/T 33190 规定字重为 0 或 100..1000 的整百值，缺省 400。 */
+    private static int weight(Element object) throws IOException {
+        int value = (int) integer(object.hasAttribute("Weight") ? object.getAttribute("Weight") : "400", 0, 1000);
+        if (value % 100 != 0) throw invalid();
+        return value;
     }
 
     /** 边展开边计数，不能先复制所有轮廓后再检查总量；字体可把很短的正文展开成大量曲线。 */

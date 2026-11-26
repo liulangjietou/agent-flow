@@ -1,35 +1,19 @@
 <script setup lang="ts">
 import type { ExpenseTaskActivity, ExpenseReturnRequest } from './expenses'
 import WorkspaceTabs from './components/WorkspaceTabs.vue'
-import AgentWorkspace from './components/AgentWorkspace.vue'
-import AccountMappingManager from './components/AccountMappingManager.vue'
 import { mappingDrafts } from './accountMappingDrafts'
-import ExpenseConfigurationManager from './components/ExpenseConfigurationManager.vue'
 import { configurationDrafts } from './expenseConfigurationDrafts'
-import DefinitionNotificationTexts from './components/DefinitionNotificationTexts.vue'
 import { copyNotificationTexts } from './notificationTexts'
-import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import ApplicationRecord from './components/ApplicationRecord.vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import type { RelatedRound } from './subprocessRelations'
 import WorkspaceNavigation from './components/WorkspaceNavigation.vue'
 import WorkspaceIcon from './components/WorkspaceIcon.vue'
 import { isWorkspacePage, workspacePageLabel, type WorkspacePage as Page } from './workspaceNavigation'
-import BranchDiagnostics from './components/BranchDiagnostics.vue'
 import { DesignerValidation } from './designerValidation'
-import ApplicationSearch from './components/ApplicationSearch.vue'
-import IntegrationWorkspace from './components/IntegrationWorkspace.vue'
-import AuditSearch from './components/AuditSearch.vue'
 import TaskActions from './components/TaskActions.vue'
 import type { CountersignInput, CountersignView } from './countersignMembership'
-import ExpenseWorkspace from './components/ExpenseWorkspace.vue'
-import CashierView from './views/CashierView.vue'
 import LoginView from './views/LoginView.vue'
 import { useRoute, useRouter } from 'vue-router'
-import ExpenseDetail from './components/ExpenseDetail.vue'
-import ExpensePlanDetail from './components/ExpensePlanDetail.vue'
-import AdvanceRequestDetail from './components/AdvanceRequestDetail.vue'
-import ProcurementPaymentDetail from './components/ProcurementPaymentDetail.vue'
-import BudgetAdjustmentDetail from './components/BudgetAdjustmentDetail.vue'
 import { procurementDrafts, type ProcurementReceipt } from './procurementPayment'
 import { budgetAdjustmentDrafts, type BudgetAdjustmentReceipt } from './budgetAdjustment'
 import { advanceDrafts, type AdvanceReceipt } from './advanceRequest'
@@ -39,75 +23,35 @@ import { invoiceUploads } from './invoiceWallet'
 import type { ExpenseDetail as ExpenseDetailData } from './expenses'
 import TaskDeadlineStatus from './components/TaskDeadlineStatus.vue'
 import PendingTaskQueue from './components/PendingTaskQueue.vue'
-import NotificationInbox from './components/NotificationInbox.vue'
-import CopyRecord from './components/CopyRecord.vue'
-import DefinitionCopyRecipient from './components/DefinitionCopyRecipient.vue'
 import { isTaskNotification } from './notificationInbox'
 import { taskActionLabels } from './taskActions'
-import WorkspaceRecords from './components/WorkspaceRecords.vue'
-import ApplicationHistory from './components/ApplicationHistory.vue'
-import RoundComparison from './components/RoundComparison.vue'
-import ApplicationComments from './components/ApplicationComments.vue'
-import AssistRunRecords from './components/AssistRunRecords.vue'
-import ExpenseApprovalAssistant from './components/ExpenseApprovalAssistant.vue'
 import { commentDrafts, type CommentDraft, type ApplicationComment } from './applicationComments'
 import RequestRecovery from './components/RequestRecovery.vue'
 import FormFields from './components/FormFields.vue'
 import InitiatorAppointmentPicker from './components/InitiatorAppointmentPicker.vue'
 import InitiatorRequirementNotice from './components/InitiatorRequirementNotice.vue'
 import { InitiatorRequirements } from './initiatorRequirements'
-import FormSchemaEditor from './components/FormSchemaEditor.vue'
-import TemplateCenter from './components/TemplateCenter.vue'
-import PortableTemplate from './components/PortableTemplate.vue'
 import type { PortableProcess } from './portableTemplate'
-import SystemChecks from './components/SystemChecks.vue'
-import FirstWorkflow from './components/FirstWorkflow.vue'
 import { guideHidden, rememberGuideSelection } from './firstWorkflow'
-import OrganizationDirectory from './components/OrganizationDirectory.vue'
-import ApprovalProxyManager from './components/ApprovalProxyManager.vue'
 import { approvalProxyDrafts, type ApprovalProxyReceipt } from './approvalProxies'
 import { organizationDrafts, type OrganizationRecord } from './organization'
 import { organizationSyncDrafts, syncPath, type SyncReceipt, type SyncPlanReceipt } from './organizationSync'
 import { rememberSignatureOperation } from './signatures'
 import { initializationDrafts } from './tenantInitialization'
-import BusinessCalendars from './components/BusinessCalendars.vue'
 import { calendarDrafts, type BusinessCalendar } from './businessCalendars'
-import ApprovalOperations from './components/ApprovalOperations.vue'
-import ExpenseFinancialReporting from './components/ExpenseFinancialReporting.vue'
-import ApiReference from './components/ApiReference.vue'
-import DefinitionSimulation from './components/DefinitionSimulation.vue'
-import DefinitionComparison from './components/DefinitionComparison.vue'
-import DefinitionCatalog from './components/DefinitionCatalog.vue'
 import DefinitionPicker from './components/DefinitionPicker.vue'
 import { DefinitionSelection } from './definitionSelection'
-import DefinitionAssignee from './components/DefinitionAssignee.vue'
-import DefinitionResponsibilities from './components/DefinitionResponsibilities.vue'
 import { readResponsibilities, writeResponsibilities, type ApprovalResponsibilities } from './approvalResponsibilities'
-import DefinitionDeadline from './components/DefinitionDeadline.vue'
-import DefinitionTimerWait from './components/DefinitionTimerWait.vue'
-import DefinitionServiceTask from './components/DefinitionServiceTask.vue'
 import type { ServiceTaskBinding } from './serviceTasks'
-import DefinitionEventWait from './components/DefinitionEventWait.vue'
-import DefinitionSubprocess from './components/DefinitionSubprocess.vue'
 import type { SubprocessBinding } from './subprocessDesigner'
 import type { EventBinding } from './events'
-import DefinitionExpenseStage from './components/DefinitionExpenseStage.vue'
-import DefinitionExpenseSelfApproval from './components/DefinitionExpenseSelfApproval.vue'
-import DefinitionExpenseDuplicateApproval from './components/DefinitionExpenseDuplicateApproval.vue'
-import DefinitionExpenseSplitRisk from './components/DefinitionExpenseSplitRisk.vue'
 import { writeSplitRule, writeSplitGateway, type SplitRuleFields } from './expenseSplitPolicy'
 import { assigneeLabel } from './definitionAssignees'
 import { approvalPolicyLabel, isCountersignMode } from './approvalPolicy'
 import { simulationIssue } from './definitionSimulation'
-import DefinitionPublication from './components/DefinitionPublication.vue'
-import DefinitionAvailability from './components/DefinitionAvailability.vue'
 import type { DefinitionAvailabilityInput } from './api'
-import PublicationDialog from './components/PublicationDialog.vue'
 import { DraftAutosave } from './draftAutosave'
 import type { GraphNode } from './api'
-import QuickDesigner from './components/QuickDesigner.vue'
-import ConditionEditor from './components/ConditionEditor.vue'
-import DefinitionRiskPolicy from './components/DefinitionRiskPolicy.vue'
 import { copyRiskPolicy } from './submissionRisk'
 import type { RiskPolicy } from './api'
 import { describeBranch, branchTooltip } from './conditionPresentation'
@@ -116,8 +60,66 @@ import { loadDesignerNodes, serializeDesignerNodes, type DesignerNode as FlowNod
 import { connectCanvasGraph, insertCanvasGraph, deleteCanvasNode, orderCanvasBranches, CANVAS_KEY_STEP, CANVAS_LARGE_KEY_STEP } from './designerEditing'
 import { arrangeNodes, routeEdges, serializeDesignerEdges, graphBounds, fittedViewport, clampZoom, zoomedScroll, draggedPosition, nodeRectangle, CANVAS_PADDING, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, type Point } from './designerLayout'
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
-import EnterpriseLogoutDialog from './components/EnterpriseLogoutDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
+
+// 非首屏页面与弹窗按需异步加载，避免将设计器、财务报表、出纳与管理后台全部打入首屏包。
+const AgentWorkspace = defineAsyncComponent(() => import('./components/AgentWorkspace.vue'))
+const AccountMappingManager = defineAsyncComponent(() => import('./components/AccountMappingManager.vue'))
+const ExpenseConfigurationManager = defineAsyncComponent(() => import('./components/ExpenseConfigurationManager.vue'))
+const DefinitionNotificationTexts = defineAsyncComponent(() => import('./components/DefinitionNotificationTexts.vue'))
+const ApplicationRecord = defineAsyncComponent(() => import('./components/ApplicationRecord.vue'))
+const BranchDiagnostics = defineAsyncComponent(() => import('./components/BranchDiagnostics.vue'))
+const ApplicationSearch = defineAsyncComponent(() => import('./components/ApplicationSearch.vue'))
+const IntegrationWorkspace = defineAsyncComponent(() => import('./components/IntegrationWorkspace.vue'))
+const AuditSearch = defineAsyncComponent(() => import('./components/AuditSearch.vue'))
+const ExpenseWorkspace = defineAsyncComponent(() => import('./components/ExpenseWorkspace.vue'))
+const CashierView = defineAsyncComponent(() => import('./views/CashierView.vue'))
+const ExpenseDetail = defineAsyncComponent(() => import('./components/ExpenseDetail.vue'))
+const ExpensePlanDetail = defineAsyncComponent(() => import('./components/ExpensePlanDetail.vue'))
+const AdvanceRequestDetail = defineAsyncComponent(() => import('./components/AdvanceRequestDetail.vue'))
+const ProcurementPaymentDetail = defineAsyncComponent(() => import('./components/ProcurementPaymentDetail.vue'))
+const BudgetAdjustmentDetail = defineAsyncComponent(() => import('./components/BudgetAdjustmentDetail.vue'))
+const NotificationInbox = defineAsyncComponent(() => import('./components/NotificationInbox.vue'))
+const CopyRecord = defineAsyncComponent(() => import('./components/CopyRecord.vue'))
+const DefinitionCopyRecipient = defineAsyncComponent(() => import('./components/DefinitionCopyRecipient.vue'))
+const WorkspaceRecords = defineAsyncComponent(() => import('./components/WorkspaceRecords.vue'))
+const ApplicationHistory = defineAsyncComponent(() => import('./components/ApplicationHistory.vue'))
+const RoundComparison = defineAsyncComponent(() => import('./components/RoundComparison.vue'))
+const ApplicationComments = defineAsyncComponent(() => import('./components/ApplicationComments.vue'))
+const AssistRunRecords = defineAsyncComponent(() => import('./components/AssistRunRecords.vue'))
+const ExpenseApprovalAssistant = defineAsyncComponent(() => import('./components/ExpenseApprovalAssistant.vue'))
+const FormSchemaEditor = defineAsyncComponent(() => import('./components/FormSchemaEditor.vue'))
+const TemplateCenter = defineAsyncComponent(() => import('./components/TemplateCenter.vue'))
+const PortableTemplate = defineAsyncComponent(() => import('./components/PortableTemplate.vue'))
+const SystemChecks = defineAsyncComponent(() => import('./components/SystemChecks.vue'))
+const FirstWorkflow = defineAsyncComponent(() => import('./components/FirstWorkflow.vue'))
+const OrganizationDirectory = defineAsyncComponent(() => import('./components/OrganizationDirectory.vue'))
+const ApprovalProxyManager = defineAsyncComponent(() => import('./components/ApprovalProxyManager.vue'))
+const BusinessCalendars = defineAsyncComponent(() => import('./components/BusinessCalendars.vue'))
+const ApprovalOperations = defineAsyncComponent(() => import('./components/ApprovalOperations.vue'))
+const ExpenseFinancialReporting = defineAsyncComponent(() => import('./components/ExpenseFinancialReporting.vue'))
+const ApiReference = defineAsyncComponent(() => import('./components/ApiReference.vue'))
+const DefinitionSimulation = defineAsyncComponent(() => import('./components/DefinitionSimulation.vue'))
+const DefinitionComparison = defineAsyncComponent(() => import('./components/DefinitionComparison.vue'))
+const DefinitionCatalog = defineAsyncComponent(() => import('./components/DefinitionCatalog.vue'))
+const DefinitionAssignee = defineAsyncComponent(() => import('./components/DefinitionAssignee.vue'))
+const DefinitionResponsibilities = defineAsyncComponent(() => import('./components/DefinitionResponsibilities.vue'))
+const DefinitionDeadline = defineAsyncComponent(() => import('./components/DefinitionDeadline.vue'))
+const DefinitionTimerWait = defineAsyncComponent(() => import('./components/DefinitionTimerWait.vue'))
+const DefinitionServiceTask = defineAsyncComponent(() => import('./components/DefinitionServiceTask.vue'))
+const DefinitionEventWait = defineAsyncComponent(() => import('./components/DefinitionEventWait.vue'))
+const DefinitionSubprocess = defineAsyncComponent(() => import('./components/DefinitionSubprocess.vue'))
+const DefinitionExpenseStage = defineAsyncComponent(() => import('./components/DefinitionExpenseStage.vue'))
+const DefinitionExpenseSelfApproval = defineAsyncComponent(() => import('./components/DefinitionExpenseSelfApproval.vue'))
+const DefinitionExpenseDuplicateApproval = defineAsyncComponent(() => import('./components/DefinitionExpenseDuplicateApproval.vue'))
+const DefinitionExpenseSplitRisk = defineAsyncComponent(() => import('./components/DefinitionExpenseSplitRisk.vue'))
+const DefinitionPublication = defineAsyncComponent(() => import('./components/DefinitionPublication.vue'))
+const DefinitionAvailability = defineAsyncComponent(() => import('./components/DefinitionAvailability.vue'))
+const PublicationDialog = defineAsyncComponent(() => import('./components/PublicationDialog.vue'))
+const QuickDesigner = defineAsyncComponent(() => import('./components/QuickDesigner.vue'))
+const ConditionEditor = defineAsyncComponent(() => import('./components/ConditionEditor.vue'))
+const DefinitionRiskPolicy = defineAsyncComponent(() => import('./components/DefinitionRiskPolicy.vue'))
+const EnterpriseLogoutDialog = defineAsyncComponent(() => import('./components/EnterpriseLogoutDialog.vue'))
 import { cloneSchema, defaultFormSchema, validatePayload, type FieldErrors, type FormSchema } from './formSchema'
 import { api, bindAuthenticationActor, writeRequests, type AuthOptions, type Actor, type ApiError, type Application, type Definition, type Graph, type GraphEdge, type Task, type TaskActionInput, type TemplateCopyInput, type SimulationResult, type ComparisonChange, type InboxMessage, type FinancialNotificationTarget, type VoucherNotificationTarget, type BudgetNotificationTarget, type ReversalNotificationTarget, type DisbursementReturnNotificationTarget, type RepaymentReviewNotificationTarget, type ExpensePartialAdjustmentNotificationTarget, type ExpenseAdjustmentNotificationTarget, type SupplierPayableNotificationTarget, type BudgetAdjustmentNotificationTarget, type RepaymentNotificationTarget, type ExpenseReturnNotificationTarget, type SupplierReturnNotificationTarget, type SupplierAdjustmentNotificationTarget, type SupplierSettlementNotificationTarget, type ExpenseSettlementNotificationTarget, type ReversalCheckNotificationTarget } from './api'
 import type { PendingWrite } from './pendingWrites.js'
@@ -129,15 +131,20 @@ import { acknowledgeExtraction, extractionDrafts, type ExtractionReceipt } from 
 
 type NodeType = 'START' | 'COPY' | 'TIMER_WAIT' | 'EVENT_WAIT' | 'SERVICE_TASK' | 'SUB_PROCESS' | 'USER_TASK' | 'EXCLUSIVE_GATEWAY' | 'PARALLEL_GATEWAY' | 'END'
 const page = ref<Page>('workbench')
-// 页面与地址双向同步：首次进入时记下地址中的页面，登录后优先回到该页面（深链与刷新）。
+// 页面与地址双向同步：首次进入时记下地址中的页面和单据深链，登录后优先回到原目标。
 const route = useRoute(), router = useRouter()
 let requestedPage: Page | null = null
-router.isReady().then(() => { if (!loggedIn.value && isWorkspacePage(route.name)) requestedPage = route.name })
+let requestedApplicationId: string | null = null
+router.isReady().then(() => {
+  if (!loggedIn.value && isWorkspacePage(route.name)) requestedPage = route.name
+  if (typeof route.query.application === 'string' && route.query.application.trim()) requestedApplicationId = route.query.application.trim()
+})
 watch(page, value => { if (route.name !== value) void router.push({ name: value }) })
 watch(() => route.name, name => { if (loggedIn.value && isWorkspacePage(name) && name !== page.value) page.value = name })
 /** 登录或恢复会话后的落地页：地址中带来的页面只使用一次，否则按角色选择开始页。 */
 function landingPage(): Page {
   const requested = requestedPage; requestedPage = null
+  if (requestedApplicationId) { recordApplicationId.value = requestedApplicationId; requestedApplicationId = null }
   return requested && requested !== 'workbench' ? requested : canInspectSystem.value && !guideHidden(actorScope.value) ? 'guide' : 'workbench'
 }
 const comparisonOpen = ref(false)
@@ -177,15 +184,17 @@ const workspace = ref<HTMLElement | null>(null)
 const unsubscribeWrites = writeRequests.subscribe(() => { pendingWrites.value = writeRequests.pending() })
 const serverAvailable = ref(false)
 const taskCount = ref<number | null>(null)
+const unreadCount = ref<number | null>(null)
 const taskRefresh = ref(0)
 const taskQueueView = ref<'list' | 'board'>('list')
 const cashierKind = ref<'employee' | 'supplier' | 'batches'>('employee')
 const notificationPaymentId = ref('')
 watch(page, value => { if (value !== 'cashier') notificationPaymentId.value = '' })
 const taskQueuePanel = ref<InstanceType<typeof PendingTaskQueue> | null>(null)
-watch(actorScope, () => { taskQueueView.value = 'list'; cashierKind.value = 'employee'; notificationPaymentId.value = '' }, { flush: 'sync' })
+watch(actorScope, () => { taskQueueView.value = 'list'; cashierKind.value = 'employee'; notificationPaymentId.value = ''; unreadCountRequest?.abort(); unreadCount.value = null }, { flush: 'sync' })
 let workspaceRefreshGeneration = 0
 let taskCountRequest: AbortController | null = null
+let unreadCountRequest: AbortController | null = null
 let taskDetailRequest: AbortController | null = null
 const activeTask = ref<Task | null>(null)
 const activeApplication = ref<Application | null>(null)
@@ -258,7 +267,13 @@ const newApplicationOpen = ref(false)
 const applicationDialog = ref<HTMLElement | null>(null)
 const recordApplicationId = ref('')
 const recordInitialRoundNo = ref<number | null>(null)
-watch(recordApplicationId, () => { recordInitialRoundNo.value = null }, { flush: 'sync' })
+watch(recordApplicationId, value => {
+  recordInitialRoundNo.value = null
+  if (!loggedIn.value) return
+  const current = typeof route.query.application === 'string' ? route.query.application : ''
+  if (value && current !== value) void router.replace({ query: { ...route.query, application: value } })
+  else if (!value && current) { const query = { ...route.query }; delete query.application; void router.replace({ query }) }
+}, { flush: 'sync' })
 /** 从已授权关联进入固定轮次；目标详情仍重新检查自身权限。 */
 function openRelatedRound(target: RelatedRound) { recordApplicationId.value = target.applicationId; recordInitialRoundNo.value = target.roundNo }
 const selectedCopy = ref<{ applicationId: string; roundNo: number } | null>(null)
@@ -448,10 +463,19 @@ async function loadTasks() {
   try { const result = await api.taskPage({ limit: 1 }, controller.signal); if (scope && actorScope.value === scope && taskCountRequest === controller) taskCount.value = result.total }
   finally { clearTimeout(timeout) }
 }
+async function loadUnreadCount() {
+  const scope = actorScope.value, controller = new AbortController()
+  unreadCountRequest?.abort(); unreadCountRequest = controller
+  const timeout = setTimeout(() => controller.abort(), 12_000)
+  try { const result = await api.inbox({ read: 'unread', limit: 1 }, controller.signal); if (scope && actorScope.value === scope && unreadCountRequest === controller) unreadCount.value = result.unreadCount }
+  catch { /* 未读数角标为只读提示，单次失败不影响主工作台可用性。 */ }
+  finally { clearTimeout(timeout) }
+}
 async function refreshWorkspace(restoreSelection = false) {
   taskRefresh.value++
   const generation = ++workspaceRefreshGeneration
   const scope = actorScope.value
+  void loadUnreadCount()
   try { await Promise.all([loadTasks(), ...(restoreSelection ? [restoreDesigner()] : [])]); if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) serverAvailable.value = true }
   catch (error) { if (scope && actorScope.value === scope && generation === workspaceRefreshGeneration) { serverAvailable.value = false; notice.value = errorMessage(error) } }
 }
@@ -559,7 +583,7 @@ async function logout(scope: 'local' | 'provider' = 'local') {
       if (authOptions.value?.mode === 'OIDC') { notice.value = '退出未完成：' + errorMessage(error); busy.value = false; return }
     }
     bindAuthenticationActor(null)
-    localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; taskCountRequest?.abort(); taskDetailRequest?.abort(); taskCount.value = null; restoredDefinition.clear(); applicationSelection.clear(); activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
+    localStorage.removeItem('agentflow.token'); loggedIn.value = false; actor.value = null; serverAvailable.value = false; taskCountRequest?.abort(); unreadCountRequest?.abort(); taskDetailRequest?.abort(); taskCount.value = null; unreadCount.value = null; restoredDefinition.clear(); applicationSelection.clear(); activeTask.value = null; activeApplication.value = null; notice.value = ''; page.value = 'workbench'
     clearDesigner(); templateRefresh.value++
     recordApplicationId.value = ''; recoveryError.value = ''; newApplicationOpen.value = false; createdApplication.value = null; busy.value = false
     sessionExpired.value = false
@@ -674,7 +698,7 @@ async function performMembershipChange(input: CountersignInput, view: Countersig
 async function readNotification(message: InboxMessage) {
   if (busy.value || writesBlocked.value) return
   busy.value = true
-  try { await api.readNotification(message.id); templateRefresh.value++; notice.value = '消息已标为已读。' }
+  try { await api.readNotification(message.id); templateRefresh.value++; void loadUnreadCount(); notice.value = '消息已标为已读。' }
   catch (error) { notice.value = errorMessage(error) }
   finally { busy.value = false }
 }
@@ -1632,9 +1656,15 @@ async function restoreEnterpriseSession() {
   } catch (error) { if (actorScope.value === scope) { sessionExpired.value = true; notice.value = errorMessage(error) }; return false }
   finally { if (actorScope.value === scope) busy.value = false }
 }
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible' && loggedIn.value && !busy.value && !sessionExpired.value) {
+    void loadTasks(); void loadUnreadCount()
+  }
+}
 onMounted(async () => {
   window.addEventListener('beforeunload', warnBeforeUnload)
   window.addEventListener('agentflow:authentication-required', authenticationRequired)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
   // 等首次路由（含根路径重定向）完成后再读取并清除回跳参数，避免重定向把参数带回地址栏。
   await router.isReady()
   if (route.query.authError === 'oidc') {
@@ -1644,8 +1674,8 @@ onMounted(async () => {
   }
   await loadAuthentication()
 })
-onBeforeUnmount(() => { clearValidation(true); taskCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); cancelCanvasInteraction(); confirmation.dispose() })
-onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload); window.removeEventListener('agentflow:authentication-required', authenticationRequired) })
+onBeforeUnmount(() => { clearValidation(true); taskCountRequest?.abort(); unreadCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); cancelCanvasInteraction(); confirmation.dispose() })
+onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload); window.removeEventListener('agentflow:authentication-required', authenticationRequired); document.removeEventListener('visibilitychange', handleVisibilityChange) })
 </script>
 
 <template>
@@ -1656,7 +1686,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
       <main id="workspace-content" ref="workspace" class="main" tabindex="-1">
         <header class="workspace-header">
           <div class="header-location">
-            <WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :can-cashier="canCashier" :can-configure-finance="canConfigureFinance" :can-read-financial-reports="canReadFinancialReports" :task-count="taskCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="requestLogout" />
+            <WorkspaceNavigation v-model:page="page" :tenant-id="tenantId" :username="username" :can-inspect="canInspectSystem" :can-manage="canManageDefinitions" :can-cashier="canCashier" :can-configure-finance="canConfigureFinance" :can-read-financial-reports="canReadFinancialReports" :task-count="taskCount" :unread-count="unreadCount" :server-available="serverAvailable" :logout-disabled="busy || pendingWrites.some(operation => operation.sending)" @logout="requestLogout" />
             <div class="crumb" aria-label="当前位置"><span class="crumb-space">工作空间</span><strong aria-hidden="true">/</strong><span class="crumb-current">{{ workspacePageLabel(page) }}</span></div>
           </div>
           <div class="header-actions">
@@ -1701,7 +1731,7 @@ onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); un
         <IntegrationWorkspace v-else-if="page === 'webhooks' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <AuditSearch v-else-if="page === 'audit' && canInspectSystem" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" />
         <ApplicationSearch v-else-if="page === 'applications'" :key="actorScope" :scope-key="actorScope" :administrator="canInspectSystem" :user-id="actor?.userId ?? ''" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
-        <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @read="readNotification" @open="openNotification" @payment-open="openPaymentNotification" @voucher-open="openVoucherNotification" @budget-open="openBudgetNotification" @reversal-open="openReversalNotification" @reversal-check-open="openReversalCheckNotification" @settlement-open="openExpenseSettlementNotification" @supplier-adjustment-open="openSupplierAdjustmentNotification" @supplier-settlement-open="openSupplierSettlementNotification" @supplier-return-open="openSupplierReturnNotification" @expense-return-open="openExpenseReturnNotification" @disbursement-return-open="openDisbursementReturnNotification" @repayment-review-open="openRepaymentReviewNotification" @expense-partial-adjustment-open="openExpensePartialAdjustmentNotification" @expense-adjustment-open="openExpenseAdjustmentNotification" @supplier-payable-open="openSupplierPayableNotification" @budget-adjustment-open="openBudgetAdjustmentNotification" @repayment-open="openRepaymentNotification" />
+        <NotificationInbox v-else-if="page === 'notifications'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @unread-change="unreadCount = $event" @read="readNotification" @open="openNotification" @payment-open="openPaymentNotification" @voucher-open="openVoucherNotification" @budget-open="openBudgetNotification" @reversal-open="openReversalNotification" @reversal-check-open="openReversalCheckNotification" @settlement-open="openExpenseSettlementNotification" @supplier-adjustment-open="openSupplierAdjustmentNotification" @supplier-settlement-open="openSupplierSettlementNotification" @supplier-return-open="openSupplierReturnNotification" @expense-return-open="openExpenseReturnNotification" @disbursement-return-open="openDisbursementReturnNotification" @repayment-review-open="openRepaymentReviewNotification" @expense-partial-adjustment-open="openExpensePartialAdjustmentNotification" @expense-adjustment-open="openExpenseAdjustmentNotification" @supplier-payable-open="openSupplierPayableNotification" @budget-adjustment-open="openBudgetAdjustmentNotification" @repayment-open="openRepaymentNotification" />
         <WorkspaceRecords v-else-if="['started', 'drafts', 'handled'].includes(page)" :key="actorScope + ':' + page" :scope-key="actorScope" :mode="page === 'handled' ? 'handled' : page === 'drafts' ? 'drafts' : 'started'" :refresh-version="templateRefresh" :locked="busy || writesBlocked" @open="recordApplicationId = $event" @create="openApplicationForm" />
         <TemplateCenter v-else-if="(page === 'templates' || page === 'examples') && canManageDefinitions" :key="actorScope + ':' + page" :examples-only="page === 'examples'" :scope-key="actorScope" :refresh-version="templateRefresh" :locked="busy || writesBlocked" :has-unsaved-definition="!readonlyDefinition && dirty" @copy="copyTemplate" @open="openSavedDefinition" @return-designer="page = 'designer'" @import="page = 'transfer'" />
         <ApiReference v-else-if="page === 'api'" :key="actorScope" :scope-key="actorScope" :refresh-version="templateRefresh" />

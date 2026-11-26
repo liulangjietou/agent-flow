@@ -27,20 +27,44 @@ import org.slf4j.LoggerFactory;
  */
 final class InvoiceDocumentProcess {
     private static final Logger log = LoggerFactory.getLogger(InvoiceDocumentProcess.class);
-    private static final Semaphore SLOT = new Semaphore(1);
+    private static final int DEFAULT_SLOTS = 2;
+    private static final int MAX_SLOTS = 8;
+    private static final Duration DEFAULT_ACQUIRE_TIMEOUT = Duration.ofSeconds(3);
+    private static final Semaphore SHARED_SLOTS = new Semaphore(DEFAULT_SLOTS, true);
     private static final Duration STOP_TIMEOUT = Duration.ofSeconds(5);
     private static final String BOOT_LAUNCHER = "org.springframework.boot.loader.launch.PropertiesLauncher";
     private final Path temporaryRoot;
     private final Duration timeout;
+    private final Semaphore slots;
+    private final Duration acquireTimeout;
 
     InvoiceDocumentProcess(Path temporaryRoot, Duration timeout) {
-        this.temporaryRoot = temporaryRoot; this.timeout = timeout;
+        this(temporaryRoot, timeout, SHARED_SLOTS, DEFAULT_ACQUIRE_TIMEOUT);
     }
 
-    /** 只有子进程正常结束且完整结果通过校验才返回；停止失败时保留占位，防止进程继续累积。 */
+    InvoiceDocumentProcess(Path temporaryRoot, Duration timeout, int concurrency, Duration acquireTimeout) {
+        this(temporaryRoot, timeout, new Semaphore(Math.max(1, Math.min(concurrency, MAX_SLOTS)), true), acquireTimeout);
+    }
+
+    private InvoiceDocumentProcess(Path temporaryRoot, Duration timeout, Semaphore slots, Duration acquireTimeout) {
+        this.temporaryRoot = temporaryRoot;
+        this.timeout = timeout;
+        this.slots = slots;
+        this.acquireTimeout = acquireTimeout == null || acquireTimeout.isNegative() ? Duration.ZERO : acquireTimeout;
+    }
+
+    /** 只有子进程正常结束且完整结果通过校验才返回；超时强杀未立即退出时在操作系统回收后异步释放槽位，避免永久泄漏。 */
     <T> T execute(Program program, byte[] original, List<String> arguments, ResultReader<T> reader) {
         if (original.length < 1 || original.length > InvoiceVerificationPort.Request.MAX_ORIGINAL_BYTES) throw unavailable();
-        if (!SLOT.tryAcquire()) throw new DomainException(ErrorCode.INVOICE_EXTRACTION_SOURCE_BUSY, "Invoice document preparation is busy");
+        if (Thread.currentThread().isInterrupted()) throw unavailable();
+        boolean acquired;
+        try {
+            acquired = acquireTimeout.isZero() ? slots.tryAcquire() : slots.tryAcquire(acquireTimeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw unavailable();
+        }
+        if (!acquired) throw new DomainException(ErrorCode.INVOICE_EXTRACTION_SOURCE_BUSY, "Invoice document preparation is busy");
         Path directory = null;
         Process process = null;
         boolean interrupted = false;
@@ -63,10 +87,19 @@ final class InvoiceDocumentProcess {
             if (process != null && process.isAlive()) interrupted |= stop(process);
             if (process == null || !process.isAlive()) {
                 if (directory != null) removeOwnedDirectory(directory);
-                SLOT.release();
+                slots.release();
             } else {
-                log.error("Document worker termination failed, errorCode={}, worker={}, pid={}",
-                        "INVOICE_DOCUMENT_STOP_FAILED", program.main().getSimpleName(), process.pid());
+                Path ownedDirectory = directory;
+                Process stuck = process;
+                log.error("Document worker termination delayed, errorCode={}, worker={}, pid={}",
+                        "INVOICE_DOCUMENT_STOP_FAILED", program.main().getSimpleName(), stuck.pid());
+                // 注册进程退出回调：待内核回收后自动清理临时目录并归还槽位，防止实例永久耗尽许可。
+                stuck.onExit().whenComplete((exited, error) -> {
+                    if (ownedDirectory != null) removeOwnedDirectory(ownedDirectory);
+                    slots.release();
+                    log.info("Delayed document worker exited and slot released, errorCode={}, worker={}, pid={}",
+                            "NONE", program.main().getSimpleName(), stuck.pid());
+                });
             }
             if (interrupted) Thread.currentThread().interrupt();
         }

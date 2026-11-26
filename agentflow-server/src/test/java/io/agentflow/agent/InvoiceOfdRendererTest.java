@@ -127,11 +127,23 @@ class InvoiceOfdRendererTest {
 
     @Test
     void rejectsUnknownVisualObjectsUnsupportedAttributesAndAmbiguousResources() throws Exception {
-        for (String invalid : List.of("<ofd:VideoObject ID=\"20\" Boundary=\"0 0 10 10\"/>", path("0 0 10 10","0 0 0","UnknownPaint=\"true\""), text("Italic=\"true\"","<ofd:TextCode X=\"1\" Y=\"6\">A</ofd:TextCode>"))) {
+        for (String invalid : List.of("<ofd:VideoObject ID=\"20\" Boundary=\"0 0 10 10\"/>", path("0 0 10 10","0 0 0","UnknownPaint=\"true\""), text("Weight=\"450\"","<ofd:TextCode X=\"1\" Y=\"6\">A</ofd:TextCode>"))) {
             var files=fixture(1);page(files,0,"",invalid);assertThatThrownBy(()->render(files)).isInstanceOf(IOException.class);
         }
         var duplicate=fixture(1);replace(duplicate,"Doc_0/Resources.xml","</ofd:Fonts>","<ofd:Font ID=\"10\" FontName=\"AgentFlowSyntheticA\"><ofd:FontFile>a.ttf</ofd:FontFile></ofd:Font></ofd:Fonts>");
         assertThatThrownBy(()->render(duplicate)).isInstanceOf(IOException.class);
+    }
+
+    @Test
+    void rendersItalicAndBoldWeightTextObjectsWithinOutlineBudgets() throws Exception {
+        var regularFiles = fixture(1); page(regularFiles, 0, "", text("", "<ofd:TextCode X=\"1\" Y=\"6\">A</ofd:TextCode>"));
+        var italicFiles = fixture(1); page(italicFiles, 0, "", text("Italic=\"true\"", "<ofd:TextCode X=\"1\" Y=\"6\">A</ofd:TextCode>"));
+        var boldFiles = fixture(1); page(boldFiles, 0, "", text("Weight=\"700\"", "<ofd:TextCode X=\"1\" Y=\"6\">A</ofd:TextCode>"));
+        byte[] regular = render(regularFiles).get(0);
+        byte[] italic = render(italicFiles).get(0);
+        byte[] bold = render(boldFiles).get(0);
+        assertThat(italic).isNotEqualTo(regular);
+        assertThat(bold).isNotEqualTo(regular);
     }
 
     @Test
