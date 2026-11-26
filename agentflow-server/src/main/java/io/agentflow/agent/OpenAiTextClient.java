@@ -43,28 +43,48 @@ final class OpenAiTextClient {
 
     /** 发送前核对本次实际目的地，凭据只写入请求头；响应体在接收期间限额。 */
     Reply complete(String promptVersion, String expectedTarget, String instruction, Object input) {
-        return completeMessage(promptVersion, expectedTarget, instruction, json.write(input));
+        return completeMessage(promptVersion, expectedTarget, instruction, json.write(input), null);
+    }
+
+    /** 支持在启用结构化输出时附带严格 JSON Schema 约束。 */
+    Reply complete(String promptVersion, String expectedTarget, String instruction, Object input, Map<String, Object> jsonSchema) {
+        return completeMessage(promptVersion, expectedTarget, instruction, json.write(input), jsonSchema);
     }
 
     /** 票据适配器提供内联图片和 XML 文本块，不接收用户定义的请求内容块。 */
     Reply completeContent(String promptVersion, String expectedTarget, String instruction, List<Map<String, Object>> parts) {
-        return completeMessage(promptVersion, expectedTarget, instruction, parts);
+        return completeMessage(promptVersion, expectedTarget, instruction, parts, null);
     }
 
-    private Reply completeMessage(String promptVersion, String expectedTarget, String instruction, Object content) {
+    private Reply completeMessage(String promptVersion, String expectedTarget, String instruction, Object content, Map<String, Object> jsonSchema) {
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("Assist model must run outside a transaction");
         try { configuration.requireAvailable(); }
         catch (io.agentflow.common.DomainException unavailable) {
             throw new AssistModelPort.ModelFailure(AssistRun.Failure.MODEL_UNAVAILABLE);
         }
-        var endpoint = configuration.uri(); String provider = configuration.getProviderId(), model = configuration.modelFor(promptVersion);
-        String apiKey = configuration.getApiKey(); int timeout = configuration.getTimeoutSeconds();
+        var endpoint = configuration.uriFor(promptVersion);
+        String provider = configuration.providerFor(promptVersion);
+        String model = configuration.modelFor(promptVersion);
+        String apiKey = configuration.apiKeyFor(promptVersion);
+        int timeout = configuration.timeoutSecondsFor(promptVersion);
         if (!configuration.targetDigest(promptVersion).equals(expectedTarget)) {
             throw new AssistModelPort.ModelFailure(AssistRun.Failure.MODEL_UNAVAILABLE);
         }
-        String body = json.write(Map.of("model", model, "stream", false, "store", false,
-                "max_completion_tokens", configuration.maxCompletionTokensFor(promptVersion), "response_format", Map.of("type", "json_object"),
-                "messages", List.of(Map.of("role", "system", "content", instruction), Map.of("role", "user", "content", content))));
+        var payload = new java.util.LinkedHashMap<String, Object>();
+        payload.put("model", model);
+        payload.put("stream", false);
+        if (configuration.isIncludeStoreParam()) payload.put("store", false);
+        payload.put("max_completion_tokens", configuration.maxCompletionTokensFor(promptVersion));
+        if (configuration.isStructuredOutputsEnabled() && jsonSchema != null) {
+            payload.put("response_format", Map.of("type", "json_schema", "json_schema", Map.of(
+                    "name", AssistConfiguration.purposeKey(promptVersion).replace('-', '_'),
+                    "strict", true,
+                    "schema", jsonSchema)));
+        } else {
+            payload.put("response_format", Map.of("type", "json_object"));
+        }
+        payload.put("messages", List.of(Map.of("role", "system", "content", instruction), Map.of("role", "user", "content", content)));
+        String body = json.write(payload);
         long started = System.nanoTime();
         long deadline = started + TimeUnit.SECONDS.toNanos(timeout);
         try {
@@ -147,15 +167,24 @@ final class OpenAiTextClient {
         LOG.error("Agent model request failed, errorCode={}, promptVersion={}, elapsedMs={}", failure, promptVersion, elapsed(started));
     }
 
-    /** 不把未报告或异常用量补成零；用量异常不改变经过业务校验的模型内容。 */
+    /** 不把未报告或异常用量补成零；兼容推理模型单独上报 reasoning_tokens 时的合计关系。 */
     static Usage usage(JsonNode node) {
         if (node.isMissingNode() || node.isNull()) return new Usage(UsageStatus.NOT_REPORTED, null, null, null);
         var input = node.path("prompt_tokens"); var output = node.path("completion_tokens"); var total = node.path("total_tokens");
         if (!tokenCount(input) || !tokenCount(output) || !tokenCount(total)
-                || input.longValue() > Long.MAX_VALUE - output.longValue() || input.longValue() + output.longValue() != total.longValue()) {
+                || input.longValue() > Long.MAX_VALUE - output.longValue()) {
             return new Usage(UsageStatus.INVALID, null, null, null);
         }
-        return new Usage(UsageStatus.REPORTED, input.longValue(), output.longValue(), total.longValue());
+        long sum = input.longValue() + output.longValue();
+        long reportedTotal = total.longValue();
+        if (sum != reportedTotal) {
+            var reasoning = node.path("completion_tokens_details").path("reasoning_tokens");
+            if (!tokenCount(reasoning) || sum > Long.MAX_VALUE - reasoning.longValue()
+                    || sum + reasoning.longValue() != reportedTotal) {
+                return new Usage(UsageStatus.INVALID, null, null, null);
+            }
+        }
+        return new Usage(UsageStatus.REPORTED, input.longValue(), output.longValue(), reportedTotal);
     }
     private static boolean tokenCount(JsonNode node) { return node.isIntegralNumber() && node.canConvertToLong() && node.longValue() >= 0; }
 

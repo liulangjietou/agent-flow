@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
+import { workspaceEvents } from '../workspaceEvents'
 import type { ExpenseDetail } from '../expenses'
 import { expenseUnits, type FinanceCatalog } from '../expenseDraft'
 import { isDefinitiveWriteFailure } from '../pendingWrites'
@@ -158,7 +159,13 @@ watch(() => [props.catalog.validUntil, preview.value?.input.validUntil, detail.v
 }, { flush: 'sync' })
 watch(busy, value => emit('busy', value), { immediate: true, flush: 'sync' })
 watch(() => draftDirty.value || reviewDirty.value, value => emit('dirty', value), { immediate: true, flush: 'sync' })
-onUnmounted(() => { active = false; abortReads(); clearTimeout(expiry); unsubscribe(); emit('busy', false); emit('dirty', false) })
+const unsubscribeEvents = workspaceEvents.subscribe(event => {
+  const inProgress = page.value?.items.some(item => item.status === 'QUEUED' || item.status === 'RUNNING')
+    || detail.value?.status === 'QUEUED' || detail.value?.status === 'RUNNING'
+  if (event.type !== 'AGENT_UPDATED' || !active || !inProgress) return
+  void loadPage(page.value?.page ?? 0, true).then(() => { if (selectedId.value) void loadDetail(selectedId.value, true) })
+})
+onUnmounted(() => { active = false; unsubscribeEvents(); abortReads(); clearTimeout(expiry); unsubscribe(); emit('busy', false); emit('dirty', false) })
 </script>
 
 <template>

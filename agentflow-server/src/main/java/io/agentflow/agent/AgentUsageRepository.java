@@ -49,4 +49,17 @@ public class AgentUsageRepository {
         return SqlRows.map(mapper.list(tenant, user, subjectId == null ? null : subjectId.toString()),
                 row -> json.read(row.getString("state_json"), AgentExecutionUsage.class));
     }
+
+    /** 汇总本租户自 since 以来已上报的总 Token 消耗，用于日度配额硬熔断。 */
+    @Transactional(readOnly = true)
+    public long totalTokensSince(String tenant, Instant since) {
+        long total = 0L;
+        for (var row : mapper.listTenantSince(tenant, since.atOffset(java.time.ZoneOffset.UTC))) {
+            var usage = json.read(row.getString("state_json"), AgentExecutionUsage.class);
+            if ("REPORTED".equals(usage.usageStatus()) && usage.totalTokens() != null && usage.totalTokens() > 0) {
+                total = Math.addExact(total, usage.totalTokens());
+            }
+        }
+        return total;
+    }
 }

@@ -2,6 +2,7 @@
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
 import { AssistRunsQuery, type AssistStatus } from '../assistRuns'
+import { workspaceEvents } from '../workspaceEvents'
 import AssistRunActions from './AssistRunActions.vue'
 
 const props = defineProps<{ applicationId: string; scopeKey: string; version: number; roundNo: number; taskId?: string; locked?: boolean; refreshVersion?: number }>()
@@ -30,7 +31,13 @@ function filter() {
 watch(() => [props.scopeKey, props.applicationId, props.version, props.refreshVersion], () => {
   filterRound.value = ''; appliedRound.value = undefined; filterError.value = ''; void refresh()
 }, { immediate: true })
-onUnmounted(() => query.clear())
+const unsubscribeEvents = workspaceEvents.subscribe(event => {
+  if (event.type !== 'AGENT_UPDATED') return
+  const activeRun = query.items.some(item => item.status === 'QUEUED' || item.status === 'RUNNING')
+    || query.detail?.status === 'QUEUED' || query.detail?.status === 'RUNNING'
+  if (activeRun) void refresh()
+})
+onUnmounted(() => { unsubscribeEvents(); query.clear() })
 </script>
 
 <template>

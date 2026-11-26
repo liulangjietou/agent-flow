@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, reactive, ref, watch } from 'vue'
 import { api } from '../api'
+import { workspaceEvents } from '../workspaceEvents'
 import type { InvoiceItem } from '../invoiceWallet'
 import { extractionDrafts, extractionError, extractionFields, extractionMatches, extractionMethods, extractionPath, extractionSelections,
   extractionStatuses, acknowledgeExtraction, focusedExtraction, rememberExtraction,
@@ -152,7 +153,11 @@ watch(() => props.focusRunId, id => { if (id) { rememberExtraction(props.scopeKe
 watch(() => [props.item.original.id, props.item.original.sha256, props.item.original.status], () => { void loadInput() })
 watch(sending, value => emit('busy', value), { flush: 'sync' })
 watch(dirty, value => emit('dirty', value), { immediate: true, flush: 'sync' })
-onUnmounted(() => { active = false; abortReads(); emit('busy', false); emit('dirty', false) })
+const unsubscribeEvents = workspaceEvents.subscribe(event => {
+  if (event.type !== 'AGENT_UPDATED' || !active || !running.value || dirty.value) return
+  void loadPage(page.value?.page ?? 0, true).then(() => { if (selectedId.value) void loadDetail(selectedId.value, true) })
+})
+onUnmounted(() => { active = false; unsubscribeEvents(); abortReads(); emit('busy', false); emit('dirty', false) })
 </script>
 
 <template>

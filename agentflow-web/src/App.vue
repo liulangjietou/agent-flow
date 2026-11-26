@@ -61,6 +61,7 @@ import { connectCanvasGraph, insertCanvasGraph, deleteCanvasNode, orderCanvasBra
 import { arrangeNodes, routeEdges, serializeDesignerEdges, graphBounds, fittedViewport, clampZoom, zoomedScroll, draggedPosition, nodeRectangle, CANVAS_PADDING, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP, type Point } from './designerLayout'
 import UnsavedConfirmationDialog from './components/UnsavedConfirmationDialog.vue'
 import { UnsavedConfirmation } from './unsavedConfirmation'
+import { workspaceEvents } from './workspaceEvents'
 
 // 非首屏页面与弹窗按需异步加载，避免将设计器、财务报表、出纳与管理后台全部打入首屏包。
 const AgentWorkspace = defineAsyncComponent(() => import('./components/AgentWorkspace.vue'))
@@ -191,7 +192,17 @@ const cashierKind = ref<'employee' | 'supplier' | 'batches'>('employee')
 const notificationPaymentId = ref('')
 watch(page, value => { if (value !== 'cashier') notificationPaymentId.value = '' })
 const taskQueuePanel = ref<InstanceType<typeof PendingTaskQueue> | null>(null)
-watch(actorScope, () => { taskQueueView.value = 'list'; cashierKind.value = 'employee'; notificationPaymentId.value = ''; unreadCountRequest?.abort(); unreadCount.value = null }, { flush: 'sync' })
+const apiBase = (import.meta.env.VITE_API_BASE || '/api/v1').replace(/\/$/, '')
+watch(actorScope, value => {
+  taskQueueView.value = 'list'; cashierKind.value = 'employee'; notificationPaymentId.value = ''; unreadCountRequest?.abort(); unreadCount.value = null
+  if (value) workspaceEvents.connect(value, apiBase, () => localStorage.getItem('agentflow.token'))
+  else workspaceEvents.disconnect()
+}, { flush: 'sync' })
+const unsubscribeEvents = workspaceEvents.subscribe(event => {
+  if (!loggedIn.value || sessionExpired.value) return
+  if (event.type === 'INBOX_UPDATED') void loadUnreadCount()
+  else if (event.type === 'TASK_UPDATED') { void loadTasks(); taskRefresh.value++ }
+})
 let workspaceRefreshGeneration = 0
 let taskCountRequest: AbortController | null = null
 let unreadCountRequest: AbortController | null = null
@@ -1675,7 +1686,7 @@ onMounted(async () => {
   await loadAuthentication()
 })
 onBeforeUnmount(() => { clearValidation(true); taskCountRequest?.abort(); unreadCountRequest?.abort(); taskDetailRequest?.abort(); viewActive = false; autosave.dispose(); cancelCanvasInteraction(); confirmation.dispose() })
-onUnmounted(() => { restoredDefinition.clear(); applicationSelection.clear(); unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload); window.removeEventListener('agentflow:authentication-required', authenticationRequired); document.removeEventListener('visibilitychange', handleVisibilityChange) })
+onUnmounted(() => { workspaceEvents.disconnect(); unsubscribeEvents(); restoredDefinition.clear(); applicationSelection.clear(); unsubscribeWrites(); window.removeEventListener('beforeunload', warnBeforeUnload); window.removeEventListener('agentflow:authentication-required', authenticationRequired); document.removeEventListener('visibilitychange', handleVisibilityChange) })
 </script>
 
 <template>

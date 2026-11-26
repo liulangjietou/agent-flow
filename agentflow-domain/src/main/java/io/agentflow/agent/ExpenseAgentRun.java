@@ -65,7 +65,7 @@ public final class ExpenseAgentRun {
         if (last().decision().action() != action || !Objects.equals(last().decision().referenceId(), invoiceId)) throw invalid();
         set(Status.WAITING_CHILD, state.steps(), state.answers(), "等待原任务完成及本人确认。", null, childId, action, now);
     }
-    /** 票据本人确认后直接进入费用草稿准备；草稿确认后由本人保存原表单。 */
+    /** 票据本人确认后若仍有其他未确认的授权票据则回到 READY 继续编排，全部确认后进入费用草稿准备；草稿确认后由本人保存原表单。 */
     public void childConfirmed(String result, Instant now) {
         require(Status.WAITING_CHILD);
         boolean invoice = state.childAction() == Action.EXTRACT_INVOICE;
@@ -73,6 +73,15 @@ public final class ExpenseAgentRun {
         var steps = new ArrayList<>(state.steps()); steps.set(steps.size() - 1, completed);
         if (invoice) {
             if (steps.size() >= context.scope().maxSteps()) { set(Status.LIMIT_REACHED, steps, state.answers(), "票据已确认；授权步数已用完，请从原费用草稿继续。", null, null, null, now); return; }
+            var confirmedInvoices = steps.stream()
+                    .filter(step -> step.decision() != null && step.decision().action() == Action.EXTRACT_INVOICE
+                            && "CONFIRMED".equals(step.outcome()) && step.decision().referenceId() != null)
+                    .map(step -> step.decision().referenceId()).collect(java.util.stream.Collectors.toSet());
+            boolean hasRemainingInvoices = context.scope().invoiceIds().stream().anyMatch(id -> !confirmedInvoices.contains(id));
+            if (hasRemainingInvoices) {
+                set(Status.READY, steps, state.answers(), "当前票据已确认，继续核对剩余授权票据或整理费用草稿。", null, null, null, now);
+                return;
+            }
             steps.add(new Step(UUID.randomUUID(), now, new Decision(Action.DRAFT, null, null, "票据已确认，请核对费用草稿的行程、目录及发送范围。"), "NEEDS_CONFIRMATION", null));
         }
         set(invoice ? Status.NEEDS_CONFIRMATION : Status.COMPLETED, steps, state.answers(),

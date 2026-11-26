@@ -55574,6 +55574,66 @@
           }
         }
       }
+    },
+    "/api/v1/events/stream": {
+      "get": {
+        "operationId": "workspaceEventStream",
+        "tags": [
+          "消息"
+        ],
+        "summary": "工作台轻量实时刷新事件流（SSE）",
+        "description": "建立当前认证主体的 Server-Sent Events 长连接，只下发无敏感业务正文的刷新信号（INBOX_UPDATED / TASK_UPDATED / AGENT_UPDATED）。",
+        "x-access": "当前已登录账号，仅限本人",
+        "x-idempotency": false,
+        "responses": {
+          "200": {
+            "description": "SSE 事件流",
+            "headers": {
+              "Cache-Control": {
+                "description": "禁止缓存",
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              },
+              "X-Accel-Buffering": {
+                "description": "关闭反向代理缓冲",
+                "schema": {
+                  "type": "string",
+                  "const": "no"
+                }
+              }
+            },
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未登录或令牌无效",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "未列出的 HTTP 或基础设施错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {

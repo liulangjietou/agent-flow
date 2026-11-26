@@ -26,22 +26,31 @@ public class AgentExecutionTelemetry {
     private static final ThreadLocal<Observation> CURRENT = new ThreadLocal<>();
     private final AgentUsageRepository repository;
     private final MeterRegistry meters;
+    private final io.agentflow.notification.WorkspaceEventPublisher events;
+    private final AssistConfiguration configuration;
 
     /** 兼容单测直接构造，不强制要求监控注册表。 */
-    public AgentExecutionTelemetry(AgentUsageRepository repository) { this(repository, (MeterRegistry) null); }
+    public AgentExecutionTelemetry(AgentUsageRepository repository) { this(repository, (MeterRegistry) null, null, null); }
 
-    /** 持久观测与只含封闭枚举标签的 Micrometer 指标独立于模型网络和业务事务。 */
+    /** 持久观测、封闭标签指标、配额检查及完成后轻量前端刷新信号独立于模型网络和业务事务。 */
     @Autowired
-    public AgentExecutionTelemetry(AgentUsageRepository repository, ObjectProvider<MeterRegistry> metersProvider) {
-        this(repository, metersProvider == null ? null : metersProvider.getIfAvailable());
+    public AgentExecutionTelemetry(AgentUsageRepository repository, ObjectProvider<MeterRegistry> metersProvider,
+                                   ObjectProvider<io.agentflow.notification.WorkspaceEventPublisher> eventsProvider,
+                                   ObjectProvider<AssistConfiguration> configurationProvider) {
+        this(repository, metersProvider == null ? null : metersProvider.getIfAvailable(),
+                eventsProvider == null ? null : eventsProvider.getIfAvailable(),
+                configurationProvider == null ? null : configurationProvider.getIfAvailable());
     }
 
-    AgentExecutionTelemetry(AgentUsageRepository repository, MeterRegistry meters) {
+    AgentExecutionTelemetry(AgentUsageRepository repository, MeterRegistry meters,
+                            io.agentflow.notification.WorkspaceEventPublisher events, AssistConfiguration configuration) {
         this.repository = repository;
         this.meters = meters;
+        this.events = events;
+        this.configuration = configuration;
     }
 
-    /** 每次领取最多执行一次；记录失败不能诱发再次调用模型或掩盖原业务失败。 */
+    /** 每次领取最多执行一次；若配置租户日度 Token 配额且已耗尽，外呼前熔断拒绝。 */
     public <T> T execute(String tenant, String user, AgentExecutionUsage.Kind kind, UUID runId, Instant claimedAt, Supplier<T> operation) {
         if (TransactionSynchronizationManager.isActualTransactionActive() || CURRENT.get() != null) {
             throw new IllegalStateException("Agent execution must have one transaction-free observation scope");
@@ -49,7 +58,12 @@ public class AgentExecutionTelemetry {
         var initial = repository.begin(tenant, user, kind, runId, claimedAt.truncatedTo(ChronoUnit.MILLIS));
         var observed = new Observation(); CURRENT.set(observed);
         String outcome = "EXECUTION_FAILED";
-        try { T result = operation.get(); outcome = "SUCCEEDED"; return result; }
+        try {
+            enforceDailyQuota(tenant, runId);
+            T result = operation.get();
+            outcome = "SUCCEEDED";
+            return result;
+        }
         catch (AssistModelPort.ModelFailure failure) { outcome = failure.failure().name(); throw failure; }
         catch (RuntimeException failure) { outcome = "EXECUTION_FAILED"; throw failure; }
         finally {
@@ -65,6 +79,20 @@ public class AgentExecutionTelemetry {
             catch (RuntimeException failure) {
                 LOG.error("Agent usage recording failed, errorCode={}, runId={}, exceptionType={}", "AGENT_USAGE_RECORD_FAILED", runId, failure.getClass().getSimpleName());
             }
+            if (events != null) {
+                events.publish(tenant, user, io.agentflow.notification.WorkspaceEventPublisher.EventType.AGENT_UPDATED);
+            }
+        }
+    }
+
+    private void enforceDailyQuota(String tenant, UUID runId) {
+        if (configuration == null || configuration.getDailyTokenQuota() <= 0) return;
+        Instant startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS);
+        long used = repository.totalTokensSince(tenant, startOfDay);
+        if (used >= configuration.getDailyTokenQuota()) {
+            LOG.error("Tenant daily agent token quota exceeded, errorCode={}, runId={}, usedTokens={}, quota={}",
+                    "AGENT_TOKEN_QUOTA_EXCEEDED", runId, used, configuration.getDailyTokenQuota());
+            throw new AssistModelPort.ModelFailure(AssistRun.Failure.MODEL_UNAVAILABLE);
         }
     }
 
